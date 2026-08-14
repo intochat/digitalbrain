@@ -589,6 +589,108 @@ public sealed class ProductOperationCatalogTests
     }
 
     [Theory]
+    [InlineData(ActivityStatus.Refused)]
+    [InlineData(ActivityStatus.Failed)]
+    [InlineData(ActivityStatus.Cancelled)]
+    public async Task Error_terminal_states_forbid_embedded_result_references(ActivityStatus status)
+    {
+        var requested = BrainActivityId.New();
+        var activity = ObservedActivity(requested, status) with
+        {
+            Result = ResultReference(Send.TerminalResultContract),
+        };
+        var binding = BindingForObservation(activity, result: null);
+
+        await Assert.ThrowsAsync<ProductOperationResultException>(() =>
+            ((IProductOperationAdapter)binding).ObserveAsync(
+                requested,
+                Invocation(Grant()),
+                TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Completed_activity_result_reference_must_match_the_bound_terminal_contract()
+    {
+        var requested = BrainActivityId.New();
+        var activity = ObservedActivity(requested, ActivityStatus.Completed) with
+        {
+            Result = ResultReference(new ContractId("conversation/other-result@1")),
+        };
+        var binding = BindingForObservation(activity, new CatalogResult("done"));
+
+        await Assert.ThrowsAsync<ProductOperationResultException>(() =>
+            ((IProductOperationAdapter)binding).ObserveAsync(
+                requested,
+                Invocation(Grant()),
+                TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Undefined_activity_status_is_rejected()
+    {
+        var requested = BrainActivityId.New();
+        var activity = ObservedActivity(requested, (ActivityStatus)999);
+        var binding = BindingForObservation(activity, result: null);
+
+        await Assert.ThrowsAsync<ProductOperationResultException>(() =>
+            ((IProductOperationAdapter)binding).ObserveAsync(
+                requested,
+                Invocation(Grant()),
+                TestContext.Current.CancellationToken));
+    }
+
+    [Theory]
+    [InlineData(ActivityStatus.Accepted, true)]
+    [InlineData(ActivityStatus.Running, true)]
+    [InlineData(ActivityStatus.AwaitingConfirmation, true)]
+    [InlineData(ActivityStatus.Completed, true)]
+    [InlineData(ActivityStatus.Refused, false)]
+    [InlineData(ActivityStatus.Failed, false)]
+    [InlineData(ActivityStatus.Cancelled, false)]
+    public async Task Activity_problem_must_match_the_lifecycle_state(
+        ActivityStatus status,
+        bool includeProblem)
+    {
+        var requested = BrainActivityId.New();
+        var activity = ObservedActivity(requested, status) with
+        {
+            Problem = includeProblem ? new ActivityProblem("hostile", "contradiction") : null,
+        };
+        var result = status == ActivityStatus.Completed ? new CatalogResult("done") : null;
+        var binding = BindingForObservation(activity, result);
+
+        await Assert.ThrowsAsync<ProductOperationResultException>(() =>
+            ((IProductOperationAdapter)binding).ObserveAsync(
+                requested,
+                Invocation(Grant()),
+                TestContext.Current.CancellationToken));
+    }
+
+    [Theory]
+    [InlineData(ActivityStatus.Accepted)]
+    [InlineData(ActivityStatus.Running)]
+    [InlineData(ActivityStatus.AwaitingConfirmation)]
+    [InlineData(ActivityStatus.Completed)]
+    [InlineData(ActivityStatus.Refused)]
+    [InlineData(ActivityStatus.Failed)]
+    [InlineData(ActivityStatus.Cancelled)]
+    public async Task Every_coherent_activity_lifecycle_state_is_projected(ActivityStatus status)
+    {
+        var requested = BrainActivityId.New();
+        var activity = ObservedActivity(requested, status);
+        var result = status == ActivityStatus.Completed ? new CatalogResult("done") : null;
+        var binding = BindingForObservation(activity, result);
+
+        var projection = await ((IProductOperationAdapter)binding).ObserveAsync(
+            requested,
+            Invocation(Grant()),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(status, projection.Activity.Status);
+        Assert.Equal(status == ActivityStatus.Completed, projection.Result.HasValue);
+    }
+
+    [Theory]
     [InlineData("pattern")]
     [InlineData("enum")]
     [InlineData("nested-object")]
@@ -645,6 +747,176 @@ public sealed class ProductOperationCatalogTests
                 CatalogJsonSerializerContext.Default.CatalogResult,
                 static (_, _, _) => throw new NotSupportedException(),
                 ObserveTypedNotSupported<CatalogResult>));
+    }
+
+    [Theory]
+    [InlineData("seeded")]
+    [InlineData("callback")]
+    [InlineData("number-handling")]
+    public void Nested_collection_construction_and_type_behaviors_are_rejected(string hostileShape)
+    {
+        var descriptor = new ProductOperationDescriptor(
+            Send,
+            Send.Id.Value,
+            "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"items\"],\"properties\":{\"items\":{\"type\":\"array\",\"items\":{\"type\":\"integer\"}}}}",
+            Descriptor(Send).TerminalResultSchema);
+
+        switch (hostileShape)
+        {
+            case "seeded":
+                Assert.Throws<ProductOperationCatalogConfigurationException>(() =>
+                    ProductOperationBinding.Create<SeededCollectionInput, CatalogResult>(
+                        descriptor,
+                        HostileJsonSerializerContext.Default.SeededCollectionInput,
+                        CatalogJsonSerializerContext.Default.CatalogResult,
+                        static (_, _, _) => throw new InvalidOperationException(),
+                        ObserveTypedNotSupported<CatalogResult>));
+                break;
+            case "callback":
+                Assert.Throws<ProductOperationCatalogConfigurationException>(() =>
+                    ProductOperationBinding.Create<CallbackCollectionInput, CatalogResult>(
+                        descriptor,
+                        HostileJsonSerializerContext.Default.CallbackCollectionInput,
+                        CatalogJsonSerializerContext.Default.CatalogResult,
+                        static (_, _, _) => throw new InvalidOperationException(),
+                        ObserveTypedNotSupported<CatalogResult>));
+                break;
+            case "number-handling":
+                Assert.Throws<ProductOperationCatalogConfigurationException>(() =>
+                    ProductOperationBinding.Create<NumberHandledCollectionInput, CatalogResult>(
+                        descriptor,
+                        HostileJsonSerializerContext.Default.NumberHandledCollectionInput,
+                        CatalogJsonSerializerContext.Default.CatalogResult,
+                        static (_, _, _) => throw new InvalidOperationException(),
+                        ObserveTypedNotSupported<CatalogResult>));
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(hostileShape));
+        }
+    }
+
+    [Fact]
+    public async Task Accepted_metadata_graph_is_frozen_before_validation_and_cannot_be_reinterpreted()
+    {
+        var options = new JsonSerializerOptions
+        {
+            AllowDuplicateProperties = false,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            RespectNullableAnnotations = true,
+            RespectRequiredConstructorParameters = true,
+            UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+        };
+        var resolver = new MutableGraphResolver();
+        options.TypeInfoResolver = resolver;
+        var inputType = JsonTypeInfo.CreateJsonTypeInfo<MutableGraphInput>(options);
+        inputType.CreateObject = static () => new MutableGraphInput();
+        inputType.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow;
+        var inputPayload = inputType.CreateJsonPropertyInfo(typeof(MutableGraphPayload), "payload");
+        inputPayload.Get = static value => ((MutableGraphInput)value).Payload;
+        inputPayload.Set = static (value, payload) =>
+            ((MutableGraphInput)value).Payload = (MutableGraphPayload)payload!;
+        inputPayload.IsRequired = true;
+        inputPayload.IsGetNullable = false;
+        inputPayload.IsSetNullable = false;
+        inputType.Properties.Add(inputPayload);
+
+        var nestedType = JsonTypeInfo.CreateJsonTypeInfo<MutableGraphPayload>(options);
+        nestedType.CreateObject = static () => new MutableGraphPayload();
+        nestedType.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow;
+        var nestedValue = nestedType.CreateJsonPropertyInfo(typeof(string), "value");
+        nestedValue.Get = static value => ((MutableGraphPayload)value).Value;
+        nestedValue.Set = static (value, property) =>
+            ((MutableGraphPayload)value).Value = (string)property!;
+        nestedValue.IsRequired = true;
+        nestedValue.IsGetNullable = false;
+        nestedValue.IsSetNullable = false;
+        nestedType.Properties.Add(nestedValue);
+
+        var replacementNestedType = JsonTypeInfo.CreateJsonTypeInfo<MutableGraphPayload>(options);
+        replacementNestedType.CreateObject = static () => new MutableGraphPayload();
+        replacementNestedType.UnmappedMemberHandling = JsonUnmappedMemberHandling.Skip;
+        var replacementValue = replacementNestedType.CreateJsonPropertyInfo(typeof(string), "value");
+        replacementValue.Get = static value => ((MutableGraphPayload)value).Value;
+        replacementValue.Set = static (value, property) =>
+            ((MutableGraphPayload)value).Value = $"reinterpreted:{property}";
+        replacementValue.IsRequired = true;
+        replacementValue.IsGetNullable = false;
+        replacementValue.IsSetNullable = false;
+        replacementNestedType.Properties.Add(replacementValue);
+
+        var resultType = JsonTypeInfo.CreateJsonTypeInfo<MutableGraphResult>(options);
+        resultType.CreateObject = static () => new MutableGraphResult();
+        resultType.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow;
+        var resultValue = resultType.CreateJsonPropertyInfo(typeof(string), "result");
+        resultValue.Get = static value => ((MutableGraphResult)value).Result;
+        resultValue.Set = static (value, property) =>
+            ((MutableGraphResult)value).Result = (string)property!;
+        resultValue.IsRequired = true;
+        resultValue.IsGetNullable = false;
+        resultValue.IsSetNullable = false;
+        resultType.Properties.Add(resultValue);
+
+        resolver.Add(inputType);
+        resolver.Add(nestedType);
+        resolver.Add(resultType);
+        resolver.Add(JsonTypeInfo.CreateJsonTypeInfo<string>(options));
+        Assert.False(inputType.IsReadOnly);
+        Assert.False(nestedType.IsReadOnly);
+
+        var invoked = 0;
+        string? observedInput = null;
+        var activity = ObservedActivity(BrainActivityId.New(), ActivityStatus.Completed);
+        var descriptor = new ProductOperationDescriptor(
+            Send,
+            Send.Id.Value,
+            "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"payload\"],\"properties\":{\"payload\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"value\"],\"properties\":{\"value\":{\"type\":\"string\"}}}}}",
+            "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"result\"],\"properties\":{\"result\":{\"type\":\"string\"}}}");
+        var binding = ProductOperationBinding.Create<MutableGraphInput, MutableGraphResult>(
+            descriptor,
+            inputType,
+            resultType,
+            (input, _, _) =>
+            {
+                invoked++;
+                observedInput = input.Payload.Value;
+                return Task.FromResult(new ProductActivityReceipt(activity.Activity, Send.Id));
+            },
+            (_, _, _) => Task.FromResult(
+                new ProductOperationObservation<MutableGraphResult>(
+                    activity,
+                    progress: null,
+                    new MutableGraphResult("done"))));
+
+        Assert.True(inputType.IsReadOnly);
+        Assert.True(nestedType.IsReadOnly);
+        Assert.True(resultType.IsReadOnly);
+        Assert.True(inputType.Options.IsReadOnly);
+        Assert.Throws<InvalidOperationException>(() => nestedType.OnDeserialized = _ => { });
+        Assert.Throws<InvalidOperationException>(() => inputType.UnmappedMemberHandling = JsonUnmappedMemberHandling.Skip);
+        Assert.Throws<InvalidOperationException>(() => inputType.Options.PropertyNameCaseInsensitive = true);
+        resolver.Replace(replacementNestedType);
+
+        var adapter = (IProductOperationAdapter)binding;
+        await Assert.ThrowsAsync<ProductOperationInputException>(() => adapter.InvokeAsync(
+            Send.Id,
+            Json("{\"payload\":{\"value\":\"ok\",\"extra\":true}}"),
+            Invocation(Grant()),
+            TestContext.Current.CancellationToken));
+        Assert.Equal(0, invoked);
+
+        await adapter.InvokeAsync(
+            Send.Id,
+            Json("{\"payload\":{\"value\":\"ok\"}}"),
+            Invocation(Grant()),
+            TestContext.Current.CancellationToken);
+        Assert.Equal(1, invoked);
+        Assert.Equal("ok", observedInput);
+
+        var projection = await adapter.ObserveAsync(
+            activity.Activity,
+            Invocation(Grant()),
+            TestContext.Current.CancellationToken);
+        Assert.Equal("done", projection.Result?.GetProperty("result").GetString());
     }
 
     [Fact]
@@ -906,14 +1178,33 @@ public sealed class ProductOperationCatalogTests
         ActivityStatus status,
         OperationId? operation = null,
         ContractId? terminalResultContract = null)
-        => new(
+    {
+        var contract = terminalResultContract ?? Send.TerminalResultContract;
+        return new ActivityView(
             activity,
             operation ?? Send.Id,
             status,
-            terminalResultContract ?? Send.TerminalResultContract,
+            contract,
             Progress: null,
-            Result: null,
-            Problem: null);
+            Result: status == ActivityStatus.Completed ? ResultReference(contract) : null,
+            Problem: status is ActivityStatus.Refused or ActivityStatus.Failed or ActivityStatus.Cancelled
+                ? new ActivityProblem("terminal", "The activity ended without a result.")
+                : null);
+    }
+
+    private static ProductOperationBinding BindingForObservation(
+        ActivityView activity,
+        CatalogResult? result)
+        => ProductOperationBinding.Create<CatalogInput, CatalogResult>(
+            Descriptor(Send),
+            CatalogJsonSerializerContext.Default.CatalogInput,
+            CatalogJsonSerializerContext.Default.CatalogResult,
+            static (_, _, _) => throw new NotSupportedException(),
+            (_, _, _) => Task.FromResult(
+                new ProductOperationObservation<CatalogResult>(activity, progress: null, result)));
+
+    private static ActivityResultReference ResultReference(ContractId contract)
+        => new(contract, new ActivityPayloadReference("result-ref"));
 
     private static JsonElement Json(string value)
         => JsonDocument.Parse(value).RootElement.Clone();
@@ -1095,6 +1386,28 @@ internal sealed class SetterAllowsNullResult
 
 internal sealed record ReferenceCollectionInput(List<string> Items);
 
+internal sealed record SeededCollectionInput(SeededIntCollection Items);
+
+internal sealed class SeededIntCollection : List<int>
+{
+    public SeededIntCollection()
+    {
+        Add(7);
+    }
+}
+
+internal sealed record CallbackCollectionInput(CallbackIntCollection Items);
+
+internal sealed class CallbackIntCollection : List<int>, IJsonOnDeserialized
+{
+    public void OnDeserialized() => Add(7);
+}
+
+internal sealed record NumberHandledCollectionInput(NumberHandledIntCollection Items);
+
+[JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+internal sealed class NumberHandledIntCollection : List<int>;
+
 internal sealed class TrimStringJsonConverter : JsonConverter<string>
 {
     public override string? Read(
@@ -1123,4 +1436,43 @@ internal sealed class TrimStringJsonConverter : JsonConverter<string>
 [JsonSerializable(typeof(SetterDisallowsNullInput))]
 [JsonSerializable(typeof(SetterAllowsNullResult))]
 [JsonSerializable(typeof(ReferenceCollectionInput))]
+[JsonSerializable(typeof(SeededCollectionInput))]
+[JsonSerializable(typeof(CallbackCollectionInput))]
+[JsonSerializable(typeof(NumberHandledCollectionInput))]
 internal sealed partial class HostileJsonSerializerContext : JsonSerializerContext;
+
+internal sealed class MutableGraphInput
+{
+    public MutableGraphPayload Payload { get; set; } = new();
+}
+
+internal sealed class MutableGraphPayload
+{
+    public string Value { get; set; } = string.Empty;
+}
+
+internal sealed class MutableGraphResult
+{
+    public MutableGraphResult()
+    {
+    }
+
+    public MutableGraphResult(string result)
+    {
+        Result = result;
+    }
+
+    public string Result { get; set; } = string.Empty;
+}
+
+internal sealed class MutableGraphResolver : IJsonTypeInfoResolver
+{
+    private readonly Dictionary<Type, JsonTypeInfo> _metadata = [];
+
+    public void Add(JsonTypeInfo metadata) => _metadata.Add(metadata.Type, metadata);
+
+    public void Replace(JsonTypeInfo metadata) => _metadata[metadata.Type] = metadata;
+
+    public JsonTypeInfo? GetTypeInfo(Type type, JsonSerializerOptions options)
+        => _metadata.GetValueOrDefault(type);
+}
