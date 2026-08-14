@@ -1,148 +1,101 @@
 # CoreV2 pseudocode
 
-Dictionary words only. Two BrainActivities that disagree on purpose.
-
-- Scenario 2 — topology only: Neurons, Synapses, Rewire, Reshape, Wiring. No Entity.
-- Scenario 5 — a thing is kept: Entity `Trip` is not a Neuron.
-
-Language: [COREV2-DICTIONARY.md](COREV2-DICTIONARY.md). Stories: [COREV2-SCENARIOS.md](COREV2-SCENARIOS.md).
-
----
-
-## Scenario 2 — wrong Synapse, then Rewire
-
-**On the board:** Workspace `SalesOps`. Principal `Alice`.  
-**Neurons:** `salesforce`, `chat`, `chart`.  
-**Entities:** none.  
-**Reshape:** `OpportunitiesToChartPoints`.  
-**SynapseKey:** `alice/opportunities-out`.
+The public boundary is an Operation. MCP and Flutter are equal adapters; both discover, invoke, and observe. Neither adapter calls BrainGraph, names a Neuron, or emits a DomainEvent.
 
 ```csharp
-record OpportunitiesObserved(IReadOnlyList<Opportunity> Rows) : DomainEvent;
-record ChartPointsAdded(IReadOnlyList<ChartPoint> Points)     : DomainEvent;
-record Rewire(SynapseKey Key, Endpoint NewTarget, ReshapeId? Reshape) : DomainEvent;
+// Persisted contract identifiers are explicit versioned strings, never CLR typeof values.
+sealed record ProofRunV1Input(string RequestId);
+sealed record ProofRunV1Result(BrainActivityId ActivityId);
+sealed record ProofRunV1Progress(BrainActivityId ActivityId, BrainActivityState State);
 
-class SalesforceNeuron : Neuron, IEmit<OpportunitiesObserved> { }
-class ChatNeuron       : Neuron, IAccept<UserSaid>, IAccept<OpportunitiesObserved> { }
-class ChartNeuron      : Neuron, IAccept<ChartPointsAdded> { }
+sealed record OperationDescriptor(
+    OperationId Id,
+    ContractId InputContract,
+    ContractId ResultContract,
+    ContractId ProgressContract,
+    AuthorizationRequirement Authorization,
+    IdempotencyScope IdempotencyScope,
+    ModuleId OwningModule,
+    NeuronRole EntryRole);
 
-// Entity: none. Rows die with the DomainEvent.
+static readonly OperationDescriptor ProofRun = new(
+    Id: "Proof.Run@1",
+    InputContract: "corev2.proof.run.input@1",
+    ResultContract: "corev2.proof.run.result@1",
+    ProgressContract: "corev2.proof.run.progress@1",
+    Authorization: "proof.run",
+    IdempotencyScope: "caller-and-workspace",
+    OwningModule: "Proof",
+    EntryRole: "proof-entry");
 
-class OpportunitiesToChartPoints : Reshape<OpportunitiesObserved, ChartPointsAdded> { }
+sealed record ProofProduced(ProofId Id) : DomainEvent;
+sealed record Rewire(SynapseKey Key, NeuronRole Target, ReshapeId? Reshape) : DomainEvent;
 
-BrainActivity activity = Open(workspace: SalesOps, principal: Alice);
-
-// --- invent, wrong sink ---
-graph.Install(new Synapse(
-    Key:      "alice/opportunities-out",
-    From:     salesforce,
-    Contract: typeof(OpportunitiesObserved),
-    To:       chat,
-    Reshape:  null,
-    Until:    now + 1.day,
-    Provenance: (Alice, activity, "show opportunities")));
-
-salesforce.Emit(new OpportunitiesObserved(rows));
-// DomainEventMetadata<OpportunitiesObserved> stamped: id, cause, activity, Alice, now
-// BrainGraph resolves Synapse → chat. Chat dumps a paragraph.
-
-// --- owner: "as a chart, not a paragraph" ---
-activity.Record(new Rewire(
-    Key:      "alice/opportunities-out",
-    NewTarget: chart,
-    Reshape:  typeof(OpportunitiesToChartPoints)));
-// Rewire does not move the joint.
-
-graph.Replace("alice/opportunities-out", to: chart, reshape: OpportunitiesToChartPoints,
-              provenance: (Alice, activity, causedBy: that Rewire));
-// Old Synapse stays in BrainGraph history. Same key, new value.
-
-salesforce.Emit(new OpportunitiesObserved(rows));
-// Reshape runs. Only chart receives ChartPointsAdded. Chat does not.
-
-wiring.Publish(v1: roles[salesforce, chart],
-               contract: OpportunitiesObserved,
-               reshape: OpportunitiesToChartPoints,
-               trigger: "query opportunities",
-               from: activity);
+// Returned by BrainGraph. Callers treat it as opaque and cannot supply it.
+SynapseKey firstRevision = brainGraph.Install(new SynapseDraft(
+    SourceRole: "proof-entry",
+    Contract: "corev2.proof.produced@1",
+    TargetRole: "summary",
+    Reshape: null,
+    Provenance: activity));
 ```
-
-After: 3 Neurons, 1 live Synapse (chart), 1 superseded Synapse (chat) in history, 1 Wiring, 0 Entities.
-
----
-
-## Scenario 5 — the trip is an Entity
-
-**On the board:** same Workspace / Principal.  
-**Neurons:** `memory`, `chat`, `chart`.  
-**Entity:** `Trip`.  
-**Synapses:** chat → memory on `UserSaid`; memory → chat on `TripRecorded`; later memory → chart on `TripsObserved`.
 
 ```csharp
-record UserSaid(string Text)                              : DomainEvent;
-record TripRecorded(TripId Id, City City, Money Spent)    : DomainEvent;
-record TripsObserved(IReadOnlyList<TripSnapshot> Trips)   : DomainEvent;
-record ChartPointsAdded(IReadOnlyList<ChartPoint> Points) : DomainEvent;
-
-class MemoryNeuron : Neuron, IAccept<UserSaid>, IEmit<TripRecorded>, IEmit<TripsObserved>
+// Adapter boundary: authenticated caller invokes one discovered Operation with a caller idempotency key.
+ProofRunV1Result Invoke(
+    AuthenticatedCaller caller,
+    OperationId operationId,
+    ProofRunV1Input input,
+    CallerIdempotencyKey idempotencyKey)
 {
-    // thinks. writes Entity. emits. is not the trip.
+    OperationDescriptor descriptor = operations.RequireEligible(caller, operationId);
+    BrainActivity activity = activities.OpenOrReturnExisting(
+        caller.Workspace, caller.Principal, descriptor, idempotencyKey);
+
+    // Direct send to the descriptor's entry role; no client graph call.
+    neurons.Send(descriptor.EntryRole, new OperationInvocation(
+        descriptor, caller, activity.Context, input, idempotencyKey));
+    return new(activity.Id);
 }
 
-class ChatNeuron  : Neuron, IAccept<UserSaid>, IAccept<TripRecorded> { }
-class ChartNeuron : Neuron, IAccept<ChartPointsAdded> { }
-
-class Trip : Entity<TripState>
+void OnProofRun(OperationInvocation<ProofRunV1Input> invocation)
 {
-    TripState State;   // City, Money, Dates — current belief
-    void Remember(City city, Money spent) => State = new(city, spent);
+    ProofProduced produced = new(CreateProof(invocation.Input));
+    DomainEventMetadata<ProofProduced> metadata = invocation.Activity.Stamp(produced);
+
+    // Resolution is internal. The staged outbox records the resolved route snapshot.
+    RouteSnapshot route = brainGraph.Resolve("proof-entry", metadata);
+    journal.Append(metadata);
+    outbox.Stage(new RoutedDomainEvent(metadata, route));
 }
-
-class TripsToChartPoints : Reshape<TripsObserved, ChartPointsAdded> { }
-
-// --- BrainActivity A: "I was in Prague, spent 1200 EUR" ---
-BrainActivity a = Open(SalesOps, Alice);
-chat.Accept(new UserSaid("I was in Prague..."));
-// Synapse: chat --UserSaid--> memory   (or Send, directed)
-
-memory.Accept(userSaid);
-var trip = Grain<Trip>("alice/prague-2025-08");
-trip.Remember(City: Prague, Spent: EUR(1200));
-memory.Emit(new TripRecorded(trip.Id, Prague, EUR(1200)));
-
-// Synapse: memory --TripRecorded--> chat
-// Trip does not emit. Trip has no Synapse.
-
-// --- BrainActivity B: "chart spend on my trips" ---
-BrainActivity b = Open(SalesOps, Alice);
-
-memory.Accept(analyze);
-var snapshots = ReadVisibleTrips(Alice);
-memory.Emit(new TripsObserved(snapshots));
-
-graph.Install(new Synapse(
-    Key:      "alice/trips-out",
-    From:     memory,
-    Contract: typeof(TripsObserved),
-    To:       chart,
-    Reshape:  typeof(TripsToChartPoints),
-    Provenance: (Alice, b, "chart trip spend")));
-
-// If spend first went to chat: Rewire, same key, target chart — same move as scenario 2.
 ```
 
-After A: 3 Neurons, 1 Entity (`Trip`), 2 Synapses.  
-After B: same Entity (Prague / 1200 EUR), plus Synapse memory → chart with Reshape.
+```csharp
+// A correction is an Operation, not a client topology command.
+void OnProofCorrect(OperationInvocation<ProofCorrectV1Input> invocation)
+{
+    Rewire evidence = new(firstRevision, "assessment", "proof.to-assessment@1");
+    activity.Record(evidence);
 
----
+    authorization.RequireGraphReplace(invocation.Caller, evidence);
+    brainGraph.Replace(firstRevision, new SynapseRevision(
+        SourceRole: "proof-entry",
+        Contract: "corev2.proof.produced@1",
+        TargetRole: "assessment",
+        Reshape: "proof.to-assessment@1",
+        Provenance: evidence));
+}
 
-## Difference
+// Retire prevents a later ProofProduced from resolving. A zero-receiver emission remains journalled.
+brainGraph.Retire(firstRevision, authorization);
 
-| | Scenario 2 | Scenario 5 |
-|---|---|---|
-| Thinks | Salesforce, chat, chart | memory, chat, chart |
-| Holds “what is true now” | nothing | `Trip` Entity |
-| What is mined | Synapses + journalled DomainEvents | same, plus Entity snapshot |
-| Learning | Rewire replaces one Synapse | same move if the chart sink is wrong |
+// A staged Wiring binds only roles and public contracts for another Principal.
+wiring.Stage(new WiringProposal(
+    Trigger: "Proof.Run@1",
+    Roles: ["proof-entry", "assessment"],
+    Contracts: ["corev2.proof.produced@1"],
+    Reshape: "proof.to-assessment@1"));
+wiring.ActivateFor(otherPrincipal);
+```
 
-A Trip is never a Neuron. A Synapse never carries JSON. A Rewire never writes the Entity.
+The internal bus carries sealed typed DomainEvents. Provider schemas and JSON do not enter the CoreV2 bus.
