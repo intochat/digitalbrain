@@ -6,9 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('shell discovers modules and completes a generic operation', (
+  testWidgets('chat renders the operation journal and live BrainGraph', (
     tester,
   ) async {
+    await tester.binding.setSurfaceSize(const Size(1500, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     final api = _FakeProductApi();
     await tester.pumpWidget(
       DigitalBrainShell(
@@ -18,109 +20,107 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('DigitalBrain CoreV2'), findsOneWidget);
-    expect(find.text('Proof'), findsOneWidget);
-    expect(find.text('Ready'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('invoke-operation')).first,
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(find.textContaining('Run durable proof'), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('invoke-operation')));
-    await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.text('Activity Completed'),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
-
-    expect(api.invocations, ['proof/run@1']);
-    expect(find.text('Activity Completed'), findsOneWidget);
-    expect(find.text('{"route":"proof/hello"}'), findsOneWidget);
-  });
-
-  testWidgets('conversation surface reads and sends durable messages', (
-    tester,
-  ) async {
-    final api = _FakeProductApi(withConversation: true);
-    await tester.pumpWidget(
-      DigitalBrainShell(
-        productBase: Uri.parse('http://localhost:5100'),
-        api: api,
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('conversation-input')).first,
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
+    expect(find.text('Chat'), findsOneWidget);
+    expect(find.text('BrainGraph'), findsOneWidget);
+    expect(find.text('Runtime journal'), findsOneWidget);
+    expect(find.text('source'), findsOneWidget);
+    expect(find.text('assessment'), findsOneWidget);
 
     await tester.enterText(
-      find.byKey(const Key('conversation-input')),
-      'Hello durable brain',
+      find.byKey(const Key('chat-input')),
+      'Wire and run proof',
     );
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('conversation-send')).first,
-      100,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.byKey(const Key('conversation-send')));
+    await tester.tap(find.byKey(const Key('chat-send')));
     await tester.pumpAndSettle();
 
-    expect(api.invocations, ['conversation/read@1', 'conversation/send@1']);
-    expect(find.text('Hello durable brain'), findsOneWidget);
-    expect(find.text('owner'), findsOneWidget);
+    expect(api.invocations, ['Chat.Send@1']);
+    expect(find.text('Wire and run proof'), findsWidgets);
+    expect(find.text('Proof completed.'), findsOneWidget);
+    expect(find.text('Proof.Run@1'), findsWidgets);
+    expect(find.text('Chat.UserMessage@1'), findsOneWidget);
+    expect(find.text('ProofProduced@1'), findsOneWidget);
   });
 }
 
 final class _FakeProductApi implements DigitalBrainProductApi {
-  _FakeProductApi({this.withConversation = false});
-
-  final bool withConversation;
   final List<String> invocations = [];
-  final Map<String, Map<String, Object?>> _inputs = {};
 
-  @override
-  Future<List<ProductModule>> getModules() async => [
-    const ProductModule(id: 'proof', displayName: 'Proof', status: 0),
-    if (withConversation)
-      const ProductModule(
-        id: 'conversation',
-        displayName: 'Conversation',
-        status: 0,
+  BrainSnapshot get _brain => BrainSnapshot(
+    workspaceId: 'local',
+    sequence: 2,
+    observedAt: DateTime.utc(2026, 8, 14),
+    neurons: const [
+      BrainNeuron(
+        id: 'proof/source/local',
+        moduleId: 'proof',
+        roleId: 'source',
+        scope: 'local',
+        firingCount: 1,
       ),
+      BrainNeuron(
+        id: 'proof/assessment/local',
+        moduleId: 'proof',
+        roleId: 'assessment',
+        scope: 'local',
+        firingCount: 1,
+      ),
+    ],
+    synapses: const [
+      BrainSynapse(
+        id: 'synapse-1',
+        revision: 1,
+        sourceNeuronId: 'proof/source/local',
+        targetNeuronId: 'proof/assessment/local',
+        inputContractId: 'ProofProduced@1',
+        outputContractId: 'ProofProduced@1',
+        status: 'live',
+        usageCount: 1,
+        provenanceActivityId: 'activity-1',
+      ),
+    ],
+  );
+
+  List<BrainJournalRecord> get _records => [
+    BrainJournalRecord(
+      sequence: 1,
+      activityId: 'activity-1',
+      neuronId: 'ui/chat/principal',
+      direction: 0,
+      contractId: 'Chat.UserMessage@1',
+      occurredAt: DateTime.utc(2026, 8, 14),
+      routeCount: 0,
+      outcome: 'received',
+      summary: 'Wire and run proof',
+    ),
+    BrainJournalRecord(
+      sequence: 2,
+      activityId: 'activity-1',
+      neuronId: 'proof/source/local',
+      direction: 1,
+      contractId: 'ProofProduced@1',
+      occurredAt: DateTime.utc(2026, 8, 14),
+      routeCount: 1,
+      outcome: 'emitted',
+      summary: 'Proof produced',
+    ),
   ];
 
   @override
-  Future<List<ProductOperation>> getOperations() async => [
-    const ProductOperation(
-      id: 'proof/run@1',
-      moduleId: 'proof',
-      displayName: 'Run durable proof',
+  Future<List<ProductModule>> getModules() async => const [
+    ProductModule(id: 'ui', displayName: 'UI', status: 'ready'),
+    ProductModule(id: 'ai', displayName: 'AI', status: 'ready'),
+    ProductModule(id: 'proof', displayName: 'Proof', status: 'ready'),
+  ];
+  @override
+  Future<List<ProductOperation>> getOperations() async => const [
+    ProductOperation(
+      id: 'Chat.Send@1',
+      moduleId: 'ui',
+      displayName: 'Send chat',
       inputSchema: '{}',
       resultSchema: '{}',
     ),
-    if (withConversation) ...const [
-      ProductOperation(
-        id: 'conversation/read@1',
-        moduleId: 'conversation',
-        displayName: 'Read conversation',
-        inputSchema: '{}',
-        resultSchema: '{}',
-      ),
-      ProductOperation(
-        id: 'conversation/send@1',
-        moduleId: 'conversation',
-        displayName: 'Send conversation message',
-        inputSchema: '{}',
-        resultSchema: '{}',
-      ),
-    ],
   ];
-
   @override
   Future<ProductActivityReceipt> invoke(
     String operationId,
@@ -128,9 +128,10 @@ final class _FakeProductApi implements DigitalBrainProductApi {
     required String idempotencyKey,
   }) async {
     invocations.add(operationId);
-    final activity = 'activity-${invocations.length}';
-    _inputs[activity] = {'operationId': operationId, ...input};
-    return ProductActivityReceipt(activity: activity, operationId: operationId);
+    return ProductActivityReceipt(
+      activityId: 'activity-1',
+      operationId: operationId,
+    );
   }
 
   @override
@@ -138,42 +139,50 @@ final class _FakeProductApi implements DigitalBrainProductApi {
     String activityId, {
     int afterSequence = 0,
   }) async* {
-    yield await getActivity(activityId);
-  }
-
-  @override
-  Future<ProductActivity> getActivity(String activityId) async {
-    final input = _inputs[activityId]!;
-    final operation = input['operationId']! as String;
-    final result = switch (operation) {
-      'proof/run@1' => {'route': 'proof/hello'},
-      'conversation/read@1' => {
-        'conversationId': 'main',
-        'messages': <Object?>[],
-      },
-      'conversation/send@1' => {
-        'conversationId': 'main',
-        'messages': [
-          {
-            'sequence': 1,
-            'role': 'user',
-            'text': input['message'],
-            'principal': 'owner',
-          },
+    yield ProductActivity(
+      activityId: activityId,
+      operationId: 'Chat.Send@1',
+      workspaceId: 'local',
+      status: 3,
+      sequence: 9,
+      resultJson: jsonEncode({
+        'response': 'Proof completed.',
+        'tools': [
+          {'operationId': 'Proof.Run@1', 'resultJson': '{}'},
         ],
-      },
-      _ => throw StateError('Unexpected operation $operation'),
-    };
-    return ProductActivity(
-      activity: activityId,
-      operationId: operation,
-      workspace: 'local',
-      status: 2,
-      sequence: 3,
-      resultJson: jsonEncode(result),
+      }),
     );
   }
 
+  @override
+  Future<ProductActivity> getActivity(String activityId) async =>
+      throw UnimplementedError();
+  @override
+  Future<ChatTurnEnvelope> sendChat(
+    String message, {
+    required String idempotencyKey,
+  }) async => throw UnimplementedError();
+  @override
+  Future<BrainSnapshot> getBrain() async => _brain;
+  @override
+  Stream<BrainSnapshot> watchBrain({int afterSequence = 0}) =>
+      const Stream.empty();
+  @override
+  Future<BrainJournalPage> getJournal(
+    String activityId, {
+    int afterSequence = 0,
+  }) async => BrainJournalPage(
+    workspaceId: 'local',
+    activityId: activityId,
+    lastSequence: 2,
+    records: _records,
+    hasMore: false,
+  );
+  @override
+  Stream<BrainJournalRecord> watchJournal(
+    String activityId, {
+    int afterSequence = 0,
+  }) => Stream.fromIterable(_records);
   @override
   void close() {}
 }
