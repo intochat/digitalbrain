@@ -1,5 +1,6 @@
 import 'process_environment_stub.dart'
-    if (dart.library.io) 'process_environment_io.dart' as process_environment;
+    if (dart.library.io) 'process_environment_io.dart'
+    as process_environment;
 
 abstract final class DigitalBrainHostEnvironment {
   static const productBaseVariable = 'DIGITALBRAIN_PRODUCT_BASE';
@@ -12,9 +13,9 @@ abstract final class DigitalBrainHostEnvironment {
   }) {
     final raw = fromDefine.isNotEmpty
         ? fromDefine
-        : (processEnvironment ?? process_environment.readProcessEnvironment())[
-                  productBaseVariable
-              ] ??
+        : (processEnvironment ??
+                  process_environment
+                      .readProcessEnvironment())[productBaseVariable] ??
               '';
     if (raw.isEmpty) {
       throw StateError(
@@ -24,7 +25,10 @@ abstract final class DigitalBrainHostEnvironment {
 
     final uri = Uri.tryParse(raw);
     if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
-      throw FormatException('$productBaseVariable must be an absolute URI.', raw);
+      throw FormatException(
+        '$productBaseVariable must be an absolute URI.',
+        raw,
+      );
     }
 
     return uri;
@@ -38,7 +42,8 @@ abstract final class DigitalBrainHostEnvironment {
       return fromDefine;
     }
 
-    final raw = (processEnvironment ??
+    final raw =
+        (processEnvironment ??
             process_environment.readProcessEnvironment())[shellVariable] ??
         '';
     return raw.isEmpty ? defaultShell : raw;
