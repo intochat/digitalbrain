@@ -35,6 +35,7 @@ public static class AIHostingExtensions
         {
             var ollama = brain.ApplicationBuilder
                 .AddOllama("ollama")
+                .WithImageTag("latest")
                 .WithGPUSupport()
                 .WithDataVolume()
                 .WithLifetime(ContainerLifetime.Persistent)

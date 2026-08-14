@@ -24,7 +24,10 @@ public sealed class AIHostingExtensionsTests
             .AddExecutable("client", "dotnet", ".")
             .WithReference(brain.AsClient());
 
-        Assert.Contains(builder.Resources, resource => resource.Name == "ollama");
+        var ollama = Assert.Single(builder.Resources, resource => resource.Name == "ollama");
+        Assert.Contains(
+            ollama.Annotations.OfType<ContainerImageAnnotation>(),
+            image => image.Tag == "latest");
         var model = Assert.Single(builder.Resources, resource => resource.Name == "gemma4-12b");
         Assert.Contains(
             runtime.Resource.Annotations.OfType<WaitAnnotation>(),
