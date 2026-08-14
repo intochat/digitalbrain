@@ -4,6 +4,7 @@ using Brain.Core.Journaling;
 using Brain.Modules.Memory;
 using Brain.Modules.Proof;
 using Brain.Modules.Scheduling;
+using Brain.Core.Runtime;
 using Brain.Runtime.Abstractions;
 using DigitalBrain.Aspire;
 using DigitalBrain.ServiceDefaults;
@@ -19,6 +20,8 @@ builder.AddDigitalBrainRuntime(silo =>
 #pragma warning restore ORLEANSEXP005
 });
 builder.Services.AddSingleton<IRuntimeProductModule, ProofProductModule>();
+builder.Services.AddSingleton<IBrainOperationHandler, ProofWireOperationHandler>();
+builder.Services.AddSingleton<IBrainOperationHandler, ProofRunOperationHandler>();
 builder.Services.AddSingleton<IRuntimeProductModule, ConversationProductModule>();
 builder.Services.AddSingleton<IRuntimeProductModule, SchedulingProductModule>();
 builder.Services.AddSingleton<IRuntimeProductModule, BehaviorProductModule>();

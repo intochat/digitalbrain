@@ -7,6 +7,7 @@ namespace Brain.Core.Journaling;
 
 [JsonSerializable(typeof(BrainActivitySnapshot))]
 [JsonSerializable(typeof(BrainJournalRecord))]
+[JsonSerializable(typeof(BrainOperationInvocation))]
 [JsonSerializable(typeof(BrainNeuronView))]
 [JsonSerializable(typeof(BrainSynapseView))]
 [JsonSerializable(typeof(bool))]

@@ -9,7 +9,8 @@ namespace Brain.Core.Journaling;
 public sealed class DurableBrainActivityGrain(
     [FromKeyedServices("records")] IDurableList<BrainJournalRecord> records,
     [FromKeyedServices("record-sequences")] IDurableDictionary<Guid, long> recordSequences,
-    [FromKeyedServices("activity")] IDurableValue<BrainActivitySnapshot?> activity)
+    [FromKeyedServices("activity")] IDurableValue<BrainActivitySnapshot?> activity,
+    [FromKeyedServices("invocation")] IDurableValue<BrainOperationInvocation?> storedInvocation)
     : DurableGrain, IBrainActivityGrain
 {
     public async Task<BrainActivityReceipt> StartAsync(
@@ -23,7 +24,8 @@ public sealed class DurableBrainActivityGrain(
         {
             if (existing.ActivityId != activityId
                 || !string.Equals(existing.OperationId, invocation.OperationId, StringComparison.Ordinal)
-                || !string.Equals(existing.WorkspaceId, invocation.WorkspaceId, StringComparison.Ordinal))
+                || !string.Equals(existing.WorkspaceId, invocation.WorkspaceId, StringComparison.Ordinal)
+                || storedInvocation.Value != invocation)
             {
                 throw new InvalidOperationException("An activity grain cannot be reused for another operation.");
             }
@@ -39,6 +41,7 @@ public sealed class DurableBrainActivityGrain(
             0,
             null,
             null);
+        storedInvocation.Value = invocation;
         await WriteStateAsync();
         return new BrainActivityReceipt(activityId, invocation.OperationId);
     }
@@ -117,6 +120,43 @@ public sealed class DurableBrainActivityGrain(
                 && string.Equals(value.WorkspaceId, workspaceId, StringComparison.Ordinal)
                     ? value
                     : null);
+    }
+
+    public async Task CompleteAsync(string workspaceId, string resultJson)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(resultJson);
+        var current = RequireActivity(workspaceId);
+        activity.Value = current with
+        {
+            Status = ActivityStatus.Completed,
+            ResultJson = resultJson,
+            Problem = null,
+        };
+        await WriteStateAsync();
+    }
+
+    public async Task FailAsync(string workspaceId, string problem)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(problem);
+        var current = RequireActivity(workspaceId);
+        activity.Value = current with
+        {
+            Status = ActivityStatus.Failed,
+            ResultJson = null,
+            Problem = problem,
+        };
+        await WriteStateAsync();
+    }
+
+    private BrainActivitySnapshot RequireActivity(string workspaceId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(workspaceId);
+        if (activity.Value is not { } current
+            || !string.Equals(current.WorkspaceId, workspaceId, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("The addressed activity does not exist in this workspace.");
+        }
+        return current;
     }
 
     private void ValidateIdentity(string workspaceId, Guid activityId)

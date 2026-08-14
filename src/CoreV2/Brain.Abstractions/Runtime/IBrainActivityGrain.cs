@@ -11,4 +11,8 @@ public interface IBrainActivityGrain : IGrainWithStringKey
     Task<BrainJournalPage> ReadJournalAsync(string workspaceId, long afterSequence, int take);
 
     Task<BrainActivitySnapshot?> GetAsync(string workspaceId);
+
+    Task CompleteAsync(string workspaceId, string resultJson);
+
+    Task FailAsync(string workspaceId, string problem);
 }
