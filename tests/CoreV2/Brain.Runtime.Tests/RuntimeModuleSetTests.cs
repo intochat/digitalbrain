@@ -1,5 +1,6 @@
 using Brain.Modules.Behavior;
 using Brain.Modules.Conversation;
+using Brain.Modules.Memory;
 using Brain.Modules.Proof;
 using Brain.Modules.Scheduling;
 using Brain.Runtime.Abstractions;
@@ -22,7 +23,9 @@ public sealed class RuntimeModuleSetTests
             ["proof", "conversation", "scheduling", "behavior", "ai", "memory", "google", "salesforce"],
             modules.Select(static module => module.Id));
         Assert.All(modules.Take(4), module => Assert.Equal(RuntimeModuleStatus.Ready, module.Status));
-        Assert.All(modules.Skip(4), module =>
+        Assert.Equal(RuntimeModuleStatus.NeedsSetup, modules[4].Status);
+        Assert.Equal(RuntimeModuleStatus.Ready, modules[5].Status);
+        Assert.All(modules.Skip(6), module =>
         {
             Assert.Equal(RuntimeModuleStatus.NeedsSetup, module.Status);
             Assert.False(string.IsNullOrWhiteSpace(module.SetupMessage));
@@ -44,8 +47,7 @@ public sealed class RuntimeModuleSetTests
                 services.AddSingleton<IRuntimeProductModule, BehaviorProductModule>();
                 services.AddSingleton<IRuntimeProductModule>(new SetupRequiredProductModule(
                     "ai", "AI", "Configure a local or hosted model provider."));
-                services.AddSingleton<IRuntimeProductModule>(new SetupRequiredProductModule(
-                    "memory", "Memory", "Configure a workspace memory provider."));
+                services.AddSingleton<IRuntimeProductModule, MemoryProductModule>();
                 services.AddSingleton<IRuntimeProductModule>(new SetupRequiredProductModule(
                     "google", "Google", "Configure the Google MCP connection."));
                 services.AddSingleton<IRuntimeProductModule>(new SetupRequiredProductModule(

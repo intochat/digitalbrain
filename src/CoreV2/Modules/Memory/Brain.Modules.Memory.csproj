@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Server" />
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Brain.Runtime.Abstractions/Brain.Runtime.Abstractions.csproj" />
+    <ProjectReference Include="../Memory.Contracts/Brain.Modules.Memory.Contracts.csproj" />
+  </ItemGroup>
+</Project>

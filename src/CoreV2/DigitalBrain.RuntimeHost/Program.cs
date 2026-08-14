@@ -1,5 +1,6 @@
 using Brain.Modules.Behavior;
 using Brain.Modules.Conversation;
+using Brain.Modules.Memory;
 using Brain.Modules.Proof;
 using Brain.Modules.Scheduling;
 using Brain.Runtime.Abstractions;
@@ -18,10 +19,7 @@ builder.Services.AddSingleton<IRuntimeProductModule>(new SetupRequiredProductMod
     "ai",
     "AI",
     "Configure a local or hosted model provider."));
-builder.Services.AddSingleton<IRuntimeProductModule>(new SetupRequiredProductModule(
-    "memory",
-    "Memory",
-    "Configure a workspace memory provider."));
+builder.Services.AddSingleton<IRuntimeProductModule, MemoryProductModule>();
 builder.Services.AddSingleton<IRuntimeProductModule>(new SetupRequiredProductModule(
     "google",
     "Google",
