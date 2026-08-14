@@ -4,57 +4,52 @@ Updated: 2026-08-14
 
 ## Outcome
 
-CoreV2 is the only compiled product graph. One `aspire start` command brings up persistent storage, the Orleans runtime silo, the ProductHost client/gateway, and the Flutter desktop client through module-owned Aspire projections.
+The CoreV2 product migration is complete. `aspire start` launches a journal-first DigitalBrain with persistent storage, an Orleans runtime, a product gateway/MCP server, a local Gemma 4 assistant, and the Flutter module in headless mode by default.
 
-## Current truth
+Chat is the product entry point. One durable activity records the user message, assistant plan, selected operations, tool results, Neuron firings, Synapse delivery, assistant response, and terminal status. The same journal incrementally projects the live BrainGraph rendered by Flutter.
 
-- The repository Aspire entry point targets `src/CoreV2/DigitalBrain.AppHost`.
-- `Brain.ServiceDefaults` owns health checks, service discovery, HTTP resilience, and OpenTelemetry conventions.
-- `Brain.Aspire.Hosting` models the brain aggregate, persistent Azurite storage, Orleans clustering, reminders, grain state, and role-specific module projections.
-- `Brain.Aspire` provides distinct application-side Orleans silo and client registrations over AppHost-injected storage configuration.
-- `DigitalBrain.RuntimeHost` owns all durable product state. `DigitalBrain.ProductHost` is an independently hosted Orleans client and exposes module discovery, operation invocation, durable activity lookup, SSE activity observation, and MCP adapters.
-- Product activity and module state survive ProductHost and runtime restarts. No durable product state is stored in ProductHost.
-- `Brain.Modules.UI.Aspire.Hosting` owns window, web, and headless Flutter launch modes, ProductHost endpoint injection, readiness ordering, source-watch reload, and an Aspire dashboard hot-reload command.
-- The CoreV2 Flutter Windows shell compiles and launches from `aspire start`, receives `DIGITALBRAIN_PRODUCT_BASE`, and uses the Flutter tool for hot reload.
-- The Flutter shell has a dedicated durable Conversation surface plus a generic discovery/invocation surface for all module operations.
-- Caller and workspace identity are derived by ProductHost. Client-supplied caller/workspace headers are ignored.
-- The V1 `src/Kernel` and `src/Modules` trees are uncompiled references only. Architecture tests prevent active CoreV2 projects from depending on them.
+## Compiled product graph
 
-## Module launch state
+`storage -> clustering/reminders/grainstate/journal -> ollama/gemma4-12b -> runtime -> product -> flutter`
 
-| Order | Module | Status | Durable capability |
-| ---: | --- | --- | --- |
-| 1 | Proof | Ready | Durable activity-backed proof operation |
-| 2 | Conversation | Ready | Workspace-isolated ordered transcripts and idempotent sends |
-| 3 | Scheduling | Ready | Persistent schedules, cancellation, and Orleans reminders |
-| 4 | Behavior | Ready | Versioned behaviors, activation, deterministic runs, and run history |
-| 5 | AI | NeedsSetup | Optional provider adapter is not configured |
-| 6 | Memory | Ready | Workspace/namespace-scoped store, search, and remove |
-| 7 | Google | NeedsSetup | Optional provider adapter is not configured |
-| 8 | Salesforce | NeedsSetup | Optional provider adapter is not configured |
+- `DigitalBrainResource` is the Aspire aggregate for the brain.
+- `journal` is an explicit persistent Azure Blob resource and a required runtime dependency. Runtime startup fails when its connection is absent.
+- `DigitalBrain.RuntimeHost` is the only durable execution runtime. The former parallel product runtime and placeholder Behavior, Conversation, Memory, and Scheduling entity modules have been deleted.
+- `DigitalBrain.ProductHost` is an Orleans client exposing HTTP, SSE, and MCP views over the durable runtime.
+- Ollama runs as a persistent, GPU-enabled module resource with `gemma4:12b`. The image is pinned to `latest` because Gemma 4 rejects the older integration default.
+- Orleans client and silo response budgets are ten minutes so local model warmup and long assistant turns do not violate the durable operation contract.
+- Flutter belongs to `Modules/UI/Flutter`. Aspire starts its headless Dart host by default, so normal development starts do not create another desktop window. Window and web hosts remain explicit opt-ins.
+- Proof, AI, and UI each own their `Contracts`, `Runtime`, and applicable `Aspire.Hosting`/`Flutter` folders.
 
-## Active slice
+## Ready modules
 
-The base product migration and live cutover are complete. Remaining work is optional provider setup for AI, Google, and Salesforce. Physical deletion of the inert V1 reference trees is intentionally deferred until those adapters reach selected V1 feature parity; V1 is already absent from the compiled and running product path.
+| Module | Product capability | Durable evidence |
+| --- | --- | --- |
+| Proof | Installs a live Synapse and fires a source Neuron through it | `Proof.Wire@1`, `Proof.Run@1`, delivery and assessment journal records |
+| AI | Gemma 4 assistant plans and invokes registered operations | model plan, tool selection, tool result, and response journal records |
+| UI | Chat orchestration, live journal, and live BrainGraph | `Chat.Send@1`, HTTP/SSE/MCP contracts, Flutter three-panel shell |
 
-## Live acceptance evidence
+## Live MCP acceptance evidence
 
-On 2026-08-14 an isolated Aspire run established this graph:
+The acceptance run used `aspire start --isolated --non-interactive` and Aspire's MCP bridge, not direct test doubles or raw HTTP calls.
 
-`Azurite storage -> Orleans runtime -> ProductHost -> Flutter Windows`
+- Aspire reported `storage`, `clustering`, `reminders`, `grainstate`, `journal`, `ollama`, `gemma4-12b`, `runtime`, `product`, and headless `flutter` healthy/running.
+- `aspire mcp tools` discovered seven ProductHost tools, including `digitalbrain_chat`, `digitalbrain_activity_journal`, and `digitalbrain_brain_snapshot`.
+- MCP chat activity `8f535f3e-617b-ab04-538a-c0a6f1abdf3a` asked the assistant to wire Proof to assessment and run `mcp-live-v2`.
+- The assistant invoked `Proof.Wire@1` and `Proof.Run@1` and returned both durable tool results.
+- The MCP journal returned 23 ordered records. They include `Chat.UserMessage@1`, `Assistant.ModelPlan@1`, both tool selections/results, `BrainGraph.SynapseInstalled@1`, the source Neuron emission, Synapse delivery, assessment Neuron receipt/emission, assistant response, and `Chat.Send@1` completion.
+- The MCP BrainGraph returned two Neurons and live Synapse `602ab2e8-02cc-41f9-910a-04786a56b26c` with revision 1, usage count 1, and the chat activity as provenance.
+- The MCP activity view reported `Chat.Send@1` as `Completed` at journal sequence 23.
+- The headless Flutter log observed the same transition: `BrainGraph sequence=2 neurons=2 synapses=1`. Aspire launched `dart run bin/digitalbrain_host.dart`; no Flutter desktop window was started.
 
-- All four resources reached healthy/running state.
-- ProductHost returned the eight modules above in the declared launch order and exposed 13 operations.
-- Conversation send/read, Scheduling schedule/read, Behavior publish/activate/run/read, and Memory store/search were invoked through ProductHost successfully.
-- Restarting the runtime preserved transcript messages, the registered schedule/reminder, active behavior revision and run, and stored memory.
-- Restarting ProductHost preserved activity lookup and left Flutter healthy.
-- The Aspire Flutter hot-reload command completed successfully against the running Windows client.
-- Aspire shut down cleanly with no remaining application instances.
+## Verification
 
-## Definition of done
+- `dotnet build DigitalBrain.slnx --no-restore`: succeeded with 0 warnings and 0 errors.
+- `dotnet test DigitalBrain.slnx --no-build --no-restore`: 299 passed, 0 failed, 0 skipped after all live-run fixes.
+- Dart core: `dart analyze` clean; 3 tests passed.
+- Flutter shell: `flutter analyze` clean; 1 widget test passed.
+- Live Aspire/MCP acceptance: passed as documented above.
 
-- `dotnet build DigitalBrain.slnx -c Release` succeeds.
-- Every CoreV2 test project passes through its native .NET 11 test executable.
-- `aspire start --isolated --non-interactive` reaches healthy storage, runtime, ProductHost, and Flutter resources.
-- Flutter can discover and invoke module operations and observe durable activity through ProductHost.
-- No compiled CoreV2 project references V1 source roots.
+## Remaining boundary
+
+The V1 `src/Kernel` and `src/Modules` trees remain as uncompiled reference material. Architecture tests prevent active CoreV2 projects from depending on them. They are not part of the CoreV2 build or runtime graph.
