@@ -10,6 +10,12 @@ using Brain.Product.Abstractions.Operations;
 
 namespace DigitalBrain.ProductHost.Catalog;
 
+internal enum ProductJsonContractDirection
+{
+    Input,
+    TerminalResult,
+}
+
 public sealed record ProductOperationObservation<TResult>
     where TResult : class
 {
@@ -42,11 +48,13 @@ public sealed class ProductOperationBinding : IProductOperationAdapter
         InputContract = ProductJsonContract.Create(
             "input",
             descriptor.InputSchema,
-            inputJsonType);
+            inputJsonType,
+            ProductJsonContractDirection.Input);
         TerminalResultContract = ProductJsonContract.Create(
             "terminal result",
             descriptor.TerminalResultSchema,
-            terminalResultJsonType);
+            terminalResultJsonType,
+            ProductJsonContractDirection.TerminalResult);
         _state = state;
         Operations = [descriptor];
     }
@@ -117,6 +125,21 @@ public sealed class ProductOperationBinding : IProductOperationAdapter
     {
         var projection = await _state.ObserveAsync(activity, context, cancellationToken)
             .ConfigureAwait(false);
+        if (projection.Activity.Activity != activity
+            || projection.Activity.Operation != Descriptor.Operation.Id
+            || projection.Activity.TerminalResultContract != Descriptor.Operation.TerminalResultContract)
+        {
+            throw new ProductOperationResultException(
+                "The observed activity identity does not match the requested bound operation.");
+        }
+
+        var isCompleted = projection.Activity.Status == ActivityStatus.Completed;
+        if (isCompleted != projection.Result.HasValue)
+        {
+            throw new ProductOperationResultException(
+                "A completed activity requires one terminal result and every other state forbids it.");
+        }
+
         if (projection.Result is { } result)
         {
             try
@@ -249,17 +272,27 @@ internal sealed class ProductJsonContract
 {
     private readonly string _kind;
     private readonly JsonElement _schema;
+    private readonly ProductJsonContractDirection _direction;
 
-    private ProductJsonContract(string kind, JsonTypeInfo metadata, JsonElement schema)
+    private ProductJsonContract(
+        string kind,
+        JsonTypeInfo metadata,
+        JsonElement schema,
+        ProductJsonContractDirection direction)
     {
         _kind = kind;
         Metadata = metadata;
         _schema = schema;
+        _direction = direction;
     }
 
     internal JsonTypeInfo Metadata { get; }
 
-    internal static ProductJsonContract Create(string kind, string schema, JsonTypeInfo metadata)
+    internal static ProductJsonContract Create(
+        string kind,
+        string schema,
+        JsonTypeInfo metadata,
+        ProductJsonContractDirection direction)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(kind);
         ArgumentNullException.ThrowIfNull(metadata);
@@ -271,7 +304,7 @@ internal sealed class ProductJsonContract
             throw Invalid(kind, "root must be one closed reference-type object contract");
         }
 
-        ValidateClosedMetadata(kind, metadata, []);
+        ValidateClosedMetadata(kind, metadata, [], direction);
 
         JsonDocument document;
         try
@@ -288,13 +321,19 @@ internal sealed class ProductJsonContract
         using (document)
         {
             var root = document.RootElement.Clone();
-            ValidateSchemaNode(kind, root, metadata, allowsNull: false);
-            return new ProductJsonContract(kind, metadata, root);
+            ValidateSchemaNode(kind, root, metadata, allowsNull: false, direction);
+            return new ProductJsonContract(kind, metadata, root, direction);
         }
     }
 
     internal void Validate(JsonElement value)
-        => ValidateRuntimeValue(_kind, _schema, Metadata, value, allowsNull: false);
+        => ValidateRuntimeValue(
+            _kind,
+            _schema,
+            Metadata,
+            value,
+            allowsNull: false,
+            _direction);
 
     private static void ValidateStrictOptions(string kind, JsonSerializerOptions options)
     {
@@ -302,6 +341,13 @@ internal sealed class ProductJsonContract
             || !options.RespectRequiredConstructorParameters
             || !options.RespectNullableAnnotations
             || options.PropertyNameCaseInsensitive
+            || options.PreferredObjectCreationHandling != JsonObjectCreationHandling.Replace
+            || options.NumberHandling != JsonNumberHandling.Strict
+            || options.ReferenceHandler is not null
+            || options.IncludeFields
+            || options.IgnoreReadOnlyFields
+            || options.IgnoreReadOnlyProperties
+            || options.DefaultIgnoreCondition != JsonIgnoreCondition.Never
             || options.Converters.Count != 0
             || options.TypeClassifiers.Count != 0)
         {
@@ -312,7 +358,8 @@ internal sealed class ProductJsonContract
     private static void ValidateClosedMetadata(
         string kind,
         JsonTypeInfo metadata,
-        HashSet<Type> visited)
+        HashSet<Type> visited,
+        ProductJsonContractDirection direction)
     {
         if (!visited.Add(metadata.Type))
         {
@@ -324,7 +371,7 @@ internal sealed class ProductJsonContract
             switch (metadata.Kind)
             {
                 case JsonTypeInfoKind.Object:
-                    ValidateClosedObjectMetadata(kind, metadata, visited);
+                    ValidateClosedObjectMetadata(kind, metadata, visited, direction);
                     break;
                 case JsonTypeInfoKind.Enumerable:
                     if (metadata.ElementType is null || IsOpenType(metadata.ElementType))
@@ -332,10 +379,18 @@ internal sealed class ProductJsonContract
                         throw Invalid(kind, "contains an open collection contract");
                     }
 
+                    if (!metadata.ElementType.IsValueType)
+                    {
+                        throw Invalid(
+                            kind,
+                            "cannot contain reference collection elements whose nullability is not generated metadata");
+                    }
+
                     ValidateClosedMetadata(
                         kind,
                         GetMetadata(kind, metadata, metadata.ElementType),
-                        visited);
+                        visited,
+                        direction);
                     break;
                 case JsonTypeInfoKind.Dictionary:
                     throw Invalid(kind, "cannot contain dictionary contracts");
@@ -359,13 +414,20 @@ internal sealed class ProductJsonContract
     private static void ValidateClosedObjectMetadata(
         string kind,
         JsonTypeInfo metadata,
-        HashSet<Type> visited)
+        HashSet<Type> visited,
+        ProductJsonContractDirection direction)
     {
         if (metadata.Type.IsValueType
             || metadata.Type == typeof(string)
             || EffectiveUnmappedHandling(metadata) != JsonUnmappedMemberHandling.Disallow
             || metadata.PolymorphismOptions is not null
-            || metadata.UnionCases.Count != 0)
+            || metadata.UnionCases.Count != 0
+            || metadata.NumberHandling is not null
+            || metadata.PreferredPropertyObjectCreationHandling == JsonObjectCreationHandling.Populate
+            || metadata.OnDeserializing is not null
+            || metadata.OnDeserialized is not null
+            || metadata.OnSerializing is not null
+            || metadata.OnSerialized is not null)
         {
             throw Invalid(kind, "must describe non-polymorphic closed object contracts");
         }
@@ -376,15 +438,45 @@ internal sealed class ProductJsonContract
             if (!names.Add(property.Name)
                 || property.IsExtensionData
                 || property.CustomConverter is not null
+                || property.NumberHandling is not null
+                || property.ShouldSerialize is not null
                 || IsOpenType(property.PropertyType))
             {
                 throw Invalid(kind, $"contains an open or ambiguous property '{property.Name}'");
             }
 
+            var creationHandling = property.ObjectCreationHandling
+                ?? metadata.PreferredPropertyObjectCreationHandling
+                ?? metadata.Options.PreferredObjectCreationHandling;
+            if (creationHandling != JsonObjectCreationHandling.Replace)
+            {
+                throw Invalid(kind, $"contains population semantics on property '{property.Name}'");
+            }
+
+            if (direction == ProductJsonContractDirection.Input
+                && property.Set is null)
+            {
+                throw Invalid(kind, $"contains non-replaceable input property '{property.Name}'");
+            }
+
+            if (direction == ProductJsonContractDirection.TerminalResult
+                && property.Get is null)
+            {
+                throw Invalid(kind, $"contains unreadable terminal property '{property.Name}'");
+            }
+
+            if (direction == ProductJsonContractDirection.Input
+                && property.AssociatedParameter is { } parameter
+                && parameter.IsNullable != property.IsSetNullable)
+            {
+                throw Invalid(kind, $"contains ambiguous input nullability on property '{property.Name}'");
+            }
+
             ValidateClosedMetadata(
                 kind,
                 GetMetadata(kind, metadata, property.PropertyType),
-                visited);
+                visited,
+                direction);
         }
     }
 
@@ -448,7 +540,8 @@ internal sealed class ProductJsonContract
         string kind,
         JsonElement schema,
         JsonTypeInfo metadata,
-        bool allowsNull)
+        bool allowsNull,
+        ProductJsonContractDirection direction)
     {
         if (schema.ValueKind != JsonValueKind.Object)
         {
@@ -461,10 +554,10 @@ internal sealed class ProductJsonContract
         switch (metadata.Kind)
         {
             case JsonTypeInfoKind.Object:
-                ValidateObjectSchema(kind, schema, metadata);
+                ValidateObjectSchema(kind, schema, metadata, direction);
                 break;
             case JsonTypeInfoKind.Enumerable:
-                ValidateEnumerableSchema(kind, schema, metadata);
+                ValidateEnumerableSchema(kind, schema, metadata, direction);
                 break;
             case JsonTypeInfoKind.None:
                 EnsureAllowedKeywords(kind, schema, "type");
@@ -474,7 +567,11 @@ internal sealed class ProductJsonContract
         }
     }
 
-    private static void ValidateObjectSchema(string kind, JsonElement schema, JsonTypeInfo metadata)
+    private static void ValidateObjectSchema(
+        string kind,
+        JsonElement schema,
+        JsonTypeInfo metadata,
+        ProductJsonContractDirection direction)
     {
         EnsureAllowedKeywords(kind, schema, "type", "additionalProperties", "properties", "required");
         if (!TryGetSingleProperty(schema, "additionalProperties", out var additional)
@@ -505,7 +602,8 @@ internal sealed class ProductJsonContract
                 kind,
                 schemaProperty.Value,
                 GetMetadata(kind, metadata, property.PropertyType),
-                AllowsNull(property));
+                AllowsNull(property, direction),
+                direction);
         }
 
         var requiredNames = ReadRequiredNames(kind, required);
@@ -519,7 +617,11 @@ internal sealed class ProductJsonContract
         }
     }
 
-    private static void ValidateEnumerableSchema(string kind, JsonElement schema, JsonTypeInfo metadata)
+    private static void ValidateEnumerableSchema(
+        string kind,
+        JsonElement schema,
+        JsonTypeInfo metadata,
+        ProductJsonContractDirection direction)
     {
         EnsureAllowedKeywords(kind, schema, "type", "items");
         if (!TryGetSingleProperty(schema, "items", out var items)
@@ -532,7 +634,8 @@ internal sealed class ProductJsonContract
             kind,
             items,
             GetMetadata(kind, metadata, metadata.ElementType),
-            Nullable.GetUnderlyingType(metadata.ElementType) is not null);
+            Nullable.GetUnderlyingType(metadata.ElementType) is not null,
+            direction);
     }
 
     private static void ValidateTypeKeyword(
@@ -616,10 +719,16 @@ internal sealed class ProductJsonContract
             : "object";
     }
 
-    private static bool AllowsNull(JsonPropertyInfo property)
+    private static bool AllowsNull(
+        JsonPropertyInfo property,
+        ProductJsonContractDirection direction)
         => Nullable.GetUnderlyingType(property.PropertyType) is not null
-            || property.IsGetNullable
-            || property.IsSetNullable;
+            || direction switch
+            {
+                ProductJsonContractDirection.Input => property.IsSetNullable,
+                ProductJsonContractDirection.TerminalResult => property.IsGetNullable,
+                _ => throw new ArgumentOutOfRangeException(nameof(direction)),
+            };
 
     private static bool IsRequired(JsonPropertyInfo property)
         => property.IsRequired || property.AssociatedParameter is { HasDefaultValue: false };
@@ -666,7 +775,8 @@ internal sealed class ProductJsonContract
         JsonElement schema,
         JsonTypeInfo metadata,
         JsonElement value,
-        bool allowsNull)
+        bool allowsNull,
+        ProductJsonContractDirection direction)
     {
         if (value.ValueKind == JsonValueKind.Null)
         {
@@ -681,10 +791,10 @@ internal sealed class ProductJsonContract
         switch (metadata.Kind)
         {
             case JsonTypeInfoKind.Object:
-                ValidateRuntimeObject(kind, schema, metadata, value);
+                ValidateRuntimeObject(kind, schema, metadata, value, direction);
                 break;
             case JsonTypeInfoKind.Enumerable:
-                ValidateRuntimeArray(kind, schema, metadata, value);
+                ValidateRuntimeArray(kind, schema, metadata, value, direction);
                 break;
             case JsonTypeInfoKind.None:
                 ValidateRuntimeScalar(kind, metadata.Type, value);
@@ -698,7 +808,8 @@ internal sealed class ProductJsonContract
         string kind,
         JsonElement schema,
         JsonTypeInfo metadata,
-        JsonElement value)
+        JsonElement value,
+        ProductJsonContractDirection direction)
     {
         if (value.ValueKind != JsonValueKind.Object)
         {
@@ -739,7 +850,8 @@ internal sealed class ProductJsonContract
                 propertySchema,
                 GetMetadata(kind, metadata, property.PropertyType),
                 propertyValue.Value,
-                AllowsNull(property));
+                AllowsNull(property, direction),
+                direction);
         }
     }
 
@@ -747,7 +859,8 @@ internal sealed class ProductJsonContract
         string kind,
         JsonElement schema,
         JsonTypeInfo metadata,
-        JsonElement value)
+        JsonElement value,
+        ProductJsonContractDirection direction)
     {
         if (value.ValueKind != JsonValueKind.Array || metadata.ElementType is null)
         {
@@ -759,7 +872,13 @@ internal sealed class ProductJsonContract
         var elementAllowsNull = Nullable.GetUnderlyingType(metadata.ElementType) is not null;
         foreach (var element in value.EnumerateArray())
         {
-            ValidateRuntimeValue(kind, items, elementMetadata, element, elementAllowsNull);
+            ValidateRuntimeValue(
+                kind,
+                items,
+                elementMetadata,
+                element,
+                elementAllowsNull,
+                direction);
         }
     }
 
@@ -821,6 +940,11 @@ public sealed class ProductOperationInputException : Exception
 
 public sealed class ProductOperationResultException : Exception
 {
+    public ProductOperationResultException(string message)
+        : base(message)
+    {
+    }
+
     public ProductOperationResultException(string message, Exception innerException)
         : base(message, innerException)
     {

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
@@ -486,10 +487,7 @@ public sealed class ProductOperationCatalogTests
     [Fact]
     public async Task Terminal_result_is_serialized_only_with_the_declared_generated_metadata()
     {
-        var activity = ActivityView.Accepted(
-            BrainActivityId.New(),
-            Send.Id,
-            Send.TerminalResultContract);
+        var activity = ObservedActivity(BrainActivityId.New(), ActivityStatus.Completed);
         var binding = ProductOperationBinding.Create<CatalogInput, CatalogResult>(
             Descriptor(Send),
             CatalogJsonSerializerContext.Default.CatalogInput,
@@ -512,10 +510,7 @@ public sealed class ProductOperationCatalogTests
     [Fact]
     public async Task Hostile_terminal_result_is_rejected_before_raw_projection_exposure()
     {
-        var activity = ActivityView.Accepted(
-            BrainActivityId.New(),
-            Send.Id,
-            Send.TerminalResultContract);
+        var activity = ObservedActivity(BrainActivityId.New(), ActivityStatus.Completed);
         var binding = ProductOperationBinding.Create<CatalogInput, CatalogResult>(
             Descriptor(Send),
             CatalogJsonSerializerContext.Default.CatalogInput,
@@ -530,6 +525,65 @@ public sealed class ProductOperationCatalogTests
         await Assert.ThrowsAsync<ProductOperationResultException>(() =>
             ((IProductOperationAdapter)binding).ObserveAsync(
                 activity.Activity,
+                Invocation(Grant()),
+                TestContext.Current.CancellationToken));
+    }
+
+    [Theory]
+    [InlineData(ActivityStatus.Completed, false)]
+    [InlineData(ActivityStatus.Accepted, true)]
+    public async Task Observation_status_and_terminal_result_must_describe_one_coherent_lifecycle(
+        ActivityStatus status,
+        bool includeResult)
+    {
+        var requested = BrainActivityId.New();
+        var activity = ObservedActivity(requested, status);
+        var binding = ProductOperationBinding.Create<CatalogInput, CatalogResult>(
+            Descriptor(Send),
+            CatalogJsonSerializerContext.Default.CatalogInput,
+            CatalogJsonSerializerContext.Default.CatalogResult,
+            static (_, _, _) => throw new NotSupportedException(),
+            (_, _, _) => Task.FromResult(
+                new ProductOperationObservation<CatalogResult>(
+                    activity,
+                    progress: null,
+                    includeResult ? new CatalogResult("done") : null)));
+
+        await Assert.ThrowsAsync<ProductOperationResultException>(() =>
+            ((IProductOperationAdapter)binding).ObserveAsync(
+                requested,
+                Invocation(Grant()),
+                TestContext.Current.CancellationToken));
+    }
+
+    [Theory]
+    [InlineData("activity")]
+    [InlineData("operation")]
+    [InlineData("terminal-contract")]
+    public async Task Observation_identity_must_match_the_requested_bound_operation(string mismatch)
+    {
+        var requested = BrainActivityId.New();
+        var activity = ObservedActivity(
+            mismatch == "activity" ? BrainActivityId.New() : requested,
+            ActivityStatus.Completed,
+            mismatch == "operation" ? new OperationId("conversation/other@1") : Send.Id,
+            mismatch == "terminal-contract"
+                ? new ContractId("conversation/other-result@1")
+                : Send.TerminalResultContract);
+        var binding = ProductOperationBinding.Create<CatalogInput, CatalogResult>(
+            Descriptor(Send),
+            CatalogJsonSerializerContext.Default.CatalogInput,
+            CatalogJsonSerializerContext.Default.CatalogResult,
+            static (_, _, _) => throw new NotSupportedException(),
+            (_, _, _) => Task.FromResult(
+                new ProductOperationObservation<CatalogResult>(
+                    activity,
+                    progress: null,
+                    new CatalogResult("done"))));
+
+        await Assert.ThrowsAsync<ProductOperationResultException>(() =>
+            ((IProductOperationAdapter)binding).ObserveAsync(
+                requested,
                 Invocation(Grant()),
                 TestContext.Current.CancellationToken));
     }
@@ -573,6 +627,78 @@ public sealed class ProductOperationCatalogTests
 
         Assert.Throws<ProductOperationCatalogConfigurationException>(() =>
             CreateBindingWithTerminalMetadata(descriptor, terminalType));
+    }
+
+    [Fact]
+    public void Populate_handled_initialized_collections_are_rejected_before_input_binding()
+    {
+        var descriptor = new ProductOperationDescriptor(
+            Send,
+            Send.Id.Value,
+            "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[],\"properties\":{\"items\":{\"type\":[\"array\",\"null\"],\"items\":{\"type\":\"integer\"}}}}",
+            Descriptor(Send).TerminalResultSchema);
+
+        Assert.Throws<ProductOperationCatalogConfigurationException>(() =>
+            ProductOperationBinding.Create<PopulateCollectionInput, CatalogResult>(
+                descriptor,
+                HostileJsonSerializerContext.Default.PopulateCollectionInput,
+                CatalogJsonSerializerContext.Default.CatalogResult,
+                static (_, _, _) => throw new NotSupportedException(),
+                ObserveTypedNotSupported<CatalogResult>));
+    }
+
+    [Fact]
+    public void Input_nullability_uses_the_generated_setter_contract_only()
+    {
+        var descriptor = new ProductOperationDescriptor(
+            Send,
+            Send.Id.Value,
+            "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[],\"properties\":{\"value\":{\"type\":[\"string\",\"null\"]}}}",
+            Descriptor(Send).TerminalResultSchema);
+
+        Assert.Throws<ProductOperationCatalogConfigurationException>(() =>
+            ProductOperationBinding.Create<SetterDisallowsNullInput, CatalogResult>(
+                descriptor,
+                HostileJsonSerializerContext.Default.SetterDisallowsNullInput,
+                CatalogJsonSerializerContext.Default.CatalogResult,
+                static (_, _, _) => throw new NotSupportedException(),
+                ObserveTypedNotSupported<CatalogResult>));
+    }
+
+    [Fact]
+    public void Terminal_nullability_uses_the_generated_getter_contract_only()
+    {
+        var descriptor = new ProductOperationDescriptor(
+            Send,
+            Send.Id.Value,
+            Descriptor(Send).InputSchema,
+            "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[],\"properties\":{\"value\":{\"type\":[\"string\",\"null\"]}}}");
+
+        Assert.Throws<ProductOperationCatalogConfigurationException>(() =>
+            ProductOperationBinding.Create<CatalogInput, SetterAllowsNullResult>(
+                descriptor,
+                CatalogJsonSerializerContext.Default.CatalogInput,
+                HostileJsonSerializerContext.Default.SetterAllowsNullResult,
+                static (_, _, _) => throw new NotSupportedException(),
+                ObserveTypedNotSupported<SetterAllowsNullResult>));
+    }
+
+    [Fact]
+    public void Reference_collection_element_nullability_must_be_provable()
+    {
+        var descriptor = new ProductOperationDescriptor(
+            Send,
+            Send.Id.Value,
+            "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"items\"],\"properties\":{\"items\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}}}",
+            Descriptor(Send).TerminalResultSchema);
+
+        Assert.Throws<ProductOperationCatalogConfigurationException>(() =>
+            ProductOperationBinding.Create<ReferenceCollectionInput, CatalogResult>(
+                descriptor,
+                HostileJsonSerializerContext.Default.ReferenceCollectionInput,
+                CatalogJsonSerializerContext.Default.CatalogResult,
+                static (_, _, _) => throw new NotSupportedException(),
+                ObserveTypedNotSupported<CatalogResult>));
     }
 
     [Theory]
@@ -775,6 +901,20 @@ public sealed class ProductOperationCatalogTests
     private static ProductInvocationContext Invocation(BrainAccessGrant grant)
         => new(grant, new IdempotencyKey("request-1"));
 
+    private static ActivityView ObservedActivity(
+        BrainActivityId activity,
+        ActivityStatus status,
+        OperationId? operation = null,
+        ContractId? terminalResultContract = null)
+        => new(
+            activity,
+            operation ?? Send.Id,
+            status,
+            terminalResultContract ?? Send.TerminalResultContract,
+            Progress: null,
+            Result: null,
+            Problem: null);
+
     private static JsonElement Json(string value)
         => JsonDocument.Parse(value).RootElement.Clone();
 
@@ -935,6 +1075,26 @@ internal sealed record JsonElementInput(JsonElement Payload);
 internal sealed record CustomConverterInput(
     [property: JsonConverter(typeof(TrimStringJsonConverter))] string Message);
 
+internal sealed class PopulateCollectionInput
+{
+    [JsonObjectCreationHandling(JsonObjectCreationHandling.Populate)]
+    public List<int> Items { get; } = [7];
+}
+
+internal sealed class SetterDisallowsNullInput
+{
+    [DisallowNull]
+    public string? Value { get; set; }
+}
+
+internal sealed class SetterAllowsNullResult
+{
+    [AllowNull]
+    public string Value { get; set; } = string.Empty;
+}
+
+internal sealed record ReferenceCollectionInput(List<string> Items);
+
 internal sealed class TrimStringJsonConverter : JsonConverter<string>
 {
     public override string? Read(
@@ -959,4 +1119,8 @@ internal sealed class TrimStringJsonConverter : JsonConverter<string>
 [JsonSerializable(typeof(OpenObjectInput))]
 [JsonSerializable(typeof(JsonElementInput))]
 [JsonSerializable(typeof(CustomConverterInput))]
+[JsonSerializable(typeof(PopulateCollectionInput))]
+[JsonSerializable(typeof(SetterDisallowsNullInput))]
+[JsonSerializable(typeof(SetterAllowsNullResult))]
+[JsonSerializable(typeof(ReferenceCollectionInput))]
 internal sealed partial class HostileJsonSerializerContext : JsonSerializerContext;
