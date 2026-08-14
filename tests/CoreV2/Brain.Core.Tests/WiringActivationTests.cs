@@ -127,6 +127,25 @@ public sealed class WiringActivationTests
         Assert.Single((await fixture.ResolveSourceTwoAsync()).Deliveries);
     }
 
+    [Fact]
+    public async Task FailedReplacementPromotionKeepsThePreviouslyActiveWiringVisibleInEveryShard()
+    {
+        var fixture = new ActivationFixture();
+        await fixture.Activations.ApplyAsync(fixture.Version, fixture.Context);
+        var replacement = fixture.CreateReplacementVersion();
+        fixture.FailNextSecondPromotion();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Activations.ApplyAsync(replacement, fixture.Context));
+
+        Assert.Equal(fixture.Target, Assert.Single((await fixture.ResolveSourceOneAsync()).Deliveries).Target.Role);
+        Assert.Equal(fixture.Target, Assert.Single((await fixture.ResolveSourceTwoAsync()).Deliveries).Target.Role);
+
+        await fixture.Activations.ApplyAsync(replacement, fixture.Context);
+
+        Assert.Equal(fixture.TargetTwo, Assert.Single((await fixture.ResolveSourceOneAsync()).Deliveries).Target.Role);
+        Assert.Equal(fixture.Target, Assert.Single((await fixture.ResolveSourceTwoAsync()).Deliveries).Target.Role);
+    }
+
     private sealed class ActivationFixture
     {
         private readonly ModuleSet _modules;
@@ -198,6 +217,8 @@ public sealed class WiringActivationTests
         public WiringVersion CreateReplacementVersion()
             => new(Version.Wiring, 2, 1, Context.Activity, Operation.Id, Operation.Version,
                 [new WiringRoute(SourceOne, TargetTwo, Produced, new WiringSlotId("source-one"), null), new WiringRoute(SourceTwo, Target, Produced, new WiringSlotId("source-two"), null)], [], []);
+
+        public void FailNextSecondPromotion() => _failSecondPromotionOnce = true;
 
         private Task<GraphResolution> ResolveAsync(NeuronRoleId role)
         {

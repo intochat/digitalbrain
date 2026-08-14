@@ -70,26 +70,21 @@ internal sealed class BrainGraphShardState
         ImmutableList<SynapseRevision> history,
         Func<Brain.Abstractions.Identity.BrainActivityId, bool> isActivationActive)
     {
-        var latest = history[^1];
-        if (latest.Status == SynapseRevisionStatus.Live)
+        for (var index = history.Count - 1; index >= 0; index--)
         {
-            return latest.Activation is null || isActivationActive(latest.Activation.Value)
-                ? latest
-                : null;
-        }
-
-        if (latest.Status == SynapseRevisionStatus.Staged)
-        {
-            if (latest.Activation is { } activation && isActivationActive(activation))
+            var revision = history[index];
+            if (revision.Status == SynapseRevisionStatus.Retired)
             {
-                return latest;
+                // Retirement is terminal for a stable route; an incomplete
+                // replacement must never resurrect what it superseded.
+                return null;
             }
 
-            // Staging must not hide an already live route, but it also must never
-            // resurrect a route that was retired before the staged revision.
-            return history.Count > 1 && history[^2].Status == SynapseRevisionStatus.Live
-                ? history[^2]
-                : null;
+            if (revision.Status == SynapseRevisionStatus.Live
+                && (revision.Activation is null || isActivationActive(revision.Activation.Value)))
+            {
+                return revision;
+            }
         }
 
         return null;
