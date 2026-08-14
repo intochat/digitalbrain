@@ -36,12 +36,19 @@ jobs:
         include:
           - name: architecture
             project: tests/CoreV2/Brain.Architecture.Tests/Brain.Architecture.Tests.csproj
+            arguments: >-
+              --report-xunit-trx
+              --report-xunit-trx-filename architecture.trx
+              --results-directory TestResults/architecture
           - name: abstractions
             project: tests/CoreV2/Brain.Abstractions.Tests/Brain.Abstractions.Tests.csproj
+            arguments: ''
           - name: core
             project: tests/CoreV2/Brain.Core.Tests/Brain.Core.Tests.csproj
+            arguments: ''
           - name: proof
             project: tests/CoreV2/Brain.Proof.Tests/Brain.Proof.Tests.csproj
+            arguments: ''
     name: corev2-${{ matrix.name }}
     steps:
       - uses: actions/checkout@v7
@@ -49,5 +56,12 @@ jobs:
         with:
           global-json-file: global.json
       - name: test ${{ matrix.name }}
-        run: dotnet test ${{ matrix.project }} -c Release
+        run: dotnet test ${{ matrix.project }} -c Release ${{ matrix.arguments }}
         timeout-minutes: 12
+      - name: publish architecture test results
+        if: always() && matrix.name == 'architecture'
+        uses: actions/upload-artifact@v7
+        with:
+          name: corev2-architecture-test-results
+          path: TestResults/architecture/architecture.trx
+          if-no-files-found: error
