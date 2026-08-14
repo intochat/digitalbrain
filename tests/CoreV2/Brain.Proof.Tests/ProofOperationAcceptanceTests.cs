@@ -69,7 +69,7 @@ public sealed class ProofOperationAcceptanceTests
         var correction = await host.ReadResultAsync<CorrectionResult>(correctionView, caller);
 
         Assert.Equal("assessment", correction.AppliedRoute);
-        Assert.Single(host.RewireEvidence);
+        Assert.Single(await host.RewireEvidenceAsync());
 
         var accepted = await host.Operations.InvokeAsync<ProofInput, ProofResult>(
             ProofContracts.Run,
@@ -99,6 +99,21 @@ public sealed class ProofOperationAcceptanceTests
 
         Assert.Equal("summary", (await host.ReadResultAsync<ProofResult>(aliceView, alice)).Route);
         Assert.Equal("summary", (await host.ReadResultAsync<ProofResult>(bobView, bob)).Route);
+    }
+
+    [Fact]
+    public async Task public_operation_path_uses_the_registered_cluster_runtime_grain()
+    {
+        await using var host = await BrainTestHost.StartAsync();
+        var caller = host.Caller("workspace/proof", "principal/alice");
+
+        var accepted = await host.Operations.InvokeAsync<ProofInput, ProofResult>(
+            ProofContracts.Run, new ProofInput("cluster"), caller, new IdempotencyKey("proof/cluster"), TestContext.Current.CancellationToken);
+
+        Assert.NotEqual(Guid.Empty, await host.RuntimeInstanceIdAsync());
+        Assert.Equal(1, await host.RuntimeDispatchCountAsync());
+        var view = await host.Operations.ObserveAsync(accepted.Activity, caller, TestContext.Current.CancellationToken);
+        Assert.Equal("summary", (await host.ReadResultAsync<ProofResult>(view, caller)).Route);
     }
 }
 
