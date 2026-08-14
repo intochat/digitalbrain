@@ -137,6 +137,32 @@ public sealed class OperationGatewayTests
     }
 
     [Fact]
+    public async Task ReusedKeyWithDifferentQueueOrderIsRefusedWithoutAnotherDispatch()
+    {
+        var fixture = GatewayFixture.Allowed();
+        var caller = Caller("workspace/sales", "principal/alice");
+        var key = new IdempotencyKey("request/queue");
+
+        await fixture.Gateway.InvokeAsync<QueueInput, ProofResult>(
+            fixture.Sequence,
+            new QueueInput(new Queue<string>(["alpha", "beta"])),
+            caller,
+            key,
+            TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<IdempotencyConflictException>(() =>
+            fixture.Gateway.InvokeAsync<QueueInput, ProofResult>(
+                fixture.Sequence,
+                new QueueInput(new Queue<string>(["beta", "alpha"])),
+                caller,
+                key,
+                TestContext.Current.CancellationToken));
+
+        Assert.Single(fixture.Store.Activities);
+        Assert.Single(fixture.Dispatcher.Calls);
+    }
+
+    [Fact]
     public async Task RegisteredDescriptorRejectsIncompatibleGenericInputAndResultBeforeActivityCreation()
     {
         var fixture = GatewayFixture.Allowed();
@@ -313,6 +339,8 @@ public sealed class OperationGatewayTests
         IReadOnlyList<string> Items,
         IReadOnlyDictionary<string, int> Values);
 
+    private sealed record QueueInput(IEnumerable<string> Items);
+
     private sealed class GatewayFixture
     {
         private GatewayFixture(PolicyDecision decision)
@@ -332,6 +360,13 @@ public sealed class OperationGatewayTests
                 new NeuronRoleId("proof.entry"),
                 new ModuleId("proof"),
                 new ContractVersion(1));
+            Sequence = new OperationDescriptor(
+                new OperationId("proof.sequence"),
+                new ContractId("proof/sequence-input@1"),
+                new ContractId("proof/sequence-result@1"),
+                new NeuronRoleId("proof.entry"),
+                new ModuleId("proof"),
+                new ContractVersion(1));
             var registry = new ModuleRegistry();
             registry.Resolve(
             [
@@ -340,7 +375,7 @@ public sealed class OperationGatewayTests
                     new ModuleVersion(1, 0, 0),
                     [],
                     [new NeuronRoleDescriptor(Run.EntryRole, NeuronScope.Workspace, Run.Owner)],
-                    [Run, Correct, Collect],
+                    [Run, Correct, Collect, Sequence],
                     [],
                     [],
                     [],
@@ -362,6 +397,7 @@ public sealed class OperationGatewayTests
                     OperationTypeBinding.For<ProofInput, ProofResult>(Run),
                     OperationTypeBinding.For<CorrectionInput, CorrectionResult>(Correct),
                     OperationTypeBinding.For<CollectionInput, ProofResult>(Collect),
+                    OperationTypeBinding.For<QueueInput, ProofResult>(Sequence),
                 ]));
         }
 
@@ -370,6 +406,8 @@ public sealed class OperationGatewayTests
         public OperationDescriptor Correct { get; }
 
         public OperationDescriptor Collect { get; }
+
+        public OperationDescriptor Sequence { get; }
 
         public InMemoryActivityStore Store { get; }
 

@@ -353,10 +353,6 @@ internal static class InputFingerprint
                 var items = enumerable.Cast<object?>()
                     .Select(item => Canonicalize(item, path))
                     .ToList();
-                if (!IsOrderedEnumerable(type))
-                {
-                    items.Sort(StringComparer.Ordinal);
-                }
 
                 Token(builder, "sequence", items.Count.ToString(CultureInfo.InvariantCulture));
                 foreach (var item in items)
@@ -432,14 +428,6 @@ internal static class InputFingerprint
         entries = [];
         return false;
     }
-
-    private static bool IsOrderedEnumerable(Type type)
-        => type.IsArray
-            || typeof(IList).IsAssignableFrom(type)
-            || type.GetInterfaces().Any(static candidate =>
-                candidate.IsGenericType
-                && (candidate.GetGenericTypeDefinition() == typeof(IList<>)
-                    || candidate.GetGenericTypeDefinition() == typeof(IReadOnlyList<>)));
 
     private static void Token(StringBuilder builder, string kind, string? value)
     {
