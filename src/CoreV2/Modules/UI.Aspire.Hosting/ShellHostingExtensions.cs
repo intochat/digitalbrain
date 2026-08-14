@@ -2,6 +2,7 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Brain.Modules.UI;
 using DigitalBrain.Aspire.Hosting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -10,7 +11,27 @@ namespace Brain.Modules.UI.Aspire.Hosting;
 
 public static class ShellHostingExtensions
 {
+    public const string HostKindConfigurationKey = "DigitalBrain:UI:HostKind";
     public const string ProductBaseEnvironmentVariable = ShellNames.ProductBaseEnvironmentVariable;
+
+    public static DigitalBrainModuleBuilder<UiModule> WithConfiguredHost(
+        this DigitalBrainModuleBuilder<UiModule> module,
+        IConfiguration configuration,
+        Action<FlutterHostOptions>? configure = null)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        var configured = configuration[HostKindConfigurationKey];
+        var kind = configured?.Trim().ToLowerInvariant() switch
+        {
+            null or "" or "headless" => FlutterHostKind.Headless,
+            "window" => FlutterHostKind.Window,
+            "web" => FlutterHostKind.Web,
+            _ => throw new InvalidOperationException(
+                $"Unsupported {HostKindConfigurationKey} value '{configured}'. Use headless, window, or web."),
+        };
+
+        return ConfigureFlutterHost(module, kind, configure);
+    }
 
     public static DigitalBrainModuleBuilder<UiModule> WithWindowHost(
         this DigitalBrainModuleBuilder<UiModule> module,
@@ -69,7 +90,10 @@ public static class ShellHostingExtensions
                     $"Flutter host is already configured on brain '{brain.Name}'. Configure exactly one window, web, or headless host.");
             }
 
-            var packageRoot = ResolveWorkingDirectory(brain.ApplicationBuilder.AppHostDirectory, options.WorkingDirectory);
+            var packageRoot = ResolveWorkingDirectory(
+                brain.ApplicationBuilder.AppHostDirectory,
+                kind,
+                options.WorkingDirectory);
             if (!File.Exists(Path.Combine(packageRoot, "pubspec.yaml")))
             {
                 throw new InvalidOperationException(
@@ -192,7 +216,10 @@ public static class ShellHostingExtensions
                 Path.GetFullPath(Path.Combine(workingDirectory, "..", "core", "lib")),
             ];
 
-        private static string ResolveWorkingDirectory(string appHostDirectory, string? configured)
+        private static string ResolveWorkingDirectory(
+            string appHostDirectory,
+            FlutterHostKind kind,
+            string? configured)
         {
             if (!string.IsNullOrWhiteSpace(configured))
             {
@@ -201,8 +228,9 @@ public static class ShellHostingExtensions
                     : Path.GetFullPath(Path.Combine(appHostDirectory, configured));
             }
 
+            var package = kind == FlutterHostKind.Headless ? "core" : "shell";
             return Path.GetFullPath(
-                Path.Combine(appHostDirectory, "..", "UI", "Flutter", "shell"));
+                Path.Combine(appHostDirectory, "..", "UI", "Flutter", package));
         }
     }
 }

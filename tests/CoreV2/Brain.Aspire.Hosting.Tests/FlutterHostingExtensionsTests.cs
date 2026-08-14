@@ -3,12 +3,52 @@ using Aspire.Hosting.ApplicationModel;
 using Brain.Modules.UI;
 using Brain.Modules.UI.Aspire.Hosting;
 using DigitalBrain.Aspire.Hosting;
+using Microsoft.Extensions.Configuration;
 using Xunit;
 
 namespace Brain.Aspire.Hosting.Tests;
 
 public sealed class FlutterHostingExtensionsTests
 {
+    [Fact]
+    public void Configured_host_defaults_to_headless_dart_without_a_window()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        var brain = builder.AddDigitalBrain("brain");
+
+        brain.AddModule<UiModule>(ui => ui.WithConfiguredHost(builder.Configuration, options =>
+        {
+            options.WorkingDirectory = FindFlutterCore();
+        }));
+
+        var flutter = Assert.IsType<ExecutableResource>(
+            Assert.Single(builder.Resources, resource => resource.Name == "flutter"));
+        Assert.Equal("dart", Path.GetFileNameWithoutExtension(flutter.Command), ignoreCase: true);
+        Assert.Equal(FindFlutterCore(), flutter.WorkingDirectory);
+    }
+
+    [Fact]
+    public void Configured_host_can_explicitly_opt_into_a_window()
+    {
+        var builder = DistributedApplication.CreateBuilder();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [ShellHostingExtensions.HostKindConfigurationKey] = "window",
+        });
+        var brain = builder.AddDigitalBrain("brain");
+
+        brain.AddModule<UiModule>(ui => ui.WithConfiguredHost(builder.Configuration, options =>
+        {
+            options.FlutterCommand = "flutter";
+            options.WorkingDirectory = FindFlutterShell();
+        }));
+
+        var flutter = Assert.IsType<ExecutableResource>(
+            Assert.Single(builder.Resources, resource => resource.Name == "flutter"));
+        Assert.Equal("flutter", flutter.Command);
+        Assert.Equal(FindFlutterShell(), flutter.WorkingDirectory);
+    }
+
     [Fact]
     public void Window_host_is_module_owned_and_waits_for_the_product_client()
     {
@@ -69,5 +109,17 @@ public sealed class FlutterHostingExtensionsTests
 
         Assert.NotNull(directory);
         return Path.Combine(directory.FullName, "src", "CoreV2", "UI", "Flutter", "shell");
+    }
+
+    private static string FindFlutterCore()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "DigitalBrain.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        Assert.NotNull(directory);
+        return Path.Combine(directory.FullName, "src", "CoreV2", "UI", "Flutter", "core");
     }
 }

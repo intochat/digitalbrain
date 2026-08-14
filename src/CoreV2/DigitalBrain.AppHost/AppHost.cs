@@ -5,7 +5,7 @@ using DigitalBrain.Aspire.Hosting;
 var builder = DistributedApplication.CreateBuilder(args);
 
 var brain = builder.AddDigitalBrain(ProductResources.Brain);
-brain.AddModule<UiModule>(ui => ui.WithWindowHost());
+brain.AddModule<UiModule>(ui => ui.WithConfiguredHost(builder.Configuration));
 var runtime = builder
     .AddProject<Projects.DigitalBrain_RuntimeHost>(ProductResources.Runtime)
     .WithReference(brain)
