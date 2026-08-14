@@ -41,6 +41,7 @@ The acceptance run used `aspire start --isolated --non-interactive` and Aspire's
 - The MCP BrainGraph returned two Neurons and live Synapse `602ab2e8-02cc-41f9-910a-04786a56b26c` with revision 1, usage count 1, and the chat activity as provenance.
 - The MCP activity view reported `Chat.Send@1` as `Completed` at journal sequence 23.
 - The headless Flutter log observed the same transition: `BrainGraph sequence=2 neurons=2 synapses=1`. Aspire launched `dart run bin/digitalbrain_host.dart`; no Flutter desktop window was started.
+- After a complete AppHost stop/start, Aspire MCP re-read the same completed activity and rehydrated the identical live Synapse, usage count, and provenance from persistent storage.
 
 ## Verification
 
