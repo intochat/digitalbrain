@@ -146,6 +146,18 @@ public sealed class WiringActivationTests
         Assert.Equal(fixture.Target, Assert.Single((await fixture.ResolveSourceTwoAsync()).Deliveries).Target.Role);
     }
 
+    [Fact]
+    public async Task DuplicateStableRouteIsRejectedBeforeItCreatesActivationOrGraphState()
+    {
+        var fixture = new ActivationFixture();
+
+        var error = Assert.Throws<ArgumentException>(fixture.CreateDuplicateStableRouteVersion);
+
+        Assert.Contains("stable", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(Guid.Empty, fixture.CurrentId.Value);
+        Assert.Equal(0, await fixture.RevisionCountSourceOneAsync());
+    }
+
     private sealed class ActivationFixture
     {
         private readonly ModuleSet _modules;
@@ -218,6 +230,10 @@ public sealed class WiringActivationTests
             => new(Version.Wiring, 2, 1, Context.Activity, Operation.Id, Operation.Version,
                 [new WiringRoute(SourceOne, TargetTwo, Produced, new WiringSlotId("source-one"), null), new WiringRoute(SourceTwo, Target, Produced, new WiringSlotId("source-two"), null)], [], []);
 
+        public WiringVersion CreateDuplicateStableRouteVersion()
+            => new(WiringId.New(), 1, null, Context.Activity, Operation.Id, Operation.Version,
+                [new WiringRoute(SourceOne, Target, Produced, new WiringSlotId("source-one"), null), new WiringRoute(SourceOne, TargetTwo, Produced, new WiringSlotId("source-one"), null)], [], []);
+
         public void FailNextSecondPromotion() => _failSecondPromotionOnce = true;
 
         private Task<GraphResolution> ResolveAsync(NeuronRoleId role)
@@ -233,6 +249,8 @@ public sealed class WiringActivationTests
             var endpoint = _resolver.Resolve(new NeuronRoleDescriptor(role, NeuronScope.Workspace, new ModuleId("proof")), caller);
             return _directory.Open(endpoint, _modules, _policy);
         }
+
+        public Task<int> RevisionCountSourceOneAsync() => Open(SourceOne).RevisionCountAsync();
 
         private void BeforeStage(NeuronRoleId sourceRole)
         {

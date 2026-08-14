@@ -81,7 +81,9 @@ public sealed class WiringVersion
         CauseActivity = causeActivity;
         Operation = operation;
         OperationMajor = operationMajor;
-        Routes = Copy(routes, nameof(routes), requireValue: true);
+        var declaredRoutes = Copy(routes, nameof(routes), requireValue: true);
+        EnsureDistinctStableRoutes(declaredRoutes, nameof(routes));
+        Routes = declaredRoutes;
         RequiredCapabilities = Copy(requiredCapabilities, nameof(requiredCapabilities), requireValue: false);
         PolicyPrerequisites = Copy(policyPrerequisites, nameof(policyPrerequisites), requireValue: false);
     }
@@ -127,6 +129,25 @@ public sealed class WiringVersion
             throw new ArgumentException("A wiring version requires a declared operation.", parameterName);
         }
     }
+
+    private static void EnsureDistinctStableRoutes(IReadOnlyList<WiringRoute> routes, string parameterName)
+    {
+        var stableRoutes = new HashSet<StableRoute>();
+        foreach (var route in routes)
+        {
+            if (!stableRoutes.Add(new StableRoute(route.SourceRole, route.EventContract, route.Slot)))
+            {
+                throw new ArgumentException(
+                    "A wiring version cannot declare duplicate stable routes for the same source role, event contract, and slot.",
+                    parameterName);
+            }
+        }
+    }
+
+    private readonly record struct StableRoute(
+        NeuronRoleId SourceRole,
+        ContractId EventContract,
+        WiringSlotId Slot);
 }
 
 public sealed record WiringProposal(WiringVersion Version);
