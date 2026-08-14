@@ -265,7 +265,7 @@ public sealed class AuthorityBoundaryTests
                 "../Aspire/Brain.Aspire/Brain.Aspire.csproj",
                 "../Brain.Product.Abstractions/Brain.Product.Abstractions.csproj",
                 "../Brain.Core/Brain.Core.csproj",
-                "../Brain.Runtime.Abstractions/Brain.Runtime.Abstractions.csproj",
+                "../Modules/UI/Contracts/Brain.Modules.UI.Contracts.csproj",
             ],
             projectReferences);
         var program = Assert.Single(

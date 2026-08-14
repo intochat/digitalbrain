@@ -288,7 +288,10 @@ public sealed class ProductBoundaryContractTests
             Path.Combine(root, "src", "CoreV2", "Modules"),
             "*.csproj",
             SearchOption.AllDirectories)
-            .Where(static path => path.Replace('\\', '/').Contains(".Contracts/", StringComparison.OrdinalIgnoreCase))
+            .Where(static path => string.Equals(
+                Path.GetFileName(Path.GetDirectoryName(path)),
+                "Contracts",
+                StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
         Assert.NotEmpty(moduleContracts);

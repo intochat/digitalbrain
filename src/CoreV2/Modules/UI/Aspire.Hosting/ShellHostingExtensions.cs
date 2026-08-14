@@ -230,7 +230,7 @@ public static class ShellHostingExtensions
 
             var package = kind == FlutterHostKind.Headless ? "core" : "shell";
             return Path.GetFullPath(
-                Path.Combine(appHostDirectory, "..", "UI", "Flutter", package));
+                Path.Combine(appHostDirectory, "..", "Modules", "UI", "Flutter", package));
         }
     }
 }

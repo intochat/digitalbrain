@@ -11,6 +11,6 @@
     <ProjectReference Include="../../../src/CoreV2/Aspire/Brain.Aspire.Hosting/Brain.Aspire.Hosting.csproj" />
     <ProjectReference Include="../../../src/CoreV2/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
     <ProjectReference Include="../../../src/CoreV2/Modules/AI/Aspire.Hosting/Brain.Modules.AI.Aspire.Hosting.csproj" />
-    <ProjectReference Include="../../../src/CoreV2/Modules/UI.Aspire.Hosting/Brain.Modules.UI.Aspire.Hosting.csproj" />
+    <ProjectReference Include="../../../src/CoreV2/Modules/UI/Aspire.Hosting/Brain.Modules.UI.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>

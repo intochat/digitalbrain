@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Journaling" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../Brain.Abstractions/Brain.Abstractions.csproj" />
+    <ProjectReference Include="../../../Brain.Core/Brain.Core.csproj" />
+    <ProjectReference Include="../Contracts/Brain.Modules.Proof.Contracts.csproj" />
+  </ItemGroup>
+</Project>

@@ -8,14 +8,8 @@
   <ItemGroup>
     <ProjectReference Include="../Aspire/Brain.Aspire/Brain.Aspire.csproj" />
     <ProjectReference Include="../Brain.Core/Brain.Core.csproj" />
-    <ProjectReference Include="../Brain.Runtime/Brain.Runtime.csproj" />
-    <ProjectReference Include="../Brain.Runtime.Abstractions/Brain.Runtime.Abstractions.csproj" />
-    <ProjectReference Include="../Modules/Behavior/Brain.Modules.Behavior.csproj" />
     <ProjectReference Include="../Modules/AI/Runtime/Brain.Modules.AI.csproj" />
-    <ProjectReference Include="../Modules/Conversation/Brain.Modules.Conversation.csproj" />
-    <ProjectReference Include="../Modules/Memory/Brain.Modules.Memory.csproj" />
-    <ProjectReference Include="../Modules/Proof/Brain.Modules.Proof.csproj" />
-    <ProjectReference Include="../Modules/Scheduling/Brain.Modules.Scheduling.csproj" />
-    <ProjectReference Include="../Modules/UI/Brain.Modules.UI.csproj" />
+    <ProjectReference Include="../Modules/Proof/Runtime/Brain.Modules.Proof.csproj" />
+    <ProjectReference Include="../Modules/UI/Runtime/Brain.Modules.UI.csproj" />
   </ItemGroup>
 </Project>

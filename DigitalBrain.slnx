@@ -3,8 +3,6 @@
     <Project Path="src/CoreV2/Brain.Abstractions/Brain.Abstractions.csproj" />
     <Project Path="src/CoreV2/Brain.Core/Brain.Core.csproj" />
     <Project Path="src/CoreV2/Brain.Product.Abstractions/Brain.Product.Abstractions.csproj" />
-    <Project Path="src/CoreV2/Brain.Runtime.Abstractions/Brain.Runtime.Abstractions.csproj" />
-    <Project Path="src/CoreV2/Brain.Runtime/Brain.Runtime.csproj" />
     <Project Path="src/CoreV2/DigitalBrain.ProductHost/DigitalBrain.ProductHost.csproj" />
     <Project Path="src/CoreV2/DigitalBrain.RuntimeHost/DigitalBrain.RuntimeHost.csproj" />
     <Project Path="src/CoreV2/Brain.Testing/Brain.Testing.csproj" />
@@ -12,18 +10,14 @@
     <Project Path="src/CoreV2/Aspire/Brain.Aspire.Hosting/Brain.Aspire.Hosting.csproj" />
     <Project Path="src/CoreV2/Aspire/Brain.Aspire/Brain.Aspire.csproj" />
     <Project Path="src/CoreV2/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
-    <Project Path="src/CoreV2/Modules/Proof.Contracts/Brain.Modules.Proof.Contracts.csproj" />
-    <Project Path="src/CoreV2/Modules/Proof/Brain.Modules.Proof.csproj" />
-    <Project Path="src/CoreV2/Modules/Conversation.Contracts/Brain.Modules.Conversation.Contracts.csproj" />
-    <Project Path="src/CoreV2/Modules/Conversation/Brain.Modules.Conversation.csproj" />
-    <Project Path="src/CoreV2/Modules/Behavior.Contracts/Brain.Modules.Behavior.Contracts.csproj" />
-    <Project Path="src/CoreV2/Modules/Behavior/Brain.Modules.Behavior.csproj" />
-    <Project Path="src/CoreV2/Modules/Memory.Contracts/Brain.Modules.Memory.Contracts.csproj" />
-    <Project Path="src/CoreV2/Modules/Memory/Brain.Modules.Memory.csproj" />
-    <Project Path="src/CoreV2/Modules/Scheduling.Contracts/Brain.Modules.Scheduling.Contracts.csproj" />
-    <Project Path="src/CoreV2/Modules/Scheduling/Brain.Modules.Scheduling.csproj" />
-    <Project Path="src/CoreV2/Modules/UI/Brain.Modules.UI.csproj" />
-    <Project Path="src/CoreV2/Modules/UI.Aspire.Hosting/Brain.Modules.UI.Aspire.Hosting.csproj" />
+    <Project Path="src/CoreV2/Modules/Proof/Contracts/Brain.Modules.Proof.Contracts.csproj" />
+    <Project Path="src/CoreV2/Modules/Proof/Runtime/Brain.Modules.Proof.csproj" />
+    <Project Path="src/CoreV2/Modules/AI/Contracts/Brain.Modules.AI.Contracts.csproj" />
+    <Project Path="src/CoreV2/Modules/AI/Runtime/Brain.Modules.AI.csproj" />
+    <Project Path="src/CoreV2/Modules/AI/Aspire.Hosting/Brain.Modules.AI.Aspire.Hosting.csproj" />
+    <Project Path="src/CoreV2/Modules/UI/Contracts/Brain.Modules.UI.Contracts.csproj" />
+    <Project Path="src/CoreV2/Modules/UI/Runtime/Brain.Modules.UI.csproj" />
+    <Project Path="src/CoreV2/Modules/UI/Aspire.Hosting/Brain.Modules.UI.Aspire.Hosting.csproj" />
     <Project Path="tests/CoreV2/Brain.Architecture.Tests/Brain.Architecture.Tests.csproj" />
     <Project Path="tests/CoreV2/Brain.Authority.Conformance.Tests/Brain.Authority.Conformance.Tests.csproj" />
     <Project Path="tests/CoreV2/Brain.Abstractions.Tests/Brain.Abstractions.Tests.csproj" />
@@ -33,5 +27,7 @@
     <Project Path="tests/CoreV2/Brain.ProductHost.Tests/Brain.ProductHost.Tests.csproj" />
     <Project Path="tests/CoreV2/Brain.Proof.Tests/Brain.Proof.Tests.csproj" />
     <Project Path="tests/CoreV2/Brain.Runtime.Tests/Brain.Runtime.Tests.csproj" />
+    <Project Path="tests/CoreV2/Modules/AI.Tests/Brain.Modules.AI.Tests.csproj" />
+    <Project Path="tests/CoreV2/Modules/UI.Tests/Brain.Modules.UI.Tests.csproj" />
   </Folder>
 </Solution>

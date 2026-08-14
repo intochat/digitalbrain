@@ -12,6 +12,6 @@
     <ProjectReference Include="../../../../src/CoreV2/Brain.Core/Brain.Core.csproj" />
     <ProjectReference Include="../../../../src/CoreV2/Modules/AI/Contracts/Brain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="../../../../src/CoreV2/Modules/AI/Runtime/Brain.Modules.AI.csproj" />
-    <ProjectReference Include="../../../../src/CoreV2/Modules/Proof/Brain.Modules.Proof.csproj" />
+    <ProjectReference Include="../../../../src/CoreV2/Modules/Proof/Runtime/Brain.Modules.Proof.csproj" />
   </ItemGroup>
 </Project>
