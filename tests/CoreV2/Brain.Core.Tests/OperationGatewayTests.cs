@@ -566,6 +566,9 @@ public sealed class OperationGatewayTests
 
         public PolicyDecision AuthorizeGraphChange(ActivityContext context, GraphChangeRequest request)
             => PolicyDecision.Refused;
+
+        public PolicyDecision AuthorizeCapability(ActivityContext context, Brain.Abstractions.Capabilities.CapabilityDescriptor capability)
+            => PolicyDecision.Refused;
     }
 
     private sealed class TestEndpointResolver : IEndpointResolver

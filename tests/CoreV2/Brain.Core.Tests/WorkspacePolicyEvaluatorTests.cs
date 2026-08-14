@@ -1,4 +1,5 @@
 using Brain.Abstractions.Context;
+using Brain.Abstractions.Capabilities;
 using Brain.Abstractions.Contracts;
 using Brain.Abstractions.Identity;
 using Brain.Abstractions.Modules;
@@ -33,6 +34,46 @@ public sealed class WorkspacePolicyEvaluatorTests
         var decision = evaluator.AuthorizeOperation(Caller(), attempted);
 
         Assert.Equal(PolicyDecision.Refused, decision);
+    }
+
+    [Fact]
+    public void AuthorizeCapabilityAllowsOnlyTheExactDescriptorPublishedByItsInstalledOwner()
+    {
+        var capability = new CapabilityDescriptor(
+            new CapabilityId("proof/classify@1"),
+            new ContractId("proof/classify-request@1"),
+            new ContractId("proof/classify-result@1"),
+            new ModuleId("proof"),
+            new ContractVersion(1));
+        var modules = ManifestValidator.Validate(
+        [
+            new ModuleManifest(
+                new ModuleId("proof"),
+                new ModuleVersion(1, 0, 0),
+                [],
+                [],
+                [],
+                [],
+                [],
+                [],
+                [capability],
+                []),
+        ]);
+        var evaluator = new WorkspacePolicyEvaluator(modules);
+        var context = new ActivityContext(
+            new WorkspaceId("workspace/sales"),
+            new PrincipalId("principal/alice"),
+            BrainActivityId.New(),
+            new CorrelationId("correlation/capability"));
+        var mismatched = new CapabilityDescriptor(
+            capability.Id,
+            capability.RequestContract,
+            capability.ResultContract,
+            capability.Owner,
+            new ContractVersion(2));
+
+        Assert.Equal(PolicyDecision.Allowed, evaluator.AuthorizeCapability(context, capability));
+        Assert.Equal(PolicyDecision.Refused, evaluator.AuthorizeCapability(context, mismatched));
     }
 
     [Fact]

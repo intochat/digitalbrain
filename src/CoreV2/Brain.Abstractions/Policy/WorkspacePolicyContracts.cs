@@ -1,4 +1,5 @@
 using Brain.Abstractions.Context;
+using Brain.Abstractions.Capabilities;
 using Brain.Abstractions.Contracts;
 using Brain.Abstractions.Identity;
 using Brain.Abstractions.Operations;
@@ -63,4 +64,6 @@ public interface IWorkspacePolicyEvaluator
     PolicyDecision AuthorizeOperation(WorkspaceContext caller, OperationDescriptor operation);
 
     PolicyDecision AuthorizeGraphChange(ActivityContext context, GraphChangeRequest request);
+
+    PolicyDecision AuthorizeCapability(ActivityContext context, CapabilityDescriptor capability);
 }

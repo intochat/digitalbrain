@@ -360,6 +360,9 @@ public sealed class BrainGraphShardTests
             => PolicyDecision.Refused;
 
         public PolicyDecision AuthorizeGraphChange(ActivityContext context, GraphChangeRequest request) => decision;
+
+        public PolicyDecision AuthorizeCapability(ActivityContext context, Brain.Abstractions.Capabilities.CapabilityDescriptor capability)
+            => PolicyDecision.Refused;
     }
 
     private sealed class ProofFinished : IDomainEvent;

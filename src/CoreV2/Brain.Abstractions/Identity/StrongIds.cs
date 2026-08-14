@@ -98,6 +98,21 @@ public readonly record struct CapabilityId
     }
 }
 
+public readonly record struct CapabilityUseName
+{
+    public CapabilityUseName(string value) => Value = Required(value, nameof(value));
+
+    public string Value { get; }
+
+    public override string ToString() => Value;
+
+    private static string Required(string value, string parameterName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value, parameterName);
+        return value;
+    }
+}
+
 public readonly record struct NeuronRoleId
 {
     public NeuronRoleId(string value) => Value = Required(value, nameof(value));

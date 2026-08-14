@@ -61,6 +61,7 @@ public interface ICapabilityBroker
 {
     Task<TResult> UseAsync<TRequest, TResult>(
         CapabilityDescriptor capability,
+        CapabilityUseName useName,
         TRequest request,
         ActivityContext context,
         CancellationToken cancellationToken)

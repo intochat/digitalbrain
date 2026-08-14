@@ -54,9 +54,18 @@ public sealed class IdentityAndContextTests
         Assert.Throws<ArgumentException>(() => new ModuleId(value));
         Assert.Throws<ArgumentException>(() => new OperationId(value));
         Assert.Throws<ArgumentException>(() => new CapabilityId(value));
+        Assert.Throws<ArgumentException>(() => new CapabilityUseName(value));
         Assert.Throws<ArgumentException>(() => new NeuronRoleId(value));
         Assert.Throws<ArgumentException>(() => new CorrelationId(value));
         Assert.Throws<ArgumentException>(() => new IdempotencyKey(value));
+    }
+
+    [Fact]
+    public void Capability_use_name_is_a_nonempty_stable_identifier()
+    {
+        var name = new CapabilityUseName("classification/customer-42");
+
+        Assert.Equal("classification/customer-42", name.Value);
     }
 
     [Fact]

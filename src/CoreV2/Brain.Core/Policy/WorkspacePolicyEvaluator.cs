@@ -1,4 +1,5 @@
 using Brain.Abstractions.Context;
+using Brain.Abstractions.Capabilities;
 using Brain.Abstractions.Operations;
 using Brain.Abstractions.Policy;
 using Brain.Core.Modules;
@@ -44,5 +45,16 @@ public sealed class WorkspacePolicyEvaluator(ModuleSet modules) : IWorkspacePoli
             .SelectMany(static module => module.Roles)
             .SingleOrDefault(role => role.Id == request.TargetRole);
         return targetRole is null ? PolicyDecision.Refused : PolicyDecision.Allowed;
+    }
+
+    public PolicyDecision AuthorizeCapability(ActivityContext context, CapabilityDescriptor capability)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(capability);
+
+        var provider = _modules.Modules.SingleOrDefault(module => module.Id == capability.Owner);
+        return provider is not null && provider.ProvidedCapabilities.Contains(capability)
+            ? PolicyDecision.Allowed
+            : PolicyDecision.Refused;
     }
 }
