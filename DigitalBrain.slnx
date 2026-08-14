@@ -2,12 +2,14 @@
   <Folder Name="/CoreV2/">
     <Project Path="src/CoreV2/Brain.Abstractions/Brain.Abstractions.csproj" />
     <Project Path="src/CoreV2/Brain.Core/Brain.Core.csproj" />
+    <Project Path="src/CoreV2/Brain.Product.Abstractions/Brain.Product.Abstractions.csproj" />
     <Project Path="src/CoreV2/Brain.Testing/Brain.Testing.csproj" />
     <Project Path="src/CoreV2/Modules/Proof.Contracts/Brain.Modules.Proof.Contracts.csproj" />
     <Project Path="src/CoreV2/Modules/Proof/Brain.Modules.Proof.csproj" />
     <Project Path="tests/CoreV2/Brain.Architecture.Tests/Brain.Architecture.Tests.csproj" />
     <Project Path="tests/CoreV2/Brain.Abstractions.Tests/Brain.Abstractions.Tests.csproj" />
     <Project Path="tests/CoreV2/Brain.Core.Tests/Brain.Core.Tests.csproj" />
+    <Project Path="tests/CoreV2/Brain.ProductHost.Tests/Brain.ProductHost.Tests.csproj" />
     <Project Path="tests/CoreV2/Brain.Proof.Tests/Brain.Proof.Tests.csproj" />
   </Folder>
 </Solution>
