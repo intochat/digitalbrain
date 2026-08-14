@@ -44,7 +44,7 @@ public sealed class WorkspacePolicyEvaluatorTests
     }
 
     [Fact]
-    public void AuthorizeGraphChangeRefusesATargetRoleOutsideTheRequestingModule()
+    public void AuthorizeGraphChangeRefusesAnUninstalledTargetRole()
     {
         var operation = Operation("proof.run", "proof.entry", "proof");
         var evaluator = new WorkspacePolicyEvaluator(ModuleSetFor(operation));
@@ -57,11 +57,32 @@ public sealed class WorkspacePolicyEvaluatorTests
             GraphChangeKind.Install,
             new ModuleId("proof"),
             new ContractId("proof/finished@1"),
-            new NeuronRoleId("other.entry"));
+            new NeuronRoleId("missing.entry"));
 
         var decision = evaluator.AuthorizeGraphChange(context, request);
 
         Assert.Equal(PolicyDecision.Refused, decision);
+    }
+
+    [Fact]
+    public void AuthorizeGraphChangeAllowsAnInstalledCrossModuleTargetRole()
+    {
+        var operation = Operation("proof.run", "proof.entry", "proof");
+        var evaluator = new WorkspacePolicyEvaluator(ModuleSetForCrossModuleTarget(operation));
+        var context = new ActivityContext(
+            new WorkspaceId("workspace/sales"),
+            new PrincipalId("principal/alice"),
+            BrainActivityId.New(),
+            new CorrelationId("correlation/one"));
+        var request = new GraphChangeRequest(
+            GraphChangeKind.Install,
+            new ModuleId("proof"),
+            new ContractId("proof/finished@1"),
+            new NeuronRoleId("assessment.entry"));
+
+        var decision = evaluator.AuthorizeGraphChange(context, request);
+
+        Assert.Equal(PolicyDecision.Allowed, decision);
     }
 
     private static WorkspaceContext Caller()
@@ -76,6 +97,33 @@ public sealed class WorkspacePolicyEvaluatorTests
                 [],
                 [new NeuronRoleDescriptor(operation.EntryRole, NeuronScope.Workspace, operation.Owner)],
                 [operation],
+                [],
+                [],
+                [],
+                [],
+                []),
+        ]);
+
+    private static ModuleSet ModuleSetForCrossModuleTarget(OperationDescriptor operation)
+        => ManifestValidator.Validate(
+        [
+            new ModuleManifest(
+                new ModuleId("proof"),
+                new ModuleVersion(1, 0, 0),
+                [],
+                [new NeuronRoleDescriptor(operation.EntryRole, NeuronScope.Workspace, operation.Owner)],
+                [operation],
+                [],
+                [],
+                [],
+                [],
+                []),
+            new ModuleManifest(
+                new ModuleId("assessment"),
+                new ModuleVersion(1, 0, 0),
+                [],
+                [new NeuronRoleDescriptor(new NeuronRoleId("assessment.entry"), NeuronScope.Workspace, new ModuleId("assessment"))],
+                [],
                 [],
                 [],
                 [],

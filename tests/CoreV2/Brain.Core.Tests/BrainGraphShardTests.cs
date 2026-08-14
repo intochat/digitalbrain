@@ -9,6 +9,7 @@ using Brain.Abstractions.Policy;
 using Brain.Core.Endpoints;
 using Brain.Core.Graph;
 using Brain.Core.Modules;
+using Brain.Core.Policy;
 using Xunit;
 
 namespace Brain.Core.Tests;
@@ -78,6 +79,37 @@ public sealed class BrainGraphShardTests
     }
 
     [Fact]
+    public async Task SameSourceHandlesShareOneAuthoritativeHistoryAndOtherSourceShardsAreIsolated()
+    {
+        var fixture = new GraphFixture(EventVisibility.Published);
+        var sameSourceHandle = fixture.Open(fixture.Source);
+        var otherSource = fixture.Source with { Role = new NeuronRoleId("proof.other-source") };
+        var otherSourceHandle = fixture.Open(otherSource);
+        var installed = await fixture.Graph.InstallAsync(fixture.Request);
+        await sameSourceHandle.RetireAsync(installed.Key, GraphReason.ManualRetire, fixture.Context);
+        var reinstalled = await fixture.Graph.InstallAsync(fixture.Request);
+        var otherInstalled = await otherSourceHandle.InstallAsync(fixture.Request with { Source = otherSource });
+
+        Assert.Equal(installed.Key, reinstalled.Key);
+        Assert.Equal(3, reinstalled.Revision);
+        Assert.Single((await sameSourceHandle.ResolveAsync(fixture.Source, fixture.Finished)).Deliveries);
+        Assert.Single((await otherSourceHandle.ResolveAsync(otherSource, fixture.Finished)).Deliveries);
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => otherSourceHandle.HistoryAsync(reinstalled.Key));
+        await Assert.ThrowsAsync<GraphValidationException>(() => fixture.Graph.InstallAsync(fixture.Request with { Source = otherSource }));
+        Assert.NotEqual(reinstalled.Key, otherInstalled.Key);
+    }
+
+    [Fact]
+    public void DelimiterContainingEndpointFieldsProduceDistinctCanonicalShardKeys()
+    {
+        var resolver = new GraphShardResolver();
+        var first = new EndpointAddress(new WorkspaceId("a|b"), new ModuleId("c"), new NeuronRoleId("d"), "e");
+        var second = new EndpointAddress(new WorkspaceId("a"), new ModuleId("b"), new NeuronRoleId("c"), "d|e");
+
+        Assert.NotEqual(resolver.Resolve(first), resolver.Resolve(second));
+    }
+
+    [Fact]
     public async Task ResolutionContainsOnlyTheLatestLiveRevisionSnapshot()
     {
         var fixture = new GraphFixture(EventVisibility.Published);
@@ -106,12 +138,26 @@ public sealed class BrainGraphShardTests
     [Fact]
     public async Task CrossModuleInternalEventIsRejectedBeforeAnyRevisionIsWritten()
     {
-        var fixture = new GraphFixture(EventVisibility.Internal);
+        var fixture = new GraphFixture(EventVisibility.Internal, useWorkspacePolicy: true);
 
         await Assert.ThrowsAsync<GraphValidationException>(() =>
             fixture.Graph.InstallAsync(fixture.Request with { Target = fixture.AssessmentTarget, Reshape = fixture.ToAssessment }));
 
         Assert.Equal(0, await fixture.Graph.RevisionCountAsync());
+    }
+
+    [Fact]
+    public async Task ProductionPolicyAllowsPublishedCrossModuleRouteToAnInstalledTargetRole()
+    {
+        var fixture = new GraphFixture(EventVisibility.Published, useWorkspacePolicy: true);
+
+        var installed = await fixture.Graph.InstallAsync(fixture.Request with
+        {
+            Target = fixture.AssessmentTarget,
+            Reshape = fixture.ToAssessment,
+        });
+
+        Assert.Equal(fixture.AssessmentTarget, installed.Target);
     }
 
     [Theory]
@@ -175,6 +221,42 @@ public sealed class BrainGraphShardTests
     }
 
     [Fact]
+    public async Task WorkspaceScopedSourceAndTargetRejectNonWorkspaceTokensBeforeStateMutation()
+    {
+        var fixture = new GraphFixture(EventVisibility.Published);
+        var invalidSource = fixture.Source with { ScopeToken = "principal/alice" };
+
+        await Assert.ThrowsAsync<GraphValidationException>(() => fixture.Open(invalidSource).InstallAsync(fixture.Request with
+        {
+            Source = invalidSource,
+        }));
+        await Assert.ThrowsAsync<GraphValidationException>(() => fixture.Graph.InstallAsync(fixture.Request with
+        {
+            Target = fixture.ProofTarget with { ScopeToken = "principal/alice" },
+        }));
+
+        Assert.Equal(0, await fixture.Graph.RevisionCountAsync());
+    }
+
+    [Fact]
+    public async Task PrincipalScopedSourceAndTargetRequireTheVerifiedPrincipalToken()
+    {
+        var fixture = new GraphFixture(EventVisibility.Published, roleScope: NeuronScope.Principal);
+        var invalidSource = fixture.Source with { ScopeToken = "workspace" };
+
+        await Assert.ThrowsAsync<GraphValidationException>(() => fixture.Open(invalidSource).InstallAsync(fixture.Request with
+        {
+            Source = invalidSource,
+        }));
+        await Assert.ThrowsAsync<GraphValidationException>(() => fixture.Graph.InstallAsync(fixture.Request with
+        {
+            Target = fixture.ProofTarget with { ScopeToken = "principal/bob" },
+        }));
+
+        Assert.Equal(0, await fixture.Graph.RevisionCountAsync());
+    }
+
+    [Fact]
     public async Task HistoryAndResolutionAreImmutableSnapshots()
     {
         var fixture = new GraphFixture(EventVisibility.Published);
@@ -190,25 +272,33 @@ public sealed class BrainGraphShardTests
 
     private sealed class GraphFixture
     {
-        public GraphFixture(EventVisibility visibility, PolicyDecision decision = PolicyDecision.Allowed)
+        private readonly ModuleSet _modules;
+        private readonly IWorkspacePolicyEvaluator _policy;
+
+        public GraphFixture(
+            EventVisibility visibility,
+            PolicyDecision decision = PolicyDecision.Allowed,
+            bool useWorkspacePolicy = false,
+            NeuronScope roleScope = NeuronScope.Workspace)
         {
             Finished = new ContractId("proof/finished@1");
             Assessed = new ContractId("proof/assessed@1");
-            Source = new EndpointAddress(new WorkspaceId("workspace/one"), new ModuleId("proof"), new NeuronRoleId("proof.source"), "workspace");
+            var scopeToken = roleScope == NeuronScope.Workspace ? "workspace" : "principal/alice";
+            Source = new EndpointAddress(new WorkspaceId("workspace/one"), new ModuleId("proof"), new NeuronRoleId("proof.source"), scopeToken);
             ProofTarget = new EndpointAddress(Source.Workspace, Source.Module, new NeuronRoleId("proof.target"), "workspace");
-            AssessmentTarget = new EndpointAddress(Source.Workspace, new ModuleId("assessment"), new NeuronRoleId("assessment.target"), "workspace");
+            AssessmentTarget = new EndpointAddress(Source.Workspace, new ModuleId("assessment"), new NeuronRoleId("assessment.target"), scopeToken);
             Context = new ActivityContext(Source.Workspace, new PrincipalId("principal/alice"), BrainActivityId.New(), new CorrelationId("correlation/one"));
             ToAssessment = new ReshapeDescriptor(Finished, Assessed, Source.Module);
-            var modules = ManifestValidator.Validate(
+            _modules = ManifestValidator.Validate(
             [
                 new ModuleManifest(
                     Source.Module,
                     new ModuleVersion(1, 0, 0),
                     [],
                     [
-                        new NeuronRoleDescriptor(Source.Role, NeuronScope.Workspace, Source.Module),
-                        new NeuronRoleDescriptor(ProofTarget.Role, NeuronScope.Workspace, Source.Module),
-                        new NeuronRoleDescriptor(new NeuronRoleId("proof.other-source"), NeuronScope.Workspace, Source.Module),
+                        new NeuronRoleDescriptor(Source.Role, roleScope, Source.Module),
+                        new NeuronRoleDescriptor(ProofTarget.Role, roleScope, Source.Module),
+                        new NeuronRoleDescriptor(new NeuronRoleId("proof.other-source"), roleScope, Source.Module),
                     ],
                     [],
                     [
@@ -223,7 +313,7 @@ public sealed class BrainGraphShardTests
                     AssessmentTarget.Module,
                     new ModuleVersion(1, 0, 0),
                     [],
-                    [new NeuronRoleDescriptor(AssessmentTarget.Role, NeuronScope.Workspace, AssessmentTarget.Module)],
+                    [new NeuronRoleDescriptor(AssessmentTarget.Role, roleScope, AssessmentTarget.Module)],
                     [],
                     [],
                     [Assessed],
@@ -232,8 +322,10 @@ public sealed class BrainGraphShardTests
                     []),
             ]);
             Shards = new GraphShardResolver();
-            Graph = new BrainGraphShardGrain(modules, new FixedPolicyEvaluator(decision), Shards);
-            Request = new SynapseChangeRequest(Source, Finished, ProofTarget, "workspace", new WiringSlotId("proof-finished"), null, Context);
+            Directory = new GraphShardDirectory(Shards);
+            _policy = useWorkspacePolicy ? new WorkspacePolicyEvaluator(_modules) : new FixedPolicyEvaluator(decision);
+            Graph = Open(Source);
+            Request = new SynapseChangeRequest(Source, Finished, ProofTarget, roleScope == NeuronScope.Workspace ? "workspace" : "principal", new WiringSlotId("proof-finished"), null, Context);
         }
 
         public ContractId Finished { get; }
@@ -252,9 +344,14 @@ public sealed class BrainGraphShardTests
 
         public GraphShardResolver Shards { get; }
 
+        public GraphShardDirectory Directory { get; }
+
         public BrainGraphShardGrain Graph { get; }
 
         public SynapseChangeRequest Request { get; }
+
+        public BrainGraphShardGrain Open(EndpointAddress source)
+            => Directory.Open(source, _modules, _policy);
     }
 
     private sealed class FixedPolicyEvaluator(PolicyDecision decision) : IWorkspacePolicyEvaluator

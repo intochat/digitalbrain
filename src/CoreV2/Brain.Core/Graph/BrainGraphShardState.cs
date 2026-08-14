@@ -9,7 +9,6 @@ internal sealed class BrainGraphShardState
 {
     private readonly Dictionary<SynapseKey, ImmutableList<SynapseRevision>> _history = [];
     private readonly Dictionary<StableRoute, SynapseKey> _stableKeys = [];
-    private readonly Dictionary<SynapseKey, string> _shards = [];
 
     internal int RevisionCount => _history.Values.Sum(static revisions => revisions.Count);
 
@@ -21,22 +20,15 @@ internal sealed class BrainGraphShardState
             ? history
             : throw new KeyNotFoundException($"No synapse history exists for '{key}'.");
 
-    internal void Add(SynapseRevision revision, string shard)
+    internal void Add(SynapseRevision revision)
     {
         ArgumentNullException.ThrowIfNull(revision);
-        ArgumentException.ThrowIfNullOrWhiteSpace(shard);
         var route = StableRoute.From(revision.Definition);
         if (!_history.TryGetValue(revision.Key, out var history))
         {
             _stableKeys.Add(route, revision.Key);
             _history.Add(revision.Key, [revision]);
-            _shards.Add(revision.Key, shard);
             return;
-        }
-
-        if (!string.Equals(_shards[revision.Key], shard, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException("A synapse key cannot move to another source shard.");
         }
 
         if (history[^1].Revision + 1 != revision.Revision)

@@ -55,8 +55,8 @@ internal sealed class SynapseRevisionValidator(ModuleSet modules, IWorkspacePoli
         request.EnsureWellFormed();
         Authorize(request, kind);
         var @event = EventProducedBySource(request);
-        ValidateEndpointOwnership(request.Source);
-        ValidateEndpointOwnership(request.Target);
+        ValidateEndpointOwnership(request.Source, request.Provenance);
+        ValidateEndpointOwnership(request.Target, request.Provenance);
 
         if (request.Source.Module != request.Target.Module && @event.Visibility != EventVisibility.Published)
         {
@@ -130,12 +130,25 @@ internal sealed class SynapseRevisionValidator(ModuleSet modules, IWorkspacePoli
         return reshape.OutputEvent;
     }
 
-    private void ValidateEndpointOwnership(EndpointAddress endpoint)
+    private void ValidateEndpointOwnership(EndpointAddress endpoint, ActivityContext provenance)
     {
-        if (!_modules.ModuleIndex.TryGetValue(endpoint.Module.Value, out var module)
-            || !module.Roles.Any(role => role.Id == endpoint.Role && role.Owner == endpoint.Module))
+        if (!_modules.ModuleIndex.TryGetValue(endpoint.Module.Value, out var module))
         {
             throw new GraphValidationException("The endpoint module does not own its declared role.");
+        }
+
+        var role = module.Roles.SingleOrDefault(candidate => candidate.Id == endpoint.Role && candidate.Owner == endpoint.Module);
+        if (role is null)
+        {
+            throw new GraphValidationException("The endpoint module does not own its declared role.");
+        }
+
+        var expectedScopeToken = role.Scope == NeuronScope.Workspace
+            ? "workspace"
+            : provenance.Principal.Value;
+        if (!string.Equals(endpoint.ScopeToken, expectedScopeToken, StringComparison.Ordinal))
+        {
+            throw new GraphValidationException("The endpoint scope token does not match its declared role scope and provenance.");
         }
     }
 }

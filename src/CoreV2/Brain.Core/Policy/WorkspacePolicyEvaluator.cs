@@ -40,9 +40,9 @@ public sealed class WorkspacePolicyEvaluator(ModuleSet modules) : IWorkspacePoli
             return PolicyDecision.Refused;
         }
 
-        var targetRole = requestingModule.Roles.SingleOrDefault(role => role.Id == request.TargetRole);
-        return targetRole is null || targetRole.Owner != request.RequestedBy
-            ? PolicyDecision.Refused
-            : PolicyDecision.Allowed;
+        var targetRole = _modules.Modules
+            .SelectMany(static module => module.Roles)
+            .SingleOrDefault(role => role.Id == request.TargetRole);
+        return targetRole is null ? PolicyDecision.Refused : PolicyDecision.Allowed;
     }
 }

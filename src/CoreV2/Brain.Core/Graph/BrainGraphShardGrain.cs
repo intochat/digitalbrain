@@ -54,58 +54,71 @@ internal sealed class GraphResolution(IEnumerable<GraphDeliverySnapshot> deliver
         ?? throw new ArgumentNullException(nameof(deliveries));
 }
 
-// This proof models the authoritative shard storage in-process. Shard identity is
-// still derived solely from Source, and no cache or global query surface exists.
+// A grain handle is bound to exactly one source-owned state entry selected by the
+// injected directory. It cannot inspect or mutate a different source shard.
 internal sealed class BrainGraphShardGrain
 {
-    private readonly BrainGraphShardState _state = new();
+    private readonly EndpointAddress _source;
+    private readonly GraphShardEntry _entry;
     private readonly SynapseRevisionValidator _validator;
-    private readonly GraphShardResolver _shards;
 
-    internal BrainGraphShardGrain(ModuleSet modules, IWorkspacePolicyEvaluator policy, GraphShardResolver shards)
+    internal BrainGraphShardGrain(
+        EndpointAddress source,
+        GraphShardEntry entry,
+        SynapseRevisionValidator validator)
     {
-        _validator = new SynapseRevisionValidator(modules, policy);
-        _shards = shards ?? throw new ArgumentNullException(nameof(shards));
+        _source = source ?? throw new ArgumentNullException(nameof(source));
+        _entry = entry ?? throw new ArgumentNullException(nameof(entry));
+        _validator = validator ?? throw new ArgumentNullException(nameof(validator));
+        if (_entry.Source != _source)
+        {
+            throw new ArgumentException("A graph grain must be bound to its entry source.", nameof(entry));
+        }
     }
 
     internal Task<SynapseRevision> InstallAsync(SynapseChangeRequest request)
     {
+        EnsureAssignedSource(request.Source);
         _validator.ValidateInstallOrReplace(request, GraphChangeKind.Install);
-        var shard = _shards.Resolve(request.Source);
-        var route = new StableRoute(request.Source, request.Contract, request.Scope, request.WiringSlot);
-        if (_state.TryGetKey(route, out var existingKey))
+        lock (_entry.Gate)
         {
-            var history = _state.History(existingKey);
-            if (history[^1].Status == SynapseRevisionStatus.Live)
+            var route = new StableRoute(request.Source, request.Contract, request.Scope, request.WiringSlot);
+            if (_entry.State.TryGetKey(route, out var existingKey))
             {
-                throw new GraphValidationException("A live synapse already occupies the stable route.");
+                var history = _entry.State.History(existingKey);
+                if (history[^1].Status == SynapseRevisionStatus.Live)
+                {
+                    throw new GraphValidationException("A live synapse already occupies the stable route.");
+                }
+
+                return Task.FromResult(Append(existingKey, request, history[^1].Revision + 1, SynapseRevisionStatus.Live, null));
             }
 
-            return Task.FromResult(Append(existingKey, request, history[^1].Revision + 1, SynapseRevisionStatus.Live, null, shard));
+            return Task.FromResult(Append(SynapseKey.New(), request, 1, SynapseRevisionStatus.Live, null));
         }
-
-        return Task.FromResult(Append(SynapseKey.New(), request, 1, SynapseRevisionStatus.Live, null, shard));
     }
 
     internal Task<SynapseRevision> ReplaceAsync(SynapseKey key, SynapseChangeRequest request)
     {
-        var history = _state.History(key);
-        var current = history[^1];
+        EnsureAssignedSource(request.Source);
         _validator.ValidateInstallOrReplace(request, GraphChangeKind.Replace);
-        if (current.Status != SynapseRevisionStatus.Live)
+        lock (_entry.Gate)
         {
-            throw new GraphValidationException("A retired synapse must be reinstalled, not replaced.");
-        }
+            var current = _entry.State.History(key)[^1];
+            if (current.Status != SynapseRevisionStatus.Live)
+            {
+                throw new GraphValidationException("A retired synapse must be reinstalled, not replaced.");
+            }
 
-        if (current.Source != request.Source || current.Contract != request.Contract
-            || !string.Equals(current.Scope, request.Scope, StringComparison.Ordinal)
-            || current.WiringSlot != request.WiringSlot)
-        {
-            throw new GraphValidationException("Replace cannot alter the stable synapse route dimensions.");
-        }
+            if (current.Source != request.Source || current.Contract != request.Contract
+                || !string.Equals(current.Scope, request.Scope, StringComparison.Ordinal)
+                || current.WiringSlot != request.WiringSlot)
+            {
+                throw new GraphValidationException("Replace cannot alter the stable synapse route dimensions.");
+            }
 
-        var shard = _shards.Resolve(request.Source);
-        return Task.FromResult(Append(key, request, current.Revision + 1, SynapseRevisionStatus.Live, null, shard));
+            return Task.FromResult(Append(key, request, current.Revision + 1, SynapseRevisionStatus.Live, null));
+        }
     }
 
     internal Task RetireAsync(SynapseKey key, GraphReason reason, ActivityContext provenance)
@@ -115,17 +128,18 @@ internal sealed class BrainGraphShardGrain
             throw new ArgumentOutOfRangeException(nameof(reason));
         }
 
-        var current = _state.History(key)[^1];
-        _validator.ValidateRetire(current, provenance);
-        if (current.Status != SynapseRevisionStatus.Live)
+        lock (_entry.Gate)
         {
-            throw new GraphValidationException("Only a live synapse can be retired.");
-        }
+            var current = _entry.State.History(key)[^1];
+            _validator.ValidateRetire(current, provenance);
+            if (current.Status != SynapseRevisionStatus.Live)
+            {
+                throw new GraphValidationException("Only a live synapse can be retired.");
+            }
 
-        var definition = current.Definition with { Provenance = provenance, Revision = current.Revision + 1 };
-        _state.Add(
-            new SynapseRevision(definition, current.OutputContract, SynapseRevisionStatus.Retired, reason),
-            _shards.Resolve(current.Source));
+            var definition = current.Definition with { Provenance = provenance, Revision = current.Revision + 1 };
+            _entry.State.Add(new SynapseRevision(definition, current.OutputContract, SynapseRevisionStatus.Retired, reason));
+        }
         return Task.CompletedTask;
     }
 
@@ -137,31 +151,44 @@ internal sealed class BrainGraphShardGrain
             throw new ArgumentException("An event contract is required.", nameof(contract));
         }
 
-        _ = _shards.Resolve(source);
-        var deliveries = _state.LatestFor(source, contract)
-            .Select(static revision => new GraphDeliverySnapshot(
-                revision.Key,
-                revision.Revision,
-                revision.Target,
-                revision.Contract,
-                revision.OutputContract,
-                revision.Definition.Reshape))
-            .ToImmutableList();
-        return Task.FromResult(new GraphResolution(deliveries));
+        EnsureAssignedSource(source);
+        lock (_entry.Gate)
+        {
+            var deliveries = _entry.State.LatestFor(source, contract)
+                .Select(static revision => new GraphDeliverySnapshot(
+                    revision.Key,
+                    revision.Revision,
+                    revision.Target,
+                    revision.Contract,
+                    revision.OutputContract,
+                    revision.Definition.Reshape))
+                .ToImmutableList();
+            return Task.FromResult(new GraphResolution(deliveries));
+        }
     }
 
     internal Task<IImmutableList<SynapseRevision>> HistoryAsync(SynapseKey key)
-        => Task.FromResult<IImmutableList<SynapseRevision>>(_state.History(key));
+    {
+        lock (_entry.Gate)
+        {
+            return Task.FromResult<IImmutableList<SynapseRevision>>(_entry.State.History(key));
+        }
+    }
 
-    internal Task<int> RevisionCountAsync() => Task.FromResult(_state.RevisionCount);
+    internal Task<int> RevisionCountAsync()
+    {
+        lock (_entry.Gate)
+        {
+            return Task.FromResult(_entry.State.RevisionCount);
+        }
+    }
 
     private SynapseRevision Append(
         SynapseKey key,
         SynapseChangeRequest request,
         int revision,
         SynapseRevisionStatus status,
-        GraphReason? reason,
-        string shard)
+        GraphReason? reason)
     {
         ReshapeId? reshapeId = request.Reshape is null ? null : ToReshapeId(request.Reshape);
         var definition = new SynapseDefinition(
@@ -176,8 +203,17 @@ internal sealed class BrainGraphShardGrain
             revision);
         var outputContract = request.Reshape?.OutputEvent ?? request.Contract;
         var appended = new SynapseRevision(definition, outputContract, status, reason);
-        _state.Add(appended, shard);
+        _entry.State.Add(appended);
         return appended;
+    }
+
+    private void EnsureAssignedSource(EndpointAddress source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (source != _source)
+        {
+            throw new GraphValidationException("This graph shard only accepts its assigned outbound source endpoint.");
+        }
     }
 
     private static ReshapeId ToReshapeId(ReshapeDescriptor reshape)
