@@ -8,8 +8,11 @@ public enum ActivityStatus
 {
     Accepted,
     Running,
-    Succeeded,
+    AwaitingConfirmation,
+    Completed,
+    Refused,
     Failed,
+    Cancelled,
 }
 
 public readonly record struct ActivityPayloadReference
