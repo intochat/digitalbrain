@@ -920,6 +920,117 @@ public sealed class ProductOperationCatalogTests
     }
 
     [Fact]
+    public void Nested_numeric_value_metadata_with_a_rewriting_converter_is_rejected()
+    {
+        var converter = new RewritingIntConverter();
+
+        Assert.Throws<ProductOperationCatalogConfigurationException>(() =>
+            CreateHostileScalarBinding(
+                converter,
+                static () => new ScalarConverterInput(),
+                static value => value.Value,
+                static (value, scalar) => value.Value = scalar));
+    }
+
+    [Fact]
+    public void Nested_enum_value_metadata_with_a_rewriting_converter_is_rejected()
+    {
+        var converter = new RewritingEnumConverter();
+
+        Assert.Throws<ProductOperationCatalogConfigurationException>(() =>
+            CreateHostileScalarBinding(
+                converter,
+                static () => new EnumConverterInput(),
+                static value => value.Value,
+                static (value, scalar) => value.Value = scalar));
+    }
+
+    [Fact]
+    public void Source_generated_type_level_enum_converter_is_rejected()
+    {
+        var descriptor = new ProductOperationDescriptor(
+            Send,
+            Send.Id.Value,
+            "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"value\"],\"properties\":{\"value\":{\"type\":\"integer\"}}}",
+            Descriptor(Send).TerminalResultSchema);
+
+        Assert.Throws<ProductOperationCatalogConfigurationException>(() =>
+            ProductOperationBinding.Create<TypeConvertedEnumInput, CatalogResult>(
+                descriptor,
+                HostileJsonSerializerContext.Default.TypeConvertedEnumInput,
+                CatalogJsonSerializerContext.Default.CatalogResult,
+                static (_, _, _) => throw new InvalidOperationException(),
+                ObserveTypedNotSupported<CatalogResult>));
+    }
+
+    [Fact]
+    public void Behaviorally_mutable_scalar_converter_is_rejected_before_it_can_switch_after_create()
+    {
+        var converter = new SwitchableIntConverter();
+
+        Assert.Throws<ProductOperationCatalogConfigurationException>(() =>
+            CreateHostileScalarBinding(
+                converter,
+                static () => new ScalarConverterInput(),
+                static value => value.Value,
+                static (value, scalar) => value.Value = scalar));
+
+        converter.Rewrite = true;
+        Assert.True(converter.Rewrite);
+    }
+
+    [Fact]
+    public async Task Canonical_source_generated_numeric_enum_and_array_scalars_remain_supported()
+    {
+        CanonicalScalarInput? observed = null;
+        var descriptor = new ProductOperationDescriptor(
+            Send,
+            Send.Id.Value,
+            "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"count\",\"state\",\"values\"],\"properties\":{\"count\":{\"type\":\"integer\"},\"state\":{\"type\":\"integer\"},\"values\":{\"type\":\"array\",\"items\":{\"type\":\"integer\"}}}}",
+            Descriptor(Send).TerminalResultSchema);
+        var binding = ProductOperationBinding.Create<CanonicalScalarInput, CatalogResult>(
+            descriptor,
+            CatalogJsonSerializerContext.Default.CanonicalScalarInput,
+            CatalogJsonSerializerContext.Default.CatalogResult,
+            (input, _, _) =>
+            {
+                observed = input;
+                return Task.FromResult(new ProductActivityReceipt(BrainActivityId.New(), Send.Id));
+            },
+            ObserveTypedNotSupported<CatalogResult>);
+
+        await ((IProductOperationAdapter)binding).InvokeAsync(
+            Send.Id,
+            Json("{\"count\":3,\"state\":1,\"values\":[1,2]}"),
+            Invocation(Grant()),
+            TestContext.Current.CancellationToken);
+
+        Assert.NotNull(observed);
+        Assert.Equal(3, observed.Count);
+        Assert.Equal(CanonicalScalarState.Ready, observed.State);
+        Assert.Equal([1, 2], observed.Values);
+    }
+
+    [Fact]
+    public void Complete_standard_closed_scalar_language_remains_supported()
+    {
+        var descriptor = new ProductOperationDescriptor(
+            Send,
+            Send.Id.Value,
+            "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"text\",\"flag\",\"character\",\"byteValue\",\"signedByte\",\"shortValue\",\"unsignedShort\",\"integer\",\"unsignedInteger\",\"longValue\",\"unsignedLong\",\"singleValue\",\"doubleValue\",\"decimalValue\",\"guid\",\"dateTime\",\"dateTimeOffset\",\"timeSpan\",\"uri\"],\"properties\":{\"text\":{\"type\":\"string\"},\"flag\":{\"type\":\"boolean\"},\"character\":{\"type\":\"string\"},\"byteValue\":{\"type\":\"integer\"},\"signedByte\":{\"type\":\"integer\"},\"shortValue\":{\"type\":\"integer\"},\"unsignedShort\":{\"type\":\"integer\"},\"integer\":{\"type\":\"integer\"},\"unsignedInteger\":{\"type\":\"integer\"},\"longValue\":{\"type\":\"integer\"},\"unsignedLong\":{\"type\":\"integer\"},\"singleValue\":{\"type\":\"number\"},\"doubleValue\":{\"type\":\"number\"},\"decimalValue\":{\"type\":\"number\"},\"guid\":{\"type\":\"string\"},\"dateTime\":{\"type\":\"string\"},\"dateTimeOffset\":{\"type\":\"string\"},\"timeSpan\":{\"type\":\"string\"},\"uri\":{\"type\":\"string\"}}}",
+            Descriptor(Send).TerminalResultSchema);
+
+        var binding = ProductOperationBinding.Create<CompleteScalarInput, CatalogResult>(
+            descriptor,
+            CatalogJsonSerializerContext.Default.CompleteScalarInput,
+            CatalogJsonSerializerContext.Default.CatalogResult,
+            static (_, _, _) => throw new NotSupportedException(),
+            ObserveTypedNotSupported<CatalogResult>);
+
+        Assert.Equal(Send.Id, binding.Descriptor.Operation.Id);
+    }
+
+    [Fact]
     public void Input_nullability_uses_the_generated_setter_contract_only()
     {
         var descriptor = new ProductOperationDescriptor(
@@ -1123,6 +1234,51 @@ public sealed class ProductOperationCatalogTests
                         (JsonTypeInfo<NullableCatalogResult>)terminalType,
                         static (_, _, _) => throw new NotSupportedException(),
                         ObserveTypedNotSupported<NullableCatalogResult>);
+
+    private static ProductOperationBinding CreateHostileScalarBinding<TInput, TScalar>(
+        JsonConverter<TScalar> converter,
+        Func<TInput> createInput,
+        Func<TInput, TScalar> get,
+        Action<TInput, TScalar> set)
+        where TInput : class
+        where TScalar : struct
+    {
+        var options = new JsonSerializerOptions
+        {
+            AllowDuplicateProperties = false,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            RespectNullableAnnotations = true,
+            RespectRequiredConstructorParameters = true,
+            UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+        };
+        var resolver = new MutableGraphResolver();
+        options.TypeInfoResolver = resolver;
+        var inputType = JsonTypeInfo.CreateJsonTypeInfo<TInput>(options);
+        inputType.CreateObject = createInput;
+        inputType.UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow;
+        var valueProperty = inputType.CreateJsonPropertyInfo(typeof(TScalar), "value");
+        valueProperty.Get = value => get((TInput)value);
+        valueProperty.Set = (value, scalar) => set((TInput)value, (TScalar)scalar!);
+        valueProperty.IsRequired = true;
+        valueProperty.IsGetNullable = false;
+        valueProperty.IsSetNullable = false;
+        inputType.Properties.Add(valueProperty);
+        var scalarType = JsonMetadataServices.CreateValueInfo<TScalar>(options, converter);
+        resolver.Add(inputType);
+        resolver.Add(scalarType);
+        var descriptor = new ProductOperationDescriptor(
+            Send,
+            Send.Id.Value,
+            "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"value\"],\"properties\":{\"value\":{\"type\":\"integer\"}}}",
+            Descriptor(Send).TerminalResultSchema);
+
+        return ProductOperationBinding.Create<TInput, CatalogResult>(
+            descriptor,
+            inputType,
+            CatalogJsonSerializerContext.Default.CatalogResult,
+            static (_, _, _) => throw new InvalidOperationException(),
+            ObserveTypedNotSupported<CatalogResult>);
+    }
 
     private static Task<ProductOperationObservation<TResult>> ObserveTypedNotSupported<TResult>(
         BrainActivityId activity,
@@ -1329,6 +1485,38 @@ internal sealed record ArrayCatalogResult(string[] Items);
 
 internal sealed record NullableCatalogResult(string? Result);
 
+internal enum CanonicalScalarState
+{
+    Unknown,
+    Ready,
+}
+
+internal sealed record CanonicalScalarInput(
+    int Count,
+    CanonicalScalarState State,
+    int[] Values);
+
+internal sealed record CompleteScalarInput(
+    string Text,
+    bool Flag,
+    char Character,
+    byte ByteValue,
+    sbyte SignedByte,
+    short ShortValue,
+    ushort UnsignedShort,
+    int Integer,
+    uint UnsignedInteger,
+    long LongValue,
+    ulong UnsignedLong,
+    float SingleValue,
+    double DoubleValue,
+    decimal DecimalValue,
+    Guid Guid,
+    DateTime DateTime,
+    DateTimeOffset DateTimeOffset,
+    TimeSpan TimeSpan,
+    Uri Uri);
+
 [JsonSourceGenerationOptions(
     AllowDuplicateProperties = false,
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
@@ -1341,6 +1529,8 @@ internal sealed record NullableCatalogResult(string? Result);
 [JsonSerializable(typeof(NestedCatalogPayload))]
 [JsonSerializable(typeof(ArrayCatalogResult))]
 [JsonSerializable(typeof(NullableCatalogResult))]
+[JsonSerializable(typeof(CanonicalScalarInput))]
+[JsonSerializable(typeof(CompleteScalarInput))]
 internal sealed partial class CatalogJsonSerializerContext : JsonSerializerContext;
 
 internal sealed record ExtensionDataInput(string Message)
@@ -1408,6 +1598,30 @@ internal sealed record NumberHandledCollectionInput(NumberHandledIntCollection I
 [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
 internal sealed class NumberHandledIntCollection : List<int>;
 
+internal sealed record TypeConvertedEnumInput(TypeConvertedScalarValue Value);
+
+[JsonConverter(typeof(TypeConvertedEnumConverter))]
+internal enum TypeConvertedScalarValue
+{
+    Zero,
+    One,
+}
+
+internal sealed class TypeConvertedEnumConverter : JsonConverter<TypeConvertedScalarValue>
+{
+    public override TypeConvertedScalarValue Read(
+        ref Utf8JsonReader reader,
+        Type typeToConvert,
+        JsonSerializerOptions options)
+        => reader.GetInt32() == 0 ? TypeConvertedScalarValue.One : TypeConvertedScalarValue.Zero;
+
+    public override void Write(
+        Utf8JsonWriter writer,
+        TypeConvertedScalarValue value,
+        JsonSerializerOptions options)
+        => writer.WriteNumberValue(value == TypeConvertedScalarValue.Zero ? 1 : 0);
+}
+
 internal sealed class TrimStringJsonConverter : JsonConverter<string>
 {
     public override string? Read(
@@ -1439,6 +1653,7 @@ internal sealed class TrimStringJsonConverter : JsonConverter<string>
 [JsonSerializable(typeof(SeededCollectionInput))]
 [JsonSerializable(typeof(CallbackCollectionInput))]
 [JsonSerializable(typeof(NumberHandledCollectionInput))]
+[JsonSerializable(typeof(TypeConvertedEnumInput))]
 internal sealed partial class HostileJsonSerializerContext : JsonSerializerContext;
 
 internal sealed class MutableGraphInput
@@ -1475,4 +1690,55 @@ internal sealed class MutableGraphResolver : IJsonTypeInfoResolver
 
     public JsonTypeInfo? GetTypeInfo(Type type, JsonSerializerOptions options)
         => _metadata.GetValueOrDefault(type);
+}
+
+internal sealed class ScalarConverterInput
+{
+    public int Value { get; set; }
+}
+
+internal enum HostileScalarValue
+{
+    Zero,
+    One,
+}
+
+internal sealed class EnumConverterInput
+{
+    public HostileScalarValue Value { get; set; }
+}
+
+internal sealed class RewritingIntConverter : JsonConverter<int>
+{
+    public override int Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => reader.GetInt32() + 100;
+
+    public override void Write(Utf8JsonWriter writer, int value, JsonSerializerOptions options)
+        => writer.WriteNumberValue(value - 100);
+}
+
+internal sealed class SwitchableIntConverter : JsonConverter<int>
+{
+    public bool Rewrite { get; set; }
+
+    public override int Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        => reader.GetInt32() + (Rewrite ? 100 : 0);
+
+    public override void Write(Utf8JsonWriter writer, int value, JsonSerializerOptions options)
+        => writer.WriteNumberValue(value - (Rewrite ? 100 : 0));
+}
+
+internal sealed class RewritingEnumConverter : JsonConverter<HostileScalarValue>
+{
+    public override HostileScalarValue Read(
+        ref Utf8JsonReader reader,
+        Type typeToConvert,
+        JsonSerializerOptions options)
+        => reader.GetInt32() == 0 ? HostileScalarValue.One : HostileScalarValue.Zero;
+
+    public override void Write(
+        Utf8JsonWriter writer,
+        HostileScalarValue value,
+        JsonSerializerOptions options)
+        => writer.WriteNumberValue(value == HostileScalarValue.Zero ? 1 : 0);
 }

@@ -299,6 +299,16 @@ public sealed class ProductOperationBinding : IProductOperationAdapter
 
 internal sealed class ProductJsonContract
 {
+    private enum CanonicalEnumProbe
+    {
+        Value,
+    }
+
+    private static readonly Type CanonicalEnumConverterDefinition =
+        JsonMetadataServices.GetEnumConverter<CanonicalEnumProbe>(new JsonSerializerOptions())
+            .GetType()
+            .GetGenericTypeDefinition();
+
     private readonly string _kind;
     private readonly JsonElement _schema;
     private readonly ProductJsonContractDirection _direction;
@@ -515,6 +525,8 @@ internal sealed class ProductJsonContract
                         throw Invalid(kind, "contains a custom-converted or open contract");
                     }
 
+                    ValidateCanonicalScalarMetadata(kind, metadata);
+
                     break;
                 default:
                     throw Invalid(kind, "contains unsupported generated metadata");
@@ -678,6 +690,94 @@ internal sealed class ProductJsonContract
             || candidate == typeof(TimeSpan)
             || candidate == typeof(Uri);
     }
+
+    private static void ValidateCanonicalScalarMetadata(string kind, JsonTypeInfo metadata)
+    {
+        if (Nullable.GetUnderlyingType(metadata.Type) is not null)
+        {
+            throw Invalid(
+                kind,
+                "nullable value converters cannot prove a closed immutable behavioral dependency");
+        }
+
+        if (metadata.Type.IsEnum)
+        {
+            if (!IsCanonicalEnumConverter(metadata))
+            {
+                throw Invalid(kind, $"contains a non-canonical scalar converter for '{metadata.Type.Name}'");
+            }
+
+            return;
+        }
+
+        var expected = GetCanonicalScalarConverter(metadata.Type);
+        if (expected is null || !ReferenceEquals(metadata.Converter, expected))
+        {
+            throw Invalid(kind, $"contains a non-canonical scalar converter for '{metadata.Type.Name}'");
+        }
+    }
+
+    private static bool IsCanonicalEnumConverter(JsonTypeInfo metadata)
+    {
+        var converterType = metadata.Converter.GetType();
+        if (converterType.Assembly != typeof(JsonSerializer).Assembly
+            || !converterType.IsSealed
+            || converterType.IsVisible
+            || !converterType.IsGenericType
+            || converterType.GetGenericTypeDefinition() != CanonicalEnumConverterDefinition
+            || converterType.GetGenericArguments() is not [var convertedType]
+            || convertedType != metadata.Type)
+        {
+            return false;
+        }
+
+        try
+        {
+            var values = Enum.GetValues(metadata.Type).Cast<object>().ToList();
+            values.Add(Enum.ToObject(metadata.Type, 0));
+            foreach (var value in values)
+            {
+                var json = JsonSerializer.SerializeToElement(value, metadata);
+                if (json.ValueKind != JsonValueKind.Number
+                    || !Equals(JsonSerializer.Deserialize(json, metadata), value))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+        catch (NotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    private static JsonConverter? GetCanonicalScalarConverter(Type type)
+        => type == typeof(string) ? JsonMetadataServices.StringConverter
+            : type == typeof(bool) ? JsonMetadataServices.BooleanConverter
+            : type == typeof(char) ? JsonMetadataServices.CharConverter
+            : type == typeof(byte) ? JsonMetadataServices.ByteConverter
+            : type == typeof(sbyte) ? JsonMetadataServices.SByteConverter
+            : type == typeof(short) ? JsonMetadataServices.Int16Converter
+            : type == typeof(ushort) ? JsonMetadataServices.UInt16Converter
+            : type == typeof(int) ? JsonMetadataServices.Int32Converter
+            : type == typeof(uint) ? JsonMetadataServices.UInt32Converter
+            : type == typeof(long) ? JsonMetadataServices.Int64Converter
+            : type == typeof(ulong) ? JsonMetadataServices.UInt64Converter
+            : type == typeof(float) ? JsonMetadataServices.SingleConverter
+            : type == typeof(double) ? JsonMetadataServices.DoubleConverter
+            : type == typeof(decimal) ? JsonMetadataServices.DecimalConverter
+            : type == typeof(Guid) ? JsonMetadataServices.GuidConverter
+            : type == typeof(DateTime) ? JsonMetadataServices.DateTimeConverter
+            : type == typeof(DateTimeOffset) ? JsonMetadataServices.DateTimeOffsetConverter
+            : type == typeof(TimeSpan) ? JsonMetadataServices.TimeSpanConverter
+            : type == typeof(Uri) ? JsonMetadataServices.UriConverter
+            : null;
 
     private static void ValidateSchemaNode(
         string kind,
