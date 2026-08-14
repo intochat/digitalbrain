@@ -9,6 +9,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../../src/CoreV2/Brain.Abstractions/Brain.Abstractions.csproj" />
+    <ProjectReference Include="../../../src/CoreV2/Brain.Core/Brain.Core.csproj" />
     <ProjectReference Include="../../../src/CoreV2/Brain.Product.Abstractions/Brain.Product.Abstractions.csproj" />
+    <ProjectReference Include="../../../src/CoreV2/DigitalBrain.ProductHost/DigitalBrain.ProductHost.csproj" />
   </ItemGroup>
 </Project>

@@ -4,6 +4,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Brain.Product.Abstractions/Brain.Product.Abstractions.csproj" />
+    <ProjectReference Include="../Brain.Core/Brain.Core.csproj" />
   </ItemGroup>
   <ItemGroup Condition="'$(Configuration)' != 'Debug'">
     <Compile Remove="Authority/LocalTestAuthority.cs" />
