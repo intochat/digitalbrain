@@ -49,13 +49,13 @@ public sealed record BrainSynapseView
         ProvenanceActivityId = provenanceActivityId;
     }
 
-    [Id(0)] public Guid Id { get; }
-    [Id(1)] public long Revision { get; }
-    [Id(2)] public string SourceNeuronId { get; }
-    [Id(3)] public string TargetNeuronId { get; }
-    [Id(4)] public string InputContractId { get; }
-    [Id(5)] public string OutputContractId { get; }
-    [Id(6)] public string Status { get; }
-    [Id(7)] public long UsageCount { get; }
-    [Id(8)] public Guid ProvenanceActivityId { get; }
+    [Id(0)] public Guid Id { get; init; }
+    [Id(1)] public long Revision { get; init; }
+    [Id(2)] public string SourceNeuronId { get; init; }
+    [Id(3)] public string TargetNeuronId { get; init; }
+    [Id(4)] public string InputContractId { get; init; }
+    [Id(5)] public string OutputContractId { get; init; }
+    [Id(6)] public string Status { get; init; }
+    [Id(7)] public long UsageCount { get; init; }
+    [Id(8)] public Guid ProvenanceActivityId { get; init; }
 }

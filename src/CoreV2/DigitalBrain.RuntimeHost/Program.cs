@@ -1,5 +1,6 @@
 using Brain.Modules.Behavior;
 using Brain.Modules.Conversation;
+using Brain.Core.Journaling;
 using Brain.Modules.Memory;
 using Brain.Modules.Proof;
 using Brain.Modules.Scheduling;
@@ -8,9 +9,15 @@ using DigitalBrain.Aspire;
 using DigitalBrain.ServiceDefaults;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Journaling.Json;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.AddDigitalBrainRuntime();
+builder.AddDigitalBrainRuntime(silo =>
+{
+#pragma warning disable ORLEANSEXP005 // CoreV2 intentionally uses the Orleans durable journal preview.
+    silo.UseJsonJournalFormat(CoreJournalJsonContext.Default);
+#pragma warning restore ORLEANSEXP005
+});
 builder.Services.AddSingleton<IRuntimeProductModule, ProofProductModule>();
 builder.Services.AddSingleton<IRuntimeProductModule, ConversationProductModule>();
 builder.Services.AddSingleton<IRuntimeProductModule, SchedulingProductModule>();
