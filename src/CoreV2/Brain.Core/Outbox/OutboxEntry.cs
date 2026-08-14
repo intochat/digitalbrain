@@ -197,14 +197,41 @@ internal sealed class OutboxEntry
     public ImmutableArray<DeliverySnapshot> Deliveries { get; }
 }
 
-internal sealed record DirectedMessage(
-    DirectedMessageId Id,
-    FiringId Firing,
-    ActivityContext Activity,
-    EndpointAddress Source,
-    EndpointAddress Target,
-    ContractId Contract,
-    DateTimeOffset StagedAt);
+internal sealed record DirectedMessage
+{
+    public DirectedMessage(
+        DirectedMessageId id,
+        FiringId firing,
+        ActivityContext activity,
+        EndpointAddress source,
+        EndpointAddress target,
+        ContractId contract,
+        DateTimeOffset stagedAt)
+    {
+        RuntimeRecordValidation.DirectedMessage(id, firing, activity, source, target, contract);
+        Id = id;
+        Firing = firing;
+        Activity = activity;
+        Source = source;
+        Target = target;
+        Contract = contract;
+        StagedAt = stagedAt;
+    }
+
+    public DirectedMessageId Id { get; }
+
+    public FiringId Firing { get; }
+
+    public ActivityContext Activity { get; }
+
+    public EndpointAddress Source { get; }
+
+    public EndpointAddress Target { get; }
+
+    public ContractId Contract { get; }
+
+    public DateTimeOffset StagedAt { get; }
+}
 
 internal readonly record struct EmissionOutcome
 {
@@ -287,5 +314,29 @@ internal static class RuntimeRecordValidation
         Contract(inputContract, nameof(inputContract));
         Contract(outputContract, nameof(outputContract));
         Reshape(reshape, nameof(reshape));
+    }
+
+    internal static void DirectedMessage(
+        DirectedMessageId id,
+        FiringId firing,
+        ActivityContext activity,
+        EndpointAddress source,
+        EndpointAddress target,
+        ContractId contract)
+    {
+        if (id.Value == Guid.Empty)
+        {
+            throw new ArgumentException("A directed message id is required.", nameof(id));
+        }
+
+        if (firing.Value == Guid.Empty)
+        {
+            throw new ArgumentException("A firing id is required.", nameof(firing));
+        }
+
+        ArgumentNullException.ThrowIfNull(activity, nameof(activity));
+        Endpoint(source, nameof(source));
+        Endpoint(target, nameof(target));
+        Contract(contract, nameof(contract));
     }
 }

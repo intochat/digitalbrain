@@ -111,6 +111,26 @@ public sealed class NeuronTurnTests
     }
 
     [Fact]
+    public void DirectedMessageConstructionRejectsInvalidMetadata()
+    {
+        var fixture = Fixture.WithRoutes();
+        var contract = new ContractId("proof/entry@1");
+
+        Assert.Throws<ArgumentException>(() => new DirectedMessage(
+            default, FiringId.New(), fixture.Context, fixture.SourceEndpoint, fixture.TargetEndpoint, contract, DateTimeOffset.UnixEpoch));
+        Assert.Throws<ArgumentException>(() => new DirectedMessage(
+            DirectedMessageId.New(), default, fixture.Context, fixture.SourceEndpoint, fixture.TargetEndpoint, contract, DateTimeOffset.UnixEpoch));
+        Assert.Throws<ArgumentNullException>(() => new DirectedMessage(
+            DirectedMessageId.New(), FiringId.New(), null!, fixture.SourceEndpoint, fixture.TargetEndpoint, contract, DateTimeOffset.UnixEpoch));
+        Assert.Throws<ArgumentNullException>(() => new DirectedMessage(
+            DirectedMessageId.New(), FiringId.New(), fixture.Context, null!, fixture.TargetEndpoint, contract, DateTimeOffset.UnixEpoch));
+        Assert.Throws<ArgumentNullException>(() => new DirectedMessage(
+            DirectedMessageId.New(), FiringId.New(), fixture.Context, fixture.SourceEndpoint, null!, contract, DateTimeOffset.UnixEpoch));
+        Assert.Throws<ArgumentException>(() => new DirectedMessage(
+            DirectedMessageId.New(), FiringId.New(), fixture.Context, fixture.SourceEndpoint, fixture.TargetEndpoint, default, DateTimeOffset.UnixEpoch));
+    }
+
+    [Fact]
     public async Task ZeroRouteEmissionIsJournaledWithoutFabricatingARefusal()
     {
         var fixture = Fixture.WithoutRoutes();
