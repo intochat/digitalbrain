@@ -52,6 +52,65 @@ public sealed class NeuronTurnTests
     }
 
     [Fact]
+    public async Task InvalidRouteMetadataLeavesNoStateJournalOrOutboxChange()
+    {
+        var fixture = Fixture.WithRoutes();
+        fixture.Routes.ReturnedRoute!.Revision = 0;
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            fixture.Neuron.EmitProducedAsync(fixture.Context, TestContext.Current.CancellationToken));
+
+        Assert.Equal(0, fixture.Store.State);
+        Assert.Empty(fixture.Store.Journal);
+        Assert.Empty(fixture.Store.Emissions);
+        Assert.Empty(fixture.Store.DirectedMessages);
+    }
+
+    [Fact]
+    public async Task InvalidDirectContractLeavesNoStateJournalOrOutboxChange()
+    {
+        var fixture = Fixture.WithRoutes();
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            fixture.Neuron.SendToEntryAsync(fixture.Context, default, TestContext.Current.CancellationToken));
+
+        Assert.Equal(0, fixture.Store.State);
+        Assert.Empty(fixture.Store.Journal);
+        Assert.Empty(fixture.Store.Emissions);
+        Assert.Empty(fixture.Store.DirectedMessages);
+    }
+
+    [Fact]
+    public void RouteAndSnapshotConstructionRejectInvalidMetadata()
+    {
+        var fixture = Fixture.WithRoutes();
+        var input = new ContractId("proof/produced@1");
+        var output = new ContractId("proof/consumed@1");
+
+        Assert.Throws<ArgumentNullException>(() => new GraphRoute(
+            null!, SynapseKey.New(), 1, input, output, reshape: null));
+        Assert.Throws<ArgumentException>(() => new GraphRoute(
+            fixture.TargetEndpoint, default, 1, input, output, reshape: null));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new GraphRoute(
+            fixture.TargetEndpoint, SynapseKey.New(), 0, input, output, reshape: null));
+        Assert.Throws<ArgumentException>(() => new GraphRoute(
+            fixture.TargetEndpoint, SynapseKey.New(), 1, default, output, reshape: null));
+        Assert.Throws<ArgumentException>(() => new GraphRoute(
+            fixture.TargetEndpoint, SynapseKey.New(), 1, input, output, new ReshapeId()));
+
+        Assert.Throws<ArgumentNullException>(() => new DeliverySnapshot(
+            DeliveryId.New(), null!, SynapseKey.New(), 1, input, output, reshape: null));
+        Assert.Throws<ArgumentException>(() => new DeliverySnapshot(
+            DeliveryId.New(), fixture.TargetEndpoint, default, 1, input, output, reshape: null));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new DeliverySnapshot(
+            DeliveryId.New(), fixture.TargetEndpoint, SynapseKey.New(), 0, input, output, reshape: null));
+        Assert.Throws<ArgumentException>(() => new DeliverySnapshot(
+            DeliveryId.New(), fixture.TargetEndpoint, SynapseKey.New(), 1, default, output, reshape: null));
+        Assert.Throws<ArgumentException>(() => new DeliverySnapshot(
+            DeliveryId.New(), fixture.TargetEndpoint, SynapseKey.New(), 1, input, output, new ReshapeId()));
+    }
+
+    [Fact]
     public async Task ZeroRouteEmissionIsJournaledWithoutFabricatingARefusal()
     {
         var fixture = Fixture.WithoutRoutes();
@@ -181,7 +240,13 @@ public sealed class NeuronTurnTests
                 },
                 cancellationToken);
 
-        public Task SendToEntryAsync(ActivityContext context, CancellationToken cancellationToken)
+    public Task SendToEntryAsync(ActivityContext context, CancellationToken cancellationToken)
+        => SendToEntryAsync(context, new ContractId("proof/entry@1"), cancellationToken);
+
+        public Task SendToEntryAsync(
+            ActivityContext context,
+            ContractId contract,
+            CancellationToken cancellationToken)
             => ExecuteTurnAsync(
                 context,
                 turn =>
@@ -193,7 +258,7 @@ public sealed class NeuronTurnTests
                             new ModuleId("proof"),
                             new NeuronRoleId("proof.entry"),
                             "workspace"),
-                        new ContractId("proof/entry@1"));
+                        contract);
                     return Task.FromResult(0);
                 },
                 cancellationToken);

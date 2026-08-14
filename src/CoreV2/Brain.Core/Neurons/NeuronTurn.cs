@@ -7,25 +7,87 @@ using Brain.Core.Outbox;
 
 namespace Brain.Core.Neurons;
 
-internal sealed class GraphRoute(
-    EndpointAddress target,
-    SynapseKey synapse,
-    long revision,
-    ContractId inputContract,
-    ContractId outputContract,
-    ReshapeId? reshape)
+internal sealed class GraphRoute
 {
-    public EndpointAddress Target { get; set; } = target;
+    public GraphRoute(
+        EndpointAddress target,
+        SynapseKey synapse,
+        long revision,
+        ContractId inputContract,
+        ContractId outputContract,
+        ReshapeId? reshape)
+    {
+        RuntimeRecordValidation.Endpoint(target, nameof(target));
+        RuntimeRecordValidation.Synapse(synapse, nameof(synapse));
+        RuntimeRecordValidation.Revision(revision, nameof(revision));
+        RuntimeRecordValidation.Contract(inputContract, nameof(inputContract));
+        RuntimeRecordValidation.Contract(outputContract, nameof(outputContract));
+        RuntimeRecordValidation.Reshape(reshape, nameof(reshape));
+        Target = target;
+        Synapse = synapse;
+        Revision = revision;
+        InputContract = inputContract;
+        OutputContract = outputContract;
+        Reshape = reshape;
+    }
 
-    public SynapseKey Synapse { get; set; } = synapse;
+    public EndpointAddress Target { get; set; }
 
-    public long Revision { get; set; } = revision;
+    public SynapseKey Synapse { get; set; }
 
-    public ContractId InputContract { get; set; } = inputContract;
+    public long Revision { get; set; }
 
-    public ContractId OutputContract { get; set; } = outputContract;
+    public ContractId InputContract { get; set; }
 
-    public ReshapeId? Reshape { get; set; } = reshape;
+    public ContractId OutputContract { get; set; }
+
+    public ReshapeId? Reshape { get; set; }
+
+    internal DeliverySnapshot ToDeliverySnapshot()
+        => new(
+            DeliveryId.New(),
+            ValidTarget(),
+            ValidSynapse(),
+            ValidRevision(),
+            ValidInputContract(),
+            ValidOutputContract(),
+            ValidReshape());
+
+    private EndpointAddress ValidTarget()
+    {
+        RuntimeRecordValidation.Endpoint(Target, nameof(Target));
+        return Target;
+    }
+
+    private SynapseKey ValidSynapse()
+    {
+        RuntimeRecordValidation.Synapse(Synapse, nameof(Synapse));
+        return Synapse;
+    }
+
+    private long ValidRevision()
+    {
+        RuntimeRecordValidation.Revision(Revision, nameof(Revision));
+        return Revision;
+    }
+
+    private ContractId ValidInputContract()
+    {
+        RuntimeRecordValidation.Contract(InputContract, nameof(InputContract));
+        return InputContract;
+    }
+
+    private ContractId ValidOutputContract()
+    {
+        RuntimeRecordValidation.Contract(OutputContract, nameof(OutputContract));
+        return OutputContract;
+    }
+
+    private ReshapeId? ValidReshape()
+    {
+        RuntimeRecordValidation.Reshape(Reshape, nameof(Reshape));
+        return Reshape;
+    }
 }
 
 internal interface IGraphRouteResolver
@@ -103,6 +165,12 @@ internal sealed class NeuronTurn<TState>
         ImmutableArray<DeliverySnapshot> deliveries,
         FiringId? causeFiring = null)
     {
+        RuntimeRecordValidation.Contract(eventContract, nameof(eventContract));
+        foreach (var delivery in deliveries)
+        {
+            delivery.EnsureValid();
+        }
+
         var firing = FiringId.New();
         var eventId = EventId.New();
         var timestamp = Clock.GetUtcNow();
@@ -128,7 +196,8 @@ internal sealed class NeuronTurn<TState>
 
     internal void StageDirectedMessage(EndpointAddress target, ContractId contract)
     {
-        ArgumentNullException.ThrowIfNull(target);
+        RuntimeRecordValidation.Endpoint(target, nameof(target));
+        RuntimeRecordValidation.Contract(contract, nameof(contract));
         _directedMessages.Add(new DirectedMessage(
             DirectedMessageId.New(),
             FiringId.New(),

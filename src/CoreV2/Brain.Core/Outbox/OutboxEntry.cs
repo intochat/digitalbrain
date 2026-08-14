@@ -89,14 +89,58 @@ internal readonly record struct ReshapeId
     public Guid Value { get; }
 }
 
-internal readonly record struct DeliverySnapshot(
-    DeliveryId Delivery,
-    EndpointAddress Target,
-    SynapseKey Synapse,
-    long SynapseRevision,
-    ContractId InputContract,
-    ContractId OutputContract,
-    ReshapeId? Reshape);
+internal readonly record struct DeliverySnapshot
+{
+    public DeliverySnapshot(
+        DeliveryId delivery,
+        EndpointAddress target,
+        SynapseKey synapse,
+        long synapseRevision,
+        ContractId inputContract,
+        ContractId outputContract,
+        ReshapeId? reshape)
+    {
+        RuntimeRecordValidation.Delivery(
+            delivery,
+            target,
+            synapse,
+            synapseRevision,
+            inputContract,
+            outputContract,
+            reshape);
+        Delivery = delivery;
+        Target = target;
+        Synapse = synapse;
+        SynapseRevision = synapseRevision;
+        InputContract = inputContract;
+        OutputContract = outputContract;
+        Reshape = reshape;
+    }
+
+    public DeliveryId Delivery { get; }
+
+    public EndpointAddress Target { get; }
+
+    public SynapseKey Synapse { get; }
+
+    public long SynapseRevision { get; }
+
+    public ContractId InputContract { get; }
+
+    public ContractId OutputContract { get; }
+
+    public ReshapeId? Reshape { get; }
+
+    internal void EnsureValid()
+        => RuntimeRecordValidation.Delivery(
+            Delivery,
+            Target,
+            Synapse,
+            SynapseRevision,
+            InputContract,
+            OutputContract,
+            Reshape);
+}
 
 internal sealed record JournalEntry(
     FiringId Firing,
@@ -175,4 +219,73 @@ internal readonly record struct EmissionOutcome
     }
 
     public int DeliveryCount { get; }
+}
+
+internal static class RuntimeRecordValidation
+{
+    internal static void Endpoint(EndpointAddress endpoint, string parameterName)
+    {
+        ArgumentNullException.ThrowIfNull(endpoint, parameterName);
+        if (endpoint.Workspace.IsEmpty
+            || string.IsNullOrWhiteSpace(endpoint.Module.Value)
+            || string.IsNullOrWhiteSpace(endpoint.Role.Value)
+            || string.IsNullOrWhiteSpace(endpoint.ScopeToken))
+        {
+            throw new ArgumentException("An endpoint must carry workspace, module, role, and scope metadata.", parameterName);
+        }
+    }
+
+    internal static void Contract(ContractId contract, string parameterName)
+    {
+        if (string.IsNullOrWhiteSpace(contract.Value))
+        {
+            throw new ArgumentException("A contract id is required.", parameterName);
+        }
+    }
+
+    internal static void Synapse(SynapseKey synapse, string parameterName)
+    {
+        if (synapse.Value == Guid.Empty)
+        {
+            throw new ArgumentException("A synapse key is required.", parameterName);
+        }
+    }
+
+    internal static void Revision(long revision, string parameterName)
+    {
+        if (revision <= 0)
+        {
+            throw new ArgumentOutOfRangeException(parameterName, "A synapse revision must be positive.");
+        }
+    }
+
+    internal static void Reshape(ReshapeId? reshape, string parameterName)
+    {
+        if (reshape is { } supplied && supplied.Value == Guid.Empty)
+        {
+            throw new ArgumentException("A reshape id cannot be empty when supplied.", parameterName);
+        }
+    }
+
+    internal static void Delivery(
+        DeliveryId delivery,
+        EndpointAddress target,
+        SynapseKey synapse,
+        long revision,
+        ContractId inputContract,
+        ContractId outputContract,
+        ReshapeId? reshape)
+    {
+        if (delivery.Value == Guid.Empty)
+        {
+            throw new ArgumentException("A delivery id is required.", nameof(delivery));
+        }
+
+        Endpoint(target, nameof(target));
+        Synapse(synapse, nameof(synapse));
+        Revision(revision, nameof(revision));
+        Contract(inputContract, nameof(inputContract));
+        Contract(outputContract, nameof(outputContract));
+        Reshape(reshape, nameof(reshape));
+    }
 }

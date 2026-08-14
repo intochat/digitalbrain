@@ -65,14 +65,11 @@ internal abstract class BrainNeuron<TState>
             .ConfigureAwait(false);
         ArgumentNullException.ThrowIfNull(routes);
 
-        var snapshots = routes.Select(static route => new DeliverySnapshot(
-            DeliveryId.New(),
-            route.Target,
-            route.Synapse,
-            route.Revision,
-            route.InputContract,
-            route.OutputContract,
-            route.Reshape)).ToImmutableArray();
+        var snapshots = routes.Select(static route =>
+        {
+            ArgumentNullException.ThrowIfNull(route);
+            return route.ToDeliverySnapshot();
+        }).ToImmutableArray();
         return turn.StageEmission(eventContract, snapshots);
     }
 }
