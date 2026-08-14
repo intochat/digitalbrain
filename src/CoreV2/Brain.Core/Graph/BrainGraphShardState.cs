@@ -39,6 +39,22 @@ internal sealed class BrainGraphShardState
         _history[revision.Key] = history.Add(revision);
     }
 
+    internal void Promote(BrainActivityId activation)
+    {
+        foreach (var key in _history.Keys.ToArray())
+        {
+            var history = _history[key];
+            var current = history[^1];
+            if (current.Status != SynapseRevisionStatus.Staged || current.Activation != activation)
+            {
+                continue;
+            }
+
+            var definition = current.Definition with { Revision = current.Revision + 1 };
+            Add(new SynapseRevision(definition, current.OutputContract, SynapseRevisionStatus.Live, null, activation));
+        }
+    }
+
     internal IEnumerable<SynapseRevision> LatestFor(
         EndpointAddress source,
         Brain.Abstractions.Contracts.ContractId contract,
@@ -57,7 +73,9 @@ internal sealed class BrainGraphShardState
         var latest = history[^1];
         if (latest.Status == SynapseRevisionStatus.Live)
         {
-            return latest;
+            return latest.Activation is null || isActivationActive(latest.Activation.Value)
+                ? latest
+                : null;
         }
 
         if (latest.Status == SynapseRevisionStatus.Staged)

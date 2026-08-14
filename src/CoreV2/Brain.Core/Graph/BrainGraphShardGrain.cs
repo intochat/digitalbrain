@@ -109,7 +109,7 @@ internal sealed class BrainGraphShardGrain
         lock (_entry.Gate)
         {
             var current = _entry.State.History(key)[^1];
-            if (current.Status != SynapseRevisionStatus.Live)
+            if (!IsLiveAndVisible(current))
             {
                 throw new GraphValidationException("A retired synapse must be reinstalled, not replaced.");
             }
@@ -153,6 +153,24 @@ internal sealed class BrainGraphShardGrain
         }
     }
 
+    // Promotion is intentionally separate from staging. It appends durable live
+    // history while retaining the activation gate until the coordinator has all
+    // shard acknowledgements and can expose the set together.
+    internal Task PromoteAsync(BrainActivityId activation)
+    {
+        if (activation.Value == Guid.Empty)
+        {
+            throw new ArgumentException("A promoted graph revision requires an activation.", nameof(activation));
+        }
+
+        lock (_entry.Gate)
+        {
+            _entry.State.Promote(activation);
+        }
+
+        return Task.CompletedTask;
+    }
+
     internal Task RetireAsync(SynapseKey key, GraphReason reason, ActivityContext provenance)
     {
         if (!Enum.IsDefined(reason))
@@ -164,7 +182,7 @@ internal sealed class BrainGraphShardGrain
         {
             var current = _entry.State.History(key)[^1];
             _validator.ValidateRetire(current, provenance);
-            if (current.Status != SynapseRevisionStatus.Live)
+            if (!IsLiveAndVisible(current))
             {
                 throw new GraphValidationException("Only a live synapse can be retired.");
             }
@@ -248,6 +266,10 @@ internal sealed class BrainGraphShardGrain
             throw new GraphValidationException("This graph shard only accepts its assigned outbound source endpoint.");
         }
     }
+
+    private bool IsLiveAndVisible(SynapseRevision revision)
+        => revision.Status == SynapseRevisionStatus.Live
+            && (revision.Activation is null || _activations.IsActive(revision.Activation.Value));
 
     private static ReshapeId ToReshapeId(ReshapeDescriptor reshape)
     {

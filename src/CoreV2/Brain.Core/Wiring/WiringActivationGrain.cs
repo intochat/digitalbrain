@@ -15,13 +15,15 @@ internal sealed class WiringActivationGrain(
     IWorkspacePolicyEvaluator policy,
     IEndpointResolver endpoints,
     GraphShardDirectory directory,
-    Action<NeuronRoleId>? beforeStage = null)
+    Action<NeuronRoleId>? beforeStage = null,
+    Action<NeuronRoleId>? beforePromote = null)
 {
     private readonly ModuleSet _modules = modules ?? throw new ArgumentNullException(nameof(modules));
     private readonly IWorkspacePolicyEvaluator _policy = policy ?? throw new ArgumentNullException(nameof(policy));
     private readonly IEndpointResolver _endpoints = endpoints ?? throw new ArgumentNullException(nameof(endpoints));
     private readonly GraphShardDirectory _directory = directory ?? throw new ArgumentNullException(nameof(directory));
     private readonly Action<NeuronRoleId>? _beforeStage = beforeStage;
+    private readonly Action<NeuronRoleId>? _beforePromote = beforePromote;
     private readonly Dictionary<WiringActivationKey, ActivationState> _activations = [];
 
     internal BrainActivityId CurrentId { get; private set; }
@@ -51,6 +53,11 @@ internal sealed class WiringActivationGrain(
         while (state.StagedShards.Count < state.RouteGroups.Count)
         {
             await StageNextAsync(state);
+        }
+
+        while (state.PromotedShards.Count < state.RouteGroups.Count)
+        {
+            await PromoteNextAsync(state);
         }
 
         _directory.Activate(state.Id);
@@ -143,6 +150,28 @@ internal sealed class WiringActivationGrain(
         }
     }
 
+    private async Task PromoteNextAsync(ActivationState state)
+    {
+        var group = state.RouteGroups.FirstOrDefault(candidate => !state.PromotedShards.Contains(candidate.Source));
+        if (group is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _beforePromote?.Invoke(group.Source.Role);
+            var shard = _directory.Open(group.Source, _modules, _policy);
+            await shard.PromoteAsync(state.Id);
+            state.PromotedShards.Add(group.Source);
+        }
+        catch
+        {
+            state.Status = WiringActivationStatus.Failed;
+            throw;
+        }
+    }
+
     private NeuronRoleDescriptor DeclaredRole(ModuleId owner, NeuronRoleId role)
         => _modules.Modules.Single(module => module.Id == owner).Roles.Single(candidate => candidate.Id == role);
 
@@ -163,6 +192,7 @@ internal sealed class WiringActivationGrain(
         internal WiringVersion Version { get; } = version;
         internal IReadOnlyList<RouteGroup> RouteGroups { get; } = routeGroups;
         internal HashSet<EndpointAddress> StagedShards { get; } = [];
+        internal HashSet<EndpointAddress> PromotedShards { get; } = [];
         internal WiringActivationStatus Status { get; set; } = WiringActivationStatus.Staging;
 
         internal WiringActivation View() => new(Id, Version.Wiring, Version.Version, Status, StagedShards.Count, RouteGroups.Count);
