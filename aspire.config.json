@@ -1,6 +1,6 @@
 {
-  "appHostPath": "src/Kernel/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj",
+  "appHostPath": "src/CoreV2/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj",
   "appHost": {
-    "path": "src/Kernel/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj"
+    "path": "src/CoreV2/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj"
   }
 }
