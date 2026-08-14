@@ -1,12 +1,24 @@
 # DigitalBrain
 
-Personal “alive OS”: Orleans **neurons** (durable grains) exchange **synapses** (facts) over a live **synapse graph** the owner and assistant rewrite at runtime.
+DigitalBrain is an Aspire-orchestrated, Orleans-backed personal runtime with a Flutter desktop client and independently discoverable product modules.
 
-![Architecture](plans/Architecture.svg)
+## Run the product
 
-**Kernel** — single-threaded turns, journal-is-outbox, emit (graph-routed) vs send (directed).  
-**Modules** — AI, Execution, UI, MCP SaaS (Salesforce/Gmail), Memory, Time, …  
-**Run** — `dotnet run --project src/Kernel/DigitalBrain.AppHost`
+From the repository root:
+
+```powershell
+aspire start
+```
+
+The CoreV2 AppHost starts persistent Azurite storage, the Orleans runtime, the ProductHost HTTP/SSE/MCP gateway, and the Flutter Windows client. Flutter is launched by its module-owned Aspire hosting extension and receives the ProductHost endpoint from the resource graph. The Aspire dashboard also exposes the Flutter hot-reload command.
+
+## Product modules
+
+- Proof, Conversation, Scheduling, Behavior, and Memory are available and durable.
+- AI, Google, and Salesforce are discoverable as optional modules and report `NeedsSetup` until their provider adapters are configured.
+- Conversation has a dedicated Flutter surface; every module can also be inspected and invoked through the generic operation surface.
+
+Migration and verification evidence is recorded in [status.md](status.md).
 
 ## CoreV2 cutover baseline
 

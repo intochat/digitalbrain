@@ -4,45 +4,57 @@ Updated: 2026-08-14
 
 ## Outcome
 
-CoreV2 is becoming the only compiled product graph. The target local startup is one `aspire start` command that brings up storage, an Orleans runtime silo, the ProductHost client, and the Flutter desktop client with module-owned Aspire projections.
+CoreV2 is the only compiled product graph. One `aspire start` command brings up persistent storage, the Orleans runtime silo, the ProductHost client/gateway, and the Flutter desktop client through module-owned Aspire projections.
 
 ## Current truth
 
-- The CoreV2 AppHost is tracked under `src/CoreV2` and the repository Aspire entry point targets it.
-- CoreV2 build and tests are green on .NET 11; obsolete .NET 8/9 MTP bridge flags were removed from the test projects.
-- `Brain.ServiceDefaults` now provides shared health checks, service discovery, HTTP resilience, and OpenTelemetry conventions.
-- `Brain.Aspire.Hosting` now models the brain aggregate, Azurite storage, Orleans clustering/reminders/grain state, and role-specific module projections.
-- `Brain.Aspire` now provides distinct application-side Orleans silo and client registrations over AppHost-injected storage configuration.
-- `DigitalBrain.RuntimeHost` is now the silo executable, while `DigitalBrain.ProductHost` is an independently hosted Orleans client with shared health endpoints.
-- The CoreV2 AppHost composes storage -> runtime -> ProductHost -> Flutter; a live isolated Aspire run verified all four resources healthy on 2026-08-14.
-- `Brain.Modules.UI.Aspire.Hosting` now owns window, web, and headless Flutter launch modes, ProductHost endpoint injection, readiness ordering, a dashboard hot-reload command, and source-watch hot reload.
-- The CoreV2 Flutter Windows shell compiles, launches from `aspire start`, receives `DIGITALBRAIN_PRODUCT_BASE`, and has green core/shell tests and analyzers.
-- CoreV2 domain and proof tests exist, but the proof runtime is still hosted behind one in-memory Orleans test grain rather than production grains.
-- `DigitalBrain.ProductHost` is a running Orleans client but does not yet expose the complete product protocol.
-- The V1 AppHost, module system, and product screens remain reference implementations only; the CoreV2 Aspire/Flutter launch path no longer depends on them.
-- The rejected ProductHost-local persistence slice remains reverted. Core state must live behind Orleans grains in the runtime host.
-- The earlier large cutover plan is superseded by the small, dependency-ordered migration plan in `docs/superpowers/plans/2026-08-14-corev2-aspire-hosting-spine.md`.
+- The repository Aspire entry point targets `src/CoreV2/DigitalBrain.AppHost`.
+- `Brain.ServiceDefaults` owns health checks, service discovery, HTTP resilience, and OpenTelemetry conventions.
+- `Brain.Aspire.Hosting` models the brain aggregate, persistent Azurite storage, Orleans clustering, reminders, grain state, and role-specific module projections.
+- `Brain.Aspire` provides distinct application-side Orleans silo and client registrations over AppHost-injected storage configuration.
+- `DigitalBrain.RuntimeHost` owns all durable product state. `DigitalBrain.ProductHost` is an independently hosted Orleans client and exposes module discovery, operation invocation, durable activity lookup, SSE activity observation, and MCP adapters.
+- Product activity and module state survive ProductHost and runtime restarts. No durable product state is stored in ProductHost.
+- `Brain.Modules.UI.Aspire.Hosting` owns window, web, and headless Flutter launch modes, ProductHost endpoint injection, readiness ordering, source-watch reload, and an Aspire dashboard hot-reload command.
+- The CoreV2 Flutter Windows shell compiles and launches from `aspire start`, receives `DIGITALBRAIN_PRODUCT_BASE`, and uses the Flutter tool for hot reload.
+- The Flutter shell has a dedicated durable Conversation surface plus a generic discovery/invocation surface for all module operations.
+- Caller and workspace identity are derived by ProductHost. Client-supplied caller/workspace headers are ignored.
+- The V1 `src/Kernel` and `src/Modules` trees are uncompiled references only. Architecture tests prevent active CoreV2 projects from depending on them.
 
-## Migration order
+## Module launch state
 
-1. Establish the tracked CoreV2 AppHost and green build/test baseline.
-2. Add shared service defaults.
-3. Add AppHost-side `Brain.Aspire.Hosting` resource and module projection abstractions.
-4. Add runtime-side `Brain.Aspire` Orleans silo/client hosting extensions.
-5. Add a dedicated CoreV2 runtime host and convert ProductHost into an Orleans client process.
-6. Prove the storage -> runtime -> ProductHost graph with `aspire start`.
-7. Add module-owned Flutter Aspire hosting and a minimal CoreV2 Flutter shell.
-8. Migrate durable product operations, protocol endpoints, module UI, and remaining modules in independently verified slices.
-9. Remove V1 from the product path only after parity and live cutover verification.
+| Order | Module | Status | Durable capability |
+| ---: | --- | --- | --- |
+| 1 | Proof | Ready | Durable activity-backed proof operation |
+| 2 | Conversation | Ready | Workspace-isolated ordered transcripts and idempotent sends |
+| 3 | Scheduling | Ready | Persistent schedules, cancellation, and Orleans reminders |
+| 4 | Behavior | Ready | Versioned behaviors, activation, deterministic runs, and run history |
+| 5 | AI | NeedsSetup | Optional provider adapter is not configured |
+| 6 | Memory | Ready | Workspace/namespace-scoped store, search, and remove |
+| 7 | Google | NeedsSetup | Optional provider adapter is not configured |
+| 8 | Salesforce | NeedsSetup | Optional provider adapter is not configured |
 
 ## Active slice
 
-Migrating the first durable Orleans-backed operation/activity path, followed by ProductHost discovery, invocation, activity, SSE, and MCP adapters.
+The base product migration and live cutover are complete. Remaining work is optional provider setup for AI, Google, and Salesforce. Physical deletion of the inert V1 reference trees is intentionally deferred until those adapters reach selected V1 feature parity; V1 is already absent from the compiled and running product path.
+
+## Live acceptance evidence
+
+On 2026-08-14 an isolated Aspire run established this graph:
+
+`Azurite storage -> Orleans runtime -> ProductHost -> Flutter Windows`
+
+- All four resources reached healthy/running state.
+- ProductHost returned the eight modules above in the declared launch order and exposed 13 operations.
+- Conversation send/read, Scheduling schedule/read, Behavior publish/activate/run/read, and Memory store/search were invoked through ProductHost successfully.
+- Restarting the runtime preserved transcript messages, the registered schedule/reminder, active behavior revision and run, and stored memory.
+- Restarting ProductHost preserved activity lookup and left Flutter healthy.
+- The Aspire Flutter hot-reload command completed successfully against the running Windows client.
+- Aspire shut down cleanly with no remaining application instances.
 
 ## Definition of done
 
 - `dotnet build DigitalBrain.slnx -c Release` succeeds.
-- Every CoreV2 test project passes through the native .NET 11 test coordinator.
+- Every CoreV2 test project passes through its native .NET 11 test executable.
 - `aspire start --isolated --non-interactive` reaches healthy storage, runtime, ProductHost, and Flutter resources.
 - Flutter can discover and invoke module operations and observe durable activity through ProductHost.
 - No compiled CoreV2 project references V1 source roots.

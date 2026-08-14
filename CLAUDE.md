@@ -1,30 +1,34 @@
 # DigitalBrain
 
+> **CoreV2 product cutover — 2026-08-14:** the compiled product is rooted at `src/CoreV2`.
+> Start it only with `aspire start`; do not run either host with `dotnet run`. The AppHost owns
+> persistent Azurite, the Orleans runtime, the ProductHost client/gateway, and the Flutter Windows
+> process. The legacy `src/Kernel` and `src/Modules` trees below are retained as uncompiled migration
+> references and must not be reintroduced into the product graph. Current migration truth and
+> verification commands live in [status.md](status.md).
+
 A personal "alive OS": an Orleans-based brain of **neurons** (durable grains) exchanging
 **synapses** (facts) whose runtime topology — the **synapse graph** of **connections** —
 is data the owner and the assistant rewrite while it runs. Architecture record and open
 decisions: [UNIFIED-ARCHITECTURE.md](UNIFIED-ARCHITECTURE.md) (current) and
 [INTERCONNECT-REVIEW.md](INTERCONNECT-REVIEW.md) (evidence base).
 
-> **Owner amendment — 2026-08-11:** production source is the current behavioral truth. The central
-> automated-test project was intentionally deleted; do not create or run .NET or Flutter tests
-> during this refit. Final hardening will design module-owned test projects/frameworks. Keep
-> Salesforce Contracts as the product boundary for neuron and synapse interfaces.
+> **Testing amendment — 2026-08-14:** CoreV2 uses module-owned .NET and Flutter test projects.
+> Run them for every product migration change. The earlier no-test instruction applies only to the
+> archived V1 refit and is superseded for CoreV2.
 
 ## Commands
 
 ```bash
 dotnet build DigitalBrain.slnx -warnaserror --nologo                  # full solution, 0 warnings expected
-pwsh scripts/gate.ps1                                                 # .NET source-build gate
-pwsh scripts/gate.ps1 -Flutter                                        # plus production Flutter lib analysis
-dotnet run --project src/Kernel/DigitalBrain.AppHost                  # full stack (Docker: Azurite, Qdrant, Ollama)
+dotnet test DigitalBrain.slnx -c Release --no-build --nologo          # CoreV2 module-owned tests
+aspire start                                                          # storage, runtime, gateway, Flutter
 ```
 
-Flutter (`src/Modules/UI/Flutter/{core,kit,shell}`): `flutter analyze lib` per package. Do not run
-automated tests. Owner scripts are .NET single-file apps in `src/Kernel/DigitalBrain.Scripting/*.cs`
-(`#:project` directives, run with `dotnet run <file>.cs -- --ConnectionStrings:clustering "…"`).
+Flutter (`src/CoreV2/UI/Flutter/{core,shell}`): run `dart analyze` and `dart test` in core,
+then `flutter analyze` and `flutter test` in shell.
 
-Stop AppHost before every build; running silos hold output files open.
+Stop Aspire before builds that replace runtime binaries; running silos can hold output files open.
 
 ## Architecture spine
 
