@@ -2,7 +2,9 @@ using DigitalBrain.Aspire;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Xunit;
 
@@ -23,6 +25,9 @@ public sealed class DigitalBrainHostingTests
         using var host = builder.Build();
 
         Assert.NotNull(host.Services.GetService<ILocalSiloDetails>());
+        Assert.Equal(
+            TimeSpan.FromMinutes(10),
+            host.Services.GetRequiredService<IOptions<SiloMessagingOptions>>().Value.ResponseTimeout);
     }
 
     [Fact]
@@ -45,5 +50,9 @@ public sealed class DigitalBrainHostingTests
 
         Assert.DoesNotContain(builder.Services, descriptor => descriptor.ServiceType == typeof(ILocalSiloDetails));
         Assert.Contains(builder.Services, descriptor => descriptor.ServiceType == typeof(IClusterClient));
+        using var host = builder.Build();
+        Assert.Equal(
+            TimeSpan.FromMinutes(10),
+            host.Services.GetRequiredService<IOptions<ClientMessagingOptions>>().Value.ResponseTimeout);
     }
 }

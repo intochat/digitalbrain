@@ -1,6 +1,8 @@
 using DigitalBrain.ServiceDefaults;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Orleans.Configuration;
 using Orleans.Journaling;
 
 namespace DigitalBrain.Aspire;
@@ -28,6 +30,11 @@ public static class DigitalBrainRuntimeHostingExtensions
             silo.AddAzureBlobJournalStorage(options => options.ConfigureBlobServiceClient(journalConnection));
 #pragma warning restore ORLEANSEXP005
             configure?.Invoke(silo);
+        });
+        builder.Services.PostConfigure<SiloMessagingOptions>(static options =>
+        {
+            options.ResponseTimeout = TimeSpan.FromMinutes(10);
+            options.ResponseTimeoutWithDebugger = TimeSpan.FromMinutes(10);
         });
         return builder;
     }
