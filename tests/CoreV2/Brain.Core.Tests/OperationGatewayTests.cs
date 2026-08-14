@@ -1,3 +1,4 @@
+using System.Globalization;
 using Brain.Abstractions.Activities;
 using Brain.Abstractions.Context;
 using Brain.Abstractions.Contracts;
@@ -14,6 +15,24 @@ namespace Brain.Core.Tests;
 
 public sealed class OperationGatewayTests
 {
+    [Fact]
+    public void RuntimeIngressDoesNotDiscoverInputClrShape()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../../"));
+        var ingress = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "CoreV2",
+            "Brain.Core",
+            "Activities",
+            "OperationGateway.cs"));
+
+        Assert.DoesNotContain("System.Reflection", ingress, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetProperties", ingress, StringComparison.Ordinal);
+        Assert.DoesNotContain("AssemblyQualifiedName", ingress, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetInterfaces", ingress, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task SameWorkspacePrincipalAndKeyReturnTheSameActivity()
     {
@@ -341,6 +360,13 @@ public sealed class OperationGatewayTests
 
     private sealed record QueueInput(IEnumerable<string> Items);
 
+    private sealed class DelegateCanonicalizer<TInput>(Func<TInput, string> canonicalize)
+        : IIdempotencyInputCanonicalizer<TInput>
+        where TInput : class
+    {
+        public string Canonicalize(TInput input) => canonicalize(input);
+    }
+
     private sealed class GatewayFixture
     {
         private GatewayFixture(PolicyDecision decision)
@@ -394,10 +420,21 @@ public sealed class OperationGatewayTests
                 new ActivityProjectionService(Store),
                 new OperationTypeBindings(
                 [
-                    OperationTypeBinding.For<ProofInput, ProofResult>(Run),
-                    OperationTypeBinding.For<CorrectionInput, CorrectionResult>(Correct),
-                    OperationTypeBinding.For<CollectionInput, ProofResult>(Collect),
-                    OperationTypeBinding.For<QueueInput, ProofResult>(Sequence),
+                    OperationTypeBinding.For<ProofInput, ProofResult>(
+                        Run,
+                        Canonicalizer<ProofInput>(input => Token("proof", input.Value))),
+                    OperationTypeBinding.For<CorrectionInput, CorrectionResult>(
+                        Correct,
+                        Canonicalizer<CorrectionInput>(input => Token("correction", input.Value))),
+                    OperationTypeBinding.For<CollectionInput, ProofResult>(
+                        Collect,
+                        Canonicalizer<CollectionInput>(input => Token(
+                            "collection",
+                            Token("items", SequenceMaterial(input.Items))
+                            + Token("values", DictionaryMaterial(input.Values))))),
+                    OperationTypeBinding.For<QueueInput, ProofResult>(
+                        Sequence,
+                        Canonicalizer<QueueInput>(input => Token("queue", SequenceMaterial(input.Items)))),
                 ]));
         }
 
@@ -420,6 +457,24 @@ public sealed class OperationGatewayTests
         public static GatewayFixture Refused() => new(PolicyDecision.Refused);
 
         public static GatewayFixture ConfirmationRequired() => new(PolicyDecision.ConfirmationRequired);
+
+        private static IIdempotencyInputCanonicalizer<TInput> Canonicalizer<TInput>(Func<TInput, string> canonicalize)
+            where TInput : class
+            => new DelegateCanonicalizer<TInput>(canonicalize);
+
+        private static string SequenceMaterial(IEnumerable<string> values)
+            => string.Concat(values.Select(value => Token("item", value)));
+
+        private static string DictionaryMaterial(IReadOnlyDictionary<string, int> values)
+            => string.Concat(values
+                .OrderBy(static pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair => Token(
+                    "entry",
+                    Token("key", pair.Key)
+                    + Token("value", pair.Value.ToString(CultureInfo.InvariantCulture)))));
+
+        private static string Token(string kind, string value)
+            => $"{kind}:{value.Length.ToString(CultureInfo.InvariantCulture)}:{value};";
     }
 
     private sealed class FixedPolicyEvaluator(PolicyDecision decision) : IWorkspacePolicyEvaluator

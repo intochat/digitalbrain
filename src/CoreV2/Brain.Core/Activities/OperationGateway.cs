@@ -1,6 +1,3 @@
-using System.Collections;
-using System.Globalization;
-using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using Brain.Abstractions.Context;
@@ -27,23 +24,37 @@ public sealed class IdempotencyConflictException(string message) : InvalidOperat
 
 public sealed class OperationTypeMismatchException(string message) : ArgumentException(message);
 
+internal interface IIdempotencyInputCanonicalizer<in TInput>
+    where TInput : class
+{
+    string Canonicalize(TInput input);
+}
+
 internal sealed record OperationTypeBinding(
     OperationId Operation,
     Type InputType,
-    Type ResultType)
+    Type ResultType,
+    Func<object, string> CanonicalizeInput)
 {
-    internal static OperationTypeBinding For<TInput, TResult>(OperationDescriptor operation)
+    internal static OperationTypeBinding For<TInput, TResult>(
+        OperationDescriptor operation,
+        IIdempotencyInputCanonicalizer<TInput> canonicalizer)
         where TInput : class
         where TResult : class
     {
         ArgumentNullException.ThrowIfNull(operation);
-        return new OperationTypeBinding(operation.Id, typeof(TInput), typeof(TResult));
+        ArgumentNullException.ThrowIfNull(canonicalizer);
+        return new OperationTypeBinding(
+            operation.Id,
+            typeof(TInput),
+            typeof(TResult),
+            input => canonicalizer.Canonicalize((TInput)input));
     }
 }
 
 internal interface IOperationTypeBindings
 {
-    void Validate<TInput, TResult>(OperationDescriptor operation)
+    OperationTypeBinding Validate<TInput, TResult>(OperationDescriptor operation)
         where TInput : class
         where TResult : class;
 }
@@ -65,7 +76,7 @@ internal sealed class OperationTypeBindings : IOperationTypeBindings
         }
     }
 
-    public void Validate<TInput, TResult>(OperationDescriptor operation)
+    public OperationTypeBinding Validate<TInput, TResult>(OperationDescriptor operation)
         where TInput : class
         where TResult : class
     {
@@ -78,6 +89,8 @@ internal sealed class OperationTypeBindings : IOperationTypeBindings
                 $"Operation '{operation.Id}' is not registered for input '{typeof(TInput).FullName}' "
                 + $"and result '{typeof(TResult).FullName}'.");
         }
+
+        return binding;
     }
 }
 
@@ -188,9 +201,9 @@ internal sealed class OperationGateway : IOperationGateway
                 nameof(operation));
         }
 
-        _typeBindings.Validate<TInput, TResult>(registered);
+        var binding = _typeBindings.Validate<TInput, TResult>(registered);
 
-        var fingerprint = InputFingerprint.Create(input);
+        var fingerprint = IdempotencyFingerprint.Create(binding.CanonicalizeInput(input));
         var identity = new ActivityIdempotencyIdentity(caller.Workspace, caller.Principal, idempotencyKey);
         var state = _store.GetOrAdd(
             identity,
@@ -260,183 +273,11 @@ internal sealed class OperationGateway : IOperationGateway
             && left.Version == right.Version;
 }
 
-internal static class InputFingerprint
+internal static class IdempotencyFingerprint
 {
-    internal static string Create<TInput>(TInput input)
-        where TInput : class
+    internal static string Create(string canonicalMaterial)
     {
-        var builder = new StringBuilder();
-        Append(builder, input, new HashSet<object>(ReferenceEqualityComparer.Instance));
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString())));
-    }
-
-    private static void Append(StringBuilder builder, object? value, HashSet<object> path)
-    {
-        if (value is null)
-        {
-            Token(builder, "null", string.Empty);
-            return;
-        }
-
-        var type = value.GetType();
-        Token(builder, "type", type.AssemblyQualifiedName ?? type.FullName ?? type.Name);
-        if (value is string text)
-        {
-            Token(builder, "string", text);
-            return;
-        }
-
-        if (value is Guid guid)
-        {
-            Token(builder, "guid", guid.ToString("D"));
-            return;
-        }
-
-        if (value is DateTime dateTime)
-        {
-            Token(builder, "datetime", dateTime.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
-            return;
-        }
-
-        if (value is DateTimeOffset dateTimeOffset)
-        {
-            Token(builder, "datetime-offset", dateTimeOffset.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
-            return;
-        }
-
-        if (type.IsEnum)
-        {
-            Token(builder, "enum", value.ToString() ?? string.Empty);
-            return;
-        }
-
-        if (type.IsPrimitive || value is decimal)
-        {
-            Token(builder, "scalar", ((IFormattable)value).ToString(null, CultureInfo.InvariantCulture));
-            return;
-        }
-
-        var added = false;
-        if (!type.IsValueType)
-        {
-            if (!path.Add(value))
-            {
-                throw new ArgumentException("Operation input must not contain reference cycles.", nameof(value));
-            }
-
-            added = true;
-        }
-
-        try
-        {
-            if (TryGetDictionaryEntries(value, out var entries))
-            {
-                Token(builder, "dictionary", entries.Count.ToString(CultureInfo.InvariantCulture));
-                foreach (var entry in entries
-                             .Select(entry => new
-                             {
-                                 Key = Canonicalize(entry.Key, path),
-                                 Value = Canonicalize(entry.Value, path),
-                             })
-                             .OrderBy(static entry => entry.Key, StringComparer.Ordinal)
-                             .ThenBy(static entry => entry.Value, StringComparer.Ordinal))
-                {
-                    Token(builder, "key", entry.Key);
-                    Token(builder, "value", entry.Value);
-                }
-
-                return;
-            }
-
-            if (value is IEnumerable enumerable)
-            {
-                var items = enumerable.Cast<object?>()
-                    .Select(item => Canonicalize(item, path))
-                    .ToList();
-
-                Token(builder, "sequence", items.Count.ToString(CultureInfo.InvariantCulture));
-                foreach (var item in items)
-                {
-                    Token(builder, "item", item);
-                }
-
-                return;
-            }
-
-            var properties = type.GetProperties(BindingFlags.Instance | BindingFlags.Public)
-                .Where(static property => property.CanRead && property.GetIndexParameters().Length == 0)
-                .OrderBy(static property => property.Name, StringComparer.Ordinal)
-                .ToArray();
-            if (properties.Length == 0)
-            {
-                throw new ArgumentException(
-                    $"Operation input value type '{type.FullName}' has no canonical public properties.",
-                    nameof(value));
-            }
-
-            Token(builder, "record", properties.Length.ToString(CultureInfo.InvariantCulture));
-            foreach (var property in properties)
-            {
-                Token(builder, "property", property.Name);
-                Append(builder, property.GetValue(value), path);
-            }
-        }
-        finally
-        {
-            if (added)
-            {
-                path.Remove(value);
-            }
-        }
-    }
-
-    private static string Canonicalize(object? value, HashSet<object> path)
-    {
-        var builder = new StringBuilder();
-        Append(builder, value, new HashSet<object>(path, ReferenceEqualityComparer.Instance));
-        return builder.ToString();
-    }
-
-    private static bool TryGetDictionaryEntries(object value, out List<(object? Key, object? Value)> entries)
-    {
-        var genericDictionary = value.GetType().GetInterfaces().Any(static candidate =>
-            candidate.IsGenericType
-            && (candidate.GetGenericTypeDefinition() == typeof(IDictionary<,>)
-                || candidate.GetGenericTypeDefinition() == typeof(IReadOnlyDictionary<,>)));
-        if (genericDictionary && value is IEnumerable enumerable)
-        {
-            entries = enumerable.Cast<object>()
-                .Select(static entry =>
-                {
-                    var type = entry.GetType();
-                    return (
-                        type.GetProperty("Key")!.GetValue(entry),
-                        type.GetProperty("Value")!.GetValue(entry));
-                })
-                .ToList();
-            return true;
-        }
-
-        if (value is IDictionary dictionary)
-        {
-            entries = dictionary.Cast<DictionaryEntry>()
-                .Select(static entry => ((object?)entry.Key, entry.Value))
-                .ToList();
-            return true;
-        }
-
-        entries = [];
-        return false;
-    }
-
-    private static void Token(StringBuilder builder, string kind, string? value)
-    {
-        var material = value ?? string.Empty;
-        builder.Append(kind)
-            .Append(':')
-            .Append(material.Length.ToString(CultureInfo.InvariantCulture))
-            .Append(':')
-            .Append(material)
-            .Append(';');
+        ArgumentException.ThrowIfNullOrWhiteSpace(canonicalMaterial);
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalMaterial)));
     }
 }
