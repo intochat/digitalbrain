@@ -42,7 +42,7 @@ public sealed class ProductRuntimeGrain(
         IEnumerable<IRuntimeProductModule> modules)
     {
         ArgumentNullException.ThrowIfNull(modules);
-        var copy = modules.OrderBy(static module => module.Module.Id, StringComparer.Ordinal).ToArray();
+        var copy = modules.ToArray();
         if (copy.Any(static module => string.IsNullOrWhiteSpace(module.Module.Id))
             || copy.Select(static module => module.Module.Id).Distinct(StringComparer.Ordinal).Count() != copy.Length)
         {
