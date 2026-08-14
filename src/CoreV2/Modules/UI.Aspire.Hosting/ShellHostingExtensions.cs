@@ -91,7 +91,11 @@ public static class ShellHostingExtensions
             if (brain.ApplicationBuilder.ExecutionContext.IsRunMode
                 && kind is FlutterHostKind.Window or FlutterHostKind.Web)
             {
-                ArmHotReload(_flutter, launch.WorkingDirectory);
+                ArmHotReload(
+                    _flutter,
+                    launch.Command,
+                    launch.WorkingDirectory,
+                    launch.Args[2]);
             }
         }
 
@@ -121,7 +125,9 @@ public static class ShellHostingExtensions
 
         private void ArmHotReload(
             IResourceBuilder<ExecutableResource> flutter,
-            string workingDirectory)
+            string flutterCommand,
+            string workingDirectory,
+            string deviceTarget)
         {
             flutter
                 .WithArgs(
@@ -138,7 +144,10 @@ public static class ShellHostingExtensions
                     {
                         try
                         {
-                            await FlutterVmService.ReloadAsync(
+                            await FlutterHotReloadRunner.ReloadAsync(
+                                flutterCommand,
+                                workingDirectory,
+                                deviceTarget,
                                 ShellNames.FlutterDdsPort,
                                 context.CancellationToken).ConfigureAwait(false);
                             return CommandResults.Success();
@@ -167,6 +176,9 @@ public static class ShellHostingExtensions
                 _hotReloadWatch = FlutterHotReloadWatch.Start(
                     ResolveWatchRoots(workingDirectory),
                     ShellNames.FlutterDdsPort,
+                    flutterCommand,
+                    workingDirectory,
+                    deviceTarget,
                     logger,
                     lifetime.ApplicationStopping);
                 return Task.CompletedTask;

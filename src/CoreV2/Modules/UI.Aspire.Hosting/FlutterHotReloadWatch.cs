@@ -5,25 +5,44 @@ namespace Brain.Modules.UI.Aspire.Hosting;
 internal sealed class FlutterHotReloadWatch : IDisposable
 {
     private readonly int _port;
+    private readonly string _flutterCommand;
+    private readonly string _workingDirectory;
+    private readonly string _deviceTarget;
     private readonly ILogger _logger;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly List<FileSystemWatcher> _watchers = [];
     private CancellationTokenSource? _debounce;
     private int _disposed;
 
-    private FlutterHotReloadWatch(int port, ILogger logger)
+    private FlutterHotReloadWatch(
+        int port,
+        string flutterCommand,
+        string workingDirectory,
+        string deviceTarget,
+        ILogger logger)
     {
         _port = port;
+        _flutterCommand = flutterCommand;
+        _workingDirectory = workingDirectory;
+        _deviceTarget = deviceTarget;
         _logger = logger;
     }
 
     internal static FlutterHotReloadWatch Start(
         IEnumerable<string> roots,
         int port,
+        string flutterCommand,
+        string workingDirectory,
+        string deviceTarget,
         ILogger logger,
         CancellationToken stopping)
     {
-        var watch = new FlutterHotReloadWatch(port, logger);
+        var watch = new FlutterHotReloadWatch(
+            port,
+            flutterCommand,
+            workingDirectory,
+            deviceTarget,
+            logger);
         stopping.Register(watch.Dispose);
         watch.Arm(roots);
         return watch;
@@ -59,7 +78,12 @@ internal sealed class FlutterHotReloadWatch : IDisposable
         try
         {
             await Task.Delay(TimeSpan.FromMilliseconds(400), cancellationToken).ConfigureAwait(false);
-            await FlutterVmService.ReloadAsync(_port, cancellationToken).ConfigureAwait(false);
+            await FlutterHotReloadRunner.ReloadAsync(
+                _flutterCommand,
+                _workingDirectory,
+                _deviceTarget,
+                _port,
+                cancellationToken).ConfigureAwait(false);
             _logger.LogInformation("Flutter hot reload applied.");
         }
         catch (OperationCanceledException)
