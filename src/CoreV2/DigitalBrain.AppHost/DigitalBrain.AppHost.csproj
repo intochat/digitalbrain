@@ -6,6 +6,8 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Aspire/Brain.Aspire.Hosting/Brain.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../Modules/AI/Aspire.Hosting/Brain.Modules.AI.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../Modules/AI/Contracts/Brain.Modules.AI.Contracts.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../Modules/UI.Aspire.Hosting/Brain.Modules.UI.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../Modules/UI/Brain.Modules.UI.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../DigitalBrain.ProductHost/DigitalBrain.ProductHost.csproj" />

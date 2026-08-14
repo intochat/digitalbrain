@@ -1,4 +1,5 @@
 using Brain.Modules.Behavior;
+using Brain.Modules.AI;
 using Brain.Modules.Conversation;
 using Brain.Core.Journaling;
 using Brain.Modules.Memory;
@@ -22,6 +23,7 @@ builder.AddDigitalBrainRuntime(silo =>
 builder.Services.AddSingleton<IRuntimeProductModule, ProofProductModule>();
 builder.Services.AddSingleton<IBrainOperationHandler, ProofWireOperationHandler>();
 builder.Services.AddSingleton<IBrainOperationHandler, ProofRunOperationHandler>();
+builder.Services.AddCoreV2AI(builder.Configuration);
 builder.Services.AddSingleton<IRuntimeProductModule, ConversationProductModule>();
 builder.Services.AddSingleton<IRuntimeProductModule, SchedulingProductModule>();
 builder.Services.AddSingleton<IRuntimeProductModule, BehaviorProductModule>();

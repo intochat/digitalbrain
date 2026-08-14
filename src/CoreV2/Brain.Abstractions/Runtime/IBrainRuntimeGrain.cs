@@ -8,5 +8,9 @@ public interface IBrainRuntimeGrain : IGrainWithStringKey
 
     Task<BrainActivityReceipt> InvokeAsync(BrainOperationInvocation invocation);
 
+    Task<BrainChildOperationResult> InvokeWithinActivityAsync(
+        Guid activityId,
+        BrainOperationInvocation invocation);
+
     Task<BrainActivitySnapshot?> GetActivityAsync(Guid activityId, string workspaceId);
 }

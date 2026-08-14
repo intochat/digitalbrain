@@ -3,9 +3,11 @@ using System.Text;
 using Brain.Abstractions.Activities;
 using Brain.Abstractions.Journal;
 using Brain.Abstractions.Runtime;
+using Orleans.Concurrency;
 
 namespace Brain.Core.Runtime;
 
+[Reentrant]
 public sealed class BrainRuntimeGrain(
     IEnumerable<IBrainOperationHandler> handlers,
     IGrainFactory grains) : Grain, IBrainRuntimeGrain
@@ -83,6 +85,58 @@ public sealed class BrainRuntimeGrain(
         }
 
         return receipt;
+    }
+
+    public async Task<BrainChildOperationResult> InvokeWithinActivityAsync(
+        Guid activityId,
+        BrainOperationInvocation invocation)
+    {
+        ArgumentNullException.ThrowIfNull(invocation);
+        if (!_handlers.TryGetValue(invocation.OperationId, out var handler))
+        {
+            throw new KeyNotFoundException($"Operation '{invocation.OperationId}' is not installed.");
+        }
+        var activity = grains.GetGrain<IBrainActivityGrain>(
+            $"{invocation.WorkspaceId}/{activityId:n}");
+        var existing = await activity.GetAsync(invocation.WorkspaceId)
+            ?? throw new KeyNotFoundException($"Activity '{activityId:n}' was not found.");
+        if (existing.Status is ActivityStatus.Completed or ActivityStatus.Failed)
+        {
+            throw new InvalidOperationException("A child Operation cannot run after its parent activity is terminal.");
+        }
+
+        var context = new BrainOperationExecutionContext(activityId, invocation, activity, grains);
+        var label = $"child:{invocation.OperationId}:{invocation.IdempotencyKey}";
+        await context.JournalAsync(
+            $"{label}:accepted",
+            "core/operation-gateway/workspace",
+            BrainJournalDirection.Operation,
+            invocation.OperationId,
+            "accepted",
+            $"Child Operation {invocation.OperationId} accepted");
+        try
+        {
+            var result = await handler.ExecuteAsync(context, CancellationToken.None);
+            await context.JournalAsync(
+                $"{label}:completed",
+                "core/operation-gateway/workspace",
+                BrainJournalDirection.Operation,
+                invocation.OperationId,
+                "completed",
+                $"Child Operation {invocation.OperationId} completed");
+            return new BrainChildOperationResult(invocation.OperationId, result);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            await context.JournalAsync(
+                $"{label}:failed",
+                "core/operation-gateway/workspace",
+                BrainJournalDirection.Operation,
+                invocation.OperationId,
+                "failed",
+                exception.Message);
+            throw;
+        }
     }
 
     public Task<BrainActivitySnapshot?> GetActivityAsync(Guid activityId, string workspaceId)
