@@ -4,6 +4,12 @@ Language: [COREV2-DICTIONARY.md](COREV2-DICTIONARY.md). Those words only.
 
 CoreV2 is a new kernel (`src/CoreV2`, `Brain.*`). It does not migrate V1 or share types with `DigitalBrain.*`. V1 stays the running product until this kernel can host a proof.
 
+## Verified status
+
+The root solution now compiles only `Brain.Abstractions`, `Brain.Core`, `Brain.Testing`, the Proof contracts and module, and their CoreV2 test projects. Architecture tests enforce that this compiled graph has no project references into `src/Kernel` or `src/Modules` and that `src/CoreV2` contains no reflection-based type discovery through `Assembly.GetTypes` or `GetCustomAttributes`.
+
+The CI gate builds `DigitalBrain.slnx` in Release with warnings treated as errors, then runs the Architecture, Abstractions, Core, and Proof test suites. V1 source remains in the repository temporarily but is excluded from the solution and compiled project graph.
+
 ## Thesis
 
 MCP and Flutter are equal adapters. Operations are the public boundary: they name the versioned intents an authenticated caller may invoke, while Capabilities let Neurons use typed module-published facilities. The proof contains no provider integration.

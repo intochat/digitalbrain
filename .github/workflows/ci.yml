@@ -25,3 +25,29 @@ jobs:
       - name: build
         run: dotnet build DigitalBrain.slnx -c Release -warnaserror --nologo
         timeout-minutes: 12
+
+  corev2-tests:
+    needs: source-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: architecture
+            project: tests/CoreV2/Brain.Architecture.Tests/Brain.Architecture.Tests.csproj
+          - name: abstractions
+            project: tests/CoreV2/Brain.Abstractions.Tests/Brain.Abstractions.Tests.csproj
+          - name: core
+            project: tests/CoreV2/Brain.Core.Tests/Brain.Core.Tests.csproj
+          - name: proof
+            project: tests/CoreV2/Brain.Proof.Tests/Brain.Proof.Tests.csproj
+    name: corev2-${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: test ${{ matrix.name }}
+        run: dotnet test ${{ matrix.project }} -c Release
+        timeout-minutes: 12
