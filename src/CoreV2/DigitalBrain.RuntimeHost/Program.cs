@@ -1,3 +1,4 @@
+using Brain.Modules.Conversation;
 using Brain.Modules.Proof;
 using Brain.Runtime.Abstractions;
 using DigitalBrain.Aspire;
@@ -7,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddDigitalBrainRuntime();
+builder.Services.AddSingleton<IRuntimeProductModule, ConversationProductModule>();
 builder.Services.AddSingleton<IRuntimeProductModule, ProofProductModule>();
 
 var app = builder.Build();
