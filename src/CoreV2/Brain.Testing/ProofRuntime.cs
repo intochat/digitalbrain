@@ -11,6 +11,7 @@ using Brain.Abstractions.Identity;
 using Brain.Abstractions.Modules;
 using Brain.Abstractions.Operations;
 using Brain.Abstractions.Reshapes;
+using Brain.Abstractions.Wiring;
 using Brain.Core.Activities;
 using Brain.Core.Capabilities;
 using Brain.Core.Delivery;
@@ -21,6 +22,7 @@ using Brain.Core.Neurons;
 using Brain.Core.Outbox;
 using Brain.Core.Policy;
 using Brain.Core.Reshapes;
+using Brain.Core.Wiring;
 using Brain.Modules.Proof;
 using Brain.Modules.Proof.Contracts;
 using Brain.Testing.Fixtures;
@@ -48,8 +50,11 @@ public sealed class ProofRuntime : IProofRouteService, IProofActivityCompletion,
     private readonly TestCapability _capability = new();
     private readonly CapabilityBroker _capabilities;
     private readonly OperationGateway _operations;
+    private readonly WiringActivationGrain _wiring;
     private readonly DeterministicTimeProvider _time;
     private int _dispatchCount;
+    private int _holdNextDelivery;
+    private readonly ConcurrentQueue<OutboxEntry> _heldDeliveries = new();
 
     public ProofRuntime(DeterministicTimeProvider time)
     {
@@ -82,6 +87,7 @@ public sealed class ProofRuntime : IProofRouteService, IProofActivityCompletion,
                 OperationTypeBinding.For<ProofInput, ProofResult>(ProofContracts.Run, new ProofInputCanonicalizer()),
                 OperationTypeBinding.For<CorrectionInput, CorrectionResult>(ProofContracts.Correct, new CorrectionInputCanonicalizer()),
             ]));
+        _wiring = new WiringActivationGrain(_modules, _policy, _endpoints, _graph);
     }
 
     internal Guid InstanceId { get; } = Guid.NewGuid();
@@ -90,11 +96,64 @@ public sealed class ProofRuntime : IProofRouteService, IProofActivityCompletion,
 
     internal IReadOnlyList<string> RewireEvidence => _rewireEvidence.ToArray();
 
+    internal int ActivityCount => _activities.Activities.Count;
+
+    internal int CapabilityCallCount => _capability.CallCount;
+
     internal Task<OperationAccepted> InvokeRunAsync(string value, string workspace, string principal, string key)
         => _operations.InvokeAsync<ProofInput, ProofResult>(ProofContracts.Run, new ProofInput(value), Caller(workspace, principal), new IdempotencyKey(key), CancellationToken.None);
 
     internal Task<OperationAccepted> InvokeCorrectionAsync(string requestedRoute, string workspace, string principal, string key)
         => _operations.InvokeAsync<CorrectionInput, CorrectionResult>(ProofContracts.Correct, new CorrectionInput(requestedRoute), Caller(workspace, principal), new IdempotencyKey(key), CancellationToken.None);
+
+    internal Task<OperationAccepted> InvokeUnregisteredAsync(string workspace, string principal, string key)
+        => _operations.InvokeAsync<ProofInput, ProofResult>(
+            new OperationDescriptor(new OperationId("proof/unregistered@1"), ProofContracts.Run.InputContract, ProofContracts.Run.TerminalResultContract, ProofContracts.Run.EntryRole, ProofContracts.Run.Owner, ProofContracts.Run.Version),
+            new ProofInput("unregistered"), Caller(workspace, principal), new IdempotencyKey(key), CancellationToken.None);
+
+    internal void HoldNextDelivery() => Interlocked.Exchange(ref _holdNextDelivery, 1);
+
+    internal async Task FlushHeldDeliveriesAsync()
+    {
+        while (_heldDeliveries.TryDequeue(out var entry))
+        {
+            await _deliveries.DispatchAsync(entry, CancellationToken.None);
+        }
+    }
+
+    internal async Task ApplyPrincipalWiringAsync(string workspace, string principal)
+    {
+        var context = new ActivityContext(new WorkspaceId(workspace), new PrincipalId(principal), BrainActivityId.New(), new CorrelationId("test-wiring/" + principal));
+        var version = new WiringVersion(
+            WiringId.New(), 1, null, context.Activity, ProofContracts.Run.Id, ProofContracts.Run.Version,
+            [new WiringRoute(ProofContracts.SourceRole, ProofContracts.SummaryRole, ProofContracts.Produced, new WiringSlotId("proof-wiring"), null)], [], []);
+        await _wiring.ApplyAsync(version, context);
+    }
+
+    internal async Task<string[]> PrincipalRuntimeEvidenceAsync(string workspace, string principal)
+    {
+        var caller = Caller(workspace, principal);
+        var source = Endpoint(ProofContracts.SourceRole, caller);
+        var evidence = new List<string> { "scope/" + source.ScopeToken };
+        var routes = await _graph.Open(source, _modules, _policy).ResolveAsync(source, ProofContracts.Produced);
+        evidence.AddRange(routes.Deliveries.Select(static route => "route/" + route.Target.ScopeToken));
+        if (!_stores.TryGetValue(source, out var store))
+        {
+            return evidence.ToArray();
+        }
+
+        foreach (var entry in store.Emissions)
+        {
+            evidence.Add("activity/" + entry.Activity.Activity.Value.ToString("N"));
+            evidence.Add("payload/" + _payloads.Read(entry.Firing, entry.EventContract));
+            if (_results.ContainsKey("result/" + entry.Activity.Activity.Value.ToString("N")))
+            {
+                evidence.Add("result/" + entry.Activity.Activity.Value.ToString("N"));
+            }
+        }
+
+        return evidence.ToArray();
+    }
 
     internal Task<ActivityView> ObserveAsync(string activity, string workspace, string principal)
         => _operations.ObserveAsync(new BrainActivityId(Guid.Parse(activity)), Caller(workspace, principal), CancellationToken.None);
@@ -194,6 +253,12 @@ public sealed class ProofRuntime : IProofRouteService, IProofActivityCompletion,
             {
                 throw new InvalidOperationException("A proof delivery must preserve one immutable activity identity.");
             }
+        }
+
+        if (Interlocked.Exchange(ref _holdNextDelivery, 0) == 1)
+        {
+            _heldDeliveries.Enqueue(entry);
+            return;
         }
 
         await _deliveries.DispatchAsync(entry, cancellationToken);

@@ -33,7 +33,7 @@ public sealed class PrivacyBoundaryAcceptanceTests
     }
 
     [Fact]
-    public async Task unregistered_operation_is_rejected_before_the_cluster_runtime_is_dispatched()
+    public async Task unregistered_operation_is_rejected_by_the_real_gateway_without_creating_an_activity()
     {
         await using var host = await BrainTestHost.StartAsync();
         var caller = host.Caller("workspace/privacy", "principal/alice");
@@ -41,10 +41,11 @@ public sealed class PrivacyBoundaryAcceptanceTests
             new OperationId("proof.unregistered@1"), ProofContracts.Run.InputContract, ProofContracts.Run.TerminalResultContract,
             ProofContracts.Run.EntryRole, ProofContracts.Run.Owner, ProofContracts.Run.Version);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => host.Operations.InvokeAsync<ProofInput, ProofResult>(
+        var activityCount = await host.ActivityCountAsync();
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => host.Operations.InvokeAsync<ProofInput, ProofResult>(
             unregistered, new ProofInput("alpha"), caller, new IdempotencyKey("privacy/unregistered"), TestContext.Current.CancellationToken));
 
-        Assert.Equal(0, await host.RuntimeDispatchCountAsync());
+        Assert.Equal(activityCount, await host.ActivityCountAsync());
     }
 
     [Fact]

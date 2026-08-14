@@ -53,6 +53,25 @@ public sealed class RewireAndRetireAcceptanceTests
     }
 
     [Fact]
+    public async Task outbox_item_staged_before_correction_dispatches_its_captured_summary_route_afterward()
+    {
+        await using var host = await BrainTestHost.StartAsync();
+        var caller = host.Caller("workspace/outbox", "principal/alice");
+        await host.HoldNextDeliveryAsync();
+        var staged = await host.Operations.InvokeAsync<ProofInput, ProofResult>(ProofContracts.Run, new ProofInput("before-correction"), caller, new IdempotencyKey("outbox/staged"), TestContext.Current.CancellationToken);
+
+        await host.Operations.InvokeAsync<CorrectionInput, CorrectionResult>(ProofContracts.Correct, new CorrectionInput("assessment"), caller, new IdempotencyKey("outbox/correction"), TestContext.Current.CancellationToken);
+        await host.FlushHeldDeliveriesAsync();
+
+        var stagedResult = await host.ReadResultAsync<ProofResult>(await host.Operations.ObserveAsync(staged.Activity, caller, TestContext.Current.CancellationToken), caller);
+        var later = await host.Operations.InvokeAsync<ProofInput, ProofResult>(ProofContracts.Run, new ProofInput("after-correction"), caller, new IdempotencyKey("outbox/later"), TestContext.Current.CancellationToken);
+        var laterResult = await host.ReadResultAsync<ProofResult>(await host.Operations.ObserveAsync(later.Activity, caller, TestContext.Current.CancellationToken), caller);
+
+        Assert.Equal("summary", stagedResult.Route);
+        Assert.Equal("assessment", laterResult.Route);
+    }
+
+    [Fact]
     public async Task retired_route_stops_later_resolution_while_test_only_history_remains_available()
     {
         var fixture = new GraphAcceptanceFixture();

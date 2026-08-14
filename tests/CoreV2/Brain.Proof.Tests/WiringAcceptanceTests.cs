@@ -37,7 +37,7 @@ public sealed class WiringAcceptanceTests
     }
 
     [Fact]
-    public async Task applying_principal_scoped_wiring_resolves_bob_only_without_copying_alice_runtime_state()
+    public async Task applying_principal_scoped_wiring_resolves_bob_only_without_copying_alice_activity_payload_result_or_capability_state()
     {
         var fixture = new WiringAcceptanceFixture();
         var bob = fixture.For("principal/bob");
@@ -48,6 +48,21 @@ public sealed class WiringAcceptanceTests
         var delivery = Assert.Single((await fixture.ResolveAsync("principal/bob")).Deliveries);
         Assert.Equal("principal/bob", delivery.Target.ScopeToken);
         Assert.DoesNotContain("alice", delivery.Target.ScopeToken, StringComparison.OrdinalIgnoreCase);
+
+        await using var host = await Brain.Testing.BrainTestHost.StartAsync();
+        var alice = host.Caller("workspace/wiring-runtime", "principal/alice");
+        var aliceActivity = await host.Operations.InvokeAsync<Brain.Modules.Proof.Contracts.ProofInput, Brain.Modules.Proof.Contracts.ProofResult>(Brain.Modules.Proof.Contracts.ProofContracts.Run, new Brain.Modules.Proof.Contracts.ProofInput("alice-private-input"), alice, new IdempotencyKey("wiring/alice"), TestContext.Current.CancellationToken);
+        var capabilityCalls = await host.CapabilityCallCountAsync();
+
+        await host.ApplyPrincipalWiringAsync("workspace/wiring-runtime", "principal/bob");
+        var bobEvidence = await host.PrincipalRuntimeEvidenceAsync("workspace/wiring-runtime", "principal/bob");
+
+        Assert.Equal(capabilityCalls, await host.CapabilityCallCountAsync());
+        Assert.Contains("scope/principal/bob", bobEvidence);
+        Assert.Contains("route/workspace", bobEvidence);
+        Assert.DoesNotContain(bobEvidence, item => item.Contains(aliceActivity.Activity.Value.ToString("N"), StringComparison.Ordinal));
+        Assert.DoesNotContain(bobEvidence, item => item.Contains("alice-private-input", StringComparison.Ordinal));
+        Assert.DoesNotContain(bobEvidence, item => item.Contains("classified/alice-private-input", StringComparison.Ordinal));
     }
 
     [Fact]

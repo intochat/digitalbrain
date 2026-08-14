@@ -19,6 +19,20 @@ public interface IProofRuntimeGrain : IGrainWithStringKey
     Task<int> DispatchCountAsync();
 
     Task<string[]> RewireEvidenceAsync();
+
+    Task<int> ActivityCountAsync();
+
+    Task<int> CapabilityCallCountAsync();
+
+    Task<string> InvokeUnregisteredAsync(string workspace, string principal, string key);
+
+    Task HoldNextDeliveryAsync();
+
+    Task FlushHeldDeliveriesAsync();
+
+    Task ApplyPrincipalWiringAsync(string workspace, string principal);
+
+    Task<string[]> PrincipalRuntimeEvidenceAsync(string workspace, string principal);
 }
 
 public sealed class ProofRuntimeGrain(ProofRuntime runtime) : Grain, IProofRuntimeGrain
@@ -48,4 +62,24 @@ public sealed class ProofRuntimeGrain(ProofRuntime runtime) : Grain, IProofRunti
     public Task<int> DispatchCountAsync() => Task.FromResult(_runtime.DispatchCount);
 
     public Task<string[]> RewireEvidenceAsync() => Task.FromResult(_runtime.RewireEvidence.ToArray());
+
+    public Task<int> ActivityCountAsync() => Task.FromResult(_runtime.ActivityCount);
+
+    public Task<int> CapabilityCallCountAsync() => Task.FromResult(_runtime.CapabilityCallCount);
+
+    public async Task<string> InvokeUnregisteredAsync(string workspace, string principal, string key)
+        => (await _runtime.InvokeUnregisteredAsync(workspace, principal, key)).Activity.Value.ToString("N");
+
+    public Task HoldNextDeliveryAsync()
+    {
+        _runtime.HoldNextDelivery();
+        return Task.CompletedTask;
+    }
+
+    public Task FlushHeldDeliveriesAsync() => _runtime.FlushHeldDeliveriesAsync();
+
+    public Task ApplyPrincipalWiringAsync(string workspace, string principal) => _runtime.ApplyPrincipalWiringAsync(workspace, principal);
+
+    public Task<string[]> PrincipalRuntimeEvidenceAsync(string workspace, string principal)
+        => _runtime.PrincipalRuntimeEvidenceAsync(workspace, principal);
 }

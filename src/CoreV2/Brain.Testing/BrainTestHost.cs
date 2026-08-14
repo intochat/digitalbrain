@@ -82,6 +82,18 @@ public sealed class BrainTestHost : IAsyncDisposable, IActivityPayloadReader
 
     public Task<string[]> RewireEvidenceAsync() => _runtime.RewireEvidenceAsync();
 
+    public Task<int> ActivityCountAsync() => _runtime.ActivityCountAsync();
+
+    public Task<int> CapabilityCallCountAsync() => _runtime.CapabilityCallCountAsync();
+
+    public Task HoldNextDeliveryAsync() => _runtime.HoldNextDeliveryAsync();
+
+    public Task FlushHeldDeliveriesAsync() => _runtime.FlushHeldDeliveriesAsync();
+
+    public Task ApplyPrincipalWiringAsync(string workspace, string principal) => _runtime.ApplyPrincipalWiringAsync(workspace, principal);
+
+    public Task<string[]> PrincipalRuntimeEvidenceAsync(string workspace, string principal) => _runtime.PrincipalRuntimeEvidenceAsync(workspace, principal);
+
     public ValueTask DisposeAsync() => _cluster.DisposeAsync();
 
     private sealed class ClusterOperations(IProofRuntimeGrain runtime) : IOperationGateway
@@ -97,6 +109,8 @@ public sealed class BrainTestHost : IAsyncDisposable, IActivityPayloadReader
                     => InvokeRunAsync(proof, caller, idempotencyKey),
                 (var descriptor, CorrectionInput correction) when descriptor == ProofContracts.Correct && typeof(TResult) == typeof(CorrectionResult)
                     => InvokeCorrectionAsync(correction, caller, idempotencyKey),
+                (_, ProofInput) when typeof(TResult) == typeof(ProofResult)
+                    => InvokeUnregisteredAsync(caller, idempotencyKey),
                 _ => throw new InvalidOperationException("The cluster proof runtime does not expose the requested operation binding."),
             };
         }
@@ -112,6 +126,9 @@ public sealed class BrainTestHost : IAsyncDisposable, IActivityPayloadReader
 
         private async Task<OperationAccepted> InvokeCorrectionAsync(CorrectionInput input, WorkspaceContext caller, IdempotencyKey key)
             => new(new BrainActivityId(Guid.Parse(await runtime.InvokeCorrectionAsync(input.RequestedRoute, caller.Workspace.Value, caller.Principal.Value, key.Value))));
+
+        private async Task<OperationAccepted> InvokeUnregisteredAsync(WorkspaceContext caller, IdempotencyKey key)
+            => new(new BrainActivityId(Guid.Parse(await runtime.InvokeUnregisteredAsync(caller.Workspace.Value, caller.Principal.Value, key.Value))));
 
         private async Task<ActivityView> ObserveCoreAsync(BrainActivityId activity, WorkspaceContext caller)
         {
