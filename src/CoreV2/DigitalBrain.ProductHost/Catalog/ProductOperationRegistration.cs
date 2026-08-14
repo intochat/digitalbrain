@@ -8,7 +8,7 @@ public sealed class ProductOperationRegistration
 {
     public ProductOperationRegistration(
         OperationDescriptor declaredOperation,
-        ProductJsonAdapter adapter,
+        ProductOperationBinding adapter,
         ProductOperationAccessPolicy accessPolicy)
     {
         ArgumentNullException.ThrowIfNull(declaredOperation);
@@ -31,7 +31,7 @@ public sealed class ProductOperationRegistration
 
     public OperationDescriptor DeclaredOperation { get; }
 
-    public ProductJsonAdapter Adapter { get; }
+    public ProductOperationBinding Adapter { get; }
 
     public ProductOperationDescriptor Descriptor { get; }
 

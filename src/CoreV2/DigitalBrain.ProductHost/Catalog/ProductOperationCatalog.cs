@@ -23,7 +23,8 @@ public sealed class ProductOperationCatalog
         _policyFilter = policyFilter ?? throw new ArgumentNullException(nameof(policyFilter));
         ArgumentNullException.ThrowIfNull(registrations);
 
-        var activeSnapshot = moduleRegistry.GetSnapshot();
+        using var snapshotLease = moduleRegistry.AcquireSnapshot();
+        var activeSnapshot = snapshotLease.Snapshot;
         _moduleGeneration = activeSnapshot.Generation;
         var index = new SortedDictionary<string, ProductOperationRegistration>(StringComparer.Ordinal);
         var northboundIdentities = new HashSet<string>(StringComparer.Ordinal);
@@ -44,12 +45,6 @@ public sealed class ProductOperationCatalog
             }
         }
 
-        if (moduleRegistry.GetSnapshot().Generation != _moduleGeneration)
-        {
-            throw new ProductOperationCatalogConfigurationException(
-                "The active module set changed while the product catalog was being constructed.");
-        }
-
         _registrations = new ReadOnlyDictionary<string, ProductOperationRegistration>(index);
     }
 
@@ -60,7 +55,8 @@ public sealed class ProductOperationCatalog
         ArgumentNullException.ThrowIfNull(grant);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (!IsActiveGeneration())
+        using var snapshotLease = _moduleRegistry.AcquireSnapshot();
+        if (!IsActiveGeneration(snapshotLease.Snapshot))
         {
             return Task.FromResult<IReadOnlyList<ProductOperationDescriptor>>([]);
         }
@@ -81,25 +77,30 @@ public sealed class ProductOperationCatalog
         ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (!IsActiveGeneration()
-            || string.IsNullOrWhiteSpace(operation.Value)
-            || !_registrations.TryGetValue(operation.Value, out var registration)
-            || !_policyFilter.IsAvailable(context.AccessGrant, registration))
+        Task<ProductActivityReceipt> invocation;
+        using (var snapshotLease = _moduleRegistry.AcquireSnapshot())
         {
-            throw new ProductOperationNotAvailableException(operation);
-        }
+            if (!IsActiveGeneration(snapshotLease.Snapshot)
+                || string.IsNullOrWhiteSpace(operation.Value)
+                || !_registrations.TryGetValue(operation.Value, out var registration)
+                || !_policyFilter.IsAvailable(context.AccessGrant, registration))
+            {
+                throw new ProductOperationNotAvailableException(operation);
+            }
 
-        if (string.IsNullOrWhiteSpace(context.IdempotencyKey.Value))
-        {
-            throw new ProductOperationInputException("An idempotency key is required.");
-        }
+            if (string.IsNullOrWhiteSpace(context.IdempotencyKey.Value))
+            {
+                throw new ProductOperationInputException("An idempotency key is required.");
+            }
 
-        var receipt = await registration.Adapter.InvokeAsync(
+            invocation = registration.Adapter.InvokeAsync(
                 operation,
                 input,
                 context,
-                cancellationToken)
-            .ConfigureAwait(false);
+                cancellationToken);
+        }
+
+        var receipt = await invocation.ConfigureAwait(false);
         if (receipt.Operation != operation)
         {
             throw new InvalidOperationException(
@@ -130,8 +131,8 @@ public sealed class ProductOperationCatalog
         }
     }
 
-    private bool IsActiveGeneration()
-        => _moduleRegistry.GetSnapshot().Generation == _moduleGeneration;
+    private bool IsActiveGeneration(ModuleRegistrySnapshot snapshot)
+        => snapshot.Generation == _moduleGeneration;
 }
 
 public sealed class ProductOperationNotAvailableException : Exception

@@ -185,6 +185,105 @@ public sealed class ProductOperationCatalogTests
     }
 
     [Fact]
+    public async Task Discovery_holds_the_active_module_snapshot_until_descriptor_exposure_finishes()
+    {
+        using var policyEntered = new ManualResetEventSlim();
+        using var releasePolicy = new ManualResetEventSlim();
+        using var mutationStarted = new ManualResetEventSlim();
+        var registry = Registry([Send]);
+        var filter = new ProductOperationPolicyFilter(
+            new BlockingPolicyEvaluator([Send.Id], policyEntered, releasePolicy),
+            new FixturePolicyVersionProvider(Workspace, currentVersion: 7),
+            new FixedTimeProvider(IssuedAt.AddMinutes(1)));
+        var catalog = new ProductOperationCatalog(
+            registry,
+            filter,
+            [Registration(Send, Adapter(Send))]);
+        var discovery = Task.Run(
+            () => catalog.DiscoverAsync(Grant(), TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(policyEntered.Wait(
+            TimeSpan.FromSeconds(2),
+            TestContext.Current.CancellationToken));
+        var mutation = Task.Run(() =>
+        {
+            mutationStarted.Set();
+            registry.Resolve([]);
+        }, TestContext.Current.CancellationToken);
+        Assert.True(mutationStarted.Wait(
+            TimeSpan.FromSeconds(2),
+            TestContext.Current.CancellationToken));
+
+        try
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken);
+            Assert.False(mutation.IsCompleted);
+        }
+        finally
+        {
+            releasePolicy.Set();
+        }
+
+        Assert.Single(await discovery);
+        await mutation;
+        Assert.Empty(await catalog.DiscoverAsync(Grant(), TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Invocation_holds_the_active_module_snapshot_through_typed_adapter_entry()
+    {
+        using var policyEntered = new ManualResetEventSlim();
+        using var releasePolicy = new ManualResetEventSlim();
+        using var mutationStarted = new ManualResetEventSlim();
+        var sequence = 0L;
+        var adapterOrder = 0L;
+        var mutationOrder = 0L;
+        var adapter = Adapter(Send, () => adapterOrder = Interlocked.Increment(ref sequence));
+        var registry = Registry([Send]);
+        var filter = new ProductOperationPolicyFilter(
+            new BlockingPolicyEvaluator([Send.Id], policyEntered, releasePolicy),
+            new FixturePolicyVersionProvider(Workspace, currentVersion: 7),
+            new FixedTimeProvider(IssuedAt.AddMinutes(1)));
+        var catalog = new ProductOperationCatalog(registry, filter, [Registration(Send, adapter)]);
+        var invocation = Task.Run(
+            () => catalog.InvokeAsync(
+                Send.Id,
+                Json("{\"message\":\"hello\"}"),
+                Invocation(Grant()),
+                TestContext.Current.CancellationToken),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(policyEntered.Wait(
+            TimeSpan.FromSeconds(2),
+            TestContext.Current.CancellationToken));
+        var mutation = Task.Run(() =>
+        {
+            mutationStarted.Set();
+            registry.Resolve([Manifest([Send], new ModuleVersion(1, 1, 0))]);
+            mutationOrder = Interlocked.Increment(ref sequence);
+        }, TestContext.Current.CancellationToken);
+        Assert.True(mutationStarted.Wait(
+            TimeSpan.FromSeconds(2),
+            TestContext.Current.CancellationToken));
+
+        try
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken);
+            Assert.False(mutation.IsCompleted);
+        }
+        finally
+        {
+            releasePolicy.Set();
+        }
+
+        await invocation;
+        await mutation;
+        Assert.True(adapterOrder > 0);
+        Assert.True(adapterOrder < mutationOrder);
+    }
+
+    [Fact]
     public void Duplicate_operation_registration_is_rejected()
     {
         var registry = Registry([Send]);
@@ -301,12 +400,12 @@ public sealed class ProductOperationCatalogTests
     public void Swapped_or_schema_mismatched_generated_metadata_is_rejected()
     {
         Assert.Throws<ProductOperationCatalogConfigurationException>(() =>
-            new ProductJsonAdapter<CatalogResult, CatalogInput>(
+            ProductOperationBinding.Create<CatalogResult, CatalogInput>(
                 Descriptor(Send),
                 CatalogJsonSerializerContext.Default.CatalogResult,
                 CatalogJsonSerializerContext.Default.CatalogInput,
                 static (_, _, _) => throw new InvalidOperationException(),
-                ObserveNotSupported));
+                ObserveTypedNotSupported<CatalogInput>));
 
         var mismatchedDescriptor = new ProductOperationDescriptor(
             Send,
@@ -314,12 +413,12 @@ public sealed class ProductOperationCatalogTests
             "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"result\"],\"properties\":{\"result\":{\"type\":\"string\"}}}",
             Descriptor(Send).TerminalResultSchema);
         Assert.Throws<ProductOperationCatalogConfigurationException>(() =>
-            new ProductJsonAdapter<CatalogInput, CatalogResult>(
+            ProductOperationBinding.Create<CatalogInput, CatalogResult>(
                 mismatchedDescriptor,
                 CatalogJsonSerializerContext.Default.CatalogInput,
                 CatalogJsonSerializerContext.Default.CatalogResult,
                 static (_, _, _) => throw new InvalidOperationException(),
-                ObserveNotSupported));
+                ObserveTypedNotSupported<CatalogResult>));
     }
 
     [Theory]
@@ -336,12 +435,12 @@ public sealed class ProductOperationCatalogTests
             Descriptor(Send).TerminalResultSchema);
 
         Assert.Throws<ProductOperationCatalogConfigurationException>(() =>
-            new ProductJsonAdapter<CatalogInput, CatalogResult>(
+            ProductOperationBinding.Create<CatalogInput, CatalogResult>(
                 descriptor,
                 CatalogJsonSerializerContext.Default.CatalogInput,
                 CatalogJsonSerializerContext.Default.CatalogResult,
                 static (_, _, _) => throw new InvalidOperationException(),
-                ObserveNotSupported));
+                ObserveTypedNotSupported<CatalogResult>));
     }
 
     [Fact]
@@ -365,6 +464,115 @@ public sealed class ProductOperationCatalogTests
         AssertHostileMetadataRejected(
             HostileJsonSerializerContext.Default.CustomConverterInput,
             "{\"message\":{\"type\":\"string\"}}");
+    }
+
+    [Fact]
+    public void Registration_admits_only_a_sealed_binding_without_a_public_raw_json_override()
+    {
+        var bindingType = typeof(ProductOperationBinding);
+        Assert.True(bindingType.IsSealed);
+
+        var constructor = Assert.Single(typeof(ProductOperationRegistration).GetConstructors());
+        Assert.Equal(bindingType, constructor.GetParameters()[1].ParameterType);
+        Assert.DoesNotContain(
+            bindingType.GetMethods(
+                System.Reflection.BindingFlags.Public
+                | System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.DeclaredOnly),
+            static method => method.GetParameters()
+                .Any(parameter => parameter.ParameterType == typeof(JsonElement)));
+    }
+
+    [Fact]
+    public async Task Terminal_result_is_serialized_only_with_the_declared_generated_metadata()
+    {
+        var activity = ActivityView.Accepted(
+            BrainActivityId.New(),
+            Send.Id,
+            Send.TerminalResultContract);
+        var binding = ProductOperationBinding.Create<CatalogInput, CatalogResult>(
+            Descriptor(Send),
+            CatalogJsonSerializerContext.Default.CatalogInput,
+            CatalogJsonSerializerContext.Default.CatalogResult,
+            static (_, _, _) => throw new NotSupportedException(),
+            (_, _, _) => Task.FromResult(
+                new ProductOperationObservation<CatalogResult>(
+                    activity,
+                    progress: null,
+                    new CatalogResult("done"))));
+
+        var projection = await ((IProductOperationAdapter)binding).ObserveAsync(
+            activity.Activity,
+            Invocation(Grant()),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal("done", projection.Result?.GetProperty("result").GetString());
+    }
+
+    [Fact]
+    public async Task Hostile_terminal_result_is_rejected_before_raw_projection_exposure()
+    {
+        var activity = ActivityView.Accepted(
+            BrainActivityId.New(),
+            Send.Id,
+            Send.TerminalResultContract);
+        var binding = ProductOperationBinding.Create<CatalogInput, CatalogResult>(
+            Descriptor(Send),
+            CatalogJsonSerializerContext.Default.CatalogInput,
+            CatalogJsonSerializerContext.Default.CatalogResult,
+            static (_, _, _) => throw new NotSupportedException(),
+            (_, _, _) => Task.FromResult(
+                new ProductOperationObservation<CatalogResult>(
+                    activity,
+                    progress: null,
+                    new CatalogResult(null!))));
+
+        await Assert.ThrowsAsync<ProductOperationResultException>(() =>
+            ((IProductOperationAdapter)binding).ObserveAsync(
+                activity.Activity,
+                Invocation(Grant()),
+                TestContext.Current.CancellationToken));
+    }
+
+    [Theory]
+    [InlineData("pattern")]
+    [InlineData("enum")]
+    [InlineData("nested-object")]
+    [InlineData("array-items")]
+    [InlineData("nullability")]
+    [InlineData("nested-duplicate")]
+    public void Terminal_schema_rejects_unenforced_or_recursively_mismatched_shapes(string hostileShape)
+    {
+        var (terminalSchema, terminalType) = hostileShape switch
+        {
+            "pattern" => (
+                "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"result\"],\"properties\":{\"result\":{\"type\":\"string\",\"pattern\":\"^ok$\"}}}",
+                (JsonTypeInfo)CatalogJsonSerializerContext.Default.CatalogResult),
+            "enum" => (
+                "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"result\"],\"properties\":{\"result\":{\"type\":\"string\",\"enum\":[\"ok\"]}}}",
+                CatalogJsonSerializerContext.Default.CatalogResult),
+            "nested-object" => (
+                "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"payload\"],\"properties\":{\"payload\":{\"type\":\"object\"}}}",
+                CatalogJsonSerializerContext.Default.NestedCatalogResult),
+            "array-items" => (
+                "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"items\"],\"properties\":{\"items\":{\"type\":\"array\"}}}",
+                CatalogJsonSerializerContext.Default.ArrayCatalogResult),
+            "nullability" => (
+                "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"result\"],\"properties\":{\"result\":{\"type\":\"string\"}}}",
+                CatalogJsonSerializerContext.Default.NullableCatalogResult),
+            "nested-duplicate" => (
+                "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"payload\"],\"properties\":{\"payload\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"value\"],\"properties\":{\"value\":{\"type\":\"string\"},\"value\":{\"type\":\"string\"}}}}}",
+                CatalogJsonSerializerContext.Default.NestedCatalogResult),
+            _ => throw new ArgumentOutOfRangeException(nameof(hostileShape)),
+        };
+        var descriptor = new ProductOperationDescriptor(
+            Send,
+            Send.Id.Value,
+            Descriptor(Send).InputSchema,
+            terminalSchema);
+
+        Assert.Throws<ProductOperationCatalogConfigurationException>(() =>
+            CreateBindingWithTerminalMetadata(descriptor, terminalType));
     }
 
     [Theory]
@@ -455,8 +663,10 @@ public sealed class ProductOperationCatalogTests
             adapter.Binding,
             new ProductOperationAccessPolicy(["member"], ["operations.invoke"]));
 
-    private static FixtureProductOperationAdapter Adapter(OperationDescriptor operation)
-        => new(Descriptor(operation));
+    private static FixtureProductOperationAdapter Adapter(
+        OperationDescriptor operation,
+        Action? onInvoke = null)
+        => new(Descriptor(operation), onInvoke);
 
     private static ProductOperationDescriptor Descriptor(OperationDescriptor operation)
         => new(
@@ -477,18 +687,50 @@ public sealed class ProductOperationCatalogTests
             Descriptor(Send).TerminalResultSchema);
 
         Assert.Throws<ProductOperationCatalogConfigurationException>(() =>
-            new ProductJsonAdapter<TInput, CatalogResult>(
+            ProductOperationBinding.Create<TInput, CatalogResult>(
                 descriptor,
                 inputType,
                 CatalogJsonSerializerContext.Default.CatalogResult,
                 static (_, _, _) => throw new InvalidOperationException(),
-                ObserveNotSupported));
+                ObserveTypedNotSupported<CatalogResult>));
     }
 
-    private static Task<ProductActivityProjection> ObserveNotSupported(
+    private static ProductOperationBinding CreateBindingWithTerminalMetadata(
+        ProductOperationDescriptor descriptor,
+        JsonTypeInfo terminalType)
+        => terminalType.Type == typeof(CatalogResult)
+            ? ProductOperationBinding.Create<CatalogInput, CatalogResult>(
+                descriptor,
+                CatalogJsonSerializerContext.Default.CatalogInput,
+                (JsonTypeInfo<CatalogResult>)terminalType,
+                static (_, _, _) => throw new NotSupportedException(),
+                ObserveTypedNotSupported<CatalogResult>)
+            : terminalType.Type == typeof(NestedCatalogResult)
+                ? ProductOperationBinding.Create<CatalogInput, NestedCatalogResult>(
+                    descriptor,
+                    CatalogJsonSerializerContext.Default.CatalogInput,
+                    (JsonTypeInfo<NestedCatalogResult>)terminalType,
+                    static (_, _, _) => throw new NotSupportedException(),
+                    ObserveTypedNotSupported<NestedCatalogResult>)
+                : terminalType.Type == typeof(ArrayCatalogResult)
+                    ? ProductOperationBinding.Create<CatalogInput, ArrayCatalogResult>(
+                        descriptor,
+                        CatalogJsonSerializerContext.Default.CatalogInput,
+                        (JsonTypeInfo<ArrayCatalogResult>)terminalType,
+                        static (_, _, _) => throw new NotSupportedException(),
+                        ObserveTypedNotSupported<ArrayCatalogResult>)
+                    : ProductOperationBinding.Create<CatalogInput, NullableCatalogResult>(
+                        descriptor,
+                        CatalogJsonSerializerContext.Default.CatalogInput,
+                        (JsonTypeInfo<NullableCatalogResult>)terminalType,
+                        static (_, _, _) => throw new NotSupportedException(),
+                        ObserveTypedNotSupported<NullableCatalogResult>);
+
+    private static Task<ProductOperationObservation<TResult>> ObserveTypedNotSupported<TResult>(
         BrainActivityId activity,
         ProductInvocationContext context,
         CancellationToken cancellationToken)
+        where TResult : class
         => throw new NotSupportedException();
 
     private static OperationDescriptor Operation(string id, int version = 1)
@@ -538,17 +780,20 @@ public sealed class ProductOperationCatalogTests
 
     private sealed class FixtureProductOperationAdapter
     {
-        public FixtureProductOperationAdapter(ProductOperationDescriptor descriptor)
+        private readonly Action? _onInvoke;
+
+        public FixtureProductOperationAdapter(ProductOperationDescriptor descriptor, Action? onInvoke = null)
         {
-            Binding = new ProductJsonAdapter<CatalogInput, CatalogResult>(
+            _onInvoke = onInvoke;
+            Binding = ProductOperationBinding.Create<CatalogInput, CatalogResult>(
                 descriptor,
                 CatalogJsonSerializerContext.Default.CatalogInput,
                 CatalogJsonSerializerContext.Default.CatalogResult,
                 InvokeTypedAsync,
-                ObserveNotSupported);
+                ObserveTypedNotSupported<CatalogResult>);
         }
 
-        public ProductJsonAdapter<CatalogInput, CatalogResult> Binding { get; }
+        public ProductOperationBinding Binding { get; }
 
         public int InvocationCount { get; private set; }
 
@@ -556,14 +801,41 @@ public sealed class ProductOperationCatalogTests
 
         private Task<ProductActivityReceipt> InvokeTypedAsync(
             CatalogInput input,
-            ProductInvocationContext context,
+            ProductInvocationContext _,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            _onInvoke?.Invoke();
             InvocationCount++;
             LastInput = input;
             return Task.FromResult(new ProductActivityReceipt(BrainActivityId.New(), Binding.Descriptor.Operation.Id));
         }
+    }
+
+    private sealed class BlockingPolicyEvaluator(
+        IReadOnlyCollection<OperationId> allowed,
+        ManualResetEventSlim entered,
+        ManualResetEventSlim release)
+        : IWorkspacePolicyEvaluator
+    {
+        private readonly HashSet<OperationId> _allowed = [.. allowed];
+
+        public PolicyDecision AuthorizeOperation(WorkspaceContext caller, OperationDescriptor operation)
+        {
+            entered.Set();
+            if (!release.Wait(TimeSpan.FromSeconds(5)))
+            {
+                throw new TimeoutException("The policy evaluation barrier was not released.");
+            }
+
+            return _allowed.Contains(operation.Id) ? PolicyDecision.Allowed : PolicyDecision.Refused;
+        }
+
+        public PolicyDecision AuthorizeGraphChange(ActivityContext context, GraphChangeRequest request)
+            => PolicyDecision.Refused;
+
+        public PolicyDecision AuthorizeCapability(ActivityContext context, CapabilityDescriptor capability)
+            => PolicyDecision.Refused;
     }
 
     private sealed class FixturePolicyEvaluator(IReadOnlyCollection<OperationId> allowed)
@@ -618,6 +890,14 @@ internal sealed record CatalogInput(string Message);
 
 internal sealed record CatalogResult(string Result);
 
+internal sealed record NestedCatalogResult(NestedCatalogPayload Payload);
+
+internal sealed record NestedCatalogPayload(string Value);
+
+internal sealed record ArrayCatalogResult(string[] Items);
+
+internal sealed record NullableCatalogResult(string? Result);
+
 [JsonSourceGenerationOptions(
     AllowDuplicateProperties = false,
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
@@ -626,6 +906,10 @@ internal sealed record CatalogResult(string Result);
     UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow)]
 [JsonSerializable(typeof(CatalogInput))]
 [JsonSerializable(typeof(CatalogResult))]
+[JsonSerializable(typeof(NestedCatalogResult))]
+[JsonSerializable(typeof(NestedCatalogPayload))]
+[JsonSerializable(typeof(ArrayCatalogResult))]
+[JsonSerializable(typeof(NullableCatalogResult))]
 internal sealed partial class CatalogJsonSerializerContext : JsonSerializerContext;
 
 internal sealed record ExtensionDataInput(string Message)
