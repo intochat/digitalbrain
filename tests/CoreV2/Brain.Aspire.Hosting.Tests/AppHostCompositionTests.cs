@@ -15,8 +15,13 @@ public sealed class AppHostCompositionTests
         var resources = appHost.Resources.ToDictionary(resource => resource.Name);
         Assert.Contains("runtime", resources.Keys);
         Assert.Contains("product", resources.Keys);
+        Assert.Contains("flutter", resources.Keys);
         Assert.Contains(
             resources["product"].Annotations.OfType<WaitAnnotation>(),
             annotation => annotation.Resource.Name == "runtime");
+        Assert.Contains(
+            resources["flutter"].Annotations.OfType<WaitAnnotation>(),
+            annotation => annotation.Resource.Name == "product"
+                && annotation.WaitType == WaitType.WaitUntilHealthy);
     }
 }

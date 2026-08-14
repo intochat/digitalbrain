@@ -14,10 +14,12 @@ CoreV2 is becoming the only compiled product graph. The target local startup is 
 - `Brain.Aspire.Hosting` now models the brain aggregate, Azurite storage, Orleans clustering/reminders/grain state, and role-specific module projections.
 - `Brain.Aspire` now provides distinct application-side Orleans silo and client registrations over AppHost-injected storage configuration.
 - `DigitalBrain.RuntimeHost` is now the silo executable, while `DigitalBrain.ProductHost` is an independently hosted Orleans client with shared health endpoints.
-- The CoreV2 AppHost composes storage -> runtime -> ProductHost; a live isolated Aspire run verified all three resources healthy on 2026-08-14.
+- The CoreV2 AppHost composes storage -> runtime -> ProductHost -> Flutter; a live isolated Aspire run verified all four resources healthy on 2026-08-14.
+- `Brain.Modules.UI.Aspire.Hosting` now owns window, web, and headless Flutter launch modes, ProductHost endpoint injection, readiness ordering, a dashboard hot-reload command, and source-watch hot reload.
+- The CoreV2 Flutter Windows shell compiles, launches from `aspire start`, receives `DIGITALBRAIN_PRODUCT_BASE`, and has green core/shell tests and analyzers.
 - CoreV2 domain and proof tests exist, but the proof runtime is still hosted behind one in-memory Orleans test grain rather than production grains.
-- `DigitalBrain.ProductHost` is not yet a production Orleans client and does not yet expose the complete product protocol.
-- The V1 AppHost, hosting extensions, module system, and Flutter client are reference implementations only; they are not part of the CoreV2 compiled graph.
+- `DigitalBrain.ProductHost` is a running Orleans client but does not yet expose the complete product protocol.
+- The V1 AppHost, module system, and product screens remain reference implementations only; the CoreV2 Aspire/Flutter launch path no longer depends on them.
 - The rejected ProductHost-local persistence slice remains reverted. Core state must live behind Orleans grains in the runtime host.
 - The earlier large cutover plan is superseded by the small, dependency-ordered migration plan in `docs/superpowers/plans/2026-08-14-corev2-aspire-hosting-spine.md`.
 
@@ -35,7 +37,7 @@ CoreV2 is becoming the only compiled product graph. The target local startup is 
 
 ## Active slice
 
-Adding module-owned Flutter Aspire hosting and a minimal CoreV2 Flutter product shell that waits for ProductHost.
+Migrating the first durable Orleans-backed operation/activity path, followed by ProductHost discovery, invocation, activity, SSE, and MCP adapters.
 
 ## Definition of done
 

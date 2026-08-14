@@ -12,6 +12,8 @@
     <Project Path="src/CoreV2/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
     <Project Path="src/CoreV2/Modules/Proof.Contracts/Brain.Modules.Proof.Contracts.csproj" />
     <Project Path="src/CoreV2/Modules/Proof/Brain.Modules.Proof.csproj" />
+    <Project Path="src/CoreV2/Modules/UI/Brain.Modules.UI.csproj" />
+    <Project Path="src/CoreV2/Modules/UI.Aspire.Hosting/Brain.Modules.UI.Aspire.Hosting.csproj" />
     <Project Path="tests/CoreV2/Brain.Architecture.Tests/Brain.Architecture.Tests.csproj" />
     <Project Path="tests/CoreV2/Brain.Authority.Conformance.Tests/Brain.Authority.Conformance.Tests.csproj" />
     <Project Path="tests/CoreV2/Brain.Abstractions.Tests/Brain.Abstractions.Tests.csproj" />
