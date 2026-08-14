@@ -8,7 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace DigitalBrain.ProductHost.Authority;
 
-public sealed class LocalTestAuthority : IBrainAccessAuthority
+internal sealed class LocalTestAuthority : IBrainAccessAuthority
 {
     public const string Issuer = "https://local-authority.digitalbrain.test";
     public const string Audience = "digitalbrain-product";
@@ -23,16 +23,8 @@ public sealed class LocalTestAuthority : IBrainAccessAuthority
     private readonly JsonWebTokenHandler _tokenHandler = new() { MapInboundClaims = false };
     private readonly TimeProvider _timeProvider;
 
-    public LocalTestAuthority(string environmentName, TimeProvider? timeProvider = null)
+    internal LocalTestAuthority(TimeProvider? timeProvider = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(environmentName);
-        if (!string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(environmentName, "Test", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(environmentName, "Testing", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("LocalTestAuthority can only be selected in development or test environments.");
-        }
-
         _timeProvider = timeProvider ?? TimeProvider.System;
         _authority = new OidcClaimsAuthority(
             new AuthorityOptions(Issuer, Audience),
@@ -50,7 +42,7 @@ public sealed class LocalTestAuthority : IBrainAccessAuthority
         CancellationToken cancellationToken)
         => _authority.GetWorkspacePresentationsAsync(accessGrant, cancellationToken);
 
-    public AuthorityAuthenticationRequest Issue(
+    internal AuthorityAuthenticationRequest Issue(
         string? workspace,
         string principal,
         IEnumerable<string> roles,
@@ -82,7 +74,8 @@ public sealed class LocalTestAuthority : IBrainAccessAuthority
         claims.AddRange(connections.Select(static value => new Claim(AuthorityOptions.DefaultConnectionClaim, value)));
         claims.Add(new Claim(
             AuthorityOptions.DefaultPolicyVersionClaim,
-            policyVersion.ToString(CultureInfo.InvariantCulture)));
+            policyVersion.ToString(CultureInfo.InvariantCulture),
+            ClaimValueTypes.Integer32));
         if (additionalClaims is not null)
         {
             claims.AddRange(additionalClaims);

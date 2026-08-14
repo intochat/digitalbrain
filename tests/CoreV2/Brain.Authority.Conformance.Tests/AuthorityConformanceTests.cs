@@ -1,8 +1,11 @@
-using System.Security.Claims;
+using System.Text;
+using System.Text.Json;
 using System.Xml.Linq;
 using Brain.Abstractions.Identity;
 using Brain.Product.Abstractions.Authority;
 using DigitalBrain.ProductHost.Authority;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Tokens;
 using Xunit;
 
 namespace Brain.Authority.Conformance.Tests;
@@ -23,6 +26,11 @@ public abstract class AuthorityConformanceTests
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             Authority.AuthenticateAsync(Issue(AuthorityFixture.WithoutWorkspace()), TestContext.Current.CancellationToken));
     }
+
+    [Fact]
+    public async Task Rejects_expected_audience_accompanied_by_another_audience()
+        => await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            Authority.AuthenticateAsync(Issue(AuthorityFixture.AdditionalAudience()), TestContext.Current.CancellationToken));
 
     [Fact]
     public async Task Rejects_wrong_issuer_and_signing_key()
@@ -71,6 +79,19 @@ public abstract class AuthorityConformanceTests
     }
 
     [Fact]
+    public async Task Rejects_unapproved_claim_value_shapes_before_grant_creation()
+    {
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            Authority.AuthenticateAsync(Issue(AuthorityFixture.NumericWorkspace()), TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            Authority.AuthenticateAsync(Issue(AuthorityFixture.BooleanRole()), TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            Authority.AuthenticateAsync(Issue(AuthorityFixture.StringPolicyVersion()), TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            Authority.AuthenticateAsync(Issue(AuthorityFixture.StringIssuedAt()), TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task Presentation_is_non_authorizing_and_scoped_to_authenticated_workspace()
     {
         var request = Issue(AuthorityFixture.Member());
@@ -88,30 +109,97 @@ public abstract class AuthorityConformanceTests
     }
 }
 
-public sealed class LocalTestAuthorityConformanceTests : AuthorityConformanceTests
+public sealed class OidcClaimsAuthorityConformanceTests : AuthorityConformanceTests
 {
-    private readonly LocalTestAuthority _authority = new("Development", new FrozenTimeProvider(AuthorityFixture.Now));
+    private readonly ConformanceTokenIssuer _fixture = new();
 
-    protected override IBrainAccessAuthority Authority => _authority;
+    protected override IBrainAccessAuthority Authority => _fixture.Authority;
 
     protected override AuthorityAuthenticationRequest Issue(AuthorityFixture fixture)
-        => _authority.Issue(
-            fixture.Workspace,
-            fixture.Principal,
-            fixture.Roles,
-            fixture.Grants,
-            fixture.Connections,
-            fixture.PolicyVersion,
-            fixture.IssuedAt,
-            fixture.ExpiresAt,
-            fixture.Audience,
-            fixture.AdditionalClaims,
-            fixture.Issuer,
-            fixture.UseUntrustedSigningKey);
+        => _fixture.Issue(fixture);
+}
+
+public sealed class AuthorityBoundaryTests
+{
+    private readonly ConformanceTokenIssuer _fixture = new();
 
     [Fact]
-    public void Local_authority_rejects_production_selection()
-        => Assert.Throws<InvalidOperationException>(() => new LocalTestAuthority("Production"));
+    public void Fixture_authority_is_internal_in_debug_and_absent_from_release_product_host()
+    {
+        var fixtureType = typeof(OidcClaimsAuthority).Assembly.GetType(
+            "DigitalBrain.ProductHost.Authority.LocalTestAuthority",
+            throwOnError: false,
+            ignoreCase: false);
+
+#if DEBUG
+        Assert.NotNull(fixtureType);
+        Assert.False(fixtureType.IsVisible);
+#else
+        Assert.Null(fixtureType);
+        var releaseAssemblyImage = Encoding.Latin1.GetString(File.ReadAllBytes(typeof(OidcClaimsAuthority).Assembly.Location));
+        Assert.DoesNotContain("https://local-authority.digitalbrain.test", releaseAssemblyImage, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "digitalbrain-local-authority-test-key-v1-only-not-a-secret",
+            releaseAssemblyImage,
+            StringComparison.Ordinal);
+#endif
+    }
+
+#if DEBUG
+    [Fact]
+    public async Task Debug_local_fixture_remains_usable_by_the_conformance_assembly()
+    {
+        var authority = new LocalTestAuthority(new FrozenTimeProvider(AuthorityFixture.Now));
+        var request = authority.Issue(
+            "workspace-a",
+            "principal-a",
+            ["member"],
+            ["connection_use"],
+            ["conn-a"],
+            7,
+            AuthorityFixture.Now,
+            AuthorityFixture.Now.AddMinutes(5));
+
+        var grant = await authority.AuthenticateAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(new WorkspaceId("workspace-a"), grant.Workspace);
+        Assert.Equal(new PrincipalId("principal-a"), grant.Principal);
+    }
+#endif
+
+    [Fact]
+    public void Configurable_claim_names_reject_reserved_protocol_collisions()
+    {
+        Assert.Throws<ArgumentException>(() => CreateAuthority(new AuthorityOptions(ConformanceTokenIssuer.Issuer, ConformanceTokenIssuer.Audience)
+        {
+            SubjectClaim = "iat",
+        }));
+        Assert.Throws<ArgumentException>(() => CreateAuthority(new AuthorityOptions(ConformanceTokenIssuer.Issuer, ConformanceTokenIssuer.Audience)
+        {
+            WorkspaceClaim = "iss",
+        }));
+        Assert.Throws<ArgumentException>(() => CreateAuthority(new AuthorityOptions(ConformanceTokenIssuer.Issuer, ConformanceTokenIssuer.Audience)
+        {
+            WorkspaceClaim = "sub",
+        }));
+        Assert.Throws<ArgumentException>(() => CreateAuthority(new AuthorityOptions(ConformanceTokenIssuer.Issuer, ConformanceTokenIssuer.Audience)
+        {
+            PolicyVersionClaim = "jti",
+        }));
+        Assert.Throws<ArgumentException>(() => CreateAuthority(new AuthorityOptions(ConformanceTokenIssuer.Issuer, ConformanceTokenIssuer.Audience)
+        {
+            RoleClaim = "email",
+        }));
+        Assert.Throws<ArgumentException>(() => CreateAuthority(new AuthorityOptions(ConformanceTokenIssuer.Issuer, ConformanceTokenIssuer.Audience)
+        {
+            GrantClaim = "auth_time",
+        }));
+
+        _ = CreateAuthority(new AuthorityOptions(ConformanceTokenIssuer.Issuer, ConformanceTokenIssuer.Audience)
+        {
+            SubjectClaim = "sub",
+        });
+    }
 
     [Fact]
     public void Authentication_request_has_no_caller_selected_workspace_or_principal()
@@ -130,7 +218,7 @@ public sealed class LocalTestAuthorityConformanceTests : AuthorityConformanceTes
         var request = new AuthorityAuthenticationRequest(new AuthorityAuthenticationEvidence("Bearer", credential));
 
         var exception = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            Authority.AuthenticateAsync(request, TestContext.Current.CancellationToken));
+            _fixture.Authority.AuthenticateAsync(request, TestContext.Current.CancellationToken));
 
         Assert.DoesNotContain(credential, exception.ToString(), StringComparison.Ordinal);
     }
@@ -170,28 +258,22 @@ public sealed class LocalTestAuthorityConformanceTests : AuthorityConformanceTes
 
         throw new DirectoryNotFoundException("Could not locate DigitalBrain.slnx.");
     }
+
+    private static OidcClaimsAuthority CreateAuthority(AuthorityOptions options)
+        => new(
+            options,
+            new TokenValidationParameters { IssuerSigningKey = ConformanceTokenIssuer.SigningKey },
+            new FrozenTimeProvider(AuthorityFixture.Now));
 }
 
 public sealed class IntoChatAuthorityExample : AuthorityConformanceTests
 {
-    private readonly LocalTestAuthority _externalFixtureIssuer = new("Test", new FrozenTimeProvider(AuthorityFixture.Now));
+    private readonly ConformanceTokenIssuer _externalFixtureIssuer = new();
 
-    protected override IBrainAccessAuthority Authority => _externalFixtureIssuer;
+    protected override IBrainAccessAuthority Authority => _externalFixtureIssuer.Authority;
 
     protected override AuthorityAuthenticationRequest Issue(AuthorityFixture fixture)
-        => _externalFixtureIssuer.Issue(
-            fixture.Workspace,
-            fixture.Principal,
-            fixture.Roles,
-            fixture.Grants,
-            fixture.Connections,
-            fixture.PolicyVersion,
-            fixture.IssuedAt,
-            fixture.ExpiresAt,
-            fixture.Audience,
-            fixture.AdditionalClaims,
-            fixture.Issuer,
-            fixture.UseUntrustedSigningKey);
+        => _externalFixtureIssuer.Issue(fixture);
 }
 
 public sealed record AuthorityFixture(
@@ -204,9 +286,9 @@ public sealed record AuthorityFixture(
     DateTimeOffset IssuedAt,
     DateTimeOffset ExpiresAt,
     string? Audience = null,
-    IReadOnlyList<Claim>? AdditionalClaims = null,
     string? Issuer = null,
-    bool UseUntrustedSigningKey = false)
+    bool UseUntrustedSigningKey = false,
+    AuthorityFixtureShape Shape = AuthorityFixtureShape.Canonical)
 {
     public static readonly DateTimeOffset Now = new(2030, 1, 2, 3, 4, 5, TimeSpan.Zero);
 
@@ -214,6 +296,9 @@ public sealed record AuthorityFixture(
         => new("workspace-a", "principal-a", ["member"], ["connection_use"], ["conn-a"], 7, Now, Now.AddMinutes(5));
 
     public static AuthorityFixture WrongAudience() => Member() with { Audience = "wrong-audience" };
+
+    public static AuthorityFixture AdditionalAudience()
+        => Member() with { Shape = AuthorityFixtureShape.AdditionalAudience };
 
     public static AuthorityFixture WrongIssuer() => Member() with { Issuer = "https://untrusted-issuer.example" };
 
@@ -233,7 +318,114 @@ public sealed record AuthorityFixture(
     public static AuthorityFixture EmptyGrant() => Member() with { Grants = ["connection_use", " "] };
 
     public static AuthorityFixture DuplicateWorkspace()
-        => Member() with { AdditionalClaims = [new Claim(AuthorityOptions.DefaultWorkspaceClaim, "workspace-b")] };
+        => Member() with { Shape = AuthorityFixtureShape.DuplicateWorkspace };
+
+    public static AuthorityFixture NumericWorkspace()
+        => Member() with { Shape = AuthorityFixtureShape.NumericWorkspace };
+
+    public static AuthorityFixture BooleanRole()
+        => Member() with { Shape = AuthorityFixtureShape.BooleanRole };
+
+    public static AuthorityFixture StringPolicyVersion()
+        => Member() with { Shape = AuthorityFixtureShape.StringPolicyVersion };
+
+    public static AuthorityFixture StringIssuedAt()
+        => Member() with { Shape = AuthorityFixtureShape.StringIssuedAt };
+}
+
+public enum AuthorityFixtureShape
+{
+    Canonical,
+    AdditionalAudience,
+    DuplicateWorkspace,
+    NumericWorkspace,
+    BooleanRole,
+    StringPolicyVersion,
+    StringIssuedAt,
+}
+
+internal sealed class ConformanceTokenIssuer
+{
+    public const string Issuer = "https://authority-conformance.digitalbrain.test";
+    public const string Audience = "digitalbrain-product";
+    public static readonly SymmetricSecurityKey SigningKey = new(
+        Encoding.UTF8.GetBytes("digitalbrain-authority-conformance-signing-key-v1-test-only"));
+    private static readonly SigningCredentials SigningCredentials =
+        new(SigningKey, SecurityAlgorithms.HmacSha256);
+    private static readonly SigningCredentials UntrustedSigningCredentials = new(
+        new SymmetricSecurityKey(Encoding.UTF8.GetBytes("digitalbrain-authority-untrusted-signing-key-v1-test-only")),
+        SecurityAlgorithms.HmacSha256);
+    private readonly JsonWebTokenHandler _tokenHandler = new() { MapInboundClaims = false };
+
+    public ConformanceTokenIssuer()
+    {
+        Authority = new OidcClaimsAuthority(
+            new AuthorityOptions(Issuer, Audience),
+            new TokenValidationParameters { IssuerSigningKey = SigningKey },
+            new FrozenTimeProvider(AuthorityFixture.Now));
+    }
+
+    public IBrainAccessAuthority Authority { get; }
+
+    public AuthorityAuthenticationRequest Issue(AuthorityFixture fixture)
+    {
+        var issuedAt = fixture.IssuedAt.ToUnixTimeSeconds();
+        var payload = new Dictionary<string, object?>
+        {
+            ["iss"] = fixture.Issuer ?? Issuer,
+            ["aud"] = fixture.Shape == AuthorityFixtureShape.AdditionalAudience
+                ? new[] { fixture.Audience ?? Audience, "another-product" }
+                : fixture.Audience ?? Audience,
+            ["nbf"] = issuedAt,
+            ["iat"] = fixture.Shape == AuthorityFixtureShape.StringIssuedAt
+                ? issuedAt.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                : issuedAt,
+            ["exp"] = fixture.ExpiresAt.ToUnixTimeSeconds(),
+            [AuthorityOptions.DefaultSubjectClaim] = fixture.Principal,
+            [AuthorityOptions.DefaultPolicyVersionClaim] = fixture.Shape == AuthorityFixtureShape.StringPolicyVersion
+                ? fixture.PolicyVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                : fixture.PolicyVersion,
+        };
+
+        if (fixture.Workspace is not null)
+        {
+            payload[AuthorityOptions.DefaultWorkspaceClaim] = fixture.Shape switch
+            {
+                AuthorityFixtureShape.DuplicateWorkspace => new[] { fixture.Workspace, "workspace-b" },
+                AuthorityFixtureShape.NumericWorkspace => 42,
+                _ => fixture.Workspace,
+            };
+        }
+
+        AddStringList(payload, AuthorityOptions.DefaultRoleClaim, fixture.Roles,
+            fixture.Shape == AuthorityFixtureShape.BooleanRole ? true : null);
+        AddStringList(payload, AuthorityOptions.DefaultGrantClaim, fixture.Grants);
+        AddStringList(payload, AuthorityOptions.DefaultConnectionClaim, fixture.Connections);
+
+        var credentials = fixture.UseUntrustedSigningKey ? UntrustedSigningCredentials : SigningCredentials;
+        var token = _tokenHandler.CreateToken(JsonSerializer.Serialize(payload), credentials);
+        return new AuthorityAuthenticationRequest(new AuthorityAuthenticationEvidence("Bearer", token));
+    }
+
+    private static void AddStringList(
+        IDictionary<string, object?> payload,
+        string claimName,
+        IReadOnlyList<string> values,
+        object? overrideValue = null)
+    {
+        if (overrideValue is not null)
+        {
+            payload[claimName] = overrideValue;
+        }
+        else if (values.Count == 1)
+        {
+            payload[claimName] = values[0];
+        }
+        else if (values.Count > 1)
+        {
+            payload[claimName] = values;
+        }
+    }
 }
 
 internal sealed class FrozenTimeProvider(DateTimeOffset utcNow) : TimeProvider

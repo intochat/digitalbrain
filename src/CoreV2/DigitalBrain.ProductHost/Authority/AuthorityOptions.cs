@@ -2,6 +2,15 @@ namespace DigitalBrain.ProductHost.Authority;
 
 public sealed class AuthorityOptions
 {
+    private static readonly HashSet<string> ReservedProtocolClaims = new(StringComparer.Ordinal)
+    {
+        "iss", "sub", "aud", "exp", "nbf", "iat", "jti",
+        "auth_time", "nonce", "acr", "amr", "azp", "at_hash", "c_hash", "s_hash", "sid",
+        "name", "given_name", "family_name", "middle_name", "nickname", "preferred_username",
+        "profile", "picture", "website", "email", "email_verified", "gender", "birthdate",
+        "zoneinfo", "locale", "phone_number", "phone_number_verified", "address", "updated_at",
+        "client_id", "scope", "cnf", "act", "may_act", "events",
+    };
     public const string DefaultSubjectClaim = "sub";
     public const string DefaultWorkspaceClaim = "brain_workspace";
     public const string DefaultRoleClaim = "brain_role";
@@ -57,6 +66,18 @@ public sealed class AuthorityOptions
         if (claimNames.Distinct(StringComparer.Ordinal).Count() != claimNames.Length)
         {
             throw new ArgumentException("Authority claim names must be distinct.");
+        }
+
+        if (ReservedProtocolClaims.Contains(SubjectClaim)
+            && !string.Equals(SubjectClaim, DefaultSubjectClaim, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("The subject mapping cannot use a reserved JWT or OIDC protocol claim.", nameof(SubjectClaim));
+        }
+
+        var authorizationClaims = claimNames.Skip(1);
+        if (authorizationClaims.Any(ReservedProtocolClaims.Contains))
+        {
+            throw new ArgumentException("Authorization mappings cannot use reserved JWT or OIDC protocol claims.");
         }
 
         if (ClockSkew < TimeSpan.Zero || ClockSkew > TimeSpan.FromMinutes(5))
