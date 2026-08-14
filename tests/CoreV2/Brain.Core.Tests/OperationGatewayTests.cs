@@ -130,6 +130,60 @@ public sealed class OperationGatewayTests
     }
 
     [Fact]
+    public async Task ReusedKeyWithReversedMultiItemArrayIsRefusedWithoutAnotherDispatch()
+    {
+        var fixture = GatewayFixture.Allowed();
+        var caller = Caller("workspace/sales", "principal/alice");
+        var key = new IdempotencyKey("request/array-order");
+
+        await fixture.Gateway.InvokeAsync<CollectionInput, ProofResult>(
+            fixture.Collect,
+            new CollectionInput(["alpha", "beta"], new Dictionary<string, int> { ["score"] = 1 }),
+            caller,
+            key,
+            TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<IdempotencyConflictException>(() =>
+            fixture.Gateway.InvokeAsync<CollectionInput, ProofResult>(
+                fixture.Collect,
+                new CollectionInput(["beta", "alpha"], new Dictionary<string, int> { ["score"] = 1 }),
+                caller,
+                key,
+                TestContext.Current.CancellationToken));
+
+        Assert.Single(fixture.Store.Activities);
+        Assert.Single(fixture.Dispatcher.Calls);
+    }
+
+    [Fact]
+    public async Task ReusedKeyWithReversedListThroughReadOnlyListIsRefusedWithoutAnotherDispatch()
+    {
+        var fixture = GatewayFixture.Allowed();
+        var caller = Caller("workspace/sales", "principal/alice");
+        var key = new IdempotencyKey("request/list-order");
+        IReadOnlyList<string> firstItems = new List<string> { "alpha", "beta" };
+        IReadOnlyList<string> reversedItems = new List<string> { "beta", "alpha" };
+
+        await fixture.Gateway.InvokeAsync<CollectionInput, ProofResult>(
+            fixture.Collect,
+            new CollectionInput(firstItems, new Dictionary<string, int> { ["score"] = 1 }),
+            caller,
+            key,
+            TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<IdempotencyConflictException>(() =>
+            fixture.Gateway.InvokeAsync<CollectionInput, ProofResult>(
+                fixture.Collect,
+                new CollectionInput(reversedItems, new Dictionary<string, int> { ["score"] = 1 }),
+                caller,
+                key,
+                TestContext.Current.CancellationToken));
+
+        Assert.Single(fixture.Store.Activities);
+        Assert.Single(fixture.Dispatcher.Calls);
+    }
+
+    [Fact]
     public async Task ReusedKeyWithDifferentDictionaryValueIsRefusedWithoutAnotherDispatch()
     {
         var fixture = GatewayFixture.Allowed();
@@ -151,6 +205,35 @@ public sealed class OperationGatewayTests
                 key,
                 TestContext.Current.CancellationToken));
 
+        Assert.Single(fixture.Store.Activities);
+        Assert.Single(fixture.Dispatcher.Calls);
+    }
+
+    [Fact]
+    public async Task ReusedKeyWithReverseInsertedEquivalentDictionaryReturnsTheSameActivity()
+    {
+        var fixture = GatewayFixture.Allowed();
+        var caller = Caller("workspace/sales", "principal/alice");
+        var key = new IdempotencyKey("request/dictionary-order");
+
+        var first = await fixture.Gateway.InvokeAsync<CollectionInput, ProofResult>(
+            fixture.Collect,
+            new CollectionInput(
+                ["alpha"],
+                new Dictionary<string, int> { ["alpha"] = 1, ["beta"] = 2 }),
+            caller,
+            key,
+            TestContext.Current.CancellationToken);
+        var retry = await fixture.Gateway.InvokeAsync<CollectionInput, ProofResult>(
+            fixture.Collect,
+            new CollectionInput(
+                ["alpha"],
+                new Dictionary<string, int> { ["beta"] = 2, ["alpha"] = 1 }),
+            caller,
+            key,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(first.Activity, retry.Activity);
         Assert.Single(fixture.Store.Activities);
         Assert.Single(fixture.Dispatcher.Calls);
     }
