@@ -19,6 +19,7 @@ public sealed class DigitalBrainResourceModelTests
         Assert.Contains("clustering", names);
         Assert.Contains("reminders", names);
         Assert.Contains("grainstate", names);
+        Assert.Contains("journal", names);
         Assert.Contains("brain", names);
     }
 

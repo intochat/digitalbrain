@@ -1,4 +1,5 @@
 using DigitalBrain.Aspire;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans;
@@ -13,11 +14,26 @@ public sealed class DigitalBrainHostingTests
     public void Runtime_extension_configures_a_silo_and_default_storage()
     {
         var builder = Host.CreateApplicationBuilder();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:journal"] = "UseDevelopmentStorage=true",
+        });
 
         builder.AddDigitalBrainRuntime();
         using var host = builder.Build();
 
         Assert.NotNull(host.Services.GetService<ILocalSiloDetails>());
+    }
+
+    [Fact]
+    public void Runtime_extension_refuses_to_start_without_durable_journal_storage()
+    {
+        var builder = Host.CreateApplicationBuilder();
+
+        var failure = Assert.Throws<InvalidOperationException>(() => builder.AddDigitalBrainRuntime());
+
+        Assert.Contains("journal", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("durability", failure.Message, StringComparison.Ordinal);
     }
 
     [Fact]

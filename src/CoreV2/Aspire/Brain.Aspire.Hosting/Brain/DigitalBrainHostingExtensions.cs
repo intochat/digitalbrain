@@ -23,17 +23,19 @@ public static class DigitalBrainHostingExtensions
         var clustering = storage.AddTables(DigitalBrainNames.Clustering);
         var reminders = storage.AddTables(DigitalBrainNames.Reminders);
         var grainState = storage.AddBlobs(DigitalBrainNames.GrainState);
+        var journal = storage.AddBlobs(DigitalBrainNames.Journal);
         var orleans = builder
             .AddOrleans(name)
             .WithClustering(clustering)
             .WithReminders(reminders)
             .WithGrainStorage(DigitalBrainNames.DefaultGrainStorage, grainState);
-        var brain = new DigitalBrainBuilder(builder, name, resource, orleans, grainState);
+        var brain = new DigitalBrainBuilder(builder, name, resource, orleans, grainState, journal);
 
         brain.RequireHealthyBeforeStart(storage.Resource);
         brain.RequireHealthyBeforeStart(clustering.Resource);
         brain.RequireHealthyBeforeStart(reminders.Resource);
         brain.RequireHealthyBeforeStart(grainState.Resource);
+        brain.RequireHealthyBeforeStart(journal.Resource);
         return brain;
     }
 
@@ -62,6 +64,7 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(brain);
 
         builder.WithReference(brain.Orleans);
+        builder.WithReference(brain.Journal, DigitalBrainNames.JournalConnection);
         WaitUntilHealthy(builder, brain.StartupDependencies);
 
         foreach (var projection in brain.Projections)

@@ -16,13 +16,15 @@ public sealed class DigitalBrainBuilder
         string name,
         IResourceBuilder<DigitalBrainResource> resource,
         OrleansService orleans,
-        IResourceBuilder<AzureBlobStorageResource> grainState)
+        IResourceBuilder<AzureBlobStorageResource> grainState,
+        IResourceBuilder<AzureBlobStorageResource> journal)
     {
         ApplicationBuilder = applicationBuilder;
         Name = name;
         Resource = resource;
         Orleans = orleans;
         GrainState = grainState;
+        Journal = journal;
     }
 
     public IDistributedApplicationBuilder ApplicationBuilder { get; }
@@ -34,6 +36,8 @@ public sealed class DigitalBrainBuilder
     internal OrleansService Orleans { get; }
 
     internal IResourceBuilder<AzureBlobStorageResource> GrainState { get; }
+
+    internal IResourceBuilder<AzureBlobStorageResource> Journal { get; }
 
     internal IReadOnlyList<DigitalBrainModuleProjection> Projections => _projections;
 
