@@ -20,6 +20,8 @@ internal interface IEntryOperationDispatcher
         where TInput : class;
 }
 
+[GenerateSerializer]
+[Alias("brain.core.idempotency-conflict")]
 public sealed class IdempotencyConflictException(string message) : InvalidOperationException(message);
 
 public sealed class OperationTypeMismatchException(string message) : ArgumentException(message);
