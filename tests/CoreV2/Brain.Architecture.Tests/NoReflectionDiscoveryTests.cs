@@ -41,6 +41,30 @@ public sealed class NoReflectionDiscoveryTests
         Assert.Contains(findings, finding => finding.MemberName == memberName);
     }
 
+    [Theory]
+    [InlineData("_ = Attribute.GetCustomAttributes(assembly);")]
+    [InlineData("_ = CustomAttributeExtensions.GetCustomAttributes(assembly);")]
+    public void Semantic_scanner_rejects_static_custom_attribute_discovery(string discovery)
+    {
+        var source = $$"""
+            using System;
+            using System.Reflection;
+
+            internal static class StaticDiscoveryFixture
+            {
+                internal static void Discover()
+                {
+                    var assembly = typeof(string).Assembly;
+                    {{discovery}}
+                }
+            }
+            """;
+
+        var findings = ReflectionDiscoveryScanner.FindForbidden([new SourceFile("Fixture.cs", source)]);
+
+        Assert.Contains(findings, finding => finding.MemberName == "GetCustomAttributes");
+    }
+
     [Fact]
     public void Semantic_scanner_allows_non_discovery_reflection()
     {
@@ -52,6 +76,7 @@ public sealed class NoReflectionDiscoveryTests
                 internal static void InspectKnownType()
                 {
                     _ = typeof(string).GetMethod(nameof(string.ToString), Type.EmptyTypes);
+                    _ = Attribute.IsDefined(typeof(string), typeof(ObsoleteAttribute));
                 }
             }
             """;
@@ -114,6 +139,7 @@ internal static class ReflectionDiscoveryScanner
                     syntaxTree,
                     memberAccess.Name.Identifier.ValueText,
                     model.GetTypeInfo(memberAccess.Expression).Type,
+                    ResolveMemberSymbol(model, memberAccess),
                     memberAccess.GetLocation());
             }
 
@@ -127,6 +153,7 @@ internal static class ReflectionDiscoveryScanner
                         syntaxTree,
                         memberBinding.Name.Identifier.ValueText,
                         receiverType,
+                        ResolveMemberSymbol(model, memberBinding),
                         memberBinding.GetLocation());
                 }
             }
@@ -140,9 +167,10 @@ internal static class ReflectionDiscoveryScanner
         SyntaxTree syntaxTree,
         string memberName,
         ITypeSymbol? receiverType,
+        ISymbol? memberSymbol,
         Location location)
     {
-        if (!IsForbidden(memberName, receiverType))
+        if (!IsForbidden(memberName, receiverType, memberSymbol))
         {
             return;
         }
@@ -151,8 +179,16 @@ internal static class ReflectionDiscoveryScanner
         findings.Add(new ReflectionDiscoveryFinding(syntaxTree.FilePath, line, memberName));
     }
 
-    private static bool IsForbidden(string memberName, ITypeSymbol? receiverType)
+    private static bool IsForbidden(string memberName, ITypeSymbol? receiverType, ISymbol? memberSymbol)
     {
+        if (AttributeDiscoveryMembers.Contains(memberName) &&
+            memberSymbol is IMethodSymbol { IsStatic: true } method &&
+            (IsTypeOrBaseType(method.ContainingType, "System.Attribute") ||
+             IsTypeOrBaseType(method.ContainingType, "System.Reflection.CustomAttributeExtensions")))
+        {
+            return true;
+        }
+
         if (receiverType is null)
         {
             return false;
@@ -169,6 +205,14 @@ internal static class ReflectionDiscoveryScanner
         }
 
         return IsTypeOrBaseType(receiverType, "System.AppDomain") && memberName == "GetAssemblies";
+    }
+
+    private static ISymbol? ResolveMemberSymbol(SemanticModel model, ExpressionSyntax memberAccess)
+    {
+        var symbolNode = memberAccess.Parent is InvocationExpressionSyntax invocation
+            ? invocation
+            : memberAccess;
+        return model.GetSymbolInfo(symbolNode).Symbol;
     }
 
     private static bool IsTypeOrBaseType(ITypeSymbol type, string metadataName)

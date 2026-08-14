@@ -35,6 +35,81 @@ public sealed class NoV1CompilationBoundaryTests
             references,
             path => path.Contains("src/Kernel/Legacy/Legacy.csproj", StringComparison.OrdinalIgnoreCase));
     }
+
+    [Fact]
+    public void Evaluated_graph_defaults_to_release_and_detects_a_release_only_v1_reference()
+    {
+        using var fixture = ReleaseConditionalReferenceFixture.Create();
+
+        var debugReferences = ProjectReferenceScanner.ReadAll(fixture.EntryProject, "Debug");
+        var releaseReferences = ProjectReferenceScanner.ReadAll(fixture.EntryProject, "Release");
+        var defaultReferences = ProjectReferenceScanner.ReadAll(fixture.EntryProject);
+
+        Assert.DoesNotContain(
+            debugReferences,
+            path => path.Contains("src/Kernel/Legacy/Legacy.csproj", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(
+            releaseReferences,
+            path => path.Contains("src/Kernel/Legacy/Legacy.csproj", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(
+            defaultReferences,
+            path => path.Contains("src/Kernel/Legacy/Legacy.csproj", StringComparison.OrdinalIgnoreCase));
+    }
+}
+
+internal sealed class ReleaseConditionalReferenceFixture : IDisposable
+{
+    private ReleaseConditionalReferenceFixture(string root, string entryProject)
+    {
+        Root = root;
+        EntryProject = entryProject;
+    }
+
+    private string Root { get; }
+
+    internal string EntryProject { get; }
+
+    internal static ReleaseConditionalReferenceFixture Create()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"brain-release-architecture-{Guid.NewGuid():N}");
+        var entryProject = Path.Combine(root, "entry", "Entry.csproj");
+        var legacyProject = Path.Combine(root, "src", "Kernel", "Legacy", "Legacy.csproj");
+
+        Directory.CreateDirectory(Path.GetDirectoryName(entryProject)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(legacyProject)!);
+
+        File.WriteAllText(
+            entryProject,
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net11.0</TargetFramework>
+              </PropertyGroup>
+              <ItemGroup Condition="'$(Configuration)' == 'Release'">
+                <ProjectReference Include="../src/Kernel/Legacy/Legacy.csproj" />
+              </ItemGroup>
+            </Project>
+            """);
+        File.WriteAllText(
+            legacyProject,
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net11.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        return new ReleaseConditionalReferenceFixture(root, entryProject);
+    }
+
+    public void Dispose()
+    {
+        if (Directory.Exists(Root))
+        {
+            Directory.Delete(Root, recursive: true);
+        }
+    }
 }
 
 internal sealed class ImportedTransitiveReferenceFixture : IDisposable
@@ -99,7 +174,12 @@ internal sealed class ImportedTransitiveReferenceFixture : IDisposable
 internal static class ProjectReferenceScanner
 {
     internal static IReadOnlyList<string> ReadAll(string solutionPath)
+        => ReadAll(solutionPath, "Release");
+
+    internal static IReadOnlyList<string> ReadAll(string solutionPath, string configuration)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(configuration);
+
         var root = RepositoryRoot.Find();
         var entryPath = Path.GetFullPath(Path.IsPathRooted(solutionPath)
             ? solutionPath
@@ -108,7 +188,7 @@ internal static class ProjectReferenceScanner
 
         try
         {
-            EvaluateGraph(root, entryPath, graphPath);
+            EvaluateGraph(root, entryPath, graphPath, configuration);
             using var graph = JsonDocument.Parse(File.ReadAllText(graphPath));
 
             return graph.RootElement
@@ -124,7 +204,11 @@ internal static class ProjectReferenceScanner
         }
     }
 
-    private static void EvaluateGraph(string workingDirectory, string entryPath, string graphPath)
+    private static void EvaluateGraph(
+        string workingDirectory,
+        string entryPath,
+        string graphPath,
+        string configuration)
     {
         var startInfo = new ProcessStartInfo("dotnet")
         {
@@ -138,6 +222,7 @@ internal static class ProjectReferenceScanner
         startInfo.ArgumentList.Add(entryPath);
         startInfo.ArgumentList.Add("-target:GenerateRestoreGraphFile");
         startInfo.ArgumentList.Add($"-property:RestoreGraphOutputPath={graphPath}");
+        startInfo.ArgumentList.Add($"-property:Configuration={configuration}");
         startInfo.ArgumentList.Add("-nologo");
 
         using var process = Process.Start(startInfo)
