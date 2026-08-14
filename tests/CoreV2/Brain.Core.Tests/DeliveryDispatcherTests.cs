@@ -149,16 +149,21 @@ public sealed class DeliveryDispatcherTests
     }
 
     [Fact]
-    public async Task Throwing_receiver_releases_its_reservation_before_a_successful_retry()
+    public async Task Throwing_receiver_discards_its_private_candidate_and_receipt_before_retry()
     {
         var fixture = new Fixture(receiver: new ThrowingReceiver());
         var entry = fixture.Entry(fixture.SummaryTarget, fixture.Produced, fixture.Produced);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.Dispatcher.DispatchAsync(entry, TestContext.Current.CancellationToken));
+        Assert.Equal(0, fixture.Summary.CommitCount);
+        Assert.Equal(0, fixture.Summary.CompletedReceiptCount);
+        Assert.Equal(1, fixture.Summary.StageCount);
         var retried = await fixture.Dispatcher.DispatchAsync(entry, TestContext.Current.CancellationToken);
         var duplicate = await fixture.Dispatcher.DispatchAsync(entry, TestContext.Current.CancellationToken);
 
         Assert.Equal(1, fixture.Summary.CommitCount);
+        Assert.Equal(1, fixture.Summary.CompletedReceiptCount);
+        Assert.Equal(2, fixture.Summary.StageCount);
         Assert.Equal(1, retried.DeliveredCount);
         Assert.Equal(1, duplicate.DuplicateCount);
     }
@@ -226,6 +231,20 @@ public sealed class DeliveryDispatcherTests
             Assert.DoesNotContain("object", source, StringComparison.Ordinal);
             Assert.DoesNotContain("Entity", source, StringComparison.Ordinal);
         }
+    }
+
+    [Fact]
+    public void Receiver_transaction_uses_copy_on_write_without_lifecycle_marker_choreography()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../../")),
+            "src", "CoreV2", "Brain.Core", "Delivery", "DeliveryDeduplicator.cs"));
+
+        Assert.DoesNotContain("TryBegin", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Complete(", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Abandon(", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Func<", source, StringComparison.Ordinal);
+        Assert.Contains("ReceiverDeliveryState", source, StringComparison.Ordinal);
     }
 
     private sealed class Fixture
@@ -304,38 +323,52 @@ public sealed class DeliveryDispatcherTests
 
     }
 
-    private class RecordingReceiver(EndpointAddress endpoint, ContractId acceptedContract) : IDeliveryReceiver
+    private class RecordingReceiver(EndpointAddress endpoint, ContractId acceptedContract)
+        : IDeliveryReceiver, IReceiverDeliveryHandler<ReceiverState>
     {
+        private readonly InMemoryReceiverDeliveryStore<ReceiverState> _store = new(new ReceiverState(0));
+
         public EndpointAddress Endpoint { get; } = endpoint;
         public ContractId AcceptedContract { get; } = acceptedContract;
-        private readonly IDeliveryReceiverTransaction _transaction = new InMemoryDeliveryReceiverTransaction();
-        public int CommitCount { get; private set; }
+        public int CommitCount => _store.State.CommitCount;
+        public int CompletedReceiptCount => _store.CompletedReceiptCount;
+        public int StageCount { get; private set; }
 
         public Task<ReceiverDeliveryResult> DeliverAsync(DeliverySnapshot snapshot, IDomainEvent domainEvent, CancellationToken cancellationToken)
-            => _transaction.ApplyOnceAsync(
-                snapshot.Delivery,
-                token => ApplyEffectAsync(snapshot, domainEvent, token),
-                cancellationToken);
+            => _store.DeliverAsync(snapshot, domainEvent, this, cancellationToken);
 
-        protected virtual Task ApplyEffectAsync(DeliverySnapshot snapshot, IDomainEvent domainEvent, CancellationToken cancellationToken)
+        public virtual Task<ReceiverState> StageAsync(
+            ReceiverState candidate,
+            DeliverySnapshot snapshot,
+            IDomainEvent domainEvent,
+            CancellationToken cancellationToken)
         {
-            CommitCount++;
-            return Task.CompletedTask;
+            StageCount++;
+            return Task.FromResult(candidate with { CommitCount = candidate.CommitCount + 1 });
         }
+
+        protected void CountStage() => StageCount++;
     }
 
     private sealed class ThrowingReceiver() : RecordingReceiver(
         new EndpointAddress(new WorkspaceId("workspace/one"), new ModuleId("summary"), new NeuronRoleId("summary.target"), "workspace"),
         new ContractId("proof/produced@1"))
     {
-        protected override Task ApplyEffectAsync(DeliverySnapshot snapshot, IDomainEvent domainEvent, CancellationToken cancellationToken)
+        public override Task<ReceiverState> StageAsync(
+            ReceiverState candidate,
+            DeliverySnapshot snapshot,
+            IDomainEvent domainEvent,
+            CancellationToken cancellationToken)
         {
+            CountStage();
             if (Attempts++ == 0)
             {
-                throw new InvalidOperationException("application failed before its effect committed");
+                var privateCandidate = candidate with { CommitCount = candidate.CommitCount + 1 };
+                _ = privateCandidate;
+                throw new InvalidOperationException("private candidate staging failed before receiver commit");
             }
 
-            return base.ApplyEffectAsync(snapshot, domainEvent, cancellationToken);
+            return Task.FromResult(candidate with { CommitCount = candidate.CommitCount + 1 });
         }
 
         private int Attempts { get; set; }
@@ -348,11 +381,16 @@ public sealed class DeliveryDispatcherTests
         public TaskCompletionSource ApplicationStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource ReleaseApplication { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        protected override async Task ApplyEffectAsync(DeliverySnapshot snapshot, IDomainEvent domainEvent, CancellationToken cancellationToken)
+        public override async Task<ReceiverState> StageAsync(
+            ReceiverState candidate,
+            DeliverySnapshot snapshot,
+            IDomainEvent domainEvent,
+            CancellationToken cancellationToken)
         {
+            CountStage();
             ApplicationStarted.SetResult();
             await ReleaseApplication.Task.WaitAsync(cancellationToken);
-            await base.ApplyEffectAsync(snapshot, domainEvent, cancellationToken);
+            return candidate with { CommitCount = candidate.CommitCount + 1 };
         }
     }
 
@@ -364,6 +402,7 @@ public sealed class DeliveryDispatcherTests
 
     private sealed record Produced(string Value) : IDomainEvent;
     private sealed record Assessed(string Value) : IDomainEvent;
+    private sealed record ReceiverState(int CommitCount);
 
     private sealed class GraphRewireFixture
     {
