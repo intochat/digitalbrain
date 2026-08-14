@@ -8,6 +8,8 @@
   <ItemGroup>
     <ProjectReference Include="../Aspire/Brain.Aspire/Brain.Aspire.csproj" />
     <ProjectReference Include="../Brain.Core/Brain.Core.csproj" />
+    <ProjectReference Include="../Brain.Runtime/Brain.Runtime.csproj" />
+    <ProjectReference Include="../Brain.Runtime.Abstractions/Brain.Runtime.Abstractions.csproj" />
     <ProjectReference Include="../Modules/Proof/Brain.Modules.Proof.csproj" />
   </ItemGroup>
 </Project>

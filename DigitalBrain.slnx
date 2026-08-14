@@ -3,6 +3,8 @@
     <Project Path="src/CoreV2/Brain.Abstractions/Brain.Abstractions.csproj" />
     <Project Path="src/CoreV2/Brain.Core/Brain.Core.csproj" />
     <Project Path="src/CoreV2/Brain.Product.Abstractions/Brain.Product.Abstractions.csproj" />
+    <Project Path="src/CoreV2/Brain.Runtime.Abstractions/Brain.Runtime.Abstractions.csproj" />
+    <Project Path="src/CoreV2/Brain.Runtime/Brain.Runtime.csproj" />
     <Project Path="src/CoreV2/DigitalBrain.ProductHost/DigitalBrain.ProductHost.csproj" />
     <Project Path="src/CoreV2/DigitalBrain.RuntimeHost/DigitalBrain.RuntimeHost.csproj" />
     <Project Path="src/CoreV2/Brain.Testing/Brain.Testing.csproj" />
@@ -22,5 +24,6 @@
     <Project Path="tests/CoreV2/Brain.Core.Tests/Brain.Core.Tests.csproj" />
     <Project Path="tests/CoreV2/Brain.ProductHost.Tests/Brain.ProductHost.Tests.csproj" />
     <Project Path="tests/CoreV2/Brain.Proof.Tests/Brain.Proof.Tests.csproj" />
+    <Project Path="tests/CoreV2/Brain.Runtime.Tests/Brain.Runtime.Tests.csproj" />
   </Folder>
 </Solution>

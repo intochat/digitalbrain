@@ -27,10 +27,10 @@ public static class ProofContracts
     public static CapabilityId Classifier { get; } = new("proof.classifier");
 
     public static OperationDescriptor Run { get; } = new(
-        new OperationId("Proof.Run@1"), Input, Result, EntryRole, Module, new ContractVersion(1));
+        new OperationId("proof/run@1"), Input, Result, EntryRole, Module, new ContractVersion(1));
 
     public static OperationDescriptor Correct { get; } = new(
-        new OperationId("Proof.Correct@1"), CorrectionInput, CorrectionResult, CorrectionEntryRole, Module, new ContractVersion(1));
+        new OperationId("proof/correct@1"), CorrectionInput, CorrectionResult, CorrectionEntryRole, Module, new ContractVersion(1));
 
     public static CapabilityDescriptor ClassifierCapability { get; } = new(
         Classifier, CapabilityInput, CapabilityResult, new ModuleId("proof.classifier"), new ContractVersion(1));
