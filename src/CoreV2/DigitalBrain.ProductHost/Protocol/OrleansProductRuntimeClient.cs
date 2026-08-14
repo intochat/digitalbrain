@@ -1,4 +1,6 @@
-using Brain.Runtime.Abstractions;
+using Brain.Abstractions.Graph;
+using Brain.Abstractions.Journal;
+using Brain.Abstractions.Runtime;
 
 namespace DigitalBrain.ProductHost.Protocol;
 
@@ -6,34 +8,55 @@ public sealed class OrleansProductRuntimeClient(IClusterClient cluster) : IProdu
 {
     private readonly IClusterClient _cluster = cluster;
 
-    public Task<IReadOnlyList<RuntimeModuleDescriptor>> GetModulesAsync(CancellationToken cancellationToken)
+    public Task<IReadOnlyList<BrainModuleDescriptor>> GetModulesAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Runtime.GetModulesAsync();
     }
 
-    public Task<IReadOnlyList<RuntimeOperationDescriptor>> GetOperationsAsync(CancellationToken cancellationToken)
+    public Task<IReadOnlyList<BrainOperationDescriptor>> GetOperationsAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Runtime.GetOperationsAsync();
     }
 
-    public Task<RuntimeActivityReceipt> InvokeAsync(
-        RuntimeInvocation invocation,
+    public Task<BrainActivityReceipt> InvokeAsync(
+        BrainOperationInvocation invocation,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Runtime.InvokeAsync(invocation);
     }
 
-    public Task<RuntimeActivitySnapshot?> GetActivityAsync(
+    public Task<BrainActivitySnapshot?> GetActivityAsync(
         Guid activity,
         string workspace,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return _cluster.GetGrain<IProductActivityGrain>(activity).GetAsync(workspace);
+        return Runtime.GetActivityAsync(activity, workspace);
     }
 
-    private IProductRuntimeGrain Runtime => _cluster.GetGrain<IProductRuntimeGrain>("product");
+    public Task<BrainJournalPage> GetJournalAsync(
+        Guid activity,
+        string workspace,
+        long afterSequence,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return _cluster
+            .GetGrain<IBrainActivityGrain>($"{workspace}/{activity:n}")
+            .ReadJournalAsync(workspace, afterSequence, take);
+    }
+
+    public Task<BrainSnapshot> GetBrainAsync(
+        string workspace,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return _cluster.GetGrain<IBrainGraphGrain>(workspace).SnapshotAsync(workspace);
+    }
+
+    private IBrainRuntimeGrain Runtime => _cluster.GetGrain<IBrainRuntimeGrain>("brain");
 }

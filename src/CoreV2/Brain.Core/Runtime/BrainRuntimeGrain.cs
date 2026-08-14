@@ -13,6 +13,18 @@ public sealed class BrainRuntimeGrain(
     private readonly IReadOnlyDictionary<string, IBrainOperationHandler> _handlers = handlers
         .ToDictionary(handler => handler.Descriptor.Id, StringComparer.Ordinal);
 
+    public Task<IReadOnlyList<BrainModuleDescriptor>> GetModulesAsync()
+        => Task.FromResult<IReadOnlyList<BrainModuleDescriptor>>(
+            _handlers.Values
+                .Select(handler => handler.Descriptor.ModuleId)
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal)
+                .Select(module => new BrainModuleDescriptor(
+                    module,
+                    char.ToUpperInvariant(module[0]) + module[1..],
+                    "ready"))
+                .ToArray());
+
     public Task<IReadOnlyList<BrainOperationDescriptor>> GetOperationsAsync()
         => Task.FromResult<IReadOnlyList<BrainOperationDescriptor>>(
             _handlers.Values

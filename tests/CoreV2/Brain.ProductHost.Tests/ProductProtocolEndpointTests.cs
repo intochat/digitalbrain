@@ -1,7 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Brain.Runtime.Abstractions;
+using Brain.Abstractions.Activities;
+using Brain.Abstractions.Graph;
+using Brain.Abstractions.Journal;
+using Brain.Abstractions.Runtime;
+using DigitalBrain.ProductHost.Mcp;
 using DigitalBrain.ProductHost.Protocol;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -22,11 +26,11 @@ public sealed class ProductProtocolEndpointTests
         await using var app = await StartAsync(runtime);
         using var client = app.GetTestClient();
 
-        var modules = await client.GetFromJsonAsync<RuntimeModuleDescriptor[]>("/v2/modules", cancellationToken);
-        var operations = await client.GetFromJsonAsync<RuntimeOperationDescriptor[]>("/v2/operations", cancellationToken);
+        var modules = await client.GetFromJsonAsync<BrainModuleDescriptor[]>("/v2/modules", cancellationToken);
+        var operations = await client.GetFromJsonAsync<BrainOperationDescriptor[]>("/v2/operations", cancellationToken);
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
-            "/v2/operations/proof%2Frun@1:invoke")
+            "/v2/operations/Proof.Run@1:invoke")
         {
             Content = JsonContent.Create(new { input = new { value = "hello" } }),
         };
@@ -34,21 +38,30 @@ public sealed class ProductProtocolEndpointTests
         request.Headers.Add("X-DigitalBrain-Workspace", "attacker-workspace");
         request.Headers.Add("X-DigitalBrain-Principal", "attacker-principal");
         var invoked = await client.SendAsync(request, cancellationToken);
-        var activity = await client.GetFromJsonAsync<RuntimeActivitySnapshot>(
+        var activity = await client.GetFromJsonAsync<BrainActivitySnapshot>(
             $"/v2/activities/{activityId:N}", cancellationToken);
+        var journal = await client.GetFromJsonAsync<BrainJournalPage>(
+            $"/v2/activities/{activityId:N}/journal", cancellationToken);
+        var brain = await client.GetFromJsonAsync<BrainSnapshot>("/v2/brain", cancellationToken);
         var events = await client.GetStringAsync(
             $"/v2/activities/{activityId:N}/events",
             cancellationToken);
+        var journalEvents = await client.GetStringAsync(
+            $"/v2/activities/{activityId:N}/journal/events",
+            cancellationToken);
 
         Assert.Contains(modules!, module => module.Id == "proof");
-        Assert.Contains(operations!, operation => operation.Id == "proof/run@1");
+        Assert.Contains(operations!, operation => operation.Id == "Proof.Run@1");
         Assert.Equal(HttpStatusCode.Accepted, invoked.StatusCode);
-        Assert.Equal("proof/run@1", runtime.LastInvocation?.OperationId);
+        Assert.Equal("Proof.Run@1", runtime.LastInvocation?.OperationId);
         Assert.Equal("request-1", runtime.LastInvocation?.IdempotencyKey);
-        Assert.Equal("local", runtime.LastInvocation?.Workspace);
-        Assert.Equal(RuntimeActivityStatus.Completed, activity?.Status);
+        Assert.Equal("local", runtime.LastInvocation?.WorkspaceId);
+        Assert.Equal(ActivityStatus.Completed, activity?.Status);
+        Assert.Equal("ProofProduced@1", Assert.Single(journal!.Records).ContractId);
+        Assert.Equal(1, Assert.Single(brain!.Synapses).UsageCount);
         Assert.Contains("event: activity", events, StringComparison.Ordinal);
         Assert.Contains("id: 3", events, StringComparison.Ordinal);
+        Assert.Contains("event: journal", journalEvents, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -59,11 +72,27 @@ public sealed class ProductProtocolEndpointTests
         using var client = app.GetTestClient();
 
         var response = await client.PostAsJsonAsync(
-            "/v2/operations/proof%2Frun@1:invoke",
+            "/v2/operations/Proof.Run@1:invoke",
             new { input = new { value = "hello" } },
             cancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Mcp_tools_expose_the_same_journal_and_BrainGraph_projections()
+    {
+        var activityId = Guid.NewGuid();
+        var tools = new ProductMcpTools(new FakeProductRuntimeClient(activityId));
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        var journal = await tools.GetActivityJournalAsync(
+            activityId,
+            cancellationToken: cancellationToken);
+        var graph = await tools.GetBrainSnapshotAsync(cancellationToken);
+
+        Assert.Equal("ProofProduced@1", Assert.Single(journal.Records).ContractId);
+        Assert.Equal(1, Assert.Single(graph.Synapses).UsageCount);
     }
 
     private static async Task<WebApplication> StartAsync(IProductRuntimeClient runtime)
@@ -79,39 +108,95 @@ public sealed class ProductProtocolEndpointTests
 
     private sealed class FakeProductRuntimeClient(Guid activity) : IProductRuntimeClient
     {
-        public RuntimeInvocation? LastInvocation { get; private set; }
+        public BrainOperationInvocation? LastInvocation { get; private set; }
 
-        public Task<IReadOnlyList<RuntimeModuleDescriptor>> GetModulesAsync(
+        public Task<IReadOnlyList<BrainModuleDescriptor>> GetModulesAsync(
             CancellationToken cancellationToken)
-            => Task.FromResult<IReadOnlyList<RuntimeModuleDescriptor>>(
-                [new("proof", "Proof", RuntimeModuleStatus.Ready)]);
+            => Task.FromResult<IReadOnlyList<BrainModuleDescriptor>>(
+                [new("proof", "Proof", "ready")]);
 
-        public Task<IReadOnlyList<RuntimeOperationDescriptor>> GetOperationsAsync(
+        public Task<IReadOnlyList<BrainOperationDescriptor>> GetOperationsAsync(
             CancellationToken cancellationToken)
-            => Task.FromResult<IReadOnlyList<RuntimeOperationDescriptor>>(
-                [new("proof/run@1", "proof", "Run", "{}", "{}")]);
+            => Task.FromResult<IReadOnlyList<BrainOperationDescriptor>>(
+                [new("Proof.Run@1", "proof", "Run", "{}", "{}")]);
 
-        public Task<RuntimeActivityReceipt> InvokeAsync(
-            RuntimeInvocation invocation,
+        public Task<BrainActivityReceipt> InvokeAsync(
+            BrainOperationInvocation invocation,
             CancellationToken cancellationToken)
         {
             LastInvocation = invocation;
-            return Task.FromResult(new RuntimeActivityReceipt(activity, invocation.OperationId));
+            return Task.FromResult(new BrainActivityReceipt(activity, invocation.OperationId));
         }
 
-        public Task<RuntimeActivitySnapshot?> GetActivityAsync(
+        public Task<BrainActivitySnapshot?> GetActivityAsync(
             Guid requested,
             string workspace,
             CancellationToken cancellationToken)
-            => Task.FromResult<RuntimeActivitySnapshot?>(requested == activity && workspace == "local"
-                ? new RuntimeActivitySnapshot(
+            => Task.FromResult<BrainActivitySnapshot?>(requested == activity && workspace == "local"
+                ? new BrainActivitySnapshot(
                     activity,
-                    "proof/run@1",
+                    "Proof.Run@1",
                     "local",
-                    RuntimeActivityStatus.Completed,
+                    ActivityStatus.Completed,
                     3,
                     "{\"route\":\"proof/hello\"}",
                     null)
                 : null);
+
+        public Task<BrainJournalPage> GetJournalAsync(
+            Guid requested,
+            string workspace,
+            long afterSequence,
+            int take,
+            CancellationToken cancellationToken)
+        {
+            var record = new BrainJournalRecord(
+                3,
+                Guid.NewGuid(),
+                workspace,
+                requested,
+                "owner",
+                "proof/source/workspace",
+                BrainJournalDirection.Outbound,
+                "ProofProduced@1",
+                Guid.NewGuid(),
+                null,
+                null,
+                null,
+                DateTimeOffset.UtcNow,
+                1,
+                "emitted",
+                "Proof produced");
+            var records = afterSequence < 3 ? new[] { record } : [];
+            return Task.FromResult(new BrainJournalPage(
+                workspace,
+                requested,
+                afterSequence,
+                records.Length == 0 ? afterSequence : 3,
+                records,
+                false));
+        }
+
+        public Task<BrainSnapshot> GetBrainAsync(
+            string workspace,
+            CancellationToken cancellationToken)
+            => Task.FromResult(new BrainSnapshot(
+                workspace,
+                2,
+                DateTimeOffset.UtcNow,
+                [
+                    new BrainNeuronView("proof/source/workspace", "proof", "source", "workspace", 1),
+                    new BrainNeuronView("proof/assessment/workspace", "proof", "assessment", "workspace", 0),
+                ],
+                [new BrainSynapseView(
+                    Guid.NewGuid(),
+                    1,
+                    "proof/source/workspace",
+                    "proof/assessment/workspace",
+                    "ProofProduced@1",
+                    "ProofProduced@1",
+                    "live",
+                    1,
+                    activity)]));
     }
 }
