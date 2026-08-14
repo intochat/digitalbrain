@@ -39,12 +39,43 @@ internal sealed class BrainGraphShardState
         _history[revision.Key] = history.Add(revision);
     }
 
-    internal IEnumerable<SynapseRevision> LatestFor(EndpointAddress source, Brain.Abstractions.Contracts.ContractId contract)
+    internal IEnumerable<SynapseRevision> LatestFor(
+        EndpointAddress source,
+        Brain.Abstractions.Contracts.ContractId contract,
+        Func<Brain.Abstractions.Identity.BrainActivityId, bool> isActivationActive)
         => _history.Values
-            .Select(static history => history[^1])
-            .Where(revision => revision.Status == SynapseRevisionStatus.Live
+            .Select(history => VisibleRevision(history, isActivationActive))
+            .Where(revision => revision is not null
                 && revision.Source == source
-                && revision.Contract == contract);
+                && revision.Contract == contract)
+            .Select(static revision => revision!);
+
+    private static SynapseRevision? VisibleRevision(
+        ImmutableList<SynapseRevision> history,
+        Func<Brain.Abstractions.Identity.BrainActivityId, bool> isActivationActive)
+    {
+        var latest = history[^1];
+        if (latest.Status == SynapseRevisionStatus.Live)
+        {
+            return latest;
+        }
+
+        if (latest.Status == SynapseRevisionStatus.Staged)
+        {
+            if (latest.Activation is { } activation && isActivationActive(activation))
+            {
+                return latest;
+            }
+
+            // Staging must not hide an already live route, but it also must never
+            // resurrect a route that was retired before the staged revision.
+            return history.Count > 1 && history[^2].Status == SynapseRevisionStatus.Live
+                ? history[^2]
+                : null;
+        }
+
+        return null;
+    }
 }
 
 internal sealed record StableRoute(

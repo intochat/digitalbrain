@@ -18,6 +18,7 @@ public readonly record struct WiringSlotId
 public enum SynapseRevisionStatus
 {
     Live,
+    Staged,
     Retired,
 }
 

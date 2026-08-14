@@ -61,6 +61,7 @@ internal sealed class GraphShardDirectory(GraphShardResolver resolver)
 {
     private readonly GraphShardResolver _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
     private readonly ConcurrentDictionary<GraphShardId, GraphShardEntry> _entries = [];
+    private readonly GraphActivationRegistry _activations = new();
 
     internal BrainGraphShardGrain Open(
         EndpointAddress source,
@@ -74,7 +75,31 @@ internal sealed class GraphShardDirectory(GraphShardResolver resolver)
             throw new InvalidOperationException("A graph shard id cannot be shared by distinct source endpoints.");
         }
 
-        return new BrainGraphShardGrain(source, entry, new SynapseRevisionValidator(modules, policy));
+        return new BrainGraphShardGrain(source, entry, new SynapseRevisionValidator(modules, policy), _activations);
+    }
+
+    internal void Activate(BrainActivityId activation) => _activations.Activate(activation);
+}
+
+internal sealed class GraphActivationRegistry
+{
+    private readonly HashSet<BrainActivityId> _active = [];
+    private readonly object _gate = new();
+
+    internal void Activate(BrainActivityId activation)
+    {
+        lock (_gate)
+        {
+            _active.Add(activation);
+        }
+    }
+
+    internal bool IsActive(BrainActivityId activation)
+    {
+        lock (_gate)
+        {
+            return _active.Contains(activation);
+        }
     }
 }
 

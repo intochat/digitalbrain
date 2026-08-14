@@ -28,7 +28,8 @@ internal sealed record SynapseRevision(
     SynapseDefinition Definition,
     ContractId OutputContract,
     SynapseRevisionStatus Status,
-    GraphReason? Reason)
+    GraphReason? Reason,
+    BrainActivityId? Activation = null)
 {
     internal SynapseKey Key => Definition.Key;
     internal EndpointAddress Source => Definition.Source;
@@ -61,15 +62,18 @@ internal sealed class BrainGraphShardGrain
     private readonly EndpointAddress _source;
     private readonly GraphShardEntry _entry;
     private readonly SynapseRevisionValidator _validator;
+    private readonly GraphActivationRegistry _activations;
 
     internal BrainGraphShardGrain(
         EndpointAddress source,
         GraphShardEntry entry,
-        SynapseRevisionValidator validator)
+        SynapseRevisionValidator validator,
+        GraphActivationRegistry activations)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _entry = entry ?? throw new ArgumentNullException(nameof(entry));
         _validator = validator ?? throw new ArgumentNullException(nameof(validator));
+        _activations = activations ?? throw new ArgumentNullException(nameof(activations));
         if (_entry.Source != _source)
         {
             throw new ArgumentException("A graph grain must be bound to its entry source.", nameof(entry));
@@ -121,6 +125,34 @@ internal sealed class BrainGraphShardGrain
         }
     }
 
+    internal Task<SynapseRevision> StageAsync(SynapseChangeRequest request, BrainActivityId activation)
+    {
+        EnsureAssignedSource(request.Source);
+        if (activation.Value == Guid.Empty)
+        {
+            throw new ArgumentException("A staged graph revision requires an activation.", nameof(activation));
+        }
+
+        _validator.ValidateInstallOrReplace(request, GraphChangeKind.Install);
+        lock (_entry.Gate)
+        {
+            var route = new StableRoute(request.Source, request.Contract, request.Scope, request.WiringSlot);
+            if (_entry.State.TryGetKey(route, out var existingKey))
+            {
+                var history = _entry.State.History(existingKey);
+                var current = history[^1];
+                if (current.Status == SynapseRevisionStatus.Staged && current.Activation == activation)
+                {
+                    return Task.FromResult(current);
+                }
+
+                return Task.FromResult(Append(existingKey, request, current.Revision + 1, SynapseRevisionStatus.Staged, null, activation));
+            }
+
+            return Task.FromResult(Append(SynapseKey.New(), request, 1, SynapseRevisionStatus.Staged, null, activation));
+        }
+    }
+
     internal Task RetireAsync(SynapseKey key, GraphReason reason, ActivityContext provenance)
     {
         if (!Enum.IsDefined(reason))
@@ -154,7 +186,7 @@ internal sealed class BrainGraphShardGrain
         EnsureAssignedSource(source);
         lock (_entry.Gate)
         {
-            var deliveries = _entry.State.LatestFor(source, contract)
+            var deliveries = _entry.State.LatestFor(source, contract, _activations.IsActive)
                 .Select(static revision => new GraphDeliverySnapshot(
                     revision.Key,
                     revision.Revision,
@@ -188,7 +220,8 @@ internal sealed class BrainGraphShardGrain
         SynapseChangeRequest request,
         int revision,
         SynapseRevisionStatus status,
-        GraphReason? reason)
+        GraphReason? reason,
+        BrainActivityId? activation = null)
     {
         ReshapeId? reshapeId = request.Reshape is null ? null : ToReshapeId(request.Reshape);
         var definition = new SynapseDefinition(
@@ -202,7 +235,7 @@ internal sealed class BrainGraphShardGrain
             request.Provenance,
             revision);
         var outputContract = request.Reshape?.OutputEvent ?? request.Contract;
-        var appended = new SynapseRevision(definition, outputContract, status, reason);
+        var appended = new SynapseRevision(definition, outputContract, status, reason, activation);
         _entry.State.Add(appended);
         return appended;
     }
