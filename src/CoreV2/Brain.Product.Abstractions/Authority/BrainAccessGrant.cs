@@ -80,6 +80,11 @@ public sealed record BrainAccessGrant
             throw new ArgumentOutOfRangeException(nameof(expiresAt), "An access grant cannot live longer than 15 minutes.");
         }
 
+        if (evaluatedUtc < issuedUtc)
+        {
+            throw new ArgumentOutOfRangeException(nameof(evaluatedAt), "An access grant cannot be evaluated before it is issued.");
+        }
+
         if (expiryUtc <= evaluatedUtc)
         {
             throw new ArgumentOutOfRangeException(nameof(expiresAt), "An access grant must not already be expired.");

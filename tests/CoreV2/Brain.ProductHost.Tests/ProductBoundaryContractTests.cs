@@ -106,6 +106,22 @@ public sealed class ProductBoundaryContractTests
     }
 
     [Fact]
+    public void Grant_rejects_evaluation_before_issuance()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            BrainAccessGrant.Create(
+                Workspace,
+                Principal,
+                [],
+                [],
+                [],
+                1,
+                IssuedAt,
+                IssuedAt.AddMinutes(5),
+                IssuedAt.AddTicks(-1)));
+    }
+
+    [Fact]
     public void Grant_owns_immutable_copies_of_authority_claims()
     {
         var roles = new List<string> { "operator" };
