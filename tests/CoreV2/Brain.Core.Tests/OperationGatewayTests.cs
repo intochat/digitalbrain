@@ -85,6 +85,75 @@ public sealed class OperationGatewayTests
     }
 
     [Fact]
+    public async Task ReusedKeyWithDifferentArrayContentsIsRefusedWithoutAnotherDispatch()
+    {
+        var fixture = GatewayFixture.Allowed();
+        var caller = Caller("workspace/sales", "principal/alice");
+        var key = new IdempotencyKey("request/array");
+
+        await fixture.Gateway.InvokeAsync<CollectionInput, ProofResult>(
+            fixture.Collect,
+            new CollectionInput(["alpha"], new Dictionary<string, int> { ["score"] = 1 }),
+            caller,
+            key,
+            TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<IdempotencyConflictException>(() =>
+            fixture.Gateway.InvokeAsync<CollectionInput, ProofResult>(
+                fixture.Collect,
+                new CollectionInput(["beta"], new Dictionary<string, int> { ["score"] = 1 }),
+                caller,
+                key,
+                TestContext.Current.CancellationToken));
+
+        Assert.Single(fixture.Store.Activities);
+        Assert.Single(fixture.Dispatcher.Calls);
+    }
+
+    [Fact]
+    public async Task ReusedKeyWithDifferentDictionaryValueIsRefusedWithoutAnotherDispatch()
+    {
+        var fixture = GatewayFixture.Allowed();
+        var caller = Caller("workspace/sales", "principal/alice");
+        var key = new IdempotencyKey("request/dictionary");
+
+        await fixture.Gateway.InvokeAsync<CollectionInput, ProofResult>(
+            fixture.Collect,
+            new CollectionInput(["alpha"], new Dictionary<string, int> { ["score"] = 1 }),
+            caller,
+            key,
+            TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<IdempotencyConflictException>(() =>
+            fixture.Gateway.InvokeAsync<CollectionInput, ProofResult>(
+                fixture.Collect,
+                new CollectionInput(["alpha"], new Dictionary<string, int> { ["score"] = 2 }),
+                caller,
+                key,
+                TestContext.Current.CancellationToken));
+
+        Assert.Single(fixture.Store.Activities);
+        Assert.Single(fixture.Dispatcher.Calls);
+    }
+
+    [Fact]
+    public async Task RegisteredDescriptorRejectsIncompatibleGenericInputAndResultBeforeActivityCreation()
+    {
+        var fixture = GatewayFixture.Allowed();
+
+        await Assert.ThrowsAsync<OperationTypeMismatchException>(() =>
+            fixture.Gateway.InvokeAsync<CorrectionInput, CorrectionResult>(
+                fixture.Run,
+                new CorrectionInput("assessment"),
+                Caller("workspace/sales", "principal/alice"),
+                new IdempotencyKey("request/type-mismatch"),
+                TestContext.Current.CancellationToken));
+
+        Assert.Empty(fixture.Store.Activities);
+        Assert.Empty(fixture.Dispatcher.Calls);
+    }
+
+    [Fact]
     public async Task PolicyRefusalCreatesAndPersistsARefusedActivity()
     {
         var fixture = GatewayFixture.Refused();
@@ -104,6 +173,28 @@ public sealed class OperationGatewayTests
 
         Assert.Equal(ActivityStatus.Refused, view.Status);
         Assert.Equal("policy-refused", view.Problem!.Code);
+        Assert.Empty(fixture.Dispatcher.Calls);
+    }
+
+    [Fact]
+    public async Task ConfirmationRequirementTransitionsToAwaitingConfirmationWithoutDispatch()
+    {
+        var fixture = GatewayFixture.ConfirmationRequired();
+        var caller = Caller("workspace/sales", "principal/alice");
+
+        var accepted = await fixture.Gateway.InvokeAsync<ProofInput, ProofResult>(
+            fixture.Run,
+            new ProofInput("alpha"),
+            caller,
+            new IdempotencyKey("request/confirmation"),
+            TestContext.Current.CancellationToken);
+
+        var view = await fixture.Gateway.ObserveAsync(
+            accepted.Activity,
+            caller,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(ActivityStatus.AwaitingConfirmation, view.Status);
         Assert.Empty(fixture.Dispatcher.Calls);
     }
 
@@ -218,6 +309,10 @@ public sealed class OperationGatewayTests
 
     private sealed record CorrectionResult;
 
+    private sealed record CollectionInput(
+        IReadOnlyList<string> Items,
+        IReadOnlyDictionary<string, int> Values);
+
     private sealed class GatewayFixture
     {
         private GatewayFixture(PolicyDecision decision)
@@ -230,6 +325,13 @@ public sealed class OperationGatewayTests
                 new NeuronRoleId("proof.entry"),
                 new ModuleId("proof"),
                 new ContractVersion(1));
+            Collect = new OperationDescriptor(
+                new OperationId("proof.collect"),
+                new ContractId("proof/collect-input@1"),
+                new ContractId("proof/collect-result@1"),
+                new NeuronRoleId("proof.entry"),
+                new ModuleId("proof"),
+                new ContractVersion(1));
             var registry = new ModuleRegistry();
             registry.Resolve(
             [
@@ -238,7 +340,7 @@ public sealed class OperationGatewayTests
                     new ModuleVersion(1, 0, 0),
                     [],
                     [new NeuronRoleDescriptor(Run.EntryRole, NeuronScope.Workspace, Run.Owner)],
-                    [Run, Correct],
+                    [Run, Correct, Collect],
                     [],
                     [],
                     [],
@@ -254,12 +356,20 @@ public sealed class OperationGatewayTests
                 new TestEndpointResolver(),
                 Dispatcher,
                 Store,
-                new ActivityProjectionService(Store));
+                new ActivityProjectionService(Store),
+                new OperationTypeBindings(
+                [
+                    OperationTypeBinding.For<ProofInput, ProofResult>(Run),
+                    OperationTypeBinding.For<CorrectionInput, CorrectionResult>(Correct),
+                    OperationTypeBinding.For<CollectionInput, ProofResult>(Collect),
+                ]));
         }
 
         public OperationDescriptor Run { get; }
 
         public OperationDescriptor Correct { get; }
+
+        public OperationDescriptor Collect { get; }
 
         public InMemoryActivityStore Store { get; }
 
@@ -270,6 +380,8 @@ public sealed class OperationGatewayTests
         public static GatewayFixture Allowed() => new(PolicyDecision.Allowed);
 
         public static GatewayFixture Refused() => new(PolicyDecision.Refused);
+
+        public static GatewayFixture ConfirmationRequired() => new(PolicyDecision.ConfirmationRequired);
     }
 
     private sealed class FixedPolicyEvaluator(PolicyDecision decision) : IWorkspacePolicyEvaluator

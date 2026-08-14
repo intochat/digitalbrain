@@ -38,6 +38,12 @@ internal sealed class BrainActivityGrain
         _store.Save(state with { Status = ActivityStatus.Refused, Problem = problem });
     }
 
+    internal void AwaitConfirmation()
+    {
+        var state = Require(ActivityStatus.Accepted);
+        _store.Save(state with { Status = ActivityStatus.AwaitingConfirmation });
+    }
+
     private BrainActivityState Require(ActivityStatus status)
     {
         var state = _store.Get(_activity);

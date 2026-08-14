@@ -1,3 +1,5 @@
+using System.Collections;
+using System.Globalization;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
@@ -23,6 +25,62 @@ internal interface IEntryOperationDispatcher
 
 public sealed class IdempotencyConflictException(string message) : InvalidOperationException(message);
 
+public sealed class OperationTypeMismatchException(string message) : ArgumentException(message);
+
+internal sealed record OperationTypeBinding(
+    OperationId Operation,
+    Type InputType,
+    Type ResultType)
+{
+    internal static OperationTypeBinding For<TInput, TResult>(OperationDescriptor operation)
+        where TInput : class
+        where TResult : class
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        return new OperationTypeBinding(operation.Id, typeof(TInput), typeof(TResult));
+    }
+}
+
+internal interface IOperationTypeBindings
+{
+    void Validate<TInput, TResult>(OperationDescriptor operation)
+        where TInput : class
+        where TResult : class;
+}
+
+// This is an explicit composition seam: modules register the typed contract implementations
+// they expose. CLR types stay out of OperationDescriptor and manifest contracts.
+internal sealed class OperationTypeBindings : IOperationTypeBindings
+{
+    private readonly IReadOnlyDictionary<OperationId, OperationTypeBinding> _bindings;
+
+    internal OperationTypeBindings(IEnumerable<OperationTypeBinding> bindings)
+    {
+        ArgumentNullException.ThrowIfNull(bindings);
+        var materialized = bindings.ToArray();
+        _bindings = materialized.ToDictionary(static binding => binding.Operation);
+        if (_bindings.Count != materialized.Length)
+        {
+            throw new ArgumentException("Operation type bindings must be unique per operation.", nameof(bindings));
+        }
+    }
+
+    public void Validate<TInput, TResult>(OperationDescriptor operation)
+        where TInput : class
+        where TResult : class
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        if (!_bindings.TryGetValue(operation.Id, out var binding)
+            || binding.InputType != typeof(TInput)
+            || binding.ResultType != typeof(TResult))
+        {
+            throw new OperationTypeMismatchException(
+                $"Operation '{operation.Id}' is not registered for input '{typeof(TInput).FullName}' "
+                + $"and result '{typeof(TResult).FullName}'.");
+        }
+    }
+}
+
 internal sealed class OperationGateway : IOperationGateway
 {
     private readonly IModuleRegistry _registry;
@@ -31,6 +89,7 @@ internal sealed class OperationGateway : IOperationGateway
     private readonly IEntryOperationDispatcher _dispatcher;
     private readonly IActivityStore _store;
     private readonly ActivityProjectionService _projections;
+    private readonly IOperationTypeBindings _typeBindings;
 
     internal OperationGateway(
         IModuleRegistry registry,
@@ -38,7 +97,8 @@ internal sealed class OperationGateway : IOperationGateway
         IEndpointResolver endpoints,
         IEntryOperationDispatcher dispatcher,
         IActivityStore store,
-        ActivityProjectionService projections)
+        ActivityProjectionService projections,
+        IOperationTypeBindings typeBindings)
     {
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _policy = policy ?? throw new ArgumentNullException(nameof(policy));
@@ -46,6 +106,7 @@ internal sealed class OperationGateway : IOperationGateway
         _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _projections = projections ?? throw new ArgumentNullException(nameof(projections));
+        _typeBindings = typeBindings ?? throw new ArgumentNullException(nameof(typeBindings));
     }
 
     public async Task<OperationAccepted> InvokeAsync<TInput, TResult>(
@@ -127,6 +188,8 @@ internal sealed class OperationGateway : IOperationGateway
                 nameof(operation));
         }
 
+        _typeBindings.Validate<TInput, TResult>(registered);
+
         var fingerprint = InputFingerprint.Create(input);
         var identity = new ActivityIdempotencyIdentity(caller.Workspace, caller.Principal, idempotencyKey);
         var state = _store.GetOrAdd(
@@ -166,6 +229,7 @@ internal sealed class OperationGateway : IOperationGateway
 
         if (decision == PolicyDecision.ConfirmationRequired)
         {
+            activity.AwaitConfirmation();
             return new OperationAccepted(state.Activity);
         }
 
@@ -201,38 +265,190 @@ internal static class InputFingerprint
     internal static string Create<TInput>(TInput input)
         where TInput : class
     {
-        var builder = new StringBuilder(typeof(TInput).AssemblyQualifiedName);
+        var builder = new StringBuilder();
         Append(builder, input, new HashSet<object>(ReferenceEqualityComparer.Instance));
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString())));
     }
 
-    private static void Append(StringBuilder builder, object? value, HashSet<object> visited)
+    private static void Append(StringBuilder builder, object? value, HashSet<object> path)
     {
         if (value is null)
         {
-            builder.Append("<null>");
+            Token(builder, "null", string.Empty);
             return;
         }
 
         var type = value.GetType();
-        builder.Append('[').Append(type.FullName).Append(']');
-        if (value is string or Guid || type.IsPrimitive || value is decimal or DateTime or DateTimeOffset)
+        Token(builder, "type", type.AssemblyQualifiedName ?? type.FullName ?? type.Name);
+        if (value is string text)
         {
-            builder.Append(System.Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture));
+            Token(builder, "string", text);
             return;
         }
 
-        if (!type.IsValueType && !visited.Add(value))
+        if (value is Guid guid)
         {
-            throw new ArgumentException("Operation input must not contain reference cycles.", nameof(value));
+            Token(builder, "guid", guid.ToString("D"));
+            return;
         }
 
-        foreach (var property in type.GetProperties(BindingFlags.Instance | BindingFlags.Public)
-                     .Where(static property => property.CanRead && property.GetIndexParameters().Length == 0)
-                     .OrderBy(static property => property.Name, StringComparer.Ordinal))
+        if (value is DateTime dateTime)
         {
-            builder.Append(property.Name).Append('=');
-            Append(builder, property.GetValue(value), visited);
+            Token(builder, "datetime", dateTime.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+            return;
         }
+
+        if (value is DateTimeOffset dateTimeOffset)
+        {
+            Token(builder, "datetime-offset", dateTimeOffset.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+            return;
+        }
+
+        if (type.IsEnum)
+        {
+            Token(builder, "enum", value.ToString() ?? string.Empty);
+            return;
+        }
+
+        if (type.IsPrimitive || value is decimal)
+        {
+            Token(builder, "scalar", ((IFormattable)value).ToString(null, CultureInfo.InvariantCulture));
+            return;
+        }
+
+        var added = false;
+        if (!type.IsValueType)
+        {
+            if (!path.Add(value))
+            {
+                throw new ArgumentException("Operation input must not contain reference cycles.", nameof(value));
+            }
+
+            added = true;
+        }
+
+        try
+        {
+            if (TryGetDictionaryEntries(value, out var entries))
+            {
+                Token(builder, "dictionary", entries.Count.ToString(CultureInfo.InvariantCulture));
+                foreach (var entry in entries
+                             .Select(entry => new
+                             {
+                                 Key = Canonicalize(entry.Key, path),
+                                 Value = Canonicalize(entry.Value, path),
+                             })
+                             .OrderBy(static entry => entry.Key, StringComparer.Ordinal)
+                             .ThenBy(static entry => entry.Value, StringComparer.Ordinal))
+                {
+                    Token(builder, "key", entry.Key);
+                    Token(builder, "value", entry.Value);
+                }
+
+                return;
+            }
+
+            if (value is IEnumerable enumerable)
+            {
+                var items = enumerable.Cast<object?>()
+                    .Select(item => Canonicalize(item, path))
+                    .ToList();
+                if (!IsOrderedEnumerable(type))
+                {
+                    items.Sort(StringComparer.Ordinal);
+                }
+
+                Token(builder, "sequence", items.Count.ToString(CultureInfo.InvariantCulture));
+                foreach (var item in items)
+                {
+                    Token(builder, "item", item);
+                }
+
+                return;
+            }
+
+            var properties = type.GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                .Where(static property => property.CanRead && property.GetIndexParameters().Length == 0)
+                .OrderBy(static property => property.Name, StringComparer.Ordinal)
+                .ToArray();
+            if (properties.Length == 0)
+            {
+                throw new ArgumentException(
+                    $"Operation input value type '{type.FullName}' has no canonical public properties.",
+                    nameof(value));
+            }
+
+            Token(builder, "record", properties.Length.ToString(CultureInfo.InvariantCulture));
+            foreach (var property in properties)
+            {
+                Token(builder, "property", property.Name);
+                Append(builder, property.GetValue(value), path);
+            }
+        }
+        finally
+        {
+            if (added)
+            {
+                path.Remove(value);
+            }
+        }
+    }
+
+    private static string Canonicalize(object? value, HashSet<object> path)
+    {
+        var builder = new StringBuilder();
+        Append(builder, value, new HashSet<object>(path, ReferenceEqualityComparer.Instance));
+        return builder.ToString();
+    }
+
+    private static bool TryGetDictionaryEntries(object value, out List<(object? Key, object? Value)> entries)
+    {
+        var genericDictionary = value.GetType().GetInterfaces().Any(static candidate =>
+            candidate.IsGenericType
+            && (candidate.GetGenericTypeDefinition() == typeof(IDictionary<,>)
+                || candidate.GetGenericTypeDefinition() == typeof(IReadOnlyDictionary<,>)));
+        if (genericDictionary && value is IEnumerable enumerable)
+        {
+            entries = enumerable.Cast<object>()
+                .Select(static entry =>
+                {
+                    var type = entry.GetType();
+                    return (
+                        type.GetProperty("Key")!.GetValue(entry),
+                        type.GetProperty("Value")!.GetValue(entry));
+                })
+                .ToList();
+            return true;
+        }
+
+        if (value is IDictionary dictionary)
+        {
+            entries = dictionary.Cast<DictionaryEntry>()
+                .Select(static entry => ((object?)entry.Key, entry.Value))
+                .ToList();
+            return true;
+        }
+
+        entries = [];
+        return false;
+    }
+
+    private static bool IsOrderedEnumerable(Type type)
+        => type.IsArray
+            || typeof(IList).IsAssignableFrom(type)
+            || type.GetInterfaces().Any(static candidate =>
+                candidate.IsGenericType
+                && (candidate.GetGenericTypeDefinition() == typeof(IList<>)
+                    || candidate.GetGenericTypeDefinition() == typeof(IReadOnlyList<>)));
+
+    private static void Token(StringBuilder builder, string kind, string? value)
+    {
+        var material = value ?? string.Empty;
+        builder.Append(kind)
+            .Append(':')
+            .Append(material.Length.ToString(CultureInfo.InvariantCulture))
+            .Append(':')
+            .Append(material)
+            .Append(';');
     }
 }
