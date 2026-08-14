@@ -1,3 +1,4 @@
+using Brain.Modules.Behavior;
 using Brain.Modules.Conversation;
 using Brain.Modules.Proof;
 using Brain.Modules.Scheduling;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddDigitalBrainRuntime();
+builder.Services.AddSingleton<IRuntimeProductModule, BehaviorProductModule>();
 builder.Services.AddSingleton<IRuntimeProductModule, ConversationProductModule>();
 builder.Services.AddSingleton<IRuntimeProductModule, ProofProductModule>();
 builder.Services.AddSingleton<IRuntimeProductModule, SchedulingProductModule>();

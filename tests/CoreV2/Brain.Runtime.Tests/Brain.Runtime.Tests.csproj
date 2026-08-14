@@ -10,6 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="../../../src/CoreV2/Brain.Runtime/Brain.Runtime.csproj" />
     <ProjectReference Include="../../../src/CoreV2/Brain.Runtime.Abstractions/Brain.Runtime.Abstractions.csproj" />
+    <ProjectReference Include="../../../src/CoreV2/Modules/Behavior/Brain.Modules.Behavior.csproj" />
     <ProjectReference Include="../../../src/CoreV2/Modules/Conversation/Brain.Modules.Conversation.csproj" />
     <ProjectReference Include="../../../src/CoreV2/Modules/Proof/Brain.Modules.Proof.csproj" />
     <ProjectReference Include="../../../src/CoreV2/Modules/Scheduling/Brain.Modules.Scheduling.csproj" />

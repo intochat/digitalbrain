@@ -16,6 +16,8 @@
     <Project Path="src/CoreV2/Modules/Proof/Brain.Modules.Proof.csproj" />
     <Project Path="src/CoreV2/Modules/Conversation.Contracts/Brain.Modules.Conversation.Contracts.csproj" />
     <Project Path="src/CoreV2/Modules/Conversation/Brain.Modules.Conversation.csproj" />
+    <Project Path="src/CoreV2/Modules/Behavior.Contracts/Brain.Modules.Behavior.Contracts.csproj" />
+    <Project Path="src/CoreV2/Modules/Behavior/Brain.Modules.Behavior.csproj" />
     <Project Path="src/CoreV2/Modules/Scheduling.Contracts/Brain.Modules.Scheduling.Contracts.csproj" />
     <Project Path="src/CoreV2/Modules/Scheduling/Brain.Modules.Scheduling.csproj" />
     <Project Path="src/CoreV2/Modules/UI/Brain.Modules.UI.csproj" />
