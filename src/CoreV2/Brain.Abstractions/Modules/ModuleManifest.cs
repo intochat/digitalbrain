@@ -7,7 +7,28 @@ using Brain.Abstractions.Operations;
 
 namespace Brain.Abstractions.Modules;
 
-public sealed record RoleDescriptor(NeuronRoleId Id, ModuleId Owner);
+public enum NeuronScope
+{
+    Workspace,
+    Principal,
+}
+
+public record NeuronRoleDescriptor(NeuronRoleId Id, NeuronScope Scope, ModuleId Owner);
+
+// Kept as a source-compatible shorthand for pre-scope manifests. New declarations should
+// state their scope explicitly through NeuronRoleDescriptor.
+public sealed record RoleDescriptor : NeuronRoleDescriptor
+{
+    public RoleDescriptor(NeuronRoleId id, ModuleId owner)
+        : base(id, NeuronScope.Workspace, owner)
+    {
+    }
+
+    public RoleDescriptor(NeuronRoleId id, NeuronScope scope, ModuleId owner)
+        : base(id, scope, owner)
+    {
+    }
+}
 
 public sealed record ReshapeDescriptor(ContractId InputEvent, ContractId OutputEvent, ModuleId Owner);
 
@@ -17,7 +38,7 @@ public sealed class ModuleManifest
         ModuleId id,
         ModuleVersion version,
         IReadOnlyCollection<ModuleDependency> dependencies,
-        IReadOnlyCollection<RoleDescriptor> roles,
+        IReadOnlyCollection<NeuronRoleDescriptor> roles,
         IReadOnlyCollection<OperationDescriptor> operations,
         IReadOnlyCollection<EventDescriptor> events,
         IReadOnlyCollection<ContractId> consumedEvents,
@@ -48,7 +69,7 @@ public sealed class ModuleManifest
 
     public IReadOnlyList<ModuleDependency> Dependencies { get; }
 
-    public IReadOnlyList<RoleDescriptor> Roles { get; }
+    public IReadOnlyList<NeuronRoleDescriptor> Roles { get; }
 
     public IReadOnlyList<OperationDescriptor> Operations { get; }
 

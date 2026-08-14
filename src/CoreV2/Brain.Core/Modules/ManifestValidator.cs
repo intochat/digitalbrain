@@ -74,7 +74,7 @@ public static class ManifestValidator
 
     private static void ValidateOwners(
         IEnumerable<ModuleManifest> manifests,
-        IReadOnlyDictionary<string, RoleDescriptor> roles)
+        IReadOnlyDictionary<string, NeuronRoleDescriptor> roles)
     {
         foreach (var manifest in manifests)
         {
