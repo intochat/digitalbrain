@@ -4,4 +4,9 @@
     <IsPackable>false</IsPackable>
     <UserSecretsId>digitalbrain-corev2-apphost-5d79b5c8-c54e-4f65-895f-e7e3b8a709b4</UserSecretsId>
   </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Aspire/Brain.Aspire.Hosting/Brain.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../DigitalBrain.ProductHost/DigitalBrain.ProductHost.csproj" />
+    <ProjectReference Include="../DigitalBrain.RuntimeHost/DigitalBrain.RuntimeHost.csproj" />
+  </ItemGroup>
 </Project>

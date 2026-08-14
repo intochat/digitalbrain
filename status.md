@@ -14,6 +14,7 @@ CoreV2 is becoming the only compiled product graph. The target local startup is 
 - `Brain.Aspire.Hosting` now models the brain aggregate, Azurite storage, Orleans clustering/reminders/grain state, and role-specific module projections.
 - `Brain.Aspire` now provides distinct application-side Orleans silo and client registrations over AppHost-injected storage configuration.
 - `DigitalBrain.RuntimeHost` is now the silo executable, while `DigitalBrain.ProductHost` is an independently hosted Orleans client with shared health endpoints.
+- The CoreV2 AppHost composes storage -> runtime -> ProductHost; a live isolated Aspire run verified all three resources healthy on 2026-08-14.
 - CoreV2 domain and proof tests exist, but the proof runtime is still hosted behind one in-memory Orleans test grain rather than production grains.
 - `DigitalBrain.ProductHost` is not yet a production Orleans client and does not yet expose the complete product protocol.
 - The V1 AppHost, hosting extensions, module system, and Flutter client are reference implementations only; they are not part of the CoreV2 compiled graph.
@@ -34,7 +35,7 @@ CoreV2 is becoming the only compiled product graph. The target local startup is 
 
 ## Active slice
 
-Composing storage, the runtime silo, and ProductHost in the CoreV2 AppHost and proving their live startup order.
+Adding module-owned Flutter Aspire hosting and a minimal CoreV2 Flutter product shell that waits for ProductHost.
 
 ## Definition of done
 
