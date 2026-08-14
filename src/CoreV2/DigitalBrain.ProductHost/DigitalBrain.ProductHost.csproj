@@ -7,11 +7,13 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Aspire/Brain.Aspire/Brain.Aspire.csproj" />
     <ProjectReference Include="../Brain.Product.Abstractions/Brain.Product.Abstractions.csproj" />
     <ProjectReference Include="../Brain.Core/Brain.Core.csproj" />
+    <ProjectReference Include="../Brain.Runtime.Abstractions/Brain.Runtime.Abstractions.csproj" />
   </ItemGroup>
   <ItemGroup Condition="'$(Configuration)' != 'Debug'">
     <Compile Remove="Authority/LocalTestAuthority.cs" />
