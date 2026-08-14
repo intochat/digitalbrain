@@ -8,8 +8,6 @@
     <PackageVersion Include="ModelContextProtocol.Core" Version="2.1.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
     <PackageVersion Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.22.0" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="11.0.0-preview.2.26159.112" />
-    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="11.0.0-preview.2" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.6.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="11.0.0-preview.6.26359.118" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0-pre.5" />
@@ -48,7 +46,6 @@
     <PackageVersion Include="Microsoft.Orleans.Journaling" Version="10.2.2-rc.2.alpha.1" />
     <PackageVersion Include="Microsoft.Orleans.Journaling.AzureStorage" Version="10.2.2-rc.2.alpha.1" />
     <PackageVersion Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.2.2" />
-    <PackageVersion Include="Microsoft.Orleans.Persistence.Memory" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.Reminders" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.Reminders.AzureStorage" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.Sdk" Version="10.2.2" />
