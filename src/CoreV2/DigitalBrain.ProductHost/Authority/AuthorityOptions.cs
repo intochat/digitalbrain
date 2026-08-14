@@ -13,6 +13,7 @@ public sealed class AuthorityOptions
     };
     public const string DefaultSubjectClaim = "sub";
     public const string DefaultWorkspaceClaim = "brain_workspace";
+    public const string DefaultPrincipalKindClaim = "brain_principal_kind";
     public const string DefaultRoleClaim = "brain_role";
     public const string DefaultGrantClaim = "brain_grant";
     public const string DefaultConnectionClaim = "brain_connection";
@@ -36,6 +37,8 @@ public sealed class AuthorityOptions
 
     public string WorkspaceClaim { get; init; } = DefaultWorkspaceClaim;
 
+    public string PrincipalKindClaim { get; init; } = DefaultPrincipalKindClaim;
+
     public string RoleClaim { get; init; } = DefaultRoleClaim;
 
     public string GrantClaim { get; init; } = DefaultGrantClaim;
@@ -52,6 +55,7 @@ public sealed class AuthorityOptions
         {
             SubjectClaim,
             WorkspaceClaim,
+            PrincipalKindClaim,
             RoleClaim,
             GrantClaim,
             ConnectionClaim,

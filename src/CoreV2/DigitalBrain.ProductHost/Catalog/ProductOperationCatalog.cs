@@ -10,6 +10,8 @@ namespace DigitalBrain.ProductHost.Catalog;
 public sealed class ProductOperationCatalog
 {
     private readonly IReadOnlyDictionary<string, ProductOperationRegistration> _registrations;
+    private readonly IModuleRegistry _moduleRegistry;
+    private readonly long _moduleGeneration;
     private readonly ProductOperationPolicyFilter _policyFilter;
 
     public ProductOperationCatalog(
@@ -17,20 +19,35 @@ public sealed class ProductOperationCatalog
         ProductOperationPolicyFilter policyFilter,
         IReadOnlyCollection<ProductOperationRegistration> registrations)
     {
-        ArgumentNullException.ThrowIfNull(moduleRegistry);
+        _moduleRegistry = moduleRegistry ?? throw new ArgumentNullException(nameof(moduleRegistry));
         _policyFilter = policyFilter ?? throw new ArgumentNullException(nameof(policyFilter));
         ArgumentNullException.ThrowIfNull(registrations);
 
+        var activeSnapshot = moduleRegistry.GetSnapshot();
+        _moduleGeneration = activeSnapshot.Generation;
         var index = new SortedDictionary<string, ProductOperationRegistration>(StringComparer.Ordinal);
+        var northboundIdentities = new HashSet<string>(StringComparer.Ordinal);
         foreach (var registration in registrations)
         {
             ArgumentNullException.ThrowIfNull(registration);
-            VerifyInstalledManifest(moduleRegistry, registration);
+            VerifyInstalledManifest(activeSnapshot.Modules, registration);
             if (!index.TryAdd(registration.DeclaredOperation.Id.Value, registration))
             {
                 throw new ProductOperationCatalogConfigurationException(
                     $"Operation '{registration.DeclaredOperation.Id}' has more than one product registration.");
             }
+
+            if (!northboundIdentities.Add(registration.Identity.NorthboundIdentity))
+            {
+                throw new ProductOperationCatalogConfigurationException(
+                    $"Operation '{registration.DeclaredOperation.Id}' collides with another northbound product identity.");
+            }
+        }
+
+        if (moduleRegistry.GetSnapshot().Generation != _moduleGeneration)
+        {
+            throw new ProductOperationCatalogConfigurationException(
+                "The active module set changed while the product catalog was being constructed.");
         }
 
         _registrations = new ReadOnlyDictionary<string, ProductOperationRegistration>(index);
@@ -42,6 +59,11 @@ public sealed class ProductOperationCatalog
     {
         ArgumentNullException.ThrowIfNull(grant);
         cancellationToken.ThrowIfCancellationRequested();
+
+        if (!IsActiveGeneration())
+        {
+            return Task.FromResult<IReadOnlyList<ProductOperationDescriptor>>([]);
+        }
 
         IReadOnlyList<ProductOperationDescriptor> visible = _registrations.Values
             .Where(registration => _policyFilter.IsAvailable(grant, registration))
@@ -59,7 +81,8 @@ public sealed class ProductOperationCatalog
         ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (string.IsNullOrWhiteSpace(operation.Value)
+        if (!IsActiveGeneration()
+            || string.IsNullOrWhiteSpace(operation.Value)
             || !_registrations.TryGetValue(operation.Value, out var registration)
             || !_policyFilter.IsAvailable(context.AccessGrant, registration))
         {
@@ -71,10 +94,9 @@ public sealed class ProductOperationCatalog
             throw new ProductOperationInputException("An idempotency key is required.");
         }
 
-        var validatedInput = registration.Json.ValidateAndCloneInput(input);
         var receipt = await registration.Adapter.InvokeAsync(
                 operation,
-                validatedInput,
+                input,
                 context,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -88,27 +110,28 @@ public sealed class ProductOperationCatalog
     }
 
     private static void VerifyInstalledManifest(
-        IModuleRegistry moduleRegistry,
+        ModuleSet activeModules,
         ProductOperationRegistration registration)
     {
-        try
-        {
-            var manifest = moduleRegistry.Get(registration.DeclaredOperation.Owner);
-            var declared = manifest.Operations
-                .SingleOrDefault(candidate => candidate.Id == registration.DeclaredOperation.Id);
-            if (declared is null || declared != registration.DeclaredOperation)
-            {
-                throw new ProductOperationCatalogConfigurationException(
-                    $"Operation '{registration.DeclaredOperation.Id}' does not match its active module manifest.");
-            }
-        }
-        catch (KeyNotFoundException exception)
+        var manifest = activeModules.Modules.SingleOrDefault(
+            module => module.Id == registration.DeclaredOperation.Owner);
+        if (manifest is null)
         {
             throw new ProductOperationCatalogConfigurationException(
-                $"Operation '{registration.DeclaredOperation.Id}' belongs to a module that is not installed.",
-                exception);
+                $"Operation '{registration.DeclaredOperation.Id}' belongs to a module that is not installed.");
+        }
+
+        var declared = manifest.Operations
+            .SingleOrDefault(candidate => candidate.Id == registration.DeclaredOperation.Id);
+        if (declared is null || declared != registration.DeclaredOperation)
+        {
+            throw new ProductOperationCatalogConfigurationException(
+                $"Operation '{registration.DeclaredOperation.Id}' does not match its active module manifest.");
         }
     }
+
+    private bool IsActiveGeneration()
+        => _moduleRegistry.GetSnapshot().Generation == _moduleGeneration;
 }
 
 public sealed class ProductOperationNotAvailableException : Exception

@@ -38,9 +38,13 @@ public sealed class ModuleSet
         => new ReadOnlyDictionary<string, T>(new Dictionary<string, T>(source, StringComparer.Ordinal));
 }
 
+public sealed record ModuleRegistrySnapshot(long Generation, ModuleSet Modules);
+
 public interface IModuleRegistry
 {
     ModuleSet Resolve(IReadOnlyCollection<ModuleManifest> installed);
+
+    ModuleRegistrySnapshot GetSnapshot();
 
     ModuleManifest Get(ModuleId id);
 
@@ -53,10 +57,20 @@ public interface IModuleRegistry
 
 public sealed class ModuleRegistry : IModuleRegistry
 {
-    private ModuleSet? _resolved;
+    private long _generation;
+    private ModuleRegistrySnapshot? _snapshot;
 
     public ModuleSet Resolve(IReadOnlyCollection<ModuleManifest> installed)
-        => _resolved = ManifestValidator.Validate(installed);
+    {
+        var resolved = ManifestValidator.Validate(installed);
+        var snapshot = new ModuleRegistrySnapshot(Interlocked.Increment(ref _generation), resolved);
+        Volatile.Write(ref _snapshot, snapshot);
+        return resolved;
+    }
+
+    public ModuleRegistrySnapshot GetSnapshot()
+        => Volatile.Read(ref _snapshot) ?? throw new InvalidOperationException(
+            "No module set has been resolved. Call Resolve before reading module declarations.");
 
     public ModuleManifest Get(ModuleId id)
         => Current.ModuleIndex.TryGetValue(id.Value, out var manifest)
@@ -78,8 +92,7 @@ public sealed class ModuleRegistry : IModuleRegistry
             ? capability
             : throw Missing("capability", id.Value);
 
-    private ModuleSet Current => _resolved ?? throw new InvalidOperationException(
-        "No module set has been resolved. Call Resolve before reading module declarations.");
+    private ModuleSet Current => GetSnapshot().Modules;
 
     private static KeyNotFoundException Missing(string kind, string id)
         => new($"Resolved module set does not contain {kind} '{id}'.");

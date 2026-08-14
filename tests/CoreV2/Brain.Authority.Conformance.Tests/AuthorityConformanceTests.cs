@@ -59,12 +59,26 @@ public abstract class AuthorityConformanceTests
 
         Assert.Equal(new WorkspaceId("workspace-a"), grant.Workspace);
         Assert.Equal(new PrincipalId("principal-a"), grant.Principal);
+        Assert.Equal(BrainPrincipalKind.Human, grant.PrincipalKind);
         Assert.Equal(["member"], grant.Roles);
         Assert.Equal(["connection_use"], grant.Grants);
         Assert.Equal([new ConnectionReference("conn-a")], grant.Connections);
         Assert.Equal(7, grant.PolicyVersion);
         Assert.Equal(AuthorityFixture.Now, grant.IssuedAt);
         Assert.Equal(AuthorityFixture.Now.AddMinutes(5), grant.ExpiresAt);
+    }
+
+    [Fact]
+    public async Task Maps_signed_closed_service_principal_kind_and_rejects_unknown_kind()
+    {
+        var service = await Authority.AuthenticateAsync(
+            Issue(AuthorityFixture.Member() with { PrincipalKind = BrainPrincipalKind.Service }),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(BrainPrincipalKind.Service, service.PrincipalKind);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => Authority.AuthenticateAsync(
+            Issue(AuthorityFixture.InvalidPrincipalKind()),
+            TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -156,6 +170,7 @@ public sealed class AuthorityBoundaryTests
             ["member"],
             ["connection_use"],
             ["conn-a"],
+            BrainPrincipalKind.Human,
             7,
             AuthorityFixture.Now,
             AuthorityFixture.Now.AddMinutes(5));
@@ -181,6 +196,10 @@ public sealed class AuthorityBoundaryTests
         Assert.Throws<ArgumentException>(() => CreateAuthority(new AuthorityOptions(ConformanceTokenIssuer.Issuer, ConformanceTokenIssuer.Audience)
         {
             WorkspaceClaim = "sub",
+        }));
+        Assert.Throws<ArgumentException>(() => CreateAuthority(new AuthorityOptions(ConformanceTokenIssuer.Issuer, ConformanceTokenIssuer.Audience)
+        {
+            PrincipalKindClaim = "client_id",
         }));
         Assert.Throws<ArgumentException>(() => CreateAuthority(new AuthorityOptions(ConformanceTokenIssuer.Issuer, ConformanceTokenIssuer.Audience)
         {
@@ -290,6 +309,7 @@ public sealed record AuthorityFixture(
     int PolicyVersion,
     DateTimeOffset IssuedAt,
     DateTimeOffset ExpiresAt,
+    BrainPrincipalKind PrincipalKind = BrainPrincipalKind.Human,
     string? Audience = null,
     string? Issuer = null,
     bool UseUntrustedSigningKey = false,
@@ -336,6 +356,9 @@ public sealed record AuthorityFixture(
 
     public static AuthorityFixture StringIssuedAt()
         => Member() with { Shape = AuthorityFixtureShape.StringIssuedAt };
+
+    public static AuthorityFixture InvalidPrincipalKind()
+        => Member() with { Shape = AuthorityFixtureShape.InvalidPrincipalKind };
 }
 
 public enum AuthorityFixtureShape
@@ -347,6 +370,7 @@ public enum AuthorityFixtureShape
     BooleanRole,
     StringPolicyVersion,
     StringIssuedAt,
+    InvalidPrincipalKind,
 }
 
 internal sealed class ConformanceTokenIssuer
@@ -387,6 +411,9 @@ internal sealed class ConformanceTokenIssuer
                 : issuedAt,
             ["exp"] = fixture.ExpiresAt.ToUnixTimeSeconds(),
             [AuthorityOptions.DefaultSubjectClaim] = fixture.Principal,
+            [AuthorityOptions.DefaultPrincipalKindClaim] = fixture.Shape == AuthorityFixtureShape.InvalidPrincipalKind
+                ? "robot"
+                : fixture.PrincipalKind == BrainPrincipalKind.Human ? "human" : "service",
             [AuthorityOptions.DefaultPolicyVersionClaim] = fixture.Shape == AuthorityFixtureShape.StringPolicyVersion
                 ? fixture.PolicyVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)
                 : fixture.PolicyVersion,

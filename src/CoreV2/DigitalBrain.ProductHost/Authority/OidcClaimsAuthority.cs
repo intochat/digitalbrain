@@ -82,6 +82,7 @@ public sealed class OidcClaimsAuthority : IBrainAccessAuthority
             EnsureOptionalNumericDate(claims, NotBeforeClaim);
             var workspace = new WorkspaceId(RequiredSingleString(claims, _options.WorkspaceClaim));
             var principal = new PrincipalId(RequiredSingleString(claims, _options.SubjectClaim));
+            var principalKind = ParsePrincipalKind(RequiredSingleString(claims, _options.PrincipalKindClaim));
             var roles = OptionalDistinctStrings(claims, _options.RoleClaim);
             var grants = OptionalDistinctStrings(claims, _options.GrantClaim);
             var connections = OptionalDistinctStrings(claims, _options.ConnectionClaim)
@@ -97,6 +98,7 @@ public sealed class OidcClaimsAuthority : IBrainAccessAuthority
             return BrainAccessGrant.Create(
                 workspace,
                 principal,
+                principalKind,
                 roles,
                 grants,
                 connections,
@@ -124,6 +126,7 @@ public sealed class OidcClaimsAuthority : IBrainAccessAuthority
         RequireRawSingleAudience(root);
         RequireRawString(root, _options.SubjectClaim);
         RequireRawString(root, _options.WorkspaceClaim);
+        RequireRawString(root, _options.PrincipalKindClaim);
         RequireRawStringList(root, _options.RoleClaim);
         RequireRawStringList(root, _options.GrantClaim);
         RequireRawStringList(root, _options.ConnectionClaim);
@@ -365,6 +368,14 @@ public sealed class OidcClaimsAuthority : IBrainAccessAuthority
 
         return parsed;
     }
+
+    private static BrainPrincipalKind ParsePrincipalKind(string value)
+        => value switch
+        {
+            "human" => BrainPrincipalKind.Human,
+            "service" => BrainPrincipalKind.Service,
+            _ => throw Unauthorized(),
+        };
 
     private static DateTimeOffset ParseNumericDate(string value)
     {

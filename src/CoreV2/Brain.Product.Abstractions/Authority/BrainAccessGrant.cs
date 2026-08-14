@@ -3,11 +3,18 @@ using Brain.Abstractions.Identity;
 
 namespace Brain.Product.Abstractions.Authority;
 
+public enum BrainPrincipalKind
+{
+    Human,
+    Service,
+}
+
 public sealed record BrainAccessGrant
 {
     private BrainAccessGrant(
         WorkspaceId workspace,
         PrincipalId principal,
+        BrainPrincipalKind principalKind,
         ImmutableArray<string> roles,
         ImmutableArray<string> grants,
         ImmutableArray<ConnectionReference> connections,
@@ -17,6 +24,7 @@ public sealed record BrainAccessGrant
     {
         Workspace = workspace;
         Principal = principal;
+        PrincipalKind = principalKind;
         Roles = roles;
         Grants = grants;
         Connections = connections;
@@ -28,6 +36,8 @@ public sealed record BrainAccessGrant
     public WorkspaceId Workspace { get; }
 
     public PrincipalId Principal { get; }
+
+    public BrainPrincipalKind PrincipalKind { get; }
 
     public ImmutableArray<string> Roles { get; }
 
@@ -44,6 +54,7 @@ public sealed record BrainAccessGrant
     public static BrainAccessGrant Create(
         WorkspaceId workspace,
         PrincipalId principal,
+        BrainPrincipalKind principalKind,
         IEnumerable<string> roles,
         IEnumerable<string> grants,
         IEnumerable<ConnectionReference> connections,
@@ -60,6 +71,11 @@ public sealed record BrainAccessGrant
         if (string.IsNullOrWhiteSpace(principal.Value))
         {
             throw new ArgumentException("An access grant requires a principal.", nameof(principal));
+        }
+
+        if (!Enum.IsDefined(principalKind))
+        {
+            throw new ArgumentOutOfRangeException(nameof(principalKind));
         }
 
         if (policyVersion <= 0)
@@ -93,6 +109,7 @@ public sealed record BrainAccessGrant
         return new BrainAccessGrant(
             workspace,
             principal,
+            principalKind,
             CopyClaims(roles, nameof(roles)),
             CopyClaims(grants, nameof(grants)),
             CopyConnections(connections),

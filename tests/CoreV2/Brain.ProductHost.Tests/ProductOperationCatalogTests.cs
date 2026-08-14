@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using Brain.Abstractions.Activities;
 using Brain.Abstractions.Capabilities;
 using Brain.Abstractions.Context;
@@ -85,9 +86,7 @@ public sealed class ProductOperationCatalogTests
         var adapter = Adapter(Send);
         var registration = new ProductOperationRegistration(
             Send,
-            adapter,
-            CatalogJsonSerializerContext.Default.CatalogInput,
-            CatalogJsonSerializerContext.Default.CatalogResult,
+            adapter.Binding,
             new ProductOperationAccessPolicy(["member"], ["operations.invoke"]));
         var catalog = Catalog([Send], [registration], allowed: [Send.Id]);
         var incompleteGrants = new[]
@@ -107,6 +106,35 @@ public sealed class ProductOperationCatalogTests
         }
 
         Assert.Equal(0, adapter.InvocationCount);
+    }
+
+    [Fact]
+    public async Task Trusted_principal_kind_is_preserved_for_core_policy()
+    {
+        var adapter = Adapter(Send);
+        var policy = new ServiceOnlyPolicyEvaluator();
+        var filter = new ProductOperationPolicyFilter(
+            policy,
+            new FixturePolicyVersionProvider(Workspace, currentVersion: 7),
+            new FixedTimeProvider(IssuedAt.AddMinutes(1)));
+        var catalog = new ProductOperationCatalog(
+            Registry([Send]),
+            filter,
+            [Registration(Send, adapter)]);
+        var human = Grant(principalKind: BrainPrincipalKind.Human);
+        var service = Grant(principalKind: BrainPrincipalKind.Service);
+
+        Assert.Empty(await catalog.DiscoverAsync(human, TestContext.Current.CancellationToken));
+        Assert.Single(await catalog.DiscoverAsync(service, TestContext.Current.CancellationToken));
+        await catalog.InvokeAsync(
+            Send.Id,
+            Json("{\"message\":\"service-call\"}"),
+            Invocation(service),
+            TestContext.Current.CancellationToken);
+
+        Assert.Contains(false, policy.ObservedKinds);
+        Assert.Contains(true, policy.ObservedKinds);
+        Assert.Equal(1, adapter.InvocationCount);
     }
 
     [Theory]
@@ -132,6 +160,30 @@ public sealed class ProductOperationCatalogTests
         Assert.Equal(0, adapter.InvocationCount);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Module_removal_or_replacement_after_catalog_construction_fails_closed(
+        bool replaceModule)
+    {
+        var adapter = Adapter(Send);
+        var registry = Registry([Send]);
+        var catalog = new ProductOperationCatalog(
+            registry,
+            Filter([Send.Id]),
+            [Registration(Send, adapter)]);
+
+        registry.Resolve(replaceModule ? [Manifest([Send], new ModuleVersion(1, 1, 0))] : []);
+
+        Assert.Empty(await catalog.DiscoverAsync(Grant(), TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ProductOperationNotAvailableException>(() => catalog.InvokeAsync(
+            Send.Id,
+            Json("{\"message\":\"hello\"}"),
+            Invocation(Grant()),
+            TestContext.Current.CancellationToken));
+        Assert.Equal(0, adapter.InvocationCount);
+    }
+
     [Fact]
     public void Duplicate_operation_registration_is_rejected()
     {
@@ -142,6 +194,35 @@ public sealed class ProductOperationCatalogTests
             registry,
             filter,
             [Registration(Send, Adapter(Send)), Registration(Send, Adapter(Send))]));
+    }
+
+    [Theory]
+    [InlineData("conversation.send@1", "conversation", 1)]
+    [InlineData("external/send@1", "conversation", 1)]
+    [InlineData("conversation/send@2", "conversation", 1)]
+    [InlineData("conversation/Send@1", "conversation", 1)]
+    public void Malformed_owner_mismatched_or_major_mismatched_operation_identity_is_rejected(
+        string id,
+        string owner,
+        int version)
+    {
+        var operation = AdversarialOperation(id, new ModuleId(owner), version);
+
+        Assert.Throws<ProductOperationCatalogConfigurationException>(() =>
+            Registration(operation, Adapter(operation)));
+    }
+
+    [Fact]
+    public void Two_versions_that_map_to_one_northbound_identity_are_rejected()
+    {
+        var versionOne = Operation("conversation/send@1", version: 1);
+        var versionTwo = Operation("conversation/send@2", version: 2);
+        var registry = Registry([versionOne, versionTwo]);
+
+        Assert.Throws<ProductOperationCatalogConfigurationException>(() => new ProductOperationCatalog(
+            registry,
+            Filter([versionOne.Id, versionTwo.Id]),
+            [Registration(versionOne, Adapter(versionOne)), Registration(versionTwo, Adapter(versionTwo))]));
     }
 
     [Fact]
@@ -217,6 +298,96 @@ public sealed class ProductOperationCatalogTests
     }
 
     [Fact]
+    public void Swapped_or_schema_mismatched_generated_metadata_is_rejected()
+    {
+        Assert.Throws<ProductOperationCatalogConfigurationException>(() =>
+            new ProductJsonAdapter<CatalogResult, CatalogInput>(
+                Descriptor(Send),
+                CatalogJsonSerializerContext.Default.CatalogResult,
+                CatalogJsonSerializerContext.Default.CatalogInput,
+                static (_, _, _) => throw new InvalidOperationException(),
+                ObserveNotSupported));
+
+        var mismatchedDescriptor = new ProductOperationDescriptor(
+            Send,
+            Send.Id.Value,
+            "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"result\"],\"properties\":{\"result\":{\"type\":\"string\"}}}",
+            Descriptor(Send).TerminalResultSchema);
+        Assert.Throws<ProductOperationCatalogConfigurationException>(() =>
+            new ProductJsonAdapter<CatalogInput, CatalogResult>(
+                mismatchedDescriptor,
+                CatalogJsonSerializerContext.Default.CatalogInput,
+                CatalogJsonSerializerContext.Default.CatalogResult,
+                static (_, _, _) => throw new InvalidOperationException(),
+                ObserveNotSupported));
+    }
+
+    [Theory]
+    [InlineData("{\"type\":\"object\",\"additionalProperties\":false,\"required\":[],\"properties\":{\"message\":{\"type\":\"string\"}}}")]
+    [InlineData("{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"message\",\"message\"],\"properties\":{\"message\":{\"type\":\"string\"}}}")]
+    [InlineData("{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"message\"],\"properties\":{\"message\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"}}}")]
+    [InlineData("{\"type\":\"object\",\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"message\"],\"properties\":{\"message\":{\"type\":\"string\"}}}")]
+    public void Schema_required_and_duplicate_members_must_match_generated_metadata(string inputSchema)
+    {
+        var descriptor = new ProductOperationDescriptor(
+            Send,
+            Send.Id.Value,
+            inputSchema,
+            Descriptor(Send).TerminalResultSchema);
+
+        Assert.Throws<ProductOperationCatalogConfigurationException>(() =>
+            new ProductJsonAdapter<CatalogInput, CatalogResult>(
+                descriptor,
+                CatalogJsonSerializerContext.Default.CatalogInput,
+                CatalogJsonSerializerContext.Default.CatalogResult,
+                static (_, _, _) => throw new InvalidOperationException(),
+                ObserveNotSupported));
+    }
+
+    [Fact]
+    public void Hostile_generated_json_contract_shapes_are_rejected()
+    {
+        AssertHostileMetadataRejected(
+            HostileJsonSerializerContext.Default.ExtensionDataInput,
+            "{\"message\":{\"type\":\"string\"}}");
+        AssertHostileMetadataRejected(
+            HostileJsonSerializerContext.Default.PerTypeSkipInput,
+            "{\"message\":{\"type\":\"string\"}}");
+        AssertHostileMetadataRejected(
+            HostileJsonSerializerContext.Default.PolymorphicInput,
+            "{}");
+        AssertHostileMetadataRejected(
+            HostileJsonSerializerContext.Default.OpenObjectInput,
+            "{\"payload\":{\"type\":\"object\"}}");
+        AssertHostileMetadataRejected(
+            HostileJsonSerializerContext.Default.JsonElementInput,
+            "{\"payload\":{\"type\":\"object\"}}");
+        AssertHostileMetadataRejected(
+            HostileJsonSerializerContext.Default.CustomConverterInput,
+            "{\"message\":{\"type\":\"string\"}}");
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"message\":\"first\",\"message\":\"second\"}")]
+    public async Task Missing_required_or_duplicate_properties_are_rejected_before_typed_invocation(
+        string input)
+    {
+        var adapter = Adapter(Send);
+        var catalog = Catalog(
+            [Send],
+            [Registration(Send, adapter)],
+            allowed: [Send.Id]);
+
+        await Assert.ThrowsAsync<ProductOperationInputException>(() => catalog.InvokeAsync(
+            Send.Id,
+            Json(input),
+            Invocation(Grant()),
+            TestContext.Current.CancellationToken));
+        Assert.Equal(0, adapter.InvocationCount);
+    }
+
+    [Fact]
     public async Task Valid_json_is_bound_with_generated_metadata_before_explicit_adapter_invocation()
     {
         var adapter = Adapter(Send);
@@ -233,7 +404,7 @@ public sealed class ProductOperationCatalogTests
 
         Assert.Equal(Send.Id, receipt.Operation);
         Assert.Equal(1, adapter.InvocationCount);
-        Assert.Equal("hello", adapter.LastInput.GetProperty("message").GetString());
+        Assert.Equal("hello", adapter.LastInput?.Message);
     }
 
     [Fact]
@@ -250,9 +421,17 @@ public sealed class ProductOperationCatalogTests
 
     private static ModuleRegistry Registry(IReadOnlyCollection<OperationDescriptor> operations)
     {
-        var manifest = new ModuleManifest(
+        var registry = new ModuleRegistry();
+        registry.Resolve([Manifest(operations)]);
+        return registry;
+    }
+
+    private static ModuleManifest Manifest(
+        IReadOnlyCollection<OperationDescriptor> operations,
+        ModuleVersion? version = null)
+        => new(
             Module,
-            new ModuleVersion(1, 0, 0),
+            version ?? new ModuleVersion(1, 0, 0),
             [],
             [new NeuronRoleDescriptor(EntryRole, NeuronScope.Workspace, Module)],
             operations,
@@ -261,10 +440,6 @@ public sealed class ProductOperationCatalogTests
             [],
             [],
             []);
-        var registry = new ModuleRegistry();
-        registry.Resolve([manifest]);
-        return registry;
-    }
 
     private static ProductOperationPolicyFilter Filter(IReadOnlyCollection<OperationId> allowed)
         => new(
@@ -277,38 +452,76 @@ public sealed class ProductOperationCatalogTests
         FixtureProductOperationAdapter adapter)
         => new(
             operation,
-            adapter,
-            CatalogJsonSerializerContext.Default.CatalogInput,
-            CatalogJsonSerializerContext.Default.CatalogResult,
+            adapter.Binding,
             new ProductOperationAccessPolicy(["member"], ["operations.invoke"]));
 
     private static FixtureProductOperationAdapter Adapter(OperationDescriptor operation)
-        => new(new ProductOperationDescriptor(
+        => new(Descriptor(operation));
+
+    private static ProductOperationDescriptor Descriptor(OperationDescriptor operation)
+        => new(
             operation,
             operation.Id.Value,
             "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"message\"],\"properties\":{\"message\":{\"type\":\"string\"}}}",
-            "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"result\"],\"properties\":{\"result\":{\"type\":\"string\"}}}"));
+            "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"result\"],\"properties\":{\"result\":{\"type\":\"string\"}}}");
 
-    private static OperationDescriptor Operation(string id)
+    private static void AssertHostileMetadataRejected<TInput>(
+        JsonTypeInfo<TInput> inputType,
+        string properties)
+        where TInput : class
+    {
+        var descriptor = new ProductOperationDescriptor(
+            Send,
+            Send.Id.Value,
+            $"{{\"type\":\"object\",\"additionalProperties\":false,\"properties\":{properties}}}",
+            Descriptor(Send).TerminalResultSchema);
+
+        Assert.Throws<ProductOperationCatalogConfigurationException>(() =>
+            new ProductJsonAdapter<TInput, CatalogResult>(
+                descriptor,
+                inputType,
+                CatalogJsonSerializerContext.Default.CatalogResult,
+                static (_, _, _) => throw new InvalidOperationException(),
+                ObserveNotSupported));
+    }
+
+    private static Task<ProductActivityProjection> ObserveNotSupported(
+        BrainActivityId activity,
+        ProductInvocationContext context,
+        CancellationToken cancellationToken)
+        => throw new NotSupportedException();
+
+    private static OperationDescriptor Operation(string id, int version = 1)
     {
         var name = id[(id.IndexOf('/', StringComparison.Ordinal) + 1)..id.LastIndexOf('@')];
         return new OperationDescriptor(
             new OperationId(id),
-            new ContractId($"conversation/{name}-input@1"),
-            new ContractId($"conversation/{name}-result@1"),
+            new ContractId($"conversation/{name}-input@{version}"),
+            new ContractId($"conversation/{name}-result@{version}"),
             EntryRole,
             Module,
-            new ContractVersion(1));
+            new ContractVersion(version));
     }
+
+    private static OperationDescriptor AdversarialOperation(string id, ModuleId owner, int version)
+        => new(
+            new OperationId(id),
+            new ContractId("conversation/adversarial-input@1"),
+            new ContractId("conversation/adversarial-result@1"),
+            EntryRole,
+            owner,
+            new ContractVersion(version));
 
     private static BrainAccessGrant Grant(
         WorkspaceId? workspace = null,
         int policyVersion = 7,
         IReadOnlyCollection<string>? roles = null,
-        IReadOnlyCollection<string>? grants = null)
+        IReadOnlyCollection<string>? grants = null,
+        BrainPrincipalKind principalKind = BrainPrincipalKind.Human)
         => BrainAccessGrant.Create(
             workspace ?? Workspace,
             Principal,
+            principalKind,
             roles ?? ["member"],
             grants ?? ["operations.invoke"],
             [],
@@ -323,32 +536,34 @@ public sealed class ProductOperationCatalogTests
     private static JsonElement Json(string value)
         => JsonDocument.Parse(value).RootElement.Clone();
 
-    private sealed class FixtureProductOperationAdapter(ProductOperationDescriptor descriptor)
-        : IProductOperationAdapter
+    private sealed class FixtureProductOperationAdapter
     {
-        public IReadOnlyList<ProductOperationDescriptor> Operations { get; } = [descriptor];
+        public FixtureProductOperationAdapter(ProductOperationDescriptor descriptor)
+        {
+            Binding = new ProductJsonAdapter<CatalogInput, CatalogResult>(
+                descriptor,
+                CatalogJsonSerializerContext.Default.CatalogInput,
+                CatalogJsonSerializerContext.Default.CatalogResult,
+                InvokeTypedAsync,
+                ObserveNotSupported);
+        }
+
+        public ProductJsonAdapter<CatalogInput, CatalogResult> Binding { get; }
 
         public int InvocationCount { get; private set; }
 
-        public JsonElement LastInput { get; private set; }
+        public CatalogInput? LastInput { get; private set; }
 
-        public Task<ProductActivityReceipt> InvokeAsync(
-            OperationId operation,
-            JsonElement input,
+        private Task<ProductActivityReceipt> InvokeTypedAsync(
+            CatalogInput input,
             ProductInvocationContext context,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             InvocationCount++;
-            LastInput = input.Clone();
-            return Task.FromResult(new ProductActivityReceipt(BrainActivityId.New(), operation));
+            LastInput = input;
+            return Task.FromResult(new ProductActivityReceipt(BrainActivityId.New(), Binding.Descriptor.Operation.Id));
         }
-
-        public Task<ProductActivityProjection> ObserveAsync(
-            BrainActivityId activity,
-            ProductInvocationContext context,
-            CancellationToken cancellationToken)
-            => throw new NotSupportedException();
     }
 
     private sealed class FixturePolicyEvaluator(IReadOnlyCollection<OperationId> allowed)
@@ -358,6 +573,23 @@ public sealed class ProductOperationCatalogTests
 
         public PolicyDecision AuthorizeOperation(WorkspaceContext caller, OperationDescriptor operation)
             => _allowed.Contains(operation.Id) ? PolicyDecision.Allowed : PolicyDecision.Refused;
+
+        public PolicyDecision AuthorizeGraphChange(ActivityContext context, GraphChangeRequest request)
+            => PolicyDecision.Refused;
+
+        public PolicyDecision AuthorizeCapability(ActivityContext context, CapabilityDescriptor capability)
+            => PolicyDecision.Refused;
+    }
+
+    private sealed class ServiceOnlyPolicyEvaluator : IWorkspacePolicyEvaluator
+    {
+        public List<bool> ObservedKinds { get; } = [];
+
+        public PolicyDecision AuthorizeOperation(WorkspaceContext caller, OperationDescriptor operation)
+        {
+            ObservedKinds.Add(caller.IsServicePrincipal);
+            return caller.IsServicePrincipal ? PolicyDecision.Allowed : PolicyDecision.Refused;
+        }
 
         public PolicyDecision AuthorizeGraphChange(ActivityContext context, GraphChangeRequest request)
             => PolicyDecision.Refused;
@@ -387,8 +619,60 @@ internal sealed record CatalogInput(string Message);
 internal sealed record CatalogResult(string Result);
 
 [JsonSourceGenerationOptions(
+    AllowDuplicateProperties = false,
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    RespectNullableAnnotations = true,
+    RespectRequiredConstructorParameters = true,
     UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow)]
 [JsonSerializable(typeof(CatalogInput))]
 [JsonSerializable(typeof(CatalogResult))]
 internal sealed partial class CatalogJsonSerializerContext : JsonSerializerContext;
+
+internal sealed record ExtensionDataInput(string Message)
+{
+    [JsonExtensionData]
+    public IDictionary<string, JsonElement> ExtensionData { get; init; }
+        = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+}
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Skip)]
+internal sealed record PerTypeSkipInput(string Message);
+
+[JsonPolymorphic]
+[JsonDerivedType(typeof(PolymorphicDerivedInput), "derived")]
+internal abstract record PolymorphicInput;
+
+internal sealed record PolymorphicDerivedInput(string Message) : PolymorphicInput;
+
+internal sealed record OpenObjectInput(object Payload);
+
+internal sealed record JsonElementInput(JsonElement Payload);
+
+internal sealed record CustomConverterInput(
+    [property: JsonConverter(typeof(TrimStringJsonConverter))] string Message);
+
+internal sealed class TrimStringJsonConverter : JsonConverter<string>
+{
+    public override string? Read(
+        ref Utf8JsonReader reader,
+        Type typeToConvert,
+        JsonSerializerOptions options)
+        => reader.GetString()?.Trim();
+
+    public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value);
+}
+
+[JsonSourceGenerationOptions(
+    AllowDuplicateProperties = false,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    RespectNullableAnnotations = true,
+    RespectRequiredConstructorParameters = true,
+    UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow)]
+[JsonSerializable(typeof(ExtensionDataInput))]
+[JsonSerializable(typeof(PerTypeSkipInput))]
+[JsonSerializable(typeof(PolymorphicInput))]
+[JsonSerializable(typeof(OpenObjectInput))]
+[JsonSerializable(typeof(JsonElementInput))]
+[JsonSerializable(typeof(CustomConverterInput))]
+internal sealed partial class HostileJsonSerializerContext : JsonSerializerContext;

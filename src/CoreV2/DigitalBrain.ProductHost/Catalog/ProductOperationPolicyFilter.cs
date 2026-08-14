@@ -88,7 +88,10 @@ public sealed class ProductOperationPolicyFilter
             return false;
         }
 
-        var caller = new WorkspaceContext(grant.Workspace, grant.Principal, isServicePrincipal: false);
+        var caller = new WorkspaceContext(
+            grant.Workspace,
+            grant.Principal,
+            isServicePrincipal: grant.PrincipalKind == BrainPrincipalKind.Service);
         return _policyEvaluator.AuthorizeOperation(caller, registration.DeclaredOperation)
             == PolicyDecision.Allowed;
     }

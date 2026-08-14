@@ -48,6 +48,7 @@ internal sealed class LocalTestAuthority : IBrainAccessAuthority
         IEnumerable<string> roles,
         IEnumerable<string> grants,
         IEnumerable<string> connections,
+        BrainPrincipalKind principalKind = BrainPrincipalKind.Human,
         int policyVersion = 1,
         DateTimeOffset? issuedAt = null,
         DateTimeOffset? expiresAt = null,
@@ -63,7 +64,13 @@ internal sealed class LocalTestAuthority : IBrainAccessAuthority
 
         var issued = issuedAt ?? _timeProvider.GetUtcNow();
         var expires = expiresAt ?? issued.AddMinutes(5);
-        var claims = new List<Claim> { new(AuthorityOptions.DefaultSubjectClaim, principal) };
+        var claims = new List<Claim>
+        {
+            new(AuthorityOptions.DefaultSubjectClaim, principal),
+            new(
+                AuthorityOptions.DefaultPrincipalKindClaim,
+                principalKind == BrainPrincipalKind.Human ? "human" : "service"),
+        };
         if (workspace is not null)
         {
             claims.Add(new Claim(AuthorityOptions.DefaultWorkspaceClaim, workspace));

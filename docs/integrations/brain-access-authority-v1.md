@@ -13,6 +13,7 @@ The default closed claim schema is:
 | Meaning | Default claim | Approved JSON shape and cardinality |
 | --- | --- | --- |
 | Principal | `sub` | exactly one non-empty JSON string |
+| Principal kind | `brain_principal_kind` | exactly one JSON string: `human` or `service` |
 | Workspace | `brain_workspace` | exactly one non-empty JSON string |
 | Roles | `brain_role` | an omitted value, one non-empty JSON string, or an array of unique non-empty JSON strings |
 | Grants | `brain_grant` | an omitted value, one non-empty JSON string, or an array of unique non-empty JSON strings |
@@ -22,7 +23,7 @@ The default closed claim schema is:
 | Issued time | `iat` | exactly one canonical integral JSON NumericDate in seconds; quoted, fractional, or exponential forms are invalid |
 | Expiry | `exp` | exactly one canonical integral JSON NumericDate in seconds; quoted, fractional, or exponential forms are invalid |
 
-`AuthorityOptions` can rename the six authorization claims and authentication scheme. Claim names are case-sensitive, must be non-empty, and must be mutually distinct. The registered JWT claims `iss`, `sub`, `aud`, `exp`, `nbf`, `iat`, and `jti`; OIDC protocol claims `auth_time`, `nonce`, `acr`, `amr`, `azp`, `at_hash`, `c_hash`, `s_hash`, and `sid`; OIDC standard identity claims `name`, `given_name`, `family_name`, `middle_name`, `nickname`, `preferred_username`, `profile`, `picture`, `website`, `email`, `email_verified`, `gender`, `birthdate`, `zoneinfo`, `locale`, `phone_number`, `phone_number_verified`, `address`, and `updated_at`; and OAuth protocol claims `client_id`, `scope`, `cnf`, `act`, `may_act`, and `events` are reserved. `sub` is permitted only as `SubjectClaim`; no other configurable mapping may use it, and `SubjectClaim` may not use any other reserved name. Unknown claims are not interpreted as authority. Duplicate, empty, or incorrectly shaped configured values are rejected rather than coerced or merged, so issuer-specific ambiguity cannot expand access.
+`AuthorityOptions` can rename the seven authorization claims and authentication scheme. Claim names are case-sensitive, must be non-empty, and must be mutually distinct. The registered JWT claims `iss`, `sub`, `aud`, `exp`, `nbf`, `iat`, and `jti`; OIDC protocol claims `auth_time`, `nonce`, `acr`, `amr`, `azp`, `at_hash`, `c_hash`, `s_hash`, and `sid`; OIDC standard identity claims `name`, `given_name`, `family_name`, `middle_name`, `nickname`, `preferred_username`, `profile`, `picture`, `website`, `email`, `email_verified`, `gender`, `birthdate`, `zoneinfo`, `locale`, `phone_number`, `phone_number_verified`, `address`, and `updated_at`; and OAuth protocol claims `client_id`, `scope`, `cnf`, `act`, `may_act`, and `events` are reserved. `sub` is permitted only as `SubjectClaim`; no other configurable mapping may use it, and `SubjectClaim` may not use any other reserved name. Unknown claims are not interpreted as authority. Duplicate, empty, or incorrectly shaped configured values are rejected rather than coerced or merged, so issuer-specific ambiguity cannot expand access. Principal kind is signed authority data and must never be accepted from a request body, header, or caller-selected string.
 
 ## Policy change and revocation
 
@@ -30,7 +31,7 @@ The positive `brain_policy_version` binds a grant to the issuer's authorization-
 
 ## Authorization and presentation
 
-`AuthenticateAsync` is the only authorizing operation. It derives workspace, principal, roles, grants, connections, policy version, and validity times solely from validated evidence.
+`AuthenticateAsync` is the only authorizing operation. It derives workspace, principal, principal kind, roles, grants, connections, policy version, and validity times solely from validated evidence.
 
 `GetWorkspacePresentationsAsync` is display-only. Its names cannot add a workspace, role, grant, connection, or policy version and must never be used for an authorization decision. The built-in adapter returns only the authenticated workspace and uses its opaque ID as the fallback display name.
 

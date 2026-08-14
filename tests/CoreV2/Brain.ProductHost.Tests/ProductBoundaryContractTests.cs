@@ -23,6 +23,7 @@ public sealed class ProductBoundaryContractTests
             BrainAccessGrant.Create(
                 default,
                 new PrincipalId("p"),
+                BrainPrincipalKind.Human,
                 [],
                 [],
                 [],
@@ -34,6 +35,7 @@ public sealed class ProductBoundaryContractTests
             BrainAccessGrant.Create(
                 Workspace,
                 default,
+                BrainPrincipalKind.Human,
                 [],
                 [],
                 [],
@@ -45,6 +47,7 @@ public sealed class ProductBoundaryContractTests
             BrainAccessGrant.Create(
                 Workspace,
                 Principal,
+                BrainPrincipalKind.Human,
                 [],
                 [],
                 [],
@@ -56,6 +59,7 @@ public sealed class ProductBoundaryContractTests
             BrainAccessGrant.Create(
                 Workspace,
                 Principal,
+                BrainPrincipalKind.Human,
                 [],
                 [],
                 [],
@@ -71,6 +75,7 @@ public sealed class ProductBoundaryContractTests
         var exactMaximum = BrainAccessGrant.Create(
             Workspace,
             Principal,
+            BrainPrincipalKind.Human,
             [],
             [],
             [],
@@ -85,6 +90,7 @@ public sealed class ProductBoundaryContractTests
             BrainAccessGrant.Create(
                 Workspace,
                 Principal,
+                BrainPrincipalKind.Human,
                 [],
                 [],
                 [],
@@ -96,6 +102,7 @@ public sealed class ProductBoundaryContractTests
             BrainAccessGrant.Create(
                 Workspace,
                 Principal,
+                BrainPrincipalKind.Human,
                 [],
                 [],
                 [],
@@ -112,6 +119,7 @@ public sealed class ProductBoundaryContractTests
             BrainAccessGrant.Create(
                 Workspace,
                 Principal,
+                BrainPrincipalKind.Human,
                 [],
                 [],
                 [],
@@ -119,6 +127,36 @@ public sealed class ProductBoundaryContractTests
                 IssuedAt,
                 IssuedAt.AddMinutes(5),
                 IssuedAt.AddTicks(-1)));
+    }
+
+    [Fact]
+    public void Grant_accepts_only_the_closed_trusted_principal_kinds()
+    {
+        var human = BrainAccessGrant.Create(
+            Workspace,
+            Principal,
+            BrainPrincipalKind.Human,
+            [],
+            [],
+            [],
+            1,
+            IssuedAt,
+            IssuedAt.AddMinutes(5),
+            IssuedAt);
+
+        Assert.Equal(BrainPrincipalKind.Human, human.PrincipalKind);
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            BrainAccessGrant.Create(
+                Workspace,
+                Principal,
+                (BrainPrincipalKind)99,
+                [],
+                [],
+                [],
+                1,
+                IssuedAt,
+                IssuedAt.AddMinutes(5),
+                IssuedAt));
     }
 
     [Fact]
@@ -131,6 +169,7 @@ public sealed class ProductBoundaryContractTests
         var grant = BrainAccessGrant.Create(
             Workspace,
             Principal,
+            BrainPrincipalKind.Human,
             roles,
             grants,
             connections,
@@ -215,6 +254,7 @@ public sealed class ProductBoundaryContractTests
         var grant = BrainAccessGrant.Create(
             Workspace,
             Principal,
+            BrainPrincipalKind.Human,
             ["operator"],
             ["operations.invoke"],
             [new ConnectionReference("calendar-primary")],
@@ -294,6 +334,7 @@ public sealed class ProductBoundaryContractTests
             return Task.FromResult(BrainAccessGrant.Create(
                 workspace,
                 principal,
+                BrainPrincipalKind.Human,
                 ["operator"],
                 ["operations.invoke"],
                 [],
