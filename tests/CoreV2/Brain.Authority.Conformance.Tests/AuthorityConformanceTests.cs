@@ -243,7 +243,7 @@ public sealed class AuthorityBoundaryTests
     }
 
     [Fact]
-    public void Product_host_remains_a_library_only_open_source_container_when_catalog_is_added()
+    public void Product_host_is_an_open_source_orleans_client_process()
     {
         var root = RepositoryRoot();
         var productHostDirectory = Path.Combine(root, "src", "CoreV2", "DigitalBrain.ProductHost");
@@ -259,14 +259,20 @@ public sealed class AuthorityBoundaryTests
             .ToArray();
 
         Assert.Equal("Microsoft.NET.Sdk", (string?)project.Root?.Attribute("Sdk"));
-        Assert.DoesNotContain(project.Descendants("OutputType"), static element => element.Value == "Exe");
+        Assert.Contains(project.Descendants("OutputType"), static element => element.Value == "Exe");
         Assert.Equal(
             [
+                "../Aspire/Brain.Aspire/Brain.Aspire.csproj",
                 "../Brain.Product.Abstractions/Brain.Product.Abstractions.csproj",
                 "../Brain.Core/Brain.Core.csproj",
             ],
             projectReferences);
-        Assert.DoesNotContain(sourceFiles, static path => Path.GetFileName(path).Equals("Program.cs", StringComparison.OrdinalIgnoreCase));
+        var program = Assert.Single(
+            sourceFiles,
+            static path => Path.GetFileName(path).Equals("Program.cs", StringComparison.OrdinalIgnoreCase));
+        var programSource = File.ReadAllText(program);
+        Assert.Contains("AddDigitalBrainClient", programSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("AddDigitalBrainRuntime", programSource, StringComparison.Ordinal);
         Assert.All(sourceFiles, path => Assert.DoesNotContain("IntoChat", File.ReadAllText(path), StringComparison.OrdinalIgnoreCase));
     }
 

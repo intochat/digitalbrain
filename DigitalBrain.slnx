@@ -4,6 +4,7 @@
     <Project Path="src/CoreV2/Brain.Core/Brain.Core.csproj" />
     <Project Path="src/CoreV2/Brain.Product.Abstractions/Brain.Product.Abstractions.csproj" />
     <Project Path="src/CoreV2/DigitalBrain.ProductHost/DigitalBrain.ProductHost.csproj" />
+    <Project Path="src/CoreV2/DigitalBrain.RuntimeHost/DigitalBrain.RuntimeHost.csproj" />
     <Project Path="src/CoreV2/Brain.Testing/Brain.Testing.csproj" />
     <Project Path="src/CoreV2/Aspire/Brain.ServiceDefaults/Brain.ServiceDefaults.csproj" />
     <Project Path="src/CoreV2/Aspire/Brain.Aspire.Hosting/Brain.Aspire.Hosting.csproj" />

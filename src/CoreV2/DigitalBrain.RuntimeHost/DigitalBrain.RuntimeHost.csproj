@@ -6,14 +6,8 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="../Aspire/Brain.Aspire/Brain.Aspire.csproj" />
-    <ProjectReference Include="../Brain.Product.Abstractions/Brain.Product.Abstractions.csproj" />
     <ProjectReference Include="../Brain.Core/Brain.Core.csproj" />
-  </ItemGroup>
-  <ItemGroup Condition="'$(Configuration)' != 'Debug'">
-    <Compile Remove="Authority/LocalTestAuthority.cs" />
+    <ProjectReference Include="../Modules/Proof/Brain.Modules.Proof.csproj" />
   </ItemGroup>
 </Project>
