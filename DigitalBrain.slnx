@@ -8,6 +8,16 @@
     <Project Path="src/Kernel/Aspire/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
     <Project Path="src/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
   </Folder>
+  <Folder Name="/CoreV2/">
+    <Project Path="src/CoreV2/Brain.Abstractions/Brain.Abstractions.csproj" />
+    <Project Path="src/CoreV2/Brain.Core/Brain.Core.csproj" />
+    <Project Path="src/CoreV2/Brain.Testing/Brain.Testing.csproj" />
+    <Project Path="src/CoreV2/Modules/Proof.Contracts/Brain.Modules.Proof.Contracts.csproj" />
+    <Project Path="src/CoreV2/Modules/Proof/Brain.Modules.Proof.csproj" />
+    <Project Path="tests/CoreV2/Brain.Abstractions.Tests/Brain.Abstractions.Tests.csproj" />
+    <Project Path="tests/CoreV2/Brain.Core.Tests/Brain.Core.Tests.csproj" />
+    <Project Path="tests/CoreV2/Brain.Proof.Tests/Brain.Proof.Tests.csproj" />
+  </Folder>
   <Folder Name="/Modules/" />
   <Folder Name="/Modules/AI/">
     <Project Path="src/Modules/AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
