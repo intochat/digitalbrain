@@ -16,5 +16,6 @@
     <ProjectReference Include="../Modules/Memory/Brain.Modules.Memory.csproj" />
     <ProjectReference Include="../Modules/Proof/Brain.Modules.Proof.csproj" />
     <ProjectReference Include="../Modules/Scheduling/Brain.Modules.Scheduling.csproj" />
+    <ProjectReference Include="../Modules/UI/Brain.Modules.UI.csproj" />
   </ItemGroup>
 </Project>

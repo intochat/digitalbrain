@@ -1,2 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Compile Remove="Contracts/**/*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Brain.Abstractions/Brain.Abstractions.csproj" />
+    <ProjectReference Include="../../Brain.Core/Brain.Core.csproj" />
+    <ProjectReference Include="../AI/Contracts/Brain.Modules.AI.Contracts.csproj" />
+    <ProjectReference Include="Contracts/Brain.Modules.UI.Contracts.csproj" />
+  </ItemGroup>
 </Project>

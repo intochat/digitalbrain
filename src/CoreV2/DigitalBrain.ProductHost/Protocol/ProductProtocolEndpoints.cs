@@ -4,6 +4,7 @@ using Brain.Abstractions.Activities;
 using Brain.Abstractions.Graph;
 using Brain.Abstractions.Journal;
 using Brain.Abstractions.Runtime;
+using Brain.Modules.UI.Contracts;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -19,6 +20,7 @@ public static class ProductProtocolEndpoints
         ArgumentNullException.ThrowIfNull(endpoints);
         endpoints.MapGet("/v2/modules", GetModulesAsync);
         endpoints.MapGet("/v2/operations", GetOperationsAsync);
+        endpoints.MapPost("/v2/chat", ChatAsync);
         endpoints.MapPost("/v2/operations/{operationId}:invoke", InvokeAsync);
         endpoints.MapGet("/v2/activities/{activityId:guid}", GetActivityAsync);
         endpoints.MapGet("/v2/activities/{activityId:guid}/events", StreamActivityAsync);
@@ -38,6 +40,44 @@ public static class ProductProtocolEndpoints
         IProductRuntimeClient runtime,
         CancellationToken cancellationToken)
         => runtime.GetOperationsAsync(cancellationToken);
+
+    private static async Task<IResult> ChatAsync(
+        ChatSendInput input,
+        HttpContext context,
+        IProductRuntimeClient runtime,
+        CancellationToken cancellationToken)
+    {
+        var idempotencyKey = context.Request.Headers["Idempotency-Key"].ToString().Trim();
+        if (idempotencyKey.Length == 0)
+        {
+            return Results.Problem(
+                "The Idempotency-Key header is required.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (string.IsNullOrWhiteSpace(input.Message))
+        {
+            return Results.Problem(
+                "A non-empty message is required.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        var caller = ProductCaller.From(context);
+        try
+        {
+            return Results.Ok(await ProductChat.SendAsync(
+                runtime,
+                input.Message,
+                caller.Workspace,
+                caller.Principal,
+                idempotencyKey,
+                cancellationToken));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Results.Problem(exception.Message, statusCode: StatusCodes.Status409Conflict);
+        }
+    }
 
     private static async Task<IResult> InvokeAsync(
         string operationId,

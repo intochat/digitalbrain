@@ -2,6 +2,7 @@ using System.ComponentModel;
 using Brain.Abstractions.Graph;
 using Brain.Abstractions.Journal;
 using Brain.Abstractions.Runtime;
+using Brain.Modules.UI.Contracts;
 using DigitalBrain.ProductHost.Protocol;
 using ModelContextProtocol.Server;
 
@@ -41,6 +42,22 @@ public sealed class ProductMcpTools(IProductRuntimeClient runtime)
         [Description("Activity id returned by digitalbrain_invoke")] Guid activity,
         CancellationToken cancellationToken = default)
         => _runtime.GetActivityAsync(activity, "local", cancellationToken);
+
+    [McpServerTool(Name = "digitalbrain_chat")]
+    [Description("Chat with DigitalBrain through Chat.Send@1 and return the durable activity id plus assistant response.")]
+    public Task<ChatTurnEnvelope> ChatAsync(
+        [Description("Message for the operation-using assistant")] string message,
+        [Description("Caller-supplied idempotency key; generated when omitted")] string idempotencyKey = "",
+        CancellationToken cancellationToken = default)
+        => ProductChat.SendAsync(
+            _runtime,
+            message,
+            "local",
+            "owner",
+            string.IsNullOrWhiteSpace(idempotencyKey)
+                ? Guid.NewGuid().ToString("N")
+                : idempotencyKey.Trim(),
+            cancellationToken);
 
     [McpServerTool(Name = "digitalbrain_activity_journal")]
     [Description("Read ordered causal journal records for a DigitalBrain activity in the local workspace.")]

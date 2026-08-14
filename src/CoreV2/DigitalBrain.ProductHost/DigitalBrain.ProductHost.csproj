@@ -13,6 +13,7 @@
     <ProjectReference Include="../Aspire/Brain.Aspire/Brain.Aspire.csproj" />
     <ProjectReference Include="../Brain.Product.Abstractions/Brain.Product.Abstractions.csproj" />
     <ProjectReference Include="../Brain.Core/Brain.Core.csproj" />
+    <ProjectReference Include="../Modules/UI/Contracts/Brain.Modules.UI.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup Condition="'$(Configuration)' != 'Debug'">
     <Compile Remove="Authority/LocalTestAuthority.cs" />

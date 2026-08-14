@@ -5,6 +5,7 @@ using Brain.Abstractions.Activities;
 using Brain.Abstractions.Graph;
 using Brain.Abstractions.Journal;
 using Brain.Abstractions.Runtime;
+using Brain.Modules.UI.Contracts;
 using DigitalBrain.ProductHost.Mcp;
 using DigitalBrain.ProductHost.Protocol;
 using Microsoft.AspNetCore.Builder;
@@ -80,6 +81,29 @@ public sealed class ProductProtocolEndpointTests
     }
 
     [Fact]
+    public async Task Chat_endpoint_returns_the_assistant_turn_and_durable_activity_id()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var activityId = Guid.NewGuid();
+        var runtime = new FakeProductRuntimeClient(activityId);
+        await using var app = await StartAsync(runtime);
+        using var client = app.GetTestClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/v2/chat")
+        {
+            Content = JsonContent.Create(new ChatSendInput("wire and run live graph")),
+        };
+        request.Headers.Add("Idempotency-Key", "chat-http-1");
+
+        var response = await client.SendAsync(request, cancellationToken);
+        var chat = await response.Content.ReadFromJsonAsync<ChatTurnEnvelope>(cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(activityId, chat?.ActivityId);
+        Assert.Equal("Proof completed.", chat?.Turn.Response);
+        Assert.Equal("Chat.Send@1", runtime.LastInvocation?.OperationId);
+    }
+
+    [Fact]
     public async Task Mcp_tools_expose_the_same_journal_and_BrainGraph_projections()
     {
         var activityId = Guid.NewGuid();
@@ -90,9 +114,12 @@ public sealed class ProductProtocolEndpointTests
             activityId,
             cancellationToken: cancellationToken);
         var graph = await tools.GetBrainSnapshotAsync(cancellationToken);
+        var chat = await tools.ChatAsync("wire and run", "chat-mcp-1", cancellationToken);
 
         Assert.Equal("ProofProduced@1", Assert.Single(journal.Records).ContractId);
         Assert.Equal(1, Assert.Single(graph.Synapses).UsageCount);
+        Assert.Equal(activityId, chat.ActivityId);
+        Assert.Equal("Proof completed.", chat.Turn.Response);
     }
 
     private static async Task<WebApplication> StartAsync(IProductRuntimeClient runtime)
@@ -135,11 +162,15 @@ public sealed class ProductProtocolEndpointTests
             => Task.FromResult<BrainActivitySnapshot?>(requested == activity && workspace == "local"
                 ? new BrainActivitySnapshot(
                     activity,
-                    "Proof.Run@1",
+                    LastInvocation?.OperationId ?? "Proof.Run@1",
                     "local",
                     ActivityStatus.Completed,
                     3,
-                    "{\"route\":\"proof/hello\"}",
+                    LastInvocation?.OperationId == "Chat.Send@1"
+                        ? JsonSerializer.Serialize(new ChatTurnResult(
+                            "Proof completed.",
+                            [new ChatToolResult("Proof.Run@1", "{\"route\":\"proof/hello\"}")]))
+                        : "{\"route\":\"proof/hello\"}",
                     null)
                 : null);
 
