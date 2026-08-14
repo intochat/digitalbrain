@@ -14,20 +14,95 @@ public sealed class ProductBoundaryContractTests
 {
     private static readonly WorkspaceId Workspace = new("workspace-1");
     private static readonly PrincipalId Principal = new("principal-1");
+    private static readonly DateTimeOffset IssuedAt = new(2030, 1, 2, 3, 4, 5, TimeSpan.Zero);
 
     [Fact]
     public void Grant_rejects_expired_or_empty_security_identity()
     {
-        var now = DateTimeOffset.UtcNow;
+        Assert.Throws<ArgumentException>(() =>
+            BrainAccessGrant.Create(
+                default,
+                new PrincipalId("p"),
+                [],
+                [],
+                [],
+                1,
+                IssuedAt,
+                IssuedAt.AddMinutes(1),
+                IssuedAt));
+        Assert.Throws<ArgumentException>(() =>
+            BrainAccessGrant.Create(
+                Workspace,
+                default,
+                [],
+                [],
+                [],
+                1,
+                IssuedAt,
+                IssuedAt.AddMinutes(1),
+                IssuedAt));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            BrainAccessGrant.Create(
+                Workspace,
+                Principal,
+                [],
+                [],
+                [],
+                0,
+                IssuedAt,
+                IssuedAt.AddMinutes(1),
+                IssuedAt));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            BrainAccessGrant.Create(
+                Workspace,
+                Principal,
+                [],
+                [],
+                [],
+                1,
+                IssuedAt.AddMinutes(-5),
+                IssuedAt.AddTicks(-1),
+                IssuedAt));
+    }
 
-        Assert.Throws<ArgumentException>(() =>
-            BrainAccessGrant.Create(default, new PrincipalId("p"), [], [], [], 1, now.AddMinutes(1)));
-        Assert.Throws<ArgumentException>(() =>
-            BrainAccessGrant.Create(Workspace, default, [], [], [], 1, now.AddMinutes(1)));
+    [Fact]
+    public void Grant_enforces_exact_fifteen_minute_maximum_lifetime()
+    {
+        var exactMaximum = BrainAccessGrant.Create(
+            Workspace,
+            Principal,
+            [],
+            [],
+            [],
+            1,
+            IssuedAt,
+            IssuedAt.AddMinutes(15),
+            IssuedAt);
+
+        Assert.Equal(IssuedAt, exactMaximum.IssuedAt);
+        Assert.Equal(IssuedAt.AddMinutes(15), exactMaximum.ExpiresAt);
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            BrainAccessGrant.Create(Workspace, Principal, [], [], [], 0, now.AddMinutes(1)));
+            BrainAccessGrant.Create(
+                Workspace,
+                Principal,
+                [],
+                [],
+                [],
+                1,
+                IssuedAt,
+                IssuedAt.AddMinutes(15).AddTicks(1),
+                IssuedAt));
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            BrainAccessGrant.Create(Workspace, Principal, [], [], [], 1, now.AddMinutes(-1)));
+            BrainAccessGrant.Create(
+                Workspace,
+                Principal,
+                [],
+                [],
+                [],
+                1,
+                IssuedAt,
+                IssuedAt,
+                IssuedAt.AddMinutes(-1)));
     }
 
     [Fact]
@@ -44,7 +119,9 @@ public sealed class ProductBoundaryContractTests
             grants,
             connections,
             7,
-            DateTimeOffset.UtcNow.AddMinutes(5));
+            IssuedAt,
+            IssuedAt.AddMinutes(5),
+            IssuedAt);
 
         roles[0] = "mutated";
         grants.Clear();
@@ -65,25 +142,42 @@ public sealed class ProductBoundaryContractTests
     }
 
     [Fact]
-    public async Task Authentication_request_cannot_select_workspace_or_principal()
+    public async Task Authentication_request_contains_only_authentication_evidence()
     {
         IBrainAccessAuthority authority = new FixtureAuthority(Workspace, Principal);
-        var request = new AuthorityAuthenticationRequest(
-            "fixture",
-            "opaque-evidence",
-            "workspace=attacker-workspace&principal=attacker-principal");
+        var evidence = new AuthorityAuthenticationEvidence("fixture", "opaque-evidence");
+        var request = new AuthorityAuthenticationRequest(evidence);
 
         var grant = await authority.AuthenticateAsync(request, TestContext.Current.CancellationToken);
+        var presentations = await authority.GetWorkspacePresentationsAsync(
+            grant,
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(Workspace, grant.Workspace);
         Assert.Equal(Principal, grant.Principal);
-        Assert.DoesNotContain(
-            typeof(AuthorityAuthenticationRequest).GetProperties(),
-            property => property.PropertyType == typeof(WorkspaceId) || property.PropertyType == typeof(PrincipalId));
+        Assert.Equal([new WorkspacePresentation(Workspace, "Research workspace")], presentations);
+        var requestProperties = typeof(AuthorityAuthenticationRequest).GetProperties();
+        Assert.Single(requestProperties);
+        Assert.Equal(nameof(AuthorityAuthenticationRequest.Evidence), requestProperties[0].Name);
+        Assert.Equal(typeof(AuthorityAuthenticationEvidence), requestProperties[0].PropertyType);
+        Assert.DoesNotContain(requestProperties, static property => property.PropertyType == typeof(string));
         var authenticate = typeof(IBrainAccessAuthority).GetMethod(nameof(IBrainAccessAuthority.AuthenticateAsync));
         Assert.Equal(
             [typeof(AuthorityAuthenticationRequest), typeof(CancellationToken)],
             authenticate!.GetParameters().Select(static parameter => parameter.ParameterType));
+    }
+
+    [Fact]
+    public void Authentication_evidence_and_request_redact_credential_from_text()
+    {
+        const string literalCredential = "literal-secret-credential";
+        var evidence = new AuthorityAuthenticationEvidence("fixture", literalCredential);
+        var request = new AuthorityAuthenticationRequest(evidence);
+
+        Assert.DoesNotContain(literalCredential, evidence.ToString());
+        Assert.DoesNotContain(literalCredential, request.ToString());
+        Assert.Contains("[REDACTED]", evidence.ToString());
+        Assert.Contains("[REDACTED]", request.ToString());
     }
 
     [Fact]
@@ -109,7 +203,9 @@ public sealed class ProductBoundaryContractTests
             ["operations.invoke"],
             [new ConnectionReference("calendar-primary")],
             3,
-            DateTimeOffset.UtcNow.AddMinutes(5));
+            IssuedAt,
+            IssuedAt.AddMinutes(5),
+            IssuedAt);
         var context = new ProductInvocationContext(grant, new IdempotencyKey("request-1"));
         var activity = BrainActivityId.New();
         var receipt = new ProductActivityReceipt(activity, operation.Id);
@@ -186,7 +282,20 @@ public sealed class ProductBoundaryContractTests
                 ["operations.invoke"],
                 [],
                 1,
-                DateTimeOffset.UtcNow.AddMinutes(1)));
+                IssuedAt,
+                IssuedAt.AddMinutes(1),
+                IssuedAt));
+        }
+
+        public Task<IReadOnlyList<WorkspacePresentation>> GetWorkspacePresentationsAsync(
+            BrainAccessGrant accessGrant,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(accessGrant);
+            cancellationToken.ThrowIfCancellationRequested();
+            IReadOnlyList<WorkspacePresentation> presentations =
+                [new WorkspacePresentation(accessGrant.Workspace, "Research workspace")];
+            return Task.FromResult(presentations);
         }
     }
 }

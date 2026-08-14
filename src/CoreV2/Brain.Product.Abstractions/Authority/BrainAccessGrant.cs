@@ -12,7 +12,8 @@ public sealed record BrainAccessGrant
         ImmutableArray<string> grants,
         ImmutableArray<ConnectionReference> connections,
         int policyVersion,
-        DateTimeOffset expiresAtUtc)
+        DateTimeOffset issuedAt,
+        DateTimeOffset expiresAt)
     {
         Workspace = workspace;
         Principal = principal;
@@ -20,7 +21,8 @@ public sealed record BrainAccessGrant
         Grants = grants;
         Connections = connections;
         PolicyVersion = policyVersion;
-        ExpiresAtUtc = expiresAtUtc;
+        IssuedAt = issuedAt;
+        ExpiresAt = expiresAt;
     }
 
     public WorkspaceId Workspace { get; }
@@ -35,7 +37,9 @@ public sealed record BrainAccessGrant
 
     public int PolicyVersion { get; }
 
-    public DateTimeOffset ExpiresAtUtc { get; }
+    public DateTimeOffset IssuedAt { get; }
+
+    public DateTimeOffset ExpiresAt { get; }
 
     public static BrainAccessGrant Create(
         WorkspaceId workspace,
@@ -44,7 +48,9 @@ public sealed record BrainAccessGrant
         IEnumerable<string> grants,
         IEnumerable<ConnectionReference> connections,
         int policyVersion,
-        DateTimeOffset expiresAtUtc)
+        DateTimeOffset issuedAt,
+        DateTimeOffset expiresAt,
+        DateTimeOffset evaluatedAt)
     {
         if (workspace.IsEmpty)
         {
@@ -61,10 +67,22 @@ public sealed record BrainAccessGrant
             throw new ArgumentOutOfRangeException(nameof(policyVersion), "A policy version must be positive.");
         }
 
-        var expiryUtc = expiresAtUtc.ToUniversalTime();
-        if (expiryUtc <= DateTimeOffset.UtcNow)
+        var issuedUtc = issuedAt.ToUniversalTime();
+        var expiryUtc = expiresAt.ToUniversalTime();
+        var evaluatedUtc = evaluatedAt.ToUniversalTime();
+        if (issuedUtc >= expiryUtc)
         {
-            throw new ArgumentOutOfRangeException(nameof(expiresAtUtc), "An access grant must expire in the future.");
+            throw new ArgumentOutOfRangeException(nameof(expiresAt), "An access grant must expire after it is issued.");
+        }
+
+        if (expiryUtc - issuedUtc > TimeSpan.FromMinutes(15))
+        {
+            throw new ArgumentOutOfRangeException(nameof(expiresAt), "An access grant cannot live longer than 15 minutes.");
+        }
+
+        if (expiryUtc <= evaluatedUtc)
+        {
+            throw new ArgumentOutOfRangeException(nameof(expiresAt), "An access grant must not already be expired.");
         }
 
         return new BrainAccessGrant(
@@ -74,6 +92,7 @@ public sealed record BrainAccessGrant
             CopyClaims(grants, nameof(grants)),
             CopyConnections(connections),
             policyVersion,
+            issuedUtc,
             expiryUtc);
     }
 
