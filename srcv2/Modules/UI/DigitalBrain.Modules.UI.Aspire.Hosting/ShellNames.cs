@@ -12,7 +12,7 @@ public static class ShellNames
     public const string HeadlessHostEntry = "bin/digitalbrain_host.dart";
     public const string DefaultShellName = "desk";
     public const string DefaultChatName = "main";
-    public const string DefaultOwner = "dev";
+    public const string DefaultOwner = DigitalBrain.Aspire.Hosting.DigitalBrainNames.DefaultOwner;
     public const string DefaultDeviceTarget = "windows";
     public const string DefaultWebDeviceTarget = "chrome";
     public const string WebPlatformDirectoryName = "web";

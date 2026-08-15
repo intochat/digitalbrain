@@ -37,6 +37,8 @@ public sealed class DigitalBrainBuilder
 
     public IDistributedApplicationBuilder ApplicationBuilder { get; }
 
+    internal string Owner { get; private set; } = DigitalBrainNames.DefaultOwner;
+
     internal IResourceBuilder<AzureBlobStorageResource> Journal { get; }
 
     internal IResourceBuilder<AzureQueueStorageResource> Streams { get; }
@@ -52,6 +54,8 @@ public sealed class DigitalBrainBuilder
     internal IResourceBuilder<ParameterResource>? StateProtectionKey { get; private set; }
 
     internal string? LocalDevelopmentOAuthCallbackUri { get; private set; }
+
+    internal void UseOwner(string owner) => Owner = owner;
 
     internal void UseLocalDevelopmentOAuthCallback(string callbackUri)
     {

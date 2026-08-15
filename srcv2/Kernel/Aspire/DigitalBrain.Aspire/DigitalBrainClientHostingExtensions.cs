@@ -9,7 +9,7 @@ namespace DigitalBrain.Aspire;
 
 public static class DigitalBrainClientHostingExtensions
 {
-    public const string DefaultOwner = "dev";
+    public const string DefaultOwner = DigitalBrainResourceNames.DefaultOwner;
 
     public static string OwnerConfigurationKey => DigitalBrainResourceNames.OwnerConfigurationKey;
 

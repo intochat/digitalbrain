@@ -9,6 +9,7 @@ public static class DigitalBrainResourceNames
 
     public const string ModulesConfigurationKey = "DigitalBrain:Modules";
     public const string OwnerConfigurationKey = "DigitalBrain:Owner";
+    public const string DefaultOwner = "dev";
     public const string StateProtectionKeyConfigurationKey = "DigitalBrain:Security:StateProtectionKey";
 
     public const string Storage = "storage";

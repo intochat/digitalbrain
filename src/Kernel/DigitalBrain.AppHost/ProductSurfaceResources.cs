@@ -12,6 +12,7 @@ internal static class ProductSurfaceResources
     public const string McpPath = "/mcp";
     public const int McpHttpPort = 5000;
 
+    public const string HttpEndpointName = "http";
     public const int UiHttpPort = 5080;
 
     // Composed from the UI port + the kernel's actual callback path so a stale

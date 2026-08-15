@@ -11,7 +11,6 @@ using DigitalBrain.Salesforce.Aspire.Hosting;
 using DigitalBrain.UI;
 using DigitalBrain.UI.Aspire.Hosting;
 using Microsoft.Extensions.Hosting;
-using System.Diagnostics.CodeAnalysis;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
@@ -34,16 +33,13 @@ brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
 
 var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceResources.Kernel)
     .WithReference(brain)
-    .WithEnvironment(
-        ShellHostingExtensions.OwnerEnvironmentVariable,
-        ShellHostingExtensions.DefaultOwner)
     .WithHttpEndpoint(
         port: ProductSurfaceResources.UiHttpPort,
-        name: ShellHostingExtensions.HttpEndpointName,
+        name: ProductSurfaceResources.HttpEndpointName,
         isProxied: false)
     .WithHttpHealthCheck("/health")
     .WithUrlForEndpoint(
-        ShellHostingExtensions.HttpEndpointName,
+        ProductSurfaceResources.HttpEndpointName,
         endpoint => new ResourceUrlAnnotation
         {
             Url = "/orleans",
@@ -51,26 +47,17 @@ var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceReso
             Endpoint = endpoint,
         });
 
-var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.Mcp)
+builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.Mcp)
     .WithReference(brain.AsClient())
-    .WithEnvironment(
-        ShellHostingExtensions.OwnerEnvironmentVariable,
-        ShellHostingExtensions.DefaultOwner)
     .WithHttpEndpoint(
         port: ProductSurfaceResources.McpHttpPort,
         name: ProductSurfaceResources.McpHttpEndpointName)
     .WithHttpHealthCheck("/health", endpointName: ProductSurfaceResources.McpHttpEndpointName)
+    .WithMcpServer(ProductSurfaceResources.McpPath, ProductSurfaceResources.McpHttpEndpointName)
     .WaitFor(kernel);
-
-mcp.WithMcpServer(
-    ProductSurfaceResources.McpPath,
-    ProductSurfaceResources.McpHttpEndpointName);
 
 builder.AddProject<Projects.DigitalBrain_Scripting>(ProductSurfaceResources.Scripting)
     .WithReference(brain.AsClient())
-    .WithEnvironment(
-        ShellHostingExtensions.OwnerEnvironmentVariable,
-        ShellHostingExtensions.DefaultOwner)
     .WaitFor(kernel);
 
 builder.Build().Run();

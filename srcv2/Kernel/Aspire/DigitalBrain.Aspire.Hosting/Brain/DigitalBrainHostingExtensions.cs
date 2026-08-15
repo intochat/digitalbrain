@@ -11,14 +11,12 @@ public static class DigitalBrainHostingExtensions
 
     public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name)
     {
-        ArgumentNullException.ThrowIfNull(builder);
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-
         var storage = builder
             .AddAzureStorage(DigitalBrainNames.Storage)
             .RunAsEmulator(static emulator => emulator
                 .WithDataVolume()
                 .WithLifetime(ContainerLifetime.Persistent));
+
         var clustering = storage.AddTables(DigitalBrainNames.Clustering);
         var reminders = storage.AddTables(DigitalBrainNames.Reminders);
         var journal = storage.AddBlobs(DigitalBrainNames.Journal);
@@ -39,6 +37,14 @@ public static class DigitalBrainHostingExtensions
         brain.RequireHealthyBeforeStart(journal.Resource);
         brain.RequireHealthyBeforeStart(streams.Resource);
         brain.RequireHealthyBeforeStart(pubSub.Resource);
+        return brain;
+    }
+
+    public static DigitalBrainBuilder WithOwner(this DigitalBrainBuilder brain, string owner)
+    {
+        ArgumentNullException.ThrowIfNull(brain);
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        brain.UseOwner(owner);
         return brain;
     }
 
@@ -91,6 +97,7 @@ public static class DigitalBrainHostingExtensions
         builder.WithReference(brain.Streams);
         builder.WithReference(brain.PubSub);
 
+        ApplyOwner(builder, brain);
         WaitUntilHealthy(builder, brain.StartupDependencies);
 
         if (brain.StateProtectionKey is not null)
@@ -116,6 +123,7 @@ public static class DigitalBrainHostingExtensions
 
         builder.WithReference(client.Brain.Orleans.AsClient());
         builder.WithReference(client.Brain.Streams);
+        ApplyOwner(builder, client.Brain);
         // Client processes need clustering tables + streams up before connecting.
         WaitUntilHealthy(builder, client.Brain.StartupDependencies);
         return builder;
@@ -149,6 +157,14 @@ public static class DigitalBrainHostingExtensions
         }
 
         return builder;
+    }
+
+    private static void ApplyOwner<TResource>(IResourceBuilder<TResource> builder, DigitalBrainBuilder brain)
+        where TResource : IResourceWithEnvironment
+    {
+        builder.WithEnvironment(
+            ConfigurationEnvironment(DigitalBrainNames.Owner),
+            brain.Owner);
     }
 
     private static string ConfigurationEnvironment(string configurationKey)

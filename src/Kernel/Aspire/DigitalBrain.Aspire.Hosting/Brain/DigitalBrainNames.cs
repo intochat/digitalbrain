@@ -13,5 +13,7 @@ public static class DigitalBrainNames
     public const string JournalConnection = "journal";
     public const string StreamProvider = "DigitalBrain";
     public const string PubSubStore = "PubSubStore";
+    public const string Owner = "DigitalBrain:Owner";
+    public const string DefaultOwner = "dev";
     public const string StateProtectionKey = "DigitalBrain:Security:StateProtectionKey";
 }
