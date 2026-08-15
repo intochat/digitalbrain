@@ -9,7 +9,7 @@ public sealed class ProjectIsolationTests
     public void CoreV2_project_references_resolve_inside_the_CoreV2_source_root()
     {
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../../"));
-        var coreV2Root = Path.Combine(root, "src", "CoreV2");
+        var coreV2Root = Path.Combine(root, "srcv2", "CoreV2");
         var projectFiles = Directory.GetFiles(
             coreV2Root,
             "*.csproj",

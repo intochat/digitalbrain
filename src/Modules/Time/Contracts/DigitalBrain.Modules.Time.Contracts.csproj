@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Time module contracts: timer commands, snapshot, and scheduled/elapsed fact vocabulary.</Description>
+    <RootNamespace>DigitalBrain.Time</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

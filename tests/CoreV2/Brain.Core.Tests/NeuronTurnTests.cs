@@ -160,7 +160,7 @@ public sealed class NeuronTurnTests
     {
         var runtime = Path.Combine(
             Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../../")),
-            "src",
+            "srcv2",
             "CoreV2",
             "Brain.Core");
         var files = new[]

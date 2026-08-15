@@ -22,6 +22,6 @@ Migration and verification evidence is recorded in [status.md](status.md).
 
 ## CoreV2 cutover baseline
 
-`DigitalBrain.slnx` compiles only the CoreV2 framework under `src/CoreV2` and its tests under `tests/CoreV2`. The retained V1 source under `src/Kernel` and `src/Modules` is intentionally unreferenced until its scheduled removal; it is not part of the compiled product boundary.
+`DigitalBrain.slnx` groups V1 under `/src/` (`srcv2/Kernel`, `srcv2/Modules`) and CoreV2 under `/srcv2/` (`srcv2/CoreV2`) plus `tests/CoreV2`. CoreV2 AppHost, ProductHost, and RuntimeHost are the compiled product surface; V1 remains in the solution for the AppHost composition graph until its scheduled removal.
 
 CI verifies the CoreV2 architecture, Abstractions, Core, and Proof suites independently and builds the full solution in Release with warnings treated as errors. See [plans/COREV2.md](plans/COREV2.md) for the verified framework scope.

@@ -280,12 +280,12 @@ public sealed class ProductBoundaryContractTests
     [Fact]
     public void Core_projects_do_not_reference_product_abstractions()
     {
-        AssertProjectHasNoReference("src/CoreV2/Brain.Abstractions/Brain.Abstractions.csproj", "Brain.Product.Abstractions");
-        AssertProjectHasNoReference("src/CoreV2/Brain.Core/Brain.Core.csproj", "Brain.Product.Abstractions");
+        AssertProjectHasNoReference("srcv2/CoreV2/Brain.Abstractions/Brain.Abstractions.csproj", "Brain.Product.Abstractions");
+        AssertProjectHasNoReference("srcv2/CoreV2/Brain.Core/Brain.Core.csproj", "Brain.Product.Abstractions");
 
         var root = RepositoryRoot();
         var moduleContracts = Directory.GetFiles(
-            Path.Combine(root, "src", "CoreV2", "Modules"),
+            Path.Combine(root, "srcv2", "CoreV2", "Modules"),
             "*.csproj",
             SearchOption.AllDirectories)
             .Where(static path => string.Equals(

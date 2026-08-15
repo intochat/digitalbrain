@@ -9,7 +9,7 @@
 #   docker compose build
 #
 # Secrets: never commit real values. Prefer env file or Key Vault-injected env
-# (see headers in src/Kernel/DigitalBrain.Kernel/Dockerfile).
+# (see headers in srcv2/Kernel/DigitalBrain.Kernel/Dockerfile).
 # Kernel HTTP serves chat streams + OAuth on 8080 (map host 5080 for stable OAuth if needed).
 
 services:
@@ -34,7 +34,7 @@ services:
     image: digitalbrain:local
     build:
       context: .
-      dockerfile: src/Kernel/DigitalBrain.Kernel/Dockerfile
+      dockerfile: srcv2/Kernel/DigitalBrain.Kernel/Dockerfile
     ports:
       - "8080:8080"
       - "5080:8080"

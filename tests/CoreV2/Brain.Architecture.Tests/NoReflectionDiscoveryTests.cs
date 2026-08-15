@@ -10,7 +10,7 @@ public sealed class NoReflectionDiscoveryTests
     [Fact]
     public void CoreV2_runtime_contains_no_reflection_discovery()
     {
-        var source = SourceTree.Read("src/CoreV2");
+        var source = SourceTree.Read("srcv2/CoreV2");
         var findings = ReflectionDiscoveryScanner.FindForbidden(source);
 
         Assert.Empty(findings);

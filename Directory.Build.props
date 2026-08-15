@@ -30,6 +30,7 @@
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
   <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)srcv2/Assets/nuget/icon.png" Pack="true" PackagePath="/" Visible="false" Condition="Exists('$(MSBuildThisFileDirectory)srcv2/Assets/nuget/icon.png')" />
     <None Include="$(MSBuildThisFileDirectory)src/Assets/nuget/icon.png" Pack="true" PackagePath="/" Visible="false" Condition="Exists('$(MSBuildThisFileDirectory)src/Assets/nuget/icon.png')" />
     <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" Visible="false" Condition="Exists('$(MSBuildThisFileDirectory)README.md')" />
   </ItemGroup>

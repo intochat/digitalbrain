@@ -8,8 +8,8 @@
     <PackageReference Include="xunit.v3" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../../src/CoreV2/Brain.Abstractions/Brain.Abstractions.csproj" />
-    <ProjectReference Include="../../../src/CoreV2/Brain.Core/Brain.Core.csproj" />
-    <ProjectReference Include="../../../src/CoreV2/Modules/Proof/Runtime/Brain.Modules.Proof.csproj" />
+    <ProjectReference Include="../../../srcv2/CoreV2/Brain.Abstractions/Brain.Abstractions.csproj" />
+    <ProjectReference Include="../../../srcv2/CoreV2/Brain.Core/Brain.Core.csproj" />
+    <ProjectReference Include="../../../srcv2/CoreV2/Modules/Proof/Runtime/Brain.Modules.Proof.csproj" />
   </ItemGroup>
 </Project>

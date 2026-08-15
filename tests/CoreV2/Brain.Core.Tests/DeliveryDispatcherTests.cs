@@ -101,7 +101,7 @@ public sealed class DeliveryDispatcherTests
     {
         var source = File.ReadAllText(Path.Combine(
             Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../../")),
-            "src", "CoreV2", "Brain.Core", "Delivery", "DeliveryDispatcher.cs"));
+            "srcv2", "CoreV2", "Brain.Core", "Delivery", "DeliveryDispatcher.cs"));
 
         Assert.DoesNotContain("IGraphRouteResolver", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Brain.Core.Graph", source, StringComparison.Ordinal);
@@ -213,7 +213,7 @@ public sealed class DeliveryDispatcherTests
     [Fact]
     public void Runtime_delivery_records_and_interfaces_have_no_untyped_or_provider_payload_escape_hatches()
     {
-        var runtime = Path.Combine(Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../../")), "src", "CoreV2", "Brain.Core");
+        var runtime = Path.Combine(Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../../")), "srcv2", "CoreV2", "Brain.Core");
         var files = new[]
         {
             Path.Combine(runtime, "Delivery", "DeliveryDispatcher.cs"),
@@ -238,7 +238,7 @@ public sealed class DeliveryDispatcherTests
     {
         var source = File.ReadAllText(Path.Combine(
             Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../../")),
-            "src", "CoreV2", "Brain.Core", "Delivery", "DeliveryDeduplicator.cs"));
+            "srcv2", "CoreV2", "Brain.Core", "Delivery", "DeliveryDeduplicator.cs"));
 
         Assert.DoesNotContain("TryBegin", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Complete(", source, StringComparison.Ordinal);

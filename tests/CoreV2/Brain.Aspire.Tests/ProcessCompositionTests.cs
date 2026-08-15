@@ -8,7 +8,7 @@ public sealed class ProcessCompositionTests
     [Fact]
     public void ProductHost_references_client_hosting_but_not_orleans_server()
     {
-        var project = LoadProject("src/CoreV2/DigitalBrain.ProductHost/DigitalBrain.ProductHost.csproj");
+        var project = LoadProject("srcv2/CoreV2/DigitalBrain.ProductHost/DigitalBrain.ProductHost.csproj");
         var projectReferences = project
             .Descendants("ProjectReference")
             .Select(reference => Path.GetFileNameWithoutExtension((string?)reference.Attribute("Include")))

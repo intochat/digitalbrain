@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Introspection module: the brain reads its own journals, tallies and topology through its own vocabulary.</Description>
+    <RootNamespace>DigitalBrain.Introspection</RootNamespace>
+    <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Contracts/DigitalBrain.Modules.Introspection.Contracts.csproj" />
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
+  </ItemGroup>
+</Project>

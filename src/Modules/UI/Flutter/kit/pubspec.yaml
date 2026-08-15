@@ -1,0 +1,24 @@
+name: digitalbrain_ui_kit
+description: >
+  Shared UI kit for DigitalBrain Flutter host. One widget family per component
+  (button, chart, card, …), usable in surfaces and inside flutter_chat_ui
+  CustomMessage bubbles.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.12.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_chat_core: ^2.9.0
+  graphic: ^2.7.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

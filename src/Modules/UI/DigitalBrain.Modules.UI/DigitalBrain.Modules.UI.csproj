@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>UI module runtime: chat, surface, and control neurons.</Description>
+    <RootNamespace>DigitalBrain.UI</RootNamespace>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />
+    <ProjectReference Include="../../AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
+    <ProjectReference Include="../../Execution/Contracts/DigitalBrain.Modules.Execution.Contracts.csproj" />
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
+  </ItemGroup>
+</Project>

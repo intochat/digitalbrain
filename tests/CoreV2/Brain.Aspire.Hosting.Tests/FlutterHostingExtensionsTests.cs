@@ -108,7 +108,7 @@ public sealed class FlutterHostingExtensionsTests
         }
 
         Assert.NotNull(directory);
-        return Path.Combine(directory.FullName, "src", "CoreV2", "Modules", "UI", "Flutter", "shell");
+        return Path.Combine(directory.FullName, "srcv2", "CoreV2", "Modules", "UI", "Flutter", "shell");
     }
 
     private static string FindFlutterCore()
@@ -120,6 +120,6 @@ public sealed class FlutterHostingExtensionsTests
         }
 
         Assert.NotNull(directory);
-        return Path.Combine(directory.FullName, "src", "CoreV2", "Modules", "UI", "Flutter", "core");
+        return Path.Combine(directory.FullName, "srcv2", "CoreV2", "Modules", "UI", "Flutter", "core");
     }
 }

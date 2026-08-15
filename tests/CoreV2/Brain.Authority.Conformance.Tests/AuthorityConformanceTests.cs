@@ -246,7 +246,7 @@ public sealed class AuthorityBoundaryTests
     public void Product_host_is_an_open_source_orleans_client_process()
     {
         var root = RepositoryRoot();
-        var productHostDirectory = Path.Combine(root, "src", "CoreV2", "DigitalBrain.ProductHost");
+        var productHostDirectory = Path.Combine(root, "srcv2", "CoreV2", "DigitalBrain.ProductHost");
         var project = XDocument.Load(Path.Combine(productHostDirectory, "DigitalBrain.ProductHost.csproj"));
         var projectReferences = project.Descendants("ProjectReference")
             .Select(static element => (string?)element.Attribute("Include"))

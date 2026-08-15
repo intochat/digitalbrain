@@ -9,18 +9,17 @@ public sealed class NoV1CompilationBoundaryTests
     [Fact]
     public void Compiled_projects_never_reference_a_v1_project()
     {
-        var references = ProjectReferenceScanner.ReadAll("DigitalBrain.slnx");
+        var references = CoreV2Graph();
         var root = RepositoryRoot.Find();
 
-        Assert.DoesNotContain(references, path => path.Contains("src/Kernel/", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(references, path => path.Contains("src/Modules/", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(references, IsV1Project);
         Assert.All(references, project =>
         {
             var relativePath = Path.GetRelativePath(root, project).Replace('\\', '/');
             Assert.True(
-                relativePath.StartsWith("src/CoreV2/", StringComparison.OrdinalIgnoreCase) ||
+                relativePath.StartsWith("srcv2/CoreV2/", StringComparison.OrdinalIgnoreCase) ||
                 relativePath.StartsWith("tests/CoreV2/", StringComparison.OrdinalIgnoreCase),
-                $"Compiled project '{relativePath}' is outside the CoreV2 source and test roots.");
+                $"Compiled CoreV2 project '{relativePath}' is outside the CoreV2 source and test roots.");
         });
     }
 
@@ -55,6 +54,29 @@ public sealed class NoV1CompilationBoundaryTests
             defaultReferences,
             path => path.Contains("src/Kernel/Legacy/Legacy.csproj", StringComparison.OrdinalIgnoreCase));
     }
+
+    private static IReadOnlyList<string> CoreV2Graph()
+    {
+        var root = RepositoryRoot.Find();
+        var entries = new[]
+        {
+            "srcv2/CoreV2/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj",
+        }.Concat(
+            Directory.GetFiles(Path.Combine(root, "tests", "CoreV2"), "*.csproj", SearchOption.AllDirectories)
+                .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/')));
+
+        return entries
+            .SelectMany(ProjectReferenceScanner.ReadAll)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static bool IsV1Project(string path)
+        => path.Contains("src/Kernel/", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("src/Modules/", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("srcv2/Kernel/", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("srcv2/Modules/", StringComparison.OrdinalIgnoreCase);
 }
 
 internal sealed class ReleaseConditionalReferenceFixture : IDisposable

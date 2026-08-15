@@ -1,0 +1,17 @@
+global using DigitalBrain.Abstractions.Behavior;
+global using DigitalBrain.Abstractions.Capabilities;
+global using DigitalBrain.Abstractions.Cell;
+global using DigitalBrain.Abstractions.Corpus;
+global using DigitalBrain.Abstractions.Graph;
+global using DigitalBrain.Abstractions.Grants;
+global using DigitalBrain.Abstractions.Identity;
+global using DigitalBrain.Abstractions.Integrations;
+global using DigitalBrain.Abstractions.Journals;
+global using DigitalBrain.Abstractions.Library;
+global using DigitalBrain.Abstractions.Messaging;
+global using DigitalBrain.Abstractions.Neurons;
+global using DigitalBrain.Abstractions.OAuth;
+global using DigitalBrain.Abstractions.Registry;
+global using DigitalBrain.Abstractions.Repository;
+global using DigitalBrain.Abstractions.Security;
+global using DigitalBrain.Abstractions.Workspace;

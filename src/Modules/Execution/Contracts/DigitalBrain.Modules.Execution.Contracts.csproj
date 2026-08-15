@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Execution module contracts: durable run, worker, attempt, operation, and blocker vocabulary.</Description>
+    <RootNamespace>DigitalBrain.Execution</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

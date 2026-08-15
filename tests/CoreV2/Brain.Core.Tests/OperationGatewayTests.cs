@@ -21,7 +21,7 @@ public sealed class OperationGatewayTests
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../../"));
         var ingress = File.ReadAllText(Path.Combine(
             root,
-            "src",
+            "srcv2",
             "CoreV2",
             "Brain.Core",
             "Activities",
