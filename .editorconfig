@@ -61,6 +61,9 @@ dotnet_diagnostic.IDE0390.severity = none
 #### Product-wide low-value naming noise (C#-first API)
 dotnet_diagnostic.CA1716.severity = none
 
+#### Aspire MCP hosting API is preview / evaluation-only
+dotnet_diagnostic.ASPIREMCP001.severity = none
+
 #### Marker interfaces are intentional catalog vocabulary
 [src/core/kernel/DigitalBrain.Abstractions/Neurons/IEmit.cs]
 dotnet_diagnostic.CA1040.severity = none
