@@ -8,7 +8,7 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var brain = builder.AddDigitalBrain(ProductResources.Brain);
 brain.AddModule<AiModule>(ai => ai.WithGemma4());
-brain.AddModule<UiModule>(ui => ui.WithConfiguredHost(builder.Configuration));
+brain.AddModule<UiModule>(ui => ui.WithWindowHost());
 var runtime = builder
     .AddProject<Projects.DigitalBrain_RuntimeHost>(ProductResources.Runtime)
     .WithReference(brain)
