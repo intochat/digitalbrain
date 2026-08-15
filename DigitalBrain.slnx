@@ -64,11 +64,6 @@
     <Project Path="srcv2/CoreV2/DigitalBrain.ProductHost/DigitalBrain.ProductHost.csproj" />
     <Project Path="srcv2/CoreV2/DigitalBrain.RuntimeHost/DigitalBrain.RuntimeHost.csproj" />
   </Folder>
-  <Folder Name="/srcv2/Aspire/">
-    <Project Path="srcv2/CoreV2/Aspire/Brain.Aspire.Hosting/Brain.Aspire.Hosting.csproj" />
-    <Project Path="srcv2/CoreV2/Aspire/Brain.Aspire/Brain.Aspire.csproj" />
-    <Project Path="srcv2/CoreV2/Aspire/Brain.ServiceDefaults/Brain.ServiceDefaults.csproj" />
-  </Folder>
   <Folder Name="/srcv2/Modules/Proof/">
     <Project Path="srcv2/CoreV2/Modules/Proof/Contracts/Brain.Modules.Proof.Contracts.csproj" />
     <Project Path="srcv2/CoreV2/Modules/Proof/Runtime/Brain.Modules.Proof.csproj" />
@@ -83,19 +78,6 @@
     <Project Path="srcv2/CoreV2/Modules/UI/Aspire.Hosting/Brain.Modules.UI.Aspire.Hosting.csproj" />
     <Project Path="srcv2/CoreV2/Modules/UI/Contracts/Brain.Modules.UI.Contracts.csproj" />
     <Project Path="srcv2/CoreV2/Modules/UI/Runtime/Brain.Modules.UI.csproj" />
-  </Folder>
-  <Folder Name="/tests/">
-    <Project Path="tests/CoreV2/Brain.Abstractions.Tests/Brain.Abstractions.Tests.csproj" />
-    <Project Path="tests/CoreV2/Brain.Architecture.Tests/Brain.Architecture.Tests.csproj" />
-    <Project Path="tests/CoreV2/Brain.Aspire.Hosting.Tests/Brain.Aspire.Hosting.Tests.csproj" />
-    <Project Path="tests/CoreV2/Brain.Aspire.Tests/Brain.Aspire.Tests.csproj" />
-    <Project Path="tests/CoreV2/Brain.Authority.Conformance.Tests/Brain.Authority.Conformance.Tests.csproj" />
-    <Project Path="tests/CoreV2/Brain.Core.Tests/Brain.Core.Tests.csproj" />
-    <Project Path="tests/CoreV2/Brain.ProductHost.Tests/Brain.ProductHost.Tests.csproj" />
-    <Project Path="tests/CoreV2/Brain.Proof.Tests/Brain.Proof.Tests.csproj" />
-    <Project Path="tests/CoreV2/Brain.Runtime.Tests/Brain.Runtime.Tests.csproj" />
-    <Project Path="tests/CoreV2/Modules/AI.Tests/Brain.Modules.AI.Tests.csproj" />
-    <Project Path="tests/CoreV2/Modules/UI.Tests/Brain.Modules.UI.Tests.csproj" />
   </Folder>
   <Project Path="srcv2/Kernel/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
 </Solution>
