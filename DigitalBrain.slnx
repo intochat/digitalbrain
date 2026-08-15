@@ -97,7 +97,6 @@
     <Project Path="tests/CoreV2/Brain.Runtime.Tests/Brain.Runtime.Tests.csproj" />
     <Project Path="tests/CoreV2/Modules/AI.Tests/Brain.Modules.AI.Tests.csproj" />
     <Project Path="tests/CoreV2/Modules/UI.Tests/Brain.Modules.UI.Tests.csproj" />
-    <Project Path="tests/Kernel/DigitalBrain.Aspire.Hosting.Tests/DigitalBrain.Aspire.Hosting.Tests.csproj" />
   </Folder>
   <Project Path="srcv2/Kernel/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
 </Solution>
