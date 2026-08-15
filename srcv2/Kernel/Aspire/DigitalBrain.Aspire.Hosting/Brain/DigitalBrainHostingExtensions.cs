@@ -13,7 +13,7 @@ public static class DigitalBrainHostingExtensions
     {
         var storage = builder
             .AddAzureStorage(DigitalBrainNames.Storage)
-            .RunAsEmulator(static emulator => emulator
+            .RunAsEmulator(emulator => emulator
                 .WithDataVolume()
                 .WithLifetime(ContainerLifetime.Persistent));
 
@@ -22,15 +22,16 @@ public static class DigitalBrainHostingExtensions
         var journal = storage.AddBlobs(DigitalBrainNames.Journal);
         var streams = storage.AddQueues(DigitalBrainNames.Streams);
         var pubSub = storage.AddTables(DigitalBrainNames.PubSub);
+
         var orleans = builder
             .AddOrleans(name)
             .WithClustering(clustering)
             .WithReminders(reminders)
             .WithGrainStorage(DigitalBrainNames.PubSubStore, pubSub)
             .WithStreaming(DigitalBrainNames.StreamProvider, streams);
+
         var brain = new DigitalBrainBuilder(builder, name, orleans, journal, streams, pubSub);
 
-        // Silo and clients WaitUntilHealthy for the full fabric before starting.
         brain.RequireHealthyBeforeStart(storage.Resource);
         brain.RequireHealthyBeforeStart(clustering.Resource);
         brain.RequireHealthyBeforeStart(reminders.Resource);
