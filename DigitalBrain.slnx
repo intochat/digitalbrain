@@ -9,7 +9,6 @@
     <Project Path="src/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
     <Project Path="src/Kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
     <Project Path="src/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
-    <Project Path="src/Kernel/DigitalBrain/DigitalBrain.csproj" Id="5770c5e8-5fe7-4ec5-852e-23655f350a2a" />
   </Folder>
   <Folder Name="/Modules/" />
   <Folder Name="/Modules/AI/">
