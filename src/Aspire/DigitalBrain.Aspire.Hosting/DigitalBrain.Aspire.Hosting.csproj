@@ -9,6 +9,6 @@
     <PackageReference Include="Aspire.Hosting.Orleans" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
+    <ProjectReference Include="../../Kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
   </ItemGroup>
 </Project>
