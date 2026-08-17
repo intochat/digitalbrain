@@ -61,43 +61,13 @@ dotnet_diagnostic.IDE0390.severity = none
 #### Product-wide low-value naming noise (C#-first API)
 dotnet_diagnostic.CA1716.severity = none
 
-#### Marker interfaces are intentional catalog vocabulary
-[src/core/kernel/DigitalBrain.Abstractions/Neurons/IEmit.cs]
-dotnet_diagnostic.CA1040.severity = none
+#### Aspire MCP hosting API is preview / evaluation-only
+dotnet_diagnostic.ASPIREMCP001.severity = none
 
-#### Orleans grains + DI filters are constructed by the host, not new in source
-[src/core/kernel/DigitalBrain.Core/Neuron/**.cs]
-dotnet_diagnostic.CA1812.severity = none
+# ORLEANSEXP005: Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+dotnet_diagnostic.ORLEANSEXP005.severity = none
 
-[src/core/kernel/DigitalBrain.Core/Filters/**.cs]
-dotnet_diagnostic.CA1812.severity = none
+[*.{cs,vb}]
+dotnet_analyzer_diagnostic.category-Style.severity = none
 
-[src/core/kernel/DigitalBrain.Core/Outbox/**.cs]
-dotnet_diagnostic.CA1812.severity = none
-
-[src/core/kernel/DigitalBrain.Core/ReminderSourceAllowlist.cs]
-dotnet_diagnostic.CA1812.severity = none
-
-[src/modules/**/**.cs]
-dotnet_diagnostic.CA1812.severity = none
-
-#### Reliability sinks intentionally catch broadly
-[src/core/kernel/DigitalBrain.Core/Neuron/Neuron.Journals.cs]
-dotnet_diagnostic.CA1031.severity = none
-
-[src/core/kernel/DigitalBrain.Core/Neuron/Neuron.Outbox.cs]
-dotnet_diagnostic.CA1031.severity = none
-
-[src/core/kernel/DigitalBrain.Core/Neuron/Neuron.Turns.cs]
-dotnet_diagnostic.CA1031.severity = none
-
-[src/core/kernel/DigitalBrain.Core/Filters/OutgoingReificationFilter.cs]
-dotnet_diagnostic.CA1031.severity = none
-
-#### Grain type identity is lowercase by design
-[src/core/kernel/DigitalBrain.Abstractions/Identity/NeuronId.cs]
-dotnet_diagnostic.CA1308.severity = none
-
-#### Session Fire is a directed command, not a .NET event
-[src/core/kernel/DigitalBrain.Abstractions/Neurons/ISessionNeuron.cs]
-dotnet_diagnostic.CA1030.severity = none
+dotnet_diagnostic.IDE0022.severity = silent

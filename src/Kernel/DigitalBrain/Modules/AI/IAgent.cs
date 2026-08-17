@@ -1,8 +1,6 @@
-using System.Runtime.CompilerServices;
-using DigitalBrain.Abstractions;
-using Microsoft.Extensions.AI;
+﻿using Microsoft.Extensions.AI;
 
-namespace DigitalBrain.AI;
+namespace DigitalBrain.Modules.AI;
 
 [Alias(nameof(IAgent))]
 public interface IAgent : INeuron

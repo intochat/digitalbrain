@@ -1,12 +1,15 @@
 <Solution>
+  <Folder Name="/Aspire/">
+    <Project Path="src/Aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
+    <Project Path="src/Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
+    <Project Path="src/Aspire/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
+  </Folder>
   <Folder Name="/Kernel/">
     <Project Path="src/Kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
     <Project Path="src/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
     <Project Path="src/Kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
-    <Project Path="src/Kernel/Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
-    <Project Path="src/Kernel/Aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
-    <Project Path="src/Kernel/Aspire/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
     <Project Path="src/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
+    <Project Path="src/Kernel/DigitalBrain/DigitalBrain.csproj" Id="5770c5e8-5fe7-4ec5-852e-23655f350a2a" />
   </Folder>
   <Folder Name="/Modules/" />
   <Folder Name="/Modules/AI/">
@@ -46,7 +49,10 @@
     <Project Path="src/Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <Project Path="src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
   </Folder>
-  <Project Path="src/Kernel/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+  </Folder>
+  <Project Path="src/Aspire/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
   <Project Path="src/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
   <Project Path="src/Kernel/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
   <Project Path="src/Kernel/DigitalBrain.Scripting/DigitalBrain.Scripting.csproj" />
