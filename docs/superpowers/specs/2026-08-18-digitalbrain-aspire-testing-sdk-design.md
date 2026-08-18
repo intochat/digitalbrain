@@ -59,6 +59,7 @@ src/Modules/<X>/
   {Module, Contracts, Aspire.Hosting, Tests/}      Tests folder added per module
 tests/
   DigitalBrain.Aspire.Tests/       Tier 1 model-only + conformance suite
+  DigitalBrain.Simulation.Tests/   Tier 2 simulation smoke + semantics pins
   DigitalBrain.E2E.Tests/          kernel-level e2e against the production AppHost
 ```
 
@@ -93,7 +94,7 @@ Repair actions (phase 0): fix all broken `ProjectReference` paths; repoint `aspi
 **`DigitalBrain.Testing`** (Tiers 1+2; deps: `Aspire.Hosting.Testing`, `Microsoft.Orleans.TestingHost`, xunit.v3 extensibility):
 
 - Tier 1: `BrainModel.BuildAsync<TAppHost>()` builds the app model without starting anything; fluent asserts over resources, `WaitAnnotation`s, and rendered env vars (via `ExecutionConfigurationBuilder`); automatic `ParameterResource` stubbing; conformance-test bases (name constants, module-projection completeness, faithful-boot topology).
-- Tier 2: `BrainSimulationFixture<TModule>` — an in-process Orleans cluster (`InProcessTestClusterBuilder`) that **reuses the production silo configuration extension**, swapping only storage: memory grain storage, memory streams, in-memory reminders, volatile durable-state provider. Exposes `Brain` (an `IDigitalBrain` connected in-process), `Grains` (escape hatch), `Time` (deterministic `TimeProvider` with `Advance()`), `Capture` (recorded synapse deliveries), `UniqueId(prefix)`. Abstract collection-definition bases; each test assembly declares a one-line subclass (xunit.v3 requires `[CollectionDefinition]` in the test assembly).
+- Tier 2: `BrainSimulation` — an in-process Orleans cluster (`InProcessTestClusterBuilder`) that **reuses the production silo configuration extension**, swapping only storage: memory grain storage, memory streams, in-memory reminders, volatile durable-state provider; fixtures supply explicit `ModuleAssemblies` rather than a generic module parameter. Exposes `Brain` (an `IDigitalBrain` connected in-process), `Grains` (escape hatch), `UniqueId(prefix)`; `sim.Time`, `Capture`, and `MockEmbeddingGenerator` arrive with their phase-3 consumers. Abstract collection-definition bases; each test assembly declares a one-line subclass (xunit.v3 requires `[CollectionDefinition]` in the test assembly).
 
 **`DigitalBrain.Testing.E2E`** (Tier 3; deps: `DigitalBrain.Testing`, `Microsoft.Playwright`):
 
@@ -161,7 +162,7 @@ Tier coverage: Tier 1 asserts the topology that hosts the flow; Tier 2 pins jour
 |---|---|---|
 | 0 | Mechanical repair: references, `aspire.config.json`, restore `master` Kernel sources as-is, name-constant linked file, retire seed project | Solution builds `-warnaserror`; `aspire run` boots |
 | 1 | Core ratification: `Entity<T>`, Cell fold, `Signal` removal, durable-state renames, facade `GetEntity`, journal contract + `docs/JOURNALS.md` | Build green; contracts reviewed |
-| 2 | Testing SDK: three packages, Tier 1 conformance suite, Simulation, E2E fixtures + `BrainSession`, test-mode contract | Conformance + a smoke test per tier green |
+| 2 | Testing SDK: `DigitalBrain.Testing` + `DigitalBrain.Testing.E2E` packages, Tier 1 conformance suite, Simulation, E2E fixtures + `BrainSession`, test-mode contract (`.Bdd` package moves to phase 3 with its first real consumers; `BrainTestHost.Compose` + fake-server toolkit + Playwright move to phases 3–5) | Conformance + a smoke test per tier green |
 | 3 | MVP vertical slice (§9) incl. vector routing, mock LLM, BDD, and the headless-UI harness the slice needs | The §9 flow green at all three tiers |
 | 4 | Module test waves: `Tests/` folders for all seven modules; OAuth/MCP fakes; full UI e2e beyond the MVP slice | Every module has Tier 2 coverage; e2e where warranted; CI pipelines live |
 | 5 | Community surface: `dotnet new digitalbrain-module` template (module + contracts + hosting + Tests scaffold incl. test silo), NuGet packing, docs | Template produces a building, testing module against packed SDK |
