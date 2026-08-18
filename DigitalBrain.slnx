@@ -51,6 +51,9 @@
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
   </Folder>
+  <Folder Name="/Testing/">
+    <Project Path="src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+  </Folder>
   <Project Path="src/Aspire/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
   <Project Path="src/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
   <Project Path="src/Kernel/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
