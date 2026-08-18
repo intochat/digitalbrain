@@ -54,6 +54,9 @@
   <Folder Name="/Testing/">
     <Project Path="src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
   </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="tests/DigitalBrain.Simulation.Tests/DigitalBrain.Simulation.Tests.csproj" />
+  </Folder>
   <Project Path="src/Aspire/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
   <Project Path="src/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
   <Project Path="src/Kernel/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
