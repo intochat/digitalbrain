@@ -1,9 +1,7 @@
-namespace DigitalBrain.Aspire;
+namespace DigitalBrain.Abstractions;
 
-// Single source of truth for resource/connection names and configuration keys, physically
-// linked into both DigitalBrain.Aspire (silo/client) and DigitalBrain.Aspire.Hosting (AppHost)
-// because neither project can reference the other. Each assembly compiles its own copy of
-// this public type — an assembly referencing both packages must alias one of them.
+// Single source of truth for resource/connection names and configuration keys used by
+// the Aspire hosting integration (AppHost side) and the silo/client runtime integration.
 public static class DigitalBrainNames
 {
     public const string DefaultBrain = "brain";
