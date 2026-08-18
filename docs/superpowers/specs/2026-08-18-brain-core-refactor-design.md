@@ -40,6 +40,14 @@ The initial solution is a minimal set of **extremely well-designed, testable abs
 
 **Stays and is load-bearing:** traffic journals, owner wall + entry-point filters, Grants, `CapabilityIndex` (hybrid + fallback), Time module (re-based on native reminders in C2 if cheap), Memory module, the AI assistant + tools, the whole testing SDK.
 
+### C1 outcome divergences from the plan
+
+Actual deletions in C1 (Task 6 complete; Tasks 1–5 earlier):
+- **Registry wave survives until C2** (executive ruling): `IRegistry` and supporting grains remain; the full wave deletion deferred to C2 after the Brain absorbs capability plumbing.
+- **Workspace** died in Task 5 (not Task 1): removed as part of the Execution module cleanup in the prior task.
+- **/authorizations/events SSE surface** died with the auth rail: the Webhook removal (no consumers, zero call sites post-C1).
+- **Webhook died**: zero consumers in the codebase; removed as dead code.
+
 ## 4. Fabric (C3 — srcv2 shape)
 
 First-class `DigitalBrainResource : Resource` registered in the model. Fabric: one Azure storage emulator → `clustering` + `reminders` tables, `grainstate` + `journal` blobs; composed via `AddOrleans(name).WithClustering(...).WithReminders(...).WithGrainStorage("Default", grainState)` natives. **No streams, no pubsub** (nothing consumes them after C2). Runtime/client glue collapses to the srcv2 thin shape (keyed clients + `UseOrleans`/`UseOrleansClient` + blob journal storage + configure hooks). Consumer surface: `WithReference(brain)` / `WithReference(brain.AsClient())`, TripRadar-style.
