@@ -1,4 +1,4 @@
-namespace DigitalBrain.Abstractions.Behavior;
+namespace DigitalBrain.Abstractions.Corpus;
 
 [GenerateSerializer]
 [Alias("db.episode-page")]

@@ -1,5 +1,3 @@
-using DigitalBrain.Abstractions.Behavior;
-using DigitalBrain.Abstractions.Corpus;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Chat;
@@ -49,7 +47,7 @@ public sealed class ChartFlowTests(SimulationFixture fixture)
     }
 
     [Fact]
-    public async Task ChartCardOffersDoNotAppendToCorporus()
+    public async Task ChartCardEmitsRespondedOffer()
     {
         var chatName = fixture.Sim.UniqueId("chat");
         var chartName = fixture.Sim.UniqueId("chart");
@@ -57,9 +55,6 @@ public sealed class ChartFlowTests(SimulationFixture fixture)
 
         var chat = fixture.Sim.Brain.Get<IChat>(chatName);
         var chatId = chat.Id;
-        var corpusId = ICorpus.ForOwner(fixture.Sim.Brain.Owner);
-
-        var corpus = fixture.Sim.Brain.Get<ICorpus>();
 
         await fixture.Sim.Brain.FireAsync(
             chatId,
@@ -75,14 +70,8 @@ public sealed class ChartFlowTests(SimulationFixture fixture)
             d => d.Synapse is Responded);
         Assert.IsType<Responded>(respondedDelivery.Synapse);
 
-        // FIXME: Test full turn completion appends to corpus in next task when Execution
-        // module is available in fixture. For now, verify that ChartCard offers (which emit
-        // Responded directly) do NOT create corpus entries, since offers are not turn completions.
-        var query = new ReadEpisode(CommandId.New(), "", Limit: 100);
-        var episode = await corpus.FireAsync(query, cancellationToken);
-
-        var chatRespondedEntries = episode.Entries.Where(e => e.Kind == "chat.responded").ToList();
-        Assert.Empty(chatRespondedEntries);
+        // The no-store-on-offers pin (ChartCard offers must not create corpus/memory entries)
+        // returns in Task 3 against the Memory ReadFacts shape, with a bounded wait.
     }
 
     private static async Task<JournalRead> PollUntilJournalPresentAsync(

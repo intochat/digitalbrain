@@ -63,11 +63,6 @@ public sealed class SystemTools(
 
         var lines = new StringBuilder();
         AppendExternalServers(lines);
-        lines.AppendLine(
-            "Library (Wave 7): fire db.discover-library with this intent, then "
-            + "db.install-library-artifact / db.enable-library-install for principal-local copies.");
-        lines.AppendLine(
-            "Behaviors (Wave 8): fire db.start-repo-review on behavior:main with RootPath + Intent.");
 
         if (hits.Count == 0)
         {
