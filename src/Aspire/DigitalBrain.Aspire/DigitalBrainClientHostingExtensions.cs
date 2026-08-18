@@ -25,16 +25,18 @@ public static class DigitalBrainClientHostingExtensions
 
     public static IHostApplicationBuilder AddDigitalBrainClient(
         this IHostApplicationBuilder builder,
-        Action<IClientBuilder>? configure = null)
+        Action<IClientBuilder>? configure = null,
+        bool activateOnStart = true)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        return AddDigitalBrainClient(builder, ResolveOwner(builder.Configuration), configure);
+        return AddDigitalBrainClient(builder, ResolveOwner(builder.Configuration), configure, activateOnStart);
     }
 
     public static IHostApplicationBuilder AddDigitalBrainClient(
         this IHostApplicationBuilder builder,
         string owner,
-        Action<IClientBuilder>? configure = null)
+        Action<IClientBuilder>? configure = null,
+        bool activateOnStart = true)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrWhiteSpace(owner);
@@ -51,7 +53,7 @@ public static class DigitalBrainClientHostingExtensions
         builder.Services.AddDigitalBrainOwner(
             builder.Configuration,
             owner,
-            activateOnStart: true);
+            activateOnStart: activateOnStart);
         return builder;
     }
 

@@ -229,7 +229,7 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
 
         var storage = DigitalBrainScriptHost.RequireStorage(hostBuilder.Configuration);
         hostBuilder.Configuration[$"ConnectionStrings:{DigitalBrainNames.Streams}"] = storage.Streams;
-        hostBuilder.AddDigitalBrainClient();
+        hostBuilder.AddDigitalBrainClient(activateOnStart: false);
 
         var host = hostBuilder.Build();
         await host.StartAsync().ConfigureAwait(false);
