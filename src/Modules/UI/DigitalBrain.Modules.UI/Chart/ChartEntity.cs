@@ -1,9 +1,13 @@
+using DigitalBrain.Abstractions;
 using DigitalBrain.Core;
+using Orleans.Runtime;
 
 namespace DigitalBrain.UI;
 
 [GrainType("chartentity")]
-internal sealed class ChartEntity : Entity<ChartState>, IChartEntity
+internal sealed class ChartEntity(
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ChartState> state)
+    : Entity<ChartState>(state), IChartEntity
 {
     public async Task Append(ChartStatePoint point, int cap)
     {

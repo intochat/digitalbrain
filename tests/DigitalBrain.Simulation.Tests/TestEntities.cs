@@ -1,7 +1,9 @@
+using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Entities;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Core;
+using Orleans.Runtime;
 
 namespace DigitalBrain.Simulation.Tests;
 
@@ -34,7 +36,9 @@ public sealed record CounterState([property: Id(0)] int Total);
 // leading "I" stripped, then lowercased by NeuronId/EntityId's IdentityPart.Validated) -- the
 // phase-3 convention, pinned here first.
 [GrainType("counterentity")]
-internal sealed class CounterEntity : Entity<CounterState>, ICounterEntity
+internal sealed class CounterEntity(
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<CounterState> state)
+    : Entity<CounterState>(state), ICounterEntity
 {
     public async Task Add(int amount)
         => await SaveAsync(new CounterState((State?.Total ?? 0) + amount));
