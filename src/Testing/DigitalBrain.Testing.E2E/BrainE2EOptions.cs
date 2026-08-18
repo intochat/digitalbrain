@@ -11,4 +11,9 @@ public sealed class BrainE2EOptions
     public string[] ExpectedHealthy { get; init; } = ["kernel", "mcp"];
 
     public TimeSpan HealthTimeout { get; init; } = TimeSpan.FromMinutes(5);
+
+    // Keyed by ParameterResource.Name. BrainAppHostFixture.StubParameters checks this before its
+    // own shape-aware defaults, so a caller can override any parameter (including the
+    // state-protection key) without subclassing the fixture.
+    public Dictionary<string, string> ParameterOverrides { get; init; } = new(StringComparer.Ordinal);
 }

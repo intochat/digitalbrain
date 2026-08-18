@@ -26,6 +26,10 @@ public sealed class BrainModel : IAsyncDisposable
             .CreateAsync<TAppHost>(args, static (_, _) => { })
             .ConfigureAwait(false);
 
+        // Plain "test" for every parameter is safe here specifically because BrainModel never
+        // calls StartAsync — nothing reads or shape-validates a parameter's value (e.g. the
+        // state-protection key's required 256-bit length) unless a resource's process actually
+        // starts, which only Tier 3's BrainAppHostFixture does.
         foreach (var parameter in builder.Resources.OfType<ParameterResource>())
         {
             builder.Configuration[$"Parameters:{parameter.Name}"] = "test";

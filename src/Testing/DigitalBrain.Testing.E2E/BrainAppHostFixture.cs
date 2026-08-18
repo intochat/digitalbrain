@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
@@ -18,6 +19,13 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
 {
     private const int DiagnosticLogLineCount = 40;
 
+    // DigitalBrainBuilder.RequireStateProtection (src/Aspire/DigitalBrain.Aspire.Hosting/Brain/
+    // DigitalBrainBuilder.cs:114) names this parameter "{brain.Name}-state-protection-key"; the
+    // AppHost's brain name is "brain" (ProductSurfaceResources.Brain, internal to that project, so
+    // the composed literal is duplicated here rather than linked). DurablePayloadProtector requires
+    // its value to base64-decode to exactly 32 bytes, which the blanket "test" stub cannot satisfy.
+    private const string StateProtectionParameterName = "brain-state-protection-key";
+
     private ResourceLogCollector? _logCollector;
     private IHost? _scriptHost;
     private IGrainFactory? _grains;
@@ -35,7 +43,7 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
             .CreateAsync<TAppHost>(options.Args)
             .ConfigureAwait(false);
 
-        StubParameters(appBuilder);
+        StubParameters(appBuilder, options.ParameterOverrides);
         IsolateContainers(appBuilder);
         RandomizeProxiedPorts(appBuilder);
         ArmExplicitStart(appBuilder, options.ExplicitStart);
@@ -94,11 +102,17 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
     public HttpClient CreateHttpClient(string resource, string? endpointName = null)
         => App.CreateHttpClient(resource, endpointName);
 
-    private static void StubParameters(IDistributedApplicationTestingBuilder appBuilder)
+    private static void StubParameters(
+        IDistributedApplicationTestingBuilder appBuilder,
+        IReadOnlyDictionary<string, string> overrides)
     {
         foreach (var parameter in appBuilder.Resources.OfType<ParameterResource>())
         {
-            appBuilder.Configuration[$"Parameters:{parameter.Name}"] = "test";
+            appBuilder.Configuration[$"Parameters:{parameter.Name}"] = overrides.TryGetValue(parameter.Name, out var overrideValue)
+                ? overrideValue
+                : string.Equals(parameter.Name, StateProtectionParameterName, StringComparison.Ordinal)
+                    ? Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+                    : "test";
         }
     }
 
