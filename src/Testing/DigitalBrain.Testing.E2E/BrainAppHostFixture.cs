@@ -103,43 +103,40 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
     }
 
     // TripRadar's container-isolation pattern: never reuse a container, its name, or its volume
-    // state across test runs. WithLifetime(Session) already performs the annotation replace.
+    // state across test runs. A ground-truth model probe (see task-5-report.md) proved "storage"
+    // (the Azurite emulator) has CLR type AzureStorageResource, not ContainerResource — so this
+    // walks IsContainer() (carries a ContainerImageAnnotation, the same test Aspire's own
+    // ContainerResourceExtensions.IsContainer uses) rather than OfType<ContainerResource>(), and
+    // sets every annotation directly rather than through WithLifetime<T>/WithContainerName<T>,
+    // both of which are constrained to `where T : ContainerResource` and would silently skip
+    // "storage" again. Without this, "storage" would keep its production
+    // ContainerLifetimeAnnotation=Persistent and ContainerMountAnnotation, mounting the
+    // developer's dev data volume into the test run and writing test data into it.
+    // (PersistenceAnnotation, WithLifetime's other annotation, is [Experimental("ASPIREPERSISTENCE001")]
+    // in this preview and deliberately left untouched here — ContainerLifetimeAnnotation is the
+    // stable annotation already proven correct for the other three containers across two prior fix
+    // rounds, and is what this same method already used successfully before this change.)
     private static void IsolateContainers(IDistributedApplicationTestingBuilder appBuilder)
-    {
-        foreach (var container in appBuilder.Resources.OfType<ContainerResource>())
-        {
-            appBuilder.CreateResourceBuilder(container).WithLifetime(ContainerLifetime.Session);
-
-            if (container.TryGetContainerMounts(out var mounts))
-            {
-                foreach (var mount in mounts.ToList())
-                {
-                    container.Annotations.Remove(mount);
-                }
-            }
-        }
-
-        ForceUniqueContainerNames(appBuilder);
-    }
-
-    // A ground-truth model probe (see task-5-report.md) proved "storage" (the Azurite emulator)
-    // has CLR type AzureStorageResource, not ContainerResource, so the OfType<ContainerResource>
-    // loop above never reaches it — yet it still runs as a container (it carries a
-    // ContainerImageAnnotation) and, with no ContainerNameAnnotation of its own, falls back to
-    // Aspire's default naming, which uses a postfix derived from the AppHost project path for
-    // resources it still treats as persistent. That default is identical for every process that
-    // instantiates this same AppHost project, so a session-lifetime test run and a developer's
-    // persistent `aspire run` session compute the SAME container name and collide. IsContainer()
-    // (carries a ContainerImageAnnotation) is the resource-shape Aspire itself uses to mean "runs
-    // as a container" and correctly includes "storage" where the CLR-type filter did not, so every
-    // such resource gets an explicit, forced-unique name here — an explicit ContainerNameAnnotation
-    // always wins over any computed default.
-    private static void ForceUniqueContainerNames(IDistributedApplicationTestingBuilder appBuilder)
     {
         var runId = Guid.NewGuid().ToString("N")[..8];
 
         foreach (var resource in appBuilder.Resources.Where(resource => resource.IsContainer()))
         {
+            foreach (var lifetime in resource.Annotations.OfType<ContainerLifetimeAnnotation>().ToList())
+            {
+                resource.Annotations.Remove(lifetime);
+            }
+
+            resource.Annotations.Add(new ContainerLifetimeAnnotation { Lifetime = ContainerLifetime.Session });
+
+            if (resource.TryGetContainerMounts(out var mounts))
+            {
+                foreach (var mount in mounts.ToList())
+                {
+                    resource.Annotations.Remove(mount);
+                }
+            }
+
             foreach (var containerName in resource.Annotations.OfType<ContainerNameAnnotation>().ToList())
             {
                 resource.Annotations.Remove(containerName);
