@@ -5,9 +5,11 @@ using DigitalBrain.Client;
 
 namespace DigitalBrain.Testing;
 
-// Thrown when a journal compacts past the wait cursor before the awaited delivery was
-// observed — the deliveries are gone (ResetSnapshot semantics), so waiting further can
-// never succeed. Distinct from TimeoutException: this is "unknowable", not "not yet".
+// Thrown when a journal compacts past the wait cursor DURING an already-established wait —
+// the deliveries are gone (ResetSnapshot semantics), so waiting further can never succeed.
+// A compaction observed on the wait's first read is not this: it is the wait's baseline
+// ("start watching from now"), since nothing the wait promised to see has been lost.
+// Distinct from TimeoutException: this is "unknowable", not "not yet".
 public sealed class JournalCompactedException : InvalidOperationException
 {
     public JournalCompactedException()
@@ -35,15 +37,16 @@ public static class JournalWait
         NeuronId subject,
         JournalKind kind,
         Func<SynapseDelivery, bool> match,
-        TimeSpan? timeout = null)
+        TimeSpan? timeout = null,
+        long afterSequence = 0)
     {
         ArgumentNullException.ThrowIfNull(brain);
         ArgumentNullException.ThrowIfNull(match);
 
         var budget = timeout ?? DefaultTimeout;
         var deadline = DateTimeOffset.UtcNow + budget;
-        var afterSequence = 0L;
         var seenTypes = new List<string>();
+        var isBaselineRead = true;
 
         while (true)
         {
@@ -51,27 +54,41 @@ public static class JournalWait
 
             if (page.ResetSnapshot is not null)
             {
-                var seenBeforeCompaction = seenTypes.Count > 0 ? string.Join(", ", seenTypes) : "(none)";
-                throw new JournalCompactedException(
-                    $"The {kind} journal of {subject} compacted past the wait cursor (resume {page.ResumeSequence}); "
-                    + $"deliveries were dropped before they could be observed. Saw before compaction: [{seenBeforeCompaction}]");
+                if (isBaselineRead)
+                {
+                    // The journal already exceeded retention before this wait started — that's
+                    // the wait's baseline ("start watching from now"), not a loss. Nothing the
+                    // wait promised to see has gone missing, so adopt the tip and keep polling.
+                    afterSequence = page.ResumeSequence;
+                }
+                else
+                {
+                    var seenBeforeCompaction = seenTypes.Count > 0 ? string.Join(", ", seenTypes) : "(none)";
+                    throw new JournalCompactedException(
+                        $"The {kind} journal of {subject} compacted past the wait cursor (resume {page.ResumeSequence}) "
+                        + $"mid-wait; deliveries were dropped before they could be observed. Saw before compaction: [{seenBeforeCompaction}]");
+                }
             }
-
-            foreach (var delivery in page.Delta)
+            else
             {
-                var typeName = delivery.Synapse.GetType().Name;
-                if (!seenTypes.Contains(typeName, StringComparer.Ordinal))
+                foreach (var delivery in page.Delta)
                 {
-                    seenTypes.Add(typeName);
+                    var typeName = delivery.Synapse.GetType().Name;
+                    if (!seenTypes.Contains(typeName, StringComparer.Ordinal))
+                    {
+                        seenTypes.Add(typeName);
+                    }
+
+                    if (match(delivery))
+                    {
+                        return delivery;
+                    }
                 }
 
-                if (match(delivery))
-                {
-                    return delivery;
-                }
+                afterSequence = page.ResumeSequence;
             }
 
-            afterSequence = page.ResumeSequence;
+            isBaselineRead = false;
 
             if (DateTimeOffset.UtcNow >= deadline)
             {
