@@ -5,6 +5,26 @@ using DigitalBrain.Client;
 
 namespace DigitalBrain.Testing;
 
+// Thrown when a journal compacts past the wait cursor before the awaited delivery was
+// observed — the deliveries are gone (ResetSnapshot semantics), so waiting further can
+// never succeed. Distinct from TimeoutException: this is "unknowable", not "not yet".
+public sealed class JournalCompactedException : InvalidOperationException
+{
+    public JournalCompactedException()
+    {
+    }
+
+    public JournalCompactedException(string message)
+        : base(message)
+    {
+    }
+
+    public JournalCompactedException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
 public static class JournalWait
 {
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
@@ -28,6 +48,15 @@ public static class JournalWait
         while (true)
         {
             var page = await brain.ReadJournalAsync(subject, kind, afterSequence).ConfigureAwait(false);
+
+            if (page.ResetSnapshot is not null)
+            {
+                var seenBeforeCompaction = seenTypes.Count > 0 ? string.Join(", ", seenTypes) : "(none)";
+                throw new JournalCompactedException(
+                    $"The {kind} journal of {subject} compacted past the wait cursor (resume {page.ResumeSequence}); "
+                    + $"deliveries were dropped before they could be observed. Saw before compaction: [{seenBeforeCompaction}]");
+            }
+
             foreach (var delivery in page.Delta)
             {
                 var typeName = delivery.Synapse.GetType().Name;
