@@ -28,7 +28,19 @@ brain.AddModule<AIModule>(ai =>
     ai.WithVoiceToText<IWhisperLargeV3Turbo>();
 });
 brain.AddModule<MemoryModule>(memory => memory.WithQdrant());
-brain.AddModule<UiModule>(ui => ui.WithWindowHost());
+// AppHost:UiHost=web selects the headless-web shell (e2e evidence); default stays the desktop window.
+var uiHostValue = builder.Configuration["AppHost:UiHost"];
+brain.AddModule<UiModule>(ui =>
+{
+    if (string.Equals(uiHostValue, "web", StringComparison.OrdinalIgnoreCase))
+    {
+        ui.WithWebHost();
+    }
+    else
+    {
+        ui.WithWindowHost();
+    }
+});
 brain.AddModule<GoogleModule>(google => google.WithGmail());
 brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
 
