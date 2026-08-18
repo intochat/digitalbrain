@@ -21,4 +21,7 @@
     <ProjectReference Include="../../Kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
     <ProjectReference Include="../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../Shared/DigitalBrainNames.cs" Link="DigitalBrainNames.cs" />
+  </ItemGroup>
 </Project>

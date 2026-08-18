@@ -26,19 +26,19 @@ public static class DigitalBrainRuntimeHostingExtensions
         ArgumentNullException.ThrowIfNull(modules);
 
         builder.AddServiceDefaults();
-        builder.AddKeyedAzureTableServiceClient(DigitalBrainResourceNames.Clustering);
-        builder.AddKeyedAzureTableServiceClient(DigitalBrainResourceNames.Reminders);
-        builder.AddKeyedAzureQueueServiceClient(DigitalBrainResourceNames.Streams);
-        builder.AddKeyedAzureTableServiceClient(DigitalBrainResourceNames.PubSub);
+        builder.AddKeyedAzureTableServiceClient(DigitalBrainNames.Clustering);
+        builder.AddKeyedAzureTableServiceClient(DigitalBrainNames.Reminders);
+        builder.AddKeyedAzureQueueServiceClient(DigitalBrainNames.Streams);
+        builder.AddKeyedAzureTableServiceClient(DigitalBrainNames.PubSub);
         builder.UseOrleans(silo =>
         {
             silo.AddDigitalBrainJournalStorage(builder.Configuration);
             DigitalBrainRuntime.Add(silo, modules);
             silo.Services
-                .AddOptions<HashRingStreamQueueMapperOptions>(DigitalBrainResourceNames.StreamProviderName)
+                .AddOptions<HashRingStreamQueueMapperOptions>(DigitalBrainNames.StreamProvider)
                 .Configure(options => options.TotalQueueCount = StreamQueueCount);
             silo.Services
-                .AddOptions<AzureQueueOptions>(DigitalBrainResourceNames.StreamProviderName)
+                .AddOptions<AzureQueueOptions>(DigitalBrainNames.StreamProvider)
                 .Configure(options => options.MessageVisibilityTimeout = StreamMessageVisibilityTimeout);
             silo.AddDashboard(options =>
             {

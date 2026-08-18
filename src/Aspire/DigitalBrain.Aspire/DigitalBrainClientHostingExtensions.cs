@@ -9,17 +9,17 @@ namespace DigitalBrain.Aspire;
 
 public static class DigitalBrainClientHostingExtensions
 {
-    public const string DefaultOwner = "dev";
+    public const string DefaultOwner = DigitalBrainNames.DefaultOwner;
 
-    public static string OwnerConfigurationKey => DigitalBrainResourceNames.OwnerConfigurationKey;
+    public static string OwnerConfigurationKey => DigitalBrainNames.Owner;
 
-    public static string ClusteringConnectionName => DigitalBrainResourceNames.Clustering;
+    public static string ClusteringConnectionName => DigitalBrainNames.Clustering;
 
     public static string ResolveOwner(IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var owner = configuration[DigitalBrainResourceNames.OwnerConfigurationKey];
+        var owner = configuration[DigitalBrainNames.Owner];
         return string.IsNullOrWhiteSpace(owner) ? DefaultOwner : owner;
     }
 
@@ -40,8 +40,8 @@ public static class DigitalBrainClientHostingExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(owner);
 
         builder.AddServiceDefaults();
-        builder.AddKeyedAzureTableServiceClient(DigitalBrainResourceNames.Clustering);
-        builder.AddKeyedAzureQueueServiceClient(DigitalBrainResourceNames.Streams);
+        builder.AddKeyedAzureTableServiceClient(DigitalBrainNames.Clustering);
+        builder.AddKeyedAzureQueueServiceClient(DigitalBrainNames.Streams);
         builder.UseOrleansClient(client =>
         {
             Core.ModelPayloadSerialization.AddModelPayloadSerialization(client.Services);

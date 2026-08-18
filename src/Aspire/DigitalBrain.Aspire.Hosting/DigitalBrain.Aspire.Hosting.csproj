@@ -11,4 +11,8 @@
   <ItemGroup>
     <ProjectReference Include="../../Kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../Shared/DigitalBrainNames.cs" Link="DigitalBrainNames.cs" />
+    <Using Include="DigitalBrain.Aspire" />
+  </ItemGroup>
 </Project>

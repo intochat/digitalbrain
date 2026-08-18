@@ -12,7 +12,7 @@ public static class DigitalBrainScriptHost
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var clustering = configuration.GetConnectionString(DigitalBrainResourceNames.Clustering);
+        var clustering = configuration.GetConnectionString(DigitalBrainNames.Clustering);
         if (string.IsNullOrWhiteSpace(clustering))
         {
             throw new InvalidOperationException(
@@ -22,7 +22,7 @@ public static class DigitalBrainScriptHost
                 + "export it as ConnectionStrings__clustering.");
         }
 
-        var streams = configuration.GetConnectionString(DigitalBrainResourceNames.Streams);
+        var streams = configuration.GetConnectionString(DigitalBrainNames.Streams);
 
         return (clustering, string.IsNullOrWhiteSpace(streams) ? clustering : streams);
     }
@@ -35,7 +35,7 @@ public static class DigitalBrainScriptHost
 
             var builder = Host.CreateApplicationBuilder(args);
             var storage = RequireStorage(builder.Configuration);
-            builder.Configuration[$"ConnectionStrings:{DigitalBrainResourceNames.Streams}"] = storage.Streams;
+            builder.Configuration[$"ConnectionStrings:{DigitalBrainNames.Streams}"] = storage.Streams;
             builder.AddDigitalBrainClient();
 
             var host = builder.Build();

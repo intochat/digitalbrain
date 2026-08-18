@@ -17,7 +17,7 @@ internal static class AuthHostingExtensions
 
         builder.Services.TryAddSingleton(static services =>
         {
-            var tables = services.GetRequiredKeyedService<TableServiceClient>(DigitalBrainResourceNames.Clustering);
+            var tables = services.GetRequiredKeyedService<TableServiceClient>(DigitalBrainNames.Clustering);
             return tables.GetTableClient(AuthOptions.UsersTableName);
         });
         builder.Services.TryAddSingleton<IAccountDirectory, TableAccountDirectory>();
