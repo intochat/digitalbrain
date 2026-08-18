@@ -174,7 +174,7 @@ internal static class OwnerCommandsHttpMaps
         return true;
     }
 
-    // Observer-only SSE: durable Send starts the Execution; request abort detaches this
+    // Observer-only SSE: durable Send starts the turn; request abort detaches this
     // watch without cancelling the turn (P0-2).
     private static async IAsyncEnumerable<SseItem<ChatResponseUpdate>> StreamDeltasAsync(
         IDigitalBrain brain,

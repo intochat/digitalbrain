@@ -16,13 +16,11 @@ public sealed class SimulationFixture : IAsyncLifetime
                     typeof(DigitalBrain.Time.StartTimer).Assembly,
                     typeof(DigitalBrain.Chat.SendMessage).Assembly,
                     typeof(DigitalBrain.AI.IAssistant).Assembly,
-                    typeof(DigitalBrain.Execution.IExecution).Assembly,
                 ],
                 [
                     typeof(DigitalBrain.Time.TimerNeuron).Assembly,
                     typeof(DigitalBrain.UI.UiModule).Assembly,
                     typeof(DigitalBrain.AI.AIModule).Assembly,
-                    typeof(DigitalBrain.Execution.ExecutionNeuron).Assembly,
                     typeof(SimulationFixture).Assembly,
                 ]),
             Configuration = new Dictionary<string, string?>

@@ -40,10 +40,6 @@
     <Project Path="src/Modules/UI/DigitalBrain.Modules.UI/DigitalBrain.Modules.UI.csproj" />
     <Project Path="src/Modules/UI/DigitalBrain.Modules.UI.Aspire.Hosting/DigitalBrain.Modules.UI.Aspire.Hosting.csproj" />
   </Folder>
-  <Folder Name="/Modules/Execution/">
-    <Project Path="src/Modules/Execution/Contracts/DigitalBrain.Modules.Execution.Contracts.csproj" />
-    <Project Path="src/Modules/Execution/Execution/DigitalBrain.Modules.Execution.csproj" />
-  </Folder>
   <Folder Name="/Modules/Time/">
     <Project Path="src/Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <Project Path="src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />

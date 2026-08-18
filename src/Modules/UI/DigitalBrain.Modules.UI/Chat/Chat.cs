@@ -3,7 +3,6 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Corpus;
 using DigitalBrain.Chat;
 using DigitalBrain.Core;
-using DigitalBrain.Execution;
 using DigitalBrain.Modules.Sdk.Mcp;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,24 +12,23 @@ using Orleans.Serialization;
 namespace DigitalBrain.UI;
 
 [GrainType("chat")]
-internal sealed class Chat : Neuron, IChat, IRemindable
+internal sealed class Chat : Neuron, IChat
 {
     private const string CommandLogName = "chat.command-log";
     private const string TranscriptName = "chat.transcript";
     private const string TurnLogName = "chat.turn-log";
     private const string QueueStateName = "chat.turn-queue";
-    private const string WaitingDeadlineReminderName = "chat.waiting-deadline";
     private const int RememberedCommands = 64;
     private const int RetainedTurns = 64;
     private const int RetainedTurnRecords = 64;
-    // Owner-path unstick for Execution parks (OutcomeUncertain / Waiting) — mirrors kernel liveness scale.
-    private static readonly TimeSpan WaitingPolicyDeadline = TimeSpan.FromSeconds(15);
-    private static readonly TimeSpan ReminderPeriod = TimeSpan.FromMinutes(1);
 
-    private static readonly ExecutionPolicy TurnPolicy = new(
-        MaximumAttempts: 1,
-        RetryDelay: TimeSpan.FromSeconds(1),
-        Deadline: null);
+    // One turn is one awaited worker call; the budget mirrors the kernel SSE edge and the
+    // call's own ResponseTimeout. The deadline timer is the belt for a call that never
+    // resumes; the grace keeps the two belts from racing on an honest slow finish.
+    private static readonly TimeSpan TurnBudget =
+        TimeSpan.Parse(NeuronCallTimeouts.LongRunning, System.Globalization.CultureInfo.InvariantCulture);
+    private static readonly TimeSpan TurnDeadlineGrace = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan TurnDeadlineCheckPeriod = TimeSpan.FromSeconds(15);
 
     private readonly IDurableList<byte[]> _commandLog;
     private readonly IDurableList<byte[]> _transcript;
@@ -40,10 +38,15 @@ internal sealed class Chat : Neuron, IChat, IRemindable
     private readonly Serializer<ChatTurn> _turns;
     private readonly Serializer<DurableTurnRecord> _turnRecords;
     private readonly Serializer<TurnQueueState> _queues;
-    // Wake-ups queued during a delivery turn; re-Read runs on a grain timer so it never
-    // nests inside Execution recovery / worker Accept (green-b deadlock class).
-    private readonly List<ExecutionTerminal> _pendingTerminalWakeups = [];
-    private IGrainTimer? _terminalWakeupTimer;
+
+    // The in-flight worker call, fire-and-tracked: the task settles the turn when the call
+    // returns or throws; the token is the turn-scoped cancel; the timer fails a call that
+    // outlives its budget. All in-memory — a restarted activation reconciles durably instead.
+    private Task? _activeCall;
+    private Guid? _activeCallTurnId;
+    private CancellationTokenSource? _activeCallCancellation;
+    private DateTimeOffset? _activeCallStartedAt;
+    private IGrainTimer? _turnDeadlineTimer;
 
     public Chat()
     {
@@ -60,7 +63,7 @@ internal sealed class Chat : Neuron, IChat, IRemindable
     protected override async Task OnNeuronActivatedAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        await ReconcileActiveExecutionAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await FailTurnInterruptedByRestartAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public async Task<TurnAccepted> Send(SendMessage message)
@@ -70,7 +73,7 @@ internal sealed class Chat : Neuron, IChat, IRemindable
         SendMessage message,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        // Enqueue + start Execution; the AI run is independent of cancellationToken.
+        // Enqueue + start the turn; the AI run is independent of cancellationToken.
         // This stream is a pure observer surface — abort detaches without cancelling the turn.
         _ = await EnqueueTurnAsync(message).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         cancellationToken.ThrowIfCancellationRequested();
@@ -96,14 +99,14 @@ internal sealed class Chat : Neuron, IChat, IRemindable
         }
 
         var record = turns[index];
-        if (record.Status is ChatTurnStatus.Completed or ChatTurnStatus.Failed or ChatTurnStatus.Cancelled)
+        if (IsTerminal(record.Status))
         {
             return;
         }
 
         if (record.Status == ChatTurnStatus.Cancelling)
         {
-            // Already asked the kernel to cancel; wait for the terminal bridge.
+            // Already flagged; the in-flight call's cancellation settles the turn.
             return;
         }
 
@@ -124,32 +127,26 @@ internal sealed class Chat : Neuron, IChat, IRemindable
             return;
         }
 
-        // Running: cancel the active Execution; stay head until the terminal bridge advances.
-        if (string.IsNullOrWhiteSpace(record.ExecutionName))
+        // Running head with no tracked call can only mean the tracking activation died and a
+        // reconcile has not settled it yet — settle here rather than cancelling nothing.
+        if (_activeCallTurnId != record.TurnId)
         {
-            throw new NeuronAuthorizationException(
-                $"Chat '{Id}' cannot cancel turn '{command.TurnId}' without an execution name.");
+            await SettleTurnAsync(record.TurnId, ChatTurnStatus.Cancelled, result: null, "cancelled")
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            return;
         }
 
-        var execution = GrainFactory.GetGrain<IExecution>(
-            NeuronId.For<IExecution>(Id.Owner, record.ExecutionName).ToGrainId());
-        var snapshot = await execution.Read().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        var expected = command.ExpectedRevision ?? snapshot.Revision;
-        await execution.Apply(new ApplyExecution(
-            command.CommandId,
-            new CancelExecution(),
-            ExpectedRevision: expected)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
+        // Running: flag first so Cancelling always precedes Cancelled in the journal, then
+        // trip the call's token; the call continuation settles the turn as Cancelled.
         turns[index] = record with { Status = ChatTurnStatus.Cancelling, Revision = record.Revision + 1 };
         SaveTurns(turns);
-
         await EmitAsync(new TurnLifecycle(
             new TurnId(record.TurnId),
             new CommandId(record.CommandId),
             Id,
             ChatTurnStatus.Cancelling,
             "running-cancel")).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        // Do NOT clear ActiveTurnId and do NOT TryStartNext — bridge only.
+        _activeCallCancellation?.Cancel();
     }
 
     public Task<ChatTranscript> Read() => Task.FromResult(new ChatTranscript(Turns()));
@@ -160,8 +157,7 @@ internal sealed class Chat : Neuron, IChat, IRemindable
                 new TurnId(turn.TurnId),
                 new CommandId(turn.CommandId),
                 turn.Text,
-                turn.Status,
-                turn.ExecutionName))]);
+                turn.Status))]);
 
     public async Task HandleAsync(ReadTranscriptRequest synapse, CancellationToken cancellationToken)
     {
@@ -238,13 +234,6 @@ internal sealed class Chat : Neuron, IChat, IRemindable
 
     protected override async Task OnUnboundSynapseAsync(Synapse synapse, CancellationToken cancellationToken)
     {
-        if (synapse is ExecutionTerminal terminal)
-        {
-            await ReconcileFromExecutionTerminalAsync(terminal)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            return;
-        }
-
         if (synapse is not AuthorizationRequired required)
         {
             await base.OnUnboundSynapseAsync(synapse, cancellationToken)
@@ -268,579 +257,28 @@ internal sealed class Chat : Neuron, IChat, IRemindable
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    private Task ReconcileFromExecutionTerminalAsync(ExecutionTerminal terminal)
-    {
-        ArgumentNullException.ThrowIfNull(terminal);
-
-        if (terminal.ExecutionId.Owner != Id.Owner)
-        {
-            return Task.CompletedTask;
-        }
-
-        var turns = LoadTurns();
-        var queue = LoadQueue();
-        if (FindTurnIndexForExecution(turns, queue, terminal.ExecutionId.Name) < 0)
-        {
-            // Unknown / mismatched ExecutionId — ignore settled.
-            return Task.CompletedTask;
-        }
-
-        // Queue the wake-up; re-Read + apply on a timer turn (not nested in this delivery).
-        _pendingTerminalWakeups.Add(terminal);
-        _terminalWakeupTimer ??= this.RegisterGrainTimer(
-            ProcessPendingTerminalWakeupsAsync,
-            dueTime: TimeSpan.FromMilliseconds(1),
-            period: TimeSpan.FromMilliseconds(50));
-        return Task.CompletedTask;
-    }
-
-    private async Task ProcessPendingTerminalWakeupsAsync(CancellationToken cancellationToken)
-    {
-        if (_pendingTerminalWakeups.Count == 0)
-        {
-            _terminalWakeupTimer?.Dispose();
-            _terminalWakeupTimer = null;
-            return;
-        }
-
-        var batch = _pendingTerminalWakeups.ToArray();
-        _pendingTerminalWakeups.Clear();
-
-        foreach (var terminal in batch)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            await ApplyTerminalWakeupFromKernelReadAsync(terminal)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        }
-
-        if (_pendingTerminalWakeups.Count == 0)
-        {
-            _terminalWakeupTimer?.Dispose();
-            _terminalWakeupTimer = null;
-        }
-    }
-
-    private async Task ApplyTerminalWakeupFromKernelReadAsync(ExecutionTerminal terminal)
-    {
-        var turns = LoadTurns();
-        var queue = LoadQueue();
-        var index = FindTurnIndexForExecution(turns, queue, terminal.ExecutionId.Name);
-        if (index < 0)
-        {
-            return;
-        }
-
-        // Wake-up only: kernel Read is authority. Forged State/Revision not confirmed by Read
-        // are ignored settled. Result/Failure always come from the snapshot.
-        ExecutionSnapshot snapshot;
-        try
-        {
-            snapshot = await GrainFactory.GetGrain<IExecution>(terminal.ExecutionId.ToGrainId())
-                .Read()
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        }
-        catch
-        {
-            return;
-        }
-
-        if (terminal.Revision != snapshot.Revision || terminal.State != snapshot.State)
-        {
-            return;
-        }
-
-        if (snapshot.State == ExecutionState.Waiting)
-        {
-            await SurfaceWaitingTurnAsync(turns, index, snapshot)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            return;
-        }
-
-        if (!IsExecutionTerminal(snapshot.State))
-        {
-            return;
-        }
-
-        await ApplyExecutionSnapshotToTurnAsync(turns, index, snapshot)
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-    }
-
-    async Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
-    {
-        if (!string.Equals(reminderName, WaitingDeadlineReminderName, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException(
-                $"Chat neuron '{Id}' does not own reminder '{reminderName}'.");
-        }
-
-        await FailWaitingTurnAfterPolicyDeadlineAsync()
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-    }
-
-    private async Task ReconcileActiveExecutionAsync()
+    // A fresh activation cannot resume an in-flight worker call (the awaiting task died with
+    // the previous activation), so a durably Running head is settled as Failed.
+    private async Task FailTurnInterruptedByRestartAsync()
     {
         var queue = LoadQueue();
-        if (queue.ActiveTurnId is null || string.IsNullOrWhiteSpace(queue.ActiveExecutionName))
+        if (queue.ActiveTurnId is not { } activeTurnId)
         {
             return;
         }
 
         var turns = LoadTurns();
-        var index = turns.FindIndex(turn => turn.TurnId == queue.ActiveTurnId.Value);
-        if (index < 0)
+        var index = turns.FindIndex(turn => turn.TurnId == activeTurnId);
+        if (index < 0 || IsTerminal(turns[index].Status))
         {
-            queue = queue with { ActiveTurnId = null, ActiveExecutionName = null };
-            SaveQueue(queue);
+            SaveQueue(queue with { ActiveTurnId = null });
             await TryStartNextAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
-        var record = turns[index];
-        if (record.Status is ChatTurnStatus.Completed or ChatTurnStatus.Failed or ChatTurnStatus.Cancelled)
-        {
-            if (queue.ActiveTurnId == record.TurnId)
-            {
-                queue = queue with { ActiveTurnId = null, ActiveExecutionName = null };
-                SaveQueue(queue);
-            }
-
-            await TryStartNextAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            return;
-        }
-
-        var executionId = NeuronId.For<IExecution>(Id.Owner, queue.ActiveExecutionName!);
-        ExecutionSnapshot snapshot;
-        try
-        {
-            snapshot = await GrainFactory.GetGrain<IExecution>(executionId.ToGrainId())
-                .Read()
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        }
-        catch
-        {
-            turns[index] = record with
-            {
-                Status = ChatTurnStatus.Failed,
-                Revision = record.Revision + 1,
-            };
-            SaveTurns(turns);
-            queue = queue with { ActiveTurnId = null, ActiveExecutionName = null };
-            SaveQueue(queue);
-            DelayDeactivation(TimeSpan.FromMinutes(1));
-            await EmitAsync(new TurnLifecycle(
-                new TurnId(record.TurnId),
-                new CommandId(record.CommandId),
-                Id,
-                ChatTurnStatus.Failed,
-                "execution-unreadable")).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            await TryStartNextAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            return;
-        }
-
-        if (IsExecutionTerminal(snapshot.State))
-        {
-            await ApplyExecutionSnapshotToTurnAsync(turns, index, snapshot)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            return;
-        }
-
-        if (snapshot.State == ExecutionState.Waiting)
-        {
-            await SurfaceWaitingTurnAsync(turns, index, snapshot)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            return;
-        }
-
-        // After silo restart the worker's in-memory Accept is gone and in-memory
-        // reminders may not fire. Drive the kernel to terminal via Cancel so the
-        // bridge can advance the queue. Live turns stay warm via DelayDeactivation.
-        if (snapshot.State is ExecutionState.Running or ExecutionState.Pending or ExecutionState.Cancelling)
-        {
-            try
-            {
-                await GrainFactory.GetGrain<IExecution>(executionId.ToGrainId())
-                    .Apply(new ApplyExecution(
-                        CommandId.New(),
-                        new CancelExecution(),
-                        ExpectedRevision: snapshot.Revision))
-                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            }
-            catch (NeuronAuthorizationException)
-            {
-                // Revision race or already terminal — re-Read below.
-            }
-
-            try
-            {
-                snapshot = await GrainFactory.GetGrain<IExecution>(executionId.ToGrainId())
-                    .Read()
-                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            }
-            catch
-            {
-                return;
-            }
-
-            if (IsExecutionTerminal(snapshot.State))
-            {
-                await ApplyExecutionSnapshotToTurnAsync(turns, index, snapshot)
-                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            }
-            else if (snapshot.State == ExecutionState.Waiting)
-            {
-                await SurfaceWaitingTurnAsync(turns, index, snapshot)
-                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            }
-            else if (record.Status != ChatTurnStatus.Cancelling)
-            {
-                turns[index] = record with
-                {
-                    Status = ChatTurnStatus.Cancelling,
-                    Revision = record.Revision + 1,
-                };
-                SaveTurns(turns);
-            }
-        }
-    }
-
-    private async Task SurfaceWaitingTurnAsync(
-        List<DurableTurnRecord> turns,
-        int index,
-        ExecutionSnapshot snapshot)
-    {
-        var record = turns[index];
-        if (record.Status is ChatTurnStatus.Completed or ChatTurnStatus.Failed or ChatTurnStatus.Cancelled)
-        {
-            return;
-        }
-
-        if (record.Status != ChatTurnStatus.Waiting)
-        {
-            var detail = snapshot.Blocker switch
-            {
-                OutcomeUncertain => "outcome-uncertain",
-                InputRequired => "input-required",
-                _ => snapshot.Blocker?.GetType().Name ?? "waiting",
-            };
-            turns[index] = record with
-            {
-                Status = ChatTurnStatus.Waiting,
-                Revision = record.Revision + 1,
-            };
-            SaveTurns(turns);
-            await EmitAsync(new TurnLifecycle(
-                new TurnId(record.TurnId),
-                new CommandId(record.CommandId),
-                Id,
-                ChatTurnStatus.Waiting,
-                detail)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        }
-
-        // Keep FIFO head; arm durable policy deadline so the park cannot freeze forever.
-        DelayDeactivation(WaitingPolicyDeadline + ReminderPeriod);
-        await this.RegisterOrUpdateReminder(
-                WaitingDeadlineReminderName,
-                WaitingPolicyDeadline,
-                ReminderPeriod)
+        await SettleTurnAsync(activeTurnId, ChatTurnStatus.Failed, result: null, "turn-interrupted")
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
-
-    private async Task FailWaitingTurnAfterPolicyDeadlineAsync()
-    {
-        var queue = LoadQueue();
-        if (queue.ActiveTurnId is null || string.IsNullOrWhiteSpace(queue.ActiveExecutionName))
-        {
-            await UnregisterWaitingDeadlineAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            return;
-        }
-
-        var turns = LoadTurns();
-        var index = turns.FindIndex(turn => turn.TurnId == queue.ActiveTurnId.Value);
-        if (index < 0)
-        {
-            await UnregisterWaitingDeadlineAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            return;
-        }
-
-        var record = turns[index];
-        if (record.Status is ChatTurnStatus.Completed or ChatTurnStatus.Failed or ChatTurnStatus.Cancelled)
-        {
-            await UnregisterWaitingDeadlineAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            return;
-        }
-
-        if (record.Status is not (ChatTurnStatus.Waiting or ChatTurnStatus.Running or ChatTurnStatus.Cancelling))
-        {
-            await UnregisterWaitingDeadlineAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            return;
-        }
-
-        var executionId = NeuronId.For<IExecution>(Id.Owner, queue.ActiveExecutionName!);
-        ExecutionSnapshot snapshot;
-        try
-        {
-            snapshot = await GrainFactory.GetGrain<IExecution>(executionId.ToGrainId())
-                .Read()
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        }
-        catch
-        {
-            turns[index] = record with
-            {
-                Status = ChatTurnStatus.Failed,
-                Revision = record.Revision + 1,
-            };
-            SaveTurns(turns);
-            queue = queue with { ActiveTurnId = null, ActiveExecutionName = null };
-            SaveQueue(queue);
-            await UnregisterWaitingDeadlineAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            await EmitAsync(new TurnLifecycle(
-                new TurnId(record.TurnId),
-                new CommandId(record.CommandId),
-                Id,
-                ChatTurnStatus.Failed,
-                "waiting-deadline-unreadable")).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            await TryStartNextAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            return;
-        }
-
-        if (IsExecutionTerminal(snapshot.State))
-        {
-            await ApplyExecutionSnapshotToTurnAsync(turns, index, snapshot)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            await UnregisterWaitingDeadlineAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            return;
-        }
-
-        // Owner policy: CancelExecution + bridge after park deadline (must not freeze FIFO).
-        try
-        {
-            await GrainFactory.GetGrain<IExecution>(executionId.ToGrainId())
-                .Apply(new ApplyExecution(
-                    CommandId.New(),
-                    new CancelExecution(),
-                    ExpectedRevision: snapshot.Revision))
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        }
-        catch (NeuronAuthorizationException)
-        {
-            // Revision race — re-Read below.
-        }
-
-        try
-        {
-            snapshot = await GrainFactory.GetGrain<IExecution>(executionId.ToGrainId())
-                .Read()
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        }
-        catch
-        {
-            return;
-        }
-
-        if (IsExecutionTerminal(snapshot.State))
-        {
-            await ApplyExecutionSnapshotToTurnAsync(turns, index, snapshot)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            await UnregisterWaitingDeadlineAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            return;
-        }
-
-        if (record.Status != ChatTurnStatus.Cancelling)
-        {
-            turns = LoadTurns();
-            index = turns.FindIndex(turn => turn.TurnId == record.TurnId);
-            if (index >= 0)
-            {
-                turns[index] = turns[index] with
-                {
-                    Status = ChatTurnStatus.Cancelling,
-                    Revision = turns[index].Revision + 1,
-                };
-                SaveTurns(turns);
-                await EmitAsync(new TurnLifecycle(
-                    new TurnId(record.TurnId),
-                    new CommandId(record.CommandId),
-                    Id,
-                    ChatTurnStatus.Cancelling,
-                    "waiting-deadline-cancel")).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            }
-        }
-
-        // Keep the reminder so a still-parked head is retried until terminal.
-        await this.RegisterOrUpdateReminder(
-                WaitingDeadlineReminderName,
-                WaitingPolicyDeadline,
-                ReminderPeriod)
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-    }
-
-    private async Task UnregisterWaitingDeadlineAsync()
-    {
-        if (await this.GetReminder(WaitingDeadlineReminderName)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext) is { } reminder)
-        {
-            await this.UnregisterReminder(reminder)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        }
-    }
-
-    private static int FindTurnIndexForExecution(
-        List<DurableTurnRecord> turns,
-        TurnQueueState queue,
-        string executionName)
-    {
-        var index = turns.FindIndex(turn =>
-            string.Equals(turn.ExecutionName, executionName, StringComparison.Ordinal));
-        if (index < 0
-            && queue.ActiveTurnId is { } activeId
-            && string.Equals(queue.ActiveExecutionName, executionName, StringComparison.Ordinal))
-        {
-            index = turns.FindIndex(turn => turn.TurnId == activeId);
-        }
-
-        return index;
-    }
-
-    private async Task ApplyExecutionSnapshotToTurnAsync(
-        List<DurableTurnRecord> turns,
-        int index,
-        ExecutionSnapshot snapshot)
-    {
-        var record = turns[index];
-        var result = snapshot.Result;
-        var failure = snapshot.Failure;
-
-        // Idempotent re-apply by Execution revision: duplicate wake-ups change nothing.
-        if (record.AppliedExecutionRevision is { } applied
-            && applied == snapshot.Revision
-            && record.Status is ChatTurnStatus.Completed
-                or ChatTurnStatus.Failed
-                or ChatTurnStatus.Cancelled)
-        {
-            var queueDone = LoadQueue();
-            if (queueDone.ActiveTurnId == record.TurnId)
-            {
-                queueDone = queueDone with { ActiveTurnId = null, ActiveExecutionName = null };
-                SaveQueue(queueDone);
-                await TryStartNextAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            }
-
-            return;
-        }
-
-        var alreadyTerminal = record.Status is ChatTurnStatus.Completed
-            or ChatTurnStatus.Failed
-            or ChatTurnStatus.Cancelled;
-
-        if (alreadyTerminal)
-        {
-            // Different kernel revision after terminal — do not re-emit Responded.
-            var queueDone = LoadQueue();
-            if (queueDone.ActiveTurnId == record.TurnId)
-            {
-                queueDone = queueDone with { ActiveTurnId = null, ActiveExecutionName = null };
-                SaveQueue(queueDone);
-            }
-
-            await TryStartNextAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            return;
-        }
-
-        var status = snapshot.State switch
-        {
-            ExecutionState.Succeeded => ChatTurnStatus.Completed,
-            ExecutionState.Failed => ChatTurnStatus.Failed,
-            ExecutionState.Cancelled => ChatTurnStatus.Cancelled,
-            _ => record.Status,
-        };
-
-        if (status is not (ChatTurnStatus.Completed or ChatTurnStatus.Failed or ChatTurnStatus.Cancelled))
-        {
-            return;
-        }
-
-        turns[index] = record with
-        {
-            Status = status,
-            Revision = record.Revision + 1,
-            AppliedExecutionRevision = snapshot.Revision,
-        };
-        SaveTurns(turns);
-        if (record.Status == ChatTurnStatus.Waiting)
-        {
-            await UnregisterWaitingDeadlineAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        }
-
-        if (status == ChatTurnStatus.Completed)
-        {
-            await TryEmitRespondedAsync(record, result)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        }
-
-        var detail = status switch
-        {
-            ChatTurnStatus.Failed when failure is ChatTurnFailure chatFailure => chatFailure.Reason,
-            ChatTurnStatus.Failed when failure is WorkerAbandoned abandoned => abandoned.Reason,
-            ChatTurnStatus.Failed => failure?.GetType().Name,
-            ChatTurnStatus.Cancelled => "cancelled",
-            _ => record.ExecutionName,
-        };
-
-        await EmitAsync(new TurnLifecycle(
-            new TurnId(record.TurnId),
-            new CommandId(record.CommandId),
-            Id,
-            status,
-            detail)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-        var queue = LoadQueue();
-        if (queue.ActiveTurnId == record.TurnId)
-        {
-            queue = queue with { ActiveTurnId = null, ActiveExecutionName = null };
-            SaveQueue(queue);
-        }
-
-        DelayDeactivation(TimeSpan.FromMinutes(1));
-        await TryStartNextAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-    }
-
-    private async Task TryEmitRespondedAsync(DurableTurnRecord record, Result? result)
-    {
-        if (result is not ChatTurnResult chatResult || string.IsNullOrWhiteSpace(chatResult.Answer))
-        {
-            return;
-        }
-
-        // Emit first: if Emit fails the delivery retries. Remembering before Emit left a
-        // transcript line that made retries skip the Emit forever (no Responded in journal).
-        await EmitAsync(new Responded(
-            new CommandId(record.CommandId),
-            Id,
-            chatResult.Answer,
-            Author: chatResult.Author ?? string.Empty))
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-        var existing = Turns();
-        if (!existing.Any(turn => !turn.FromUser
-            && string.Equals(turn.Text, chatResult.Answer, StringComparison.Ordinal)))
-        {
-            Remember(new ChatTurn(FromUser: false, chatResult.Answer));
-        }
-
-        await SendAsync(
-            ICorpus.ForOwner(Id.Owner),
-            new AppendCorpusEntry(
-                CommandId.New(),
-                Kind: "chat.responded",
-                Text: chatResult.Answer,
-                Correlation: record.CommandId.ToString("n"),
-                At: DateTimeOffset.UtcNow))
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-    }
-
-    private static bool IsExecutionTerminal(ExecutionState state)
-        => state is ExecutionState.Succeeded or ExecutionState.Failed or ExecutionState.Cancelled;
 
     private async Task<TurnAccepted> EnqueueTurnAsync(SendMessage message)
     {
@@ -869,7 +307,6 @@ internal sealed class Chat : Neuron, IChat, IRemindable
             message.Text,
             message.Actor!,
             ChatTurnStatus.Pending,
-            ExecutionName: null,
             Revision: 0);
         var turns = LoadTurns();
         turns.Add(record);
@@ -924,43 +361,197 @@ internal sealed class Chat : Neuron, IChat, IRemindable
             return;
         }
 
-        var executionName = $"chat-turn-{record.TurnId:N}";
-        var worker = ChatTurnWorker.ForChat(Id);
-        var goal = new ChatTurnGoal(
-            record.TurnId,
+        var running = record with { Status = ChatTurnStatus.Running, Revision = record.Revision + 1 };
+        turns[index] = running;
+        SaveTurns(turns);
+        SaveQueue(queue with { ActiveTurnId = record.TurnId });
+        // Stay activated for the whole attempt so idle deactivation cannot orphan a live head.
+        DelayDeactivation(TurnBudget + TurnDeadlineGrace + TurnDeadlineCheckPeriod);
+
+        // Running is committed to the journal BEFORE the call starts, so a instantly-settling
+        // worker can never put Responded/Completed ahead of Running.
+        await EmitAsync(new TurnLifecycle(
+            new TurnId(record.TurnId),
             new CommandId(record.CommandId),
-            record.Text,
-            record.Actor,
-            Id);
+            Id,
+            ChatTurnStatus.Running)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        var execution = GrainFactory.GetGrain<IExecution>(
-            NeuronId.For<IExecution>(Id.Owner, executionName).ToGrainId());
-        await execution.Apply(new ApplyExecution(
-            CommandId.New(),
-            new StartExecution(goal, worker, TurnPolicy, RetryOf: null, Origin: Id)))
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        StartTurnCall(running);
+    }
 
-        turns[index] = record with
+    private void StartTurnCall(DurableTurnRecord record)
+    {
+        _activeCallCancellation?.Dispose();
+        var cancellation = new CancellationTokenSource();
+        _activeCallCancellation = cancellation;
+        _activeCallTurnId = record.TurnId;
+        _activeCallStartedAt = TimeProvider.GetUtcNow();
+        _activeCall = RunTurnAsync(record, cancellation.Token);
+        _turnDeadlineTimer ??= this.RegisterGrainTimer(
+            FailOverBudgetTurnAsync,
+            dueTime: TurnDeadlineCheckPeriod,
+            period: TurnDeadlineCheckPeriod);
+    }
+
+    private async Task RunTurnAsync(DurableTurnRecord record, CancellationToken cancellationToken)
+    {
+        try
         {
-            Status = ChatTurnStatus.Running,
-            ExecutionName = executionName,
-            Revision = record.Revision + 1,
-        };
+            var worker = GrainFactory.GetGrain<IChatTurnWorker>(ChatTurnWorker.ForChat(Id).ToGrainId());
+            var goal = new ChatTurnGoal(
+                record.TurnId,
+                new CommandId(record.CommandId),
+                record.Text,
+                record.Actor,
+                Id);
+            var result = await worker.RunAsync(goal, cancellationToken)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await SettleTurnAsync(record.TurnId, ChatTurnStatus.Completed, result, detail: null)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            await SettleTurnAsync(record.TurnId, ChatTurnStatus.Cancelled, result: null, "cancelled")
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
+        catch (Exception failure)
+        {
+            await SettleTurnAsync(record.TurnId, ChatTurnStatus.Failed, result: null, failure.Message)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
+    }
+
+    private async Task FailOverBudgetTurnAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_activeCallTurnId is not { } turnId || _activeCallStartedAt is not { } startedAt)
+        {
+            _turnDeadlineTimer?.Dispose();
+            _turnDeadlineTimer = null;
+            return;
+        }
+
+        if (TimeProvider.GetUtcNow() - startedAt < TurnBudget + TurnDeadlineGrace)
+        {
+            return;
+        }
+
+        if (_activeCall is { IsCompleted: true })
+        {
+            // The call already returned; its settle continuation is queued — let it land.
+            return;
+        }
+
+        // Fail durably FIRST so the call continuation's late cancellation lands on a settled
+        // turn, then trip the token to reclaim the worker. The source is detached before the
+        // settle so the next turn's start cannot dispose it out from under this callback.
+        var cancellation = _activeCallCancellation;
+        _activeCallCancellation = null;
+        await SettleTurnAsync(
+            turnId,
+            ChatTurnStatus.Failed,
+            result: null,
+            $"turn-budget-exceeded after {TurnBudget}").ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        cancellation?.Cancel();
+        cancellation?.Dispose();
+    }
+
+    // The single settle point for every turn outcome: worker result, worker failure,
+    // cancellation, budget overrun, restart reconcile. Emits the frozen journal footprint —
+    // Responded (Completed with an answer only) then the terminal TurnLifecycle — and
+    // advances the FIFO.
+    private async Task SettleTurnAsync(
+        Guid turnId,
+        ChatTurnStatus status,
+        ChatTurnResult? result,
+        string? detail)
+    {
+        if (_activeCallTurnId == turnId)
+        {
+            _activeCallTurnId = null;
+            _activeCallStartedAt = null;
+            _activeCall = null;
+        }
+
+        var turns = LoadTurns();
+        var index = turns.FindIndex(turn => turn.TurnId == turnId);
+        if (index < 0 || IsTerminal(turns[index].Status))
+        {
+            // Already settled (deadline beat the continuation, or retention dropped it) —
+            // only make sure the queue is not stuck on it.
+            var queueDone = LoadQueue();
+            if (queueDone.ActiveTurnId == turnId)
+            {
+                SaveQueue(queueDone with { ActiveTurnId = null });
+                await TryStartNextAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            }
+
+            return;
+        }
+
+        var record = turns[index];
+        turns[index] = record with { Status = status, Revision = record.Revision + 1 };
         SaveTurns(turns);
 
-        queue = queue with { ActiveTurnId = record.TurnId, ActiveExecutionName = executionName };
-        SaveQueue(queue);
-        // Stay activated for the duration of the AI attempt so idle reactivation
-        // does not spuriously cancel a live head (see ReconcileActiveExecutionAsync).
-        DelayDeactivation(TimeSpan.FromHours(2));
+        if (status == ChatTurnStatus.Completed)
+        {
+            await TryEmitRespondedAsync(record, result)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
 
         await EmitAsync(new TurnLifecycle(
             new TurnId(record.TurnId),
             new CommandId(record.CommandId),
             Id,
-            ChatTurnStatus.Running,
-            executionName)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            status,
+            detail)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        var queue = LoadQueue();
+        if (queue.ActiveTurnId == record.TurnId)
+        {
+            SaveQueue(queue with { ActiveTurnId = null });
+        }
+
+        DelayDeactivation(TimeSpan.FromMinutes(1));
+        await TryStartNextAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
+
+    private async Task TryEmitRespondedAsync(DurableTurnRecord record, ChatTurnResult? result)
+    {
+        if (result is null || string.IsNullOrWhiteSpace(result.Answer))
+        {
+            return;
+        }
+
+        // Emit first: if Emit fails the delivery retries. Remembering before Emit left a
+        // transcript line that made retries skip the Emit forever (no Responded in journal).
+        await EmitAsync(new Responded(
+            new CommandId(record.CommandId),
+            Id,
+            result.Answer,
+            Author: result.Author))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        var existing = Turns();
+        if (!existing.Any(turn => !turn.FromUser
+            && string.Equals(turn.Text, result.Answer, StringComparison.Ordinal)))
+        {
+            Remember(new ChatTurn(FromUser: false, result.Answer));
+        }
+
+        await SendAsync(
+            ICorpus.ForOwner(Id.Owner),
+            new AppendCorpusEntry(
+                CommandId.New(),
+                Kind: "chat.responded",
+                Text: result.Answer,
+                Correlation: record.CommandId.ToString("n"),
+                At: DateTimeOffset.UtcNow))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
+
+    private static bool IsTerminal(ChatTurnStatus status)
+        => status is ChatTurnStatus.Completed or ChatTurnStatus.Failed or ChatTurnStatus.Cancelled;
 
     private static ChatTranscript Trimmed(ChatTranscript transcript, int? maxTurns)
         => maxTurns is not { } cap || transcript.Turns.Count <= cap
@@ -1041,7 +632,7 @@ internal sealed class Chat : Neuron, IChat, IRemindable
     {
         if (_queueState.Value is not { Length: > 0 } bytes)
         {
-            return new TurnQueueState([], null, null);
+            return new TurnQueueState([], null);
         }
 
         return _queues.Deserialize(bytes);
@@ -1073,5 +664,4 @@ internal sealed class Chat : Neuron, IChat, IRemindable
             entries.RemoveAt(0);
         }
     }
-
 }

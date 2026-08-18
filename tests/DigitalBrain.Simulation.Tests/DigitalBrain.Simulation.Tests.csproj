@@ -25,7 +25,6 @@
     <ProjectReference Include="../../src/Modules/UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />
     <ProjectReference Include="../../src/Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
     <ProjectReference Include="../../src/Modules/AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
-    <ProjectReference Include="../../src/Modules/Execution/Execution/DigitalBrain.Modules.Execution.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- The mock-LLM corpus the fixture points DigitalBrain:AI:Corpus:Path at. -->

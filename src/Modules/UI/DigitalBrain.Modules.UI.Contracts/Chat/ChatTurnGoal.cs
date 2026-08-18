@@ -1,9 +1,9 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
-using DigitalBrain.Execution;
 
 namespace DigitalBrain.UI;
 
+// Everything the turn worker needs to run one durable chat turn's AI attempt.
 [GenerateSerializer]
 [Alias("chat.turn-goal")]
 public sealed record ChatTurnGoal(
@@ -11,4 +11,4 @@ public sealed record ChatTurnGoal(
     [property: Id(1)] CommandId CommandId,
     [property: Id(2)] string Text,
     [property: Id(3)] ActorContext Actor,
-    [property: Id(4)] NeuronId Chat) : Goal;
+    [property: Id(4)] NeuronId Chat);

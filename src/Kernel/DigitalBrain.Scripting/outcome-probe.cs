@@ -2,7 +2,6 @@
 #:project ../../Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj
 #:project ../../Modules/UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj
 #:project ../../Modules/AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj
-#:project ../../Modules/Execution/Contracts/DigitalBrain.Modules.Execution.Contracts.csproj
 #:property TreatWarningsAsErrors=false
 #:property PublishAot=false
 #:property JsonSerializerIsReflectionEnabledByDefault=true

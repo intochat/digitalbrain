@@ -10,6 +10,7 @@ public enum ChatTurnStatus
     Failed = 3,
     Cancelled = 4,
     Cancelling = 5,
-    // Execution parked (OutcomeUncertain / InputRequired) while this turn is still FIFO head.
+    // Retired wire value: parked turns died with the awaited-worker turn shape. Kept so
+    // journaled lifecycles from older builds still deserialize.
     Waiting = 6,
 }
