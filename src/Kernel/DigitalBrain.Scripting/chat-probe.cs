@@ -1,4 +1,4 @@
-#:project ../Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj
+#:project ../../Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj
 #:project ../../Modules/UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj
 #:property TreatWarningsAsErrors=false
 

@@ -1,4 +1,4 @@
-#:project ../Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj
+#:project ../../Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj
 #:project ../../Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj
 #:project ../../Modules/UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj
 #:project ../../Modules/AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj

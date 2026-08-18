@@ -1,4 +1,4 @@
-#:project ../Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj
+#:project ../../Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj
 #:property TreatWarningsAsErrors=false
 #:property PublishAot=false
 #:property JsonSerializerIsReflectionEnabledByDefault=true
