@@ -14,7 +14,7 @@ internal static class HttpActor
             throw new InvalidOperationException("An authenticated principal is required.");
         }
 
-        var principalText = http.User.FindFirstValue(AuthOptions.PrincipalIdClaimType);
+        var principalText = http.User.FindFirstValue(DevCookieAuth.PrincipalIdClaimType);
         if (string.IsNullOrWhiteSpace(principalText)
             || !Guid.TryParse(principalText, out var principalGuid)
             || principalGuid == Guid.Empty)

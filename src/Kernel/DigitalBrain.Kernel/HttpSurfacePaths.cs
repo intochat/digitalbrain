@@ -10,9 +10,7 @@ internal static class HttpSurfacePaths
 
     public const string AuthBootstrapPath = "/auth/bootstrap";
     public const string AuthLoginPath = "/auth/login";
-    public const string AuthLogoutPath = "/auth/logout";
     public const string AuthMePath = "/auth/me";
-    public const string AuthUsersPath = "/auth/users";
 
     public const string EventStreamContentType = "text/event-stream";
     public const string CacheControlNoCache = "no-cache";

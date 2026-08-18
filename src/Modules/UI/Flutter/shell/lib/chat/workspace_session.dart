@@ -88,8 +88,9 @@ final class WorkspaceSession extends ChangeNotifier {
         notifyListeners();
       },
       onError: (Object error) {
-        turnFailure = '$error';
-        notifyListeners();
+        // The authorizations endpoint no longer exists server-side; do not surface its
+        // permanent failure on the shared turnFailure banner (that field is for chat turns).
+        debugPrint('authorization events stream failed: $error');
       },
     );
   }

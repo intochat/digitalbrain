@@ -9,4 +9,3 @@ global using DigitalBrain.Abstractions.Messaging;
 global using DigitalBrain.Abstractions.Neurons;
 global using DigitalBrain.Abstractions.Registry;
 global using DigitalBrain.Abstractions.Security;
-global using DigitalBrain.Abstractions.Workspace;
