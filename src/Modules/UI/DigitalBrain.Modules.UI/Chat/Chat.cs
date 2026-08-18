@@ -137,6 +137,7 @@ internal sealed class Chat : Neuron, IChat
 
         // Running: flag first so Cancelling always precedes Cancelled in the journal, then
         // trip the call's token; the call continuation settles the turn as Cancelled.
+        var cancellation = _activeCallCancellation;
         turns[index] = record with { Status = ChatTurnStatus.Cancelling, Revision = record.Revision + 1 };
         SaveTurns(turns);
         await EmitAsync(new TurnLifecycle(
@@ -145,7 +146,7 @@ internal sealed class Chat : Neuron, IChat
             Id,
             ChatTurnStatus.Cancelling,
             "running-cancel")).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        _activeCallCancellation?.Cancel();
+        cancellation?.Cancel();
     }
 
     public Task<ChatTranscript> Read() => Task.FromResult(new ChatTranscript(Turns()));

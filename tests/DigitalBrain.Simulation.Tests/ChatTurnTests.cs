@@ -12,9 +12,8 @@ namespace DigitalBrain.Simulation.Tests;
 
 // The full-turn safety net: one durable Send driven end-to-end through the production turn
 // machinery against the corpus-scripted mock LLM (tests/corpus/mvp-chart.feature). Pins the
-// frozen journal footprint UserMessaged → Pending → Running → Responded + Completed and the
-// side effects the scripted fires must leave behind (the chart entity's points and the
-// completed turn's memory fact).
+// frozen journal footprint's Responded + Completed and the side effects the scripted fires
+// must leave behind (the chart entity's points and the completed turn's memory fact).
 [Collection(SimulationCollection.Name)]
 public sealed class ChatTurnTests(SimulationFixture fixture)
 {

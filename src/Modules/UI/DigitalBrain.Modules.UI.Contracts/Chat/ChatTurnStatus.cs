@@ -10,7 +10,4 @@ public enum ChatTurnStatus
     Failed = 3,
     Cancelled = 4,
     Cancelling = 5,
-    // Retired wire value: parked turns died with the awaited-worker turn shape. Kept so
-    // journaled lifecycles from older builds still deserialize.
-    Waiting = 6,
 }

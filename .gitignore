@@ -36,3 +36,4 @@ plans/stage1/logs/
 # local runtime logs
 apphost.out.log
 apphost.err.log
+*.log

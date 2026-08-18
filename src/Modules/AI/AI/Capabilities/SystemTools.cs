@@ -62,7 +62,6 @@ public sealed class SystemTools(
             cancellationToken).ConfigureAwait(false);
 
         var lines = new StringBuilder();
-        AppendExternalServers(lines);
 
         if (hits.Count == 0)
         {
@@ -86,23 +85,6 @@ public sealed class SystemTools(
         }
 
         return lines.ToString();
-    }
-
-    private void AppendExternalServers(StringBuilder lines)
-    {
-        var servers = services.GetServices<ExternalServerCapability>().ToArray();
-        if (servers.Length == 0)
-        {
-            return;
-        }
-
-        lines.AppendLine(
-            "External servers (their live tool catalogs are the capabilities — fire "
-            + "db.mcp.list-tools at mcp:<key>, then db.mcp.call-tool):");
-        foreach (var server in servers)
-        {
-            lines.AppendLine($"  {server.Key} ({server.DisplayName}) — target mcp:{server.Key}");
-        }
     }
 
     // Absence is stated rather than left blank: a wire made before provenance existed is not

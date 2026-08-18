@@ -44,8 +44,8 @@ The initial solution is a minimal set of **extremely well-designed, testable abs
 
 Actual deletions in C1 (Task 6 complete; Tasks 1–5 earlier):
 - **Registry wave survives until C2** (executive ruling): `IRegistry` and supporting grains remain; the full wave deletion deferred to C2 after the Brain absorbs capability plumbing.
-- **Workspace** died in Task 5 (not Task 1): removed as part of the Execution module cleanup in the prior task.
-- **/authorizations/events SSE surface** died with the auth rail: the Webhook removal (no consumers, zero call sites post-C1).
+- **Workspace** died in Task 5 with the auth slim-down (commit 60c15f67), not Task 1 — one coherent change with the cookie dev-auth replacement.
+- **The /authorizations/events SSE surface** (MapAuthorizationStreams + AuthorizationEvent) died in Task 4 with the MCP authorization rail — the rail was its only producer. The Flutter shell's subscription was de-fanged in Task 5 (debugPrint-only onError).
 - **Webhook died**: zero consumers in the codebase; removed as dead code.
 
 ## 4. Fabric (C3 — srcv2 shape)
