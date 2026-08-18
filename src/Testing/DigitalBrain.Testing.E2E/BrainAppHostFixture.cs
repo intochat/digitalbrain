@@ -24,6 +24,8 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
 
     public DistributedApplication App { get; private set; } = null!;
 
+    public IReadOnlyList<string> StrippedWaits { get; private set; } = [];
+
     public virtual BrainE2EOptions Configure() => new();
 
     public async ValueTask InitializeAsync()
@@ -37,6 +39,7 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
         IsolateContainers(appBuilder);
         RandomizeProxiedPorts(appBuilder);
         ArmExplicitStart(appBuilder, options.ExplicitStart);
+        StrippedWaits = StripNeverStartingWaits(appBuilder, options.ExplicitStart);
         ArmBrainTestMode(appBuilder);
 
         App = await appBuilder.BuildAsync().ConfigureAwait(false);
@@ -99,8 +102,12 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
         }
     }
 
-    // TripRadar's container-isolation pattern: never reuse a container or its volume state
-    // across test runs. WithLifetime(Session) already performs the annotation replace.
+    // TripRadar's container-isolation pattern: never reuse a container, its name, or its volume
+    // state across test runs. WithLifetime(Session) already performs the annotation replace.
+    // A stray ContainerNameAnnotation still wins over that lifetime for naming purposes — Aspire
+    // falls back to a random per-run postfix only when no such annotation is present at all,
+    // which is what let a session-lifetime "storage" container collide with, and replace, a
+    // developer's persistent aspire-run "storage" container sharing the same deterministic name.
     private static void IsolateContainers(IDistributedApplicationTestingBuilder appBuilder)
     {
         foreach (var container in appBuilder.Resources.OfType<ContainerResource>())
@@ -113,6 +120,11 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
                 {
                     container.Annotations.Remove(mount);
                 }
+            }
+
+            foreach (var containerName in container.Annotations.OfType<ContainerNameAnnotation>().ToList())
+            {
+                container.Annotations.Remove(containerName);
             }
         }
     }
@@ -147,6 +159,82 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
                 appBuilder.CreateResourceBuilder(resource).WithExplicitStart();
             }
         }
+    }
+
+    // kernel's WaitUntilHealthy chain (via .WithReference(brain)) transitively reaches model
+    // resources (e.g. the AI module's gemma4-12b) that are children of container resources named
+    // in ExplicitStart (e.g. ollama). Since explicit-start resources are deliberately never
+    // started, that DCP-level "enter Running" wait blocks forever, upstream of and invisible to
+    // WaitForResourceHealthyAsync. Strip every wait that targets an explicit-start resource or a
+    // descendant of one, so kernel never blocks on a resource this fixture chose not to start.
+    private static IReadOnlyList<string> StripNeverStartingWaits(
+        IDistributedApplicationTestingBuilder appBuilder,
+        IReadOnlyList<string> explicitStart)
+    {
+        var explicitStartResources = new HashSet<IResource>();
+        foreach (var resourceName in explicitStart)
+        {
+            if (appBuilder.Resources.TryGetByName(resourceName, out var resource))
+            {
+                explicitStartResources.Add(resource);
+            }
+        }
+
+        var neverStarting = new HashSet<IResource>(explicitStartResources);
+        foreach (var resource in appBuilder.Resources)
+        {
+            if (ReachesExplicitStart(resource, explicitStartResources))
+            {
+                neverStarting.Add(resource);
+            }
+        }
+
+        var stripped = new List<string>();
+        foreach (var resource in appBuilder.Resources)
+        {
+            var waitsOnNeverStarting = resource.Annotations
+                .OfType<WaitAnnotation>()
+                .Where(wait => neverStarting.Contains(wait.Resource))
+                .ToList();
+
+            foreach (var wait in waitsOnNeverStarting)
+            {
+                resource.Annotations.Remove(wait);
+                stripped.Add($"{resource.Name} -> {wait.Resource.Name} ({wait.WaitType})");
+            }
+        }
+
+        return stripped;
+    }
+
+    // Walks the resource's "Parent" relationship chain (ResourceRelationshipAnnotation with
+    // Type "Parent" — the literal Aspire's own WithParentRelationship embeds for its internal
+    // KnownRelationshipTypes.Parent, which is not itself publicly reachable) up to the root,
+    // reporting whether any ancestor is one of the never-started resources.
+    private static bool ReachesExplicitStart(IResource resource, IReadOnlySet<IResource> explicitStartResources)
+    {
+        var current = resource;
+        for (var hop = 0; hop < 32; hop++)
+        {
+            var parent = current.Annotations
+                .OfType<ResourceRelationshipAnnotation>()
+                .FirstOrDefault(relationship => string.Equals(relationship.Type, "Parent", StringComparison.Ordinal))
+                ?.Resource;
+
+            if (parent is null)
+            {
+                return false;
+            }
+
+            if (explicitStartResources.Contains(parent))
+            {
+                return true;
+            }
+
+            current = parent;
+        }
+
+        return false;
     }
 
     private static void ArmBrainTestMode(IDistributedApplicationTestingBuilder appBuilder)
