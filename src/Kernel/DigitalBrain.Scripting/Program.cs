@@ -38,11 +38,6 @@ while (DateTimeOffset.UtcNow < deadline)
     await Task.Delay(2000).ConfigureAwait(false);
 }
 
-// 3) Wave 2 registry probe.
-var probe = Path.Combine(scriptingDir, "wave2-registry-probe.cs");
-Console.WriteLine($"probe:{probe}");
-Console.WriteLine(await RunScriptAsync(probe).ConfigureAwait(false));
-
 static async Task<string> RunScriptAsync(string scriptPath)
 {
     var start = new ProcessStartInfo("dotnet", $"run --file \"{scriptPath}\" --no-launch-profile")
