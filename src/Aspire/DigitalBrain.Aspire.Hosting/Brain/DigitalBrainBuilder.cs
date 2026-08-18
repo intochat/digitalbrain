@@ -17,18 +17,18 @@ public sealed class DigitalBrainBuilder
         IDistributedApplicationBuilder builder,
         string name,
         OrleansService orleans,
-        IResourceBuilder<AzureBlobStorageResource> journal,
+        IResourceBuilder<AzureBlobStorageResource> durableStateStore,
         IResourceBuilder<AzureQueueStorageResource> streams,
         IResourceBuilder<AzureTableStorageResource> pubSub)
     {
-        ArgumentNullException.ThrowIfNull(journal);
+        ArgumentNullException.ThrowIfNull(durableStateStore);
         ArgumentNullException.ThrowIfNull(streams);
         ArgumentNullException.ThrowIfNull(pubSub);
 
         ApplicationBuilder = builder;
         Name = name;
         Orleans = orleans;
-        Journal = journal;
+        DurableStateStore = durableStateStore;
         Streams = streams;
         PubSub = pubSub;
     }
@@ -37,7 +37,7 @@ public sealed class DigitalBrainBuilder
 
     public IDistributedApplicationBuilder ApplicationBuilder { get; }
 
-    internal IResourceBuilder<AzureBlobStorageResource> Journal { get; }
+    internal IResourceBuilder<AzureBlobStorageResource> DurableStateStore { get; }
 
     internal IResourceBuilder<AzureQueueStorageResource> Streams { get; }
 

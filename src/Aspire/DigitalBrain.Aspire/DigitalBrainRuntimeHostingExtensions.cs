@@ -32,7 +32,7 @@ public static class DigitalBrainRuntimeHostingExtensions
         builder.AddKeyedAzureTableServiceClient(DigitalBrainNames.PubSub);
         builder.UseOrleans(silo =>
         {
-            silo.AddDigitalBrainJournalStorage(builder.Configuration);
+            silo.AddDigitalBrainDurableState(builder.Configuration);
             DigitalBrainRuntime.Add(silo, modules);
             silo.Services
                 .AddOptions<HashRingStreamQueueMapperOptions>(DigitalBrainNames.StreamProvider)

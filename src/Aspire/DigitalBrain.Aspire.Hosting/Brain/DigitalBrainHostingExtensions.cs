@@ -6,7 +6,7 @@ namespace DigitalBrain.Aspire.Hosting;
 
 public static class DigitalBrainHostingExtensions
 {
-    public static string JournalConnectionName => DigitalBrainNames.JournalConnection;
+    public static string DurableStateConnectionName => DigitalBrainNames.JournalConnection;
 
     public static string StateProtectionKeyConfigurationKey => DigitalBrainNames.StateProtectionKey;
 
@@ -22,7 +22,7 @@ public static class DigitalBrainHostingExtensions
                 .WithLifetime(ContainerLifetime.Persistent));
         var clustering = storage.AddTables(DigitalBrainNames.Clustering);
         var reminders = storage.AddTables(DigitalBrainNames.Reminders);
-        var journal = storage.AddBlobs(DigitalBrainNames.Journal);
+        var durableStateStore = storage.AddBlobs(DigitalBrainNames.Journal);
         var streams = storage.AddQueues(DigitalBrainNames.Streams);
         var pubSub = storage.AddTables(DigitalBrainNames.PubSub);
         var orleans = builder
@@ -31,13 +31,13 @@ public static class DigitalBrainHostingExtensions
             .WithReminders(reminders)
             .WithGrainStorage(DigitalBrainNames.PubSubStore, pubSub)
             .WithStreaming(DigitalBrainNames.StreamProvider, streams);
-        var brain = new DigitalBrainBuilder(builder, name, orleans, journal, streams, pubSub);
+        var brain = new DigitalBrainBuilder(builder, name, orleans, durableStateStore, streams, pubSub);
 
         // Silo and clients WaitUntilHealthy for the full fabric before starting.
         brain.RequireHealthyBeforeStart(storage.Resource);
         brain.RequireHealthyBeforeStart(clustering.Resource);
         brain.RequireHealthyBeforeStart(reminders.Resource);
-        brain.RequireHealthyBeforeStart(journal.Resource);
+        brain.RequireHealthyBeforeStart(durableStateStore.Resource);
         brain.RequireHealthyBeforeStart(streams.Resource);
         brain.RequireHealthyBeforeStart(pubSub.Resource);
         return brain;
@@ -88,7 +88,7 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(brain);
 
         builder.WithReference(brain.Orleans);
-        builder.WithReference(brain.Journal, DigitalBrainNames.JournalConnection);
+        builder.WithReference(brain.DurableStateStore, DigitalBrainNames.JournalConnection);
         builder.WithReference(brain.Streams);
         builder.WithReference(brain.PubSub);
 

@@ -19,7 +19,7 @@ public static class DigitalBrainRuntime
         builder.Services.AddSingleton(CapabilityIndex.Build(manifests));
 
         builder.AddJournalStorage();
-        builder.UseJsonJournalFormat(JournalJson.TypeInfoResolver);
+        builder.UseJsonJournalFormat(DurableStateJson.TypeInfoResolver);
         builder.AddIncomingGrainCallFilter<IncomingReificationFilter>();
         builder.AddIncomingGrainCallFilter<OwnerBoundCallFilter>();
         builder.AddOutgoingGrainCallFilter<OutgoingReificationFilter>();
