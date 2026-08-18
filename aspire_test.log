@@ -1,0 +1,87 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\tests\DigitalBrain.Aspire.Tests\DigitalBrain.Aspire.Tests.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Modules\UI\DigitalBrain.Modules.UI.Aspire.Hosting\DigitalBrain.Modules.UI.Aspire.Hosting.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Modules\UI\DigitalBrain.Modules.UI\DigitalBrain.Modules.UI.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Modules\Introspection\Introspection\DigitalBrain.Modules.Introspection.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Kernel\DigitalBrain.Core\DigitalBrain.Core.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Modules\Time\Time\DigitalBrain.Modules.Time.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Modules\AI\Contracts\DigitalBrain.Modules.AI.Contracts.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Kernel\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Modules\UI\DigitalBrain.Modules.UI.Contracts\DigitalBrain.Modules.UI.Contracts.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Modules\AI\AI\DigitalBrain.Modules.AI.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Modules\Time\Contracts\DigitalBrain.Modules.Time.Contracts.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Kernel\DigitalBrain.Sdk\DigitalBrain.Sdk.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Aspire\DigitalBrain.AppHost\DigitalBrain.AppHost.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Aspire\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Modules\Memory\Contracts\DigitalBrain.Modules.Memory.Contracts.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Modules\Memory\Aspire.Hosting\DigitalBrain.Modules.Memory.Aspire.Hosting.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Modules\Memory\Memory\DigitalBrain.Modules.Memory.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Modules\AI\Aspire.Hosting\DigitalBrain.Modules.AI.Aspire.Hosting.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Modules\Introspection\Contracts\DigitalBrain.Modules.Introspection.Contracts.csproj]
+  DigitalBrain.Abstractions -> E:\intochat\digitalbrain\src\Kernel\DigitalBrain.Abstractions\bin\Debug\net11.0\DigitalBrain.Abstractions.dll
+  DigitalBrain.Client -> E:\intochat\digitalbrain\src\Kernel\DigitalBrain.Client\bin\Debug\net11.0\DigitalBrain.Client.dll
+  DigitalBrain.Modules.Time.Contracts -> E:\intochat\digitalbrain\src\Modules\Time\Contracts\bin\Debug\net11.0\DigitalBrain.Modules.Time.Contracts.dll
+  DigitalBrain.Sdk -> E:\intochat\digitalbrain\src\Kernel\DigitalBrain.Sdk\bin\Debug\net11.0\DigitalBrain.Modules.Sdk.dll
+  DigitalBrain.Modules.AI.Contracts -> E:\intochat\digitalbrain\src\Modules\AI\Contracts\bin\Debug\net11.0\DigitalBrain.Modules.AI.Contracts.dll
+  DigitalBrain.Core -> E:\intochat\digitalbrain\src\Kernel\DigitalBrain.Core\bin\Debug\net11.0\DigitalBrain.Core.dll
+  DigitalBrain.Modules.UI.Contracts -> E:\intochat\digitalbrain\src\Modules\UI\DigitalBrain.Modules.UI.Contracts\bin\Debug\net11.0\DigitalBrain.Modules.UI.Contracts.dll
+  DigitalBrain.Modules.Memory.Contracts -> E:\intochat\digitalbrain\src\Modules\Memory\Contracts\bin\Debug\net11.0\DigitalBrain.Modules.Memory.Contracts.dll
+  DigitalBrain.Modules.Introspection.Contracts -> E:\intochat\digitalbrain\src\Modules\Introspection\Contracts\bin\Debug\net11.0\DigitalBrain.Modules.Introspection.Contracts.dll
+  DigitalBrain.Aspire.Hosting -> E:\intochat\digitalbrain\src\Aspire\DigitalBrain.Aspire.Hosting\bin\Debug\net11.0\DigitalBrain.Aspire.Hosting.dll
+  DigitalBrain.ServiceDefaults -> E:\intochat\digitalbrain\src\Aspire\DigitalBrain.ServiceDefaults\bin\Debug\net11.0\DigitalBrain.ServiceDefaults.dll
+  DigitalBrain.Testing -> E:\intochat\digitalbrain\src\Testing\DigitalBrain.Testing\bin\Debug\net11.0\DigitalBrain.Testing.dll
+  DigitalBrain.Modules.Introspection -> E:\intochat\digitalbrain\src\Modules\Introspection\Introspection\bin\Debug\net11.0\DigitalBrain.Modules.Introspection.dll
+  DigitalBrain.Modules.Memory -> E:\intochat\digitalbrain\src\Modules\Memory\Memory\bin\Debug\net11.0\DigitalBrain.Modules.Memory.dll
+  DigitalBrain.Modules.UI -> E:\intochat\digitalbrain\src\Modules\UI\DigitalBrain.Modules.UI\bin\Debug\net11.0\DigitalBrain.Modules.UI.dll
+  DigitalBrain.Modules.Time -> E:\intochat\digitalbrain\src\Modules\Time\Time\bin\Debug\net11.0\DigitalBrain.Modules.Time.dll
+  DigitalBrain.Modules.AI -> E:\intochat\digitalbrain\src\Modules\AI\AI\bin\Debug\net11.0\DigitalBrain.Modules.AI.dll
+  DigitalBrain.Aspire -> E:\intochat\digitalbrain\src\Aspire\DigitalBrain.Aspire\bin\Debug\net11.0\DigitalBrain.Aspire.dll
+  DigitalBrain.Modules.UI.Aspire.Hosting -> E:\intochat\digitalbrain\src\Modules\UI\DigitalBrain.Modules.UI.Aspire.Hosting\bin\Debug\net11.0\DigitalBrain.Modules.UI.Aspire.Hosting.dll
+  DigitalBrain.Modules.AI.Aspire.Hosting -> E:\intochat\digitalbrain\src\Modules\AI\Aspire.Hosting\bin\Debug\net11.0\DigitalBrain.Modules.AI.Aspire.Hosting.dll
+  DigitalBrain.Modules.Memory.Aspire.Hosting -> E:\intochat\digitalbrain\src\Modules\Memory\Aspire.Hosting\bin\Debug\net11.0\DigitalBrain.Modules.Memory.Aspire.Hosting.dll
+  DigitalBrain.Mcp -> E:\intochat\digitalbrain\src\Kernel\DigitalBrain.Mcp\bin\Debug\net11.0\DigitalBrain.Mcp.dll
+  DigitalBrain.Kernel -> E:\intochat\digitalbrain\src\Kernel\DigitalBrain.Kernel\bin\Debug\net11.0\win-x64\DigitalBrain.Kernel.dll
+  DigitalBrain.AppHost -> E:\intochat\digitalbrain\src\Aspire\DigitalBrain.AppHost\bin\Debug\net11.0\DigitalBrain.AppHost.dll
+  Γöî  Syncing CodeGraph
+  Γöé
+  Scanning files...
+  Γöé
+  ΓùÅ  Already up to date
+  Γöé
+  Γöö  Done
+  
+  DigitalBrain.Aspire.Tests -> E:\intochat\digitalbrain\tests\DigitalBrain.Aspire.Tests\bin\Debug\net11.0\DigitalBrain.Aspire.Tests.dll
+Running tests from E:\intochat\digitalbrain\tests\DigitalBrain.Aspire.Tests\bin\Debug\net11.0\DigitalBrain.Aspire.Tests.dll (net11.0|x64)
+info: Aspire.Hosting.DistributedApplication[0]
+      Aspire AppHost version: 13.5.0-preview.1.26376.5+8669e0b8f8ca137ae3443f3bf52312bc3ec680d9
+info: Aspire.Hosting.DistributedApplication[0]
+      Distributed application starting.
+info: Aspire.Hosting.DistributedApplication[0]
+      Application host directory is: E:\intochat\digitalbrain\src\Aspire\DigitalBrain.AppHost
+fail: Microsoft.Extensions.Hosting.Internal.Host[9]
+      BackgroundService failed
+      System.Threading.Tasks.TaskCanceledException: A task was canceled.
+         at Microsoft.Extensions.Hosting.Internal.Host.TryExecuteBackgroundServiceAsync(BackgroundService backgroundService)
+crit: Microsoft.Extensions.Hosting.Internal.Host[10]
+      The HostOptions.BackgroundServiceExceptionBehavior is configured to StopHost. A BackgroundService has thrown an unhandled exception, and the IHost instance is stopping. To avoid this behavior, configure this to Ignore; however the BackgroundService will not be restarted.
+      System.Threading.Tasks.TaskCanceledException: A task was canceled.
+         at Microsoft.Extensions.Hosting.Internal.Host.TryExecuteBackgroundServiceAsync(BackgroundService backgroundService)
+fail: Microsoft.Extensions.Hosting.Internal.Host[11]
+      Hosting failed to start
+      System.Threading.Tasks.TaskCanceledException: A task was canceled.
+         at Aspire.Hosting.Dcp.DcpDependencyCheck.GetDcpInfoAsync(Boolean force, CancellationToken cancellationToken) in /_/src/Aspire.Hosting/Dcp/DcpDependencyCheck.cs:line 34
+         at Aspire.Hosting.Dcp.DcpHost.EnsureDcpContainerRuntimeAsync(CancellationToken cancellationToken) in /_/src/Aspire.Hosting/Dcp/DcpHost.cs:line 89
+         at Aspire.Hosting.Dcp.DcpHost.StartAsync(CancellationToken cancellationToken) in /_/src/Aspire.Hosting/Dcp/DcpHost.cs:line 80
+         at Aspire.Hosting.Orchestrator.OrchestratorHostService.StartAsync(CancellationToken cancellationToken) in /_/src/Aspire.Hosting/Orchestrator/OrchestratorHostService.cs:line 39
+         at Microsoft.Extensions.Hosting.Internal.Host.<StartAsync>b__16_1(IHostedService service, CancellationToken token)
+         at Microsoft.Extensions.Hosting.Internal.Host.ForeachService[T](IEnumerable`1 services, CancellationToken token, Boolean concurrent, Boolean abortOnFirstException, List`1 exceptions, Func`3 operation)
+E:\intochat\digitalbrain\tests\DigitalBrain.Aspire.Tests\bin\Debug\net11.0\DigitalBrain.Aspire.Tests.dll (net11.0|x64) passed [+16/x0/?0] (21s 325ms)
+
+Test run summary: Passed!
+  total: 16
+  failed: 0
+  succeeded: 16
+  skipped: 0
+  duration: 21s 503ms

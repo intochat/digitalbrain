@@ -1,0 +1,38 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\tests\DigitalBrain.Simulation.Tests\DigitalBrain.Simulation.Tests.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Modules\Time\Contracts\DigitalBrain.Modules.Time.Contracts.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Modules\AI\AI\DigitalBrain.Modules.AI.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Modules\UI\DigitalBrain.Modules.UI\DigitalBrain.Modules.UI.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Modules\Time\Time\DigitalBrain.Modules.Time.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Modules\Memory\Memory\DigitalBrain.Modules.Memory.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Kernel\DigitalBrain.Abstractions\DigitalBrain.Abstractions.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Kernel\DigitalBrain.Sdk\DigitalBrain.Sdk.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Modules\AI\Contracts\DigitalBrain.Modules.AI.Contracts.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Kernel\DigitalBrain.Core\DigitalBrain.Core.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Modules\UI\DigitalBrain.Modules.UI.Contracts\DigitalBrain.Modules.UI.Contracts.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Kernel\DigitalBrain.Client\DigitalBrain.Client.csproj]
+C:\Program Files\dotnet\sdk\11.0.100-preview.6.26359.118\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [E:\intochat\digitalbrain\src\Testing\DigitalBrain.Testing\DigitalBrain.Testing.csproj]
+  DigitalBrain.Abstractions -> E:\intochat\digitalbrain\src\Kernel\DigitalBrain.Abstractions\bin\Debug\net11.0\DigitalBrain.Abstractions.dll
+  DigitalBrain.Sdk -> E:\intochat\digitalbrain\src\Kernel\DigitalBrain.Sdk\bin\Debug\net11.0\DigitalBrain.Modules.Sdk.dll
+  DigitalBrain.Modules.Time.Contracts -> E:\intochat\digitalbrain\src\Modules\Time\Contracts\bin\Debug\net11.0\DigitalBrain.Modules.Time.Contracts.dll
+  DigitalBrain.Modules.UI.Contracts -> E:\intochat\digitalbrain\src\Modules\UI\DigitalBrain.Modules.UI.Contracts\bin\Debug\net11.0\DigitalBrain.Modules.UI.Contracts.dll
+  DigitalBrain.Modules.Memory.Contracts -> E:\intochat\digitalbrain\src\Modules\Memory\Contracts\bin\Debug\net11.0\DigitalBrain.Modules.Memory.Contracts.dll
+  DigitalBrain.Client -> E:\intochat\digitalbrain\src\Kernel\DigitalBrain.Client\bin\Debug\net11.0\DigitalBrain.Client.dll
+  DigitalBrain.Modules.AI.Contracts -> E:\intochat\digitalbrain\src\Modules\AI\Contracts\bin\Debug\net11.0\DigitalBrain.Modules.AI.Contracts.dll
+  DigitalBrain.Core -> E:\intochat\digitalbrain\src\Kernel\DigitalBrain.Core\bin\Debug\net11.0\DigitalBrain.Core.dll
+  DigitalBrain.Modules.UI -> E:\intochat\digitalbrain\src\Modules\UI\DigitalBrain.Modules.UI\bin\Debug\net11.0\DigitalBrain.Modules.UI.dll
+  DigitalBrain.Modules.Memory -> E:\intochat\digitalbrain\src\Modules\Memory\Memory\bin\Debug\net11.0\DigitalBrain.Modules.Memory.dll
+  DigitalBrain.Modules.Time -> E:\intochat\digitalbrain\src\Modules\Time\Time\bin\Debug\net11.0\DigitalBrain.Modules.Time.dll
+  DigitalBrain.Modules.AI -> E:\intochat\digitalbrain\src\Modules\AI\AI\bin\Debug\net11.0\DigitalBrain.Modules.AI.dll
+  DigitalBrain.Testing -> E:\intochat\digitalbrain\src\Testing\DigitalBrain.Testing\bin\Debug\net11.0\DigitalBrain.Testing.dll
+  DigitalBrain.Simulation.Tests -> E:\intochat\digitalbrain\tests\DigitalBrain.Simulation.Tests\bin\Debug\net11.0\win-x64\DigitalBrain.Simulation.Tests.dll
+Running tests from E:\intochat\digitalbrain\tests\DigitalBrain.Simulation.Tests\bin\Debug\net11.0\win-x64\DigitalBrain.Simulation.Tests.dll (net11.0|x64)
+E:\intochat\digitalbrain\tests\DigitalBrain.Simulation.Tests\bin\Debug\net11.0\win-x64\DigitalBrain.Simulation.Tests.dll (net11.0|x64) passed [+8/x0/?0] (54s 084ms)
+
+Test run summary: Passed!
+  total: 8
+  failed: 0
+  succeeded: 8
+  skipped: 0
+  duration: 54s 290ms

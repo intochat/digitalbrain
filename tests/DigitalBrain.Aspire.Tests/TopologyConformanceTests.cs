@@ -26,23 +26,11 @@ public sealed class TopologyConformanceTests(ModelFixture fixture)
     [Theory]
     [InlineData(ProductSurfaceResourceNames.Kernel)]
     [InlineData(ProductSurfaceResourceNames.Mcp)]
-    [InlineData(ProductSurfaceResourceNames.Scripting)]
     public void ProductSurfaceResourceExists(string resourceName)
     {
         var resource = fixture.Model.Resource(resourceName);
 
         Assert.Equal(resourceName, resource.Name);
-    }
-
-    [Fact]
-    public void ScriptingCarriesExplicitStartupAnnotation()
-    {
-        // Pins the phase-1 fix: scripting must not auto-run alongside kernel/mcp, only from
-        // the dashboard. Aspire 13.5 marks that with ExplicitStartupAnnotation (a presence-only
-        // marker, found via Aspire.Hosting.dll reflection: Aspire.Hosting.ApplicationModel.ExplicitStartupAnnotation).
-        var scripting = fixture.Model.Resource(ProductSurfaceResourceNames.Scripting);
-
-        Assert.NotEmpty(scripting.Annotations.OfType<ExplicitStartupAnnotation>());
     }
 
     [Fact]

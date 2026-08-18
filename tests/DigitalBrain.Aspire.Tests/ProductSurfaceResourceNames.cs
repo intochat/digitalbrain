@@ -7,5 +7,4 @@ internal static class ProductSurfaceResourceNames
 {
     public const string Kernel = "kernel";
     public const string Mcp = "mcp";
-    public const string Scripting = "scripting";
 }
