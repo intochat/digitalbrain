@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.Corpus;
 using DigitalBrain.Chat;
 using DigitalBrain.Core;
 using DigitalBrain.Execution;
@@ -826,6 +827,16 @@ internal sealed class Chat : Neuron, IChat, IRemindable
         {
             Remember(new ChatTurn(FromUser: false, chatResult.Answer));
         }
+
+        await SendAsync(
+            ICorpus.ForOwner(Id.Owner),
+            new AppendCorpusEntry(
+                CommandId.New(),
+                Kind: "chat.responded",
+                Text: chatResult.Answer,
+                Correlation: record.CommandId.ToString("n"),
+                At: DateTimeOffset.UtcNow))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private static bool IsExecutionTerminal(ExecutionState state)

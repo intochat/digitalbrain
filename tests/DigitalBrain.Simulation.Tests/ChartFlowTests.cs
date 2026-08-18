@@ -1,3 +1,9 @@
+using DigitalBrain.Abstractions.Behavior;
+using DigitalBrain.Abstractions.Corpus;
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Journals;
+using DigitalBrain.Chat;
+using DigitalBrain.Client;
 using DigitalBrain.UI;
 using Xunit;
 
@@ -40,6 +46,67 @@ public sealed class ChartFlowTests(SimulationFixture fixture)
         Assert.Equal("series-a", point.Series);
         Assert.Equal("jan", point.Label);
         Assert.Equal(42, point.Value);
+    }
+
+    [Fact]
+    public async Task ChartCardOffersDoNotAppendToCorporus()
+    {
+        var chatName = fixture.Sim.UniqueId("chat");
+        var chartName = fixture.Sim.UniqueId("chart");
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        var chat = fixture.Sim.Brain.Get<IChat>(chatName);
+        var chatId = chat.Id;
+        var corpusId = ICorpus.ForOwner(fixture.Sim.Brain.Owner);
+
+        var corpus = fixture.Sim.Brain.Get<ICorpus>();
+
+        await fixture.Sim.Brain.FireAsync(
+            chatId,
+            new ChartCard(chartName),
+            cancellationToken);
+
+        var outgoing = await PollUntilJournalPresentAsync(
+            () => fixture.Sim.Brain.ReadJournalAsync(chatId, JournalKind.Outgoing, cancellationToken: cancellationToken),
+            cancellationToken);
+
+        var respondedDelivery = Assert.Single(
+            outgoing.Delta,
+            d => d.Synapse is Responded);
+        Assert.IsType<Responded>(respondedDelivery.Synapse);
+
+        // FIXME: Test full turn completion appends to corpus in next task when Execution
+        // module is available in fixture. For now, verify that ChartCard offers (which emit
+        // Responded directly) do NOT create corpus entries, since offers are not turn completions.
+        var query = new ReadEpisode(CommandId.New(), "", Limit: 100);
+        var episode = await corpus.FireAsync(query, cancellationToken);
+
+        var chatRespondedEntries = episode.Entries.Where(e => e.Kind == "chat.responded").ToList();
+        Assert.Empty(chatRespondedEntries);
+    }
+
+    private static async Task<JournalRead> PollUntilJournalPresentAsync(
+        Func<Task<JournalRead>> read,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow + PollTimeout;
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = await read();
+            if (result.Delta.Count > 0)
+            {
+                return result;
+            }
+
+            if (DateTimeOffset.UtcNow >= deadline)
+            {
+                throw new TimeoutException(
+                    $"The journal had no entries within {PollTimeout}.");
+            }
+
+            await Task.Delay(PollInterval, cancellationToken);
+        }
     }
 
     private static async Task<ChartState> PollUntilPresentAsync(
