@@ -34,31 +34,7 @@ public readonly record struct NeuronId
     public static NeuronId BroadcastReceiver(string type, OwnerId owner, CorrelationId correlation)
         => new(type, owner, correlation.Value.ToString("D"));
 
-    public static string GrainTypeNameOf(Type neuronType)
-    {
-        ArgumentNullException.ThrowIfNull(neuronType);
-
-        var declared = neuronType.GetCustomAttributesData()
-            .FirstOrDefault(attribute => attribute.AttributeType == typeof(GrainTypeAttribute))?
-            .ConstructorArguments[0].Value as string;
-
-        if (declared is not null)
-        {
-            return declared;
-        }
-
-        const string OrleansGrainSuffix = "Grain";
-        var name = neuronType.Name;
-
-        if (neuronType.IsInterface && name.Length > 1 && name[0] == 'I' && char.IsUpper(name[1]))
-        {
-            return name[1..];
-        }
-
-        return name.Length > OrleansGrainSuffix.Length && name.EndsWith(OrleansGrainSuffix, StringComparison.Ordinal)
-            ? name[..^OrleansGrainSuffix.Length]
-            : name;
-    }
+    public static string GrainTypeNameOf(Type neuronType) => GrainTypeNames.Of(neuronType);
 
     public static NeuronId FromGrainKey(string type, string grainKey)
     {
