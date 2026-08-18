@@ -57,6 +57,7 @@ public sealed class BrainSimulation : IAsyncDisposable
             silo.Services.AddSingleton<IJournalStorageProvider, VolatileJournalStorageProvider>();
             DigitalBrainRuntime.Add(silo, options.Modules);
             silo.AddMemoryGrainStorage(DigitalBrainNames.PubSubStore);
+            silo.AddMemoryGrainStorage(DigitalBrainNames.DefaultGrainStorage);
             silo.AddMemoryStreams(DigitalBrainNames.StreamProvider);
             silo.UseInMemoryReminderService();
             options.ConfigureSilo?.Invoke(silo);

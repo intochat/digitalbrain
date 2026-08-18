@@ -19,6 +19,7 @@ public sealed class NamesConformanceTests(ModelFixture fixture)
     [InlineData(DigitalBrainNames.Streams)]
     [InlineData(DigitalBrainNames.PubSub)]
     [InlineData(DigitalBrainNames.Journal)]
+    [InlineData(DigitalBrainNames.GrainState)]
     public async Task KernelRenderedEnvironmentContainsFabricConnectionStringKey(string fabricResourceName)
     {
         var environment = await fixture.Model.RenderedEnvironmentAsync(ProductSurfaceResourceNames.Kernel);

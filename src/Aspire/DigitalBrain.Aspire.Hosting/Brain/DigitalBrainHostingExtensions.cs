@@ -22,6 +22,7 @@ public static class DigitalBrainHostingExtensions
         var clustering = storage.AddTables(DigitalBrainNames.Clustering);
         var reminders = storage.AddTables(DigitalBrainNames.Reminders);
         var durableStateStore = storage.AddBlobs(DigitalBrainNames.Journal);
+        var grainState = storage.AddBlobs(DigitalBrainNames.GrainState);
         var streams = storage.AddQueues(DigitalBrainNames.Streams);
         var pubSub = storage.AddTables(DigitalBrainNames.PubSub);
         var orleans = builder
@@ -29,14 +30,16 @@ public static class DigitalBrainHostingExtensions
             .WithClustering(clustering)
             .WithReminders(reminders)
             .WithGrainStorage(DigitalBrainNames.PubSubStore, pubSub)
+            .WithGrainStorage(DigitalBrainNames.DefaultGrainStorage, grainState)
             .WithStreaming(DigitalBrainNames.StreamProvider, streams);
-        var brain = new DigitalBrainBuilder(builder, name, orleans, durableStateStore, streams, pubSub);
+        var brain = new DigitalBrainBuilder(builder, name, orleans, durableStateStore, grainState, streams, pubSub);
 
         // Silo and clients WaitUntilHealthy for the full fabric before starting.
         brain.RequireHealthyBeforeStart(storage.Resource);
         brain.RequireHealthyBeforeStart(clustering.Resource);
         brain.RequireHealthyBeforeStart(reminders.Resource);
         brain.RequireHealthyBeforeStart(durableStateStore.Resource);
+        brain.RequireHealthyBeforeStart(grainState.Resource);
         brain.RequireHealthyBeforeStart(streams.Resource);
         brain.RequireHealthyBeforeStart(pubSub.Resource);
         return brain;
@@ -63,6 +66,7 @@ public static class DigitalBrainHostingExtensions
 
         builder.WithReference(brain.Orleans);
         builder.WithReference(brain.DurableStateStore, DigitalBrainNames.JournalConnection);
+        builder.WithReference(brain.GrainState, DigitalBrainNames.GrainState);
         builder.WithReference(brain.Streams);
         builder.WithReference(brain.PubSub);
 

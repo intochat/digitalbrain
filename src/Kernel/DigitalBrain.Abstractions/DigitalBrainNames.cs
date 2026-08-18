@@ -11,12 +11,14 @@ public static class DigitalBrainNames
     public const string Clustering = "clustering";
     public const string Reminders = "reminders";
     public const string Journal = "journal";
+    public const string GrainState = "grainstate";
     public const string Streams = "streams";
     public const string PubSub = "pubsub";
 
     public const string JournalConnection = "journal";
     public const string StreamProvider = "DigitalBrain";
     public const string PubSubStore = "PubSubStore";
+    public const string DefaultGrainStorage = "Default";
 
     public const string Owner = "DigitalBrain:Owner";
     public const string Modules = "DigitalBrain:Modules";
