@@ -12,18 +12,6 @@ public interface ICounterEntity : IEntity<CounterState>
     [Alias(nameof(Add))]
     Task Add(int amount);
 
-    // Redeclares (hides) IEntity<TState>.Read: OwnerBoundCallFilter's unattributed-caller gate
-    // checks [ClientEntryPoint] on the DISPATCHED method's OWN declaring interface, not on any
-    // interface the target additionally implements. Calling Read() through an ICounterEntity
-    // reference dispatches against IEntity<TState> -- which carries no [ClientEntryPoint] -- so
-    // an external client's Read() is refused even though ICounterEntity itself is marked.
-    // Discovered by running EntityRoundTripsState: it threw NeuronAuthorizationException
-    // ("'Read' is not a client entry point...") until Read was redeclared here, matching how
-    // every other [ClientEntryPoint] contract in this codebase (ISessionNeuron, ITimer, ...)
-    // declares its members directly rather than relying on a shared unmarked base.
-    [Alias(nameof(Read))]
-    new Task<CounterState?> Read();
-
     // Test-only probe for the owner wall. OwnerBoundCallFilter only compares owners on an
     // ATTRIBUTED caller -- one whose own SourceId is itself a grain key in "{owner}/{name}"
     // form (see OwnerOf/OwnerBoundCallFilter.cs) -- and an external test client is never
