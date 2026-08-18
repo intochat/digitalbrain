@@ -1,7 +1,7 @@
 namespace DigitalBrain.Abstractions.Registry;
 
-// Durable per-owner catalog of instances that exist even when cold (not activated).
-// get_neurons reads this so "walk me through this brain" can name idle/disabled/cold cells.
+// Durable per-owner catalog of installed instances.
+// get_neurons reads this so "walk me through this brain" can name idle/disabled/cold instances.
 // Named IRegistry so GrainTypeNameOf → "registry" matches [GrainType("registry")].
 [ClientEntryPoint]
 [Alias("db.registry")]

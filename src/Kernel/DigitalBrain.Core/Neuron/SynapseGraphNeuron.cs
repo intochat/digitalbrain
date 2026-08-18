@@ -249,18 +249,6 @@ internal sealed class SynapseGraphNeuron : Neuron, ISynapseGraph
 
     private void RequireKnownEndpoint(NeuronId subject, string side)
     {
-        // Cell is the interpreted tier — kinds live in the key, type is always "cell".
-        if (string.Equals(subject.Type, ICell.GrainTypeName, StringComparison.OrdinalIgnoreCase))
-        {
-            if (subject.Name.IndexOf('@') <= 0 || subject.Name.EndsWith('@'))
-            {
-                throw new NeuronAuthorizationException(
-                    $"Graph '{Id}' refuses {side} '{subject}': cell keys must be kind@instance.");
-            }
-
-            return;
-        }
-
         var typeMap = ServiceProvider.GetService<ActiveModuleContractTypeMap>();
         if (typeMap is null)
         {
@@ -293,12 +281,6 @@ internal sealed class SynapseGraphNeuron : Neuron, ISynapseGraph
 
     private void RequireTargetHandlesAlias(NeuronId target, string deliveredAlias)
     {
-        // Cells accept kind-local and carrier facts; connect-time kind shape lands later.
-        if (string.Equals(target.Type, ICell.GrainTypeName, StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
         var catalog = ServiceProvider.GetService<ActiveCapabilityCatalog>();
         var typeMap = ServiceProvider.GetService<ActiveModuleContractTypeMap>();
         if (catalog is null || typeMap is null)

@@ -1,6 +1,6 @@
 global using DigitalBrain.Abstractions.Behavior;
 global using DigitalBrain.Abstractions.Capabilities;
-global using DigitalBrain.Abstractions.Cell;
+global using DigitalBrain.Abstractions.Entities;
 global using DigitalBrain.Abstractions.Corpus;
 global using DigitalBrain.Abstractions.Graph;
 global using DigitalBrain.Abstractions.Grants;

@@ -19,8 +19,6 @@ internal static class McpSurface
     public const string ForceScheduleCatchUp = "force_schedule_catch_up";
     public const string ReadSchedule = "read_schedule";
     public const string ReadCorpus = "read_corpus";
-    public const string CellApply = "cell_apply";
-    public const string CellReset = "cell_reset";
     public const string PublishLibrary = "publish_library";
     public const string DiscoverLibrary = "discover_library";
     public const string InstallLibrary = "install_library";

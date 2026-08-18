@@ -120,44 +120,4 @@ internal sealed class TimeTools(IDigitalBrain brain)
             + string.Join("\n", lines);
     }
 
-    [McpServerTool(Name = McpSurface.CellApply)]
-    [Description("Apply a key to a cell kind@instance (Wave 6 calculator).")]
-    public async Task<string> CellApplyAsync(
-        [Description("Cell identity kind@name, e.g. calculator@desk")] string identity,
-        [Description("Key: digit, operator, =, C, CE, BS")] string key,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(identity);
-        ArgumentException.ThrowIfNullOrWhiteSpace(key);
-
-        var snap = await brain
-            .Get<ICell>(identity.Trim())
-            .FireAsync<CellSnapshot>(
-                new CellApply(CommandId.New(), key.Trim()),
-                cancellationToken)
-            .WaitAsync(Bound, cancellationToken)
-            .ConfigureAwait(false);
-
-        return $"kind={snap.Kind} instance={snap.Instance} display={snap.Display} "
-            + $"value={snap.Value} phase={snap.Phase}";
-    }
-
-    [McpServerTool(Name = McpSurface.CellReset)]
-    [Description("Reset a cell to fresh kind state.")]
-    public async Task<string> CellResetAsync(
-        [Description("Cell identity kind@name")] string identity,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(identity);
-
-        var snap = await brain
-            .Get<ICell>(identity.Trim())
-            .FireAsync<CellSnapshot>(
-                new CellReset(CommandId.New()),
-                cancellationToken)
-            .WaitAsync(Bound, cancellationToken)
-            .ConfigureAwait(false);
-
-        return $"RESET kind={snap.Kind} instance={snap.Instance} display={snap.Display}";
-    }
 }
