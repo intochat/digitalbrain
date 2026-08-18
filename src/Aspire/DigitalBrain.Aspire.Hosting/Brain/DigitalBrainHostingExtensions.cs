@@ -1,5 +1,6 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using DigitalBrain.Abstractions.OAuth;
 
 namespace DigitalBrain.Aspire.Hosting;
 

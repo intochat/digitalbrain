@@ -1,6 +1,7 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.OAuth;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Aspire.Hosting;
