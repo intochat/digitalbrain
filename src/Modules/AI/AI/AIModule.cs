@@ -1,3 +1,4 @@
+using DigitalBrain.Abstractions;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Modules.Sdk;
 using Microsoft.Extensions.AI;
@@ -13,7 +14,18 @@ public sealed class AIModule : Core.IModule
         ArgumentNullException.ThrowIfNull(builder);
 
         DurablePayloadProtectionHosting.Configure(builder.Services, builder.Configuration);
-        AIClients.Add(builder.Services);
+        if (string.Equals(
+                builder.Configuration[DigitalBrainNames.Mode],
+                DigitalBrainNames.TestingMode,
+                StringComparison.Ordinal))
+        {
+            AITestingClients.Add(builder.Services, builder.Configuration);
+        }
+        else
+        {
+            AIClients.Add(builder.Services);
+        }
+
         VoiceToTextHosting.Add(builder.Services, builder.Configuration);
 
         // The unkeyed IChatClient IS the main model. Every other model use is an
