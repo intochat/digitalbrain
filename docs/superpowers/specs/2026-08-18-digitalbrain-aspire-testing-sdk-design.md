@@ -64,13 +64,13 @@ tests/
 
 Repair actions (phase 0): fix all broken `ProjectReference` paths; repoint `aspire.config.json`; restore the types dropped in the move and the gutted Kernel sources from `master` (as-is — ratification is phase 1); remove the seed project after absorption; `dotnet build DigitalBrain.slnx -warnaserror` green is the exit criterion.
 
-**Name-constant unification:** one linked source file (`<Compile Include>`) shared by `DigitalBrain.Aspire` and `DigitalBrain.Aspire.Hosting` replaces the two drifting name-constant files, under the single class name `DigitalBrainNames`. A Tier 1 conformance test pins it.
+**Name-constant unification:** one public `DigitalBrainNames` class in `DigitalBrain.Abstractions`, referenced by both Aspire packages (hoisted in phase 1 to dissolve the dual-compiled-type hazard). A Tier 1 conformance test pins it.
 
 ## 5. Ratified core model
 
 **Neuron** — journaled, durable, routed. Carries synapse traffic; participates in the owner's graph; owns exactly two bounded traffic journals (Incoming/Outgoing) with sequence numbers, tallies, and `ResetSnapshot` semantics as implemented on `master`. `Agent : Neuron` is the AI kind; `SalesforceAgentNeuron : Agent` reaches Salesforce via MCP.
 
-**Entity\<T\>** — a plain stateful grain: `SaveAsync`/`ReadAsync` over `IPersistentState<T>`, plus typed members (e.g. `IChartEntity.AddPointAsync`). **No journal, no synapse membrane.** `ChartEntity` (bounded to the last 1000 points) is the canonical example. `master`'s `ICell` folds into Entity: typed `Entity<T>` is first-class and the interpreted-kind cell tier is **retired** in phase 1 (revisited only if a product scenario demands dynamic kinds).
+**Entity\<T\>** — a plain stateful grain: SaveAsync/Read over Orleans.Journaling durable state (the solution's only persistence fabric — there is no `IPersistentState` provider and none is added), plus typed members (e.g. `IChartEntity.AddPointAsync`). **No journal, no synapse membrane.** `ChartEntity` (bounded to the last 1000 points) is the canonical example. `master`'s `ICell` folds into Entity: typed `Entity<T>` is first-class and the interpreted-kind cell tier is **retired** in phase 1 (revisited only if a product scenario demands dynamic kinds).
 
 **The brain** — `Entity<BrainGraph>`: the owner-scoped graph of neurons and synapse connections is state; routing (`ISynapseGraph`: Connect/Disconnect/RouteOutcome) operates on it. Capability routing consults the graph and the capability index; when the Memory module is installed, a semantic index backs routing (§8), with lexical fallback otherwise.
 
