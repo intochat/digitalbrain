@@ -1,6 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
 using DigitalBrain.Core;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Journaling;
@@ -17,6 +18,10 @@ public sealed class BrainSimulationOptions
     public int SiloCount { get; init; } = 1;
 
     public Action<ISiloBuilder>? ConfigureSilo { get; init; }
+
+    // Host configuration values visible to module Configure hooks (ISiloBuilder.Configuration),
+    // e.g. DigitalBrain:Mode=Testing plus the mock-LLM corpus path.
+    public IReadOnlyDictionary<string, string?>? Configuration { get; init; }
 }
 
 // An in-process Orleans cluster running the production silo composition
@@ -42,6 +47,11 @@ public sealed class BrainSimulation : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(options);
 
         var builder = new InProcessTestClusterBuilder((short)options.SiloCount);
+        if (options.Configuration is { Count: > 0 } configuration)
+        {
+            builder.ConfigureHost(host => host.Configuration.AddInMemoryCollection(configuration));
+        }
+
         builder.ConfigureSilo((_, silo) =>
         {
             silo.Services.AddSingleton<IJournalStorageProvider, VolatileJournalStorageProvider>();
