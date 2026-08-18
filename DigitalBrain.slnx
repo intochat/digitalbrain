@@ -53,6 +53,7 @@
   </Folder>
   <Folder Name="/Testing/">
     <Project Path="src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+    <Project Path="src/Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
   </Folder>
   <Folder Name="/Tests/">
     <Project Path="tests/DigitalBrain.Aspire.Tests/DigitalBrain.Aspire.Tests.csproj" />
