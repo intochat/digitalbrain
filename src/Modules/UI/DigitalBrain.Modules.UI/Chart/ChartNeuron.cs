@@ -1,25 +1,12 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Core;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Journaling;
-using Orleans.Serialization;
 
 namespace DigitalBrain.UI;
 
 [GrainType("chart")]
 internal sealed class ChartNeuron : Neuron, IChart
 {
-    private const string PointLogName = "chart.points";
     private const int RetainedPoints = 256;
-
-    private readonly IDurableList<byte[]> _points;
-    private readonly Serializer<ChartPoint> _serializer;
-
-    public ChartNeuron()
-    {
-        _points = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(PointLogName);
-        _serializer = ServiceProvider.GetRequiredService<Serializer<ChartPoint>>();
-    }
 
     public async Task HandleAsync(ChartPoint synapse, CancellationToken cancellationToken)
     {
@@ -28,17 +15,22 @@ internal sealed class ChartNeuron : Neuron, IChart
         await GrantsNeuron.RequireReadAccessAsync(GrainFactory, Id, cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        _points.Add(_serializer.SerializeToArray(synapse));
-        while (_points.Count > RetainedPoints)
-        {
-            _points.RemoveAt(0);
-        }
+        await GrainFactory.GetGrain<IChartEntity>(EntityId.For<IChartEntity>(Id.Owner, Id.Name).ToGrainId())
+            .Append(new ChartStatePoint(synapse.Series, synapse.Label, synapse.Value), RetainedPoints)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public async Task<IReadOnlyList<ChartPoint>> Read()
     {
         await GrantsNeuron.RequireReadAccessAsync(GrainFactory, Id, CancellationToken.None)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        return [.. _points.Select(_serializer.Deserialize)];
+
+        var state = await GrainFactory.GetGrain<IChartEntity>(EntityId.For<IChartEntity>(Id.Owner, Id.Name).ToGrainId())
+            .Read()
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        return state is null
+            ? []
+            : [.. state.Points.Select(static point => new ChartPoint(point.Series, point.Label, point.Value))];
     }
 }

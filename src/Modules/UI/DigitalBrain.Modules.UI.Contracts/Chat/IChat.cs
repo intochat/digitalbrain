@@ -10,7 +10,8 @@ public partial interface IChat :
     INeuron,
     IHandle<ReadTranscriptRequest>,
     IHandle<Note>,
-    IHandle<TimerCard>
+    IHandle<TimerCard>,
+    IHandle<ChartCard>
 {
     [Alias(nameof(Send))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]

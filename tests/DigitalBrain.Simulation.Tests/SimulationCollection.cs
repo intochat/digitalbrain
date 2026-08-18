@@ -12,8 +12,12 @@ public sealed class SimulationFixture : IAsyncLifetime
         => Sim = await BrainSimulation.StartAsync(new()
         {
             Modules = new ModuleAssemblies(
-                [typeof(DigitalBrain.Time.StartTimer).Assembly],
-                [typeof(DigitalBrain.Time.TimerNeuron).Assembly, typeof(SimulationFixture).Assembly]),
+                [typeof(DigitalBrain.Time.StartTimer).Assembly, typeof(DigitalBrain.Chat.SendMessage).Assembly],
+                [
+                    typeof(DigitalBrain.Time.TimerNeuron).Assembly,
+                    typeof(DigitalBrain.UI.UiModule).Assembly,
+                    typeof(SimulationFixture).Assembly,
+                ]),
         });
 
     public async ValueTask DisposeAsync() => await Sim.DisposeAsync();

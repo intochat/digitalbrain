@@ -16,5 +16,7 @@
     <ProjectReference Include="../../src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
     <ProjectReference Include="../../src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
     <ProjectReference Include="../../src/Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
+    <ProjectReference Include="../../src/Modules/UI/DigitalBrain.Modules.UI/DigitalBrain.Modules.UI.csproj" />
+    <ProjectReference Include="../../src/Modules/UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />
   </ItemGroup>
 </Project>

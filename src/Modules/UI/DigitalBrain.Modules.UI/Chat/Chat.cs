@@ -208,6 +208,33 @@ internal sealed class Chat : Neuron, IChat, IRemindable
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
+    public async Task HandleAsync(ChartCard synapse, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(synapse);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (string.IsNullOrWhiteSpace(synapse.Title))
+        {
+            throw new NeuronAuthorizationException($"Chat '{Id}' refuses a chart card without a title.");
+        }
+
+        // Title names the chart instance the points targeted (the corpus grammar's chart-card
+        // invariant), so it doubles as the ChartEntity's instance name.
+        var state = await GrainFactory
+            .GetGrain<IChartEntity>(EntityId.For<IChartEntity>(Id.Owner, synapse.Title).ToGrainId())
+            .Read()
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        ChatChartPoint[] points = state is null
+            ? []
+            : [.. state.Points.Select(static point => new ChatChartPoint(point.Label, point.Value))];
+
+        ChatChartOffer[] offers = [new ChatChartOffer(synapse.Title, points, "bar")];
+        Remember(new ChatTurn(FromUser: false, synapse.Title, Charts: offers));
+        await EmitAsync(new Responded(CommandId.New(), Id, synapse.Title, Charts: offers, Author: Id.Name))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
+
     protected override async Task OnUnboundSynapseAsync(Synapse synapse, CancellationToken cancellationToken)
     {
         if (synapse is ExecutionTerminal terminal)
