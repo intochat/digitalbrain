@@ -3,10 +3,17 @@ using System.Diagnostics;
 var repoRoot = LocateRepoRoot();
 var scriptingDir = Path.Combine(repoRoot, "src", "Kernel", "DigitalBrain.Scripting");
 
-// 1) Prune dead Orleans membership so force-killed silos do not block join.
-var prune = Path.Combine(scriptingDir, "prune-membership.cs");
-Console.WriteLine($"prune:{prune}");
-Console.WriteLine(await RunScriptAsync(prune).ConfigureAwait(false));
+// 1) Membership pruning mutates the live cluster table — explicit opt-in only.
+if (Environment.GetEnvironmentVariable("DIGITALBRAIN_PRUNE_MEMBERSHIP") == "1")
+{
+    var prune = Path.Combine(scriptingDir, "prune-membership.cs");
+    Console.WriteLine($"prune:{prune}");
+    Console.WriteLine(await RunScriptAsync(prune).ConfigureAwait(false));
+}
+else
+{
+    Console.WriteLine("membership prune skipped (set DIGITALBRAIN_PRUNE_MEMBERSHIP=1 to enable)");
+}
 
 // 2) Wait for kernel HTTP — starts in parallel; prune unblocks cluster join.
 Console.WriteLine("waiting for kernel http://localhost:5080/health …");

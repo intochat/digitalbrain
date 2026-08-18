@@ -8,7 +8,8 @@ namespace DigitalBrain.Core;
 public abstract class Neuron :
     DurableGrain,
     INeuron,
-    IOutboxDrain
+    IOutboxDrain,
+    IOwnerBoundGrain
 {
     private const string OutboxName = "outbox";
     private const string HandledName = "handled";

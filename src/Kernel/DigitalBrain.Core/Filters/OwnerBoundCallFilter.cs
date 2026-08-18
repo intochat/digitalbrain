@@ -60,16 +60,16 @@ internal sealed class OwnerBoundCallFilter(IEnumerable<ReminderSourceAllowlist> 
 
         if (OwnerOf(context.SourceId) is not { } caller)
         {
-            if (context.Grain is Neuron unattributedTarget && !AllowsUnattributedCaller(context, unattributedTarget))
+            if (context.Grain is IOwnerBoundGrain unattributedTarget && !AllowsUnattributedCaller(context, unattributedTarget))
             {
                 throw new NeuronAuthorizationException(
-                    $"'{context.InterfaceMethod?.Name}' is not a client entry point, so an unattributed caller cannot be authorized to reach '{unattributedTarget.Id}'. Reach a neuron through a session of the owner you are acting as.");
+                    $"'{context.InterfaceMethod?.Name}' is not a client entry point, so an unattributed caller cannot be authorized to reach '{TargetOf(context)}'. Reach a neuron through a session of the owner you are acting as.");
             }
         }
-        else if (context.Grain is Neuron target && caller != target.Id.Owner)
+        else if (context.Grain is IOwnerBoundGrain && TargetOf(context) is var target && caller != target.Owner)
         {
             throw new NeuronAuthorizationException(
-                $"Neuron '{target.Id}' belongs to owner '{target.Id.Owner}' and cannot be reached by owner '{caller}'.");
+                $"Neuron '{target}' belongs to owner '{target.Owner}' and cannot be reached by owner '{caller}'.");
         }
 
         if (context.Grain is Neuron bindTarget
@@ -121,11 +121,11 @@ internal sealed class OwnerBoundCallFilter(IEnumerable<ReminderSourceAllowlist> 
     private bool IsAdditionalTrustedSource(GrainId source)
         => additionalReminderSources.Any(allowlist => allowlist.Contains(source));
 
-    private static bool AllowsUnattributedCaller(IIncomingGrainCallContext context, Neuron target)
+    private static bool AllowsUnattributedCaller(IIncomingGrainCallContext context, IOwnerBoundGrain target)
         => IsClientEntryPoint(context.InterfaceMethod)
             || IsClientEntryPoint(ContractMethodTheTargetImplements(context, target));
 
-    private static MethodInfo? ContractMethodTheTargetImplements(IIncomingGrainCallContext context, Neuron target)
+    private static MethodInfo? ContractMethodTheTargetImplements(IIncomingGrainCallContext context, IOwnerBoundGrain target)
         => CapabilityInvocation.ContractMethod(context.InterfaceMethod, context.Request) is { } contract
             && contract.DeclaringType!.IsInstanceOfType(target)
                 ? contract
@@ -133,6 +133,15 @@ internal sealed class OwnerBoundCallFilter(IEnumerable<ReminderSourceAllowlist> 
 
     private static bool IsClientEntryPoint(MethodInfo? method)
         => method?.DeclaringType?.GetCustomAttribute<ClientEntryPointAttribute>() is not null;
+
+    // Neuron and IOwnerBoundGrain entities share the identical "{owner}/{name}" grain key
+    // format, so a NeuronId reconstructed off the call's TargetId reads the caller-visible
+    // identity and owner for either grain kind without touching the live grain instance.
+    private static NeuronId TargetOf(IIncomingGrainCallContext context)
+        => NeuronId.FromGrainKey(
+            context.TargetId.Type.ToString()
+                ?? throw new InvalidOperationException("The target grain has no grain type."),
+            context.TargetId.Key.ToString());
 
     private static OwnerId? OwnerOf(GrainId? source)
     {

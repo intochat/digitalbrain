@@ -5,7 +5,7 @@ using Orleans.Serialization;
 
 namespace DigitalBrain.Core;
 
-public abstract class Entity<TState> : DurableGrain, IEntity<TState>
+public abstract class Entity<TState> : DurableGrain, IEntity<TState>, IOwnerBoundGrain
     where TState : class
 {
     private const string StateName = "entity.state";

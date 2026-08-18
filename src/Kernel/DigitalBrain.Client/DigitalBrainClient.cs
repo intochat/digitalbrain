@@ -56,6 +56,7 @@ public sealed class DigitalBrainClient : IDigitalBrain
         where TEntity : class, IEntity
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        RequireDomainEntityContract(typeof(TEntity));
         return _grains.GetGrain<TEntity>(EntityId.For<TEntity>(Owner, name).ToGrainId());
     }
 
@@ -379,6 +380,15 @@ public sealed class DigitalBrainClient : IDigitalBrain
         {
             throw new NeuronAuthorizationException(
                 $"'{neuronType.Name}' is not addressable through IDigitalBrain.Get. Activate the brain with ActivateAsync; address domain neuron contracts with Get; fire synapses through FireAsync; observe journals through ReadJournalAsync and WatchJournalAsync.");
+        }
+    }
+
+    private static void RequireDomainEntityContract(Type entityType)
+    {
+        if (entityType == typeof(IEntity))
+        {
+            throw new NeuronAuthorizationException(
+                $"'{entityType.Name}' is not addressable through IDigitalBrain.GetEntity. Address a concrete entity contract with GetEntity.");
         }
     }
 }
