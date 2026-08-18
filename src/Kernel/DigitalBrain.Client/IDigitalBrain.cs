@@ -19,6 +19,14 @@ public interface IDigitalBrain
     TNeuron GetGrainProxy<TNeuron>(string name = "default")
         where TNeuron : class, INeuron;
 
+    Task<string> ActiveContextAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<BrainContext>> ContextsAsync(CancellationToken cancellationToken = default);
+
+    Task UseContextAsync(string name, CancellationToken cancellationToken = default);
+
+    Task<BrainReference?> ResolveAsync(string hint, CancellationToken cancellationToken = default);
+
     Task FireAsync<TNeuron>(string name, Synapse synapse, CancellationToken cancellationToken = default)
         where TNeuron : INeuron;
 

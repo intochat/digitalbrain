@@ -1,4 +1,4 @@
-namespace DigitalBrain.Abstractions.Graph;
+namespace DigitalBrain.Abstractions.Brain;
 
 // Correlation is carried in the payload because the outcome is journaled under its own
 // envelope: readers match on this field, never on the envelope's CorrelationId.

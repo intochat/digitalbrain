@@ -1,4 +1,4 @@
-namespace DigitalBrain.Abstractions.Graph;
+namespace DigitalBrain.Abstractions.Brain;
 
 [GenerateSerializer]
 [Alias("db.route-outcome-kind")]

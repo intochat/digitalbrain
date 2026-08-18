@@ -93,10 +93,29 @@ public abstract class Neuron :
 
         await OnNeuronActivatedAsync(cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        _ = RegisterInOwnersBrainAsync();
     }
 
     protected virtual Task OnNeuronActivatedAsync(CancellationToken cancellationToken)
         => Task.CompletedTask;
+
+    // Fire-and-forget: the brain's registry must never block or fail a neuron's activation.
+    private async Task RegisterInOwnersBrainAsync()
+    {
+        try
+        {
+            var brain = GrainFactory.GetGrain<IBrain>(
+                EntityId.For<IBrain>(Id.Owner, DigitalBrainNames.DefaultBrain).ToGrainId());
+            await brain
+                .Register(new BrainReference(BrainReferenceKind.Neuron, Id.Type, Id.Name, default))
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
+        catch (Exception unregistered)
+        {
+            SynapseTelemetry.BrainRegistrationDropped(Id, unregistered);
+        }
+    }
 
     public async Task Deliver(
         SynapseDelivery delivery,

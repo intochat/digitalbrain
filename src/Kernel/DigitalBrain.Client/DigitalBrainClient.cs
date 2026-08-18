@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
@@ -8,6 +9,8 @@ namespace DigitalBrain.Client;
 public sealed class DigitalBrainClient : IDigitalBrain
 {
     private static readonly TimeSpan ResponsePollInterval = TimeSpan.FromMilliseconds(100);
+
+    private static readonly ActivitySource RegistrationTelemetry = new("DigitalBrain");
 
     private readonly IGrainFactory _grains;
 
@@ -57,7 +60,43 @@ public sealed class DigitalBrainClient : IDigitalBrain
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         RequireDomainEntityContract(typeof(TEntity));
-        return _grains.GetGrain<TEntity>(EntityId.For<TEntity>(Owner, name).ToGrainId());
+
+        var entity = EntityId.For<TEntity>(Owner, name);
+        // GetEntity is the facade's single entity-resolution point, so it is where the brain
+        // honestly learns about entities; the registry itself is not a registrable node.
+        if (typeof(TEntity) != typeof(IBrain))
+        {
+            _ = RegisterEntityUseAsync(entity);
+        }
+
+        return _grains.GetGrain<TEntity>(entity.ToGrainId());
+    }
+
+    public async Task<string> ActiveContextAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var state = await BrainRegistry().Read().ConfigureAwait(false);
+        return state?.ActiveContext ?? BrainState.DefaultContext;
+    }
+
+    public Task<IReadOnlyList<BrainContext>> ContextsAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return BrainRegistry().Contexts();
+    }
+
+    public Task UseContextAsync(string name, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        cancellationToken.ThrowIfCancellationRequested();
+        return BrainRegistry().UseContext(name);
+    }
+
+    public Task<BrainReference?> ResolveAsync(string hint, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(hint);
+        cancellationToken.ThrowIfCancellationRequested();
+        return BrainRegistry().Resolve(hint);
     }
 
     public Task FireAsync<TNeuron>(string name, Synapse synapse, CancellationToken cancellationToken = default)
@@ -226,6 +265,33 @@ public sealed class DigitalBrainClient : IDigitalBrain
 
     private IDigitalBrainNeuron Brain()
         => _grains.GetGrain<IDigitalBrainNeuron>(IDigitalBrainNeuron.ForOwner(Owner).ToGrainId());
+
+    private IBrain BrainRegistry()
+        => _grains.GetGrain<IBrain>(
+            EntityId.For<IBrain>(Owner, DigitalBrainNames.DefaultBrain).ToGrainId());
+
+    // Fire-and-forget: the brain's registry must never block or fail entity resolution.
+    private async Task RegisterEntityUseAsync(EntityId entity)
+    {
+        try
+        {
+            await BrainRegistry()
+                .Register(new BrainReference(BrainReferenceKind.Entity, entity.Type, entity.Name, default))
+                .ConfigureAwait(false);
+        }
+        catch (Exception unregistered)
+        {
+            RegistrationDropped(entity, unregistered);
+        }
+    }
+
+    private static void RegistrationDropped(EntityId entity, Exception unregistered)
+    {
+        using var dropped = RegistrationTelemetry.StartActivity("db.brain-registration-dropped");
+
+        dropped?.SetTag("db.receiver", entity.ToString());
+        dropped?.SetTag("db.brain-registration-dropped", unregistered.GetType().Name);
+    }
 
     private ISessionNeuron Session()
         => _grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(Owner).ToGrainId());

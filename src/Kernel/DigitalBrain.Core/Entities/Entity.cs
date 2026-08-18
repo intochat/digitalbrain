@@ -4,6 +4,9 @@ using Orleans.Runtime;
 
 namespace DigitalBrain.Core;
 
+// Concrete subclasses must redeclare [PersistentState(...)] on their own constructor parameter
+// and forward to base(state) — Orleans binds facets on the leaf class's own constructor, not an
+// inherited one. Omitting it compiles but throws at activation.
 public abstract class Entity<TState>(
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<TState> state)
     : Grain, IEntity<TState>, IOwnerBoundGrain
