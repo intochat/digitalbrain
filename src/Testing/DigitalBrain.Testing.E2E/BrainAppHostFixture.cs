@@ -104,10 +104,6 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
 
     // TripRadar's container-isolation pattern: never reuse a container, its name, or its volume
     // state across test runs. WithLifetime(Session) already performs the annotation replace.
-    // A stray ContainerNameAnnotation still wins over that lifetime for naming purposes — Aspire
-    // falls back to a random per-run postfix only when no such annotation is present at all,
-    // which is what let a session-lifetime "storage" container collide with, and replace, a
-    // developer's persistent aspire-run "storage" container sharing the same deterministic name.
     private static void IsolateContainers(IDistributedApplicationTestingBuilder appBuilder)
     {
         foreach (var container in appBuilder.Resources.OfType<ContainerResource>())
@@ -121,11 +117,35 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
                     container.Annotations.Remove(mount);
                 }
             }
+        }
 
-            foreach (var containerName in container.Annotations.OfType<ContainerNameAnnotation>().ToList())
+        ForceUniqueContainerNames(appBuilder);
+    }
+
+    // A ground-truth model probe (see task-5-report.md) proved "storage" (the Azurite emulator)
+    // has CLR type AzureStorageResource, not ContainerResource, so the OfType<ContainerResource>
+    // loop above never reaches it — yet it still runs as a container (it carries a
+    // ContainerImageAnnotation) and, with no ContainerNameAnnotation of its own, falls back to
+    // Aspire's default naming, which uses a postfix derived from the AppHost project path for
+    // resources it still treats as persistent. That default is identical for every process that
+    // instantiates this same AppHost project, so a session-lifetime test run and a developer's
+    // persistent `aspire run` session compute the SAME container name and collide. IsContainer()
+    // (carries a ContainerImageAnnotation) is the resource-shape Aspire itself uses to mean "runs
+    // as a container" and correctly includes "storage" where the CLR-type filter did not, so every
+    // such resource gets an explicit, forced-unique name here — an explicit ContainerNameAnnotation
+    // always wins over any computed default.
+    private static void ForceUniqueContainerNames(IDistributedApplicationTestingBuilder appBuilder)
+    {
+        var runId = Guid.NewGuid().ToString("N")[..8];
+
+        foreach (var resource in appBuilder.Resources.Where(resource => resource.IsContainer()))
+        {
+            foreach (var containerName in resource.Annotations.OfType<ContainerNameAnnotation>().ToList())
             {
-                container.Annotations.Remove(containerName);
+                resource.Annotations.Remove(containerName);
             }
+
+            resource.Annotations.Add(new ContainerNameAnnotation { Name = $"{resource.Name}-e2e-{runId}" });
         }
     }
 
@@ -207,20 +227,20 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
         return stripped;
     }
 
-    // Walks the resource's "Parent" relationship chain (ResourceRelationshipAnnotation with
-    // Type "Parent" — the literal Aspire's own WithParentRelationship embeds for its internal
-    // KnownRelationshipTypes.Parent, which is not itself publicly reachable) up to the root,
-    // reporting whether any ancestor is one of the never-started resources.
+    // Walks the resource's parent chain up to the root, reporting whether any ancestor is one of
+    // the never-started resources. A ground-truth model probe (see task-5-report.md) proved the
+    // AI module's gemma4-12b model resource declares its parent purely through
+    // IResourceWithParent<T>.Parent (CommunityToolkit's OllamaModelResource) and carries no
+    // ResourceRelationshipAnnotation at all, so that interface is checked first; the
+    // ResourceRelationshipAnnotation(Type == "Parent") walk — the literal Aspire's own
+    // WithParentRelationship embeds for its internal KnownRelationshipTypes.Parent, not itself
+    // publicly reachable — remains as a second source for resources that express parentage that way.
     private static bool ReachesExplicitStart(IResource resource, IReadOnlySet<IResource> explicitStartResources)
     {
         var current = resource;
         for (var hop = 0; hop < 32; hop++)
         {
-            var parent = current.Annotations
-                .OfType<ResourceRelationshipAnnotation>()
-                .FirstOrDefault(relationship => string.Equals(relationship.Type, "Parent", StringComparison.Ordinal))
-                ?.Resource;
-
+            var parent = ParentOf(current);
             if (parent is null)
             {
                 return false;
@@ -235,6 +255,19 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
         }
 
         return false;
+    }
+
+    private static IResource? ParentOf(IResource resource)
+    {
+        if (resource is IResourceWithParent withParent)
+        {
+            return withParent.Parent;
+        }
+
+        return resource.Annotations
+            .OfType<ResourceRelationshipAnnotation>()
+            .FirstOrDefault(relationship => string.Equals(relationship.Type, "Parent", StringComparison.Ordinal))
+            ?.Resource;
     }
 
     private static void ArmBrainTestMode(IDistributedApplicationTestingBuilder appBuilder)
