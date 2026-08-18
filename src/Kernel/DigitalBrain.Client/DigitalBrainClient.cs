@@ -63,7 +63,9 @@ public sealed class DigitalBrainClient : IDigitalBrain
 
         var entity = EntityId.For<TEntity>(Owner, name);
         // GetEntity is the facade's single entity-resolution point, so it is where the brain
-        // honestly learns about entities; the registry itself is not a registrable node.
+        // honestly learns about entities; the registry itself is not a registrable node. Grains
+        // are virtual, so a referenced-but-never-activated name (typos included) registers a
+        // node — accepted consequence of this trigger.
         if (typeof(TEntity) != typeof(IBrain))
         {
             _ = RegisterEntityUseAsync(entity);

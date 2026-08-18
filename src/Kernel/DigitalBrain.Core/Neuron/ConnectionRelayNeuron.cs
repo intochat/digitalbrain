@@ -14,6 +14,8 @@ internal static class ConnectionRelay
 [GrainType(ConnectionRelay.GrainTypeName)]
 internal sealed class ConnectionRelayNeuron : Neuron
 {
+    protected override bool RegistersWithBrain => false;
+
     protected override async Task OnUnboundSynapseAsync(Synapse synapse, CancellationToken cancellationToken)
     {
         if (!Guid.TryParse(Id.Name, out var connectionId))

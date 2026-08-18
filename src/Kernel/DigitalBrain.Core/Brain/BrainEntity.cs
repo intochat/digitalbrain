@@ -135,7 +135,37 @@ internal sealed class BrainEntity(
                 : c)
             .ToArray();
 
-        return snapshot with { Nodes = nodes, Contexts = contexts };
+        return Capped(snapshot with { Nodes = nodes, Contexts = contexts });
+    }
+
+    // Growth backstop mirroring the contexts cap: an evicted node also leaves every context's
+    // Members and Tallies so nothing dangles.
+    private static BrainState Capped(BrainState grown)
+    {
+        if (grown.Nodes.Count <= BrainState.MaximumNodes)
+        {
+            return grown;
+        }
+
+        var evicted = grown.Nodes
+            .OrderBy(node => node.LastUsed)
+            .Take(grown.Nodes.Count - BrainState.MaximumNodes)
+            .ToArray();
+        var contexts = grown.Contexts
+            .Select(c => c with
+            {
+                Members = [.. c.Members.Where(member => !evicted.Any(e => SameNode(e, member)))],
+                Tallies = c.Tallies
+                    .Where(tally => !evicted.Any(e => string.Equals(e.Key, tally.Key, StringComparison.Ordinal)))
+                    .ToDictionary(tally => tally.Key, tally => tally.Value, StringComparer.Ordinal),
+            })
+            .ToArray();
+
+        return grown with
+        {
+            Nodes = [.. grown.Nodes.Where(node => !evicted.Any(e => SameNode(e, node)))],
+            Contexts = contexts,
+        };
     }
 
     private static IReadOnlyList<BrainContext> WithContext(

@@ -56,6 +56,9 @@ public abstract class Neuron :
 
     internal virtual int RememberedDeliveryBound => RememberedDeliveries;
 
+    // The Brain knows the owner's organs, not the plumbing: infrastructure neurons opt out.
+    protected virtual bool RegistersWithBrain => true;
+
     internal IServiceProvider NeuronServices => ServiceProvider;
 
     internal IGrainFactory NeuronGrainFactory => GrainFactory;
@@ -94,7 +97,10 @@ public abstract class Neuron :
         await OnNeuronActivatedAsync(cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        _ = RegisterInOwnersBrainAsync();
+        if (RegistersWithBrain)
+        {
+            _ = RegisterInOwnersBrainAsync();
+        }
     }
 
     protected virtual Task OnNeuronActivatedAsync(CancellationToken cancellationToken)

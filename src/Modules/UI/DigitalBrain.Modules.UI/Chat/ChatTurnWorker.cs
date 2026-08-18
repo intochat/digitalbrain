@@ -15,6 +15,8 @@ internal sealed class ChatTurnWorker : Neuron, IChatTurnWorker
 {
     internal const string GrainTypeName = "chat-turn-worker";
 
+    protected override bool RegistersWithBrain => false;
+
     public static NeuronId ForChat(NeuronId chat)
         => new(GrainTypeName, chat.Owner, chat.Name);
 

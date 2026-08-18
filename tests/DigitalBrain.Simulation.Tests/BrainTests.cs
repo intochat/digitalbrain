@@ -83,6 +83,12 @@ public sealed class BrainTests(SimulationFixture fixture)
         await PollForNodeAsync(
             brain, BrainReferenceKind.Entity, "chartentity", workChart, cancellationToken);
 
+        // Re-touch the first chart in ITS context via the per-call override: it becomes the
+        // most recently used node overall, so a contextless recency-only resolution would
+        // return it and fail the assertion below.
+        var reTouched = await BrainGrainOf(brain).Resolve(defaultChart, BrainState.DefaultContext);
+        Assert.Equal(defaultChart, reTouched!.Name);
+
         var resolved = await brain.ResolveAsync("chart", cancellationToken);
 
         Assert.NotNull(resolved);
@@ -97,20 +103,53 @@ public sealed class BrainTests(SimulationFixture fixture)
         var habitual = fixture.Sim.UniqueId("counter");
         var cancellationToken = TestContext.Current.CancellationToken;
 
+        // The habitual registrations are poll-confirmed landed BEFORE the occasional counter
+        // is touched, so the occasional one is strictly the most recent and only the tally
+        // can make the habitual one win.
         await brain.GetEntity<ICounterEntity>(habitual).Add(1);
         await brain.GetEntity<ICounterEntity>(habitual).Add(1);
-        await brain.GetEntity<ICounterEntity>(occasional).Add(1);
-
         await PollForTalliesAsync(
             brain,
-            tallies => tallies.GetValueOrDefault($"counterentity/{habitual}") == 2
-                && tallies.GetValueOrDefault($"counterentity/{occasional}") == 1,
+            tallies => tallies.GetValueOrDefault($"counterentity/{habitual}") == 2,
+            cancellationToken);
+
+        await brain.GetEntity<ICounterEntity>(occasional).Add(1);
+        await PollForTalliesAsync(
+            brain,
+            tallies => tallies.GetValueOrDefault($"counterentity/{occasional}") == 1,
             cancellationToken);
 
         var resolved = await brain.ResolveAsync("counter", cancellationToken);
 
         Assert.NotNull(resolved);
         Assert.Equal(habitual, resolved.Name);
+    }
+
+    [Fact]
+    public async Task NodesCapEvictsTheLeastRecentlyUsedReference()
+    {
+        var brain = fixture.Sim.BrainFor(fixture.Sim.UniqueId("owner"));
+        var grain = BrainGrainOf(brain);
+
+        for (var i = 0; i <= BrainState.MaximumNodes; i++)
+        {
+            await grain.Register(new BrainReference(
+                BrainReferenceKind.Entity,
+                "counterentity",
+                $"counter-{i:D3}",
+                default));
+        }
+
+        var state = await grain.Read();
+        Assert.NotNull(state);
+        Assert.Equal(BrainState.MaximumNodes, state.Nodes.Count);
+        Assert.DoesNotContain(state.Nodes, node => node.Name == "counter-000");
+
+        var defaultContext = Assert.Single(state.Contexts);
+        Assert.Equal(BrainState.MaximumNodes, defaultContext.Members.Count);
+        Assert.DoesNotContain(
+            defaultContext.Tallies.Keys,
+            key => key.EndsWith("/counter-000", StringComparison.Ordinal));
     }
 
     [Fact]

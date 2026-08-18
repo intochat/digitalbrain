@@ -1,10 +1,9 @@
 namespace DigitalBrain.Abstractions.Brain;
 
-// [ClientEntryPoint] on the whole contract: the IDigitalBrain facade reaches this grain as an
-// unattributed external Orleans client (OwnerBoundCallFilter attributes only grain-to-grain
-// calls), so UseContext/Contexts/Resolve must be entry-point-visible for the facade to reach
-// them at all. Register rides along visibly but harmlessly: registrations are owner-scoped
-// snapshot upserts and idempotent.
+// [ClientEntryPoint]: the IDigitalBrain facade is an unattributed external client, which the
+// OwnerBoundCallFilter admits by this attribute alone — owner scoping comes from the CALLER'S
+// key construction under the standing trusted-zone posture (pinned in TestEntities.cs).
+// Register, Connect/Disconnect, and UseContext are writes riding the same gate.
 [ClientEntryPoint]
 [Alias("db.brain")]
 public interface IBrain : IEntity<BrainState>

@@ -4,6 +4,8 @@ namespace DigitalBrain.Core;
 
 internal sealed class SessionNeuron : Neuron, ISessionNeuron
 {
+    protected override bool RegistersWithBrain => false;
+
     public Task<SynapseDelivery> Fire(NeuronId receiver, Synapse synapse)
     {
         if (receiver.Owner != Id.Owner)

@@ -13,6 +13,8 @@ public sealed class GrantsNeuron : Neuron, IGrants
     private readonly IDurableValue<byte[]> _state;
     private readonly Serializer<GrantsState> _states;
 
+    protected override bool RegistersWithBrain => false;
+
     public GrantsNeuron()
     {
         _state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName);

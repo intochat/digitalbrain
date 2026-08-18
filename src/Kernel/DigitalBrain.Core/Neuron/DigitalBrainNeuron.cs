@@ -11,6 +11,8 @@ internal sealed class DigitalBrainNeuron : Neuron, IDigitalBrainNeuron
 
     private readonly IDurableValue<bool> _activationPublished;
 
+    protected override bool RegistersWithBrain => false;
+
     public DigitalBrainNeuron()
     {
         _activationPublished = ServiceProvider.GetRequiredKeyedService<IDurableValue<bool>>(ActivationPublishedName);
