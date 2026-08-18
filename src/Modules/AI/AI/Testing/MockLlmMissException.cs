@@ -25,7 +25,7 @@ public sealed class MockLlmMissException : Exception
         ArgumentNullException.ThrowIfNull(givenPatterns);
 
         var loaded = givenPatterns.Count == 0
-            ? "  (none — the corpus loaded no scenarios)"
+            ? $"  (none — {AITestingClients.CorpusPathKey} is not set, so no corpus was loaded)"
             : string.Join(Environment.NewLine, givenPatterns.Select(static pattern => $"  {pattern}"));
 
         return new MockLlmMissException(

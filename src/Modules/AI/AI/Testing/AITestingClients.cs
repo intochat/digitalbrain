@@ -26,15 +26,17 @@ internal static class AITestingClients
     internal static void Add(IServiceCollection services, IConfiguration configuration)
     {
         var corpusPath = configuration[CorpusPathKey];
-        if (string.IsNullOrWhiteSpace(corpusPath))
-        {
-            throw new InvalidOperationException(
-                $"Testing mode requires {CorpusPathKey} to point at a directory of .feature "
-                + "files scripting the mock LLM.");
-        }
 
-        // Loaded eagerly so a missing or malformed corpus fails host startup, not the first turn.
-        var scriptedClient = new BddMockChatClient(BddScenarioCorpus.Load(corpusPath));
+        // A blank path boots test mode with no scripted scenarios rather than refusing to
+        // start -- a host that never talks to the LLM (e.g. an E2E health-check smoke) should
+        // not need a corpus wired. A path that IS set but broken (missing/empty/unparseable
+        // directory) still fails host startup eagerly below -- that stays a real corpus
+        // author's mistake to catch fast, not the first turn. Either way, the first prompt
+        // that actually reaches an empty-corpus mock throws MockLlmMissException naming the
+        // config key to set, loud at the point it matters.
+        var scriptedClient = new BddMockChatClient(string.IsNullOrWhiteSpace(corpusPath)
+            ? BddScenarioCorpus.Empty()
+            : BddScenarioCorpus.Load(corpusPath));
         foreach (var modelKey in ModelKeys)
         {
             services.AddKeyedSingleton<IChatClient>(modelKey, scriptedClient);

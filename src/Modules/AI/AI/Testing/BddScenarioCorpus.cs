@@ -25,6 +25,11 @@ internal sealed partial class BddScenarioCorpus
 
     internal IReadOnlyList<string> GivenPatterns { get; }
 
+    // Boot-time stand-in for test hosts that never talk to the LLM (e.g. an E2E health-check
+    // smoke): no scenarios are loaded, so a prompt that DOES reach the mock throws
+    // MockLlmMissException naming the config key to set, instead of failing host startup.
+    internal static BddScenarioCorpus Empty() => new([]);
+
     internal static BddScenarioCorpus Load(string directory)
     {
         if (!Directory.Exists(directory))
