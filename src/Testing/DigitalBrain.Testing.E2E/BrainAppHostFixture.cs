@@ -20,11 +20,11 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
     private const int DiagnosticLogLineCount = 40;
 
     // DigitalBrainBuilder.RequireStateProtection (src/Aspire/DigitalBrain.Aspire.Hosting/Brain/
-    // DigitalBrainBuilder.cs:114) names this parameter "{brain.Name}-state-protection-key"; the
-    // AppHost's brain name is "brain" (ProductSurfaceResources.Brain, internal to that project, so
-    // the composed literal is duplicated here rather than linked). DurablePayloadProtector requires
-    // its value to base64-decode to exactly 32 bytes, which the blanket "test" stub cannot satisfy.
-    private const string StateProtectionParameterName = "brain-state-protection-key";
+    // DigitalBrainBuilder.cs:114) composes this parameter's name as "{brain.Name}-state-protection-key",
+    // and an AppHost's brain isn't necessarily named "brain" — so match on the stable suffix rather
+    // than the full literal. DurablePayloadProtector requires its value to base64-decode to exactly
+    // 32 bytes, which the blanket "test" stub cannot satisfy.
+    private const string StateProtectionParameterSuffix = "-state-protection-key";
 
     private ResourceLogCollector? _logCollector;
     private IHost? _scriptHost;
@@ -132,7 +132,7 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
         {
             appBuilder.Configuration[$"Parameters:{parameter.Name}"] = overrides.TryGetValue(parameter.Name, out var overrideValue)
                 ? overrideValue
-                : string.Equals(parameter.Name, StateProtectionParameterName, StringComparison.Ordinal)
+                : parameter.Name.EndsWith(StateProtectionParameterSuffix, StringComparison.Ordinal)
                     ? Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
                     : "test";
         }
@@ -436,6 +436,12 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
                     .WithEnvironmentVariablesConfig()
                     .BuildAsync(executionContext)
                     .ConfigureAwait(false);
+                if (executionConfiguration.Exception is not null)
+                {
+                    failures.Add($"{project.Name}: {executionConfiguration.Exception.Message}");
+                    continue;
+                }
+
                 environment = executionConfiguration.EnvironmentVariables.ToDictionary();
             }
             catch (Exception exception)

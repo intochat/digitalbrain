@@ -7,8 +7,11 @@ namespace DigitalBrain.Testing;
 
 // Thrown when a journal compacts past the wait cursor DURING an already-established wait —
 // the deliveries are gone (ResetSnapshot semantics), so waiting further can never succeed.
-// A compaction observed on the wait's first read is not this: it is the wait's baseline
-// ("start watching from now"), since nothing the wait promised to see has been lost.
+// A reset observed on the wait's first read is not this: it is the wait's baseline. If the
+// requested cursor was beyond the tip, the baseline is "start watching from now". If the
+// requested cursor had already fallen out of retention before the wait started, the baseline
+// instead adopts the earliest still-readable sequence, so the retained window gets scanned
+// rather than silently skipped.
 // Distinct from TimeoutException: this is "unknowable", not "not yet".
 public sealed class JournalCompactedException : InvalidOperationException
 {
@@ -56,10 +59,23 @@ public static class JournalWait
             {
                 if (isBaselineRead)
                 {
-                    // The journal already exceeded retention before this wait started — that's
-                    // the wait's baseline ("start watching from now"), not a loss. Nothing the
-                    // wait promised to see has gone missing, so adopt the tip and keep polling.
-                    afterSequence = page.ResumeSequence;
+                    var snapshot = page.ResetSnapshot;
+                    if (afterSequence < snapshot.EarliestRetainedSequence - 1)
+                    {
+                        // The requested cursor had already fallen out of retention before this
+                        // wait started, but up to 512 retained entries are still readable.
+                        // Adopt earliest-retained-minus-one as the baseline cursor so the NEXT
+                        // poll scans the retained window instead of silently skipping straight
+                        // to the tip and losing entries the wait could otherwise have seen.
+                        afterSequence = snapshot.EarliestRetainedSequence - 1;
+                    }
+                    else
+                    {
+                        // The requested cursor is beyond the tip — that's the wait's baseline
+                        // ("start watching from now"), not a loss. Nothing the wait promised to
+                        // see has gone missing, so adopt the tip and keep polling.
+                        afterSequence = page.ResumeSequence;
+                    }
                 }
                 else
                 {
