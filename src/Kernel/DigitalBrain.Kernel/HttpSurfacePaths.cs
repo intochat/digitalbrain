@@ -7,8 +7,6 @@ internal static class HttpSurfacePaths
     public const string SurfaceEventsPath = "/surfaces/{surfaceName}/events";
     public const string BrainTopologyPath = "/brain/topology";
     public const string GraphEventsPath = "/graph/events";
-    public const string McpOAuthCallbackPath = DigitalBrain.Abstractions.OAuth.OAuthCallbackPaths.RelativePath;
-    public const string AuthorizationEventsPath = "/authorizations/events";
 
     public const string AuthBootstrapPath = "/auth/bootstrap";
     public const string AuthLoginPath = "/auth/login";
@@ -22,7 +20,6 @@ internal static class HttpSurfacePaths
     public const string ChatTurnEvent = "chat-turn";
     public const string GraphChangeEvent = "graph-change";
     public const string ChatDeltaEvent = "chat-delta";
-    public const string AuthorizationEvent = "authorization";
 
     public const string KindChatSend = "chat.send";
     public const string KindChatCancelTurn = "chat.cancel-turn";

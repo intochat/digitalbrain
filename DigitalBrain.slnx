@@ -16,11 +16,6 @@
     <Project Path="src/Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
     <Project Path="src/Modules/AI/Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" />
   </Folder>
-  <Folder Name="/Modules/Google/">
-    <Project Path="src/Modules/Google/Contracts/DigitalBrain.Modules.Google.Contracts.csproj" />
-    <Project Path="src/Modules/Google/Google/DigitalBrain.Modules.Google.csproj" />
-    <Project Path="src/Modules/Google/Aspire.Hosting/DigitalBrain.Modules.Google.Aspire.Hosting.csproj" />
-  </Folder>
   <Folder Name="/Modules/Introspection/">
     <Project Path="src/Modules/Introspection/Contracts/DigitalBrain.Modules.Introspection.Contracts.csproj" />
     <Project Path="src/Modules/Introspection/Introspection/DigitalBrain.Modules.Introspection.csproj" />
@@ -29,11 +24,6 @@
     <Project Path="src/Modules/Memory/Contracts/DigitalBrain.Modules.Memory.Contracts.csproj" />
     <Project Path="src/Modules/Memory/Memory/DigitalBrain.Modules.Memory.csproj" />
     <Project Path="src/Modules/Memory/Aspire.Hosting/DigitalBrain.Modules.Memory.Aspire.Hosting.csproj" />
-  </Folder>
-  <Folder Name="/Modules/SalesForce/">
-    <Project Path="src/Modules/SalesForce/Contracts/DigitalBrain.Modules.Salesforce.Contracts.csproj" />
-    <Project Path="src/Modules/SalesForce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
-    <Project Path="src/Modules/SalesForce/Aspire.Hosting/DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" />
   </Folder>
   <Folder Name="/Modules/UI/">
     <Project Path="src/Modules/UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />

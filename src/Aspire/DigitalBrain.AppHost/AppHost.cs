@@ -2,12 +2,8 @@ using DigitalBrain.AI;
 using DigitalBrain.AI.Aspire.Hosting;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Google;
-using DigitalBrain.Google.Aspire.Hosting;
 using DigitalBrain.Memory;
 using DigitalBrain.Memory.Aspire.Hosting;
-using DigitalBrain.Salesforce;
-using DigitalBrain.Salesforce.Aspire.Hosting;
 using DigitalBrain.UI;
 using DigitalBrain.UI.Aspire.Hosting;
 using Microsoft.Extensions.Hosting;
@@ -15,9 +11,7 @@ using Microsoft.Extensions.Hosting;
 var builder = DistributedApplication.CreateBuilder(args);
 
 // AppHost is the product composition root: brain fabric + modules + runtimes.
-var brain = builder
-    .AddDigitalBrain(ProductSurfaceResources.Brain)
-    .WithLocalDevelopmentOAuthCallback(new Uri(ProductSurfaceResources.LocalDevelopmentOAuthCallbackUri));
+var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain);
 
 brain.AddModule<AIModule>(ai =>
 {
@@ -42,9 +36,6 @@ brain.AddModule<UiModule>(ui =>
         ui.WithWindowHost();
     }
 });
-brain.AddModule<GoogleModule>(google => google.WithGmail());
-brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
-
 // Silo: waits for Azurite/Orleans fabric (+ module projections such as Ollama/Qdrant)
 // via WithReference(brain) → WaitUntilHealthy on brain startup dependencies.
 var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceResources.Kernel)

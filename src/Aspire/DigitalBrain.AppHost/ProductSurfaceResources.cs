@@ -13,9 +13,4 @@ internal static class ProductSurfaceResources
     public const int McpHttpPort = 5000;
 
     public const int UiHttpPort = 5080;
-
-    // Composed from the UI port + the kernel's actual callback path so a stale
-    // /oauth/mcp/callback secret cannot become the accidental product default.
-    public static string LocalDevelopmentOAuthCallbackUri { get; } =
-        $"http://localhost:{UiHttpPort}{DigitalBrain.Abstractions.OAuth.OAuthCallbackPaths.RelativePath}";
 }

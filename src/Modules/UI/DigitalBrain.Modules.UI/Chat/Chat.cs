@@ -3,7 +3,6 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.Core;
 using DigitalBrain.Memory;
-using DigitalBrain.Modules.Sdk.Mcp;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
@@ -229,31 +228,6 @@ internal sealed class Chat : Neuron, IChat
         ChatChartOffer[] offers = [new ChatChartOffer(synapse.Title, points, "bar")];
         Remember(new ChatTurn(FromUser: false, synapse.Title, Charts: offers));
         await EmitAsync(new Responded(CommandId.New(), Id, synapse.Title, Charts: offers, Author: Id.Name))
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-    }
-
-    protected override async Task OnUnboundSynapseAsync(Synapse synapse, CancellationToken cancellationToken)
-    {
-        if (synapse is not AuthorizationRequired required)
-        {
-            await base.OnUnboundSynapseAsync(synapse, cancellationToken)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            return;
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        if (string.IsNullOrWhiteSpace(required.ServerDisplayName))
-        {
-            throw new NeuronAuthorizationException($"Chat '{Id}' refuses a sign-in offer without a server name.");
-        }
-
-        var label = $"Sign in via {required.ServerDisplayName}";
-        var buttonId = $"sign-in-{required.ServerKey}";
-        var action = required.SignInUrl.AbsoluteUri;
-        ChatButtonOffer[] buttons = [new ChatButtonOffer(buttonId, label, action)];
-        var text = $"{required.ServerDisplayName} needs sign-in before that request can continue.";
-        Remember(new ChatTurn(FromUser: false, text, buttons));
-        await EmitAsync(new Responded(required.CommandId, Id, text, buttons, Author: Id.Name))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 

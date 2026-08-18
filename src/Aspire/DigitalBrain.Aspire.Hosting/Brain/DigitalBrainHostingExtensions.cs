@@ -1,6 +1,5 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
-using DigitalBrain.Abstractions.OAuth;
 
 namespace DigitalBrain.Aspire.Hosting;
 
@@ -40,31 +39,6 @@ public static class DigitalBrainHostingExtensions
         brain.RequireHealthyBeforeStart(durableStateStore.Resource);
         brain.RequireHealthyBeforeStart(streams.Resource);
         brain.RequireHealthyBeforeStart(pubSub.Resource);
-        return brain;
-    }
-
-    public static DigitalBrainBuilder WithLocalDevelopmentOAuthCallback(
-        this DigitalBrainBuilder brain,
-        Uri callbackUri)
-    {
-        ArgumentNullException.ThrowIfNull(brain);
-        ArgumentNullException.ThrowIfNull(callbackUri);
-        if (!callbackUri.IsAbsoluteUri)
-        {
-            throw new ArgumentException(
-                "The local-development OAuth callback must be an absolute URI.",
-                nameof(callbackUri));
-        }
-
-        if (!OAuthCallbackPaths.EndsWithCanonicalCallback(callbackUri))
-        {
-            throw new ArgumentException(
-                $"The local-development OAuth callback must end with '{OAuthCallbackPaths.RelativePath}' "
-                + $"(the path the kernel serves). Received '{callbackUri}'.",
-                nameof(callbackUri));
-        }
-
-        brain.UseLocalDevelopmentOAuthCallback(callbackUri.AbsoluteUri);
         return brain;
     }
 

@@ -51,19 +51,6 @@ public sealed class DigitalBrainBuilder
 
     internal IResourceBuilder<ParameterResource>? StateProtectionKey { get; private set; }
 
-    internal string? LocalDevelopmentOAuthCallbackUri { get; private set; }
-
-    internal void UseLocalDevelopmentOAuthCallback(string callbackUri)
-    {
-        if (LocalDevelopmentOAuthCallbackUri is not null)
-        {
-            throw new InvalidOperationException(
-                $"A local-development OAuth callback is already configured on brain '{Name}'. Configure it exactly once.");
-        }
-
-        LocalDevelopmentOAuthCallbackUri = callbackUri;
-    }
-
     public TState GetOrAddState<TState>(Func<DigitalBrainBuilder, TState> create, out bool added)
         where TState : class
     {

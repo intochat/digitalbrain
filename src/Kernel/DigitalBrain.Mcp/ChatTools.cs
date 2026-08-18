@@ -2,7 +2,6 @@ using System.ComponentModel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
-using DigitalBrain.Modules.Sdk.Mcp;
 using DigitalBrain.UI;
 using ModelContextProtocol.Server;
 
@@ -53,9 +52,6 @@ internal sealed class ChatTools(IDigitalBrain brain)
         var (principal, username) = ResolvePrincipal(principalKey);
         var chatInstance = PrincipalPartition.InstanceName(principal, chatName);
         var chatId = NeuronId.For<IChat>(brain.Owner, chatInstance);
-        var authorizationId = NeuronId.For<IMcpAuthorization>(
-            brain.Owner,
-            IMcpAuthorization.DefaultInstanceName);
         var command = new CommandId(commandIdentity);
 
         await brain.ActivateAsync(cancellationToken);
@@ -67,7 +63,7 @@ internal sealed class ChatTools(IDigitalBrain brain)
 
         try
         {
-            return await WaitForResponseAsync(chatId, authorizationId, chatName, command, timeout.Token);
+            return await WaitForResponseAsync(chatId, chatName, command, timeout.Token);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -106,9 +102,6 @@ internal sealed class ChatTools(IDigitalBrain brain)
         var (principal, _) = ResolvePrincipal(principalKey);
         var chatInstance = PrincipalPartition.InstanceName(principal, chatName);
         var chatId = NeuronId.For<IChat>(brain.Owner, chatInstance);
-        var authorizationId = NeuronId.For<IMcpAuthorization>(
-            brain.Owner,
-            IMcpAuthorization.DefaultInstanceName);
         var cursor = await brain.ReadJournalAsync(chatId, JournalKind.Outgoing, afterSequence: long.MaxValue, cancellationToken);
         var resume = cursor.ResumeSequence;
 
@@ -123,7 +116,7 @@ internal sealed class ChatTools(IDigitalBrain brain)
 
         try
         {
-            return await WaitForResponseAfterAsync(chatId, authorizationId, chatName, resume, timeout.Token);
+            return await WaitForResponseAfterAsync(chatId, chatName, resume, timeout.Token);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -146,30 +139,16 @@ internal sealed class ChatTools(IDigitalBrain brain)
 
     private async Task<ChatMessageResult> WaitForResponseAsync(
         NeuronId chatId,
-        NeuronId authorizationId,
         string chatName,
         CommandId commandId,
         CancellationToken cancellationToken)
     {
-        long authorizationCursor = 0;
-
         await foreach (var page in brain.WatchJournalAsync(
             chatId,
             JournalKind.Outgoing,
             afterSequence: 0,
             cancellationToken))
         {
-            var authorizationPage = await brain.ReadJournalAsync(
-                authorizationId,
-                JournalKind.Outgoing,
-                authorizationCursor,
-                cancellationToken);
-            ThrowIfAuthorizationRequired(authorizationPage);
-            if (authorizationPage.Delta.Count > 0)
-            {
-                authorizationCursor = authorizationPage.Delta[^1].Sequence;
-            }
-
             foreach (var delivery in page.Delta)
             {
                 if (delivery.Synapse is Responded response
@@ -185,30 +164,16 @@ internal sealed class ChatTools(IDigitalBrain brain)
 
     private async Task<ChatMessageResult> WaitForResponseAfterAsync(
         NeuronId chatId,
-        NeuronId authorizationId,
         string chatName,
         long afterSequence,
         CancellationToken cancellationToken)
     {
-        long authorizationCursor = 0;
-
         await foreach (var page in brain.WatchJournalAsync(
             chatId,
             JournalKind.Outgoing,
             afterSequence,
             cancellationToken))
         {
-            var authorizationPage = await brain.ReadJournalAsync(
-                authorizationId,
-                JournalKind.Outgoing,
-                authorizationCursor,
-                cancellationToken);
-            ThrowIfAuthorizationRequired(authorizationPage);
-            if (authorizationPage.Delta.Count > 0)
-            {
-                authorizationCursor = authorizationPage.Delta[^1].Sequence;
-            }
-
             foreach (var delivery in page.Delta)
             {
                 if (delivery.Synapse is Responded response)
@@ -241,17 +206,4 @@ internal sealed class ChatTools(IDigitalBrain brain)
                     c.Title,
                     [.. c.Points.Select(static p => new ChatChartPointResult(p.Label, p.Value))],
                     c.ChartKind))]);
-
-    private static void ThrowIfAuthorizationRequired(JournalRead page)
-    {
-        ArgumentNullException.ThrowIfNull(page);
-
-        foreach (var delivery in page.Delta)
-        {
-            if (delivery.Synapse is AuthorizationRequired required)
-            {
-                throw McpAuthorizationElicitation.For(required);
-            }
-        }
-    }
 }

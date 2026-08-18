@@ -1,7 +1,6 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
-using DigitalBrain.Modules.Sdk.Mcp;
 using DigitalBrain.UI;
 
 namespace DigitalBrain.Kernel;
@@ -57,19 +56,6 @@ internal sealed class OwnerSessionJournal(IDigitalBrain brain)
 
         return brain.WatchJournalAsync(
             graph,
-            JournalKind.Outgoing,
-            afterSequence,
-            cancellationToken);
-    }
-
-    public IAsyncEnumerable<JournalRead> WatchAuthorizationOutgoingAsync(
-        long afterSequence,
-        CancellationToken cancellationToken)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
-
-        return brain.WatchJournalAsync(
-            NeuronId.For<IMcpAuthorization>(brain.Owner, IMcpAuthorization.DefaultInstanceName),
             JournalKind.Outgoing,
             afterSequence,
             cancellationToken);

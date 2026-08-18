@@ -8,7 +8,6 @@ global using DigitalBrain.Abstractions.Integrations;
 global using DigitalBrain.Abstractions.Journals;
 global using DigitalBrain.Abstractions.Messaging;
 global using DigitalBrain.Abstractions.Neurons;
-global using DigitalBrain.Abstractions.OAuth;
 global using DigitalBrain.Abstractions.Registry;
 global using DigitalBrain.Abstractions.Security;
 global using DigitalBrain.Abstractions.Workspace;
