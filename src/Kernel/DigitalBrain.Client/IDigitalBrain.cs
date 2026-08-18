@@ -12,6 +12,9 @@ public interface IDigitalBrain
     NeuronReference<TNeuron> Get<TNeuron>(string name = "default")
         where TNeuron : INeuron;
 
+    TEntity GetEntity<TEntity>(string name = "default")
+        where TEntity : class, IEntity;
+
     [EditorBrowsable(EditorBrowsableState.Never)]
     TNeuron GetGrainProxy<TNeuron>(string name = "default")
         where TNeuron : class, INeuron;

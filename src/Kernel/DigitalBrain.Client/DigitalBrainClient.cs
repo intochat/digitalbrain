@@ -52,6 +52,13 @@ public sealed class DigitalBrainClient : IDigitalBrain
         return _grains.GetGrain<TNeuron>(NeuronId.For<TNeuron>(Owner, name).ToGrainId());
     }
 
+    public TEntity GetEntity<TEntity>(string name = "default")
+        where TEntity : class, IEntity
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return _grains.GetGrain<TEntity>(EntityId.For<TEntity>(Owner, name).ToGrainId());
+    }
+
     public Task FireAsync<TNeuron>(string name, Synapse synapse, CancellationToken cancellationToken = default)
         where TNeuron : INeuron
     {
