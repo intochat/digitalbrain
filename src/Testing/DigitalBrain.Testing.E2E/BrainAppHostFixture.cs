@@ -51,13 +51,32 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
         ArmBrainTestMode(appBuilder);
 
         App = await appBuilder.BuildAsync().ConfigureAwait(false);
-        _logCollector = new ResourceLogCollector(App.Services.GetRequiredService<ResourceLoggerService>(), options.ExpectedHealthy);
-        await App.StartAsync().ConfigureAwait(false);
 
-        await WaitForExpectedHealthyAsync(options).ConfigureAwait(false);
+        try
+        {
+            _logCollector = new ResourceLogCollector(App.Services.GetRequiredService<ResourceLoggerService>(), options.ExpectedHealthy);
+            await App.StartAsync().ConfigureAwait(false);
 
-        _scriptHost = await ConnectScriptHostAsync().ConfigureAwait(false);
-        _grains = _scriptHost.Services.GetRequiredService<IGrainFactory>();
+            await WaitForExpectedHealthyAsync(options).ConfigureAwait(false);
+
+            _scriptHost = await ConnectScriptHostAsync().ConfigureAwait(false);
+            _grains = _scriptHost.Services.GetRequiredService<IGrainFactory>();
+        }
+        catch
+        {
+            // xunit never calls DisposeAsync when InitializeAsync throws, which leaked the
+            // session containers on every failed boot. Run the normal cleanup path here instead.
+            try
+            {
+                await DisposeAsync().ConfigureAwait(false);
+            }
+            catch
+            {
+                // Best-effort cleanup must not replace the original boot failure.
+            }
+
+            throw;
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -65,17 +84,20 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
         if (_logCollector is not null)
         {
             await _logCollector.DisposeAsync().ConfigureAwait(false);
+            _logCollector = null;
         }
 
         if (_scriptHost is not null)
         {
             await _scriptHost.StopAsync().ConfigureAwait(false);
             _scriptHost.Dispose();
+            _scriptHost = null;
         }
 
         if (App is not null)
         {
             await App.DisposeAsync().ConfigureAwait(false);
+            App = null!;
         }
     }
 
@@ -126,10 +148,6 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
     // "storage" again. Without this, "storage" would keep its production
     // ContainerLifetimeAnnotation=Persistent and ContainerMountAnnotation, mounting the
     // developer's dev data volume into the test run and writing test data into it.
-    // (PersistenceAnnotation, WithLifetime's other annotation, is [Experimental("ASPIREPERSISTENCE001")]
-    // in this preview and deliberately left untouched here — ContainerLifetimeAnnotation is the
-    // stable annotation already proven correct for the other three containers across two prior fix
-    // rounds, and is what this same method already used successfully before this change.)
     private static void IsolateContainers(IDistributedApplicationTestingBuilder appBuilder)
     {
         var runId = Guid.NewGuid().ToString("N")[..8];
@@ -139,6 +157,20 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
             foreach (var lifetime in resource.Annotations.OfType<ContainerLifetimeAnnotation>().ToList())
             {
                 resource.Annotations.Remove(lifetime);
+            }
+
+            // Aspire's lifetime decision (ResourceExtensions.GetLifetimeType) consults
+            // PersistenceAnnotation before ContainerLifetimeAnnotation, and production
+            // WithLifetime(ContainerLifetime.Persistent) adds both — so unless the persistence
+            // annotation goes too, the container outlives the test session (a live run proved it:
+            // storage-e2e-* survived a fully green run and teardown). The annotation type is
+            // [Experimental("ASPIREPERSISTENCE001")] and cannot be named here without opting into
+            // that surface, so it is matched by its stable full name instead.
+            foreach (var persistence in resource.Annotations
+                         .Where(annotation => annotation.GetType().FullName == "Aspire.Hosting.ApplicationModel.PersistenceAnnotation")
+                         .ToList())
+            {
+                resource.Annotations.Remove(persistence);
             }
 
             resource.Annotations.Add(new ContainerLifetimeAnnotation { Lifetime = ContainerLifetime.Session });
@@ -358,13 +390,81 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
         var hostBuilder = Host.CreateApplicationBuilder();
         hostBuilder.Configuration[$"ConnectionStrings:{DigitalBrainNames.Clustering}"] = clustering;
         hostBuilder.Configuration[$"ConnectionStrings:{DigitalBrainNames.Streams}"] = streams;
+        foreach (var (configurationKey, value) in await CaptureOrleansClientConfigurationAsync().ConfigureAwait(false))
+        {
+            hostBuilder.Configuration[configurationKey] = value;
+        }
 
         var storage = DigitalBrainScriptHost.RequireStorage(hostBuilder.Configuration);
         hostBuilder.Configuration[$"ConnectionStrings:{DigitalBrainNames.Streams}"] = storage.Streams;
         hostBuilder.AddDigitalBrainClient(activateOnStart: false);
 
         var host = hostBuilder.Build();
-        await host.StartAsync().ConfigureAwait(false);
+        try
+        {
+            await host.StartAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            host.Dispose();
+            throw;
+        }
+
         return host;
+    }
+
+    // AddDigitalBrainClient registers only keyed Azure clients; UseOrleansClient turns them into
+    // clustering/streaming providers purely from the host's "Orleans" configuration section,
+    // which Aspire injects into referencing projects as Orleans__* environment variables
+    // (AppHost side: WithReference(brain.AsClient())). A freestanding HostApplicationBuilder
+    // receives none of that, so Orleans' ClientClusteringValidator throws "Clustering has not
+    // been configured". Mirror the section verbatim from a client-shaped project in the running
+    // model — clustering configured, but no silo-only Reminders/GrainStorage sections — so
+    // ClusterId, ServiceId, and provider service keys match the silo exactly.
+    private async Task<IReadOnlyDictionary<string, string>> CaptureOrleansClientConfigurationAsync()
+    {
+        var model = App.Services.GetRequiredService<DistributedApplicationModel>();
+        var executionContext = App.Services.GetRequiredService<DistributedApplicationExecutionContext>();
+        var failures = new List<string>();
+
+        foreach (var project in model.GetProjectResources())
+        {
+            Dictionary<string, string> environment;
+            try
+            {
+                var executionConfiguration = await ExecutionConfigurationBuilder.Create(project)
+                    .WithEnvironmentVariablesConfig()
+                    .BuildAsync(executionContext)
+                    .ConfigureAwait(false);
+                environment = executionConfiguration.EnvironmentVariables.ToDictionary();
+            }
+            catch (Exception exception)
+            {
+                failures.Add($"{project.Name}: {exception.Message}");
+                continue;
+            }
+
+            var orleansConfiguration = environment
+                .Where(variable => variable.Key.StartsWith("Orleans__", StringComparison.Ordinal))
+                .ToDictionary(
+                    variable => variable.Key.Replace("__", ":", StringComparison.Ordinal),
+                    variable => variable.Value,
+                    StringComparer.Ordinal);
+
+            var isClientShaped = orleansConfiguration.ContainsKey("Orleans:Clustering:ProviderType")
+                && !orleansConfiguration.Keys.Any(key =>
+                    key.StartsWith("Orleans:Reminders:", StringComparison.Ordinal)
+                    || key.StartsWith("Orleans:GrainStorage:", StringComparison.Ordinal));
+            if (isClientShaped)
+            {
+                return orleansConfiguration;
+            }
+        }
+
+        throw new InvalidOperationException(
+            "No project resource exposes Orleans client configuration (an Orleans__Clustering__ProviderType "
+            + "environment variable without silo-only Reminders/GrainStorage sections), so the fixture "
+            + "cannot configure clustering for its own Orleans client host."
+            + (failures.Count == 0 ? string.Empty : $" Environment could not be resolved for: {string.Join("; ", failures)}"));
     }
 }
