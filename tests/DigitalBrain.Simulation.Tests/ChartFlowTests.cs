@@ -2,6 +2,7 @@ using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
+using DigitalBrain.Memory;
 using DigitalBrain.UI;
 using Xunit;
 
@@ -70,8 +71,18 @@ public sealed class ChartFlowTests(SimulationFixture fixture)
             d => d.Synapse is Responded);
         Assert.IsType<Responded>(respondedDelivery.Synapse);
 
-        // The no-store-on-offers pin (ChartCard offers must not create corpus/memory entries)
-        // returns in Task 3 against the Memory ReadFacts shape, with a bounded wait.
+        // The no-store-on-offers pin: ChartCard's handler emits Responded directly (it is not a
+        // turn completion, so it never reaches TryEmitRespondedAsync/StoreFact) -- the outgoing
+        // Responded delivery above already proves the single-threaded handler ran to completion,
+        // so one bounded ReadFacts call (no polling) deterministically catches a regression.
+        // chartName is a fresh UniqueId, so no legitimate fact anywhere can carry it as Text.
+        var facts = await fixture.Sim.Brain.Get<IFactMemory>(IFactMemory.InstanceName)
+            .FireAsync<FactsRead>(
+                new ReadFacts(CommandId.New(), Kind: "chat.responded", Limit: 500),
+                cancellationToken)
+            .WaitAsync(PollTimeout, cancellationToken);
+
+        Assert.DoesNotContain(facts.Facts, fact => fact.Text == chartName);
     }
 
     private static async Task<JournalRead> PollUntilJournalPresentAsync(

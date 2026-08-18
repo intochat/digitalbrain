@@ -1,10 +1,9 @@
-namespace DigitalBrain.Abstractions.Corpus;
+namespace DigitalBrain.Memory;
 
 [GenerateSerializer]
-[Alias("db.corpus-page")]
-public sealed record CorpusPage(
+[Alias("memory.facts-read")]
+public sealed record FactsRead(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] long Watermark,
-    [property: Id(2)] CorpusEntry[] Entries,
+    [property: Id(2)] FactEntry[] Facts,
     [property: Id(3)] bool Truncated) : Synapse;
-

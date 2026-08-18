@@ -1,6 +1,7 @@
 using System.Globalization;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Core;
+using DigitalBrain.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;
@@ -249,10 +250,10 @@ public sealed class ScheduleNeuron : Neuron, ISchedule, IRemindable
                 await EmitAsync(tick)
                     .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-                // Corpus projection (owner-scoped watermark rail).
+                // Memory-fact projection (owner-scoped watermark rail).
                 await SendAsync(
-                    ICorpus.ForOwner(Id.Owner),
-                    new AppendCorpusEntry(
+                    IFactMemory.ForOwner(Id.Owner),
+                    new StoreFact(
                         CommandId.New(),
                         Kind: "time.schedule-tick",
                         Text: $"schedule {Id.Name} tick Resolution={resolution} CollapsedPeriods={collapsed} Note={data.Note}",

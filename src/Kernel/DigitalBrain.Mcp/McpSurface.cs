@@ -15,5 +15,5 @@ internal static class McpSurface
     public const string ArmSchedule = "arm_schedule";
     public const string ForceScheduleCatchUp = "force_schedule_catch_up";
     public const string ReadSchedule = "read_schedule";
-    public const string ReadCorpus = "read_corpus";
+    public const string ReadMemoryFacts = "read_memory_facts";
 }

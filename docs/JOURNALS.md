@@ -6,11 +6,11 @@ Three concepts share the word "journal" in this codebase's ancestry. This is the
 |---|---|---|---|
 | Traffic journal | Every **neuron** (only neurons) | Incoming/Outgoing `SynapseDelivery` feeds: sequence-numbered observation windows with per-synapse-type tallies | Bounded: 512 entries / 512 KB per feed; reads past retention return a `ResetSnapshot` |
 | Durable state | Every durable grain (neurons AND entities) | Orleans.Journaling persistence (`IDurableValue`/`IDurableList` over the `journal` blob connection) — infrastructure, not a domain concept; hosted via `DurableStateHosting.AddDigitalBrainDurableState` | Managed by Orleans.Journaling (append + compaction) |
-| Corpus | The **owner** (or principal) | Watermarked, resumable story facts (`ICorpus`) — long-term history | Effectively unbounded |
+| Memory facts | The **owner** (or principal) | Watermarked, resumable story facts (`IFactMemory`) — long-term history, part of the Memory module alongside vector memory | Bounded: 4096 facts, oldest dropped first |
 
 ## The rules
 
-1. **Neurons own traffic journals. Entities own snapshots. Corpus owns history.**
+1. **Neurons own traffic journals. Entities own snapshots. Memory owns history.**
    An `Entity<TState>` (`DigitalBrain.Core`) is a plain stateful grain: `Read()`/`SaveAsync()`
    over durable state. It has no journals and no synapse membrane, and it is never a
    synapse-graph endpoint.

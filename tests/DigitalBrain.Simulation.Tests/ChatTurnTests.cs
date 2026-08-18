@@ -3,6 +3,7 @@ using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
+using DigitalBrain.Memory;
 using DigitalBrain.Testing;
 using DigitalBrain.UI;
 using Xunit;
@@ -12,7 +13,8 @@ namespace DigitalBrain.Simulation.Tests;
 // The full-turn safety net: one durable Send driven end-to-end through the production turn
 // machinery against the corpus-scripted mock LLM (tests/corpus/mvp-chart.feature). Pins the
 // frozen journal footprint UserMessaged → Pending → Running → Responded + Completed and the
-// side effects the scripted fires must leave behind (the chart entity's points).
+// side effects the scripted fires must leave behind (the chart entity's points and the
+// completed turn's memory fact).
 [Collection(SimulationCollection.Name)]
 public sealed class ChatTurnTests(SimulationFixture fixture)
 {
@@ -68,6 +70,21 @@ public sealed class ChatTurnTests(SimulationFixture fixture)
                 Assert.Equal("b", point.Label);
                 Assert.Equal(3, point.Value);
             });
+
+        // The completed turn's TryEmitRespondedAsync awaits its StoreFact call before emitting
+        // TurnLifecycle(Completed) (SettleTurnAsync awaits TryEmitRespondedAsync in full first),
+        // so the fact is already durable by the time the wait above observes Completed -- one
+        // bounded read is enough, no polling needed.
+        var facts = await brain.Get<IFactMemory>(IFactMemory.InstanceName)
+            .FireAsync<FactsRead>(
+                new ReadFacts(CommandId.New(), Kind: "chat.responded", Correlation: command.ToString(), Limit: 10),
+                cancellationToken)
+            .WaitAsync(PollTimeout, cancellationToken);
+
+        var fact = Assert.Single(facts.Facts);
+        Assert.Equal("chat.responded", fact.Kind);
+        Assert.Equal("Plotted 2 points on demo.", fact.Text);
+        Assert.Equal(command.ToString(), fact.Correlation);
     }
 
     private static async Task<ChartState> PollForPointsAsync(

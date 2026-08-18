@@ -1,8 +1,8 @@
 using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Abstractions.Corpus;
 using DigitalBrain.Chat;
 using DigitalBrain.Core;
+using DigitalBrain.Memory;
 using DigitalBrain.Modules.Sdk.Mcp;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -540,8 +540,8 @@ internal sealed class Chat : Neuron, IChat
         }
 
         await SendAsync(
-            ICorpus.ForOwner(Id.Owner),
-            new AppendCorpusEntry(
+            IFactMemory.ForOwner(Id.Owner),
+            new StoreFact(
                 CommandId.New(),
                 Kind: "chat.responded",
                 Text: result.Answer,

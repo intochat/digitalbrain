@@ -1,15 +1,15 @@
-namespace DigitalBrain.Abstractions.Corpus;
+namespace DigitalBrain.Memory;
 
-// Watermarked, resumable owner (or principal) projection of durable story facts.
+// Watermarked, resumable owner (or principal) projection of durable story facts — the
+// single long-term-memory concept.
 [ClientEntryPoint]
-[Alias("db.corpus")]
-public partial interface ICorpus :
+[Alias("memory.facts")]
+public partial interface IFactMemory :
     INeuron,
-    IHandle<AppendCorpusEntry>,
-    IHandle<ReadCorpus>,
-    IHandle<ReadEpisode>
+    IHandle<StoreFact>,
+    IHandle<ReadFacts>
 {
-    const string GrainTypeName = "corpus";
+    const string GrainTypeName = "factmemory";
     const string InstanceName = "main";
 
     static NeuronId ForOwner(OwnerId owner)

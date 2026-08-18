@@ -1,8 +1,7 @@
-namespace DigitalBrain.Abstractions.Corpus;
+namespace DigitalBrain.Memory;
 
 [GenerateSerializer]
-[Alias("db.corpus-appended")]
-public sealed record CorpusAppended(
+[Alias("memory.fact-stored")]
+public sealed record FactStored(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] long Sequence) : Synapse;
-

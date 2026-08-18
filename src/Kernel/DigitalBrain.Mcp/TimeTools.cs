@@ -2,6 +2,7 @@ using System.ComponentModel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Client;
 using DigitalBrain.Core;
+using DigitalBrain.Memory;
 using DigitalBrain.Time;
 using ModelContextProtocol.Server;
 
@@ -97,25 +98,26 @@ internal sealed class TimeTools(IDigitalBrain brain)
             + $"lastCollapsedPeriods={snap.LastCollapsedPeriods} note={snap.Note}";
     }
 
-    [McpServerTool(Name = McpSurface.ReadCorpus)]
-    [Description("Read the corpus watermark page (Wave 5 memory projection).")]
-    public async Task<string> ReadCorpusAsync(
-        [Description("Read entries after this sequence")] long afterSequence = 0,
-        [Description("Max entries")] int limit = 50,
+    [McpServerTool(Name = McpSurface.ReadMemoryFacts)]
+    [Description("Read the owner's memory facts (kind/correlation filtered; long-term-memory projection).")]
+    public async Task<string> ReadMemoryFactsAsync(
+        [Description("Filter by fact kind, e.g. chat.responded")] string? kind = null,
+        [Description("Filter by correlation id")] string? correlation = null,
+        [Description("Max facts")] int limit = 50,
         CancellationToken cancellationToken = default)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(Bound);
 
         var page = await brain
-            .Get<ICorpus>(ICorpus.InstanceName)
-            .FireAsync<CorpusPage>(
-                new ReadCorpus(CommandId.New(), afterSequence, limit),
+            .Get<IFactMemory>(IFactMemory.InstanceName)
+            .FireAsync<FactsRead>(
+                new ReadFacts(CommandId.New(), kind, correlation, limit),
                 timeout.Token)
             .ConfigureAwait(false);
 
-        var lines = page.Entries.Select(e =>
-            $"#{e.Sequence} [{e.Kind}] {e.Text} @ {e.At:o}");
+        var lines = page.Facts.Select(f =>
+            $"#{f.Sequence} [{f.Kind}] {f.Text} @ {f.At:o}");
         return $"watermark={page.Watermark} truncated={page.Truncated}\n"
             + string.Join("\n", lines);
     }
