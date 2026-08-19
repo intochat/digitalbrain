@@ -12,6 +12,7 @@
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="Reqnroll.xunit.v3" />
     <PackageReference Include="Reqnroll.Tools.MsBuild.Generation" />
+    <PackageReference Include="ModelContextProtocol.Core" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
