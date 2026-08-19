@@ -21,6 +21,7 @@ public sealed class SystemTools(
     public const string GetNeurons = "get_neurons";
     public const string Fire = "fire";
     public const string BrainConnect = "brain_connect";
+    public const string BrainDisconnect = "brain_disconnect";
 
     private const int FindLimit = 8;
 
@@ -39,6 +40,8 @@ public sealed class SystemTools(
                 "Send a request synapse and return its reply. 'contract' is a contract id from find_capabilities; 'arguments' are its fields (commandId is filled for you); 'target' overrides the default instance — a grain type ('timer'), an instance name ('main'), or type:name."),
             AIFunctionFactory.Create(BrainConnectAsync, BrainConnect,
                 "Wire source → target in the owner's brain: facts the source emits under synapseAlias are delivered to the target. source and target are 'type:name' instances from get_neurons; synapseAlias is the fact's contract id from find_capabilities."),
+            AIFunctionFactory.Create(BrainDisconnectAsync, BrainDisconnect,
+                "Remove a wire from the owner's brain: the exact source, synapseAlias, and target of an existing connection, as brain_connect wired it."),
         ];
 
     private async Task<string> FindCapabilitiesAsync(string intent, CancellationToken cancellationToken)
@@ -97,6 +100,7 @@ public sealed class SystemTools(
 
         // The brain's registry is durable: it remembers nodes across activations, cold or hot.
         BrainState? brainState = null;
+        var brainUnreachable = false;
         try
         {
             brainState = await OwnersBrain()
@@ -105,7 +109,8 @@ public sealed class SystemTools(
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
-            // Brain unavailable — live list still works.
+            // Emptiness must never be claimed for an unreachable brain; say so instead.
+            brainUnreachable = true;
         }
 
         var nodes = brainState?.Nodes ?? [];
@@ -114,7 +119,12 @@ public sealed class SystemTools(
             : [.. nodes.Where(node =>
                 string.Equals(node.Type, grainType.Trim(), StringComparison.OrdinalIgnoreCase))];
 
-        if (filteredNodes.Count > 0)
+        if (brainUnreachable)
+        {
+            lines.AppendLine(
+                "Brain-registered nodes: (the brain was unreachable — registered nodes are unknown)");
+        }
+        else if (filteredNodes.Count > 0)
         {
             lines.AppendLine("Brain-registered nodes (exist even when cold):");
             foreach (var node in filteredNodes.OrderBy(static n => n.Key, StringComparer.Ordinal))
@@ -139,11 +149,18 @@ public sealed class SystemTools(
             lines.AppendLine($"  {neuron}");
         }
 
-        var connections = brainState?.Connections ?? [];
-        lines.AppendLine(connections.Count == 0 ? "No connections yet." : "Connections:");
-        foreach (var connection in connections)
+        if (brainUnreachable)
         {
-            lines.AppendLine($"  {connection.From} --{connection.Role}--> {connection.To}");
+            lines.AppendLine("Connections: (the brain was unreachable — connections are unknown)");
+        }
+        else
+        {
+            var connections = brainState?.Connections ?? [];
+            lines.AppendLine(connections.Count == 0 ? "No connections yet." : "Connections:");
+            foreach (var connection in connections)
+            {
+                lines.AppendLine($"  {connection.From} --{connection.Role}--> {connection.To}");
+            }
         }
 
         return lines.ToString();
@@ -165,14 +182,14 @@ public sealed class SystemTools(
                     + "contract id), and target ('type:name').";
             }
 
-            if (ParseInstance(source) is not { } from)
+            if (!NeuronId.TryParseInstance(source, owner, out var from))
             {
-                return $"Source '{source}' must be written type:name, for example 'timer:default'.";
+                return $"Source '{source}' must be written type:name, for example 'timer:default' — no owner segment.";
             }
 
-            if (ParseInstance(target) is not { } to)
+            if (!NeuronId.TryParseInstance(target, owner, out var to))
             {
-                return $"Target '{target}' must be written type:name, for example 'chat:main'.";
+                return $"Target '{target}' must be written type:name, for example 'chat:main' — no owner segment.";
             }
 
             var alias = synapseAlias.Trim();
@@ -188,22 +205,51 @@ public sealed class SystemTools(
         }
     }
 
-    private NeuronId? ParseInstance(string instance)
+    private async Task<string> BrainDisconnectAsync(
+        string source,
+        string synapseAlias,
+        string target,
+        CancellationToken cancellationToken)
     {
-        var trimmed = instance.Trim();
-        var separator = trimmed.IndexOf(':', StringComparison.Ordinal);
-        if (separator <= 0 || separator == trimmed.Length - 1)
+        try
         {
-            return null;
+            if (string.IsNullOrWhiteSpace(source)
+                || string.IsNullOrWhiteSpace(synapseAlias)
+                || string.IsNullOrWhiteSpace(target))
+            {
+                return "brain_disconnect needs the wire's source ('type:name'), synapseAlias, "
+                    + "and target ('type:name') — get_neurons lists the connections.";
+            }
+
+            if (!NeuronId.TryParseInstance(source, owner, out var from))
+            {
+                return $"Source '{source}' must be written type:name, for example 'timer:default' — no owner segment.";
+            }
+
+            if (!NeuronId.TryParseInstance(target, owner, out var to))
+            {
+                return $"Target '{target}' must be written type:name, for example 'chat:main' — no owner segment.";
+            }
+
+            var alias = synapseAlias.Trim();
+            var routed = await OwnersBrain()
+                .Connections(from, alias)
+                .WaitAsync(NeuronCallTimeouts.LookupBound, cancellationToken).ConfigureAwait(false);
+            if (!routed.Any(existing => existing.To == to))
+            {
+                return $"No wire {from} --{alias}--> {to} exists.";
+            }
+
+            await OwnersBrain()
+                .Disconnect(new Connection(from, alias, to))
+                .WaitAsync(NeuronCallTimeouts.LookupBound, cancellationToken).ConfigureAwait(false);
+            return $"Disconnected {from} --{alias}--> {to}.";
         }
-
-        var type = trimmed[..separator];
-        var rest = trimmed[(separator + 1)..];
-        var name = rest.Contains('/', StringComparison.Ordinal)
-            ? rest[(rest.IndexOf('/', StringComparison.Ordinal) + 1)..]
-            : rest;
-
-        return new NeuronId(type, owner, name);
+        catch (Exception refused) when (refused is not OperationCanceledException)
+        {
+            // The model must always see WHY, never an opaque "Function failed".
+            return $"brain_disconnect failed: {refused.Message}";
+        }
     }
 
     private IBrain OwnersBrain()

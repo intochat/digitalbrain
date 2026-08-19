@@ -69,10 +69,28 @@ internal sealed class BrainEntity(
                 + $"{connection.To}.");
         }
 
+        // The owner wall: the Connection payload is caller-supplied, so a foreign-owner
+        // endpoint here would let one owner's brain route deliveries into another owner.
+        var owner = GrainOwnership.RequireOwner(this.GetGrainId());
+        if (connection.From.Owner != owner || connection.To.Owner != owner)
+        {
+            throw new NeuronAuthorizationException(
+                $"The brain of owner '{owner}' cannot wire {connection.From} "
+                + $"--{connection.Role}--> {connection.To}: both endpoints must belong to "
+                + "this owner.");
+        }
+
         var snapshot = Snapshot();
-        if (snapshot.Connections.Contains(connection))
+        if (snapshot.Connections.Any(c => SameWire(c, connection)))
         {
             return;
+        }
+
+        if (snapshot.Connections.Count >= BrainState.MaximumConnections)
+        {
+            throw new NeuronAuthorizationException(
+                $"The brain holds its maximum of {BrainState.MaximumConnections} connections "
+                + "and refuses another wire. Disconnect one first; wires are never evicted.");
         }
 
         // Routing is single-target: an emission's (source, alias) pair resolves at most one
@@ -101,7 +119,7 @@ internal sealed class BrainEntity(
         ArgumentNullException.ThrowIfNull(connection);
 
         var snapshot = Snapshot();
-        var kept = snapshot.Connections.Where(c => c != connection).ToArray();
+        var kept = snapshot.Connections.Where(c => !SameWire(c, connection)).ToArray();
         if (kept.Length == snapshot.Connections.Count)
         {
             return;
@@ -264,47 +282,56 @@ internal sealed class BrainEntity(
 
     // Walks the existing table from the proposed target back toward the proposed source,
     // role-blind: a routed cycle deadlocks regardless of which aliases ride it. Returns the
-    // closed path for the refusal message, or null when the wire is acyclic.
+    // closed path for the refusal message, or null when the wire is acyclic. Iterative on an
+    // explicit stack: recursion depth would scale with the table and overflow untrappably.
     private static string? CyclePath(IReadOnlyList<Connection> table, Connection proposed)
     {
         List<Connection> path = [proposed];
-        HashSet<NeuronId> visited = [];
+        HashSet<NeuronId> visited = [proposed.To];
+        // A frame is a node being expanded plus the table index its edge scan resumes from.
+        var frames = new Stack<(NeuronId Node, int NextIndex)>();
+        frames.Push((proposed.To, 0));
 
-        return Reaches(proposed.To)
-            ? proposed.From + string.Concat(path.Select(edge => $" --{edge.Role}--> {edge.To}"))
-            : null;
-
-        bool Reaches(NeuronId node)
+        while (frames.Count > 0)
         {
-            if (node == proposed.From)
+            var (node, index) = frames.Pop();
+            while (index < table.Count && table[index].From != node)
             {
-                return true;
+                index++;
             }
 
-            if (!visited.Add(node))
+            if (index == table.Count)
             {
-                return false;
+                path.RemoveAt(path.Count - 1);
+                continue;
             }
 
-            foreach (var edge in table)
+            var edge = table[index];
+            frames.Push((node, index + 1));
+            path.Add(edge);
+
+            if (edge.To == proposed.From)
             {
-                if (edge.From != node)
-                {
-                    continue;
-                }
+                return proposed.From + string.Concat(path.Select(e => $" --{e.Role}--> {e.To}"));
+            }
 
-                path.Add(edge);
-                if (Reaches(edge.To))
-                {
-                    return true;
-                }
-
+            if (visited.Add(edge.To))
+            {
+                frames.Push((edge.To, 0));
+            }
+            else
+            {
                 path.RemoveAt(path.Count - 1);
             }
-
-            return false;
         }
+
+        return null;
     }
+
+    private static bool SameWire(Connection left, Connection right)
+        => left.From == right.From
+            && left.To == right.To
+            && SameRole(left.Role, right.Role);
 
     private static bool SameRole(string left, string right)
         => string.Equals(left, right, StringComparison.OrdinalIgnoreCase);

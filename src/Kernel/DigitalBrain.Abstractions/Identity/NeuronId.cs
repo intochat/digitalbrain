@@ -36,6 +36,34 @@ public readonly record struct NeuronId
 
     public static string GrainTypeNameOf(Type neuronType) => GrainTypeNames.Of(neuronType);
 
+    // The "type:name" instance shape tool surfaces accept. A "type:owner/name" form is
+    // refused rather than silently re-owned: the owner always comes from the calling surface.
+    public static bool TryParseInstance(string? instance, OwnerId owner, out NeuronId id)
+    {
+        id = default;
+        if (string.IsNullOrWhiteSpace(instance))
+        {
+            return false;
+        }
+
+        var trimmed = instance.Trim();
+        var separator = trimmed.IndexOf(':', StringComparison.Ordinal);
+        if (separator <= 0 || separator == trimmed.Length - 1)
+        {
+            return false;
+        }
+
+        try
+        {
+            id = new NeuronId(trimmed[..separator], owner, trimmed[(separator + 1)..]);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
     public static NeuronId FromGrainKey(string type, string grainKey)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(grainKey);

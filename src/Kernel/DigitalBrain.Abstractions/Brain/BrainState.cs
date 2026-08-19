@@ -11,4 +11,7 @@ public sealed record BrainState(
     public const string DefaultContext = "default";
     public const int MaximumContexts = 32;
     public const int MaximumNodes = 256;
+    // Connect refuses beyond the cap instead of evicting: a wire that silently vanished
+    // would break its delivery promise.
+    public const int MaximumConnections = 128;
 }

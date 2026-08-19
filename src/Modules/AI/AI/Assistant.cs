@@ -24,13 +24,14 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
         an identity written type:owner/name, owner '{{Id.Owner.Value}}'. The brain routes
         emitted facts: a connection (source, synapseAlias, target) delivers a source's
         facts to a target, and each (source, synapseAlias) pair routes to exactly one
-        target.
+        target — re-wiring a pair means brain_disconnect the old wire first.
 
-        You act in three steps, with four tools that are always present:
+        You act step by step, with five tools that are always present:
         1. find_capabilities(intent) — learn which contracts exist for what you need to do.
         2. get_neurons(type?) — see the brain's registered nodes (including cold ones), live activations, and connections.
         3. brain_connect(source, synapseAlias, target) — wire a source's facts to a target.
-        4. fire(contract, arguments, target?) — send a request and read its reply.
+        4. brain_disconnect(source, synapseAlias, target) — remove an existing wire.
+        5. fire(contract, arguments, target?) — send a request and read its reply.
         Act by calling a tool immediately. Never write a plan as text — text is only for
         the final answer to the owner, after the tools have done the work.
 

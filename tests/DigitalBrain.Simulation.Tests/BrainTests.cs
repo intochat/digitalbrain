@@ -175,8 +175,64 @@ public sealed class BrainTests(SimulationFixture fixture)
         var routed = Assert.Single(await grain.Connections(connection.From, "render"));
         Assert.Equal(connection, routed);
 
-        await grain.Disconnect(connection);
+        // Roles compare case-insensitively everywhere: a re-connect over a different casing
+        // is idempotent, and a disconnect by a different casing removes the wire.
+        await grain.Connect(connection with { Role = "RENDER" });
+        Assert.Single(await grain.Connections(connection.From, "render"));
+
+        await grain.Disconnect(connection with { Role = "RENDER" });
         Assert.Null(await grain.Route(connection.From, "render"));
+    }
+
+    [Fact]
+    public async Task ConnectRefusesEndpointsOfAnotherOwner()
+    {
+        var brain = fixture.Sim.BrainFor(fixture.Sim.UniqueId("owner"));
+        var grain = BrainGrainOf(brain);
+        var foreign = new OwnerId(fixture.Sim.UniqueId("owner"));
+        var inside = NeuronId.For<IChart>(brain.Owner, fixture.Sim.UniqueId("chart"));
+        var outside = NeuronId.For<IChart>(foreign, fixture.Sim.UniqueId("chart"));
+
+        var leakOut = await Assert.ThrowsAsync<NeuronAuthorizationException>(
+            () => grain.Connect(new Connection(inside, "leak", outside)));
+        Assert.Contains("belong to this owner", leakOut.Message, StringComparison.Ordinal);
+
+        var leakIn = await Assert.ThrowsAsync<NeuronAuthorizationException>(
+            () => grain.Connect(new Connection(outside, "leak", inside)));
+        Assert.Contains("belong to this owner", leakIn.Message, StringComparison.Ordinal);
+
+        // Neither refused wire was stored.
+        Assert.Null(await grain.Route(inside, "leak"));
+        Assert.Empty((await grain.Read())?.Connections ?? []);
+    }
+
+    [Fact]
+    public async Task ConnectRefusesTheWireBeyondTheConnectionCap()
+    {
+        var brain = fixture.Sim.BrainFor(fixture.Sim.UniqueId("owner"));
+        var grain = BrainGrainOf(brain);
+
+        for (var i = 0; i < BrainState.MaximumConnections; i++)
+        {
+            await grain.Connect(new Connection(
+                new NeuronId("chart", brain.Owner, $"cap-src-{i:D3}"),
+                "cap",
+                new NeuronId("chart", brain.Owner, $"cap-dst-{i:D3}")));
+        }
+
+        var refused = await Assert.ThrowsAsync<NeuronAuthorizationException>(
+            () => grain.Connect(new Connection(
+                new NeuronId("chart", brain.Owner, "cap-src-overflow"),
+                "cap",
+                new NeuronId("chart", brain.Owner, "cap-dst-overflow"))));
+        Assert.Contains($"{BrainState.MaximumConnections}", refused.Message, StringComparison.Ordinal);
+
+        // No eviction: every stored wire survived the refusal and still routes.
+        Assert.Equal(BrainState.MaximumConnections, (await grain.Read())!.Connections.Count);
+        Assert.NotNull(await grain.Route(new NeuronId("chart", brain.Owner, "cap-src-000"), "cap"));
+        Assert.NotNull(await grain.Route(
+            new NeuronId("chart", brain.Owner, $"cap-src-{BrainState.MaximumConnections - 1:D3}"),
+            "cap"));
     }
 
     [Fact]
