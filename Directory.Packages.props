@@ -41,6 +41,7 @@
     <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.17.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.17.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.17.0" />
+    <PackageVersion Include="Microsoft.Orleans.BroadcastChannel" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.Client" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.Dashboard" Version="10.2.2" />

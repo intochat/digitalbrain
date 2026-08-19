@@ -199,7 +199,4 @@ public static class SynapseCapabilityTool
     }
 
 
-    internal static readonly TimeSpan ToolResponseWait = DeliveryPolicy.DeliveryAttemptTimeout * 3;
-
-
 }

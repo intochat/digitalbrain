@@ -7,7 +7,7 @@ internal sealed class IntrospectionJournalReader(IGrainFactory grainFactory, Own
 {
     private const long BeyondJournalEnd = long.MaxValue;
 
-    internal static readonly TimeSpan ReadBound = DeliveryPolicy.InnerDeliveryReadBound;
+    internal static readonly TimeSpan ReadBound = NeuronCallTimeouts.LookupBound;
 
     private readonly OwnerNeuronInventory _inventory = new(grainFactory, owner);
 

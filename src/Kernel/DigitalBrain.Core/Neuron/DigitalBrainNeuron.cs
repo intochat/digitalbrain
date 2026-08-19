@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.BroadcastChannel;
 using Orleans.Journaling;
 
 namespace DigitalBrain.Core;
@@ -25,18 +26,21 @@ internal sealed class DigitalBrainNeuron : Neuron, IDigitalBrainNeuron
             return;
         }
 
-        // Directed, not Emit: SurfaceBoot used to receive DigitalBrainActivated only as a
-        // per-correlation broadcast ghost. Broadcast is now opt-in and empty by default;
-        // the stable surface-boot instance is the real boot path.
-        await SendAsync(
-                new NeuronId(SurfaceBootGrainType, Id.Owner, SurfaceBootInstanceName),
-                new DigitalBrainActivated(Id.Owner))
+        // Journal first: DigitalBrainActivated in this neuron's OWN Outgoing journal is the
+        // pinned activation footprint, whether or not any surface module subscribes.
+        var activated = await StageOutgoingAsync(new DigitalBrainActivated(Id.Owner), cause: null)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        var writer = ServiceProvider
+            .GetRequiredService<IClusterClient>()
+            .GetBroadcastChannelProvider(DigitalBrainNames.BroadcastChannelProvider)
+            .GetChannelWriter<SynapseDelivery>(ChannelId.Create(
+                DigitalBrainNames.ActivationChannelNamespace,
+                $"{Id.Owner.Value}/{DigitalBrainNames.ActivationSubscriberName}"));
+        await writer.Publish(activated)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
         _activationPublished.Value = true;
         await WriteStateAsync().ConfigureAwait(true);
     }
-
-    // Grain type string matches SurfaceBoot's [GrainType]; name is the stable instance.
-    private const string SurfaceBootGrainType = "surface-boot";
-    private const string SurfaceBootInstanceName = "default";
 }

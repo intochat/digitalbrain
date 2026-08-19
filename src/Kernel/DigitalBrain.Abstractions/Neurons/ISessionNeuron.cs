@@ -10,10 +10,14 @@ public interface ISessionNeuron : INeuron
     static NeuronId ForOwner(OwnerId owner)
         => new(GrainTypeName, owner, InstanceName);
 
+    // A fire is a direct awaited call spanning the receiver's whole turn, so it carries
+    // the same budget as the receiver's Deliver.
     [Alias(nameof(Fire))]
+    [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
     Task<SynapseDelivery> Fire(NeuronId receiver, Synapse synapse);
 
     [Alias(nameof(Emit))]
+    [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
     Task Emit(Synapse synapse);
 
     [Alias(nameof(ReadNeuronJournal))]

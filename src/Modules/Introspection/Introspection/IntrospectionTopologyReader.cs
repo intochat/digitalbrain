@@ -58,12 +58,9 @@ internal sealed class IntrospectionTopologyReader(
                     .OrderBy(static connection => connection.Source, StringComparer.Ordinal)
                     .ThenBy(static connection => connection.SynapseAlias, StringComparer.Ordinal),
             ],
-            [
-                .. (services.GetService<BroadcastTopology>()?.Routes ?? [])
-                    .Select(static route => new TopologyBroadcastRoute(
-                        route.SynapseAlias,
-                        route.HandlerGrainType)),
-            ]);
+            // Broadcast fan-out moved to Orleans BroadcastChannel; the catalog of per-alias
+            // broadcast routes died with it, so the contract's field stays empty.
+            BroadcastRoutes: []);
     }
 
     private IReadOnlyList<string> ComposedModuleIds()

@@ -28,12 +28,16 @@ internal static class SynapseTelemetry
         dropped?.SetTag("db.brain-registration-dropped", unregistered.GetType().Name);
     }
 
-    internal static void RetractionUncommitted(DigitalBrain.Abstractions.Identity.NeuronId neuron, Exception uncommitted)
+    internal static void ReplyDropped(
+        DigitalBrain.Abstractions.Identity.NeuronId replier,
+        DigitalBrain.Abstractions.Identity.NeuronId receiver,
+        Exception undelivered)
     {
-        using var retraction = Source.StartActivity("db.retraction-uncommitted");
+        using var dropped = Source.StartActivity("db.reply-dropped");
 
-        retraction?.SetStatus(ActivityStatusCode.Error, uncommitted.Message);
-        retraction?.SetTag(ReceiverTag, neuron.ToString());
-        retraction?.SetTag("db.retraction-uncommitted", uncommitted.GetType().Name);
+        dropped?.SetStatus(ActivityStatusCode.Error, undelivered.Message);
+        dropped?.SetTag(ReceiverTag, receiver.ToString());
+        dropped?.SetTag("db.replier", replier.ToString());
+        dropped?.SetTag("db.reply-dropped", undelivered.GetType().Name);
     }
 }

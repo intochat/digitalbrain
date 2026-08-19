@@ -1,19 +1,29 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Core;
+using Orleans.BroadcastChannel;
 
 namespace DigitalBrain.UI;
 
-// Receives DigitalBrainActivated by directed Send from DigitalBrainNeuron to
-// surface-boot:{owner}/default — not by broadcast ghosts (Wave 1).
+// Receives DigitalBrainActivated over the activation BroadcastChannel: the implicit channel
+// subscription activates surface-boot:{owner}/default from the channel key, and the published
+// delivery runs through the regular Deliver path so it journals and dispatches like any send.
 [GrainType("surface-boot")]
+[ImplicitChannelSubscription(DigitalBrainNames.ActivationChannelNamespace)]
 internal sealed class SurfaceBoot :
     Neuron,
-    IHandle<DigitalBrainActivated>
+    IHandle<DigitalBrainActivated>,
+    IOnBroadcastChannelSubscribed
 {
     public const string InstanceName = "default";
     public const string DefaultSurfaceName = ISurface.DefaultInstanceName;
     public const string HomeSurfaceKey = "home";
     public const string HomeSurfaceTitle = "Home";
+
+    public Task OnSubscribed(IBroadcastChannelSubscription subscription)
+    {
+        ArgumentNullException.ThrowIfNull(subscription);
+        return subscription.Attach<SynapseDelivery>(activation => Deliver(activation));
+    }
 
     public Task HandleAsync(DigitalBrainActivated synapse, CancellationToken cancellationToken)
     {

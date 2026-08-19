@@ -24,13 +24,6 @@ internal sealed class OwnerBoundCallFilter(IEnumerable<ReminderSourceAllowlist> 
                 $"'{nameof(IRemindable.ReceiveReminder)}' can be called only by the Orleans reminder provider. Source: '{context.SourceId?.ToString() ?? "unattributed"}'.");
         }
 
-        if (IsOutboxDrainCall(context))
-        {
-            RequireDedicatedWakeupForTarget(context);
-            await context.Invoke().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            return;
-        }
-
         if (context.Grain is Neuron enumerationTarget
             && CapabilityInvocation.IsEnumerationDispatch(context.InterfaceMethod)
             && CapabilityInvocation.EnumerationId(context.Request) is { } enumerationId
@@ -96,22 +89,6 @@ internal sealed class OwnerBoundCallFilter(IEnumerable<ReminderSourceAllowlist> 
     private static bool IsReminderCall(IIncomingGrainCallContext context)
         => context.InterfaceMethod?.DeclaringType == typeof(IRemindable)
             && context.InterfaceMethod?.Name == nameof(IRemindable.ReceiveReminder);
-
-    private static bool IsOutboxDrainCall(IIncomingGrainCallContext context)
-        => context.InterfaceMethod?.DeclaringType == typeof(IOutboxDrain)
-            && context.InterfaceMethod?.Name == nameof(IOutboxDrain.Drain);
-
-    private static void RequireDedicatedWakeupForTarget(IIncomingGrainCallContext context)
-    {
-        if (context.SourceId is not { } source
-            || !string.Equals(source.Type.ToString(), OutboxWakeup.GrainTypeName, StringComparison.Ordinal)
-            || !OutboxWakeup.TryParseTarget(source.Key.ToString(), out var encodedTarget)
-            || encodedTarget.ToGrainId() != context.TargetId)
-        {
-            throw new NeuronAuthorizationException(
-                $"'{nameof(IOutboxDrain.Drain)}' can be called only by the dedicated wakeup for target '{context.TargetId}'. Source: '{context.SourceId?.ToString() ?? "unattributed"}'.");
-        }
-    }
 
     private bool IsTrustedReminderProvider(GrainId? source)
         => source is { } identified

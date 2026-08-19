@@ -17,13 +17,10 @@ public sealed class JournalSmokeTests(SimulationFixture fixture)
         var brain = fixture.Sim.BrainFor(fixture.Sim.UniqueId("journal-owner"));
         await brain.ActivateAsync(TestContext.Current.CancellationToken);
 
-        // DigitalBrainNeuron.Activate() sends DigitalBrainActivated to the surface-boot
-        // instance via Directed SendAsync, not Emit. NeuronMessagePipeline.FireAsync stages
-        // that delivery into the SENDER's own Outgoing journal (turn.StageOutgoing) BEFORE the
-        // outbox even attempts to route it to the receiver -- so IDigitalBrainNeuron's own
-        // Outgoing journal is where the activation deterministically lands, independent of
-        // whether the UI module (surface-boot's grain type) is loaded by this fixture's
-        // Time-only ModuleAssemblies.
+        // DigitalBrainNeuron.Activate() journals DigitalBrainActivated into its OWN Outgoing
+        // journal BEFORE publishing it on the activation BroadcastChannel -- so
+        // IDigitalBrainNeuron's own Outgoing journal is where the activation
+        // deterministically lands, independent of whether any surface module subscribes.
         var subject = IDigitalBrainNeuron.ForOwner(brain.Owner);
         var delivery = await JournalWait.ForAsync(
             brain,
@@ -32,6 +29,18 @@ public sealed class JournalSmokeTests(SimulationFixture fixture)
             static d => d.Synapse is DigitalBrainActivated);
 
         Assert.IsType<DigitalBrainActivated>(delivery.Synapse);
+
+        // The BroadcastChannel fan-out: the implicit channel subscriber
+        // (surface-boot:{owner}/default, keyed by the channel key) journals the published
+        // delivery through the regular Deliver path as its own Incoming.
+        var surfaceBoot = new NeuronId("surface-boot", brain.Owner, "default");
+        var received = await JournalWait.ForAsync(
+            brain,
+            surfaceBoot,
+            JournalKind.Incoming,
+            static d => d.Synapse is DigitalBrainActivated);
+
+        Assert.Equal(delivery.SynapseId, received.SynapseId);
     }
 
     [Fact]
@@ -44,15 +53,9 @@ public sealed class JournalSmokeTests(SimulationFixture fixture)
 
         // CHOSEN SHAPE (documented per the task's discovery instruction): watch the SENDER's
         // own Outgoing journal (the owner's SessionNeuron), not the timer's Incoming journal.
-        // An earlier version fired at the timer and watched ITS Incoming feed; overflowing that
-        // requires 550 deliveries to actually drain through SessionNeuron's outbox to a single
-        // contended receiver, which measured anywhere from ~40s to 3m45s+ across runs -- too
-        // slow and too timing-variable to race deterministically within a test timeout.
-        // NeuronMessagePipeline.FireAsync appends every fired synapse to the SENDER's own
-        // Outgoing feed SYNCHRONOUSLY (turn.StageOutgoing, before the outbox even attempts to
-        // route it to a receiver), so watching the session's own Outgoing journal observes the
-        // overflow the instant each FireAsync call commits, decoupled entirely from how slowly
-        // (or whether) the receiver ever actually processes the deliveries.
+        // A send journals into the sender's own Outgoing feed BEFORE the direct grain call to
+        // the receiver, so watching the session's own Outgoing journal observes the overflow
+        // as each fire commits, regardless of what the receiver does with the delivery.
         var subject = ISessionNeuron.ForOwner(brain.Owner);
 
         // Start the wait BEFORE firing anything. `JournalWait.ForAsync` is a plain async
@@ -69,17 +72,27 @@ public sealed class JournalSmokeTests(SimulationFixture fixture)
             static _ => false,
             timeout: TimeSpan.FromSeconds(45));
 
-        // 550 comfortably exceeds NeuronFeed's 512-entry retention cap. The receiver (the
-        // fixture's real ITimer neuron) never needs to actually process these for this test --
-        // the assertion is about the SENDER's own Outgoing journal, so StartTimer is used only
-        // because it is the cheapest fireable synapse the Time module accepts. Fired
-        // concurrently, not one at a time: each FireAsync round-trips twice (ActivateAsync then
-        // Session().Fire), and dispatching all 550 at once overlaps that round-trip latency
-        // instead of paying it 1100 times sequentially.
-        var fires = Enumerable.Range(0, 550).Select(_ => brain.FireAsync(
-            timerSubject,
-            new TimerModule.StartTimer(CommandId.New(), 60, "compaction-smoke"),
-            cancellationToken));
+        // 550 comfortably exceeds NeuronFeed's 512-entry retention cap. The assertion is
+        // about the SENDER's own Outgoing journal, so StartTimer is used only because it is
+        // the cheapest fireable synapse the Time module accepts. A fire is a direct awaited
+        // call now: after the first one arms the timer, the handler REFUSES every further
+        // StartTimer and that refusal surfaces to the sender -- but each send was already
+        // journaled into the session's Outgoing feed before the call, which is all the
+        // overflow needs, so the refusals are swallowed here. Fired concurrently to overlap
+        // the round-trip latency.
+        var fires = Enumerable.Range(0, 550).Select(async _ =>
+        {
+            try
+            {
+                await brain.FireAsync(
+                    timerSubject,
+                    new TimerModule.StartTimer(CommandId.New(), 60, "compaction-smoke"),
+                    cancellationToken);
+            }
+            catch (NeuronAuthorizationException)
+            {
+            }
+        });
         await Task.WhenAll(fires);
 
         var compacted = await Assert.ThrowsAsync<JournalCompactedException>(() => waitTask);

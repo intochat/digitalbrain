@@ -13,7 +13,7 @@ internal sealed class Button : Neuron, IButton
 
         // An activation with no live route journals and vanishes (zero-receiver
         // emission); the click must refuse visibly once its offer expired.
-        using var lookup = new CancellationTokenSource(DeliveryPolicy.ConnectionLookupTimeout);
+        using var lookup = new CancellationTokenSource(NeuronCallTimeouts.LookupBound);
         var routes = await GrainFactory
             .GetGrain<ISynapseGraph>(ISynapseGraph.ForOwner(Id.Owner).ToGrainId())
             .ConnectionsFrom(Id, ButtonActivated.AliasName)

@@ -23,32 +23,18 @@ public static class DigitalBrainRuntime
         builder.AddIncomingGrainCallFilter<IncomingReificationFilter>();
         builder.AddIncomingGrainCallFilter<OwnerBoundCallFilter>();
         builder.AddOutgoingGrainCallFilter<OutgoingReificationFilter>();
+        // Awaited publish: a subscriber's failure surfaces to the publisher, matching the
+        // direct-call delivery semantics of Send.
+        builder.AddBroadcastChannel(
+            DigitalBrainNames.BroadcastChannelProvider,
+            options => options.FireAndForgetDelivery = false);
         builder.Services.AddSingleton(capabilities);
         builder.Services.AddSingleton(
             ActiveModuleContractTypeMap.Create(
                 modules.Contracts.Concat(modules.Implementations),
                 capabilities));
-        builder.Services.AddSingleton(services =>
-        {
-            var catalog = new BroadcastCatalog();
-
-            foreach (var configure in services.GetServices<IConfigureBroadcastCatalog>())
-            {
-                configure.Configure(catalog);
-            }
-
-            return catalog;
-        });
-        builder.Services.AddSingleton(services =>
-            new BroadcastTopology(services.GetRequiredService<BroadcastCatalog>().Routes()));
 
         ModelPayloadSerialization.AddModelPayloadSerialization(builder.Services);
-
-        foreach (var implementation in modules.Implementations)
-        {
-            builder.Services.AddSingleton<IConfigureBroadcastCatalog>(
-                new AssemblyBroadcastHandlers(implementation));
-        }
 
         foreach (var hook in ModuleHooksOf(modules))
         {

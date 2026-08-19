@@ -155,9 +155,6 @@ public sealed class InstanceRegistryNeuron : Neuron, IRegistry
                     .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                 wireCount++;
             }
-
-            await FlushOutboxAsync(cancellationToken)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
 
         await ReplyAsync(

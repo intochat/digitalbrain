@@ -32,11 +32,9 @@ public sealed class ChartFlowTests(SimulationFixture fixture)
             new ChartPoint("series-a", "jan", 42),
             cancellationToken);
 
-        // Fire is not delivery: NeuronMessagePipeline.FireAsync stages the ChartPoint into the
-        // outbox and calls outbox.ScheduleDrain() (a background drain), it does not synchronously
-        // run ChartNeuron.HandleAsync -- so the entity write can still be in flight when this
-        // client call returns. Poll the entity read (the exact thing under test) rather than
-        // inventing a journal-based proxy signal for "handler ran".
+        // A fire is a direct awaited call, so ChartNeuron.HandleAsync (and its entity write)
+        // completed before this client call returned. The poll is kept as a cheap wait on the
+        // exact state under test rather than assuming synchronous completion forever.
         var state = await PollUntilPresentAsync(
             () => fixture.Sim.Brain.GetEntity<IChartEntity>(name).Read(),
             cancellationToken);

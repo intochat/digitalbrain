@@ -63,7 +63,7 @@ internal sealed class ChatTurnWorker : Neuron, IChatTurnWorker
 
     private async Task<(IAgent Responder, string Author)> ResponderAsync(NeuronId chatId)
     {
-        using var lookup = new CancellationTokenSource(DeliveryPolicy.ConnectionLookupTimeout);
+        using var lookup = new CancellationTokenSource(NeuronCallTimeouts.LookupBound);
         try
         {
             var routes = await GrainFactory

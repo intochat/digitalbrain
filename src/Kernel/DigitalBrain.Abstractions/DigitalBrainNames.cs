@@ -20,6 +20,13 @@ public static class DigitalBrainNames
     public const string PubSubStore = "PubSubStore";
     public const string DefaultGrainStorage = "Default";
 
+    // Orleans BroadcastChannel carrying DigitalBrainActivated fan-out. The channel key is the
+    // subscriber's grain key ("{owner}/{name}"), so implicit channel subscribers activate as
+    // regular owner-bound neurons.
+    public const string BroadcastChannelProvider = "db.broadcast";
+    public const string ActivationChannelNamespace = "db.activation";
+    public const string ActivationSubscriberName = "default";
+
     public const string Owner = "DigitalBrain:Owner";
     public const string Modules = "DigitalBrain:Modules";
     public const string Mode = "DigitalBrain:Mode";

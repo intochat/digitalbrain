@@ -33,12 +33,20 @@ internal sealed class SynapseGraphNeuron : Neuron, ISynapseGraph
                 $"Graph '{Id}' refuses a connection without a synapse alias.");
         }
 
+        // Transforms were applied by the connection relay; with delivery now a direct grain
+        // call there is nothing left to apply them, so a wire carrying one is refused loudly
+        // instead of silently never morphing.
+        if (synapse.Transform is not null)
+        {
+            throw new NeuronAuthorizationException(
+                $"Graph '{Id}' no longer applies synapse transforms; connect "
+                + $"'{synapse.SynapseAlias}' only to a target that accepts it as-is.");
+        }
+
         var alias = synapse.SynapseAlias.Trim();
         RequireKnownEndpoint(synapse.Source, "source");
         RequireKnownEndpoint(synapse.Target, "target");
-        RequireWorkingTransform(synapse with { SynapseAlias = alias });
-        var deliveredAlias = DeliveredAlias(alias, synapse.Transform);
-        RequireTargetHandlesAlias(synapse.Target, deliveredAlias);
+        RequireTargetHandlesAlias(synapse.Target, alias);
         SweepExpired();
         RequireNoDuplicateRoute(synapse.ConnectionId, synapse.Source, alias, synapse.Target);
         Remove(synapse.ConnectionId);
@@ -170,59 +178,6 @@ internal sealed class SynapseGraphNeuron : Neuron, ISynapseGraph
         }
     }
 
-    // A morph that names a field neither contract has would refuse every delivery
-    // silently later; a wiring typo must fail loudly at wiring time instead.
-    private void RequireWorkingTransform(Connect synapse)
-    {
-        if (synapse.Transform is not { } transformName
-            || !transformName.StartsWith("to:", StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        if (DeclarativeSynapseTransform.TryParse(transformName) is not { } morph)
-        {
-            throw new NeuronAuthorizationException(
-                $"Graph '{Id}' cannot parse transform '{transformName}'. Write it as "
-                + "to:<synapse-alias>{TargetField=SourceField,...} with a known target alias.");
-        }
-
-        var sourceType = SynapseTypeIndex.FindByAlias(synapse.SynapseAlias);
-
-        foreach (var (target, source) in morph.Mappings)
-        {
-            if (morph.TargetType.GetProperty(
-                    target,
-                    System.Reflection.BindingFlags.Public
-                        | System.Reflection.BindingFlags.Instance
-                        | System.Reflection.BindingFlags.IgnoreCase) is null)
-            {
-                throw new NeuronAuthorizationException(
-                    $"Transform '{transformName}' writes '{target}', but "
-                    + $"'{morph.TargetType.Name}' has no such field. It has: "
-                    + $"{FieldList(morph.TargetType)}.");
-            }
-
-            if (sourceType is not null
-                && sourceType.GetProperty(
-                    source,
-                    System.Reflection.BindingFlags.Public
-                        | System.Reflection.BindingFlags.Instance
-                        | System.Reflection.BindingFlags.IgnoreCase) is null)
-            {
-                throw new NeuronAuthorizationException(
-                    $"Transform '{transformName}' reads '{source}', but "
-                    + $"'{sourceType.Name}' ({synapse.SynapseAlias}) has no such field. "
-                    + $"It has: {FieldList(sourceType)}.");
-            }
-        }
-    }
-
-    private static string FieldList(Type synapseType)
-        => string.Join(
-            ", ",
-            synapseType.GetProperties().Select(static property => property.Name));
-
     private void RequireConnectionId(Guid connectionId)
     {
         if (connectionId == Guid.Empty)
@@ -263,20 +218,6 @@ internal sealed class SynapseGraphNeuron : Neuron, ISynapseGraph
                 $"Graph '{Id}' refuses {side} '{subject}': grain type '{subject.Type}' "
                 + "is not a known neuron type in this deployment.");
         }
-    }
-
-    // Alias the target actually receives after any morph (relay rewrites the payload).
-    private static string DeliveredAlias(string sourceAlias, string? transform)
-    {
-        if (transform is { } name
-            && name.StartsWith("to:", StringComparison.Ordinal)
-            && DeclarativeSynapseTransform.TryParse(name) is { } morph
-            && SynapseAlias.Of(morph.TargetType) is { } targetAlias)
-        {
-            return targetAlias;
-        }
-
-        return sourceAlias;
     }
 
     private void RequireTargetHandlesAlias(NeuronId target, string deliveredAlias)
