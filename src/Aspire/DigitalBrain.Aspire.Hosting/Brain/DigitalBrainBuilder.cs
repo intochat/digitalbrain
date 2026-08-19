@@ -14,12 +14,14 @@ public sealed class DigitalBrainBuilder
     internal DigitalBrainBuilder(
         IDistributedApplicationBuilder builder,
         string name,
+        IResourceBuilder<DigitalBrainResource> resource,
         OrleansService orleans,
         IResourceBuilder<AzureBlobStorageResource> durableStateStore,
         IResourceBuilder<AzureBlobStorageResource> grainState,
         IResourceBuilder<AzureQueueStorageResource> streams,
         IResourceBuilder<AzureTableStorageResource> pubSub)
     {
+        ArgumentNullException.ThrowIfNull(resource);
         ArgumentNullException.ThrowIfNull(durableStateStore);
         ArgumentNullException.ThrowIfNull(grainState);
         ArgumentNullException.ThrowIfNull(streams);
@@ -27,6 +29,7 @@ public sealed class DigitalBrainBuilder
 
         ApplicationBuilder = builder;
         Name = name;
+        Resource = resource;
         Orleans = orleans;
         DurableStateStore = durableStateStore;
         GrainState = grainState;
@@ -37,6 +40,8 @@ public sealed class DigitalBrainBuilder
     public string Name { get; }
 
     public IDistributedApplicationBuilder ApplicationBuilder { get; }
+
+    public IResourceBuilder<DigitalBrainResource> Resource { get; }
 
     internal IResourceBuilder<AzureBlobStorageResource> DurableStateStore { get; }
 
@@ -92,6 +97,6 @@ public sealed class DigitalBrainBuilder
         }
     }
 
-    public ClientDigitalBrainReference AsClient() => new(this);
+    public DigitalBrainClientReference AsClient() => new(this);
 
 }

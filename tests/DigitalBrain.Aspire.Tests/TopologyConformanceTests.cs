@@ -1,5 +1,6 @@
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Aspire.Hosting;
 using Xunit;
 
 namespace DigitalBrain.Aspire.Tests;
@@ -40,5 +41,17 @@ public sealed class TopologyConformanceTests(ModelFixture fixture)
         var kernel = fixture.Model.Resource(ProductSurfaceResourceNames.Kernel);
 
         Assert.Contains(kernel, mcp.Annotations.OfType<WaitAnnotation>().Select(static wait => wait.Resource));
+    }
+
+    [Fact]
+    public void BrainResourceExistsAndParentsTheFabric()
+    {
+        var brain = fixture.Model.Resource(ProductSurfaceResourceNames.Brain);
+        var storage = fixture.Model.Resource(DigitalBrainNames.Storage);
+
+        Assert.IsType<DigitalBrainResource>(brain);
+        Assert.Contains(
+            storage.Annotations.OfType<ResourceRelationshipAnnotation>(),
+            relationship => relationship.Resource == brain && relationship.Type == "Parent");
     }
 }

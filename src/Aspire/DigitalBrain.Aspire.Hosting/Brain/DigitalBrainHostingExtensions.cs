@@ -12,11 +12,21 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
+        var resource = builder.AddResource(new DigitalBrainResource(name))
+            .ExcludeFromManifest()
+            .WithInitialState(new CustomResourceSnapshot
+            {
+                ResourceType = "DigitalBrain",
+                CreationTimeStamp = DateTime.UtcNow,
+                State = KnownResourceStates.Running,
+                Properties = [new(CustomResourceKnownProperties.Source, "DigitalBrain fabric")],
+            });
         var storage = builder
             .AddAzureStorage(DigitalBrainNames.Storage)
             .RunAsEmulator(static emulator => emulator
                 .WithDataVolume()
-                .WithLifetime(ContainerLifetime.Persistent));
+                .WithLifetime(ContainerLifetime.Persistent))
+            .WithParentRelationship(resource);
         var clustering = storage.AddTables(DigitalBrainNames.Clustering);
         var reminders = storage.AddTables(DigitalBrainNames.Reminders);
         var durableStateStore = storage.AddBlobs(DigitalBrainNames.Journal);
@@ -30,7 +40,7 @@ public static class DigitalBrainHostingExtensions
             .WithGrainStorage(DigitalBrainNames.PubSubStore, pubSub)
             .WithGrainStorage(DigitalBrainNames.DefaultGrainStorage, grainState)
             .WithStreaming(DigitalBrainNames.StreamProvider, streams);
-        var brain = new DigitalBrainBuilder(builder, name, orleans, durableStateStore, grainState, streams, pubSub);
+        var brain = new DigitalBrainBuilder(builder, name, resource, orleans, durableStateStore, grainState, streams, pubSub);
 
         // Silo and clients WaitUntilHealthy for the full fabric before starting.
         brain.RequireHealthyBeforeStart(storage.Resource);
@@ -78,7 +88,7 @@ public static class DigitalBrainHostingExtensions
         return builder;
     }
 
-    public static IResourceBuilder<TResource> WithReference<TResource>(this IResourceBuilder<TResource> builder, ClientDigitalBrainReference client)
+    public static IResourceBuilder<TResource> WithReference<TResource>(this IResourceBuilder<TResource> builder, DigitalBrainClientReference client)
         where TResource : IResourceWithEnvironment, IResourceWithEndpoints
     {
         ArgumentNullException.ThrowIfNull(builder);

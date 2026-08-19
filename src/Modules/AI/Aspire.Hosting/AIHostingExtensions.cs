@@ -183,7 +183,8 @@ public static class AIHostingExtensions
                 .WithEnvironment("OLLAMA_KEEP_ALIVE", "-1")
                 .WithOpenWebUI(
                     uiContainer => uiContainer.WithLifetime(ContainerLifetime.Persistent),
-                    containerName: "openwebui");
+                    containerName: "openwebui")
+                .WithParentRelationship(brain.Resource);
 
         private void AddOllamaModel(Type model, string resourceName, string tag)
             => _ollamaModels[model] = EnsureOllama().AddModel(resourceName, tag);

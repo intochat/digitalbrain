@@ -5,6 +5,7 @@ namespace DigitalBrain.Aspire.Tests;
 // once, for every conformance test that needs them.
 internal static class ProductSurfaceResourceNames
 {
+    public const string Brain = "brain";
     public const string Kernel = "kernel";
     public const string Mcp = "mcp";
 }

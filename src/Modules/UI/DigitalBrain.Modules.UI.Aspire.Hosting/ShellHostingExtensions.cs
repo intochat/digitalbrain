@@ -111,7 +111,8 @@ public static class ShellHostingExtensions
             var host = appHost
                 .AddExecutable(resourceName, launch.Command, launch.WorkingDirectory, launch.Args)
                 .WithEnvironment(ShellEnvironmentVariable, shell)
-                .WithEnvironment(ChatEnvironmentVariable, chat);
+                .WithEnvironment(ChatEnvironmentVariable, chat)
+                .WithParentRelationship(brain.Resource);
 
             if (appHost.ExecutionContext.IsRunMode && kind is FlutterHostKind.Window or FlutterHostKind.Web)
             {
