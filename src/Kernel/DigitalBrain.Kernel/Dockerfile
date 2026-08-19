@@ -27,9 +27,10 @@
 #     DigitalBrain__AI__OpenAI__ApiKey
 #     DigitalBrain__AI__OpenAI__Gpt56__Model
 #
-#   Azure Storage (Orleans clustering, reminders, journal)
-#     ConnectionStrings__brain-clustering
-#     ConnectionStrings__brain-reminders
+#   Azure Storage (Orleans clustering, reminders, grain state, journal)
+#     ConnectionStrings__clustering
+#     ConnectionStrings__reminders
+#     ConnectionStrings__grainstate
 #     ConnectionStrings__journal
 #
 #   Qdrant vector memory (platform dependency — not this image)

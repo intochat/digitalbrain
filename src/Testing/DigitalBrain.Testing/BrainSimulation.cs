@@ -26,7 +26,7 @@ public sealed class BrainSimulationOptions
 
 // An in-process Orleans cluster running the production silo composition
 // (DigitalBrainRuntime.Add) with only the persistence seams swapped for
-// in-memory equivalents: journal storage, grain storage, streams, reminders.
+// in-memory equivalents: journal storage, grain storage, reminders.
 public sealed class BrainSimulation : IAsyncDisposable
 {
     private readonly InProcessTestCluster _cluster;
@@ -56,9 +56,7 @@ public sealed class BrainSimulation : IAsyncDisposable
         {
             silo.Services.AddSingleton<IJournalStorageProvider, VolatileJournalStorageProvider>();
             DigitalBrainRuntime.Add(silo, options.Modules);
-            silo.AddMemoryGrainStorage(DigitalBrainNames.PubSubStore);
             silo.AddMemoryGrainStorage(DigitalBrainNames.DefaultGrainStorage);
-            silo.AddMemoryStreams(DigitalBrainNames.StreamProvider);
             silo.UseInMemoryReminderService();
             options.ConfigureSilo?.Invoke(silo);
         });

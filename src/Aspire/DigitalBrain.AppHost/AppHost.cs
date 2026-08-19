@@ -57,7 +57,7 @@ var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceReso
             Endpoint = endpoint,
         });
 
-// Client processes share clustering/streams and must wait for a live silo.
+// Client processes share clustering and must wait for a live silo.
 var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.Mcp)
     .WithReference(brain.AsClient())
     .WithEnvironment(

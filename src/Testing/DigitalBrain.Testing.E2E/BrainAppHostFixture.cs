@@ -394,18 +394,15 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
     private async Task<IHost> ConnectScriptHostAsync()
     {
         var clustering = await App.GetConnectionStringAsync(DigitalBrainNames.Clustering).ConfigureAwait(false);
-        var streams = await App.GetConnectionStringAsync(DigitalBrainNames.Streams).ConfigureAwait(false);
 
         var hostBuilder = Host.CreateApplicationBuilder();
         hostBuilder.Configuration[$"ConnectionStrings:{DigitalBrainNames.Clustering}"] = clustering;
-        hostBuilder.Configuration[$"ConnectionStrings:{DigitalBrainNames.Streams}"] = streams;
         foreach (var (configurationKey, value) in await CaptureOrleansClientConfigurationAsync().ConfigureAwait(false))
         {
             hostBuilder.Configuration[configurationKey] = value;
         }
 
-        var storage = DigitalBrainClientHostingExtensions.RequireStorage(hostBuilder.Configuration);
-        hostBuilder.Configuration[$"ConnectionStrings:{DigitalBrainNames.Streams}"] = storage.Streams;
+        DigitalBrainClientHostingExtensions.RequireStorage(hostBuilder.Configuration);
         hostBuilder.AddDigitalBrainClient(activateOnStart: false);
 
         var host = hostBuilder.Build();

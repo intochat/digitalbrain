@@ -15,7 +15,7 @@ public static class DigitalBrainClientHostingExtensions
 
     public static string ClusteringConnectionName => DigitalBrainNames.Clustering;
 
-    public static (string Clustering, string Streams) RequireStorage(IConfiguration configuration)
+    public static string RequireStorage(IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
@@ -29,9 +29,7 @@ public static class DigitalBrainClientHostingExtensions
                 + "export it as ConnectionStrings__clustering.");
         }
 
-        var streams = configuration.GetConnectionString(DigitalBrainNames.Streams);
-
-        return (clustering, string.IsNullOrWhiteSpace(streams) ? clustering : streams);
+        return clustering;
     }
 
     public static string ResolveOwner(IConfiguration configuration)
@@ -62,7 +60,6 @@ public static class DigitalBrainClientHostingExtensions
 
         builder.AddServiceDefaults();
         builder.AddKeyedAzureTableServiceClient(DigitalBrainNames.Clustering);
-        builder.AddKeyedAzureQueueServiceClient(DigitalBrainNames.Streams);
         builder.UseOrleansClient(client =>
         {
             Core.ModelPayloadSerialization.AddModelPayloadSerialization(client.Services);

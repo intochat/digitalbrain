@@ -2,6 +2,8 @@ namespace DigitalBrain.Abstractions;
 
 // Single source of truth for resource/connection names and configuration keys used by
 // the Aspire hosting integration (AppHost side) and the silo/client runtime integration.
+// The fabric is tables and blobs only — no Streams/PubSub: wire delivery rides Orleans
+// grain calls and BroadcastChannel, durability rides each neuron's journal blobs.
 public static class DigitalBrainNames
 {
     public const string DefaultBrain = "brain";
@@ -12,12 +14,8 @@ public static class DigitalBrainNames
     public const string Reminders = "reminders";
     public const string Journal = "journal";
     public const string GrainState = "grainstate";
-    public const string Streams = "streams";
-    public const string PubSub = "pubsub";
 
     public const string JournalConnection = "journal";
-    public const string StreamProvider = "DigitalBrain";
-    public const string PubSubStore = "PubSubStore";
     public const string DefaultGrainStorage = "Default";
 
     // Orleans BroadcastChannel carrying DigitalBrainActivated fan-out. The channel key is the

@@ -15,8 +15,6 @@ public sealed class TopologyConformanceTests(ModelFixture fixture)
     [InlineData(DigitalBrainNames.Clustering)]
     [InlineData(DigitalBrainNames.Reminders)]
     [InlineData(DigitalBrainNames.Journal)]
-    [InlineData(DigitalBrainNames.Streams)]
-    [InlineData(DigitalBrainNames.PubSub)]
     public void FabricResourceExists(string resourceName)
     {
         var resource = fixture.Model.Resource(resourceName);

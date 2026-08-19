@@ -17,15 +17,11 @@ public sealed class DigitalBrainBuilder
         IResourceBuilder<DigitalBrainResource> resource,
         OrleansService orleans,
         IResourceBuilder<AzureBlobStorageResource> durableStateStore,
-        IResourceBuilder<AzureBlobStorageResource> grainState,
-        IResourceBuilder<AzureQueueStorageResource> streams,
-        IResourceBuilder<AzureTableStorageResource> pubSub)
+        IResourceBuilder<AzureBlobStorageResource> grainState)
     {
         ArgumentNullException.ThrowIfNull(resource);
         ArgumentNullException.ThrowIfNull(durableStateStore);
         ArgumentNullException.ThrowIfNull(grainState);
-        ArgumentNullException.ThrowIfNull(streams);
-        ArgumentNullException.ThrowIfNull(pubSub);
 
         ApplicationBuilder = builder;
         Name = name;
@@ -33,8 +29,6 @@ public sealed class DigitalBrainBuilder
         Orleans = orleans;
         DurableStateStore = durableStateStore;
         GrainState = grainState;
-        Streams = streams;
-        PubSub = pubSub;
     }
 
     public string Name { get; }
@@ -46,10 +40,6 @@ public sealed class DigitalBrainBuilder
     internal IResourceBuilder<AzureBlobStorageResource> DurableStateStore { get; }
 
     internal IResourceBuilder<AzureBlobStorageResource> GrainState { get; }
-
-    internal IResourceBuilder<AzureQueueStorageResource> Streams { get; }
-
-    internal IResourceBuilder<AzureTableStorageResource> PubSub { get; }
 
     internal OrleansService Orleans { get; }
 
