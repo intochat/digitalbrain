@@ -112,6 +112,17 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
         return DigitalBrainClient.Connect(_grains, owner);
     }
 
+    public Task<IGrainFactory> GrainsAsync()
+    {
+        if (_grains is null)
+        {
+            throw new InvalidOperationException(
+                $"{nameof(GrainsAsync)} was called before {nameof(InitializeAsync)} completed.");
+        }
+
+        return Task.FromResult(_grains);
+    }
+
     public async Task<BrainSession> OpenSessionAsync()
     {
         var ownerHex = Guid.NewGuid().ToString("N")[..8];
