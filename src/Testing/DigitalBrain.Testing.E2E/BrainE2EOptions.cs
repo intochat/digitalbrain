@@ -16,4 +16,8 @@ public sealed class BrainE2EOptions
     // own shape-aware defaults, so a caller can override any parameter (including the
     // state-protection key) without subclassing the fixture.
     public Dictionary<string, string> ParameterOverrides { get; init; } = new(StringComparer.Ordinal);
+
+    // Environment stamped on every project resource (kernel, mcp) before boot — the corpus
+    // path and any per-run test knobs ride here, mirroring how ArmBrainTestMode stamps Mode.
+    public Dictionary<string, string> ProjectEnvironment { get; init; } = new(StringComparer.Ordinal);
 }

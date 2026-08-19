@@ -29,11 +29,25 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
     private IHost? _scriptHost;
     private IGrainFactory? _grains;
 
+    private readonly BrainE2EOptions? _options;
+
+    public BrainAppHostFixture()
+    {
+    }
+
+    // Options-first construction for hosts that build the fixture themselves (e.g. the Reqnroll
+    // BDD boot) instead of letting xunit instantiate it and subclasses override Configure().
+    public BrainAppHostFixture(BrainE2EOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        _options = options;
+    }
+
     public DistributedApplication App { get; private set; } = null!;
 
     public IReadOnlyList<string> StrippedWaits { get; private set; } = [];
 
-    public virtual BrainE2EOptions Configure() => new();
+    public virtual BrainE2EOptions Configure() => _options ?? new();
 
     public async ValueTask InitializeAsync()
     {
@@ -47,7 +61,7 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
         RandomizeProxiedPorts(appBuilder);
         ArmExplicitStart(appBuilder, options.ExplicitStart);
         StrippedWaits = StripNeverStartingWaits(appBuilder, options.ExplicitStart);
-        ArmBrainTestMode(appBuilder);
+        ArmBrainTestMode(appBuilder, options.ProjectEnvironment);
 
         App = await appBuilder.BuildAsync().ConfigureAwait(false);
 
@@ -323,11 +337,17 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
             ?.Resource;
     }
 
-    private static void ArmBrainTestMode(IDistributedApplicationTestingBuilder appBuilder)
+    private static void ArmBrainTestMode(
+        IDistributedApplicationTestingBuilder appBuilder,
+        IReadOnlyDictionary<string, string> projectEnvironment)
     {
         foreach (var project in appBuilder.Resources.OfType<ProjectResource>())
         {
-            appBuilder.CreateResourceBuilder(project).WithBrainTestMode();
+            var projectBuilder = appBuilder.CreateResourceBuilder(project).WithBrainTestMode();
+            foreach (var (key, value) in projectEnvironment)
+            {
+                projectBuilder.WithEnvironment(key, value);
+            }
         }
     }
 

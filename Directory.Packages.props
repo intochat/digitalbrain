@@ -12,8 +12,10 @@
     <PackageVersion Include="xunit.v3" Version="4.0.0-pre.154" />
     <PackageVersion Include="xunit.v3.extensibility.core" Version="4.0.0-pre.154" />
     <PackageVersion Include="Gherkin" Version="42.0.1" />
+    <PackageVersion Include="Reqnroll" Version="3.3.4" />
     <PackageVersion Include="Reqnroll.xunit.v3" Version="3.3.4" />
     <PackageVersion Include="Reqnroll.Tools.MsBuild.Generation" Version="3.3.4" />
+    <PackageVersion Include="xunit.v3.assert" Version="4.0.0-pre.154" />
   </ItemGroup>
   <ItemGroup>
     <PackageVersion Include="Aspire.Hosting" Version="13.5.0-preview.1.26376.5" />
