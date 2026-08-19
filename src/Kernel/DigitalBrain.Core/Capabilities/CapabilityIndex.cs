@@ -35,7 +35,7 @@ public sealed class CapabilityIndex
                             CapabilityHit.RequestKind,
                             accepted.ContractId,
                             neuron.ContractId,
-                            neuron.DefaultInstanceName));
+                            accepted.DefaultInstanceName ?? neuron.DefaultInstanceName));
                     }
                 }
             }

@@ -8,6 +8,7 @@ public sealed record BrainReference(
     [property: Id(2)] string Name,
     [property: Id(3)] DateTimeOffset LastUsed)
 {
-    // Tally key: Type alone already separates the kinds (a neuron "chart" vs an entity "chartentity").
+    // Tally key: Type is the exact grain-type string (no suffix scheme), so Type alone already
+    // separates the kinds -- a neuron and an entity never share a Type value.
     public string Key => $"{Type}/{Name}";
 }

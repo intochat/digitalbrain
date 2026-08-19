@@ -271,8 +271,9 @@ internal sealed class BrainEntity(
             .First();
     }
 
-    // A hint names either the node itself or its concept; grain types carry the concept plus
-    // a suffix ("chart" -> "chartentity"), so the type match is a prefix match.
+    // A hint names either the node itself or its concept; grain types are exact concept
+    // strings today (no suffix scheme), so a StartsWith is a deliberate loose match beyond
+    // an exact hit, not a requirement for telling concepts apart.
     private static bool Matches(string hint, BrainReference node)
         => MatchesName(hint, node)
             || node.Type.StartsWith(hint, StringComparison.OrdinalIgnoreCase);

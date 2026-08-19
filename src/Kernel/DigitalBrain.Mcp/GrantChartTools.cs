@@ -93,9 +93,10 @@ internal sealed class GrantChartTools(IDigitalBrain brain, IGrainFactory grains)
             // The read-side grant gate migrated here from the deleted ChartNeuron: a pure
             // entity cannot open the capability turn IGrants.HasAccess requires, and this is
             // the surface that serves cross-principal chart reads.
+            var chart = EntityId.For<IChart>(brain.Owner, chartName);
             await GrantsNeuron.RequireReadAccessAsync(
                 grains,
-                new NeuronId("chart", brain.Owner, chartName),
+                new NeuronId(chart.Type, chart.Owner, chart.Name),
                 cancellationToken).ConfigureAwait(false);
 
             var state = await brain

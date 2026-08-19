@@ -27,9 +27,6 @@
 #     DigitalBrain__AI__OpenAI__ApiKey
 #     DigitalBrain__AI__OpenAI__Gpt56__Model
 #
-#   Durable state protection
-#     DigitalBrain__Security__StateProtectionKey
-#
 #   Azure Storage (Orleans clustering, reminders, journal)
 #     ConnectionStrings__brain-clustering
 #     ConnectionStrings__brain-reminders

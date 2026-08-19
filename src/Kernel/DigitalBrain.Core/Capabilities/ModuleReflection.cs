@@ -85,7 +85,8 @@ public static class ModuleReflection
             SynapseAlias.Of(synapse) ?? synapse.Name,
             1,
             Humanized(synapse.Name),
-            CapabilitySchema.For(synapse));
+            CapabilitySchema.For(synapse),
+            synapse.GetField(DefaultInstanceMemberName)?.GetRawConstantValue() as string);
 
     private static Type? ReplyTypeOf(Type synapse)
     {

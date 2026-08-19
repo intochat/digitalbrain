@@ -9,8 +9,8 @@ using Orleans.Runtime;
 
 namespace DigitalBrain.AI;
 
-// The assistant's whole surface: four constant tools, no matter how many
-// modules exist. find → get → connect/fire, with correctable errors the model can act on.
+// The assistant's whole surface: five constant tools, no matter how many
+// modules exist. find → get → connect/disconnect/fire, with correctable errors the model can act on.
 public sealed class SystemTools(
     IGrainFactory grains,
     OwnerId owner,
@@ -24,6 +24,10 @@ public sealed class SystemTools(
     public const string BrainDisconnect = "brain_disconnect";
 
     private const int FindLimit = 8;
+
+    // The entity types the UIRenderer's own capabilities write (chart:demo, surface:desk):
+    // the only entity-shaped fire targets ResolveTarget silently redirects to their writer.
+    private static readonly string[] RendererEntityGrainTypes = ["chart", "surface"];
 
     // In-process replies land in milliseconds; a long wait only slows the
     // model's self-correction when a target refuses or is unconfigured.
@@ -321,8 +325,17 @@ public sealed class SystemTools(
             return $"The arguments do not fit {ContractSignature.Of(requestType)}: {invalid.Message}";
         }
 
+        // A capability can declare its own default instance (SynapseCapabilityDescriptor),
+        // overriding the host neuron's default — one neuron contract can serve several
+        // capabilities that do not all want the same default (uirenderer's own default is
+        // "default", but ui.open-surface's is "desk", the surface the shell watches).
+        var defaultInstance = host.Accepted
+            .FirstOrDefault(accepted => string.Equals(accepted.ContractId, contract.Trim(), StringComparison.Ordinal))
+            ?.DefaultInstanceName
+            ?? host.DefaultInstanceName;
+
         var activated = await ActivatedAsync(cancellationToken).ConfigureAwait(false);
-        if (ResolveTarget(target, grainType, host.DefaultInstanceName, typeMap, activated) is not { } resolved)
+        if (ResolveTarget(target, grainType, defaultInstance, typeMap, activated) is not { } resolved)
         {
             return $"Target '{target}' names no known neuron. get_neurons lists the live instances.";
         }
@@ -330,7 +343,7 @@ public sealed class SystemTools(
         if (!string.Equals(resolved.Type, grainType, StringComparison.OrdinalIgnoreCase))
         {
             return $"'{contract}' is handled by '{grainType}', not by '{resolved}'. Omit target "
-                + $"to reach {grainType}:{host.DefaultInstanceName}; connection endpoints belong "
+                + $"to reach {grainType}:{defaultInstance}; connection endpoints belong "
                 + "in the arguments (source/target), not in fire's target.";
         }
 
@@ -479,8 +492,12 @@ public sealed class SystemTools(
 
             // An entity is never a delivery target: an entity-shaped target ('chart:demo')
             // routes to the handling neuron, and the entity's name selects the writer
-            // instance (chart:demo → uirenderer:demo, which fills chart:demo).
+            // instance (chart:demo → uirenderer:demo, which fills chart:demo). Only the
+            // renderer's own entities redirect this way — any other entity-shaped target
+            // (e.g. 'brain:x') is not one this host can fill, so it falls through to the
+            // type-mismatch refusal below instead of a silent adopt.
             if (!string.Equals(type, hostGrainType, StringComparison.OrdinalIgnoreCase)
+                && RendererEntityGrainTypes.Contains(type, StringComparer.OrdinalIgnoreCase)
                 && typeMap.KnownEntityGrainTypes.Contains(type.ToLowerInvariant()))
             {
                 return new NeuronId(hostGrainType, owner, name);

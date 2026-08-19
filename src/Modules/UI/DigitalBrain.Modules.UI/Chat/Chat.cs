@@ -519,7 +519,7 @@ internal sealed class Chat : Neuron, IChat
                 Kind: "chat.responded",
                 Text: result.Answer,
                 Correlation: record.CommandId.ToString("n"),
-                At: DateTimeOffset.UtcNow))
+                At: TimeProvider.GetUtcNow()))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
