@@ -1,4 +1,3 @@
-using System.Reflection;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Brain;
 using DigitalBrain.Abstractions.Identity;
@@ -21,14 +20,6 @@ public sealed class BrainLearningTests : IAsyncLifetime
         public DateTimeOffset Now => _now;
     }
 
-    // NeuronTime is internal to DigitalBrain.Core with no InternalsVisibleTo grant to this
-    // assembly, so the exact key object Entity<TState>/Neuron resolve their TimeProvider
-    // against is fetched by reflection instead of a direct NeuronTime.ServiceKey reference.
-    private static readonly object NeuronTimeServiceKey =
-        typeof(Neuron).Assembly.GetType("DigitalBrain.Core.NeuronTime")!
-            .GetProperty("ServiceKey", BindingFlags.NonPublic | BindingFlags.Static)!
-            .GetValue(null)!;
-
     private readonly ManualClock _clock = new();
     private BrainSimulation _sim = null!;
 
@@ -39,7 +30,7 @@ public sealed class BrainLearningTests : IAsyncLifetime
                 [typeof(DigitalBrain.Chat.SendMessage).Assembly],
                 [typeof(DigitalBrain.UI.UiModule).Assembly, typeof(BrainLearningTests).Assembly]),
             ConfigureSilo = silo =>
-                silo.Services.AddKeyedSingleton<TimeProvider>(NeuronTimeServiceKey, _clock),
+                silo.Services.AddKeyedSingleton<TimeProvider>(NeuronTime.ServiceKey, _clock),
         });
 
     public async ValueTask DisposeAsync() => await _sim.DisposeAsync();

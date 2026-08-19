@@ -54,7 +54,7 @@ public sealed class FabricSurfaceTests(AppHostFixture fixture)
         Assert.Equal(JsonValueKind.Array, snapshot.GetProperty("modules").ValueKind);
 
         using var request = new HttpRequestMessage(HttpMethod.Get, "/graph/events?afterSequence=0");
-        var events = await http.SendAsync(
+        using var events = await http.SendAsync(
             request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         Assert.Equal(HttpStatusCode.OK, events.StatusCode);
         Assert.Equal("text/event-stream", events.Content.Headers.ContentType?.MediaType);
