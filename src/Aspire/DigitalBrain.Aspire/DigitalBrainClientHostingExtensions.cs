@@ -15,6 +15,25 @@ public static class DigitalBrainClientHostingExtensions
 
     public static string ClusteringConnectionName => DigitalBrainNames.Clustering;
 
+    public static (string Clustering, string Streams) RequireStorage(IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        var clustering = configuration.GetConnectionString(DigitalBrainNames.Clustering);
+        if (string.IsNullOrWhiteSpace(clustering))
+        {
+            throw new InvalidOperationException(
+                "No 'ConnectionStrings:clustering' is configured. Pass "
+                + "--ConnectionStrings:clustering \"<azure storage connection>\" (the value the "
+                + "running brain's silo uses; see the Aspire dashboard resource environment) or "
+                + "export it as ConnectionStrings__clustering.");
+        }
+
+        var streams = configuration.GetConnectionString(DigitalBrainNames.Streams);
+
+        return (clustering, string.IsNullOrWhiteSpace(streams) ? clustering : streams);
+    }
+
     public static string ResolveOwner(IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);

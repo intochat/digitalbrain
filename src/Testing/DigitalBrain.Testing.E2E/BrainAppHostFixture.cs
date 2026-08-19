@@ -378,10 +378,9 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
         return report.ToString();
     }
 
-    // DigitalBrainClient.ConnectAsync(args) can't be reused as-is: it binds one owner per host
-    // and hands back an IDigitalBrain, not the shared IGrainFactory BrainFor needs for many
-    // owners. This mirrors its host-construction shell, reusing RequireStorage and
-    // AddDigitalBrainClient so the Orleans wiring itself stays in one place.
+    // BrainFor needs the shared IGrainFactory for many owners, not a single bound IDigitalBrain,
+    // so this builds its own host — reusing RequireStorage and AddDigitalBrainClient so the
+    // Orleans wiring itself stays in one place.
     private async Task<IHost> ConnectScriptHostAsync()
     {
         var clustering = await App.GetConnectionStringAsync(DigitalBrainNames.Clustering).ConfigureAwait(false);
@@ -395,7 +394,7 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
             hostBuilder.Configuration[configurationKey] = value;
         }
 
-        var storage = DigitalBrainScriptHost.RequireStorage(hostBuilder.Configuration);
+        var storage = DigitalBrainClientHostingExtensions.RequireStorage(hostBuilder.Configuration);
         hostBuilder.Configuration[$"ConnectionStrings:{DigitalBrainNames.Streams}"] = storage.Streams;
         hostBuilder.AddDigitalBrainClient(activateOnStart: false);
 

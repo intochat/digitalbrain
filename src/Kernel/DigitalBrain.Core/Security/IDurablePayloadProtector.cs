@@ -1,4 +1,4 @@
-namespace DigitalBrain.Modules.Sdk;
+namespace DigitalBrain.Core;
 
 public interface IDurablePayloadProtector
 {

@@ -2,7 +2,6 @@ using System.ComponentModel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
-using DigitalBrain.Introspection;
 using ModelContextProtocol.Server;
 
 namespace DigitalBrain.Mcp;
@@ -12,19 +11,6 @@ internal sealed class IntrospectionTools(IDigitalBrain brain)
 {
 
     internal static readonly TimeSpan ReplyBound = TimeSpan.FromSeconds(90);
-
-    [McpServerTool(Name = McpSurface.ListActiveNeurons)]
-    [Description("List the neurons currently activated in the cluster, with their grain type and identity.")]
-    public async Task<IReadOnlyList<ActiveNeuron>> ListActiveNeuronsAsync(
-        CancellationToken cancellationToken = default)
-    {
-        var topology = await BoundedAsync(
-            token => brain.Get<IIntrospection>().FireAsync(new ReadTopologyRequest(), token),
-            nameof(ReadTopologyRequest),
-            cancellationToken);
-
-        return [.. topology.Neurons.Select(static neuron => new ActiveNeuron(neuron.GrainType, neuron.Identity))];
-    }
 
     [McpServerTool(Name = McpSurface.ReadNeuronJournal)]
     [Description(
@@ -37,33 +23,25 @@ internal sealed class IntrospectionTools(IDigitalBrain brain)
         [Description("Read entries after this sequence")] long afterSequence = 0,
         CancellationToken cancellationToken = default)
     {
-        var request = new ReadJournalRequest(
-            grainType,
-            name,
-            kind,
-            afterSequence,
-            ReadJournalRequest.MaximumMaxEntries,
-            CommandId.New());
+        var direction = ParseKind(kind);
+        var subject = new NeuronId(grainType, brain.Owner, name);
+
         var page = await BoundedAsync(
-            token => brain.Get<IIntrospection>().FireAsync(request, token),
-            nameof(ReadJournalRequest),
+            token => brain.ReadJournalAsync(subject, direction, afterSequence, token),
+            nameof(JournalRead),
             cancellationToken);
-        if (page.Error is { } refused)
-        {
-            throw new InvalidOperationException(refused);
-        }
 
         return new NeuronJournalPage(
-            page.Subject.ToString(),
-            JournalDirection.Parse(page.Direction).ToString(),
+            subject.ToString(),
+            direction.ToString(),
             page.ResumeSequence,
-            page.Compacted,
+            page.ResetSnapshot is not null,
             [
-                .. page.Entries.Select(static entry => new JournaledSynapse(
+                .. page.Delta.Select(static entry => new JournaledSynapse(
                     entry.Sequence,
-                    entry.Synapse,
-                    entry.Caller,
-                    entry.Correlation,
+                    entry.Synapse.GetType().Name,
+                    entry.Caller.ToString(),
+                    entry.CorrelationId.ToString(),
                     entry.Timestamp)),
             ]);
     }
@@ -90,6 +68,14 @@ internal sealed class IntrospectionTools(IDigitalBrain brain)
             ]);
     }
 
+    private static JournalKind ParseKind(string kind)
+        => kind.Trim().ToLowerInvariant() switch
+        {
+            "incoming" => JournalKind.Incoming,
+            "outgoing" => JournalKind.Outgoing,
+            _ => throw new ArgumentException($"'{kind}' must be 'incoming' or 'outgoing'.", nameof(kind)),
+        };
+
     private static async Task<TResponse> BoundedAsync<TResponse>(
         Func<CancellationToken, Task<TResponse>> request,
         string requestName,
@@ -105,8 +91,7 @@ internal sealed class IntrospectionTools(IDigitalBrain brain)
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             throw new TimeoutException(
-                $"The introspection neuron did not answer '{requestName}' within "
-                + $"{ReplyBound.TotalSeconds} seconds.");
+                $"'{requestName}' did not answer within {ReplyBound.TotalSeconds} seconds.");
         }
     }
 }

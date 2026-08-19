@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace DigitalBrain.Modules.Sdk;
+namespace DigitalBrain.Core;
 
 public static class DurablePayloadProtectionHosting
 {

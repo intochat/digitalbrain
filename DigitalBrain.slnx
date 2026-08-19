@@ -8,17 +8,12 @@
     <Project Path="src/Kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
     <Project Path="src/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
     <Project Path="src/Kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
-    <Project Path="src/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
   </Folder>
   <Folder Name="/Modules/" />
   <Folder Name="/Modules/AI/">
     <Project Path="src/Modules/AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <Project Path="src/Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
     <Project Path="src/Modules/AI/Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" />
-  </Folder>
-  <Folder Name="/Modules/Introspection/">
-    <Project Path="src/Modules/Introspection/Contracts/DigitalBrain.Modules.Introspection.Contracts.csproj" />
-    <Project Path="src/Modules/Introspection/Introspection/DigitalBrain.Modules.Introspection.csproj" />
   </Folder>
   <Folder Name="/Modules/Memory/">
     <Project Path="src/Modules/Memory/Contracts/DigitalBrain.Modules.Memory.Contracts.csproj" />

@@ -11,14 +11,12 @@ public static class ProductModules
         [
             typeof(DigitalBrain.Abstractions.DigitalBrainNames).Assembly,
             typeof(DigitalBrain.AI.IAssistant).Assembly,
-            typeof(DigitalBrain.Introspection.ReadTopologyRequest).Assembly,
             typeof(DigitalBrain.Memory.IVectorMemory).Assembly,
             typeof(DigitalBrain.Time.StartTimer).Assembly,
             typeof(DigitalBrain.Chat.SendMessage).Assembly,
         ],
         [
             typeof(DigitalBrain.AI.AIModule).Assembly,
-            typeof(DigitalBrain.Introspection.IntrospectionNeuron).Assembly,
             typeof(DigitalBrain.Memory.MemoryModule).Assembly,
             typeof(DigitalBrain.Time.TimerNeuron).Assembly,
             typeof(DigitalBrain.UI.UiModule).Assembly,

@@ -1,6 +1,6 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI.Ollama;
-using DigitalBrain.Modules.Sdk;
+using DigitalBrain.Core;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;

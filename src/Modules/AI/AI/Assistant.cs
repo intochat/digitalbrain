@@ -10,12 +10,6 @@ namespace DigitalBrain.Assistant;
 internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient chatClient)
     : Agent(chatClient), IAssistant
 {
-    public const string ConveneModelTeam = "convene_model_team";
-
-    private const int SmallestTeam = 2;
-
-    private static readonly string ModelRoster = string.Join(", ", TeamLineUp.KnownModels);
-
     protected override string? Instructions =>
         $$"""
         You are DigitalBrain, the AI assistant inside the owner's DigitalBrain.
@@ -52,10 +46,6 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
         something, it did not happen — say what you attempted and what is needed instead of
         claiming success. When something is not connected or unconfigured, relay the fix to
         the owner.
-
-        A local action, convene_model_team, is offered only while the owner's latest message
-        names at least {{SmallestTeam}} of: {{ModelRoster}}. Never claim you convened a team
-        you were not offered.
         """;
 
     protected override IReadOnlyList<AIFunction> AdditionalToolsFor(IReadOnlyList<ChatMessage> messages)
@@ -64,20 +54,13 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
 
         var tools = new List<AIFunction>();
 
-        var named = ModelMentions.NamedIn(LatestOwnerText(messages));
-        if (named.Count >= SmallestTeam)
-        {
-            tools.Add(ConveneTool());
-        }
-
-        if (named.Any(static model => model.Contains("llama", StringComparison.OrdinalIgnoreCase)))
+        if (LatestOwnerText(messages).Contains("llama", StringComparison.OrdinalIgnoreCase))
         {
             tools.Add(AskLlamaTool());
         }
 
         return tools;
     }
-
 
     private AIFunction AskLlamaTool()
         => Capability(
@@ -101,17 +84,6 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
             : answered.Text;
     }
 
-    private AIFunction ConveneTool()
-        => Capability(
-                ConveneModelTeam,
-                "Put two or more named models in one room, ask them a single question, and return what "
-                + "they jointly answered. Use this only when the owner explicitly asks to compare, "
-                + "contrast, or get a second opinion from named models. Name each model exactly as one "
-                + $"of: {ModelRoster}.",
-                ([Description("Two or more model names, each exactly as listed in this tool's description")] string[] models,
-                 [Description("The single question all of those models should answer")] string question)
-                    => ConveneAsync(models, question));
-
     private static string LatestOwnerText(IReadOnlyList<ChatMessage> messages)
     {
         for (var turn = messages.Count - 1; turn >= 0; turn--)
@@ -124,43 +96,4 @@ internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient 
 
         return string.Empty;
     }
-
-    private async Task<string> ConveneAsync(string[] models, string question)
-    {
-        try
-        {
-            ArgumentNullException.ThrowIfNull(models);
-            ArgumentException.ThrowIfNullOrWhiteSpace(question);
-
-            if (models.Length < SmallestTeam)
-            {
-                return $"A team answers together, so it needs at least {SmallestTeam} models. "
-                    + $"Name each one exactly as one of: {ModelRoster}.";
-            }
-
-            var lineUp = TeamLineUp.Of(models);
-            var team = GrainFactory.GetGrain<ITeam>(
-                NeuronId.For<ITeam>(Id.Owner, lineUp.TeamName).ToGrainId());
-
-            await team.Form(lineUp.Formation).ConfigureAwait(true);
-
-            var answer = await team.Respond([new ChatMessage(ChatRole.User, question)])
-                .ConfigureAwait(true);
-
-            return answer.Text;
-        }
-        catch (ArgumentException correctable)
-        {
-            return Correctable(correctable);
-        }
-        catch (OrchestrationRefusedException correctable)
-        {
-            return Correctable(correctable);
-        }
-    }
-
-    private static string Correctable(Exception failure)
-        => failure.InnerException is { } cause
-            ? $"{failure.Message} Cause: {cause.Message}"
-            : failure.Message;
 }
