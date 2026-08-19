@@ -58,12 +58,16 @@ public sealed class McpSurfaceTests(AppHostFixture fixture)
             ["target"] = "uirenderer:wire-b",
         };
 
+        // The wire is created server-side by this call, so every assertion that follows -- not
+        // just the ones after list_active_neurons -- must run inside the try/finally that
+        // guards brain_disconnect, or a failing assert here leaks the wire into the shared
+        // dev-owner brain state for the rest of the run.
         var connect = await client.CallToolAsync(BrainConnectTool, wireArguments, cancellationToken: cancellationToken);
-        Assert.False(connect.IsError is true);
-        Assert.Contains("Connected", TextOf(connect), StringComparison.Ordinal);
-
         try
         {
+            Assert.False(connect.IsError is true);
+            Assert.Contains("Connected", TextOf(connect), StringComparison.Ordinal);
+
             var active = await client.CallToolAsync(ListActiveNeuronsTool, cancellationToken: cancellationToken);
             Assert.False(active.IsError is true);
             Assert.NotEmpty(active.Content);
