@@ -73,7 +73,6 @@ public static class AIHostingExtensions
         var state = module.Brain.GetOrAddState(static brain => new AIHostingState(brain), out var added);
         if (added)
         {
-            module.RequireStateProtection();
             module.AddProjection(state);
         }
 

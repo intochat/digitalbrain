@@ -7,8 +7,6 @@ public static class DigitalBrainHostingExtensions
 {
     public static string DurableStateConnectionName => DigitalBrainNames.JournalConnection;
 
-    public static string StateProtectionKeyConfigurationKey => DigitalBrainNames.StateProtectionKey;
-
     public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -72,13 +70,6 @@ public static class DigitalBrainHostingExtensions
 
         WaitUntilHealthy(builder, brain.StartupDependencies);
 
-        if (brain.StateProtectionKey is not null)
-        {
-            builder.WithEnvironment(
-                ConfigurationEnvironment(DigitalBrainNames.StateProtectionKey),
-                brain.StateProtectionKey);
-        }
-
         foreach (var projection in brain.Projections)
         {
             projection.Apply(builder);
@@ -111,25 +102,4 @@ public static class DigitalBrainHostingExtensions
         }
     }
 
-    public static IResourceBuilder<TResource> WithStateProtectionKey<TResource>(
-        this IResourceBuilder<TResource> builder,
-        DigitalBrainBuilder brain)
-        where TResource : IResourceWithEnvironment
-    {
-        ArgumentNullException.ThrowIfNull(builder);
-        ArgumentNullException.ThrowIfNull(brain);
-
-        brain.RequireStateProtection();
-        if (brain.StateProtectionKey is not null)
-        {
-            builder.WithEnvironment(
-                ConfigurationEnvironment(DigitalBrainNames.StateProtectionKey),
-                brain.StateProtectionKey);
-        }
-
-        return builder;
-    }
-
-    private static string ConfigurationEnvironment(string configurationKey)
-        => configurationKey.Replace(":", "__", StringComparison.Ordinal);
 }

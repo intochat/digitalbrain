@@ -32,9 +32,6 @@ public sealed class SimulationFixture : IAsyncLifetime
                 [DigitalBrain.Abstractions.DigitalBrainNames.Mode] =
                     DigitalBrain.Abstractions.DigitalBrainNames.TestingMode,
                 ["DigitalBrain:AI:Corpus:Path"] = Path.Combine(AppContext.BaseDirectory, "corpus"),
-                // 256-bit base64 key; the simulation persists nothing worth protecting.
-                [DigitalBrain.Abstractions.DigitalBrainNames.StateProtectionKey] =
-                    Convert.ToBase64String(new byte[32]),
             },
         });
 

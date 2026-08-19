@@ -1,9 +1,7 @@
-using System.Security.Cryptography;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Orleans;
-using Aspire.Hosting.Publishing;
 
 namespace DigitalBrain.Aspire.Hosting;
 
@@ -54,8 +52,6 @@ public sealed class DigitalBrainBuilder
 
     internal IReadOnlyList<IResource> StartupDependencies => _startupDependencies;
 
-    internal IResourceBuilder<ParameterResource>? StateProtectionKey { get; private set; }
-
     public TState GetOrAddState<TState>(Func<DigitalBrainBuilder, TState> create, out bool added)
         where TState : class
     {
@@ -94,21 +90,6 @@ public sealed class DigitalBrainBuilder
         {
             _startupDependencies.Add(dependency);
         }
-    }
-
-    internal void RequireStateProtection()
-    {
-        if (StateProtectionKey is not null)
-        {
-            return;
-        }
-
-        var name = $"{Name}-state-protection-key";
-        StateProtectionKey = (ApplicationBuilder.ExecutionContext.IsRunMode
-                ? ApplicationBuilder.AddParameter(name, new StateProtectionKeyParameterDefault(), secret: true, persist: true)
-                : ApplicationBuilder.AddParameter(name, secret: true))
-            .WithDescription(
-                "Base64-encoded 256-bit key shared by every silo that recovers encrypted durable module state.");
     }
 
     public ClientDigitalBrainReference AsClient() => new(this);

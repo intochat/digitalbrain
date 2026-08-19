@@ -9,7 +9,4 @@ public sealed class DigitalBrainModuleBuilder<TModule>
 
     public void AddProjection(DigitalBrainModuleProjection projection)
         => Brain.AddProjection(projection);
-
-    public void RequireStateProtection()
-        => Brain.RequireStateProtection();
 }

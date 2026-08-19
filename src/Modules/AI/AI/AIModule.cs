@@ -1,6 +1,5 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI.Ollama;
-using DigitalBrain.Core;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -13,7 +12,6 @@ public sealed class AIModule : Core.IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        DurablePayloadProtectionHosting.Configure(builder.Services, builder.Configuration);
         if (string.Equals(
                 builder.Configuration[DigitalBrainNames.Mode],
                 DigitalBrainNames.TestingMode,
