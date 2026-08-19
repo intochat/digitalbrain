@@ -96,6 +96,17 @@ First-class `DigitalBrainResource : Resource` registered in the model. Fabric: o
 - **Deviations discovered across Tasks 1-3**: none functional. Task 1 needed two additional `using` directives in `TestNeurons.cs` (a global-using scoping mismatch, not a design gap) and a non-`async` `GrainsAsync()` body (the brief's suggested lazy-accessor pattern doesn't exist in this fixture version; reused the eagerly-built `_grains` field instead — same observable contract). Task 3's Dockerfile fix corrected two stale connection-string names beyond the rider's literal "add grainstate" scope, to avoid shipping a self-contradictory inventory next to the freshly-corrected line.
 - **Known nit, deferred**: `FabricSurfaceTests.BrainTopologyAndGraphEventsServeTheShellWire`'s SSE `HttpResponseMessage` (`events`, line 57) is never disposed — hygiene only, no leak under test-process lifetime; carried forward rather than fixed in C3.
 
+### C3 final whole-branch review — fix landed and C4 carry-forward
+
+The closing review (de55a4a9..2736a565) verified the fabric trace complete and minimal (every keyed client the silo/client demands maps to exactly one `WithReference` projection), the resource genuinely passive (nothing waits on it; the E2E isolation loop skips it), the streams/pubsub deletion zero-remnant repo-wide, and the three T1 pins unweakened by the rewrite. One Important find, fixed in the phase's final commit (b774fa91): `docker-compose.yml` omitted `ConnectionStrings__grainstate`, so the standalone compose deploy would die at first entity activation while the freshly corrected Dockerfile inventory beside it claimed otherwise — the warm E2E fixture could never see it. The same commit added the missing `InlineData(DigitalBrainNames.GrainState)` conformance row (Aspire 15/15).
+
+Parked by ruling at C3 close:
+- The wire-delivery pin exercises `IBrain.Connect` grain-directly; the MCP `brain_connect` TOOL surface is still untested — C4's "check chart" demo should be the first thing to cross it.
+- The durability pin has a theoretical false-PASS mode (a busy activation surviving `ForceActivationCollection` would serve in-memory state); accepted as the standard Orleans pattern — C4's learning tests must add an activation-identity assertion if they depend on genuine reload semantics.
+- The C2 hot-grain budget item's trigger has fired: the `Default` blob provider is live and no measurement was taken. C4 inherits it explicitly.
+
+C4 plan carry-forward (open with these): (1) the `BrainEntity` TimeProvider seam — spec-mandated before learning tests, deliberately untouched in C3; (2) `Testing.Bdd`/`BrainSteps.cs` does not exist yet; (3) the `ButtonClicked`/`ControlActivated` preconditions and the untested untargeted `ui.open-surface` runtime wiring (both touch C4's UI evidence); (4) the hot-grain write-budget measurement; (5) the untested MCP `brain_connect` surface; (6) the deferred SSE-disposal nit if convenient.
+
 ## 5. Ordering and gates
 
 | Phase | Content | Gate |
