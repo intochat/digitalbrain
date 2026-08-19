@@ -114,7 +114,37 @@ public static class ShellHostingExtensions
                 .WithEnvironment(ChatEnvironmentVariable, chat)
                 .WithParentRelationship(brain.Resource);
 
-            if (appHost.ExecutionContext.IsRunMode && kind is FlutterHostKind.Window or FlutterHostKind.Web)
+            if (kind == FlutterHostKind.Web)
+            {
+                // FlutterHostLaunch.ResolveWeb pins --web-port/--web-hostname to these same
+                // values, so this unproxied endpoint is the address flutter actually serves on.
+                // The health check proves the dev server is up and answering; it cannot prove
+                // the build has landed (the server answers "/" with 200 within seconds of
+                // launch, before the web build completes -- observed live), so consumers that
+                // need the app itself must tolerate one early page load (see UiEvidenceTests'
+                // reload fallback).
+                host
+                    .WithHttpEndpoint(
+                        port: ShellNames.FlutterWebPort,
+                        name: HttpEndpointName,
+                        isProxied: false)
+                    .WithEndpoint(
+                        HttpEndpointName,
+                        static endpoint => endpoint.TargetHost = ShellNames.FlutterWebHostname,
+                        createIfNotExists: false)
+                    .WithHttpHealthCheck("/");
+            }
+
+            // Hot reload rides the Dart VM service, which the headless web-server target no
+            // longer exposes (it runs --release; see FlutterHostLaunch.ResolveWeb). Window and
+            // browser-driving web targets (e.g. "chrome" via the configure hook) keep it.
+            var hasVmService = kind == FlutterHostKind.Window
+                || (kind == FlutterHostKind.Web
+                    && !string.Equals(
+                        launch.DeviceTarget,
+                        ShellNames.DefaultWebDeviceTarget,
+                        StringComparison.OrdinalIgnoreCase));
+            if (appHost.ExecutionContext.IsRunMode && hasVmService)
             {
                 ArmHotReload(host, launch.WorkingDirectory);
             }

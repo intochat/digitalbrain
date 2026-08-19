@@ -15,7 +15,11 @@ internal static class FlutterHostLaunch
     private const string DefaultFlutterCommand = "flutter";
     private const string DefaultDartCommand = "dart";
 
-    internal sealed record Result(string Command, string WorkingDirectory, string[] Args);
+    internal sealed record Result(
+        string Command,
+        string WorkingDirectory,
+        string[] Args,
+        string? DeviceTarget = null);
 
     internal static Result Resolve(
         FlutterHostKind kind,
@@ -72,7 +76,11 @@ internal static class FlutterHostLaunch
                 $"or the sibling '../{ShellPackageDirectoryName}' (clients/flutter/shell). " +
                 $"Use {nameof(ShellHostingExtensions.WithHeadlessHost)}() for the pure-Dart host.");
 
-        return new Result(ResolveFlutterCommand(options, configuration), workDir, ["run", "-d", deviceTarget]);
+        return new Result(
+            ResolveFlutterCommand(options, configuration),
+            workDir,
+            ["run", "-d", deviceTarget],
+            deviceTarget);
     }
 
     private static Result ResolveHeadless(
@@ -136,7 +144,26 @@ internal static class FlutterHostLaunch
                 $"Use {nameof(ShellHostingExtensions.WithWindowHost)}() for Windows chrome, " +
                 $"or {nameof(ShellHostingExtensions.WithHeadlessHost)}() for the pure-Dart host.");
 
-        return new Result(ResolveFlutterCommand(options, configuration), workDir, ["run", "-d", deviceTarget]);
+        // Both web devices (web-server and chrome) honor the port/hostname flags, so the served
+        // address always matches the fixed Aspire endpoint ShellHostingExtensions registers.
+        //
+        // The headless web-server device must run --release: its debug build only executes
+        // main() through a one-shot DWDS handshake granted to the first browser instance that
+        // connects after the compile finishes -- a connection arriving mid-compile (the dev
+        // server answers "/" with 200 within seconds of launch, long before the build lands) or
+        // any second instance (a plain browser refresh) loads all scripts but never starts the
+        // app. Proven live against Flutter 3.44.8; a release build serves plain static script
+        // bootstrapping with none of that fragility. Debug + hot reload stays available through
+        // a browser-driving device target (e.g. "chrome" via the configure hook).
+        var args = new List<string> { "run", "-d", deviceTarget };
+        if (string.Equals(deviceTarget, ShellNames.DefaultWebDeviceTarget, StringComparison.OrdinalIgnoreCase))
+        {
+            args.Add("--release");
+        }
+
+        args.Add($"--web-port={ShellNames.FlutterWebPort}");
+        args.Add($"--web-hostname={ShellNames.FlutterWebHostname}");
+        return new Result(ResolveFlutterCommand(options, configuration), workDir, [.. args], deviceTarget);
     }
 
     private static bool HasWindowMarkers(string workingDirectory, string deviceTarget)
