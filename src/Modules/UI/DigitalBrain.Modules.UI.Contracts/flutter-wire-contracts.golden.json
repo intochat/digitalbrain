@@ -44,13 +44,6 @@
       "methods": []
     },
     {
-      "name": "IButton",
-      "kind": "interface",
-      "alias": "ui.button",
-      "properties": [],
-      "methods": []
-    },
-    {
       "name": "ButtonClicked",
       "kind": "record",
       "alias": "ui.button-clicked",

@@ -23,13 +23,13 @@ public sealed class BrainTests(SimulationFixture fixture)
         var name = fixture.Sim.UniqueId("chart");
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        await brain.FireAsync<IChart>(name, new ChartPoint("series-a", "jan", 1), cancellationToken);
+        await brain.FireAsync<IUIRenderer>(name, new ChartPoint("series-a", "jan", 1), cancellationToken);
 
-        await PollForNodeAsync(brain, BrainReferenceKind.Neuron, "chart", name, cancellationToken);
+        await PollForNodeAsync(brain, BrainReferenceKind.Neuron, "uirenderer", name, cancellationToken);
 
         var contexts = await brain.ContextsAsync(cancellationToken);
         var defaultContext = Assert.Single(contexts, c => c.Name == BrainState.DefaultContext);
-        Assert.Contains(defaultContext.Members, member => member.Name == name && member.Type == "chart");
+        Assert.Contains(defaultContext.Members, member => member.Name == name && member.Type == "uirenderer");
     }
 
     [Fact]
@@ -73,16 +73,16 @@ public sealed class BrainTests(SimulationFixture fixture)
 
         // The registrations are fire-and-forget, so each touch is confirmed landed before the
         // context switches — otherwise the first chart could race into the "work" context.
-        await brain.GetEntity<IChartEntity>(defaultChart).Read();
+        await brain.GetEntity<IChart>(defaultChart).Read();
         await PollForNodeAsync(
-            brain, BrainReferenceKind.Entity, "chartentity", defaultChart, cancellationToken);
+            brain, BrainReferenceKind.Entity, "chart", defaultChart, cancellationToken);
 
         await brain.UseContextAsync("work", cancellationToken);
         Assert.Equal("work", await brain.ActiveContextAsync(cancellationToken));
 
-        await brain.GetEntity<IChartEntity>(workChart).Read();
+        await brain.GetEntity<IChart>(workChart).Read();
         await PollForNodeAsync(
-            brain, BrainReferenceKind.Entity, "chartentity", workChart, cancellationToken);
+            brain, BrainReferenceKind.Entity, "chart", workChart, cancellationToken);
 
         // Re-touch the first chart in ITS context via the per-call override: it becomes the
         // most recently used node overall, so a contextless recency-only resolution would
@@ -159,9 +159,9 @@ public sealed class BrainTests(SimulationFixture fixture)
         var brain = fixture.Sim.BrainFor(fixture.Sim.UniqueId("owner"));
         var grain = BrainGrainOf(brain);
         var connection = new Connection(
-            NeuronId.For<IChart>(brain.Owner, fixture.Sim.UniqueId("chart")),
+            NeuronId.For<IUIRenderer>(brain.Owner, fixture.Sim.UniqueId("chart")),
             "render",
-            NeuronId.For<IChart>(brain.Owner, fixture.Sim.UniqueId("chart")));
+            NeuronId.For<IUIRenderer>(brain.Owner, fixture.Sim.UniqueId("chart")));
 
         await grain.Connect(connection);
 
@@ -169,7 +169,7 @@ public sealed class BrainTests(SimulationFixture fixture)
         Assert.Null(await grain.Route(connection.From, "unknown"));
 
         // Source-aware: another neuron emitting the same alias is not captured by this wire.
-        var stranger = NeuronId.For<IChart>(brain.Owner, fixture.Sim.UniqueId("chart"));
+        var stranger = NeuronId.For<IUIRenderer>(brain.Owner, fixture.Sim.UniqueId("chart"));
         Assert.Null(await grain.Route(stranger, "render"));
 
         var routed = Assert.Single(await grain.Connections(connection.From, "render"));
@@ -190,8 +190,8 @@ public sealed class BrainTests(SimulationFixture fixture)
         var brain = fixture.Sim.BrainFor(fixture.Sim.UniqueId("owner"));
         var grain = BrainGrainOf(brain);
         var foreign = new OwnerId(fixture.Sim.UniqueId("owner"));
-        var inside = NeuronId.For<IChart>(brain.Owner, fixture.Sim.UniqueId("chart"));
-        var outside = NeuronId.For<IChart>(foreign, fixture.Sim.UniqueId("chart"));
+        var inside = NeuronId.For<IUIRenderer>(brain.Owner, fixture.Sim.UniqueId("chart"));
+        var outside = NeuronId.For<IUIRenderer>(foreign, fixture.Sim.UniqueId("chart"));
 
         var leakOut = await Assert.ThrowsAsync<NeuronAuthorizationException>(
             () => grain.Connect(new Connection(inside, "leak", outside)));
@@ -240,9 +240,9 @@ public sealed class BrainTests(SimulationFixture fixture)
     {
         var brain = fixture.Sim.BrainFor(fixture.Sim.UniqueId("owner"));
         var grain = BrainGrainOf(brain);
-        var a = NeuronId.For<IChart>(brain.Owner, fixture.Sim.UniqueId("chart"));
-        var b = NeuronId.For<IChart>(brain.Owner, fixture.Sim.UniqueId("chart"));
-        var c = NeuronId.For<IChart>(brain.Owner, fixture.Sim.UniqueId("chart"));
+        var a = NeuronId.For<IUIRenderer>(brain.Owner, fixture.Sim.UniqueId("chart"));
+        var b = NeuronId.For<IUIRenderer>(brain.Owner, fixture.Sim.UniqueId("chart"));
+        var c = NeuronId.For<IUIRenderer>(brain.Owner, fixture.Sim.UniqueId("chart"));
 
         // A self-route dispatches in place and recurses with no timeout.
         var selfWire = await Assert.ThrowsAsync<NeuronAuthorizationException>(

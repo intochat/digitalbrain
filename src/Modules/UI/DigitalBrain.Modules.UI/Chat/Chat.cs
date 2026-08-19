@@ -216,9 +216,9 @@ internal sealed class Chat : Neuron, IChat
         }
 
         // Title names the chart instance the points targeted (the corpus grammar's chart-card
-        // invariant), so it doubles as the ChartEntity's instance name.
+        // invariant), so it doubles as the chart entity's instance name.
         var state = await GrainFactory
-            .GetGrain<IChartEntity>(EntityId.For<IChartEntity>(Id.Owner, synapse.Title).ToGrainId())
+            .GetGrain<IChart>(EntityId.For<IChart>(Id.Owner, synapse.Title).ToGrainId())
             .Read()
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
@@ -498,8 +498,6 @@ internal sealed class Chat : Neuron, IChat
             return;
         }
 
-        // Emit first: if Emit fails the delivery retries. Remembering before Emit left a
-        // transcript line that made retries skip the Emit forever (no Responded in journal).
         await EmitAsync(new Responded(
             new CommandId(record.CommandId),
             Id,

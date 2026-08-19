@@ -4,10 +4,10 @@ using Orleans.Runtime;
 
 namespace DigitalBrain.UI;
 
-[GrainType("chartentity")]
+[GrainType("chart")]
 internal sealed class ChartEntity(
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ChartState> state)
-    : Entity<ChartState>(state), IChartEntity
+    : Entity<ChartState>(state), IChart
 {
     public async Task Append(ChartStatePoint point, int cap)
     {

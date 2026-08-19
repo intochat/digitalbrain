@@ -15,8 +15,9 @@ internal sealed class OwnerSessionJournal(IDigitalBrain brain)
         ArgumentException.ThrowIfNullOrWhiteSpace(surfaceName);
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
 
+        // SurfaceOpened is emitted by the renderer instance sharing the surface's name.
         return brain.WatchJournalAsync(
-            NeuronId.For<ISurface>(brain.Owner, surfaceName),
+            NeuronId.For<IUIRenderer>(brain.Owner, surfaceName),
             JournalKind.Outgoing,
             afterSequence,
             cancellationToken);

@@ -36,7 +36,7 @@ internal sealed class SurfaceBoot :
         }
 
         return SendAsync(
-            NeuronId.For<ISurface>(Id.Owner, DefaultSurfaceName),
+            NeuronId.For<IUIRenderer>(Id.Owner, DefaultSurfaceName),
             new OpenSurface(CommandId.New(), HomeSurfaceKey, HomeSurfaceTitle));
     }
 }

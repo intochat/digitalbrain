@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>UI module runtime: chat, surface, and control neurons.</Description>
+    <Description>UI module runtime: the chat neuron, the UI renderer, and the chart and surface entities.</Description>
     <RootNamespace>DigitalBrain.UI</RootNamespace>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>

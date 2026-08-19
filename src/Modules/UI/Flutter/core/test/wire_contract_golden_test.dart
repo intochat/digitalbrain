@@ -23,6 +23,6 @@ void main() {
     expect(manifest['version'], 1);
     final types = (manifest['types'] as List).cast<Map>();
     final aliases = types.map((t) => t['alias']).toSet();
-    expect(aliases, containsAll(['ui.surface', 'ui.open-surface', 'ui.surface-opened', 'ui.button', 'ui.button-clicked']));
+    expect(aliases, containsAll(['ui.surface', 'ui.open-surface', 'ui.surface-opened', 'ui.button-clicked']));
   });
 }

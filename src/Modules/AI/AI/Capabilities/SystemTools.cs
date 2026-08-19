@@ -477,6 +477,15 @@ public sealed class SystemTools(
                 ? rest[(rest.IndexOf('/', StringComparison.Ordinal) + 1)..]
                 : rest;
 
+            // An entity is never a delivery target: an entity-shaped target ('chart:demo')
+            // routes to the handling neuron, and the entity's name selects the writer
+            // instance (chart:demo → uirenderer:demo, which fills chart:demo).
+            if (!string.Equals(type, hostGrainType, StringComparison.OrdinalIgnoreCase)
+                && typeMap.KnownEntityGrainTypes.Contains(type.ToLowerInvariant()))
+            {
+                return new NeuronId(hostGrainType, owner, name);
+            }
+
             return KnownGrainType(type, typeMap, activated)
                 ? new NeuronId(type, owner, name)
                 : null;

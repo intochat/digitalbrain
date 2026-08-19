@@ -8,7 +8,7 @@ using ModelContextProtocol.Server;
 namespace DigitalBrain.Mcp;
 
 [McpServerToolType]
-internal sealed class GrantChartTools(IDigitalBrain brain)
+internal sealed class GrantChartTools(IDigitalBrain brain, IGrainFactory grains)
 {
     private static readonly TimeSpan Bound = TimeSpan.FromSeconds(60);
 
@@ -90,12 +90,20 @@ internal sealed class GrantChartTools(IDigitalBrain brain)
         var chartName = PrincipalPartition.InstanceName(ownerPrincipal, subjectLocalName.Trim());
         try
         {
-            var points = await brain
-                .GetGrainProxy<IChart>(chartName)
+            // The read-side grant gate migrated here from the deleted ChartNeuron: a pure
+            // entity cannot open the capability turn IGrants.HasAccess requires, and this is
+            // the surface that serves cross-principal chart reads.
+            await GrantsNeuron.RequireReadAccessAsync(
+                grains,
+                new NeuronId("chart", brain.Owner, chartName),
+                cancellationToken).ConfigureAwait(false);
+
+            var state = await brain
+                .GetEntity<IChart>(chartName)
                 .Read()
                 .WaitAsync(Bound, cancellationToken)
                 .ConfigureAwait(false);
-            return $"OK count={points.Count} chart=chart:{brain.Owner.Value}/{chartName}";
+            return $"OK count={state?.Points.Count ?? 0} chart=chart:{brain.Owner.Value}/{chartName}";
         }
         catch (NeuronAuthorizationException refused)
         {

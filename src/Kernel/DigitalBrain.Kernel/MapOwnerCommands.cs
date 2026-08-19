@@ -105,8 +105,10 @@ internal static class OwnerCommandsHttpMaps
                         return;
                     }
 
-                    await brain.FireAsync<IButton>(
-                        ChatButtons.OfferedInstanceName(chatInstance, offerCommandId, request.ButtonId),
+                    // A click lands in the conversation's own journal — the same durable
+                    // ButtonClicked path the MCP activate_chat_button tool fires.
+                    await brain.FireAsync<IChat>(
+                        chatInstance,
                         new ButtonClicked(offerCommandId, request.ButtonId, request.Action),
                         cancellationToken).ConfigureAwait(false);
                     http.Response.StatusCode = StatusCodes.Status202Accepted;
@@ -134,7 +136,7 @@ internal static class OwnerCommandsHttpMaps
                         return;
                     }
 
-                    await brain.FireAsync<ISurface>(
+                    await brain.FireAsync<IUIRenderer>(
                         surfaceInstance,
                         new OpenSurface(CommandId.New(), request.SurfaceKey, request.Title),
                         cancellationToken).ConfigureAwait(false);

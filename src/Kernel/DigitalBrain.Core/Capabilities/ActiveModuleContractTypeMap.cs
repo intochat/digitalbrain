@@ -11,16 +11,20 @@ public sealed class ActiveModuleContractTypeMap
 
     private ActiveModuleContractTypeMap(
         IReadOnlyDictionary<(string ContractId, int SchemaVersion), Type> synapses,
-        IReadOnlyDictionary<string, string> neuronGrainTypes)
+        IReadOnlyDictionary<string, string> neuronGrainTypes,
+        IReadOnlySet<string> entityGrainTypes)
     {
         _synapses = synapses;
         _neuronGrainTypes = neuronGrainTypes;
         KnownGrainTypes = neuronGrainTypes.Values
             .Select(static grainType => grainType.ToLowerInvariant())
             .ToHashSet(StringComparer.Ordinal);
+        KnownEntityGrainTypes = entityGrainTypes;
     }
 
     public IReadOnlySet<string> KnownGrainTypes { get; }
+
+    public IReadOnlySet<string> KnownEntityGrainTypes { get; }
 
     public static ActiveModuleContractTypeMap Create(
         IEnumerable<Assembly> moduleAssemblies,
@@ -39,6 +43,7 @@ public sealed class ActiveModuleContractTypeMap
         var synapses = new Dictionary<(string, int), Type>();
         var neuronGrainTypes = new Dictionary<string, string>(StringComparer.Ordinal);
         var interfaceGrainHints = new Dictionary<string, string>(StringComparer.Ordinal);
+        var entityGrainTypes = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var assembly in assemblies.OrderBy(static item => item.FullName, StringComparer.Ordinal))
         {
@@ -83,7 +88,17 @@ public sealed class ActiveModuleContractTypeMap
 
             foreach (var type in types.OrderBy(static item => item.FullName, StringComparer.Ordinal))
             {
-                if (type is null || type.IsInterface || type.IsAbstract || !typeof(INeuron).IsAssignableFrom(type))
+                if (type is null || type.IsInterface || type.IsAbstract)
+                {
+                    continue;
+                }
+
+                if (typeof(IEntity).IsAssignableFrom(type) && ReadGrainType(type) is { } entityGrain)
+                {
+                    entityGrainTypes.Add(entityGrain.ToLowerInvariant());
+                }
+
+                if (!typeof(INeuron).IsAssignableFrom(type))
                 {
                     continue;
                 }
@@ -126,7 +141,7 @@ public sealed class ActiveModuleContractTypeMap
             neuronGrainTypes[contractId] = interfaceGrain;
         }
 
-        return new ActiveModuleContractTypeMap(synapses, neuronGrainTypes);
+        return new ActiveModuleContractTypeMap(synapses, neuronGrainTypes, entityGrainTypes);
     }
 
     public bool TryGetSynapseType(string contractId, int schemaVersion, out Type? type)

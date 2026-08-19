@@ -54,7 +54,7 @@ public sealed class ChatTurnTests(SimulationFixture fixture)
         // The scripted fires ran through the real pipeline; the entity write drains
         // asynchronously behind the reply, so poll the exact state under test.
         var state = await PollForPointsAsync(
-            () => brain.GetEntity<IChartEntity>("demo").Read(),
+            () => brain.GetEntity<IChart>("demo").Read(),
             cancellationToken);
 
         Assert.Collection(
