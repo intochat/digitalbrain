@@ -18,6 +18,7 @@ public sealed class BrainE2EOptions
     public Dictionary<string, string> ParameterOverrides { get; init; } = new(StringComparer.Ordinal);
 
     // Environment stamped on every project resource (kernel, mcp) before boot — the corpus
-    // path and any per-run test knobs ride here, mirroring how ArmBrainTestMode stamps Mode.
+    // path and any per-run test knobs ride here, applied by the same ArmProjectResources loop
+    // that stamps the Testing mode.
     public Dictionary<string, string> ProjectEnvironment { get; init; } = new(StringComparer.Ordinal);
 }

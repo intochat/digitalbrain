@@ -61,7 +61,7 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
         RandomizeProxiedPorts(appBuilder);
         ArmExplicitStart(appBuilder, options.ExplicitStart);
         StrippedWaits = StripNeverStartingWaits(appBuilder, options.ExplicitStart);
-        ArmBrainTestMode(appBuilder, options.ProjectEnvironment);
+        ArmProjectResources(appBuilder, options.ProjectEnvironment);
 
         App = await appBuilder.BuildAsync().ConfigureAwait(false);
 
@@ -337,7 +337,7 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
             ?.Resource;
     }
 
-    private static void ArmBrainTestMode(
+    private static void ArmProjectResources(
         IDistributedApplicationTestingBuilder appBuilder,
         IReadOnlyDictionary<string, string> projectEnvironment)
     {

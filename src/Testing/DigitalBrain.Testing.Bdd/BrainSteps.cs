@@ -95,16 +95,29 @@ public sealed class BrainSteps : IDisposable
 
         // The reply rode Responded; the turn's memory fact settles before
         // TurnLifecycle(Completed) (the ordering ChatTurnTests pins), so anchoring "the flow
-        // completed" here lets every Then step read settled state. The chat instance is the
-        // principal-partitioned name MapOwnerCommands.TryPrincipalResource derives.
+        // completed" here lets every Then step read settled state. The wait matches any
+        // settling status so a Failed/Cancelled turn (whose SSE stream closes with no delta)
+        // fails fast with its detail instead of burning the full timeout. The chat instance
+        // is the principal-partitioned name MapOwnerCommands.TryPrincipalResource derives.
         var chatInstance = PrincipalPartition.InstanceName(_principal, _chatName);
         var chatId = NeuronId.For<IChat>(_brain.Owner, chatInstance);
-        await JournalWait.ForAsync(
+        var settled = await JournalWait.ForAsync(
             _brain,
             chatId,
             JournalKind.Outgoing,
-            static delivery => delivery.Synapse is TurnLifecycle { Status: ChatTurnStatus.Completed },
+            static delivery => delivery.Synapse is TurnLifecycle
+            {
+                Status: ChatTurnStatus.Completed or ChatTurnStatus.Failed or ChatTurnStatus.Cancelled,
+            },
             TurnTimeout).ConfigureAwait(false);
+
+        var lifecycle = (TurnLifecycle)settled.Synapse;
+        if (lifecycle.Status != ChatTurnStatus.Completed)
+        {
+            Assert.Fail(
+                $"The chat turn settled as {lifecycle.Status} instead of Completed."
+                + $" Detail: {lifecycle.Detail ?? "(none)"}");
+        }
     }
 
     [Then("the assistant replies {string}")]

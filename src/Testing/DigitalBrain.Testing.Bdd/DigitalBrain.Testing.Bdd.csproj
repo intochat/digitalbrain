@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <IsPackable>true</IsPackable>
+    <!-- Not packable while BddBrainHost references the (non-packable) AppHost project; the
+         phase-5 restructure moves the boot hook to the consumer so the steps stay SDK-pure. -->
+    <IsPackable>false</IsPackable>
     <Description>DigitalBrain BDD testing SDK: the Reqnroll step vocabulary that drives the kernel HTTP edge of a booted AppHost.</Description>
   </PropertyGroup>
   <ItemGroup>

@@ -14,6 +14,11 @@ public sealed class AppHostFixture : BrainAppHostFixture<Projects.DigitalBrain_A
 // is a hard compile error on this repo's xunit.v3 4.0.0-pre.154: the obsoleted member is marked
 // error:true, not just warning. This collection-level property is the supported replacement,
 // and since this assembly declares only this one collection, the effect is the same.)
+//
+// INVARIANT: every future non-BDD test class in this assembly MUST join this collection.
+// The Reqnroll-generated feature classes run in the parallel phase with their own AppHost
+// (BddBrainHost, feature-scoped); a classless test outside this collection would share that
+// phase and collide with it on the kernel's fixed unproxied port 5080.
 [CollectionDefinition(Name, DisableParallelization = true)]
 public sealed class E2ECollection : ICollectionFixture<AppHostFixture>
 {
