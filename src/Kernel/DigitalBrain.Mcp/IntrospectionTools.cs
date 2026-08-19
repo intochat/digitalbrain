@@ -12,6 +12,10 @@ internal sealed class IntrospectionTools(IDigitalBrain brain)
 
     internal static readonly TimeSpan ReplyBound = TimeSpan.FromSeconds(90);
 
+    // Matches the old ReadJournalRequest.MaximumMaxEntries bound: worst-case MCP payload
+    // stays capped well under the journal's own 512-entry retention.
+    private const int MaximumEntries = 200;
+
     [McpServerTool(Name = McpSurface.ReadNeuronJournal)]
     [Description(
         "Read a neuron's durable synapse journal. Returns the causal facts the kernel committed, "
@@ -31,19 +35,23 @@ internal sealed class IntrospectionTools(IDigitalBrain brain)
             nameof(JournalRead),
             cancellationToken);
 
+        JournaledSynapse[] entries =
+        [
+            .. page.Delta.Take(MaximumEntries).Select(static entry => new JournaledSynapse(
+                entry.Sequence,
+                entry.Synapse.GetType().Name,
+                entry.Caller.ToString(),
+                entry.CorrelationId.ToString(),
+                entry.Timestamp)),
+        ];
+        var truncated = page.Delta.Count > entries.Length;
+
         return new NeuronJournalPage(
             subject.ToString(),
             direction.ToString(),
-            page.ResumeSequence,
+            truncated ? entries[^1].Sequence : page.ResumeSequence,
             page.ResetSnapshot is not null,
-            [
-                .. page.Delta.Select(static entry => new JournaledSynapse(
-                    entry.Sequence,
-                    entry.Synapse.GetType().Name,
-                    entry.Caller.ToString(),
-                    entry.CorrelationId.ToString(),
-                    entry.Timestamp)),
-            ]);
+            entries);
     }
 
     [McpServerTool(Name = McpSurface.ReadChatTranscript)]
@@ -68,13 +76,22 @@ internal sealed class IntrospectionTools(IDigitalBrain brain)
             ]);
     }
 
-    private static JournalKind ParseKind(string kind)
-        => kind.Trim().ToLowerInvariant() switch
+    private static JournalKind ParseKind(string? kind)
+    {
+        if (string.IsNullOrWhiteSpace(kind))
         {
-            "incoming" => JournalKind.Incoming,
-            "outgoing" => JournalKind.Outgoing,
-            _ => throw new ArgumentException($"'{kind}' must be 'incoming' or 'outgoing'.", nameof(kind)),
-        };
+            return JournalKind.Outgoing;
+        }
+
+        if (!Enum.TryParse<JournalKind>(kind.Trim(), ignoreCase: true, out var parsed))
+        {
+            throw new ArgumentException(
+                $"Journal direction '{kind}' is not recognised. Use 'incoming' or 'outgoing'.",
+                nameof(kind));
+        }
+
+        return parsed;
+    }
 
     private static async Task<TResponse> BoundedAsync<TResponse>(
         Func<CancellationToken, Task<TResponse>> request,

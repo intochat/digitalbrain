@@ -7,6 +7,24 @@ namespace DigitalBrain.Mcp;
 [McpServerToolType]
 internal sealed class BrainTools(IDigitalBrain brain)
 {
+    [McpServerTool(Name = McpSurface.ListActiveNeurons)]
+    [Description(
+        "List the neurons registered in the owner's brain — live or cold — with their "
+        + "grain type and identity.")]
+    public async Task<IReadOnlyList<ActiveNeuron>> ListActiveNeuronsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var state = await BrainGrain()
+            .Read()
+            .WaitAsync(NeuronCallTimeouts.LookupBound, cancellationToken);
+
+        return
+        [
+            .. (state?.Nodes ?? [])
+                .Select(node => new ActiveNeuron(node.Type, $"{brain.Owner}/{node.Name}")),
+        ];
+    }
+
     [McpServerTool(Name = McpSurface.BrainConnect)]
     [Description(
         "Wire a connection in the owner's brain: facts the source emits under synapseAlias "

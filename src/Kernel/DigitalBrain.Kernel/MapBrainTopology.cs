@@ -55,21 +55,26 @@ internal static class BrainTopologyHttpMaps
             .GetGrain<IManagementGrain>(0)
             .GetDetailedGrainStatistics()
             .WaitAsync(cancellationToken);
-        var ownedGrains = statistics
-            .Where(statistic =>
-                statistic.GrainId.Key.ToString() is { } key
+
+        List<(DetailedGrainStatistic Statistic, string Identity)> ownedGrains = [];
+        foreach (var statistic in statistics)
+        {
+            if (statistic.GrainId.Key.ToString() is { } key
                 && key.StartsWith(ownerPrefix, StringComparison.Ordinal))
-            .ToArray();
+            {
+                ownedGrains.Add((statistic, key));
+            }
+        }
 
         var placements = ownedGrains
-            .Select(static statistic => statistic.SiloAddress)
+            .Select(static owned => owned.Statistic.SiloAddress)
             .Distinct()
             .OrderBy(static address => address.ToString(), StringComparer.Ordinal)
             .Select(static (address, index) => (Address: address, Label: $"cluster-{index + 1}"))
             .ToDictionary(static placement => placement.Address, static placement => placement.Label);
 
         var registry = brain.GetEntity<IBrain>(DigitalBrainNames.DefaultBrain);
-        var state = await registry.Read();
+        var state = await registry.Read().WaitAsync(cancellationToken);
         var connections = state?.Connections ?? [];
 
         return new BrainTopologySnapshot(
@@ -80,11 +85,11 @@ internal static class BrainTopologyHttpMaps
             ],
             [
                 .. ownedGrains
-                    .Select(statistic => new BrainNeuron(
-                        $"{statistic.GrainId.Type}:{statistic.GrainId.Key}",
-                        statistic.GrainId.Type.ToString()!,
-                        statistic.GrainId.Key.ToString()!,
-                        placements[statistic.SiloAddress]))
+                    .Select(owned => new BrainNeuron(
+                        $"{owned.Statistic.GrainId.Type}:{owned.Identity}",
+                        owned.Statistic.GrainId.Type.ToString()!,
+                        owned.Identity,
+                        placements[owned.Statistic.SiloAddress]))
                     .OrderBy(static neuron => neuron.GrainType, StringComparer.Ordinal)
                     .ThenBy(static neuron => neuron.Identity, StringComparer.Ordinal),
             ],
