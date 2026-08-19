@@ -59,6 +59,27 @@ Actual deletions in C1 (Task 6 complete; Tasks 1–5 earlier):
 - **LOC**: 16,589 src across 325 files (−19.2% vs post-C1 20,527; −48.4% vs the original 32,127); tests 1,218 across 16 files. T8's sweep landed 16,560 src/325 files; T9's riders and quality pass added ~29 src lines and 2 test files (no new src files).
 - **Tree accuracy notes (T9)**: path drift confirmed against the working tree — `DigitalBrainModuleBuilder`/`DigitalBrainModuleProjection` live under `Aspire.Hosting/Brain/`; `ModelPayloadSerialization` lives under `Core/Hosting/`; `IModule`, `GrainOwnership`, and `GrainCallerContext` sit at the `Core` project root; `CapabilityHit` and `SynapseAlias` are `Core` types, not `Abstractions` as their tree annotations imply; `ClientDigitalBrainReference` is a naming-order mismatch against the tree's `DigitalBrainClientReference`, not a missing file. Itemized tree sections (as opposed to bare-folder sections) undercounted their folders' real, coherent contents by 2–10x — a documentation gap, not a code gap; future tree edits should whitelist folders instead of itemizing files one by one. `BrainSteps.cs` (Testing.Bdd), named in the p-sdk tree, never existed in git history — it is C4 work (the paused BDD corpus feature), not a C2 omission; marked planned, not missing.
 
+### C2 final whole-branch review — fixes landed and debt inventory
+
+The closing review (d1b89598..c48424cc) verified every frozen wire byte-compatible across the whole range and found two composition seams no single task created; both were fixed in the phase's final commit (a241a220):
+
+- **Infra-wire refusal**: `BrainWireRules` (Abstractions) denylists call-graph interior neurons (`sessionneuron`, `surface-boot`, `chat-turn-worker`, `grants`) as wire endpoints — the table-walk cycle check cannot see compiled-in call edges, and a wire into the activation chain (e.g. uirenderer → `ui.surface-opened` → surface-boot) deadlocked activation for the 5-minute response timeout. `SurfaceBoot` no longer registers with the Brain (plumbing). Pinned.
+- **Silo-side entity registration**: `UIRenderer` registers the chart/surface it writes in the owner's Brain (fire-and-forget, the generalized `RegisterInOwnersBrainAsync(BrainReference)` overload) — previously registration was facade-only, so a corpus-filled chart never resolved. Pinned: a renderer-written chart resolves. §2's "auto-registered" claim now holds for both write paths.
+
+Parked with names (accepted, deliberate — the complete debt inventory as of C2 close):
+
+- The streams/pubsub fabric is provisioned but has zero consumers (queues, tables, keyed clients, sim MemoryStreams, and `RequireStorage`'s streams requirement) — its deletion is C3's mandate (§4); the C3 plan must include the `RequireStorage` signature change and E2E fixture edits.
+- The Brain is a single serialized hot grain: every register/resolve-hit/route-hit is a full-state write, and `/graph/events` adds a 1 Hz read poll per SSE subscriber. Invisible under the sim's memory storage; budget for it when the `Default` blob provider goes live in C3.
+- `UIRenderer.HandleAsync(ControlActivated)` is an inert no-op (wire-frozen record, nothing fires it) — same family as the ButtonClicked precondition; needs an honest comment or a refusal.
+- `SystemTools.ResolveTarget`'s entity redirect adopts the fired contract's host for any chart:/surface:-shaped target (no misroute possible, but the old teaching refusal is gone for that shape), and `RendererEntityGrainTypes` hardcodes UI knowledge in the AI module.
+- `BrainEntity` uses bare `DateTimeOffset.UtcNow` at 7 sites; `Entity<TState>` has no TimeProvider seam — recency/tally learning is untestable under simulated time. Fix before C4's learning tests.
+- Every unwired lifecycle fact stages an `Unrouted` counter-entry with its own durable write (4 per chat turn); consider `[JournalProjection]` on lifecycle facts or a fact/request distinction.
+- Kernel `Dockerfile`'s operator env inventory omits `ConnectionStrings__grainstate` (required since the Default provider landed).
+- The `brain:x` type-mismatch refusal message is precise only while the Brain grain is live (cold-brain yields the generic refusal — both refuse; no misroute).
+- The untargeted `ui.open-surface` → desk default is pinned at manifest/reflection level only; the runtime wiring through `FireCoreAsync`/`ResolveTarget` has no integration test.
+
+Test gaps to open the C3 plan with: (1) state durability across deactivate/reactivate on the real `Default` provider (nothing pins recovery today); (2) end-to-end wire delivery (`brain_connect` → emit → target's Incoming journal); (3) `/brain/topology` + `/graph/events` smoke over real HTTP (shell-consumed, rewritten twice in C2, zero coverage).
+
 ## 4. Fabric (C3 — srcv2 shape)
 
 First-class `DigitalBrainResource : Resource` registered in the model. Fabric: one Azure storage emulator → `clustering` + `reminders` tables, `grainstate` + `journal` blobs; composed via `AddOrleans(name).WithClustering(...).WithReminders(...).WithGrainStorage("Default", grainState)` natives. **No streams, no pubsub** (nothing consumes them after C2). Runtime/client glue collapses to the srcv2 thin shape (keyed clients + `UseOrleans`/`UseOrleansClient` + blob journal storage + configure hooks). Consumer surface: `WithReference(brain)` / `WithReference(brain.AsClient())`, TripRadar-style.
