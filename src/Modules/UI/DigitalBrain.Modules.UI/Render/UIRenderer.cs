@@ -26,6 +26,11 @@ internal sealed class UIRenderer : Neuron, IUIRenderer
         await GrainFactory.GetGrain<IChart>(chart.ToGrainId())
             .Append(new ChartStatePoint(synapse.Series, synapse.Label, synapse.Value), RetainedPoints)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        // This write is silo-side (GrainFactory, not the client facade's GetEntity), so the
+        // brain never learns about it unless the renderer tells it here.
+        _ = RegisterInOwnersBrainAsync(
+            new BrainReference(BrainReferenceKind.Entity, chart.Type, chart.Name, default));
     }
 
     public async Task HandleAsync(OpenSurface synapse, CancellationToken cancellationToken)
@@ -39,10 +44,16 @@ internal sealed class UIRenderer : Neuron, IUIRenderer
             return;
         }
 
+        var surface = EntityId.For<ISurface>(Id.Owner, Id.Name);
         await GrainFactory
-            .GetGrain<ISurface>(EntityId.For<ISurface>(Id.Owner, Id.Name).ToGrainId())
+            .GetGrain<ISurface>(surface.ToGrainId())
             .Open(new SurfaceScene(synapse.SurfaceKey, synapse.Title), RetainedScenes)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        // This write is silo-side (GrainFactory, not the client facade's GetEntity), so the
+        // brain never learns about it unless the renderer tells it here.
+        _ = RegisterInOwnersBrainAsync(
+            new BrainReference(BrainReferenceKind.Entity, surface.Type, surface.Name, default));
 
         await EmitAsync(new SurfaceOpened(synapse.CommandId, Id, synapse.SurfaceKey, synapse.Title))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);

@@ -13,8 +13,8 @@ public static class DigitalBrainRuntimeHostingExtensions
     // Deliberate Azure Queue stream layout for a small single-silo product composition:
     // ~8 physical queues, ~20 streams/queue headroom (2× safety). Visibility is double a
     // one-minute cache window. Azure Queue streams are at-least-once, not rewindable, and
-    // not FIFO under failure — weaker than the durable synapse outbox; do not move outbox
-    // traffic onto this provider.
+    // not FIFO under failure — fine for neuron traffic, because durability and ordering
+    // come from each neuron's own Outgoing/Incoming journal, not from this transport.
     internal const int StreamQueueCount = 8;
     internal static readonly TimeSpan StreamMessageVisibilityTimeout = TimeSpan.FromMinutes(2);
 

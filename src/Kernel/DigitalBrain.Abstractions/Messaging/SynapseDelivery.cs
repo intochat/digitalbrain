@@ -45,7 +45,7 @@ public sealed class SynapseDelivery
     [Id(6)]
     public DateTimeOffset Timestamp { get; }
 
-    // Trailing: rides the delivery so outbox drain and receivers can re-enter VerifiedActor.
+    // Trailing: rides the delivery so Neuron.DispatchDeliveryAsync can re-enter VerifiedActor.
     // Null = system/unattributed (timer ticks, bootstrap). Append-only — never renumber.
     [Id(7)]
     public PrincipalId? Principal { get; }

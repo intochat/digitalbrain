@@ -70,12 +70,19 @@ public abstract class Neuron :
         => Task.CompletedTask;
 
     // Fire-and-forget: the brain's registry must never block or fail a neuron's activation.
-    private async Task RegisterInOwnersBrainAsync()
+    private Task RegisterInOwnersBrainAsync()
+        => RegisterInOwnersBrainAsync(
+            new BrainReference(BrainReferenceKind.Neuron, Id.Type, Id.Name, default));
+
+    // Fire-and-forget: the brain's registry must never block or fail the caller. Exposed so a
+    // neuron that writes another entity silo-side (UIRenderer writing chart/surface) can
+    // register that entity the same honest way the client facade's GetEntity does.
+    protected async Task RegisterInOwnersBrainAsync(BrainReference reference)
     {
         try
         {
             await OwnersBrain()
-                .Register(new BrainReference(BrainReferenceKind.Neuron, Id.Type, Id.Name, default))
+                .Register(reference)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch (Exception unregistered)

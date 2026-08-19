@@ -268,6 +268,47 @@ public sealed class BrainTests(SimulationFixture fixture)
         Assert.Null(await grain.Route(c, "third"));
     }
 
+    [Fact]
+    public async Task ConnectRefusesAWireIntoAnInfrastructureNeuron()
+    {
+        var brain = fixture.Sim.BrainFor(fixture.Sim.UniqueId("owner"));
+        var grain = BrainGrainOf(brain);
+        var renderer = NeuronId.For<IUIRenderer>(brain.Owner, "desk");
+        // "surface-boot" is the compiled-in [GrainType] string (SurfaceBoot.cs); it does not
+        // register with the brain, so it is addressed here the same literal way
+        // JournalSmokeTests.cs does.
+        var surfaceBoot = new NeuronId("surface-boot", brain.Owner, "default");
+
+        // The exact deadlock the review proved: SessionNeuron -> broadcast -> SurfaceBoot ->
+        // awaited send to uirenderer -> UIRenderer emits ui.surface-opened -> routed back into
+        // surface-boot, which is still awaiting its own send. CyclePath's table walk cannot see
+        // this because the loop is compiled call edges, not brain wires.
+        var refused = await Assert.ThrowsAsync<NeuronAuthorizationException>(
+            () => grain.Connect(new Connection(renderer, "ui.surface-opened", surfaceBoot)));
+        Assert.Contains(surfaceBoot.ToString(), refused.Message, StringComparison.Ordinal);
+        Assert.Contains("call-graph interior neuron", refused.Message, StringComparison.Ordinal);
+
+        Assert.Null(await grain.Route(renderer, "ui.surface-opened"));
+        Assert.Empty((await grain.Read())?.Connections ?? []);
+    }
+
+    [Fact]
+    public async Task ConnectRefusesASessionNeuronEndpoint()
+    {
+        var brain = fixture.Sim.BrainFor(fixture.Sim.UniqueId("owner"));
+        var grain = BrainGrainOf(brain);
+        var renderer = NeuronId.For<IUIRenderer>(brain.Owner, fixture.Sim.UniqueId("chart"));
+        var session = ISessionNeuron.ForOwner(brain.Owner);
+
+        var refused = await Assert.ThrowsAsync<NeuronAuthorizationException>(
+            () => grain.Connect(new Connection(renderer, "some.alias", session)));
+        Assert.Contains(session.ToString(), refused.Message, StringComparison.Ordinal);
+        Assert.Contains("call-graph interior neuron", refused.Message, StringComparison.Ordinal);
+
+        Assert.Null(await grain.Route(renderer, "some.alias"));
+        Assert.Empty((await grain.Read())?.Connections ?? []);
+    }
+
     private IBrain BrainGrainOf(IDigitalBrain brain)
         => fixture.Sim.Grains.GetGrain<IBrain>(
             EntityId.For<IBrain>(brain.Owner, DigitalBrainNames.DefaultBrain).ToGrainId());

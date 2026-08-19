@@ -51,7 +51,7 @@ public sealed class ChatTurnTests(SimulationFixture fixture)
                 && life.TurnId == accepted.TurnId,
             TurnTimeout);
 
-        // The scripted fires ran through the real pipeline; the entity write drains
+        // The scripted fires ran through the production turn machinery; the entity write drains
         // asynchronously behind the reply, so poll the exact state under test.
         var state = await PollForPointsAsync(
             () => brain.GetEntity<IChart>("demo").Read(),

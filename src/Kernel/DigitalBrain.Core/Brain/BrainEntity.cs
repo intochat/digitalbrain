@@ -69,6 +69,19 @@ internal sealed class BrainEntity(
                 + $"{connection.To}.");
         }
 
+        // Infra neurons are call-graph interior: wiring one re-enters an awaited chain that
+        // CyclePath's table walk cannot see (its edges are compiled calls, not brain wires).
+        var fromIsInfrastructure = BrainWireRules.InfrastructureGrainTypes.Contains(connection.From.Type);
+        var toIsInfrastructure = BrainWireRules.InfrastructureGrainTypes.Contains(connection.To.Type);
+        if (fromIsInfrastructure || toIsInfrastructure)
+        {
+            var endpoint = fromIsInfrastructure ? connection.From : connection.To;
+            throw new NeuronAuthorizationException(
+                $"The brain refuses the wire {connection.From} --{connection.Role}--> "
+                + $"{connection.To}: '{endpoint}' is a call-graph interior neuron and cannot "
+                + "be a connection endpoint.");
+        }
+
         // The owner wall: the Connection payload is caller-supplied, so a foreign-owner
         // endpoint here would let one owner's brain route deliveries into another owner.
         var owner = GrainOwnership.RequireOwner(this.GetGrainId());

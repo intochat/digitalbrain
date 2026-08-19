@@ -19,6 +19,8 @@ internal sealed class SurfaceBoot :
     public const string HomeSurfaceKey = "home";
     public const string HomeSurfaceTitle = "Home";
 
+    protected override bool RegistersWithBrain => false;
+
     public Task OnSubscribed(IBroadcastChannelSubscription subscription)
     {
         ArgumentNullException.ThrowIfNull(subscription);
