@@ -51,12 +51,13 @@ internal static class BrainTopologyHttpMaps
                     read.ObservedAt,
                     [
                         .. read.Connections.Select(static connection => new BrainConnection(
-                            connection.ConnectionId,
+                            ConnectionIdentity.Of(
+                                connection.Source,
+                                connection.SynapseAlias,
+                                connection.Target),
                             connection.Source,
                             connection.SynapseAlias,
-                            connection.Target,
-                            connection.Transform,
-                            connection.ExpiresAt)),
+                            connection.Target)),
                     ],
                     [
                         .. read.BroadcastRoutes.Select(static route => new BrainBroadcastRoute(

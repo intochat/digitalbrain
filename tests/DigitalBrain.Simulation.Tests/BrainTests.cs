@@ -1,6 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Brain;
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Client;
 using DigitalBrain.UI;
 using Xunit;
@@ -153,7 +154,7 @@ public sealed class BrainTests(SimulationFixture fixture)
     }
 
     [Fact]
-    public async Task RouteFollowsAConnectionByRoleAndReturnsNullOtherwise()
+    public async Task RouteMatchesTheSourceAndRoleAndReturnsNullOtherwise()
     {
         var brain = fixture.Sim.BrainFor(fixture.Sim.UniqueId("owner"));
         var grain = BrainGrainOf(brain);
@@ -164,11 +165,51 @@ public sealed class BrainTests(SimulationFixture fixture)
 
         await grain.Connect(connection);
 
-        Assert.Equal(connection, await grain.Route("render"));
-        Assert.Null(await grain.Route("unknown"));
+        Assert.Equal(connection, await grain.Route(connection.From, "render"));
+        Assert.Null(await grain.Route(connection.From, "unknown"));
+
+        // Source-aware: another neuron emitting the same alias is not captured by this wire.
+        var stranger = NeuronId.For<IChart>(brain.Owner, fixture.Sim.UniqueId("chart"));
+        Assert.Null(await grain.Route(stranger, "render"));
+
+        var routed = Assert.Single(await grain.Connections(connection.From, "render"));
+        Assert.Equal(connection, routed);
 
         await grain.Disconnect(connection);
-        Assert.Null(await grain.Route("render"));
+        Assert.Null(await grain.Route(connection.From, "render"));
+    }
+
+    [Fact]
+    public async Task ConnectRefusesSelfWiresCyclesAndDuplicateRoutes()
+    {
+        var brain = fixture.Sim.BrainFor(fixture.Sim.UniqueId("owner"));
+        var grain = BrainGrainOf(brain);
+        var a = NeuronId.For<IChart>(brain.Owner, fixture.Sim.UniqueId("chart"));
+        var b = NeuronId.For<IChart>(brain.Owner, fixture.Sim.UniqueId("chart"));
+        var c = NeuronId.For<IChart>(brain.Owner, fixture.Sim.UniqueId("chart"));
+
+        // A self-route dispatches in place and recurses with no timeout.
+        var selfWire = await Assert.ThrowsAsync<NeuronAuthorizationException>(
+            () => grain.Connect(new Connection(a, "loop", a)));
+        Assert.Contains("self-wire", selfWire.Message, StringComparison.Ordinal);
+
+        await grain.Connect(new Connection(a, "first", b));
+        await grain.Connect(new Connection(b, "second", c));
+
+        // Routing is single-target: a second wire on the same (source, alias) is refused.
+        var duplicate = await Assert.ThrowsAsync<NeuronAuthorizationException>(
+            () => grain.Connect(new Connection(a, "first", c)));
+        Assert.Contains("single-target", duplicate.Message, StringComparison.Ordinal);
+
+        // Closing c -> a would cycle a -> b -> c -> a and deadlock the non-reentrant grains.
+        var cycle = await Assert.ThrowsAsync<NeuronAuthorizationException>(
+            () => grain.Connect(new Connection(c, "third", a)));
+        Assert.Contains("cycle", cycle.Message, StringComparison.Ordinal);
+        Assert.Contains($"{c} --third--> {a} --first--> {b} --second--> {c}", cycle.Message, StringComparison.Ordinal);
+
+        // The refused wires left no trace: the acyclic pair still routes.
+        Assert.NotNull(await grain.Route(a, "first"));
+        Assert.Null(await grain.Route(c, "third"));
     }
 
     private IBrain BrainGrainOf(IDigitalBrain brain)

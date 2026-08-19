@@ -30,8 +30,8 @@ public sealed class BootSmokeTests(AppHostFixture fixture)
 
         // Activation already fired during OpenSessionAsync; observe its journal footprint using
         // the same subject/kind Tier 2's JournalSmokeTests.ActivationLandsInTheSessionJournal
-        // pinned: DigitalBrainActivated lands in IDigitalBrainNeuron's OWN Outgoing journal.
-        var subject = IDigitalBrainNeuron.ForOwner(session.Owner);
+        // pinned: DigitalBrainActivated lands in the owner session's OWN Outgoing journal.
+        var subject = ISessionNeuron.ForOwner(session.Owner);
         var delivery = await session.WaitForJournalAsync(
             subject,
             JournalKind.Outgoing,

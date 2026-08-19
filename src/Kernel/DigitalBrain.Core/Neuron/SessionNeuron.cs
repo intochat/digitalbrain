@@ -1,10 +1,52 @@
 using DigitalBrain.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.BroadcastChannel;
+using Orleans.Journaling;
 
 namespace DigitalBrain.Core;
 
 internal sealed class SessionNeuron : Neuron, ISessionNeuron
 {
+    private const string ActivationPublishedName = "activation-published";
+
+    private readonly IDurableValue<bool> _activationPublished;
+
     protected override bool RegistersWithBrain => false;
+
+    public SessionNeuron()
+    {
+        _activationPublished = ServiceProvider.GetRequiredKeyedService<IDurableValue<bool>>(ActivationPublishedName);
+    }
+
+    public async Task Activate()
+    {
+        if (_activationPublished.Value)
+        {
+            return;
+        }
+
+        // The owner's brain wakes with the first activation, so routing and resolution never
+        // cold-start on a live emission.
+        await OwnersBrain().Read()
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        // Journal first: DigitalBrainActivated in this session's OWN Outgoing journal is the
+        // pinned activation footprint, whether or not any surface module subscribes.
+        var activated = await StageOutgoingAsync(new DigitalBrainActivated(Id.Owner), cause: null)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        var writer = ServiceProvider
+            .GetRequiredService<IClusterClient>()
+            .GetBroadcastChannelProvider(DigitalBrainNames.BroadcastChannelProvider)
+            .GetChannelWriter<SynapseDelivery>(ChannelId.Create(
+                DigitalBrainNames.ActivationChannelNamespace,
+                $"{Id.Owner.Value}/{DigitalBrainNames.ActivationSubscriberName}"));
+        await writer.Publish(activated)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        _activationPublished.Value = true;
+        await WriteStateAsync().ConfigureAwait(true);
+    }
 
     public Task<SynapseDelivery> Fire(NeuronId receiver, Synapse synapse)
     {

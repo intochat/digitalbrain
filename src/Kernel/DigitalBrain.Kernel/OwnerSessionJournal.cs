@@ -37,27 +37,4 @@ internal sealed class OwnerSessionJournal(IDigitalBrain brain)
             cancellationToken);
     }
 
-    public IAsyncEnumerable<JournalRead> WatchGraphOutgoingAsync(
-        long afterSequence,
-        CancellationToken cancellationToken)
-        => WatchGraphOutgoingAsync(principal: null, afterSequence, cancellationToken);
-
-    // A18: principal partition when authenticated; owner graph only for unattributed/system.
-    public IAsyncEnumerable<JournalRead> WatchGraphOutgoingAsync(
-        PrincipalId? principal,
-        long afterSequence,
-        CancellationToken cancellationToken)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
-
-        var graph = principal is { } id
-            ? ISynapseGraph.ForPrincipal(brain.Owner, id)
-            : ISynapseGraph.ForOwner(brain.Owner);
-
-        return brain.WatchJournalAsync(
-            graph,
-            JournalKind.Outgoing,
-            afterSequence,
-            cancellationToken);
-    }
 }

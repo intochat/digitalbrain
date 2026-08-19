@@ -10,7 +10,6 @@ internal static class CapabilityInvocation
     [
         typeof(INeuron),
         typeof(ISessionNeuron),
-        typeof(ISynapseGraph),
     ];
 
     internal static bool IsRequest(MethodInfo? method)

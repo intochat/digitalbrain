@@ -155,7 +155,7 @@ public abstract class Neuron :
             return;
         }
 
-        if (synapse is not (RouteOutcome or Unrouted) && !IsJournalProjection(synapse.GetType()))
+        if (synapse is not Unrouted && !IsJournalProjection(synapse.GetType()))
         {
             await StageIncomingOutcomeAsync(
                     new Unrouted(delivery.SynapseId, alias, Id, delivery.CorrelationId),
@@ -286,7 +286,7 @@ public abstract class Neuron :
         }
     }
 
-    private IBrain OwnersBrain()
+    protected IBrain OwnersBrain()
         => GrainFactory.GetGrain<IBrain>(
             EntityId.For<IBrain>(Id.Owner, DigitalBrainNames.DefaultBrain).ToGrainId());
 
@@ -296,7 +296,7 @@ public abstract class Neuron :
         try
         {
             return await OwnersBrain()
-                .Route(alias)
+                .Route(Id, alias)
                 .WaitAsync(bound.Token)
                 .ConfigureAwait(true);
         }

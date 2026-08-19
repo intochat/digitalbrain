@@ -66,16 +66,15 @@ internal sealed class ChatTurnWorker : Neuron, IChatTurnWorker
         using var lookup = new CancellationTokenSource(NeuronCallTimeouts.LookupBound);
         try
         {
-            var routes = await GrainFactory
-                .GetGrain<ISynapseGraph>(ISynapseGraph.ForOwner(chatId.Owner).ToGrainId())
-                .ConnectionsFrom(chatId, ChatRoles.Responder)
+            var routes = await OwnersBrain()
+                .Connections(chatId, ChatRoles.Responder)
                 .WaitAsync(lookup.Token).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             if (routes.FirstOrDefault() is { } bound)
             {
                 return (
-                    GrainFactory.GetGrain<IAgent>(bound.Target.ToGrainId()),
-                    bound.Target.Name);
+                    GrainFactory.GetGrain<IAgent>(bound.To.ToGrainId()),
+                    bound.To.Name);
             }
 
             return (DefaultResponder(chatId.Owner), "assistant");

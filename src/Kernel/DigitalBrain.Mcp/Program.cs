@@ -8,6 +8,7 @@ builder.AddDigitalBrainClient();
 builder.Services
     .AddMcpServer()
     .WithHttpTransport(options => options.Stateless = true)
+    .WithTools<BrainTools>()
     .WithTools<ChatTools>()
     .WithTools<IntrospectionTools>()
     .WithTools<GrantChartTools>()

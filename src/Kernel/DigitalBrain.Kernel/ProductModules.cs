@@ -9,7 +9,7 @@ public static class ProductModules
 {
     public static ModuleAssemblies Assemblies { get; } = new(
         [
-            typeof(DigitalBrain.Abstractions.Graph.ISynapseGraph).Assembly,
+            typeof(DigitalBrain.Abstractions.DigitalBrainNames).Assembly,
             typeof(DigitalBrain.AI.IAssistant).Assembly,
             typeof(DigitalBrain.Introspection.ReadTopologyRequest).Assembly,
             typeof(DigitalBrain.Memory.IVectorMemory).Assembly,

@@ -17,11 +17,12 @@ public sealed class JournalSmokeTests(SimulationFixture fixture)
         var brain = fixture.Sim.BrainFor(fixture.Sim.UniqueId("journal-owner"));
         await brain.ActivateAsync(TestContext.Current.CancellationToken);
 
-        // DigitalBrainNeuron.Activate() journals DigitalBrainActivated into its OWN Outgoing
-        // journal BEFORE publishing it on the activation BroadcastChannel -- so
-        // IDigitalBrainNeuron's own Outgoing journal is where the activation
-        // deterministically lands, independent of whether any surface module subscribes.
-        var subject = IDigitalBrainNeuron.ForOwner(brain.Owner);
+        // SessionNeuron.Activate() journals DigitalBrainActivated into its OWN Outgoing
+        // journal BEFORE publishing it on the activation BroadcastChannel -- so the owner
+        // session's own Outgoing journal is where the activation deterministically lands,
+        // independent of whether any surface module subscribes. (Pin moved here in C2 Task 5
+        // when the Brain absorbed the standalone DigitalBrainNeuron.)
+        var subject = ISessionNeuron.ForOwner(brain.Owner);
         var delivery = await JournalWait.ForAsync(
             brain,
             subject,

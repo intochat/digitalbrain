@@ -20,11 +20,12 @@ internal sealed class IntrospectionTopologyReader(
     {
         var ownerStatistics = await _inventory.ReadAsync(cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        var connections = await grainFactory
-            .GetGrain<ISynapseGraph>(ISynapseGraph.ForOwner(owner).ToGrainId())
-            .Connections()
+        var brainState = await grainFactory
+            .GetGrain<IBrain>(EntityId.For<IBrain>(owner, DigitalBrainNames.DefaultBrain).ToGrainId())
+            .Read()
             .WaitAsync(cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        var connections = brainState?.Connections ?? [];
         var placements = ownerStatistics
             .Select(static neuron => neuron.Silo)
             .Distinct()
@@ -49,12 +50,9 @@ internal sealed class IntrospectionTopologyReader(
             [
                 .. connections
                     .Select(static connection => new TopologyConnection(
-                        connection.ConnectionId,
-                        connection.Source.ToString(),
-                        connection.SynapseAlias,
-                        connection.Target.ToString(),
-                        connection.Transform,
-                        connection.ExpiresAt))
+                        connection.From.ToString(),
+                        connection.Role,
+                        connection.To.ToString()))
                     .OrderBy(static connection => connection.Source, StringComparer.Ordinal)
                     .ThenBy(static connection => connection.SynapseAlias, StringComparer.Ordinal),
             ],

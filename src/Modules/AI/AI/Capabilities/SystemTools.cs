@@ -9,8 +9,8 @@ using Orleans.Runtime;
 
 namespace DigitalBrain.AI;
 
-// The assistant's whole surface: three constant tools, no matter how many
-// modules exist. find → get → fire, with correctable errors the model can act on.
+// The assistant's whole surface: four constant tools, no matter how many
+// modules exist. find → get → connect/fire, with correctable errors the model can act on.
 public sealed class SystemTools(
     IGrainFactory grains,
     OwnerId owner,
@@ -20,6 +20,7 @@ public sealed class SystemTools(
     public const string FindCapabilities = "find_capabilities";
     public const string GetNeurons = "get_neurons";
     public const string Fire = "fire";
+    public const string BrainConnect = "brain_connect";
 
     private const int FindLimit = 8;
 
@@ -31,11 +32,13 @@ public sealed class SystemTools(
         =>
         [
             AIFunctionFactory.Create(FindCapabilitiesAsync, FindCapabilities,
-                "Search the system's contracts for what can be done. Returns requests you can fire (with their signatures) and facts you can route with db.connect."),
+                "Search the system's contracts for what can be done. Returns requests you can fire (with their signatures) and facts you can route with brain_connect."),
             AIFunctionFactory.Create(GetNeuronsAsync, GetNeurons,
-                "List registered instances (including cold/disabled), live activations (type:owner/name), and synapse-graph connections. Optionally filter by grain type."),
+                "List the brain's registered nodes (including cold ones), live activations (type:owner/name), and connections. Optionally filter by grain type."),
             AIFunctionFactory.Create(FireAsync, Fire,
                 "Send a request synapse and return its reply. 'contract' is a contract id from find_capabilities; 'arguments' are its fields (commandId is filled for you); 'target' overrides the default instance — a grain type ('timer'), an instance name ('main'), or type:name."),
+            AIFunctionFactory.Create(BrainConnectAsync, BrainConnect,
+                "Wire source → target in the owner's brain: facts the source emits under synapseAlias are delivered to the target. source and target are 'type:name' instances from get_neurons; synapseAlias is the fact's contract id from find_capabilities."),
         ];
 
     private async Task<string> FindCapabilitiesAsync(string intent, CancellationToken cancellationToken)
@@ -76,21 +79,12 @@ public sealed class SystemTools(
                 continue;
             }
 
-            lines.AppendLine($"{hit.ContractId} — fact; route it with db.connect, then trigger its source");
+            lines.AppendLine($"{hit.ContractId} — fact; route it with brain_connect, then trigger its source");
             lines.AppendLine($"  {hit.Signature}");
         }
 
         return lines.ToString();
     }
-
-    // Absence is stated rather than left blank: a wire made before provenance existed is not
-    // the same as a wire whose author declined to say why.
-    private static string DescribeProvenance(Provenance? provenance)
-        => provenance is null
-            ? "intent: unrecorded — wired before provenance was kept"
-            : string.IsNullOrEmpty(provenance.StatedIntent)
-                ? $"intent: none stated — wired by {provenance.Author} at {provenance.At:u}"
-                : $"intent: \"{provenance.StatedIntent}\" — wired by {provenance.Author} at {provenance.At:u}";
 
     private async Task<string> GetNeuronsAsync(CancellationToken cancellationToken, string? grainType = null)
     {
@@ -101,72 +95,42 @@ public sealed class SystemTools(
 
         var lines = new StringBuilder();
 
-        // Registry is durable: cold charts, idle schedules, disabled bundle members.
-        RegisteredInstance[] registered = [];
+        // The brain's registry is durable: it remembers nodes across activations, cold or hot.
+        BrainState? brainState = null;
         try
         {
-            var session = grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(owner).ToGrainId());
-            var registryId = VerifiedActor.Current is { } actor
-                ? IRegistry.ForPrincipal(owner, actor.PrincipalId)
-                : IRegistry.ForOwner(owner);
-            var opened = await session
-                .ReadNeuronJournal(ISessionNeuron.ForOwner(owner), JournalKind.Incoming, long.MaxValue)
-                .ConfigureAwait(false);
-            var cursor = opened.ResumeSequence;
-            var listRequest = new ListInstances(CommandId.New());
-            var delivery = await session.Fire(registryId, listRequest).ConfigureAwait(false);
-            var abandon = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(8);
-            while (DateTimeOffset.UtcNow < abandon)
-            {
-                var page = await session
-                    .ReadNeuronJournal(ISessionNeuron.ForOwner(owner), JournalKind.Incoming, cursor)
-                    .ConfigureAwait(false);
-                foreach (var entry in page.Delta)
-                {
-                    if (entry.CorrelationId == delivery.CorrelationId
-                        && entry.Synapse is InstancesListed listed)
-                    {
-                        registered = listed.Items;
-                        goto RegistryLoaded;
-                    }
-                }
-
-                cursor = page.ResumeSequence;
-                await Task.Delay(25, cancellationToken).ConfigureAwait(false);
-            }
+            brainState = await OwnersBrain()
+                .Read()
+                .WaitAsync(NeuronCallTimeouts.LookupBound, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception)
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
-            // Registry unavailable — live list still works.
+            // Brain unavailable — live list still works.
         }
 
-    RegistryLoaded:
+        var nodes = brainState?.Nodes ?? [];
+        IReadOnlyList<BrainReference> filteredNodes = string.IsNullOrWhiteSpace(grainType)
+            ? nodes
+            : [.. nodes.Where(node =>
+                string.Equals(node.Type, grainType.Trim(), StringComparison.OrdinalIgnoreCase))];
 
-        if (registered.Length > 0)
+        if (filteredNodes.Count > 0)
         {
-            RegisteredInstance[] filtered = string.IsNullOrWhiteSpace(grainType)
-                ? registered
-                : [.. registered.Where(entry =>
-                    string.Equals(entry.Subject.Type, grainType.Trim(), StringComparison.OrdinalIgnoreCase))];
-
-            lines.AppendLine(filtered.Length == 0
-                ? "Registered instances: (none match filter)"
-                : "Registered instances (exist even when cold):");
-            var liveKeys = activated.Select(static n => n.ToString()).ToHashSet(StringComparer.Ordinal);
-            foreach (var entry in filtered.OrderBy(static e => e.Subject.ToString(), StringComparer.Ordinal))
+            lines.AppendLine("Brain-registered nodes (exist even when cold):");
+            foreach (var node in filteredNodes.OrderBy(static n => n.Key, StringComparer.Ordinal))
             {
-                var heat = liveKeys.Contains(entry.Subject.ToString()) ? "live" : "cold";
-                var enabled = entry.Enabled ? "enabled" : "disabled";
-                var bundle = entry.Bundle is null ? "" : $" bundle={entry.Bundle}";
-                var note = entry.Note is null ? "" : $" note={entry.Note}";
-                lines.AppendLine(
-                    $"  {entry.Subject} role={entry.Role} [{heat}, {enabled}]{bundle}{note}");
+                var heat = activated.Any(neuron =>
+                    string.Equals(neuron.Type, node.Type, StringComparison.Ordinal)
+                    && string.Equals(neuron.Name, node.Name, StringComparison.Ordinal))
+                    ? "live"
+                    : "cold";
+                lines.AppendLine($"  {node.Type}:{node.Name} kind={node.Kind} [{heat}] lastUsed={node.LastUsed:u}");
             }
         }
         else
         {
             lines.AppendLine(
-                "Registered instances: (none — fire db.register-instance or db.install-bundle)");
+                "Brain-registered nodes: (none yet — neurons register themselves on first activation)");
         }
 
         lines.AppendLine(liveFilter.Count == 0 ? "Live (activated) instances: (none match)" : "Live (activated) instances:");
@@ -175,26 +139,76 @@ public sealed class SystemTools(
             lines.AppendLine($"  {neuron}");
         }
 
-        var connections = await grains
-            .GetGrain<ISynapseGraph>(
-                (VerifiedActor.Current is { } graphActor
-                    ? ISynapseGraph.ForPrincipal(owner, graphActor.PrincipalId)
-                    : ISynapseGraph.ForOwner(owner)).ToGrainId())
-            .Connections()
-            .WaitAsync(NeuronCallTimeouts.LookupBound, cancellationToken).ConfigureAwait(false);
+        var connections = brainState?.Connections ?? [];
         lines.AppendLine(connections.Count == 0 ? "No connections yet." : "Connections:");
         foreach (var connection in connections)
         {
-            var transform = connection.Transform is null ? "" : $" via {connection.Transform}";
-            // The id is printed because db.disconnect addresses it: without it the model can
-            // only unwire what it created in the same turn.
-            lines.AppendLine($"  [{connection.ConnectionId}] {connection.Source} "
-                + $"--{connection.SynapseAlias}--> {connection.Target}{transform}");
-            lines.AppendLine($"      {DescribeProvenance(connection.Provenance)}");
+            lines.AppendLine($"  {connection.From} --{connection.Role}--> {connection.To}");
         }
 
         return lines.ToString();
     }
+
+    private async Task<string> BrainConnectAsync(
+        string source,
+        string synapseAlias,
+        string target,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(source)
+                || string.IsNullOrWhiteSpace(synapseAlias)
+                || string.IsNullOrWhiteSpace(target))
+            {
+                return "brain_connect needs source ('type:name'), synapseAlias (the fact's "
+                    + "contract id), and target ('type:name').";
+            }
+
+            if (ParseInstance(source) is not { } from)
+            {
+                return $"Source '{source}' must be written type:name, for example 'timer:default'.";
+            }
+
+            if (ParseInstance(target) is not { } to)
+            {
+                return $"Target '{target}' must be written type:name, for example 'chat:main'.";
+            }
+
+            var alias = synapseAlias.Trim();
+            await OwnersBrain()
+                .Connect(new Connection(from, alias, to))
+                .WaitAsync(NeuronCallTimeouts.LookupBound, cancellationToken).ConfigureAwait(false);
+            return $"Connected {from} --{alias}--> {to}.";
+        }
+        catch (Exception refused) when (refused is not OperationCanceledException)
+        {
+            // The model must always see WHY, never an opaque "Function failed".
+            return $"brain_connect failed: {refused.Message}";
+        }
+    }
+
+    private NeuronId? ParseInstance(string instance)
+    {
+        var trimmed = instance.Trim();
+        var separator = trimmed.IndexOf(':', StringComparison.Ordinal);
+        if (separator <= 0 || separator == trimmed.Length - 1)
+        {
+            return null;
+        }
+
+        var type = trimmed[..separator];
+        var rest = trimmed[(separator + 1)..];
+        var name = rest.Contains('/', StringComparison.Ordinal)
+            ? rest[(rest.IndexOf('/', StringComparison.Ordinal) + 1)..]
+            : rest;
+
+        return new NeuronId(type, owner, name);
+    }
+
+    private IBrain OwnersBrain()
+        => grains.GetGrain<IBrain>(
+            EntityId.For<IBrain>(owner, DigitalBrainNames.DefaultBrain).ToGrainId());
 
     private async Task<string> FireAsync(
         string contract,

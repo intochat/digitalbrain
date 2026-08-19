@@ -26,6 +26,9 @@ public interface IBrain : IEntity<BrainState>
     [Alias(nameof(Disconnect))]
     Task Disconnect(Connection connection);
 
+    [Alias(nameof(Connections))]
+    Task<IReadOnlyList<Connection>> Connections(NeuronId from, string role);
+
     [Alias(nameof(Route))]
-    Task<Connection?> Route(string alias);
+    Task<Connection?> Route(NeuronId source, string alias);
 }

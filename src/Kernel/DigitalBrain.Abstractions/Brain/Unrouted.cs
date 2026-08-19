@@ -1,4 +1,4 @@
-namespace DigitalBrain.Abstractions.Graph;
+namespace DigitalBrain.Abstractions.Brain;
 
 // An emission that resolved zero receivers is journaled and never delivered. Without this
 // record the loss is invisible: nothing is retried, nothing refuses, nothing is reported.

@@ -60,10 +60,37 @@ internal sealed class BrainEntity(
     {
         ArgumentNullException.ThrowIfNull(connection);
 
+        // A self-route dispatches in place (Neuron delivers to itself without a grain call)
+        // and recurses with no timeout at all.
+        if (connection.From == connection.To)
+        {
+            throw new NeuronAuthorizationException(
+                $"The brain refuses the self-wire {connection.From} --{connection.Role}--> "
+                + $"{connection.To}.");
+        }
+
         var snapshot = Snapshot();
         if (snapshot.Connections.Contains(connection))
         {
             return;
+        }
+
+        // Routing is single-target: an emission's (source, alias) pair resolves at most one
+        // receiver, so a second wire on the pair is refused instead of silently never firing.
+        if (snapshot.Connections.FirstOrDefault(
+                c => c.From == connection.From && SameRole(c.Role, connection.Role)) is { } occupied)
+        {
+            throw new NeuronAuthorizationException(
+                $"The brain already routes '{connection.Role}' from {connection.From} to "
+                + $"{occupied.To}. Disconnect that wire first; routing is single-target.");
+        }
+
+        // A routed cycle deadlocks its non-reentrant neurons until the Deliver timeout.
+        if (CyclePath(snapshot.Connections, connection) is { } cycle)
+        {
+            throw new NeuronAuthorizationException(
+                $"The brain refuses the wire {connection.From} --{connection.Role}--> "
+                + $"{connection.To}: it closes the cycle {cycle}.");
         }
 
         await SaveAsync(snapshot with { Connections = [.. snapshot.Connections, connection] });
@@ -83,15 +110,24 @@ internal sealed class BrainEntity(
         await SaveAsync(snapshot with { Connections = kept });
     }
 
+    public Task<IReadOnlyList<Connection>> Connections(NeuronId from, string role)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(role);
+
+        return Task.FromResult<IReadOnlyList<Connection>>(
+            [.. Snapshot().Connections.Where(c => c.From == from && SameRole(c.Role, role))]);
+    }
+
     // Graph connections only; capability search stays the caller's fallback (SystemTools
-    // already consults CapabilityIndex when nothing is connected).
-    public async Task<Connection?> Route(string alias)
+    // already consults CapabilityIndex when nothing is connected). Connect keeps the
+    // (source, role) pair unique, so the first match is the only match.
+    public async Task<Connection?> Route(NeuronId source, string alias)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(alias);
 
         var snapshot = Snapshot();
         var connection = snapshot.Connections.FirstOrDefault(
-            c => string.Equals(c.Role, alias, StringComparison.OrdinalIgnoreCase));
+            c => c.From == source && SameRole(c.Role, alias));
         if (connection is null)
         {
             return null;
@@ -225,6 +261,53 @@ internal sealed class BrainEntity(
 
     private static bool MatchesName(string hint, BrainReference node)
         => string.Equals(node.Name, hint, StringComparison.OrdinalIgnoreCase);
+
+    // Walks the existing table from the proposed target back toward the proposed source,
+    // role-blind: a routed cycle deadlocks regardless of which aliases ride it. Returns the
+    // closed path for the refusal message, or null when the wire is acyclic.
+    private static string? CyclePath(IReadOnlyList<Connection> table, Connection proposed)
+    {
+        List<Connection> path = [proposed];
+        HashSet<NeuronId> visited = [];
+
+        return Reaches(proposed.To)
+            ? proposed.From + string.Concat(path.Select(edge => $" --{edge.Role}--> {edge.To}"))
+            : null;
+
+        bool Reaches(NeuronId node)
+        {
+            if (node == proposed.From)
+            {
+                return true;
+            }
+
+            if (!visited.Add(node))
+            {
+                return false;
+            }
+
+            foreach (var edge in table)
+            {
+                if (edge.From != node)
+                {
+                    continue;
+                }
+
+                path.Add(edge);
+                if (Reaches(edge.To))
+                {
+                    return true;
+                }
+
+                path.RemoveAt(path.Count - 1);
+            }
+
+            return false;
+        }
+    }
+
+    private static bool SameRole(string left, string right)
+        => string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
 
     private static bool SameNode(BrainReference left, BrainReference right)
         => left.Kind == right.Kind
