@@ -19,7 +19,7 @@ internal sealed class BrainEntity(
         ArgumentNullException.ThrowIfNull(reference);
 
         var snapshot = Snapshot();
-        await SaveAsync(Touched(snapshot, reference, snapshot.ActiveContext, DateTimeOffset.UtcNow));
+        await SaveAsync(Touched(snapshot, reference, snapshot.ActiveContext, TimeProvider.GetUtcNow()));
     }
 
     public async Task<BrainReference?> Resolve(string hint, string? context = null)
@@ -36,7 +36,7 @@ internal sealed class BrainEntity(
 
         var scope = snapshot.Contexts.FirstOrDefault(c => IsNamed(c, scopeName));
         var winner = WinnerAmong(candidates, hint, scope);
-        var now = DateTimeOffset.UtcNow;
+        var now = TimeProvider.GetUtcNow();
         await SaveAsync(Touched(snapshot, winner, scopeName, now));
         return winner with { LastUsed = now };
     }
@@ -46,7 +46,7 @@ internal sealed class BrainEntity(
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
         var snapshot = Snapshot();
-        var now = DateTimeOffset.UtcNow;
+        var now = TimeProvider.GetUtcNow();
         var contexts = WithContext(snapshot.Contexts, name, snapshot.ActiveContext, now)
             .Select(c => IsNamed(c, name) ? c with { LastUsed = now } : c)
             .ToArray();
@@ -170,7 +170,7 @@ internal sealed class BrainEntity(
             && string.Equals(node.Name, connection.To.Name, StringComparison.Ordinal));
         if (target is not null)
         {
-            await SaveAsync(Touched(snapshot, target, snapshot.ActiveContext, DateTimeOffset.UtcNow));
+            await SaveAsync(Touched(snapshot, target, snapshot.ActiveContext, TimeProvider.GetUtcNow()));
         }
 
         return connection;
@@ -180,7 +180,7 @@ internal sealed class BrainEntity(
         => State ?? new BrainState(
             Nodes: [],
             Connections: [],
-            Contexts: [new BrainContext(BrainState.DefaultContext, [], DateTimeOffset.UtcNow, NoTallies)],
+            Contexts: [new BrainContext(BrainState.DefaultContext, [], TimeProvider.GetUtcNow(), NoTallies)],
             ActiveContext: BrainState.DefaultContext);
 
     private static BrainState Touched(
