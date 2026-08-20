@@ -20,11 +20,10 @@ public sealed class ChartFlowTests(SimulationFixture fixture)
         var chartName = fixture.Sim.UniqueId("chart");
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        var chat = fixture.Sim.Brain.Get<IChat>(chatName);
-        var chatId = chat.Id;
+        var chatId = NeuronId.For<IChat>(fixture.Sim.Brain.Owner, chatName);
 
-        await fixture.Sim.Brain.FireAsync(
-            chatId,
+        await fixture.Sim.Brain.FireAsync<IChat>(
+            chatName,
             new ChartCard(chartName),
             cancellationToken);
 

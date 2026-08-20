@@ -14,8 +14,6 @@ final class BrainChatApp extends StatelessWidget {
     required this.chatName,
     this.turns,
     this.authorizations,
-    this.graphChanges,
-    this.onLoadTopology,
     this.onSend,
     this.onStream,
     this.onStreamVoice,
@@ -30,8 +28,6 @@ final class BrainChatApp extends StatelessWidget {
   final String chatName;
   final Stream<ChatTurnEvent>? turns;
   final Stream<AuthorizationEvent>? authorizations;
-  final Stream<GraphChangeEvent>? graphChanges;
-  final LoadTopology? onLoadTopology;
   final SendMessage? onSend;
   final StreamMessage? onStream;
   final StreamVoice? onStreamVoice;
@@ -52,8 +48,6 @@ final class BrainChatApp extends StatelessWidget {
         chatName: chatName,
         turns: turns,
         authorizations: authorizations,
-        graphChanges: graphChanges,
-        onLoadTopology: onLoadTopology,
         onSend: onSend,
         onStream: onStream,
         onStreamVoice: onStreamVoice,

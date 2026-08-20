@@ -15,8 +15,6 @@ internal sealed class ChatTurnWorker : Neuron, IChatTurnWorker
 {
     internal const string GrainTypeName = "chat-turn-worker";
 
-    protected override bool RegistersWithBrain => false;
-
     public static NeuronId ForChat(NeuronId chat)
         => new(GrainTypeName, chat.Owner, chat.Name);
 
@@ -39,13 +37,11 @@ internal sealed class ChatTurnWorker : Neuron, IChatTurnWorker
             .WaitAsync(cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        var (responder, author) = await ResponderAsync(goal.Chat)
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        var responder = DefaultResponder(goal.Chat.Owner);
 
         var conversationContext = new ChatMessage(
             ChatRole.System,
-            $"This conversation lives in neuron {goal.Chat}. Route cards and notes into it by "
-            + $"targeting 'chat:{goal.Chat.Name}' or wiring connections whose target is {goal.Chat}.");
+            $"This conversation lives in chat '{goal.Chat.Name}'. Send cards and notes by targeting 'chat:{goal.Chat.Name}'.");
 
         var answer = new StringBuilder();
         using (VerifiedActor.Enter(goal.Actor))
@@ -58,31 +54,7 @@ internal sealed class ChatTurnWorker : Neuron, IChatTurnWorker
             }
         }
 
-        return (answer.ToString(), author);
-    }
-
-    private async Task<(IAgent Responder, string Author)> ResponderAsync(NeuronId chatId)
-    {
-        using var lookup = new CancellationTokenSource(NeuronCallTimeouts.LookupBound);
-        try
-        {
-            var routes = await OwnersBrain()
-                .Connections(chatId, ChatRoles.Responder)
-                .WaitAsync(lookup.Token).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-            if (routes.FirstOrDefault() is { } bound)
-            {
-                return (
-                    GrainFactory.GetGrain<IAgent>(bound.To.ToGrainId()),
-                    bound.To.Name);
-            }
-
-            return (DefaultResponder(chatId.Owner), "assistant");
-        }
-        catch (OperationCanceledException) when (lookup.IsCancellationRequested)
-        {
-            return (DefaultResponder(chatId.Owner), "assistant");
-        }
+        return (answer.ToString(), "assistant");
     }
 
     private IAssistant DefaultResponder(OwnerId owner)

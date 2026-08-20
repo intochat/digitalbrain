@@ -1,6 +1,3 @@
-using System.Net;
-using System.Net.Http.Json;
-using System.Text.Json;
 using DigitalBrain.UI;
 using Orleans.Runtime;
 using Xunit;
@@ -32,31 +29,5 @@ public sealed class FabricSurfaceTests(AppHostFixture fixture)
         Assert.NotNull(survived);
         var point = Assert.Single(survived!.Points);
         Assert.Equal(41, point.Value);
-    }
-
-    // C2 review gap 3: /brain/topology and /graph/events are shell-consumed, were rewritten
-    // twice in C2, and had zero coverage. Smoke them over real HTTP with the real auth cookie.
-    [Fact]
-    public async Task BrainTopologyAndGraphEventsServeTheShellWire()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var http = fixture.CreateHttpClient("kernel");
-
-        var login = await http.PostAsJsonAsync(
-            "/auth/login", new { username = "owner", password = "ownerowner" }, cancellationToken);
-        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
-
-        var topology = await http.GetAsync("/brain/topology", cancellationToken);
-        Assert.Equal(HttpStatusCode.OK, topology.StatusCode);
-        var snapshot = await topology.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
-        Assert.Equal(JsonValueKind.Array, snapshot.GetProperty("neurons").ValueKind);
-        Assert.Equal(JsonValueKind.Array, snapshot.GetProperty("connections").ValueKind);
-        Assert.Equal(JsonValueKind.Array, snapshot.GetProperty("modules").ValueKind);
-
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/graph/events?afterSequence=0");
-        using var events = await http.SendAsync(
-            request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        Assert.Equal(HttpStatusCode.OK, events.StatusCode);
-        Assert.Equal("text/event-stream", events.Content.Headers.ContentType?.MediaType);
     }
 }

@@ -21,32 +21,6 @@ ChatTurnEvent shellTurn(
   timestamp: DateTime.utc(2026, 7, 28, 8, 0, sequence),
 );
 
-BrainTopologySnapshot shellTopology() => BrainTopologySnapshot(
-  modules: const [
-    BrainModule(id: 'DigitalBrain.Chat.ChatModule'),
-    BrainModule(id: 'DigitalBrain.AI.AIModule'),
-    BrainModule(id: 'DigitalBrain.Shell.ShellModule'),
-    BrainModule(id: 'DigitalBrain.Google.GoogleModule'),
-    BrainModule(id: 'DigitalBrain.Assistant.AssistantModule'),
-    BrainModule(id: 'DigitalBrain.Salesforce.SalesforceModule'),
-  ],
-  neurons: const [
-    BrainNeuron(
-      id: 'chat:owner/main',
-      grainType: 'chat',
-      identity: 'owner/main',
-      placement: 'cluster-1',
-    ),
-  ],
-  observedAt: DateTime.utc(2026, 7, 28, 8),
-);
-
-BrainTopologySnapshot shellTopologyWithoutNeuron() => BrainTopologySnapshot(
-  modules: shellTopology().modules,
-  neurons: const [],
-  observedAt: DateTime.utc(2026, 7, 28, 8),
-);
-
 Future<void> prepareShellSurface(WidgetTester tester) async {
   tester.view.physicalSize = const Size(1400, 900);
   tester.view.devicePixelRatio = 1;

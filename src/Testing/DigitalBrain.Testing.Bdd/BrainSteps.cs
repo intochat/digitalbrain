@@ -163,29 +163,6 @@ public sealed class BrainSteps : IDisposable
         Assert.Equal(text, fact.Text);
     }
 
-    [Then("resolving {string} finds {string}")]
-    public async Task ThenResolvingFinds(string hint, string expectedName)
-    {
-        // Registration of the renderer-written chart reaches the brain graph asynchronously
-        // (UIRendererTests polls the same edge), so poll until something resolves, then
-        // assert the exact name.
-        var deadline = DateTimeOffset.UtcNow + PollTimeout;
-        BrainReference? resolved;
-        while (true)
-        {
-            resolved = await _brain.ResolveAsync(hint).ConfigureAwait(false);
-            if (resolved is not null || DateTimeOffset.UtcNow >= deadline)
-            {
-                break;
-            }
-
-            await Task.Delay(PollInterval).ConfigureAwait(false);
-        }
-
-        Assert.NotNull(resolved);
-        Assert.Equal(expectedName, resolved!.Name);
-    }
-
     public void Dispose()
     {
         _kernel?.Dispose();

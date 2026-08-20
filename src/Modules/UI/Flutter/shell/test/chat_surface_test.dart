@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/shell_test_support.dart';
+
 void main() {
   testWidgets('journal turns project as message text on the chat surface', (
     tester,
@@ -102,39 +103,40 @@ void main() {
     },
   );
 
-  testWidgets('sending hands the text to the edge and shows the journal answer', (
-    tester,
-  ) async {
-    await prepareShellSurface(tester);
-    final sent = <String>[];
-    final turns = StreamController<ChatTurnEvent>();
-    addTearDown(turns.close);
+  testWidgets(
+    'sending hands the text to the edge and shows the journal answer',
+    (tester) async {
+      await prepareShellSurface(tester);
+      final sent = <String>[];
+      final turns = StreamController<ChatTurnEvent>();
+      addTearDown(turns.close);
 
-    await tester.pumpWidget(
-      BrainChatApp(
-        chatName: 'main',
-        turns: turns.stream,
-        onSend: (text) async => sent.add(text),
-      ),
-    );
+      await tester.pumpWidget(
+        BrainChatApp(
+          chatName: 'main',
+          turns: turns.stream,
+          onSend: (text) async => sent.add(text),
+        ),
+      );
 
-    await tester.enterText(find.byType(TextField), 'enrich my account');
-    await tester.testTextInput.receiveAction(TextInputAction.send);
-    await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'enrich my account');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
 
-    expect(sent, ['enrich my account']);
-    expect(find.text('enrich my account'), findsWidgets);
+      expect(sent, ['enrich my account']);
+      expect(find.text('enrich my account'), findsWidgets);
 
-    turns.add(shellTurn(1, true, 'enrich my account'));
-    turns.add(shellTurn(2, false, 'Done.'));
-    await tester.pumpAndSettle();
+      turns.add(shellTurn(1, true, 'enrich my account'));
+      turns.add(shellTurn(2, false, 'Done.'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Done.'), findsOneWidget);
-    await drainShellTimers(tester);
-  });
+      expect(find.text('Done.'), findsOneWidget);
+      await drainShellTimers(tester);
+    },
+  );
 
   testWidgets(
-    'topology reloads do not wipe an optimistic send before journal arrives',
+    'workspace navigation does not wipe an optimistic send before journal arrives',
     (tester) async {
       await prepareShellSurface(tester);
       final turns = StreamController<ChatTurnEvent>();
@@ -144,7 +146,6 @@ void main() {
         BrainChatApp(
           chatName: 'main',
           turns: turns.stream,
-          onLoadTopology: () async => shellTopology(),
           onSend: (_) async {},
         ),
       );
@@ -155,7 +156,7 @@ void main() {
 
       expect(find.text('stay visible'), findsWidgets);
 
-      await tester.tap(find.byKey(const Key('destination_brain')));
+      await tester.tap(find.byKey(const Key('destination_activity')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('destination_chat')));
       await tester.pumpAndSettle();
@@ -172,47 +173,45 @@ void main() {
     },
   );
 
-  testWidgets(
-    'an in-flight stream bubble survives journal user-turn arrival',
-    (tester) async {
-      await prepareShellSurface(tester);
-      final turns = StreamController<ChatTurnEvent>();
-      addTearDown(turns.close);
+  testWidgets('an in-flight stream bubble survives journal user-turn arrival', (
+    tester,
+  ) async {
+    await prepareShellSurface(tester);
+    final turns = StreamController<ChatTurnEvent>();
+    addTearDown(turns.close);
 
-      // Completes after a short delay so the bubble exists while the user
-      // journal lands, without leaving an open stream that hangs the test.
-      await tester.pumpWidget(
-        BrainChatApp(
-          chatName: 'main',
-          turns: turns.stream,
-          onStream: (_) async* {
-            await Future<void>.delayed(const Duration(milliseconds: 80));
-          },
-        ),
-      );
+    // Completes after a short delay so the bubble exists while the user
+    // journal lands, without leaving an open stream that hangs the test.
+    await tester.pumpWidget(
+      BrainChatApp(
+        chatName: 'main',
+        turns: turns.stream,
+        onStream: (_) async* {
+          await Future<void>.delayed(const Duration(milliseconds: 80));
+        },
+      ),
+    );
 
-      await tester.enterText(find.byType(TextField), 'stream me');
-      await tester.testTextInput.receiveAction(TextInputAction.send);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 20));
+    await tester.enterText(find.byType(TextField), 'stream me');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 20));
 
-      expect(find.text('stream me'), findsWidgets);
+    expect(find.text('stream me'), findsWidgets);
 
-      turns.add(shellTurn(1, true, 'stream me'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 20));
+    turns.add(shellTurn(1, true, 'stream me'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 20));
 
-      expect(find.text('stream me'), findsWidgets);
+    expect(find.text('stream me'), findsWidgets);
 
-      await tester.pump(const Duration(milliseconds: 100));
-      turns.add(shellTurn(2, false, 'stream done'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
+    await tester.pump(const Duration(milliseconds: 100));
+    turns.add(shellTurn(2, false, 'stream done'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
 
-      expect(find.text('stream me'), findsOneWidget);
-      expect(find.text('stream done'), findsOneWidget);
-      await drainShellTimers(tester);
-    },
-  );
+    expect(find.text('stream me'), findsOneWidget);
+    expect(find.text('stream done'), findsOneWidget);
+    await drainShellTimers(tester);
+  });
 }
-

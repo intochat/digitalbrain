@@ -35,6 +35,15 @@ public sealed class ChatTurnTests(SimulationFixture fixture)
         Assert.Equal(command, accepted.CommandId);
 
         var chatId = NeuronId.For<IChat>(brain.Owner, "main");
+        var terminal = await JournalWait.ForAsync(
+            brain,
+            chatId,
+            JournalKind.Outgoing,
+            delivery => delivery.Synapse is TurnLifecycle { Status: ChatTurnStatus.Completed or ChatTurnStatus.Failed or ChatTurnStatus.Cancelled },
+            TurnTimeout);
+        var lifecycle = Assert.IsType<TurnLifecycle>(terminal.Synapse);
+        Assert.True(lifecycle.Status == ChatTurnStatus.Completed, lifecycle.Detail);
+
         var responded = await JournalWait.ForAsync(
             brain,
             chatId,
@@ -43,13 +52,7 @@ public sealed class ChatTurnTests(SimulationFixture fixture)
             TurnTimeout);
         Assert.Equal("Plotted 2 points on demo.", ((Responded)responded.Synapse).Text);
 
-        await JournalWait.ForAsync(
-            brain,
-            chatId,
-            JournalKind.Outgoing,
-            delivery => delivery.Synapse is TurnLifecycle { Status: ChatTurnStatus.Completed } life
-                && life.TurnId == accepted.TurnId,
-            TurnTimeout);
+        Assert.Equal(accepted.TurnId, lifecycle.TurnId);
 
         // The scripted fires ran through the production turn machinery; the entity write drains
         // asynchronously behind the reply, so poll the exact state under test.

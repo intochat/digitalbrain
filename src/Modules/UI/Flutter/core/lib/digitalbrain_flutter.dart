@@ -9,5 +9,4 @@ export 'src/sse_authorization_frames.dart';
 export 'src/sse_behavior_frames.dart';
 export 'src/sse_chat_delta_frames.dart';
 export 'src/sse_chat_frames.dart';
-export 'src/sse_graph_frames.dart';
 export 'src/sse_frames.dart';

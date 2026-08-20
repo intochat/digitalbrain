@@ -49,7 +49,6 @@ public sealed class JournalSmokeTests(SimulationFixture fixture)
     {
         var brain = fixture.Sim.BrainFor(fixture.Sim.UniqueId("compaction-owner"));
         var timerName = fixture.Sim.UniqueId("timer");
-        var timerSubject = NeuronId.For<TimerModule.ITimer>(brain.Owner, timerName);
         var cancellationToken = TestContext.Current.CancellationToken;
 
         // CHOSEN SHAPE (documented per the task's discovery instruction): watch the SENDER's
@@ -85,8 +84,8 @@ public sealed class JournalSmokeTests(SimulationFixture fixture)
         {
             try
             {
-                await brain.FireAsync(
-                    timerSubject,
+                await brain.FireAsync<TimerModule.ITimer>(
+                    timerName,
                     new TimerModule.StartTimer(CommandId.New(), 60, "compaction-smoke"),
                     cancellationToken);
             }

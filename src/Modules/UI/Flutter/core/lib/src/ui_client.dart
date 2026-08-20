@@ -9,7 +9,6 @@ import 'sse_authorization_frames.dart';
 import 'sse_chat_delta_frames.dart';
 import 'sse_chat_frames.dart';
 import 'sse_frames.dart';
-import 'sse_graph_frames.dart';
 import 'ui_models.dart';
 
 final class DigitalBrainUiClient {
@@ -109,7 +108,9 @@ final class DigitalBrainUiClient {
       return null;
     }
     if (response.statusCode != 200) {
-      throw StateError('auth/me failed: ${response.statusCode} ${response.body}');
+      throw StateError(
+        'auth/me failed: ${response.statusCode} ${response.body}',
+      );
     }
 
     final decoded = jsonDecode(response.body);
@@ -304,11 +305,7 @@ final class DigitalBrainUiClient {
     Future<http.StreamedResponse> postOnce() {
       final request = http.MultipartRequest('POST', uri)
         ..files.add(
-          http.MultipartFile.fromBytes(
-            'audio',
-            audioBytes,
-            filename: fileName,
-          ),
+          http.MultipartFile.fromBytes('audio', audioBytes, filename: fileName),
         );
       return _http.send(request);
     }
@@ -331,9 +328,7 @@ final class DigitalBrainUiClient {
     }
     if (response.statusCode != 200) {
       final body = await response.stream.bytesToString();
-      throw StateError(
-        'chat.voice failed: ${response.statusCode} $body',
-      );
+      throw StateError('chat.voice failed: ${response.statusCode} $body');
     }
 
     yield* _parseChatDeltas(response);
@@ -383,33 +378,6 @@ final class DigitalBrainUiClient {
     }
   }
 
-  Stream<GraphChangeEvent> watchGraphChanges({
-    int afterSequence = 0,
-  }) async* {
-    final uri = baseUri.replace(
-      path: '/graph/events',
-      queryParameters: {'afterSequence': '$afterSequence'},
-    );
-    final response = await _sendAuthed(http.Request('GET', uri));
-    if (response.statusCode != 200) {
-      throw StateError('graph events failed: ${response.statusCode}');
-    }
-
-    final lines = response.stream
-        .transform(utf8.decoder)
-        .transform(const LineSplitter());
-
-    final parser = SseGraphChangeParser();
-    await for (final line in lines) {
-      for (final event in parser.addLine(line)) {
-        yield event;
-      }
-    }
-    for (final event in parser.flush()) {
-      yield event;
-    }
-  }
-
   Stream<AuthorizationEvent> watchAuthorizations({
     int afterSequence = 0,
   }) async* {
@@ -435,60 +403,6 @@ final class DigitalBrainUiClient {
     for (final event in parser.flush()) {
       yield event;
     }
-  }
-
-  Future<BrainTopologySnapshot> readBrainTopology({
-    Duration requestTimeout = const Duration(seconds: 5),
-  }) async {
-    await _requireSession();
-    final uri = baseUri.replace(path: '/brain/topology');
-    final abort = Completer<void>();
-    final operation = () async {
-      final request = http.AbortableRequest(
-        'GET',
-        uri,
-        abortTrigger: abort.future,
-      );
-      final streamed = await _http.send(request);
-      return http.Response.fromStream(streamed);
-    }();
-    final response = await operation.timeout(
-      requestTimeout,
-      onTimeout: () {
-        abort.complete();
-        throw http.RequestAbortedException(uri);
-      },
-    );
-    if (response.statusCode == 401 || response.statusCode == 403) {
-      _session = null;
-      _sessionReady = false;
-      await ensureSession();
-      final retry = await _http.get(uri);
-      if (retry.statusCode != 200) {
-        throw StateError(
-          'brain-topology failed: ${retry.statusCode} ${retry.body}',
-        );
-      }
-      final decodedRetry = jsonDecode(retry.body);
-      if (decodedRetry is! Map) {
-        throw const FormatException('brain-topology response is not an object');
-      }
-      return BrainTopologySnapshot.fromJson(
-        Map<String, Object?>.from(decodedRetry),
-      );
-    }
-    if (response.statusCode != 200) {
-      throw StateError(
-        'brain-topology failed: ${response.statusCode} ${response.body}',
-      );
-    }
-
-    final decoded = jsonDecode(response.body);
-    if (decoded is! Map) {
-      throw const FormatException('brain-topology response is not an object');
-    }
-
-    return BrainTopologySnapshot.fromJson(Map<String, Object?>.from(decoded));
   }
 
   void close() {

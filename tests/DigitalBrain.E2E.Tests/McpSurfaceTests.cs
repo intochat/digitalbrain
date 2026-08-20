@@ -4,10 +4,7 @@ using Xunit;
 
 namespace DigitalBrain.E2E.Tests;
 
-// The C3 parked ruling: the MCP brain_connect tool surface had never been crossed by any test.
-// This is the first real ModelContextProtocol.Core client against the frozen tool surface --
-// a genuine Streamable HTTP session against the running mcp resource, not an in-process call
-// into BrainTools.
+// A real ModelContextProtocol.Core client crosses the Streamable HTTP tool surface.
 [Collection(E2ECollection.Name)]
 public sealed class McpSurfaceTests(AppHostFixture fixture)
 {
@@ -17,10 +14,8 @@ public sealed class McpSurfaceTests(AppHostFixture fixture)
     // tests/DigitalBrain.Aspire.Tests/ProductSurfaceResourceNames.cs) rather than granting
     // InternalsVisibleTo.
     private const string McpPath = "/mcp";
-    private const string ListActiveNeuronsTool = "list_active_neurons";
-    private const string BrainConnectTool = "brain_connect";
-    private const string BrainDisconnectTool = "brain_disconnect";
     private const string ReadNeuronJournalTool = "read_neuron_journal";
+    private const string ReadChatTranscriptTool = "read_chat_transcript";
 
     [Fact]
     public async Task TheFrozenMcpToolsAnswerOverTheRealProtocol()
@@ -42,43 +37,9 @@ public sealed class McpSurfaceTests(AppHostFixture fixture)
 
         var tools = await client.ListToolsAsync(cancellationToken: cancellationToken);
         var toolNames = tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
-        foreach (var expectedTool in new[]
-                 {
-                     ListActiveNeuronsTool, BrainConnectTool, BrainDisconnectTool, ReadNeuronJournalTool,
-                 })
+        foreach (var expectedTool in new[] { ReadNeuronJournalTool, ReadChatTranscriptTool })
         {
             Assert.Contains(expectedTool, toolNames);
         }
-
-        var wireArguments = new Dictionary<string, object?>
-        {
-            ["source"] = "uirenderer:wire-a",
-            ["synapseAlias"] = "demo.wire",
-            ["target"] = "uirenderer:wire-b",
-        };
-
-        // The wire is created server-side by this call, so every assertion that follows -- not
-        // just the ones after list_active_neurons -- must run inside the try/finally that
-        // guards brain_disconnect, or a failing assert here leaks the wire into the shared
-        // dev-owner brain state for the rest of the run.
-        var connect = await client.CallToolAsync(BrainConnectTool, wireArguments, cancellationToken: cancellationToken);
-        try
-        {
-            Assert.False(connect.IsError is true);
-            Assert.Contains("Connected", TextOf(connect), StringComparison.Ordinal);
-
-            var active = await client.CallToolAsync(ListActiveNeuronsTool, cancellationToken: cancellationToken);
-            Assert.False(active.IsError is true);
-            Assert.NotEmpty(active.Content);
-        }
-        finally
-        {
-            var disconnect = await client.CallToolAsync(BrainDisconnectTool, wireArguments, cancellationToken: cancellationToken);
-            Assert.False(disconnect.IsError is true);
-            Assert.Contains("Disconnected", TextOf(disconnect), StringComparison.Ordinal);
-        }
     }
-
-    private static string TextOf(CallToolResult result)
-        => string.Concat(result.Content.OfType<TextContentBlock>().Select(block => block.Text));
 }

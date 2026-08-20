@@ -2,7 +2,9 @@ import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:flutter/material.dart';
 
 import 'chat_screen.dart';
-import 'open_url_io.dart' if (dart.library.html) 'open_url_web.dart' as open_url;
+import 'open_url_io.dart'
+    if (dart.library.html) 'open_url_web.dart'
+    as open_url;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,8 +35,6 @@ Future<void> main() async {
       statusMessage: status,
       turns: edge?.watchChatTurns(chatName: chat),
       authorizations: edge?.watchAuthorizations(),
-      graphChanges: edge?.watchGraphChanges(),
-      onLoadTopology: edge?.readBrainTopology,
       onStream: edge == null
           ? null
           : (text) => edge.streamMessage(chatName: chat, text: text),
@@ -47,16 +47,13 @@ Future<void> main() async {
             ),
       onActivateButton: edge == null
           ? null
-          : ({
-              required offerCommandId,
-              required buttonId,
-              required action,
-            }) => edge.activateChatButton(
-              chatName: chat,
-              offerCommandId: offerCommandId,
-              buttonId: buttonId,
-              action: action,
-            ),
+          : ({required offerCommandId, required buttonId, required action}) =>
+                edge.activateChatButton(
+                  chatName: chat,
+                  offerCommandId: offerCommandId,
+                  buttonId: buttonId,
+                  action: action,
+                ),
       onOpenSignIn: openExternalUrl,
       behaviorClient: behavior,
     ),

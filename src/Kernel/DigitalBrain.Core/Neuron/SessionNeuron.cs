@@ -11,8 +11,6 @@ internal sealed class SessionNeuron : Neuron, ISessionNeuron
 
     private readonly IDurableValue<bool> _activationPublished;
 
-    protected override bool RegistersWithBrain => false;
-
     public SessionNeuron()
     {
         _activationPublished = ServiceProvider.GetRequiredKeyedService<IDurableValue<bool>>(ActivationPublishedName);
@@ -24,11 +22,6 @@ internal sealed class SessionNeuron : Neuron, ISessionNeuron
         {
             return;
         }
-
-        // The owner's brain wakes with the first activation, so routing and resolution never
-        // cold-start on a live emission.
-        await OwnersBrain().Read()
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         // Journal first: DigitalBrainActivated in this session's OWN Outgoing journal is the
         // pinned activation footprint, whether or not any surface module subscribes.

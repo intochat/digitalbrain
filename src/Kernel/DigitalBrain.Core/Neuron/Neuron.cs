@@ -41,9 +41,6 @@ public abstract class Neuron :
 
     protected TimeProvider TimeProvider { get; }
 
-    // The Brain knows the owner's organs, not the plumbing: infrastructure neurons opt out.
-    protected virtual bool RegistersWithBrain => true;
-
     protected NeuronId? CurrentDeliveryCaller => _handling?.Caller;
 
     // A handler stamping provenance needs the correlation of the request that asked for it;
@@ -60,36 +57,10 @@ public abstract class Neuron :
         await OnNeuronActivatedAsync(cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        if (RegistersWithBrain)
-        {
-            _ = RegisterInOwnersBrainAsync();
-        }
     }
 
     protected virtual Task OnNeuronActivatedAsync(CancellationToken cancellationToken)
         => Task.CompletedTask;
-
-    // Fire-and-forget: the brain's registry must never block or fail a neuron's activation.
-    private Task RegisterInOwnersBrainAsync()
-        => RegisterInOwnersBrainAsync(
-            new BrainReference(BrainReferenceKind.Neuron, Id.Type, Id.Name, default));
-
-    // Fire-and-forget: the brain's registry must never block or fail the caller. Exposed so a
-    // neuron that writes another entity silo-side (UIRenderer writing chart/surface) can
-    // register that entity the same honest way the client facade's GetEntity does.
-    protected async Task RegisterInOwnersBrainAsync(BrainReference reference)
-    {
-        try
-        {
-            await OwnersBrain()
-                .Register(reference)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        }
-        catch (Exception unregistered)
-        {
-            SynapseTelemetry.BrainRegistrationDropped(Id, unregistered);
-        }
-    }
 
     public async Task Deliver(
         SynapseDelivery delivery,
@@ -149,26 +120,7 @@ public abstract class Neuron :
         var delivery = await StageOutgoingAsync(synapse, _handling, correlation)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        if (SynapseAlias.Of(synapse.GetType()) is not { } alias)
-        {
-            return;
-        }
-
-        if (await RouteThroughBrainAsync(alias)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext) is { } connection)
-        {
-            await DeliverToAsync(connection.To, delivery)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            return;
-        }
-
-        if (synapse is not Unrouted && !IsJournalProjection(synapse.GetType()))
-        {
-            await StageIncomingOutcomeAsync(
-                    new Unrouted(delivery.SynapseId, alias, Id, delivery.CorrelationId),
-                    delivery)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        }
+        _ = delivery;
     }
 
     protected async Task ReplyAsync(
@@ -290,28 +242,6 @@ public abstract class Neuron :
         catch (Exception undelivered)
         {
             SynapseTelemetry.ReplyDropped(Id, receiver, undelivered);
-        }
-    }
-
-    protected IBrain OwnersBrain()
-        => GrainFactory.GetGrain<IBrain>(
-            EntityId.For<IBrain>(Id.Owner, DigitalBrainNames.DefaultBrain).ToGrainId());
-
-    private async Task<Connection?> RouteThroughBrainAsync(string alias)
-    {
-        using var bound = new CancellationTokenSource(NeuronCallTimeouts.LookupBound);
-        try
-        {
-            return await OwnersBrain()
-                .Route(Id, alias)
-                .WaitAsync(bound.Token)
-                .ConfigureAwait(true);
-        }
-        catch (OperationCanceledException) when (bound.IsCancellationRequested)
-        {
-            throw new TimeoutException(
-                $"The brain's route lookup for '{alias}' did not answer within "
-                + $"{NeuronCallTimeouts.LookupBound}.");
         }
     }
 

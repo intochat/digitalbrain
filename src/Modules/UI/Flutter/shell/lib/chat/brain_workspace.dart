@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 
 import '../activity_screen.dart';
 import '../behaviors/behavior_workspace.dart';
-import '../brain_screen.dart';
 import '../user_actions/user_action_card.dart';
 import '../windowing/windowing_screen.dart';
 import 'brain_chat_screen.dart';
@@ -20,8 +19,6 @@ final class BrainWorkspace extends StatefulWidget {
     required this.chatName,
     this.turns,
     this.authorizations,
-    this.graphChanges,
-    this.onLoadTopology,
     this.onSend,
     this.onStream,
     this.onStreamVoice,
@@ -36,8 +33,6 @@ final class BrainWorkspace extends StatefulWidget {
   final String chatName;
   final Stream<ChatTurnEvent>? turns;
   final Stream<AuthorizationEvent>? authorizations;
-  final Stream<GraphChangeEvent>? graphChanges;
-  final LoadTopology? onLoadTopology;
   final SendMessage? onSend;
   final StreamMessage? onStream;
   final StreamVoice? onStreamVoice;
@@ -65,8 +60,6 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
       chatName: widget.chatName,
       turns: widget.turns,
       authorizations: widget.authorizations,
-      graphChanges: widget.graphChanges,
-      onLoadTopology: widget.onLoadTopology,
     )..addListener(_onSession);
   }
 
@@ -88,21 +81,11 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
     if (!identical(oldWidget.authorizations, widget.authorizations)) {
       _session.listenAuthorizations(widget.authorizations);
     }
-    if (!identical(oldWidget.graphChanges, widget.graphChanges)) {
-      _session.listenGraphChanges(widget.graphChanges);
-    }
-    if (!identical(oldWidget.onLoadTopology, widget.onLoadTopology)) {
-      _session.onLoadTopology = widget.onLoadTopology;
-      unawaited(_session.refreshTopology());
-    }
   }
 
   void _selectDestination(int index) {
     if (_destination != index) {
       setState(() => _destination = index);
-    }
-    if (index == brainDestinationIndex) {
-      unawaited(_session.refreshTopology());
     }
   }
 
@@ -115,7 +98,7 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
   }
 
   Widget _destinationPage() {
-    // Product tabs stay in an IndexedStack so chat/topology state survives
+    // Product tabs stay in an IndexedStack so chat state survives
     // switches. Kit/Windowing mount only while selected (offline demos with
     // periodic clocks would otherwise block widget tests via IndexedStack).
     if (_destination <= behaviorsDestinationIndex) {
@@ -137,13 +120,6 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
             turns: _session.projectedTurns,
             userActions: widget.userActions,
             onOpenUserAction: widget.onOpenSignIn,
-          ),
-          BrainScreen(
-            chatName: widget.chatName,
-            turns: _session.projectedTurns,
-            topology: _session.topology,
-            graphChange: _session.graphChange,
-            statusMessage: _session.statusMessage(widget.statusMessage),
           ),
           BehaviorWorkspace(
             client: widget.behaviorClient,

@@ -55,8 +55,7 @@ internal static class DevCookieAuth
             });
 
         // Everything except /auth/* (AllowAnonymous below) and the health checks (self-declared
-        // AllowAnonymous in ServiceDefaultsExtensions) requires the cookie -- MapBrainTopology in
-        // particular carries no in-handler actor check and relies entirely on this policy.
+        // AllowAnonymous in ServiceDefaultsExtensions) requires the cookie.
         builder.Services.AddAuthorization(static options =>
         {
             options.FallbackPolicy = new AuthorizationPolicyBuilder()

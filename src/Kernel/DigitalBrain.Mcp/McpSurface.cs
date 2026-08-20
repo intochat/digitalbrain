@@ -6,9 +6,6 @@ internal static class McpSurface
 
     public const string SendChatMessage = "send_chat_message";
     public const string ActivateChatButton = "activate_chat_button";
-    public const string ListActiveNeurons = "list_active_neurons";
-    public const string BrainConnect = "brain_connect";
-    public const string BrainDisconnect = "brain_disconnect";
     public const string ReadNeuronJournal = "read_neuron_journal";
     public const string ReadChatTranscript = "read_chat_transcript";
     public const string ArmSchedule = "arm_schedule";

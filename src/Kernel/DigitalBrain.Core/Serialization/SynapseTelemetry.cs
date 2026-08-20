@@ -20,14 +20,6 @@ internal static class SynapseTelemetry
         dropped?.SetTag("db.watcher-dropped", unreachable.GetType().Name);
     }
 
-    internal static void BrainRegistrationDropped(DigitalBrain.Abstractions.Identity.NeuronId neuron, Exception unregistered)
-    {
-        using var dropped = Source.StartActivity("db.brain-registration-dropped");
-
-        dropped?.SetTag(ReceiverTag, neuron.ToString());
-        dropped?.SetTag("db.brain-registration-dropped", unregistered.GetType().Name);
-    }
-
     internal static void ReplyDropped(
         DigitalBrain.Abstractions.Identity.NeuronId replier,
         DigitalBrain.Abstractions.Identity.NeuronId receiver,

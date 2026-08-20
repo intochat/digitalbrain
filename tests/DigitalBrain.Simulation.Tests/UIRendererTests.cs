@@ -1,4 +1,3 @@
-using DigitalBrain.Abstractions.Brain;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.UI;
 using Xunit;
@@ -58,27 +57,6 @@ public sealed class UIRendererTests(SimulationFixture fixture)
         var scene = Assert.Single(state.Scenes);
         Assert.Equal("home", scene.SurfaceKey);
         Assert.Equal("Home", scene.Title);
-    }
-
-    [Fact]
-    public async Task ChartPointFiredAtTheRendererRegistersTheChartInTheOwnersBrain()
-    {
-        // A fresh owner keeps ResolveAsync("chart") unambiguous: the renderer's write is
-        // silo-side (GrainFactory, not the client facade's GetEntity), so this pins that the
-        // brain still learns about it and chart:{owner}/{name} becomes resolvable.
-        var brain = fixture.Sim.BrainFor(fixture.Sim.UniqueId("owner"));
-        var name = fixture.Sim.UniqueId("chart");
-        var cancellationToken = TestContext.Current.CancellationToken;
-
-        await brain.FireAsync<IUIRenderer>(name, new ChartPoint("series-a", "jan", 1), cancellationToken);
-
-        var resolved = await PollUntilPresentAsync(
-            () => brain.ResolveAsync("chart", cancellationToken),
-            reference => reference.Name == name,
-            cancellationToken);
-
-        Assert.Equal("chart", resolved.Type);
-        Assert.Equal(BrainReferenceKind.Entity, resolved.Kind);
     }
 
     [Fact]

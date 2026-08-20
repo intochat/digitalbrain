@@ -21,7 +21,5 @@ app.MapOwnerCommands();
 app.MapChatVoice();
 app.MapChatStreams();
 app.MapSurfaceStreams();
-app.MapBrainTopology();
-app.MapBrainStreams();
 app.MapOrleansDashboard("/orleans");
 app.Run();

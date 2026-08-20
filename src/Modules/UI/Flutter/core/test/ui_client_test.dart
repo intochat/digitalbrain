@@ -212,12 +212,15 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
 
       expect(seen, isNotNull);
       expect(frames, hasLength(2));
-      expect(frames.map((frame) => frame.text).join(), 'the edge probe answered');
+      expect(
+        frames.map((frame) => frame.text).join(),
+        'the edge probe answered',
+      );
       expect(frames.every((frame) => frame.role == 'assistant'), isTrue);
     },
   );
 
-  test('openScene and activateControl reject non-202', () async {
+  test('openScene rejects non-202', () async {
     final client = DigitalBrainUiClient(
       baseUri: Uri.parse('http://ui.example:5080'),
       httpClient: MockClient((request) async => http.Response('nope', 500)),
@@ -227,111 +230,5 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
       client.openScene(shellName: 'desk', sceneKey: 'home', title: 'Home'),
       throwsA(isA<StateError>()),
     );
-    await expectLater(
-      client.activateControl(
-        sceneName: 'home',
-        controlId: 'primary',
-        intent: 'submit',
-      ),
-      throwsA(isA<StateError>()),
-    );
   });
-
-  test('readBrainTopology loads modules and active neurons once', () async {
-    var requestCount = 0;
-    final client = DigitalBrainUiClient(
-      baseUri: Uri.parse('http://ui.example:5080'),
-      httpClient: MockClient((request) async {
-        expect(request.method, 'GET');
-        expect(request.url.toString(), 'http://ui.example:5080/brain/topology');
-        requestCount++;
-        return http.Response(
-          jsonEncode({
-            'modules': [
-              {'id': 'DigitalBrain.Chat.ChatModule'},
-            ],
-            'neurons': [
-              {
-                'id': 'chat:owner/main',
-                'grainType': 'chat',
-                'identity': 'owner/main',
-                'placement': 'cluster-1',
-              },
-            ],
-            'observedAt': '2026-07-28T08:00:00Z',
-          }),
-          200,
-          headers: {'content-type': 'application/json'},
-        );
-      }),
-    );
-
-    final snapshot = await client.readBrainTopology();
-
-    expect(requestCount, 1);
-    expect(snapshot.modules.single.id, 'DigitalBrain.Chat.ChatModule');
-    expect(snapshot.neurons.single.id, 'chat:owner/main');
-  });
-
-  test('readBrainTopology surfaces a failed topology response', () async {
-    final client = DigitalBrainUiClient(
-      baseUri: Uri.parse('http://ui.example:5080'),
-      httpClient: MockClient(
-        (request) async => http.Response('temporarily unavailable', 503),
-      ),
-    );
-
-    await expectLater(
-      client.readBrainTopology(),
-      throwsA(isA<StateError>()),
-    );
-  });
-
-  test('readBrainTopology aborts a hung request', () async {
-    final httpClient = _AbortThenSucceedClient();
-    final client = DigitalBrainUiClient(
-      baseUri: Uri.parse('http://ui.example:5080'),
-      httpClient: httpClient,
-    );
-
-    await expectLater(
-      client.readBrainTopology(requestTimeout: const Duration(milliseconds: 1)),
-      throwsA(isA<http.RequestAbortedException>()),
-    );
-
-    expect(httpClient.requests, 1);
-    expect(httpClient.sawAbortableRequest, isTrue);
-  });
-}
-
-final class _AbortThenSucceedClient extends http.BaseClient {
-  int requests = 0;
-  bool sawAbortableRequest = false;
-
-  @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) async {
-    requests++;
-    if (requests == 1) {
-      sawAbortableRequest = request is http.AbortableRequest;
-      final abortable = request as http.AbortableRequest;
-      await abortable.abortTrigger;
-      throw http.RequestAbortedException(request.url);
-    }
-
-    return http.StreamedResponse(
-      Stream.value(
-        utf8.encode(
-          jsonEncode({
-            'modules': [
-              {'id': 'DigitalBrain.Chat.ChatModule'},
-            ],
-            'neurons': const [],
-            'observedAt': '2026-07-28T08:00:00Z',
-          }),
-        ),
-      ),
-      200,
-      headers: {'content-type': 'application/json'},
-    );
-  }
 }
