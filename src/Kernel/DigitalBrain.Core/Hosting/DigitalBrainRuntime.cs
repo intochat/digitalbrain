@@ -14,10 +14,6 @@ public static class DigitalBrainRuntime
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(modules);
 
-        var manifests = ManifestsOf(modules);
-        var capabilities = ActiveCapabilityCatalog.Create(manifests);
-        builder.Services.AddSingleton(CapabilityIndex.Build(manifests));
-
         builder.AddJournalStorage();
         builder.UseJsonJournalFormat(DurableStateJson.TypeInfoResolver);
         // Awaited publish: a subscriber's failure surfaces to the publisher, matching the
@@ -25,30 +21,12 @@ public static class DigitalBrainRuntime
         builder.AddBroadcastChannel(
             DigitalBrainNames.BroadcastChannelProvider,
             options => options.FireAndForgetDelivery = false);
-        builder.Services.AddSingleton(capabilities);
-        builder.Services.AddSingleton(
-            ActiveModuleContractTypeMap.Create(
-                modules.Contracts.Concat(modules.Implementations),
-                capabilities));
-
         ModelPayloadSerialization.AddModelPayloadSerialization(builder.Services);
 
         foreach (var hook in ModuleHooksOf(modules))
         {
             hook.Configure(builder);
         }
-    }
-
-    public static IReadOnlyList<CapabilityManifest> ManifestsOf(ModuleAssemblies modules)
-    {
-        ArgumentNullException.ThrowIfNull(modules);
-
-        return
-        [
-            .. modules.Contracts
-                .Select(ModuleReflection.ManifestOf)
-                .OrderBy(static manifest => manifest.ModuleId.Value, StringComparer.Ordinal),
-        ];
     }
 
     private static IEnumerable<IModule> ModuleHooksOf(ModuleAssemblies modules)

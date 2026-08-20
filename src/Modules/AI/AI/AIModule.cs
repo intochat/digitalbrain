@@ -17,7 +17,7 @@ public sealed class AIModule : Core.IModule
                 DigitalBrainNames.TestingMode,
                 StringComparison.Ordinal))
         {
-            AITestingClients.Add(builder.Services, builder.Configuration);
+            AITestingClients.Add(builder.Services);
         }
         else
         {

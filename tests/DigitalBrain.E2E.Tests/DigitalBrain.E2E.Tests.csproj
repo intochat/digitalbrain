@@ -21,12 +21,4 @@
     <ProjectReference Include="../../src/Aspire/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../src/Modules/UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <!-- The mock-LLM corpus the fixture points DigitalBrain:AI:Corpus:Path at. -->
-    <None Include="../corpus/**" CopyToOutputDirectory="PreserveNewest" LinkBase="corpus" />
-    <!-- Reqnroll's default ReqnrollFeatureFile glob (**/*.feature, no bin/obj exclude) would
-         otherwise pick the corpus copy out of the output folder and generate a test class for
-         it — the corpus scripts the mock LLM, it is not a test of this assembly. -->
-    <ReqnrollFeatureFile Remove="bin/**/*.feature;obj/**/*.feature" />
-  </ItemGroup>
 </Project>
