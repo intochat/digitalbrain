@@ -18,7 +18,7 @@ internal static class AIClients
     private const string TelemetrySource = "DigitalBrain.AI";
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromMinutes(5);
 
-    internal static void Add(IServiceCollection services, IConfiguration configuration)
+    internal static void Add(IServiceCollection services)
     {
         AddOllamaModel<Llama32>(services, "llama3.2");
         AddOllamaModel<Gemma4>(services, "gemma4:12b");

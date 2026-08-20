@@ -21,7 +21,7 @@ public sealed class AIModule : Core.IModule
         }
         else
         {
-            AIClients.Add(builder.Services, builder.Configuration);
+            AIClients.Add(builder.Services);
         }
 
         VoiceToTextHosting.Add(builder.Services, builder.Configuration);
