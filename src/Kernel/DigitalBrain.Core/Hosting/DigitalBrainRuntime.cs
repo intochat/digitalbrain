@@ -20,9 +20,6 @@ public static class DigitalBrainRuntime
 
         builder.AddJournalStorage();
         builder.UseJsonJournalFormat(DurableStateJson.TypeInfoResolver);
-        builder.AddIncomingGrainCallFilter<IncomingReificationFilter>();
-        builder.AddIncomingGrainCallFilter<OwnerBoundCallFilter>();
-        builder.AddOutgoingGrainCallFilter<OutgoingReificationFilter>();
         // Awaited publish: a subscriber's failure surfaces to the publisher, matching the
         // direct-call delivery semantics of Send.
         builder.AddBroadcastChannel(
