@@ -1,6 +1,5 @@
 using DigitalBrain.Abstractions.Brain;
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.UI;
 using Xunit;
 
@@ -83,21 +82,22 @@ public sealed class UIRendererTests(SimulationFixture fixture)
     }
 
     [Fact]
-    public async Task RendererRefusesAPrincipalScopedChartWriteWithoutAVerifiedPrincipal()
+    public async Task RendererWritesAPrincipalScopedChartWithoutAGrant()
     {
-        // "{principal:N}.sales" IS a partitioned name, and this client call rides no verified
-        // principal, so the write-path grant check (migrated from ChartNeuron into the
-        // renderer) must refuse the write before it reaches the chart entity.
         var name = PrincipalPartition.InstanceName(new PrincipalId(Guid.NewGuid()), "sales");
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        await Assert.ThrowsAsync<NeuronAuthorizationException>(
-            () => fixture.Sim.Brain.FireAsync<IUIRenderer>(
-                name,
-                new ChartPoint("series-a", "jan", 1),
-                cancellationToken));
+        await fixture.Sim.Brain.FireAsync<IUIRenderer>(
+            name,
+            new ChartPoint("series-a", "jan", 1),
+            cancellationToken);
 
-        Assert.Null(await fixture.Sim.Brain.GetEntity<IChart>(name).Read());
+        var state = await PollUntilPresentAsync(
+            () => fixture.Sim.Brain.GetEntity<IChart>(name).Read(),
+            state => state.Points.Count > 0,
+            cancellationToken);
+
+        Assert.Single(state.Points);
     }
 
     private static async Task<TState> PollUntilPresentAsync<TState>(

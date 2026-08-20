@@ -14,15 +14,7 @@ internal sealed class UIRenderer : Neuron, IUIRenderer
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
 
-        // The grant subject is the chart being written, not this renderer: grants are issued
-        // against "chart:{owner}/{name}", and the chart shares this instance's name.
         var chart = EntityId.For<IChart>(Id.Owner, Id.Name);
-        await GrantsNeuron.RequireReadAccessAsync(
-                GrainFactory,
-                new NeuronId(chart.Type, chart.Owner, chart.Name),
-                cancellationToken)
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
         await GrainFactory.GetGrain<IChart>(chart.ToGrainId())
             .Append(new ChartStatePoint(synapse.Series, synapse.Label, synapse.Value), RetainedPoints)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);

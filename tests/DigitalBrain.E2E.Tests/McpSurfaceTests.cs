@@ -21,7 +21,6 @@ public sealed class McpSurfaceTests(AppHostFixture fixture)
     private const string BrainConnectTool = "brain_connect";
     private const string BrainDisconnectTool = "brain_disconnect";
     private const string ReadNeuronJournalTool = "read_neuron_journal";
-    private const string ReadChartTool = "read_chart";
 
     [Fact]
     public async Task TheFrozenMcpToolsAnswerOverTheRealProtocol()
@@ -45,7 +44,7 @@ public sealed class McpSurfaceTests(AppHostFixture fixture)
         var toolNames = tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
         foreach (var expectedTool in new[]
                  {
-                     ListActiveNeuronsTool, BrainConnectTool, BrainDisconnectTool, ReadNeuronJournalTool, ReadChartTool,
+                     ListActiveNeuronsTool, BrainConnectTool, BrainDisconnectTool, ReadNeuronJournalTool,
                  })
         {
             Assert.Contains(expectedTool, toolNames);

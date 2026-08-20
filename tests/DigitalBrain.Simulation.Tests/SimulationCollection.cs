@@ -23,6 +23,7 @@ public sealed class SimulationFixture : IAsyncLifetime
                     typeof(DigitalBrain.UI.UiModule).Assembly,
                     typeof(DigitalBrain.AI.AIModule).Assembly,
                     typeof(DigitalBrain.Memory.MemoryModule).Assembly,
+                    typeof(PingerNeuron).Assembly,
                     typeof(SimulationFixture).Assembly,
                 ]),
             Configuration = new Dictionary<string, string?>

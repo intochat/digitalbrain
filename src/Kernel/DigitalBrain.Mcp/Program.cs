@@ -11,7 +11,6 @@ builder.Services
     .WithTools<BrainTools>()
     .WithTools<ChatTools>()
     .WithTools<IntrospectionTools>()
-    .WithTools<GrantChartTools>()
     .WithTools<TimeTools>();
 
 var app = builder.Build();

@@ -3,7 +3,7 @@ using DigitalBrain.Abstractions.Messaging;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Core;
 
-namespace DigitalBrain.Simulation.Tests;
+namespace DigitalBrain.Testing;
 
 [GenerateSerializer]
 [Alias(AliasName)]
@@ -25,7 +25,6 @@ public interface IPingerNeuron : INeuron, IHandle<EmitPing>;
 [Alias("test.echo")]
 public interface IEchoNeuron : INeuron, IHandle<Pinged>;
 
-// Emits Pinged when poked; the wire-delivery pin routes that emission through the Brain.
 [GrainType("pingerneuron")]
 public sealed class PingerNeuron : Neuron, IPingerNeuron
 {
