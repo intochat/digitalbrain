@@ -14,8 +14,7 @@ public sealed class McpSurfaceTests(AppHostFixture fixture)
     // tests/DigitalBrain.Aspire.Tests/ProductSurfaceResourceNames.cs) rather than granting
     // InternalsVisibleTo.
     private const string McpPath = "/mcp";
-    private const string ReadNeuronJournalTool = "read_neuron_journal";
-    private const string ReadChatTranscriptTool = "read_chat_transcript";
+    private const string SendChatMessageTool = "send_chat_message";
 
     [Fact]
     public async Task TheFrozenMcpToolsAnswerOverTheRealProtocol()
@@ -37,9 +36,6 @@ public sealed class McpSurfaceTests(AppHostFixture fixture)
 
         var tools = await client.ListToolsAsync(cancellationToken: cancellationToken);
         var toolNames = tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
-        foreach (var expectedTool in new[] { ReadNeuronJournalTool, ReadChatTranscriptTool })
-        {
-            Assert.Contains(expectedTool, toolNames);
-        }
+        Assert.Equal([SendChatMessageTool], toolNames.OrderBy(static name => name, StringComparer.Ordinal));
     }
 }

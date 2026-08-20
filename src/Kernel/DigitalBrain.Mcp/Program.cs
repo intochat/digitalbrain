@@ -8,9 +8,7 @@ builder.AddDigitalBrainClient();
 builder.Services
     .AddMcpServer()
     .WithHttpTransport(options => options.Stateless = true)
-    .WithTools<ChatTools>()
-    .WithTools<IntrospectionTools>()
-    .WithTools<TimeTools>();
+    .WithTools<ChatTools>();
 
 var app = builder.Build();
 app.MapDefaultEndpoints();
