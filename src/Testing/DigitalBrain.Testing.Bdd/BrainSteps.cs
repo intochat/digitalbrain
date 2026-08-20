@@ -27,7 +27,6 @@ public sealed class BrainSteps : IDisposable
 {
     private static readonly TimeSpan TurnTimeout = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan PollTimeout = TimeSpan.FromSeconds(10);
-    private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(50);
 
     private HttpClient? _kernel;
     private PrincipalId _principal;
@@ -122,28 +121,6 @@ public sealed class BrainSteps : IDisposable
 
     [Then("the assistant replies {string}")]
     public void ThenTheAssistantReplies(string expected) => Assert.Equal(expected, _replyText);
-
-    [Then("the chart {string} holds {int} points")]
-    public async Task ThenTheChartHoldsPoints(string chart, int count)
-    {
-        // The entity write drains asynchronously behind the reply (ChatTurnTests polls the
-        // same state), so poll for the exact count and then assert it exactly.
-        var deadline = DateTimeOffset.UtcNow + PollTimeout;
-        ChartState? state;
-        while (true)
-        {
-            state = await _brain.GetEntity<IChart>(chart).Read().ConfigureAwait(false);
-            if (state?.Points.Count == count || DateTimeOffset.UtcNow >= deadline)
-            {
-                break;
-            }
-
-            await Task.Delay(PollInterval).ConfigureAwait(false);
-        }
-
-        Assert.NotNull(state);
-        Assert.Equal(count, state!.Points.Count);
-    }
 
     [Then("the memory holds the story fact {string}")]
     public async Task ThenTheMemoryHoldsTheFact(string text)

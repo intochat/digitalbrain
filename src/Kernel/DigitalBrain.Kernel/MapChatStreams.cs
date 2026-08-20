@@ -1,7 +1,6 @@
 using System.Net.ServerSentEvents;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
-using DigitalBrain.UI;
 
 namespace DigitalBrain.Kernel;
 
@@ -86,9 +85,6 @@ internal static class ChatStreamsHttpMaps
             CommandId command,
             string synapseName,
             NeuronId chat,
-            ChatButtonOffer[]? buttons,
-            ChatChartOffer[]? charts = null,
-            ChatTimerOffer[]? timers = null,
             string? turnId = null,
             string? status = null)
             => new(
@@ -101,26 +97,20 @@ internal static class ChatStreamsHttpMaps
                 delivery.Caller.ToString(),
                 delivery.CorrelationId.ToString(),
                 delivery.Timestamp,
-                buttons,
-                charts,
-                timers,
                 turnId,
                 status);
 
         return delivery.Synapse switch
         {
             UserMessaged messaged =>
-                Turn(true, messaged.Text, messaged.CommandId, nameof(UserMessaged), messaged.Chat, null),
+                Turn(true, messaged.Text, messaged.CommandId, nameof(UserMessaged), messaged.Chat),
             Responded responded =>
                 Turn(
                     false,
                     responded.Text,
                     responded.CommandId,
                     nameof(Responded),
-                    responded.Chat,
-                    responded.Buttons,
-                    responded.Charts,
-                    responded.Timers),
+                    responded.Chat),
             TurnLifecycle life =>
                 Turn(
                     false,
@@ -128,7 +118,6 @@ internal static class ChatStreamsHttpMaps
                     life.CommandId,
                     nameof(TurnLifecycle),
                     life.Chat,
-                    null,
                     turnId: life.TurnId.ToString(),
                     status: life.Status.ToString()),
             _ => null,

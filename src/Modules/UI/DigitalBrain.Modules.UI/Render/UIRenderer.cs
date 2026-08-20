@@ -6,20 +6,7 @@ namespace DigitalBrain.UI;
 [GrainType("uirenderer")]
 internal sealed class UIRenderer : Neuron, IUIRenderer
 {
-    private const int RetainedPoints = 256;
     private const int RetainedScenes = 64;
-
-    public async Task HandleAsync(ChartPoint synapse, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(synapse);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var chart = EntityId.For<IChart>(Id.Owner, Id.Name);
-        await GrainFactory.GetGrain<IChart>(chart.ToGrainId())
-            .Append(new ChartStatePoint(synapse.Series, synapse.Label, synapse.Value), RetainedPoints)
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-    }
 
     public async Task HandleAsync(OpenSurface synapse, CancellationToken cancellationToken)
     {

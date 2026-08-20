@@ -88,33 +88,6 @@ internal static class OwnerCommandsHttpMaps
                     return;
                 }
 
-                if (string.Equals(request.Kind, HttpSurfacePaths.KindChatButton, StringComparison.Ordinal))
-                {
-                    if (string.IsNullOrWhiteSpace(request.ChatName)
-                        || string.IsNullOrWhiteSpace(request.ButtonId)
-                        || string.IsNullOrWhiteSpace(request.Action)
-                        || !TryParseCommandId(request.OfferCommandId, out var offerCommandId))
-                    {
-                        http.Response.StatusCode = StatusCodes.Status400BadRequest;
-                        return;
-                    }
-
-                    if (!TryPrincipalResource(actor.PrincipalId, request.ChatName, out var chatInstance))
-                    {
-                        http.Response.StatusCode = StatusCodes.Status400BadRequest;
-                        return;
-                    }
-
-                    // A click lands in the conversation's own journal — the same durable
-                    // ButtonClicked path the MCP activate_chat_button tool fires.
-                    await brain.FireAsync<IChat>(
-                        chatInstance,
-                        new ButtonClicked(offerCommandId, request.ButtonId, request.Action),
-                        cancellationToken).ConfigureAwait(false);
-                    http.Response.StatusCode = StatusCodes.Status202Accepted;
-                    return;
-                }
-
                 if (string.Equals(request.Kind, HttpSurfacePaths.KindSurfaceOpen, StringComparison.Ordinal))
                 {
                     if (string.IsNullOrWhiteSpace(request.SurfaceName)

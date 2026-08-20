@@ -8,7 +8,6 @@ namespace DigitalBrain.UI;
 [Alias("ui.renderer")]
 public partial interface IUIRenderer :
     INeuron,
-    IHandle<ChartPoint>,
     IHandle<OpenSurface>,
     IHandle<ControlActivated>
 {

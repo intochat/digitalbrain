@@ -189,49 +189,6 @@ internal sealed class Chat : Neuron, IChat
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    public async Task HandleAsync(TimerCard synapse, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(synapse);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        if (string.IsNullOrWhiteSpace(synapse.Label))
-        {
-            throw new NeuronAuthorizationException($"Chat '{Id}' refuses a timer card without a label.");
-        }
-
-        ChatTimerOffer[] offers = [new ChatTimerOffer(synapse.Label, synapse.DueAt)];
-        Remember(new ChatTurn(FromUser: false, synapse.Label, Timers: offers));
-        await EmitAsync(new Responded(CommandId.New(), Id, synapse.Label, Timers: offers, Author: Id.Name))
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-    }
-
-    public async Task HandleAsync(ChartCard synapse, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(synapse);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        if (string.IsNullOrWhiteSpace(synapse.Title))
-        {
-            throw new NeuronAuthorizationException($"Chat '{Id}' refuses a chart card without a title.");
-        }
-
-        // Title names the chart instance the points targeted (the corpus grammar's chart-card
-        // invariant), so it doubles as the chart entity's instance name.
-        var state = await GrainFactory
-            .GetGrain<IChart>(EntityId.For<IChart>(Id.Owner, synapse.Title).ToGrainId())
-            .Read()
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-        ChatChartPoint[] points = state is null
-            ? []
-            : [.. state.Points.Select(static point => new ChatChartPoint(point.Label, point.Value))];
-
-        ChatChartOffer[] offers = [new ChatChartOffer(synapse.Title, points, "bar")];
-        Remember(new ChatTurn(FromUser: false, synapse.Title, Charts: offers));
-        await EmitAsync(new Responded(CommandId.New(), Id, synapse.Title, Charts: offers, Author: Id.Name))
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-    }
-
     // A fresh activation cannot resume an in-flight worker call (the awaiting task died with
     // the previous activation), so a durably Running head is settled as Failed.
     private async Task FailTurnInterruptedByRestartAsync()
