@@ -15,7 +15,6 @@ internal static class AIClients
     internal const string ConfigurationRoot = "DigitalBrain:AI";
     private const string EnableSensitiveDataKey =
         $"{ConfigurationRoot}:Telemetry:EnableSensitiveData";
-    private const string EmbeddingsModelKey = $"{ConfigurationRoot}:Ollama:Embeddings:Model";
     private const string TelemetrySource = "DigitalBrain.AI";
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromMinutes(5);
 
@@ -29,14 +28,6 @@ internal static class AIClients
         services.AddKeyedSingleton<IChatClient>(
             typeof(Gpt56),
             static (provider, _) => OpenAI(provider.GetRequiredService<IConfiguration>()));
-
-        // Config-gated: absent key means no registration, so CapabilityIndex.FindAsync keeps
-        // using its built-in lexical fallback instead of hybrid vector+keyword ranking.
-        if (!string.IsNullOrWhiteSpace(configuration[EmbeddingsModelKey]))
-        {
-            services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(
-                static provider => Embeddings(provider.GetRequiredService<IConfiguration>()));
-        }
 
         services.AddHostedService<LlmWarmupHostedService>();
     }
@@ -76,36 +67,6 @@ internal static class AIClients
         return new ChatClientBuilder(new OllamaApiClient(http, tag))
             .UseOpenTelemetry(
                 sourceName: $"{TelemetrySource}.{modelName}",
-                configure: telemetry => telemetry.EnableSensitiveData = enableSensitiveData)
-            .Build();
-    }
-
-    private static IEmbeddingGenerator<string, Embedding<float>> Embeddings(IConfiguration configuration)
-    {
-        var endpoint = configuration[$"{ConfigurationRoot}:Ollama:Endpoint"];
-        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri)
-            || endpointUri is null
-            || (!string.Equals(endpointUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(endpointUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
-        {
-            throw new InvalidOperationException(
-                $"Embeddings require {ConfigurationRoot}:Ollama:Endpoint to be an absolute HTTP(S) URI. Configure it through AIModule.WithEmbeddings() in AppHost.");
-        }
-
-        var tag = configuration[EmbeddingsModelKey]
-            ?? throw new InvalidOperationException(
-                $"Embeddings require {EmbeddingsModelKey}. Configure it through AIModule.WithEmbeddings() in AppHost.");
-        var enableSensitiveData = configuration.GetValue<bool>(EnableSensitiveDataKey);
-
-        var http = new HttpClient
-        {
-            BaseAddress = endpointUri,
-            Timeout = RequestTimeout,
-        };
-
-        return new EmbeddingGeneratorBuilder<string, Embedding<float>>(new OllamaApiClient(http, tag))
-            .UseOpenTelemetry(
-                sourceName: $"{TelemetrySource}.Embeddings",
                 configure: telemetry => telemetry.EnableSensitiveData = enableSensitiveData)
             .Build();
     }

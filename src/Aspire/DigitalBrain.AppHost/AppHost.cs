@@ -18,7 +18,6 @@ brain.AddModule<AIModule>(ai =>
     ai.EnableSensitiveData = builder.Environment.IsDevelopment();
     ai.WithLlm<Gemma4>();
     //ai.WithLlm<Llama32>();
-    ai.WithEmbeddings();
     // Local Whisper STT (Foundry Local). Optional: swap IWhisperSmall / IWhisperTiny for weaker GPUs.
     ai.WithVoiceToText<IWhisperLargeV3Turbo>();
 });

@@ -34,17 +34,6 @@ public static class AIHostingExtensions
         return module;
     }
 
-    // Config-gated production embeddings: AIClients only registers IEmbeddingGenerator when
-    // DigitalBrain:AI:Ollama:Embeddings:Model is present, so CapabilityIndex.FindAsync can switch
-    // from lexical-only to hybrid (vector + keyword) ranking without any CapabilityIndex change.
-    public static DigitalBrainModuleBuilder<AIModule> WithEmbeddings(
-        this DigitalBrainModuleBuilder<AIModule> module,
-        string model = "nomic-embed-text")
-    {
-        State(module).AddEmbeddings(model);
-        return module;
-    }
-
     // Local Whisper STT (Foundry Local). Marker types: IWhisperTiny / IWhisperSmall / IWhisperLargeV3Turbo.
     public static DigitalBrainModuleBuilder<AIModule> WithVoiceToText<TModel>(
         this DigitalBrainModuleBuilder<AIModule> module)
@@ -94,7 +83,6 @@ public static class AIHostingExtensions
         private readonly HashSet<Type> _models = [];
         private readonly Dictionary<Type, IResourceBuilder<OllamaModelResource>> _ollamaModels = [];
         private IResourceBuilder<OllamaResource>? _ollama;
-        private IResourceBuilder<OllamaModelResource>? _embeddingsModel;
         private IResourceBuilder<OpenAIResource>? _openAI;
         private IResourceBuilder<OpenAIModelResource>? _gpt56;
         private IResourceBuilder<ParameterResource>? _openAIKey;
@@ -128,18 +116,6 @@ public static class AIHostingExtensions
                 $"{model.FullName} has no Aspire integration. The AI module must own the provider resource for every concrete LLM.");
         }
 
-        internal void AddEmbeddings(string model)
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(model);
-            if (_embeddingsModel is not null)
-            {
-                throw new InvalidOperationException(
-                    $"Embeddings are already configured on brain '{brain.Name}'. Call WithEmbeddings once.");
-            }
-
-            _embeddingsModel = EnsureOllama().AddModel("embeddings", model);
-        }
-
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {
             ArgumentNullException.ThrowIfNull(builder);
@@ -154,14 +130,6 @@ public static class AIHostingExtensions
                     .WithAnnotation(new WaitAnnotation(resource.Resource, WaitType.WaitUntilHealthy, exitCode: 0))
                     .WithEnvironment("DigitalBrain__AI__Ollama__Endpoint", resource.Resource.Parent.UriExpression)
                     .WithEnvironment($"DigitalBrain__AI__Ollama__{model.Name}__Model", resource.Resource.ModelName);
-            }
-
-            if (_embeddingsModel is not null)
-            {
-                builder
-                    .WithAnnotation(new WaitAnnotation(_embeddingsModel.Resource, WaitType.WaitUntilHealthy, exitCode: 0))
-                    .WithEnvironment("DigitalBrain__AI__Ollama__Endpoint", _embeddingsModel.Resource.Parent.UriExpression)
-                    .WithEnvironment("DigitalBrain__AI__Ollama__Embeddings__Model", _embeddingsModel.Resource.ModelName);
             }
 
             if (_gpt56 is not null)

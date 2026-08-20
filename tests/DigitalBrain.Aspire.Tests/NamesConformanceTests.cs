@@ -29,19 +29,6 @@ public sealed class NamesConformanceTests(ModelFixture fixture)
     }
 
     [Fact]
-    public async Task KernelRenderedEnvironmentContainsEmbeddingsModelKey()
-    {
-        // Pins the phase-3 production embeddings opt-in: WithEmbeddings() on the AI module must
-        // project the Ollama embeddings model tag so AIClients can gate IEmbeddingGenerator
-        // registration on it (CapabilityIndex.FindAsync switches to hybrid ranking automatically).
-        var environment = await fixture.Model.RenderedEnvironmentAsync(ProductSurfaceResourceNames.Kernel);
-
-        Assert.Contains(
-            environment.Keys,
-            key => string.Equals(key, "DigitalBrain__AI__Ollama__Embeddings__Model", StringComparison.OrdinalIgnoreCase));
-    }
-
-    [Fact]
     public async Task WithBrainTestModeStampsTestingModeEnvironmentVariable()
     {
         // Throwaway builder/resource, unrelated to the shared AppHost model: this exercises the
