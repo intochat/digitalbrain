@@ -2,7 +2,6 @@ using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Time;
 
-[ClientEntryPoint]
 [Alias("timer")]
 public partial interface ITimer :
     INeuron,

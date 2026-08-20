@@ -1,6 +1,5 @@
 namespace DigitalBrain.Abstractions.Neurons;
 
-[ClientEntryPoint]
 [Alias("DigitalBrain.Abstractions.ISessionNeuron")]
 public interface ISessionNeuron : INeuron
 {

@@ -3,7 +3,6 @@ using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.AI;
 
-[ClientEntryPoint]
 [Alias("DigitalBrain.AI.ILLM")]
 public interface ILLM : INeuron
 {

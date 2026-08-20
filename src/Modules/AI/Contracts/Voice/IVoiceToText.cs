@@ -2,7 +2,6 @@ using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.AI;
 
-[ClientEntryPoint]
 [Alias("ai.voice-to-text")]
 public partial interface IVoiceToText :
     INeuron,

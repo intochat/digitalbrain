@@ -4,7 +4,6 @@ namespace DigitalBrain.Time;
 
 // Recurring cadence with durable next-due and phase-preserving catch-up.
 // Grain type "schedule"; instance name is free (often principal-scoped).
-[ClientEntryPoint]
 [Alias("schedule")]
 public partial interface ISchedule :
     INeuron,

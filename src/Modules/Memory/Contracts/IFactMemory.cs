@@ -2,7 +2,6 @@ namespace DigitalBrain.Memory;
 
 // Watermarked, resumable owner (or principal) projection of durable story facts — the
 // single long-term-memory concept.
-[ClientEntryPoint]
 [Alias("memory.facts")]
 public partial interface IFactMemory :
     INeuron,

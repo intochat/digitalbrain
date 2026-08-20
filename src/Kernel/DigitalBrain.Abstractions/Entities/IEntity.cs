@@ -8,7 +8,6 @@ public interface IEntity : IGrainWithStringKey
 }
 
 // Reads are the client-facing query surface (JOURNALS.md rule 3); writes stay behind each concrete contract's own entry-point opt-in.
-[ClientEntryPoint]
 [Alias("db.entity-state")]
 public interface IEntity<TState> : IEntity
     where TState : class

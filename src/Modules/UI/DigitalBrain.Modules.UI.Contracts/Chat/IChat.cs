@@ -4,7 +4,6 @@ using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.Chat;
 
-[ClientEntryPoint]
 [Alias("chat")]
 public partial interface IChat :
     INeuron,
