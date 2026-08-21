@@ -8,6 +8,7 @@ Only the loopback NVIDIA server receives the Hugging Face credential.
 
 import asyncio
 from dataclasses import dataclass
+import hmac
 import logging
 import os
 import subprocess
@@ -106,6 +107,19 @@ def _float_to_pcm16(pcm: np.ndarray) -> bytes:
 
 
 async def stream_handler(request: web.Request) -> web.StreamResponse:
+    adapter_token: str | None = request.app.get("adapter_token")
+    authorization = request.headers.get("Authorization")
+    if not adapter_token:
+        LOGGER.error("stream_authorization_failed reason=adapter_configuration")
+        return web.json_response({"error": "unavailable"}, status=503)
+    if not authorization:
+        LOGGER.warning("stream_authorization_failed reason=missing")
+        return web.json_response({"error": "unauthorized"}, status=401)
+    presented = authorization.removeprefix("Bearer ")
+    if presented == authorization or not hmac.compare_digest(presented, adapter_token):
+        LOGGER.warning("stream_authorization_failed reason=invalid")
+        return web.json_response({"error": "unauthorized"}, status=403)
+
     _require_dependencies()
     state: RuntimeState = request.app["runtime_state"]
     if state.health()["state"] != "ready":
@@ -195,6 +209,9 @@ async def supervise_runtime(app: web.Application) -> None:
     if not os.environ.get("HF_TOKEN"):
         state.set_failed("PersonaPlex runtime credentials are unavailable.")
         return
+    if not app.get("adapter_token"):
+        state.set_failed("PersonaPlex adapter credentials are unavailable.")
+        return
 
     for cpu_offload in (False, True):
         state.set_loading("Loading official PersonaPlex runtime.")
@@ -229,6 +246,7 @@ def create_app() -> web.Application:
     _require_dependencies()
     app = web.Application()
     app["runtime_state"] = RuntimeState()
+    app["adapter_token"] = os.environ.get("PERSONAPLEX_ADAPTER_TOKEN")
     voice_prompt = os.environ.get("PERSONAPLEX_VOICE_PROMPT", "s0.pt")
     app["upstream_url"] = (
         f"ws://{UPSTREAM_HOST}:{UPSTREAM_PORT}/api/chat?text_prompt=&voice_prompt={voice_prompt}"

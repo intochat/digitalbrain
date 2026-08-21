@@ -1,0 +1,16 @@
+[project]
+name = "digitalbrain-personaplex-runtime"
+version = "0.1.0"
+requires-python = ">=3.10,<3.11"
+dependencies = [
+    "accelerate==0.34.2",
+    "aiohttp==3.10.11",
+    "einops==0.7.0",
+    "huggingface-hub==0.24.7",
+    "numpy==1.26.4",
+    "safetensors==0.4.5",
+    "sentencepiece==0.2.0",
+    "sounddevice==0.5.1",
+    "sphn==0.1.12",
+    "torch==2.4.1",
+]
