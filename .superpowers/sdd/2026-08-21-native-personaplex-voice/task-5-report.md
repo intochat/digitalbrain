@@ -2,10 +2,13 @@
 
 ## Status and commit
 
-Task 5 is implemented in commit `f1465d2b10d679618f5978345373379f6878dec2`
-(`feat: add native PersonaPlex voice workspace`). The evidence report is kept in
-a follow-up documentation-only commit so that it can cite the immutable
-implementation commit exactly.
+Task 5 is implemented by commits
+`f1465d2b10d679618f5978345373379f6878dec2`
+(`feat: add native PersonaPlex voice workspace`) and
+`5d47d2a6251f4e06c67cde874b4a64216cfde4c5`
+(`fix: harden PersonaPlex Flutter lifecycle`). The evidence report is kept in
+follow-up documentation-only commits so that it can cite immutable
+implementation commits exactly.
 
 The implementation adds an independent Voice destination. It does not call the
 existing chat voice upload route, Whisper/STT, `MapChatVoice`, or
@@ -35,15 +38,20 @@ Current package documentation was checked through Context7 for
 buffering target. It starts one continuous stream, appends each decoded frame,
 and releases the handle/source and engine on stop.
 
-Web has a precise runtime constraint: `flutter_soloud` web output requires a
-Flutter `--wasm` build or a legacy web host configured for cross-origin
-isolation with COOP/COEP. The `--wasm` build compiles successfully. On a web
-deployment that does not satisfy the package runtime requirement, audio init or
-playback becomes the explicit `unavailable` UI state with this message:
+The original implementation note about COOP/COEP was stale. The current 4.1.7
+changelog states that 4.1.6 removed `-pthread`/`SharedArrayBuffer`, so
+cross-origin isolation is no longer required. Current setup documentation does
+require these two loader scripts, now present in `shell/web/index.html`:
 
-> Continuous 24 kHz mono PCM16 playback is unavailable in this web host.
-> flutter_soloud web audio requires a --wasm build or cross-origin-isolated
-> COOP/COEP hosting.
+- `assets/packages/flutter_soloud/web/libflutter_soloud_plugin.js`
+- `assets/packages/flutter_soloud/web/init_module.dart.js`
+
+Both standard JavaScript and Wasm web builds compile. If audio initialization
+or playback nevertheless fails in an unsupported browser/device, the UI now
+reports the accurate runtime diagnosis:
+
+> Continuous 24 kHz mono PCM16 playback failed to initialize in this browser.
+> Verify flutter_soloud web loader scripts and browser support.
 
 There is no silent/no-op production output implementation.
 
@@ -164,14 +172,15 @@ Shell integration and dependencies:
   pre-existing unused import at
   `lib/chat/workspace_session.dart:6`; `git diff` confirms Task 5 did not modify
   that file.
-- Core `flutter test`: success, 32 tests passed.
-- Shell `flutter test`: success, 22 tests passed.
+- Core `flutter test`: success, 33 tests passed.
+- Shell `flutter test`: success, 28 tests passed.
 - `flutter build windows --debug`: success; produced
   `build/windows/x64/runner/Debug/digitalbrain_flutter.exe` using the real
   MiniAudio output backend.
-- `flutter build web --release --wasm`: success; produced `build/web`. It emits
-  the repository's existing missing CupertinoIcons font warning but no build
-  error.
+- `flutter build web --release` and the earlier
+  `flutter build web --release --wasm`: success. The standard build contains
+  both required loader script references and both package assets. It emits the
+  repository's existing missing CupertinoIcons font warning but no build error.
 - `git diff --check`: success (Git emitted only line-ending conversion notices).
 - Forbidden path/audio-log source scan: no matches.
 
@@ -189,8 +198,65 @@ Shell integration and dependencies:
   was available in this task environment. Windows and web compilation plus
   deterministic capture/playback/socket seams were verified; device-level
   audio continuity remains an end-to-end hardware acceptance item.
-- A deployed web host must use the successful `--wasm` build path or configure
-  COOP/COEP. Without that deployment configuration the deliberate behavior is
-  `unavailable`, not silent output.
+- Web no longer requires COOP/COEP with `flutter_soloud` 4.1.7. The required
+  loader scripts are included; an actual browser/device initialization failure
+  remains `unavailable`, not silent output.
 - The unrelated full-shell analyzer warning in `workspace_session.dart` remains
   intentionally untouched.
+
+## Review-fix addendum
+
+Review hardening was completed test-first in
+`5d47d2a6251f4e06c67cde874b4a64216cfde4c5`.
+
+### RED/GREEN evidence
+
+1. Voice deactivation during a delayed retry release was RED with two created
+   sessions where one was expected. After adding a lifecycle generation and
+   checking `mounted`, `active`, and generation after every `_start` await, the
+   widget test creates no late controller and reports exactly one cleanup of
+   capture, output, and socket.
+2. Two synchronous Start invocations were RED with two controllers. GREEN now
+   creates one session; unmount proves exactly one capture stop/dispose, output
+   stop/dispose, and socket close. A controller produced by a stale generation
+   is disposed before it can be retained.
+3. WebSocket subscription cancellation was RED with
+   `Bad state: cancel failed`; channel close was skipped. GREEN independently
+   guards subscription cancellation, stop control, channel close, and event
+   stream close, and verifies channel close count is one.
+4. Recorder cleanup injected failures at config callback removal,
+   `isRecording`, and recorder `stop`. RED observed source cancellation count
+   zero. GREEN preserves the first failure while still cancelling the source,
+   closing output, and directly disposing the recorder exactly once. Calling
+   dispose twice reuses the cached result without a second native disposal.
+5. Overlapping stale/release cleanup was RED with Flutter's
+   `PersonaPlexVoiceController was used after being disposed` assertion. GREEN
+   makes notifier disposal idempotent while retaining once-only resource
+   cleanup.
+
+### Review verification
+
+- Focused core protocol/client: 6 passed.
+- Focused controller, screen lifecycle, and workspace: 18 passed.
+- Full core suite: 33 passed.
+- Full shell suite: 28 passed.
+- Core analyzer: no issues.
+- Voice implementation/test analyzer: no issues.
+- Full shell analyzer: only the unchanged
+  `lib/chat/workspace_session.dart:6` unused-import warning.
+- Windows debug build: passed.
+- Standard JavaScript web release build: passed; Wasm dry run also passed.
+- Built web output contains both required `flutter_soloud` loader scripts and
+  assets.
+- Forbidden native-path/raw-audio-log scan: no matches.
+
+### Review-fix files
+
+- `src/Modules/UI/Flutter/core/lib/src/personaplex_voice_client.dart`
+- `src/Modules/UI/Flutter/core/test/personaplex_voice_protocol_test.dart`
+- `src/Modules/UI/Flutter/shell/lib/voice/pcm_audio_output.dart`
+- `src/Modules/UI/Flutter/shell/lib/voice/personaplex_voice_controller.dart`
+- `src/Modules/UI/Flutter/shell/lib/voice/personaplex_voice_screen.dart`
+- `src/Modules/UI/Flutter/shell/test/voice/personaplex_voice_controller_test.dart`
+- `src/Modules/UI/Flutter/shell/test/voice/personaplex_voice_screen_test.dart`
+- `src/Modules/UI/Flutter/shell/web/index.html`
