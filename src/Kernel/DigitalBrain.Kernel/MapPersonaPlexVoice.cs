@@ -6,6 +6,7 @@ namespace DigitalBrain.Kernel;
 
 internal static class PersonaPlexVoiceHttpMaps
 {
+    private const int LocalFlutterWebPort = 54723;
     private const int QueueCapacity = 4;
 
     public static IEndpointRouteBuilder MapPersonaPlexVoice(this IEndpointRouteBuilder endpoints)
@@ -19,6 +20,12 @@ internal static class PersonaPlexVoiceHttpMaps
                 IPersonaPlexSessionFactory sessions,
                 CancellationToken cancellationToken) =>
             {
+                if (!IsAllowedOrigin(http.Request))
+                {
+                    http.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    return;
+                }
+
                 if (!http.WebSockets.IsWebSocketRequest)
                 {
                     http.Response.StatusCode = StatusCodes.Status426UpgradeRequired;
@@ -36,7 +43,37 @@ internal static class PersonaPlexVoiceHttpMaps
         return endpoints;
     }
 
-    private static async Task RunConnectionAsync(
+    private static bool IsAllowedOrigin(HttpRequest request)
+    {
+        var origins = request.Headers.Origin;
+        if (origins.Count == 0)
+        {
+            // Native Flutter/Windows clients do not send the browser Origin header.
+            return true;
+        }
+
+        if (origins.Count != 1
+            || !Uri.TryCreate(origins[0], UriKind.Absolute, out var origin)
+            || origin.AbsolutePath != "/"
+            || !string.IsNullOrEmpty(origin.Query)
+            || !string.IsNullOrEmpty(origin.Fragment))
+        {
+            return false;
+        }
+
+        var requestPort = request.Host.Port
+            ?? (string.Equals(request.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ? 443 : 80);
+        var isSameOrigin = string.Equals(origin.Scheme, request.Scheme, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(origin.Host, request.Host.Host, StringComparison.OrdinalIgnoreCase)
+            && origin.Port == requestPort;
+        var isLocalFlutterWeb = string.Equals(origin.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+            && origin.IsLoopback
+            && origin.Port == LocalFlutterWebPort;
+
+        return isSameOrigin || isLocalFlutterWeb;
+    }
+
+    internal static async Task RunConnectionAsync(
         WebSocket socket,
         string connectionId,
         IPersonaPlexSessionFactory sessions,
@@ -47,9 +84,10 @@ internal static class PersonaPlexVoiceHttpMaps
         {
             var start = await ReceiveMessageAsync(socket, cancellationToken).ConfigureAwait(false);
             if (start.Type != WebSocketMessageType.Text
-                || PersonaPlexVoiceProtocol.DecodeControl(start.Payload) != PersonaPlexVoiceControl.Start)
+                || DecodeControl(start.Payload) != PersonaPlexVoiceControl.Start)
             {
-                throw new InvalidDataException("A PersonaPlex session must begin with a start control message.");
+                throw new PersonaPlexVoiceProtocolException(
+                    "A PersonaPlex session must begin with a start control message.");
             }
 
             session = await sessions
@@ -64,14 +102,14 @@ internal static class PersonaPlexVoiceHttpMaps
 
             await RunPipelinesAsync(socket, session, cancellationToken).ConfigureAwait(false);
         }
-        catch (InvalidDataException)
+        catch (PersonaPlexVoiceProtocolException)
         {
             await TrySendErrorAsync(
                 socket,
                 "protocol_error",
                 "Invalid PersonaPlex voice protocol message.",
                 cancellationToken).ConfigureAwait(false);
-            await TryCloseAsync(
+            await TryCloseOutputAsync(
                 socket,
                 WebSocketCloseStatus.ProtocolError,
                 "Invalid PersonaPlex voice protocol message.",
@@ -90,7 +128,7 @@ internal static class PersonaPlexVoiceHttpMaps
                 "unavailable",
                 "PersonaPlex voice is unavailable.",
                 cancellationToken).ConfigureAwait(false);
-            await TryCloseAsync(
+            await TryCloseOutputAsync(
                 socket,
                 WebSocketCloseStatus.InternalServerError,
                 "PersonaPlex voice is unavailable.",
@@ -104,7 +142,7 @@ internal static class PersonaPlexVoiceHttpMaps
                 await TryDisposeAsync(session).ConfigureAwait(false);
             }
 
-            await TryCloseAsync(
+            await TryCloseOutputAsync(
                 socket,
                 WebSocketCloseStatus.NormalClosure,
                 "PersonaPlex voice session ended.",
@@ -119,12 +157,12 @@ internal static class PersonaPlexVoiceHttpMaps
     {
         var inputs = CreateFrameChannel();
         var outputs = CreateFrameChannel();
-        using var pipelineCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var pipelineToken = pipelineCancellation.Token;
+        using var receiveCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var workCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
-        var receive = ReceiveAudioAsync(socket, inputs.Writer, pipelineToken);
-        var process = ProcessAudioAsync(session, inputs.Reader, outputs.Writer, pipelineToken);
-        var send = SendAudioAsync(socket, outputs.Reader, pipelineToken);
+        var receive = ReceiveAudioAsync(socket, inputs.Writer, receiveCancellation.Token);
+        var process = ProcessAudioAsync(session, inputs.Reader, outputs.Writer, workCancellation.Token);
+        var send = SendAudioAsync(socket, outputs.Reader, workCancellation.Token);
 
         try
         {
@@ -132,14 +170,44 @@ internal static class PersonaPlexVoiceHttpMaps
             await first.ConfigureAwait(false);
             await Task.WhenAll(receive, process, send).ConfigureAwait(false);
         }
-        catch
+        catch (Exception exception)
         {
-            pipelineCancellation.Cancel();
+            workCancellation.Cancel();
             inputs.Writer.TryComplete();
             outputs.Writer.TryComplete();
-            await ObserveAsync(receive, process, send).ConfigureAwait(false);
-            throw;
+            await ObserveAsync(process, send).ConfigureAwait(false);
+
+            if (!cancellationToken.IsCancellationRequested
+                && exception is not (OperationCanceledException or WebSocketException))
+            {
+                await TrySendPipelineFailureAsync(socket, exception, cancellationToken).ConfigureAwait(false);
+            }
+
+            receiveCancellation.Cancel();
+            await ObserveAsync(receive).ConfigureAwait(false);
         }
+    }
+
+    private static async Task TrySendPipelineFailureAsync(
+        WebSocket socket,
+        Exception exception,
+        CancellationToken cancellationToken)
+    {
+        var isProtocolError = exception is PersonaPlexVoiceProtocolException;
+        await TrySendErrorAsync(
+            socket,
+            isProtocolError ? "protocol_error" : "unavailable",
+            isProtocolError
+                ? "Invalid PersonaPlex voice protocol message."
+                : "PersonaPlex voice is unavailable.",
+            cancellationToken).ConfigureAwait(false);
+        await TryCloseOutputAsync(
+            socket,
+            isProtocolError ? WebSocketCloseStatus.ProtocolError : WebSocketCloseStatus.InternalServerError,
+            isProtocolError
+                ? "Invalid PersonaPlex voice protocol message."
+                : "PersonaPlex voice is unavailable.",
+            cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task ReceiveAudioAsync(
@@ -161,28 +229,31 @@ internal static class PersonaPlexVoiceHttpMaps
 
                 if (message.Type == WebSocketMessageType.Text)
                 {
-                    if (PersonaPlexVoiceProtocol.DecodeControl(message.Payload) == PersonaPlexVoiceControl.Stop)
+                    if (DecodeControl(message.Payload) == PersonaPlexVoiceControl.Stop)
                     {
                         return;
                     }
 
-                    throw new InvalidDataException("Only stop is accepted after a PersonaPlex session starts.");
+                    throw new PersonaPlexVoiceProtocolException(
+                        "Only stop is accepted after a PersonaPlex session starts.");
                 }
 
                 if (message.Type != WebSocketMessageType.Binary)
                 {
-                    throw new InvalidDataException("PersonaPlex audio must use binary WebSocket messages.");
+                    throw new PersonaPlexVoiceProtocolException(
+                        "PersonaPlex audio must use binary WebSocket messages.");
                 }
 
-                var frame = PersonaPlexVoiceProtocol.DecodeAudio(message.Payload);
+                var frame = DecodeAudio(message.Payload);
                 if (frame.Sequence != expectedSequence)
                 {
-                    throw new InvalidDataException("PersonaPlex audio sequence is out of order.");
+                    throw new PersonaPlexVoiceProtocolException(
+                        "PersonaPlex audio sequence is out of order.");
                 }
 
                 if (expectedSequence == long.MaxValue)
                 {
-                    throw new InvalidDataException("PersonaPlex audio sequence is exhausted.");
+                    throw new PersonaPlexVoiceProtocolException("PersonaPlex audio sequence is exhausted.");
                 }
 
                 expectedSequence++;
@@ -268,31 +339,56 @@ internal static class PersonaPlexVoiceHttpMaps
             SingleWriter = true,
         });
 
+    private static PersonaPlexVoiceControl DecodeControl(ReadOnlySpan<byte> payload)
+    {
+        try
+        {
+            return PersonaPlexVoiceProtocol.DecodeControl(payload);
+        }
+        catch (InvalidDataException exception)
+        {
+            throw new PersonaPlexVoiceProtocolException(exception.Message, exception);
+        }
+    }
+
+    private static PersonaPlexAudioFrame DecodeAudio(ReadOnlySpan<byte> payload)
+    {
+        try
+        {
+            return PersonaPlexVoiceProtocol.DecodeAudio(payload);
+        }
+        catch (InvalidDataException exception)
+        {
+            throw new PersonaPlexVoiceProtocolException(exception.Message, exception);
+        }
+    }
+
     private static async Task<ReceivedMessage> ReceiveMessageAsync(
         WebSocket socket,
         CancellationToken cancellationToken)
     {
-        var buffer = new byte[PersonaPlexVoiceProtocol.PacketByteCount];
+        var buffer = new byte[PersonaPlexVoiceProtocol.PacketByteCount + 1];
         var count = 0;
         WebSocketMessageType? messageType = null;
 
         while (true)
         {
-            if (count == buffer.Length)
-            {
-                throw new InvalidDataException("PersonaPlex WebSocket message is too large.");
-            }
-
             var received = await socket
                 .ReceiveAsync(buffer.AsMemory(count), cancellationToken)
                 .ConfigureAwait(false);
             messageType ??= received.MessageType;
             if (messageType != received.MessageType)
             {
-                throw new InvalidDataException("PersonaPlex WebSocket message type changed between fragments.");
+                throw new PersonaPlexVoiceProtocolException(
+                    "PersonaPlex WebSocket message type changed between fragments.");
             }
 
             count += received.Count;
+            if (count > PersonaPlexVoiceProtocol.PacketByteCount)
+            {
+                throw new PersonaPlexVoiceProtocolException("PersonaPlex WebSocket message is too large.");
+            }
+
             if (received.EndOfMessage)
             {
                 return new ReceivedMessage(received.MessageType, buffer.AsSpan(0, count).ToArray());
@@ -333,7 +429,7 @@ internal static class PersonaPlexVoiceHttpMaps
         }
     }
 
-    private static async Task TryCloseAsync(
+    private static async Task TryCloseOutputAsync(
         WebSocket socket,
         WebSocketCloseStatus status,
         string description,
@@ -346,7 +442,7 @@ internal static class PersonaPlexVoiceHttpMaps
 
         try
         {
-            await socket.CloseAsync(status, description, cancellationToken).ConfigureAwait(false);
+            await socket.CloseOutputAsync(status, description, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception) when (socket.State is not (WebSocketState.Open or WebSocketState.CloseReceived))
         {

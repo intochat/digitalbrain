@@ -10,6 +10,19 @@ internal enum PersonaPlexVoiceControl
     Stop,
 }
 
+internal sealed class PersonaPlexVoiceProtocolException : Exception
+{
+    public PersonaPlexVoiceProtocolException(string message)
+        : base(message)
+    {
+    }
+
+    public PersonaPlexVoiceProtocolException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
 internal static class PersonaPlexVoiceProtocol
 {
     internal const int Version = 1;
