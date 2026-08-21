@@ -26,23 +26,23 @@ public static class ShellHostingExtensions
     public const string WebPlatformDirectoryName = ShellNames.WebPlatformDirectoryName;
     public const string HttpEndpointName = ShellNames.HttpEndpointName;
 
-    public static DigitalBrainModuleBuilder<UiModule> WithHeadlessHost(
-        this DigitalBrainModuleBuilder<UiModule> module,
+    public static DigitalBrainModuleBuilder<UIModule> WithHeadlessHost(
+        this DigitalBrainModuleBuilder<UIModule> module,
         Action<FlutterHostOptions>? configure = null)
         => ConfigureFlutterHost(module, FlutterHostKind.Headless, configure);
 
-    public static DigitalBrainModuleBuilder<UiModule> WithWindowHost(
-        this DigitalBrainModuleBuilder<UiModule> module,
+    public static DigitalBrainModuleBuilder<UIModule> WithWindowHost(
+        this DigitalBrainModuleBuilder<UIModule> module,
         Action<FlutterHostOptions>? configure = null)
         => ConfigureFlutterHost(module, FlutterHostKind.Window, configure);
 
-    public static DigitalBrainModuleBuilder<UiModule> WithWebHost(
-        this DigitalBrainModuleBuilder<UiModule> module,
+    public static DigitalBrainModuleBuilder<UIModule> WithWebHost(
+        this DigitalBrainModuleBuilder<UIModule> module,
         Action<FlutterHostOptions>? configure = null)
         => ConfigureFlutterHost(module, FlutterHostKind.Web, configure);
 
-    private static DigitalBrainModuleBuilder<UiModule> ConfigureFlutterHost(
-        DigitalBrainModuleBuilder<UiModule> module,
+    private static DigitalBrainModuleBuilder<UIModule> ConfigureFlutterHost(
+        DigitalBrainModuleBuilder<UIModule> module,
         FlutterHostKind kind,
         Action<FlutterHostOptions>? configure)
     {
@@ -59,7 +59,7 @@ public static class ShellHostingExtensions
         return module;
     }
 
-    private static ShellHostingState GetOrCreateState(DigitalBrainModuleBuilder<UiModule> module)
+    private static ShellHostingState GetOrCreateState(DigitalBrainModuleBuilder<UIModule> module)
     {
         var state = module.Brain.GetOrAddState(
             static brain => new ShellHostingState(brain),
