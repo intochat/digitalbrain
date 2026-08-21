@@ -38,6 +38,27 @@ public sealed class PersonaPlexSessionFactoryTests
     }
 
     [Fact]
+    public async Task DisabledConfigurationWithNonPositiveMaxSessionsFailsDiHostedServiceStartup()
+    {
+        var configuration = new ConfigurationManager
+        {
+            [$"{PersonaPlexOptions.SectionName}:Enabled"] = "false",
+            [$"{PersonaPlexOptions.SectionName}:MaxSessions"] = "0",
+        };
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddPersonaPlex(configuration);
+
+        await using var provider = services.BuildServiceProvider();
+        var hostedService = Assert.Single(provider.GetServices<IHostedService>());
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => hostedService.StartAsync(TestContext.Current.CancellationToken));
+
+        Assert.Equal("PersonaPlex requires at least one session.", exception.Message);
+    }
+
+    [Fact]
     public async Task DisabledConfigurationRejectsSessionCreation()
     {
         await using var factory = new PersonaPlexSessionFactory(

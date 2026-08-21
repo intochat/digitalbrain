@@ -57,6 +57,7 @@ public sealed class PersonaPlexSessionFactory : IPersonaPlexSessionFactory, IHos
 
         if (!_enabled)
         {
+            _options.Validate();
             SetReadiness(PersonaPlexReadinessState.Disabled, "PersonaPlex is disabled.", false);
             return;
         }
