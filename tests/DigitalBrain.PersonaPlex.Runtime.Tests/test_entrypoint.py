@@ -132,7 +132,7 @@ class RuntimeStateTests(unittest.TestCase):
         runtime = load_entrypoint()
         command = runtime.server_command(cpu_offload=True)
 
-        self.assertEqual(command[:3], ["python", "-m", "moshi.server"])
+        self.assertEqual(command[:3], ["python3", "-m", "moshi.server"])
         self.assertIn("--cpu-offload", command)
         self.assertEqual(command[command.index("--host") + 1], "127.0.0.1")
         self.assertEqual(command[command.index("--port") + 1], "8998")

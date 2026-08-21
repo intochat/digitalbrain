@@ -63,7 +63,7 @@ class RuntimeState:
 
 def server_command(*, cpu_offload: bool) -> list[str]:
     command = [
-        "python",
+        "python3",
         "-m",
         "moshi.server",
         "--host",
