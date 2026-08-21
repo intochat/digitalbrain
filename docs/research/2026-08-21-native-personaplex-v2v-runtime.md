@@ -112,7 +112,9 @@ The following automated checks were run from this checkout on 2026-08-21:
 
 | Check | Result |
 | --- | --- |
-| `dotnet test DigitalBrain.slnx --no-restore` | The initial full-suite invocation began the Simulation, Aspire, and E2E projects; the captured output did not reach a final summary. A repeat with the minimal console logger completed with Testing Platform handshake failures: all four test assemblies reported zero tests and exit code 5. This is a full-suite infrastructure failure, not a passing verification. |
+| `dotnet test DigitalBrain.slnx --no-restore` and the minimal-console-logger variant | These invocations can produce Microsoft Testing Platform handshake failures (zero tests, exit code 5); that is a runner issue and is not the authoritative suite result. |
+| `dotnet test DigitalBrain.slnx --no-restore -- --no-ansi --progress off` | Ran 74 real tests: 71 passed, 2 failed, 1 skipped. The failures were the pre-existing `DigitalBrain.E2E.Tests.McpSurfaceTests.TheFrozenMcpToolInvokesChatOverTheRealProtocol` (attributed by `git blame` to `daea795b`) and `DigitalBrain.E2E.Tests.PersonaPlexVoiceTests.RuntimeInvalidDataFailureIsUnavailableNotProtocolError`. The PersonaPlex close test passes in isolation, so its solution-wide failure is consistent with cross-assembly parallel resource/timing interference rather than a reproducible PersonaPlex failure. |
+| `dotnet test tests/DigitalBrain.E2E.Tests/DigitalBrain.E2E.Tests.csproj --no-restore -- --no-ansi --progress off --parallel none` | Ran 23 tests: 21 passed, 1 failed, 1 skipped. The sole failure was the same pre-existing MCP surface test; the PersonaPlex close test passed with E2E parallelism disabled. |
 | `dotnet test tests/DigitalBrain.AI.PersonaPlex.Tests/DigitalBrain.AI.PersonaPlex.Tests.csproj --no-restore --no-build` | Passed: 20 total, 20 succeeded, 0 failed, 0 skipped (957 ms). |
 | `flutter analyze` in `src/Modules/UI/Flutter/shell` | Completed with one warning: unused import `chat_contracts.dart` in `lib/chat/workspace_session.dart:6`. |
 | `flutter test` in `src/Modules/UI/Flutter/shell` | Passed: 28 tests. |
