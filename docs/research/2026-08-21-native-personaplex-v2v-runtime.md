@@ -105,3 +105,22 @@ Only the small per-frame audio/code/logit values should cross the host/device bo
 ## Evidence boundaries
 
 This report verifies source availability and documented runtime behavior; it does not claim a successful run on the project's particular GPU or an existing maintained C# PersonaPlex package. The substantive .NET work is porting the stateful four-graph generation loop, especially the temporal KV-cache I/O binding and the depformer sampling loop.
+
+## 2026-08-21 implementation verification
+
+The following automated checks were run from this checkout on 2026-08-21:
+
+| Check | Result |
+| --- | --- |
+| `dotnet test DigitalBrain.slnx --no-restore` | The initial full-suite invocation began the Simulation, Aspire, and E2E projects; the captured output did not reach a final summary. A repeat with the minimal console logger completed with Testing Platform handshake failures: all four test assemblies reported zero tests and exit code 5. This is a full-suite infrastructure failure, not a passing verification. |
+| `dotnet test tests/DigitalBrain.AI.PersonaPlex.Tests/DigitalBrain.AI.PersonaPlex.Tests.csproj --no-restore --no-build` | Passed: 20 total, 20 succeeded, 0 failed, 0 skipped (957 ms). |
+| `flutter analyze` in `src/Modules/UI/Flutter/shell` | Completed with one warning: unused import `chat_contracts.dart` in `lib/chat/workspace_session.dart:6`. |
+| `flutter test` in `src/Modules/UI/Flutter/shell` | Passed: 28 tests. |
+
+### Hardware acceptance status: blocked by model configuration
+
+`nvidia-smi` identifies an NVIDIA GeForce RTX 5080 with driver 596.36 and 16,303 MiB of memory. That establishes that an NVIDIA GPU is visible, but it does not prove the enabled ONNX Runtime CUDA execution provider or the four-graph PersonaPlex runtime.
+
+No `AppHost:PersonaPlex:ModelDirectory` / `DigitalBrain__AI__PersonaPlex__ModelDirectory` value was configured in this environment, and no configured external model set was available. The required gated artifacts are `mimi_encoder/model.onnx`, `temporal/model.onnx`, `depformer/model.onnx`, and `mimi_decoder/model.onnx` (including every external-data sidecar required by those graphs). Consequently, no microphone-to-speaker session was started and no p50/p95 frame latency, GPU-memory usage during inference, or transcription-service invocation count was measured.
+
+To unblock acceptance, provide the licensed/gated four-graph artifact directory, configure it in AppHost together with `Enabled=true` and a valid CUDA device ID, and run the application with an ONNX Runtime CUDA provider compatible with the installed NVIDIA driver. Only then can a sustained 24 kHz microphone-to-speaker run produce the required latency, memory, and zero-transcription-service evidence.
