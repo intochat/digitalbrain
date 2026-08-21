@@ -43,13 +43,17 @@ class RuntimeState:
     _message: str = "PersonaPlex runtime is starting."
 
     def set_loading(self, message: str) -> None:
-        self._state, self._mode, self._message = "loading", "unavailable", message
+        self._set("loading", "unavailable", message)
 
     def set_ready(self, message: str, *, mode: str) -> None:
-        self._state, self._mode, self._message = "ready", mode, message
+        self._set("ready", mode, message)
 
     def set_failed(self, message: str) -> None:
-        self._state, self._mode, self._message = "failed", "unavailable", message
+        self._set("failed", "unavailable", message)
+
+    def _set(self, state: str, mode: str, message: str) -> None:
+        self._state, self._mode, self._message = state, mode, message
+        LOGGER.info("readiness_transition state=%s mode=%s", state, mode)
 
     def health(self, _token: str | None = None, _cache_path: str | None = None) -> dict[str, str]:
         """Return the public readiness shape; arguments exist for leak-regression tests."""
@@ -87,9 +91,13 @@ async def ready_handler(request: web.Request) -> web.Response:
 
 
 def _pcm16_to_float(payload: bytes) -> np.ndarray:
+    validate_pcm_frame(payload)
+    return np.frombuffer(payload, dtype="<i2").astype(np.float32) / 32768.0
+
+
+def validate_pcm_frame(payload: bytes) -> None:
     if len(payload) != PCM_FRAME_BYTES:
         raise ValueError("PCM frames must contain exactly 1,920 samples.")
-    return np.frombuffer(payload, dtype="<i2").astype(np.float32) / 32768.0
 
 
 def _float_to_pcm16(pcm: np.ndarray) -> bytes:
