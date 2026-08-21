@@ -8,6 +8,7 @@ using DigitalBrain.Memory.Aspire.Hosting;
 using DigitalBrain.Time;
 using DigitalBrain.UI;
 using DigitalBrain.UI.Aspire.Hosting;
+using Aspire.Hosting;
 using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -20,7 +21,10 @@ var personaPlexHuggingFaceToken = builder
 
 // This credential authenticates only the private Kernel-to-adapter stream. Unlike
 // HF_TOKEN, it is intentionally shared with the Kernel so it can call /stream.
-var personaPlexAdapterToken = builder.AddParameter("personaplex-adapter-token", secret: true);
+var personaPlexAdapterToken = builder.AddResource(
+    ParameterResourceBuilderExtensions.CreateDefaultPasswordParameter(
+        builder,
+        "personaplex-adapter-token"));
 
 #pragma warning disable ASPIREPROBES001 // The readiness probe makes the runtime endpoint contract explicit in the resource model.
 var personaPlexRuntime = builder

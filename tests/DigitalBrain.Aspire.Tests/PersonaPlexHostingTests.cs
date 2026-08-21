@@ -21,19 +21,21 @@ public sealed class PersonaPlexHostingTests(ModelFixture fixture)
             static resource => resource.Name == "personaplex-hugging-face-token");
 
         Assert.True(parameter.Secret);
+        Assert.Null(parameter.Default);
         Assert.True(parameter.EnableDescriptionMarkdown);
         Assert.Contains("https://huggingface.co/nvidia/personaplex-7b-v1", parameter.Description, StringComparison.Ordinal);
         Assert.Contains("https://huggingface.co/settings/tokens", parameter.Description, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void AppHostExposesSeparateSecretPersonaPlexAdapterToken()
+    public void AppHostGeneratesAndPersistsSeparatePersonaPlexAdapterToken()
     {
         var parameter = Assert.Single(
             fixture.Model.Resources.OfType<ParameterResource>(),
             static resource => resource.Name == "personaplex-adapter-token");
 
         Assert.True(parameter.Secret);
+        Assert.Equal("UserSecretsParameterDefault", parameter.Default?.GetType().Name);
     }
 
     [Fact]
