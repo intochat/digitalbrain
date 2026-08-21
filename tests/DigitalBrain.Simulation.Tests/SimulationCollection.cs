@@ -6,19 +6,19 @@ namespace DigitalBrain.Simulation.Tests;
 
 public sealed class SimulationFixture : IAsyncLifetime
 {
-    public BrainSimulation Sim { get; private set; } = null!;
+    private BrainSimulation? _sim;
+
+    public BrainSimulation Sim => _sim ?? throw new InvalidOperationException("Simulation has not started.");
 
     public async ValueTask InitializeAsync()
-        => Sim = await BrainSimulation.StartAsync(new()
+        => _sim = await BrainSimulation.StartAsync(new()
         {
-            Modules = new ModuleAssemblies(
+            Modules = new ModuleManifest(
                 [
-                    typeof(DigitalBrain.Time.TimerNeuron).Assembly,
-                    typeof(DigitalBrain.UI.UiModule).Assembly,
-                    typeof(DigitalBrain.AI.AIModule).Assembly,
-                    typeof(DigitalBrain.Memory.MemoryModule).Assembly,
-                    typeof(PingerNeuron).Assembly,
-                    typeof(SimulationFixture).Assembly,
+                    typeof(DigitalBrain.Time.TimeModule),
+                    typeof(DigitalBrain.UI.UiModule),
+                    typeof(DigitalBrain.AI.AIModule),
+                    typeof(DigitalBrain.Memory.MemoryModule),
                 ]),
             Configuration = new Dictionary<string, string?>
             {
@@ -29,7 +29,13 @@ public sealed class SimulationFixture : IAsyncLifetime
             },
         });
 
-    public async ValueTask DisposeAsync() => await Sim.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        if (_sim is not null)
+        {
+            await _sim.DisposeAsync();
+        }
+    }
 }
 
 [CollectionDefinition(Name)]

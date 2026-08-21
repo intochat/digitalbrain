@@ -11,7 +11,7 @@ namespace DigitalBrain.Testing;
 
 public sealed class BrainSimulationOptions
 {
-    public required ModuleAssemblies Modules { get; init; }
+    public required ModuleManifest Modules { get; init; }
 
     public string Owner { get; init; } = DigitalBrainNames.DefaultOwner;
 
@@ -64,7 +64,7 @@ public sealed class BrainSimulation : IAsyncDisposable
         // Mirrors DigitalBrainClientHostingExtensions.AddDigitalBrainClient's production client
         // wiring: the in-process cluster client validates its serializer manifest against every
         // [GenerateSerializer] type reachable from loaded assemblies (not only the silo's
-        // ModuleAssemblies), so any module whose contracts touch Microsoft.Extensions.AI types
+        // ModuleManifest), so any module whose contracts touch Microsoft.Extensions.AI types
         // (e.g. UI's ChatResponseUpdate/ChatMessage) needs this JSON codec registered
         // client-side too, or ClusterClient construction throws CodecNotFoundException.
         builder.ConfigureClient(client =>

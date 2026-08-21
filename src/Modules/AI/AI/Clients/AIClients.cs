@@ -17,7 +17,8 @@ internal static class AIClients
 
     internal static void Add(IServiceCollection services)
     {
-        AddOllamaModel<Gemma4>(services, "gemma4:12b");
+        AddOllamaModel<IGemma4>(services, "gemma4:12b");
+        AddOllamaEmbedding<IEmbeddingGemma>(services, "embeddinggemma");
 
         services.AddHostedService<LlmWarmupHostedService>();
     }
@@ -30,21 +31,38 @@ internal static class AIClients
                 provider.GetRequiredService<IConfiguration>(),
                 typeof(TModel).Name,
                 defaultTag));
+
+    private static void AddOllamaEmbedding<TModel>(IServiceCollection services, string defaultTag)
+        where TModel : class
+        => services.AddKeyedSingleton<IEmbeddingGenerator<string, Embedding<float>>>(
+            typeof(TModel),
+            (provider, _) => OllamaEmbedding(
+                provider.GetRequiredService<IConfiguration>(),
+                typeof(TModel).Name,
+                defaultTag));
+
+    private static IEmbeddingGenerator<string, Embedding<float>> OllamaEmbedding(
+        IConfiguration configuration,
+        string modelName,
+        string defaultTag)
+    {
+        var endpoint = RequireOllamaEndpoint(configuration, modelName);
+        var tag = configuration[$"{ConfigurationRoot}:Ollama:{modelName}:Model"] ?? defaultTag;
+        var http = new HttpClient
+        {
+            BaseAddress = endpoint,
+            Timeout = RequestTimeout,
+        };
+
+        return new OllamaApiClient(http, tag);
+    }
+
     private static IChatClient Ollama(
         IConfiguration configuration,
         string modelName,
         string defaultTag)
     {
-        var endpoint = configuration[$"{ConfigurationRoot}:Ollama:Endpoint"];
-        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri)
-            || endpointUri is null
-            || (!string.Equals(endpointUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(endpointUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
-        {
-            throw new InvalidOperationException(
-                $"{modelName} requires DigitalBrain:AI:Ollama:Endpoint to be an absolute HTTP(S) URI. Configure it through AIModule.WithLlm<{modelName}>() in AppHost.");
-        }
-
+        var endpointUri = RequireOllamaEndpoint(configuration, modelName);
         var tag = configuration[$"{ConfigurationRoot}:Ollama:{modelName}:Model"] ?? defaultTag;
         var enableSensitiveData = configuration.GetValue<bool>(EnableSensitiveDataKey);
 
@@ -59,6 +77,21 @@ internal static class AIClients
                 sourceName: $"{TelemetrySource}.{modelName}",
                 configure: telemetry => telemetry.EnableSensitiveData = enableSensitiveData)
             .Build();
+    }
+
+    private static Uri RequireOllamaEndpoint(IConfiguration configuration, string modelName)
+    {
+        var endpoint = configuration[$"{ConfigurationRoot}:Ollama:Endpoint"];
+        if (Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri)
+            && endpointUri is not null
+            && (string.Equals(endpointUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(endpointUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
+        {
+            return endpointUri;
+        }
+
+        throw new InvalidOperationException(
+            $"{modelName} requires DigitalBrain:AI:Ollama:Endpoint to be an absolute HTTP(S) URI. Configure it through AIModule.WithLlm<{modelName}>() in AppHost.");
     }
 
 }

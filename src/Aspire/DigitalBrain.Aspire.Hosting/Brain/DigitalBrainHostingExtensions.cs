@@ -55,6 +55,7 @@ public static class DigitalBrainHostingExtensions
     {
         ArgumentNullException.ThrowIfNull(brain);
         ArgumentNullException.ThrowIfNull(configure);
+        brain.AddModule(typeof(TModule));
         configure(new DigitalBrainModuleBuilder<TModule>(brain));
         return brain;
     }
@@ -68,6 +69,14 @@ public static class DigitalBrainHostingExtensions
         builder.WithReference(brain.Orleans);
         builder.WithReference(brain.DurableStateStore, DigitalBrainNames.JournalConnection);
         builder.WithReference(brain.GrainState, DigitalBrainNames.GrainState);
+
+        for (var index = 0; index < brain.Modules.Count; index++)
+        {
+            var module = brain.Modules[index];
+            builder.WithEnvironment(
+                $"DigitalBrain__Modules__{index}",
+                $"{module.FullName}, {module.Assembly.GetName().Name}");
+        }
 
         WaitUntilHealthy(builder, brain.StartupDependencies);
 

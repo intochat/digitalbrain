@@ -1,0 +1,10 @@
+{
+  "namespace": "DigitalBrain.UI",
+  "version": 1,
+  "types": [
+    { "alias": "ui.surface" },
+    { "alias": "ui.open-surface" },
+    { "alias": "ui.surface-opened" },
+    { "alias": "ui.control-activated" }
+  ]
+}

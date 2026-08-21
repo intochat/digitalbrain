@@ -28,7 +28,16 @@ void main() {
       await tester.tap(find.byKey(const Key('destination_behaviors')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('behavior_workspace')), findsOneWidget);
-      expect(find.byKey(const Key('behavior_library')), findsOneWidget);
+      expect(find.text('Behavior recipes'), findsOneWidget);
+      expect(
+        find.textContaining('Google Calendar', findRichText: true),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('ICalendar', findRichText: true),
+        findsWidgets,
+      );
+      expect(find.text('Planned composition'), findsOneWidget);
       await drainShellTimers(tester);
 
       await tester.tap(find.byKey(const Key('destination_kit')));

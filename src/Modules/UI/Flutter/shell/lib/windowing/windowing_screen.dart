@@ -425,7 +425,7 @@ final class _ActivityBody extends StatelessWidget {
       'ChatTurnCommitted · seq 42',
       'AuthorizationRequired · google',
       'TopologyPulse · 3 grains',
-      'BehaviorDraftSaved · countdown',
+      'TimerScheduled · countdown',
     ];
     return ListView(
       children: [

@@ -6,7 +6,7 @@ import 'package:http/testing.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test('openScene POSTs OpenSceneRequest to UI HTTP root path', () async {
+  test('openScene POSTs the explicit surface command', () async {
     http.Request? seen;
     final client = DigitalBrainUiClient(
       baseUri: Uri.parse('http://ui.example:5080'),
@@ -20,8 +20,13 @@ void main() {
 
     expect(seen, isNotNull);
     expect(seen!.method, 'POST');
-    expect(seen!.url.toString(), 'http://ui.example:5080/shells/desk/scenes');
-    expect(jsonDecode(seen!.body), {'sceneKey': 'home', 'title': 'Home'});
+    expect(seen!.url.toString(), 'http://ui.example:5080/owner/commands');
+    expect(jsonDecode(seen!.body), {
+      'kind': 'surface.open',
+      'surfaceName': 'desk',
+      'surfaceKey': 'home',
+      'title': 'Home',
+    });
   });
 
   test(
@@ -50,7 +55,7 @@ data: {"sequence":5,"sceneKey":"countdown","title":"Countdown","commandId":"d","
           expect(request.method, 'GET');
           expect(
             request.url.toString(),
-            'http://ui.example:5080/shells/desk/events?afterSequence=0',
+            'http://ui.example:5080/surfaces/desk/events?afterSequence=0',
           );
           return http.Response(
             body,
@@ -71,48 +76,6 @@ data: {"sequence":5,"sceneKey":"countdown","title":"Countdown","commandId":"d","
       expect(surface.latest?.title, 'Countdown');
     },
   );
-
-  test('watchAuthorizations streams authorization journal SSE', () async {
-    const body = '''
-: connected
-
-id: 1
-event: authorization
-data: {"sequence":1,"kind":"AuthorizationRequired","commandId":"c1","serverKey":"google.gmail","serverDisplayName":"DigitalBrain Gmail","signInUrl":"https://ui.test/oauth?state=s1","state":"s1","timestamp":"2026-07-28T08:00:00Z"}
-
-id: 2
-event: noise
-data: {"sequence":2,"kind":"AuthorizationRequired","commandId":"c2","serverKey":"x","state":"x","timestamp":"2026-07-28T08:00:01Z"}
-
-id: 3
-event: authorization
-data: {"sequence":3,"kind":"AuthorizationCompleted","commandId":"c1","serverKey":"google.gmail","state":"s1","timestamp":"2026-07-28T08:00:02Z"}
-
-''';
-
-    final client = DigitalBrainUiClient(
-      baseUri: Uri.parse('http://ui.example:5080'),
-      httpClient: MockClient((request) async {
-        expect(request.method, 'GET');
-        expect(
-          request.url.toString(),
-          'http://ui.example:5080/authorizations/events?afterSequence=0',
-        );
-        return http.Response(
-          body,
-          200,
-          headers: {'content-type': 'text/event-stream'},
-        );
-      }),
-    );
-
-    final events = await client.watchAuthorizations().toList();
-    expect(events, hasLength(2));
-    expect(events[0].isRequired, isTrue);
-    expect(events[0].serverDisplayName, 'DigitalBrain Gmail');
-    expect(events[1].isCompleted, isTrue);
-    expect(SignInCardProjection.project(events), isEmpty);
-  });
 
   test(
     'watchShellEvents multi-event SSE projects into one ShellSurfaceController without restart',
@@ -139,7 +102,7 @@ data: {"sequence":3,"sceneKey":"home","title":"Home refreshed","commandId":"c","
         httpClient: MockClient((request) async {
           expect(
             request.url.toString(),
-            'http://ui.example:5080/shells/desk/events?afterSequence=0',
+            'http://ui.example:5080/surfaces/desk/events?afterSequence=0',
           );
           return http.Response(
             body,
@@ -173,7 +136,7 @@ data: {"sequence":3,"sceneKey":"home","title":"Home refreshed","commandId":"c","
   );
 
   test(
-    'streamMessage POSTs to /messages/stream and yields chat-delta frames',
+    'streamMessage POSTs the explicit chat command and yields chat-delta frames',
     () async {
       const body = '''
 event: chat-delta
@@ -195,9 +158,13 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
           expect(request.method, 'POST');
           expect(
             request.url.toString(),
-            'http://ui.example:5080/chats/pulse/messages/stream',
+            'http://ui.example:5080/owner/commands',
           );
-          expect(jsonDecode(request.body), {'text': 'hello'});
+          expect(jsonDecode(request.body), {
+            'kind': 'chat.send',
+            'chatName': 'pulse',
+            'text': 'hello',
+          });
           return http.Response(
             body,
             200,

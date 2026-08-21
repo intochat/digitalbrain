@@ -33,11 +33,7 @@ internal static class OwnerCommandsHttpMaps
                 ArgumentNullException.ThrowIfNull(brain);
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (!HttpActor.TryGet(http, out var actor))
-                {
-                    http.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                    return;
-                }
+                var actor = HttpActor.Current;
 
                 if (string.IsNullOrWhiteSpace(request.Kind))
                 {

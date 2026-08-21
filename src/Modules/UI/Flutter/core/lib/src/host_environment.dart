@@ -9,17 +9,10 @@ abstract final class DigitalBrainHostEnv {
   static const defaultShellName = 'desk';
   static const chatVariable = 'DIGITALBRAIN_CHAT';
   static const defaultChatName = 'main';
-  static const usernameVariable = 'DIGITALBRAIN_USERNAME';
-  static const passwordVariable = 'DIGITALBRAIN_PASSWORD';
-  static const defaultUsername = 'owner';
-  static const defaultPassword = 'ownerowner';
-
   static const hostProcessVariables = {
     uiBaseVariable,
     shellVariable,
     chatVariable,
-    usernameVariable,
-    passwordVariable,
   };
 
   static String resolveUiBaseRaw({
@@ -86,27 +79,4 @@ abstract final class DigitalBrainHostEnv {
     return raw;
   }
 
-  static String resolveUsername({
-    String fromDefine = const String.fromEnvironment(usernameVariable),
-    Map<String, String>? processEnvironment,
-  }) {
-    if (fromDefine.isNotEmpty) {
-      return fromDefine;
-    }
-    final process = processEnvironment ?? process_env.readProcessEnvironment();
-    final raw = process[usernameVariable] ?? '';
-    return raw.isEmpty ? defaultUsername : raw;
-  }
-
-  static String resolvePassword({
-    String fromDefine = const String.fromEnvironment(passwordVariable),
-    Map<String, String>? processEnvironment,
-  }) {
-    if (fromDefine.isNotEmpty) {
-      return fromDefine;
-    }
-    final process = processEnvironment ?? process_env.readProcessEnvironment();
-    final raw = process[passwordVariable] ?? '';
-    return raw.isEmpty ? defaultPassword : raw;
-  }
 }

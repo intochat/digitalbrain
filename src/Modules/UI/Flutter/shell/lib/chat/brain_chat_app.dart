@@ -13,28 +13,24 @@ final class BrainChatApp extends StatelessWidget {
     super.key,
     required this.chatName,
     this.turns,
-    this.authorizations,
     this.onSend,
     this.onStream,
     this.onStreamVoice,
     this.onAttachmentTap,
     this.onOpenSignIn,
     this.onActivateButton,
-    this.behaviorClient,
     this.userActions = const [],
     this.statusMessage,
   });
 
   final String chatName;
   final Stream<ChatTurnEvent>? turns;
-  final Stream<AuthorizationEvent>? authorizations;
   final SendMessage? onSend;
   final StreamMessage? onStream;
   final StreamVoice? onStreamVoice;
   final VoidCallback? onAttachmentTap;
   final OpenUrl? onOpenSignIn;
   final ActivateChatButton? onActivateButton;
-  final BehaviorClient? behaviorClient;
   final List<UserActionCardModel> userActions;
   final String? statusMessage;
 
@@ -47,14 +43,12 @@ final class BrainChatApp extends StatelessWidget {
       home: BrainWorkspace(
         chatName: chatName,
         turns: turns,
-        authorizations: authorizations,
         onSend: onSend,
         onStream: onStream,
         onStreamVoice: onStreamVoice,
         onAttachmentTap: onAttachmentTap,
         onOpenSignIn: onOpenSignIn,
         onActivateButton: onActivateButton,
-        behaviorClient: behaviorClient,
         userActions: userActions,
         statusMessage: statusMessage,
       ),

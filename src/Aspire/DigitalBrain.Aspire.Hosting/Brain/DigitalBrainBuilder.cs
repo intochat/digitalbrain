@@ -7,6 +7,7 @@ namespace DigitalBrain.Aspire.Hosting;
 
 public sealed class DigitalBrainBuilder
 {
+    private readonly List<Type> _modules = [];
     private readonly List<DigitalBrainModuleProjection> _projections = [];
     private readonly List<IResource> _startupDependencies = [];
     private readonly Dictionary<Type, object> _states = [];
@@ -46,6 +47,18 @@ public sealed class DigitalBrainBuilder
     internal IReadOnlyList<DigitalBrainModuleProjection> Projections => _projections;
 
     internal IReadOnlyList<IResource> StartupDependencies => _startupDependencies;
+
+    internal IReadOnlyList<Type> Modules => _modules;
+
+    internal void AddModule(Type module)
+    {
+        ArgumentNullException.ThrowIfNull(module);
+
+        if (!_modules.Contains(module))
+        {
+            _modules.Add(module);
+        }
+    }
 
     public TState GetOrAddState<TState>(Func<DigitalBrainBuilder, TState> create, out bool added)
         where TState : class

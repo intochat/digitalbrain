@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
 using System.Net.ServerSentEvents;
 using System.Text;
 using System.Text.Json;
@@ -9,7 +8,6 @@ using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
-using DigitalBrain.Memory;
 using DigitalBrain.Testing;
 using DigitalBrain.UI;
 using Microsoft.Extensions.AI;
@@ -26,7 +24,6 @@ namespace DigitalBrain.Testing.Bdd;
 public sealed class BrainSteps : IDisposable
 {
     private static readonly TimeSpan TurnTimeout = TimeSpan.FromSeconds(60);
-    private static readonly TimeSpan PollTimeout = TimeSpan.FromSeconds(10);
 
     private HttpClient? _kernel;
     private PrincipalId _principal;
@@ -38,13 +35,7 @@ public sealed class BrainSteps : IDisposable
     public async Task GivenAnActivatedOwnerSession()
     {
         _kernel = BddBrainHost.Fixture.CreateHttpClient("kernel");
-        using var login = await _kernel
-            .PostAsJsonAsync("/auth/login", new { username = "owner", password = "ownerowner" })
-            .ConfigureAwait(false);
-        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
-
-        var me = await login.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false);
-        _principal = new PrincipalId(Guid.Parse(me.GetProperty("principalId").GetString()!));
+        _principal = new PrincipalId(new Guid("0000dead-0000-0000-0000-000000000001"));
 
         // The kernel serves exactly one owner: AppHost.cs stamps DigitalBrain__Owner with
         // ShellHostingExtensions.DefaultOwner ("dev" — the same value as
@@ -121,24 +112,6 @@ public sealed class BrainSteps : IDisposable
 
     [Then("the assistant replies {string}")]
     public void ThenTheAssistantReplies(string expected) => Assert.Equal(expected, _replyText);
-
-    [Then("the memory holds the story fact {string}")]
-    public async Task ThenTheMemoryHoldsTheFact(string text)
-    {
-        // Mirrors ChatTurnTests' fact assertion, minus the Correlation filter: the completing
-        // turn's CommandId was minted inside the kernel's SSE handler and never crosses the
-        // wire, so the read filters by kind alone — this boot's single turn stored exactly
-        // one chat.responded fact. The wait above already observed TurnLifecycle(Completed),
-        // which the turn only emits after its StoreFact settled, so one bounded read suffices.
-        var facts = await _brain.Get<IFactMemory>(IFactMemory.InstanceName)
-            .FireAsync<FactsRead>(
-                new ReadFacts(CommandId.New(), Kind: "chat.responded", Correlation: null, Limit: 10))
-            .WaitAsync(PollTimeout).ConfigureAwait(false);
-
-        var fact = Assert.Single(facts.Facts);
-        Assert.Equal("chat.responded", fact.Kind);
-        Assert.Equal(text, fact.Text);
-    }
 
     public void Dispose()
     {

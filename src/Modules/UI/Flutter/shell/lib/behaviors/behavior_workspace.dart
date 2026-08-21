@@ -1,199 +1,129 @@
-import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:flutter/material.dart';
 
 import '../brain_theme.dart';
 import '../user_actions/user_action_card.dart';
-import 'behavior_assistant_change.dart';
-import 'behavior_library.dart';
-import 'behavior_overview.dart';
-import 'behavior_revisions.dart';
-import 'behavior_scenarios.dart';
-import 'behavior_source.dart';
-import 'behavior_view_model.dart';
 
-final class BehaviorWorkspace extends StatefulWidget {
+/// An intentionally static preview of the future behavior composer.
+///
+/// Recipes do not call a `/behaviors` API or claim to execute. The live chat
+/// and voice surfaces remain the product paths; this tab shows the composition
+/// language those modules will expose when behavior execution is introduced.
+final class BehaviorWorkspace extends StatelessWidget {
   const BehaviorWorkspace({
     super.key,
-    this.client,
     this.userActions = const [],
     this.onOpenUserAction,
   });
 
-  final BehaviorClient? client;
   final List<UserActionCardModel> userActions;
   final ValueChanged<Uri>? onOpenUserAction;
 
   @override
-  State<BehaviorWorkspace> createState() => _BehaviorWorkspaceState();
-}
-
-final class _BehaviorWorkspaceState extends State<BehaviorWorkspace> {
-  late final BehaviorStudioController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = BehaviorStudioController(client: widget.client);
-    _controller.addListener(_onChanged);
-    // Always refresh: offline → demo fixtures; empty edge → demo fixtures;
-    // live grains → edge library.
-    _controller.refreshLibrary();
-  }
-
-  @override
-  void dispose() {
-    _controller
-      ..removeListener(_onChanged)
-      ..dispose();
-    super.dispose();
-  }
-
-  void _onChanged() {
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final selected = _controller.selected;
-    return Column(
+    return ListView(
       key: const Key('behavior_workspace'),
-      children: [
-        if (selected != null)
-          _DetailChrome(
-            document: selected,
-            view: _controller.view,
-            onBack: _controller.backToLibrary,
-            onSelectView: _controller.showView,
-          ),
-        if (_controller.statusMessage != null)
-          Container(
-            width: double.infinity,
-            color: BrainPalette.surfaceSunken,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-            child: Text(_controller.statusMessage!, style: BrainType.meta),
-          ),
-        Expanded(child: _body()),
+      padding: const EdgeInsets.all(24),
+      children: const [
+        Text('Behavior recipes', style: BrainType.heading),
+        SizedBox(height: 8),
+        Text(
+          'Prepared examples of future module composition. They are not running automations.',
+          style: BrainType.bodyMuted,
+        ),
+        SizedBox(height: 24),
+        _RecipeCard(
+          trigger: 'When there is a new event in',
+          source: 'Google Calendar',
+          sourceNeuron: 'ICalendar',
+          action: 'send me a summary to',
+          target: '@intochat',
+          targetNeuron: 'IChat',
+        ),
+        SizedBox(height: 16),
+        _RecipeCard(
+          trigger: 'When a message arrives in',
+          source: 'Chat',
+          sourceNeuron: 'IChat',
+          action: 'ask',
+          target: 'OpenAI · IGpt56',
+          targetNeuron: 'planned',
+        ),
+        SizedBox(height: 24),
+        Text('Planned composition', style: BrainType.cardTitle),
+        SizedBox(height: 8),
+        Text(
+          'Modules will contribute typed neurons such as ICalendar, IChat, and IGpt56. A later composer can join them into a recipe without hiding which provider or capability is used.',
+          style: BrainType.bodyMuted,
+        ),
       ],
     );
   }
-
-  Widget _body() {
-    final selected = _controller.selected;
-    switch (_controller.view) {
-      case BehaviorStudioView.library:
-        return BehaviorLibraryView(
-          items: _controller.library,
-          loading: _controller.loading,
-          error: _controller.showingDemoFixtures
-              ? null
-              : _controller.statusMessage,
-          onRefresh: _controller.refreshLibrary,
-          onOpen: _controller.openBehavior,
-        );
-      case BehaviorStudioView.overview:
-        return BehaviorOverviewView(
-          document: selected!,
-          lastRunOutcome: _controller.lastRunOutcome,
-          userActions: widget.userActions,
-          onStop: _controller.stopSelected,
-          onStart: _controller.startSelected,
-          onRunOnce: _controller.runOnceSelected,
-          onAskAssistant: () => _controller.showView(BehaviorStudioView.assistantChange),
-          onOpenScenarios: () => _controller.showView(BehaviorStudioView.scenarios),
-          onOpenSource: () => _controller.showView(BehaviorStudioView.source),
-          onOpenRevisions: () => _controller.showView(BehaviorStudioView.revisions),
-          onToggleBinding: _controller.setBindingEnabled,
-          onOpenUserAction: widget.onOpenUserAction,
-        );
-      case BehaviorStudioView.scenarios:
-        return BehaviorScenariosView(document: selected!);
-      case BehaviorStudioView.assistantChange:
-        return BehaviorAssistantChangeView(
-          document: selected!,
-          proposal: _controller.pendingProposal,
-          onPropose: _controller.proposeChange,
-          onApproveScenario: () => _controller.approvePendingScenario(approved: true),
-          onRejectScenario: () => _controller.approvePendingScenario(approved: false),
-        );
-      case BehaviorStudioView.source:
-        return BehaviorSourceView(
-          document: selected!,
-          onPropose: (program, feature) => _controller.proposeSource(
-            programSource: program,
-            featureText: feature,
-          ),
-          onRunTests: _controller.runTestsSelected,
-          onApprove: _controller.approveSelected,
-          onActivate: _controller.activateSelected,
-        );
-      case BehaviorStudioView.revisions:
-        return BehaviorRevisionsView(
-          document: selected!,
-          onRestorePrior: _controller.rollbackSelected,
-        );
-    }
-  }
 }
 
-final class _DetailChrome extends StatelessWidget {
-  const _DetailChrome({
-    required this.document,
-    required this.view,
-    required this.onBack,
-    required this.onSelectView,
+final class _RecipeCard extends StatelessWidget {
+  const _RecipeCard({
+    required this.trigger,
+    required this.source,
+    required this.sourceNeuron,
+    required this.action,
+    required this.target,
+    required this.targetNeuron,
   });
 
-  final BehaviorDocument document;
-  final BehaviorStudioView view;
-  final VoidCallback onBack;
-  final ValueChanged<BehaviorStudioView> onSelectView;
+  final String trigger;
+  final String source;
+  final String sourceNeuron;
+  final String action;
+  final String target;
+  final String targetNeuron;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: const BoxDecoration(
-        color: BrainPalette.surfaceRaised,
-        border: Border(bottom: BorderSide(color: BrainPalette.line)),
-      ),
-      child: Row(
-        children: [
-          TextButton.icon(
-            key: const Key('behavior_back_library'),
-            onPressed: onBack,
-            icon: const Icon(Icons.arrow_back, size: 16),
-            label: const Text('Library'),
-          ),
-          const SizedBox(width: 8),
-          Text(document.displayName, style: BrainType.metaStrong),
-          const Spacer(),
-          for (final entry in _tabs)
-            Padding(
-              padding: const EdgeInsets.only(left: 4),
-              child: TextButton(
-                key: Key('behavior_tab_${entry.$1.name}'),
-                onPressed: () => onSelectView(entry.$1),
-                child: Text(
-                  entry.$2,
-                  style: view == entry.$1
-                      ? BrainType.metaStrong.copyWith(color: BrainPalette.signal)
-                      : BrainType.meta,
-                ),
-              ),
-            ),
-        ],
+    return Card(
+      color: BrainPalette.surfaceRaised,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            Text(trigger, style: BrainType.body),
+            _NeuronLabel(label: source, neuron: sourceNeuron),
+            Text(action, style: BrainType.body),
+            _NeuronLabel(label: target, neuron: targetNeuron),
+          ],
+        ),
       ),
     );
   }
 }
 
-const _tabs = <(BehaviorStudioView, String)>[
-  (BehaviorStudioView.overview, 'Overview'),
-  (BehaviorStudioView.scenarios, 'Scenarios'),
-  (BehaviorStudioView.assistantChange, 'Assistant'),
-  (BehaviorStudioView.source, 'Source'),
-  (BehaviorStudioView.revisions, 'Revisions'),
-];
+final class _NeuronLabel extends StatelessWidget {
+  const _NeuronLabel({required this.label, required this.neuron});
+
+  final String label;
+  final String neuron;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: BrainPalette.surfaceSunken,
+        border: Border.all(color: BrainPalette.line),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        child: Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(text: label, style: BrainType.metaStrong),
+              TextSpan(text: ' · $neuron', style: BrainType.meta),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

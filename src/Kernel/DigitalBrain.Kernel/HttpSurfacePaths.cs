@@ -6,10 +6,6 @@ internal static class HttpSurfacePaths
     public const string ChatEventsPath = "/chats/{chatName}/events";
     public const string SurfaceEventsPath = "/surfaces/{surfaceName}/events";
 
-    public const string AuthBootstrapPath = "/auth/bootstrap";
-    public const string AuthLoginPath = "/auth/login";
-    public const string AuthMePath = "/auth/me";
-
     public const string EventStreamContentType = "text/event-stream";
     public const string CacheControlNoCache = "no-cache";
     public const string SurfaceOpenedEvent = "surface-opened";

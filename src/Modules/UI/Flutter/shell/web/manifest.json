@@ -5,7 +5,7 @@
     "display": "standalone",
     "background_color": "#0B1220",
     "theme_color": "#0B1220",
-    "description": "DigitalBrain Behavior Studio and product shell.",
+    "description": "DigitalBrain chat and product shell.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

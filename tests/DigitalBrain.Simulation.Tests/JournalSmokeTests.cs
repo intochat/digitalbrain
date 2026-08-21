@@ -2,7 +2,9 @@ using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Messaging;
 using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Memory;
 using DigitalBrain.Testing;
+using Orleans.Serialization;
 using Xunit;
 using TimerModule = DigitalBrain.Time;
 
@@ -11,6 +13,15 @@ namespace DigitalBrain.Simulation.Tests;
 [Collection(SimulationCollection.Name)]
 public sealed class JournalSmokeTests(SimulationFixture fixture)
 {
+    [Fact]
+    public void HistoricalFactJournalAliasesRemainResolvable()
+    {
+        // Chat used to journal these synapses. They are no longer emitted, but existing
+        // retained journals must still be readable after the fact-memory projection is gone.
+        Assert.Equal("memory.store-fact", AliasOf<StoreFact>());
+        Assert.Equal("memory.fact-stored", AliasOf<FactStored>());
+    }
+
     [Fact]
     public async Task ActivationLandsInTheSessionJournal()
     {
@@ -98,4 +109,10 @@ public sealed class JournalSmokeTests(SimulationFixture fixture)
         var compacted = await Assert.ThrowsAsync<JournalCompactedException>(() => waitTask);
         Assert.Contains("mid-wait", compacted.Message, StringComparison.Ordinal);
     }
+
+    private static string AliasOf<T>()
+        => typeof(T).GetCustomAttributes(typeof(AliasAttribute), inherit: false)
+            .OfType<AliasAttribute>()
+            .Single()
+            .Alias;
 }

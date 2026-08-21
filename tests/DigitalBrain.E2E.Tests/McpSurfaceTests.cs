@@ -17,7 +17,7 @@ public sealed class McpSurfaceTests(AppHostFixture fixture)
     private const string SendChatMessageTool = "send_chat_message";
 
     [Fact]
-    public async Task TheFrozenMcpToolsAnswerOverTheRealProtocol()
+    public async Task TheFrozenMcpToolInvokesChatOverTheRealProtocol()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         // The mcp resource's HTTP endpoint is named "mcp" (ProductSurfaceResources.McpHttpEndpointName),
@@ -37,5 +37,21 @@ public sealed class McpSurfaceTests(AppHostFixture fixture)
         var tools = await client.ListToolsAsync(cancellationToken: cancellationToken);
         var toolNames = tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
         Assert.Equal([SendChatMessageTool], toolNames.OrderBy(static name => name, StringComparer.Ordinal));
+
+        var result = await client.CallToolAsync(
+            SendChatMessageTool,
+            new Dictionary<string, object?>
+            {
+                ["text"] = "MCP end-to-end check",
+                ["commandId"] = Guid.NewGuid().ToString("D"),
+                ["chatName"] = "mcp-e2e",
+                ["timeoutSeconds"] = 30,
+            },
+            cancellationToken: cancellationToken);
+
+        Assert.False(result.IsError);
+        Assert.Equal(
+            "Test assistant reply.",
+            Assert.Single(result.Content.OfType<TextContentBlock>()).Text);
     }
 }

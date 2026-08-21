@@ -1,9 +1,11 @@
 using DigitalBrain.AI;
 using DigitalBrain.AI.Aspire.Hosting;
+using DigitalBrain.AI.FoundryLocal;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Memory;
 using DigitalBrain.Memory.Aspire.Hosting;
+using DigitalBrain.Time;
 using DigitalBrain.UI;
 using DigitalBrain.UI.Aspire.Hosting;
 using Microsoft.Extensions.Hosting;
@@ -16,11 +18,13 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain);
 brain.AddModule<AIModule>(ai =>
 {
     ai.EnableSensitiveData = builder.Environment.IsDevelopment();
-    ai.WithLlm<Gemma4>();
+    ai.WithLlm<IGemma4>();
+    ai.WithEmbedding<IEmbeddingGemma>();
     // Local Whisper STT (Foundry Local). Optional: swap IWhisperSmall / IWhisperTiny for weaker GPUs.
     ai.WithVoiceToText<IWhisperLargeV3Turbo>();
 });
 brain.AddModule<MemoryModule>(memory => memory.WithQdrant());
+brain.AddModule<TimeModule>();
 // AppHost:UiHost=web selects the headless-web shell (e2e evidence); default stays the desktop window.
 var uiHostValue = builder.Configuration["AppHost:UiHost"];
 brain.AddModule<UiModule>(ui =>

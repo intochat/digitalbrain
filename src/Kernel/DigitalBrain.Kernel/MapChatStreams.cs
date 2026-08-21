@@ -25,11 +25,7 @@ internal static class ChatStreamsHttpMaps
                 ArgumentNullException.ThrowIfNull(sessionJournal);
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (!HttpActor.TryGet(http, out var actor))
-                {
-                    http.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                    return;
-                }
+                var actor = HttpActor.Current;
 
                 if (string.IsNullOrWhiteSpace(chatName)
                     || !TryPrincipalResource(actor.PrincipalId, chatName, out var chatInstance))

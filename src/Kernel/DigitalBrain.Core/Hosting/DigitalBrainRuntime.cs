@@ -9,7 +9,7 @@ namespace DigitalBrain.Core;
 [EditorBrowsable(EditorBrowsableState.Never)]
 public static class DigitalBrainRuntime
 {
-    public static void Add(ISiloBuilder builder, ModuleAssemblies modules)
+    public static void Add(ISiloBuilder builder, ModuleManifest modules)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(modules);
@@ -29,12 +29,17 @@ public static class DigitalBrainRuntime
         }
     }
 
-    private static IEnumerable<IModule> ModuleHooksOf(ModuleAssemblies modules)
-        => modules.Implementations
-            .SelectMany(static assembly => assembly.GetTypes())
-            .Where(static type => type is { IsClass: true, IsAbstract: false }
-                && typeof(IModule).IsAssignableFrom(type)
-                && type.GetConstructor(Type.EmptyTypes) is not null)
-            .OrderBy(static type => type.FullName, StringComparer.Ordinal)
-            .Select(static type => (IModule)Activator.CreateInstance(type)!);
+    private static IEnumerable<IModule> ModuleHooksOf(ModuleManifest modules)
+        => modules.Types.Select(static type =>
+        {
+            if (type is not { IsClass: true, IsAbstract: false }
+                || !typeof(IModule).IsAssignableFrom(type)
+                || type.GetConstructor(Type.EmptyTypes) is null)
+            {
+                throw new InvalidOperationException(
+                    $"Configured module '{type.FullName}' must be a concrete {nameof(IModule)} with a public parameterless constructor.");
+            }
+
+            return (IModule)Activator.CreateInstance(type)!;
+        });
 }

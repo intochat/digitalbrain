@@ -29,7 +29,9 @@ public sealed class AIModule : Core.IModule
         // The unkeyed IChatClient IS the main model. Every other model use is an
         // explicit keyed choice (ask_llama).
         builder.Services.TryAddSingleton(static services =>
-            services.GetRequiredKeyedService<IChatClient>(typeof(Gemma4)));
+            services.GetRequiredKeyedService<IChatClient>(typeof(IGemma4)));
+        builder.Services.TryAddSingleton(static services =>
+            services.GetRequiredKeyedService<IEmbeddingGenerator<string, Embedding<float>>>(typeof(IEmbeddingGemma)));
     }
 }
 

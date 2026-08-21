@@ -5,7 +5,7 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Assistant;
-internal sealed class Assistant([FromKeyedServices(typeof(Gemma4))] IChatClient chatClient)
+internal sealed class Assistant([FromKeyedServices(typeof(IGemma4))] IChatClient chatClient)
     : Agent(chatClient), IAssistant
 {
     protected override string? Instructions =>

@@ -19,9 +19,6 @@ const behaviorsDestinationIndex = 2;
 const kitDestinationIndex = 3;
 const windowingDestinationIndex = 4;
 
-typedef LoadBehaviors = Future<BehaviorLibraryDocument> Function();
-typedef OpenBehavior = Future<BehaviorDocument> Function(String behaviorId);
-
 extension ChatTurnKitParts on ChatTurnEvent {
   List<KitPart> get kitParts => [
     for (final button in buttons)

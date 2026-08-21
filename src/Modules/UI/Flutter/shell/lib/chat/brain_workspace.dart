@@ -18,28 +18,24 @@ final class BrainWorkspace extends StatefulWidget {
     super.key,
     required this.chatName,
     this.turns,
-    this.authorizations,
     this.onSend,
     this.onStream,
     this.onStreamVoice,
     this.onAttachmentTap,
     this.onOpenSignIn,
     this.onActivateButton,
-    this.behaviorClient,
     this.userActions = const [],
     this.statusMessage,
   });
 
   final String chatName;
   final Stream<ChatTurnEvent>? turns;
-  final Stream<AuthorizationEvent>? authorizations;
   final SendMessage? onSend;
   final StreamMessage? onStream;
   final StreamVoice? onStreamVoice;
   final VoidCallback? onAttachmentTap;
   final OpenUrl? onOpenSignIn;
   final ActivateChatButton? onActivateButton;
-  final BehaviorClient? behaviorClient;
   final List<UserActionCardModel> userActions;
   final String? statusMessage;
 
@@ -59,7 +55,6 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
     _session = WorkspaceSession(
       chatName: widget.chatName,
       turns: widget.turns,
-      authorizations: widget.authorizations,
     )..addListener(_onSession);
   }
 
@@ -77,9 +72,6 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
     }
     if (!identical(oldWidget.turns, widget.turns)) {
       _session.listenTurns(widget.turns);
-    }
-    if (!identical(oldWidget.authorizations, widget.authorizations)) {
-      _session.listenAuthorizations(widget.authorizations);
     }
   }
 
@@ -108,7 +100,6 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
           BrainChatScreen(
             chatName: widget.chatName,
             turns: _session.projectedTurns,
-            signInCards: _session.signInCards,
             onSend: widget.onSend,
             onStream: widget.onStream,
             onStreamVoice: widget.onStreamVoice,
@@ -122,7 +113,6 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
             onOpenUserAction: widget.onOpenSignIn,
           ),
           BehaviorWorkspace(
-            client: widget.behaviorClient,
             userActions: widget.userActions,
             onOpenUserAction: widget.onOpenSignIn,
           ),

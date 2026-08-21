@@ -1,5 +1,6 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using DigitalBrain.AI.FoundryLocal;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Aspire.Hosting;
 
@@ -28,7 +29,14 @@ public static class AIHostingExtensions
         return module;
     }
 
-    // Local Whisper STT (Foundry Local). Marker types: IWhisperTiny / IWhisperSmall / IWhisperLargeV3Turbo.
+    public static DigitalBrainModuleBuilder<AIModule> WithEmbedding<TModel>(this DigitalBrainModuleBuilder<AIModule> module)
+        where TModel : class
+    {
+        State(module).Add<TModel>();
+        return module;
+    }
+
+    // Local Whisper STT (Foundry Local). Marker types live in DigitalBrain.AI.FoundryLocal.
     public static DigitalBrainModuleBuilder<AIModule> WithVoiceToText<TModel>(
         this DigitalBrainModuleBuilder<AIModule> module)
         where TModel : class
@@ -67,6 +75,7 @@ public static class AIHostingExtensions
         private const string OllamaImageTag = "latest";
 
         private static readonly (string ResourceName, string Tag) Gemma4Model = ("gemma4-12b", "gemma4:12b");
+        private static readonly (string ResourceName, string Tag) EmbeddingGemmaModel = ("embeddinggemma", "embeddinggemma");
 
         private readonly HashSet<Type> _models = [];
         private readonly Dictionary<Type, IResourceBuilder<OllamaModelResource>> _ollamaModels = [];
@@ -85,14 +94,20 @@ public static class AIHostingExtensions
                     $"{model.FullName} is already configured on brain '{brain.Name}'. Add each model exactly once.");
             }
 
-            if (model == typeof(DigitalBrain.AI.Ollama.Gemma4))
+            if (model == typeof(DigitalBrain.AI.Ollama.IGemma4))
             {
                 AddOllamaModel(model, Gemma4Model.ResourceName, Gemma4Model.Tag);
                 return Gemma4Feature;
             }
 
+            if (model == typeof(DigitalBrain.AI.Ollama.IEmbeddingGemma))
+            {
+                AddOllamaModel(model, EmbeddingGemmaModel.ResourceName, EmbeddingGemmaModel.Tag);
+                return "ai.embedding.embeddinggemma";
+            }
+
             throw new NotSupportedException(
-                $"{model.FullName} is not the product chat model. Use {nameof(DigitalBrain.AI.Ollama.Gemma4)}.");
+                $"{model.FullName} is not a supported product AI model. Use {nameof(DigitalBrain.AI.Ollama.IGemma4)} or {nameof(DigitalBrain.AI.Ollama.IEmbeddingGemma)}.");
         }
 
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)

@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Text.Json;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Messaging;
 using DigitalBrain.Abstractions.Neurons;
@@ -41,32 +40,4 @@ public sealed class BootSmokeTests(AppHostFixture fixture)
         Assert.NotNull(delivery.Synapse);
     }
 
-    // Task 5's minimal cookie dev-auth (DevCookieAuth.cs), exercised against a live kernel
-    // rather than in-memory: the shell's default owner credentials (host_environment.dart) must
-    // set a cookie on login, and that cookie must authenticate the following /auth/me call.
-    [Fact]
-    public async Task AuthEndpointsServeTheShellContract()
-    {
-        using var http = fixture.CreateHttpClient("kernel");
-        var cancellationToken = TestContext.Current.CancellationToken;
-
-        var login = await http.PostAsJsonAsync(
-            "/auth/login",
-            new { username = "owner", password = "ownerowner" },
-            cancellationToken);
-
-        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
-        Assert.True(
-            login.Headers.TryGetValues("Set-Cookie", out var cookies)
-                && cookies.Any(cookie => cookie.StartsWith("DigitalBrain.Auth=", StringComparison.Ordinal)),
-            "POST /auth/login did not set the DigitalBrain.Auth cookie.");
-
-        var me = await http.GetAsync("/auth/me", cancellationToken);
-        Assert.Equal(HttpStatusCode.OK, me.StatusCode);
-
-        var body = await me.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
-        Assert.Equal("owner", body.GetProperty("username").GetString());
-        Assert.True(body.GetProperty("isBootstrapOwner").GetBoolean());
-        Assert.False(string.IsNullOrWhiteSpace(body.GetProperty("principalId").GetString()));
-    }
 }

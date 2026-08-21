@@ -13,6 +13,35 @@ namespace DigitalBrain.Aspire.Tests;
 [Collection(ModelCollection.Name)]
 public sealed class NamesConformanceTests(ModelFixture fixture)
 {
+    [Fact]
+    public async Task KernelRenderedEnvironmentContainsTheSelectedEmbeddingModel()
+    {
+        var environment = await fixture.Model.RenderedEnvironmentAsync(ProductSurfaceResourceNames.Kernel);
+
+        Assert.True(environment.ContainsKey("DigitalBrain__AI__Ollama__IEmbeddingGemma__Model"));
+    }
+
+    [Fact]
+    public async Task KernelRenderedEnvironmentContainsTheExplicitAppHostModuleManifest()
+    {
+        var environment = await fixture.Model.RenderedEnvironmentAsync(ProductSurfaceResourceNames.Kernel);
+
+        var modules = environment
+            .Where(static pair => pair.Key.StartsWith("DigitalBrain__Modules__", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(static pair => pair.Key, StringComparer.Ordinal)
+            .Select(static pair => pair.Value)
+            .ToArray();
+
+        Assert.Equal(
+            [
+                "DigitalBrain.AI.AIModule, DigitalBrain.Modules.AI",
+                "DigitalBrain.Memory.MemoryModule, DigitalBrain.Modules.Memory",
+                "DigitalBrain.Time.TimeModule, DigitalBrain.Modules.Time",
+                "DigitalBrain.UI.UiModule, DigitalBrain.Modules.UI",
+            ],
+            modules);
+    }
+
     [Theory]
     [InlineData(DigitalBrainNames.Clustering)]
     [InlineData(DigitalBrainNames.Reminders)]

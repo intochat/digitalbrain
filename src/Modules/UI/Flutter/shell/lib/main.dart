@@ -12,16 +12,9 @@ Future<void> main() async {
   final chat = DigitalBrainHostEnv.resolveChat();
 
   DigitalBrainUiClient? client;
-  BehaviorClient? behavior;
   String? status;
   try {
     client = DigitalBrainUiClient.fromEnvironment();
-    final me = await client.ensureSession();
-    // Same cookie jar as the UI session — behavior host is not anonymous.
-    behavior = BehaviorClient.sharingSession(client);
-    debugPrint(
-      'DigitalBrain session: ${me.username} principal=${me.principalId}',
-    );
   } on Object catch (error) {
     status = error.toString();
     debugPrint('DigitalBrain session failed: $error');
@@ -34,7 +27,6 @@ Future<void> main() async {
       chatName: chat,
       statusMessage: status,
       turns: edge?.watchChatTurns(chatName: chat),
-      authorizations: edge?.watchAuthorizations(),
       onStream: edge == null
           ? null
           : (text) => edge.streamMessage(chatName: chat, text: text),
@@ -55,7 +47,6 @@ Future<void> main() async {
                   action: action,
                 ),
       onOpenSignIn: openExternalUrl,
-      behaviorClient: behavior,
     ),
   );
 }

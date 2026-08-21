@@ -25,11 +25,7 @@ internal static class SurfaceStreamsHttpMaps
                 ArgumentNullException.ThrowIfNull(sessionJournal);
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (!HttpActor.TryGet(http, out var actor))
-                {
-                    http.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                    return;
-                }
+                var actor = HttpActor.Current;
 
                 if (string.IsNullOrWhiteSpace(surfaceName)
                     || !TryPrincipalResource(actor.PrincipalId, surfaceName, out var surfaceInstance))

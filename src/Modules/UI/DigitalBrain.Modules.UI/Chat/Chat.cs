@@ -4,7 +4,6 @@ using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Chat;
 using DigitalBrain.Core;
-using DigitalBrain.Memory;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
@@ -471,15 +470,6 @@ internal sealed class Chat : Neuron, IChat
             Remember(new ChatTurn(FromUser: false, result.Answer));
         }
 
-        await SendAsync(
-            IFactMemory.ForOwner(Id.Owner),
-            new StoreFact(
-                CommandId.New(),
-                Kind: "chat.responded",
-                Text: result.Answer,
-                Correlation: record.CommandId.ToString("n"),
-                At: TimeProvider.GetUtcNow()))
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private static bool IsTerminal(ChatTurnStatus status)

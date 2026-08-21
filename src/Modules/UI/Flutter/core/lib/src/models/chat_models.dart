@@ -34,19 +34,12 @@ final class ChatDelta {
               .toList(growable: false)
         : const <ChatDeltaPart>[];
 
-    return ChatDelta(
-      role: json['role'] as String?,
-      contents: contents,
-    );
+    return ChatDelta(role: json['role'] as String?, contents: contents);
   }
 }
 
 final class ChatDeltaPart {
-  const ChatDeltaPart({
-    required this.type,
-    this.text,
-    required this.raw,
-  });
+  const ChatDeltaPart({required this.type, this.text, required this.raw});
 
   final String type;
   final String? text;
@@ -168,9 +161,7 @@ final class ChatTurnEvent {
     final charts = rawCharts is List
         ? rawCharts
               .whereType<Map>()
-              .map(
-                (e) => ChatChartOffer.fromJson(Map<String, Object?>.from(e)),
-              )
+              .map((e) => ChatChartOffer.fromJson(Map<String, Object?>.from(e)))
               .toList(growable: false)
         : const <ChatChartOffer>[];
     final rawTimers = json['timers'];
@@ -214,5 +205,3 @@ final class ChatTimerOffer {
     );
   }
 }
-
-/// Journal projection of MCP authorization facts from UI-HTTP SSE.
