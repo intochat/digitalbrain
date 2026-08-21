@@ -1,0 +1,10 @@
+# Pinned to the upstream moshi/pyproject dependency ranges for commit 3428dfd95309a7f3c84fd93259ded0f810d1ff91.
+aiohttp==3.10.11
+einops==0.7.0
+huggingface-hub==0.24.7
+numpy==1.26.4
+safetensors==0.4.5
+sentencepiece==0.2.0
+sphn==0.1.5
+torch==2.4.1
+accelerate==0.34.2
