@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 
+using DigitalBrain.Abstractions.Neurons;
 namespace DigitalBrain.Abstractions.Identity;
 
 [GenerateSerializer]

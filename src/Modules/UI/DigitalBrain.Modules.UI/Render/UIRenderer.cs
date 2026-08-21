@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Core;
 
 namespace DigitalBrain.UI;

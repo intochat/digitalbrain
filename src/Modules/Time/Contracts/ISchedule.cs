@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions;
 
+using DigitalBrain.Abstractions.Neurons;
 namespace DigitalBrain.Time;
 
 // Recurring cadence with durable next-due and phase-preserving catch-up.

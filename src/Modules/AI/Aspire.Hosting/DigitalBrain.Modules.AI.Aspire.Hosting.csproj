@@ -5,7 +5,6 @@
     <RootNamespace>DigitalBrain.AI.Aspire.Hosting</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Aspire.Hosting.OpenAI" />
     <PackageReference Include="CommunityToolkit.Aspire.Hosting.Ollama" />
   </ItemGroup>
   <ItemGroup>

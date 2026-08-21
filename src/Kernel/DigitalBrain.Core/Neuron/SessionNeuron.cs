@@ -3,6 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.BroadcastChannel;
 using Orleans.Journaling;
 
+using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Journals;
 namespace DigitalBrain.Core;
 
 internal sealed class SessionNeuron : Neuron, ISessionNeuron

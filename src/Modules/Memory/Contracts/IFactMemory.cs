@@ -1,3 +1,5 @@
+using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.Memory;
 
 // Watermarked, resumable owner (or principal) projection of durable story facts — the

@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions;
 
+using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.Chat;
 
 [GenerateSerializer]

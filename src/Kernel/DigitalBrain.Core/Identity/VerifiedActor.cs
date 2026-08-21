@@ -1,6 +1,7 @@
 using DigitalBrain.Abstractions;
 using Orleans.Runtime;
 
+using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.Core;
 
 // Ambient verified principal for the current authenticated turn. Uses Orleans

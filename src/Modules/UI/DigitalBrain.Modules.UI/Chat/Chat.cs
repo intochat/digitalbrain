@@ -1,5 +1,7 @@
 using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Chat;
 using DigitalBrain.Core;
 using DigitalBrain.Memory;

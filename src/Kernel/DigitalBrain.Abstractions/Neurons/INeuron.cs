@@ -1,5 +1,7 @@
 using Orleans.Concurrency;
 
+using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Journals;
 namespace DigitalBrain.Abstractions.Neurons;
 
 [Alias("DigitalBrain.Abstractions.INeuron")]

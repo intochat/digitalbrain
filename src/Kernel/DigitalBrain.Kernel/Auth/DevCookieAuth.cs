@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 
+using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.Kernel;
 
 // Single-owner dev auth. The Flutter shell's default credentials (host_environment.dart:

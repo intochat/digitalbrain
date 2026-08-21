@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions;
 
+using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.Kernel;
 
 internal static class PrincipalSurface

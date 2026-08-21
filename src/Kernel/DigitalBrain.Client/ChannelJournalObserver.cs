@@ -1,6 +1,7 @@
 using System.Threading.Channels;
 using DigitalBrain.Abstractions;
 
+using DigitalBrain.Abstractions.Journals;
 namespace DigitalBrain.Client;
 
 internal sealed class ChannelJournalObserver : IJournalObserver

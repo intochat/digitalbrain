@@ -1,8 +1,6 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
-using Aspire.Hosting.OpenAI;
 using DigitalBrain.AI.Ollama;
-using DigitalBrain.AI.OpenAI;
 using DigitalBrain.Aspire.Hosting;
 
 namespace DigitalBrain.AI.Aspire.Hosting;
@@ -12,11 +10,7 @@ public static class AIHostingExtensions
     private const string EnableSensitiveDataEnvironmentKey =
         "DigitalBrain__AI__Telemetry__EnableSensitiveData";
 
-    public const string Llama32Feature = "ai.llm.llama32";
     public const string Gemma4Feature = "ai.llm.gemma4";
-    public const string Qwen35Feature = "ai.llm.qwen35";
-    public const string Granite41Feature = "ai.llm.granite41";
-    public const string Gpt56Feature = "ai.llm.gpt56";
 
     extension(DigitalBrainModuleBuilder<AIModule> module)
     {
@@ -28,7 +22,7 @@ public static class AIHostingExtensions
     }
 
     public static DigitalBrainModuleBuilder<AIModule> WithLlm<TModel>(this DigitalBrainModuleBuilder<AIModule> module)
-        where TModel : class, ILLM
+        where TModel : class
     {
         State(module).Add<TModel>();
         return module;
@@ -72,25 +66,16 @@ public static class AIHostingExtensions
     {
         private const string OllamaImageTag = "latest";
 
-        private static readonly Dictionary<Type, (string ResourceName, string Tag, string Feature)> OllamaModelCatalog = new()
-        {
-            [typeof(Llama32)] = ("llama32-3b", "llama3.2", Llama32Feature),
-            [typeof(Gemma4)] = ("gemma4-12b", "gemma4:12b", Gemma4Feature),
-            [typeof(Qwen35)] = ("qwen35-9b", "qwen3.5:9b", Qwen35Feature),
-            [typeof(Granite41)] = ("granite41-8b", "granite4.1:8b", Granite41Feature),
-        };
+        private static readonly (string ResourceName, string Tag) Gemma4Model = ("gemma4-12b", "gemma4:12b");
 
         private readonly HashSet<Type> _models = [];
         private readonly Dictionary<Type, IResourceBuilder<OllamaModelResource>> _ollamaModels = [];
         private IResourceBuilder<OllamaResource>? _ollama;
-        private IResourceBuilder<OpenAIResource>? _openAI;
-        private IResourceBuilder<OpenAIModelResource>? _gpt56;
-        private IResourceBuilder<ParameterResource>? _openAIKey;
 
         internal bool EnableSensitiveData { get; set; }
 
         internal string Add<TModel>()
-            where TModel : class, ILLM
+            where TModel : class
         {
             var model = typeof(TModel);
 
@@ -100,20 +85,14 @@ public static class AIHostingExtensions
                     $"{model.FullName} is already configured on brain '{brain.Name}'. Add each model exactly once.");
             }
 
-            if (OllamaModelCatalog.TryGetValue(model, out var ollama))
+            if (model == typeof(DigitalBrain.AI.Ollama.Gemma4))
             {
-                AddOllamaModel(model, ollama.ResourceName, ollama.Tag);
-                return ollama.Feature;
-            }
-
-            if (model == typeof(Gpt56))
-            {
-                AddGpt56();
-                return Gpt56Feature;
+                AddOllamaModel(model, Gemma4Model.ResourceName, Gemma4Model.Tag);
+                return Gemma4Feature;
             }
 
             throw new NotSupportedException(
-                $"{model.FullName} has no Aspire integration. The AI module must own the provider resource for every concrete LLM.");
+                $"{model.FullName} is not the product chat model. Use {nameof(DigitalBrain.AI.Ollama.Gemma4)}.");
         }
 
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
@@ -131,14 +110,6 @@ public static class AIHostingExtensions
                     .WithEnvironment("DigitalBrain__AI__Ollama__Endpoint", resource.Resource.Parent.UriExpression)
                     .WithEnvironment($"DigitalBrain__AI__Ollama__{model.Name}__Model", resource.Resource.ModelName);
             }
-
-            if (_gpt56 is not null)
-            {
-                builder
-                    .WithEnvironment("DigitalBrain__AI__OpenAI__ApiKey", _openAIKey!)
-                    .WithEnvironment("DigitalBrain__AI__OpenAI__Endpoint", _gpt56.Resource.Parent.UriExpression)
-                    .WithEnvironment("DigitalBrain__AI__OpenAI__Gpt56__Model", _gpt56.Resource.Model);
-            }
         }
 
         private IResourceBuilder<OllamaResource> EnsureOllama()
@@ -149,27 +120,11 @@ public static class AIHostingExtensions
                 .WithDataVolume()
                 .WithLifetime(ContainerLifetime.Persistent)
                 .WithEnvironment("OLLAMA_KEEP_ALIVE", "-1")
-                .WithOpenWebUI(
-                    uiContainer => uiContainer.WithLifetime(ContainerLifetime.Persistent),
-                    containerName: "openwebui")
                 .WithParentRelationship(brain.Resource);
 
         private void AddOllamaModel(Type model, string resourceName, string tag)
             => _ollamaModels[model] = EnsureOllama().AddModel(resourceName, tag);
 
-        private void AddGpt56()
-        {
-            var builder = brain.ApplicationBuilder;
-            _openAIKey ??= builder
-                .AddParameter("openai-api-key", secret: true)
-                .WithDescription(
-                    "Create or manage an API key at [OpenAI Platform](https://platform.openai.com/api-keys).",
-                    enableMarkdown: true);
-            _openAI ??= builder
-                .AddOpenAI("openai")
-                .WithApiKey(_openAIKey);
-            _gpt56 = _openAI.AddModel("gpt56", "gpt-5.6");
-        }
     }
 
     private sealed class VoiceToTextHostingState(DigitalBrainBuilder brain) : DigitalBrainModuleProjection

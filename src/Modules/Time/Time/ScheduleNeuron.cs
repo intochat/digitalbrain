@@ -1,5 +1,7 @@
 using System.Globalization;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Core;
 using DigitalBrain.Memory;
 using Microsoft.Extensions.DependencyInjection;

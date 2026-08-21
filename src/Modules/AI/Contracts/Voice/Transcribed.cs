@@ -1,5 +1,7 @@
 using DigitalBrain.Abstractions;
 
+using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.AI;
 
 [GenerateSerializer]

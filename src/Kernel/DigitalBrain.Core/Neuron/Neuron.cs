@@ -5,6 +5,10 @@ using DigitalBrain.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 
+using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Journals;
 namespace DigitalBrain.Core;
 
 public abstract class Neuron :

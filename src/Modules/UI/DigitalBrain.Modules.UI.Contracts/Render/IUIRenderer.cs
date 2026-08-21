@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions;
 
+using DigitalBrain.Abstractions.Neurons;
 namespace DigitalBrain.UI;
 
 // The one write path into UI entities. A renderer instance shares its name with the entity it

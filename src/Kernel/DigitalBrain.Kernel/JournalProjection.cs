@@ -3,6 +3,8 @@ using System.Net.ServerSentEvents;
 using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 
+using DigitalBrain.Abstractions.Journals;
+using DigitalBrain.Abstractions.Messaging;
 namespace DigitalBrain.Kernel;
 
 internal static class JournalProjection

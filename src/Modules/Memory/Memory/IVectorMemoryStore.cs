@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.Security;
 
 namespace DigitalBrain.Memory;
 

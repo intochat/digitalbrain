@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using DigitalBrain.Abstractions;
 
+using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.Kernel;
 
 internal static class HttpActor

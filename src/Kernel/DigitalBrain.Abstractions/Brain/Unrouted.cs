@@ -1,3 +1,5 @@
+using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.Abstractions.Brain;
 
 // An emission that resolved zero receivers is journaled and never delivered. Without this

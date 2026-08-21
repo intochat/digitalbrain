@@ -22,13 +22,13 @@ public static class DigitalBrainRuntimeHostingExtensions
         // provider through Orleans' own config-driven discovery, which resolves its
         // BlobServiceClient via GetRequiredKeyedService<BlobServiceClient>("grainstate") — so the
         // keyed client below is the only piece the runtime needs to supply. Setting
-        // AzureBlobStorageOptions.BlobServiceClient manually (DurableStateHosting's journal style)
+        // AzureBlobStorageOptions.BlobServiceClient must be registered before Orleans applies
         // does not work here: the auto-wired provider's own Configure delegate runs afterward and
         // unconditionally overwrites it, throwing when no keyed client is registered.
         builder.AddKeyedAzureBlobServiceClient(DigitalBrainNames.GrainState);
         builder.UseOrleans(silo =>
         {
-            silo.AddDigitalBrainDurableState(builder.Configuration);
+            silo.AddAzureBlobJournal(builder.Configuration);
             DigitalBrainRuntime.Add(silo, modules);
             silo.AddDashboard(options =>
             {

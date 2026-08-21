@@ -1,6 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 
+using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.UI;
 
 // Everything the turn worker needs to run one durable chat turn's AI attempt.

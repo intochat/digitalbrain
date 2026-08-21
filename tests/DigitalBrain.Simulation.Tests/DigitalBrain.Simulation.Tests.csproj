@@ -10,9 +10,7 @@
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and $([MSBuild]::IsOSPlatform('Windows'))">win-x64</RuntimeIdentifier>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="xunit.v3" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="xunit.v3.mtp-v2" />
     <!-- Host pin mirroring DigitalBrain.Kernel: the AI module keeps Foundry Local private,
          so any host loading its assembly needs the managed Foundry assemblies on disk. -->
     <PackageReference Include="Microsoft.AI.Foundry.Local" />

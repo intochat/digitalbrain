@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using DigitalBrain.Abstractions;
 using Orleans;
 
+using DigitalBrain.Abstractions.Messaging;
 namespace DigitalBrain.Core;
 
 public static class SynapseTypeIndex

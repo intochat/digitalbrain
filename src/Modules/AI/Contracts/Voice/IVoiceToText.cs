@@ -1,5 +1,7 @@
 using DigitalBrain.Abstractions;
 
+using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.AI;
 
 [Alias("ai.voice-to-text")]

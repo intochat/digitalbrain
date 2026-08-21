@@ -2,9 +2,8 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Kernel;
 
-// Silo contracts + implementation assemblies. AppHost AddModule<> is the
-// product composition root (see AppHost.cs) — keep these lists aligned when
-// shipping a new module into the silo.
+// The Kernel is the only runtime module catalog. AppHost only projects external
+// resources and configuration into this process; it does not choose silo modules.
 public static class ProductModules
 {
     public static ModuleAssemblies Assemblies { get; } = new(

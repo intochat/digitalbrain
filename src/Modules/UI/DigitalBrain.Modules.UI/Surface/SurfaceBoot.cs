@@ -1,4 +1,7 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Core;
 using Orleans.BroadcastChannel;
 

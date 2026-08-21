@@ -64,7 +64,7 @@ public sealed class DigitalBrainBuilder
         return state;
     }
 
-    internal void AddProjection(DigitalBrainModuleProjection projection)
+    public void AddProjection(DigitalBrainModuleProjection projection)
     {
         ArgumentNullException.ThrowIfNull(projection);
 
@@ -88,5 +88,4 @@ public sealed class DigitalBrainBuilder
     }
 
     public DigitalBrainClientReference AsClient() => new(this);
-
 }

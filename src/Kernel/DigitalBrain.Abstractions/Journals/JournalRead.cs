@@ -1,3 +1,4 @@
+using DigitalBrain.Abstractions.Messaging;
 namespace DigitalBrain.Abstractions.Journals;
 
 [GenerateSerializer]

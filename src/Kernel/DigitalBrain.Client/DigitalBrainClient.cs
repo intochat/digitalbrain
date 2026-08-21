@@ -3,6 +3,12 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Journals;
+using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Entities;
+using DigitalBrain.Abstractions.Brain;
 namespace DigitalBrain.Client;
 
 public sealed class DigitalBrainClient : IDigitalBrain

@@ -6,6 +6,9 @@ using DigitalBrain.Client;
 using DigitalBrain.UI;
 using Microsoft.Extensions.AI;
 
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Journals;
+using DigitalBrain.Abstractions.Neurons;
 namespace DigitalBrain.Kernel;
 
 internal static class OwnerCommandsHttpMaps

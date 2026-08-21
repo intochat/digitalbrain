@@ -1,3 +1,6 @@
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Journals;
 namespace DigitalBrain.Abstractions.Neurons;
 
 [Alias("DigitalBrain.Abstractions.ISessionNeuron")]

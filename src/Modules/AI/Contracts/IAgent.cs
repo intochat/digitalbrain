@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 using Microsoft.Extensions.AI;
 
+using DigitalBrain.Abstractions.Neurons;
 namespace DigitalBrain.AI;
 
 [Alias(nameof(IAgent))]

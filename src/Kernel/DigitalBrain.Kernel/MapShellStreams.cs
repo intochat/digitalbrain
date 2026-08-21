@@ -2,6 +2,8 @@ using System.Net.ServerSentEvents;
 using DigitalBrain.Abstractions;
 using DigitalBrain.UI;
 
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Messaging;
 namespace DigitalBrain.Kernel;
 
 internal static class SurfaceStreamsHttpMaps

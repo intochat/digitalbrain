@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions;
 
+using DigitalBrain.Abstractions.Messaging;
 namespace DigitalBrain.Memory;
 
 [GenerateSerializer]

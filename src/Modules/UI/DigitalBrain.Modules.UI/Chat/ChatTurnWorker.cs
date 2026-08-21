@@ -1,5 +1,6 @@
 using System.Text;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.AI;
 using DigitalBrain.Chat;
 using DigitalBrain.Core;

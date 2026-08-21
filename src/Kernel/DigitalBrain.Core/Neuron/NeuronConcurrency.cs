@@ -2,6 +2,7 @@ using System.Reflection;
 using DigitalBrain.Abstractions;
 using Orleans.Concurrency;
 
+using DigitalBrain.Abstractions.Neurons;
 namespace DigitalBrain.Core;
 
 internal static class NeuronConcurrency

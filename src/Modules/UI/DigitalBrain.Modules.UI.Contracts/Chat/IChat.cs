@@ -2,6 +2,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.UI;
 using Microsoft.Extensions.AI;
 
+using DigitalBrain.Abstractions.Neurons;
 namespace DigitalBrain.Chat;
 
 [Alias("chat")]

@@ -38,7 +38,6 @@ public static class DigitalBrainHostingExtensions
             .WithGrainStorage(DigitalBrainNames.DefaultGrainStorage, grainState);
         var brain = new DigitalBrainBuilder(builder, name, resource, orleans, durableStateStore, grainState);
 
-        // Silo and clients WaitUntilHealthy for the full fabric before starting.
         brain.RequireHealthyBeforeStart(storage.Resource);
         brain.RequireHealthyBeforeStart(clustering.Resource);
         brain.RequireHealthyBeforeStart(reminders.Resource);
@@ -87,7 +86,6 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(client);
 
         builder.WithReference(client.Brain.Orleans.AsClient());
-        // Client processes need clustering tables up before connecting.
         WaitUntilHealthy(builder, client.Brain.StartupDependencies);
         return builder;
     }
@@ -102,5 +100,4 @@ public static class DigitalBrainHostingExtensions
             builder.WithAnnotation(new WaitAnnotation(dependency, WaitType.WaitUntilHealthy, exitCode: 0));
         }
     }
-
 }

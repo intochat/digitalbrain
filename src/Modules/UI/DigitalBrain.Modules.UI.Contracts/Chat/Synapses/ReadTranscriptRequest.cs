@@ -1,6 +1,8 @@
 using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions;
 
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Messaging;
 namespace DigitalBrain.Chat;
 
 [GenerateSerializer]

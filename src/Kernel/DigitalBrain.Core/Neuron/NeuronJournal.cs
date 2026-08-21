@@ -1,5 +1,7 @@
 using DigitalBrain.Abstractions;
 
+using DigitalBrain.Abstractions.Journals;
+using DigitalBrain.Abstractions.Messaging;
 namespace DigitalBrain.Core;
 
 internal sealed class NeuronJournal

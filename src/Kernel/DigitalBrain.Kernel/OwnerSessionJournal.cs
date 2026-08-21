@@ -3,6 +3,8 @@ using DigitalBrain.Chat;
 using DigitalBrain.Client;
 using DigitalBrain.UI;
 
+using DigitalBrain.Abstractions.Journals;
+using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.Kernel;
 
 internal sealed class OwnerSessionJournal(IDigitalBrain brain)
