@@ -20,8 +20,9 @@ RUN printf '%s\n' \
     && git checkout --detach "${PERSONAPLEX_COMMIT}"
 
 WORKDIR /opt/adapter
-COPY pyproject.toml uv.lock requirements.lock ./
-RUN python3 -m pip install --no-cache-dir --require-hashes -r requirements.lock \
+COPY pyproject.toml uv.lock requirements.lock build-requirements.lock ./
+RUN python3 -m pip install --no-cache-dir --require-hashes -r build-requirements.lock \
+    && python3 -m pip install --no-cache-dir --require-hashes -r requirements.lock \
     && python3 -m pip install --no-cache-dir --no-deps --no-build-isolation /opt/personaplex/moshi
 
 COPY entrypoint.py ./entrypoint.py

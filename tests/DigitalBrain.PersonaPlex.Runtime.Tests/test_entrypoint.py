@@ -166,16 +166,23 @@ class RuntimeStateTests(unittest.TestCase):
 
 
 class ContainerDefinitionTests(unittest.TestCase):
-    def test_image_is_digest_pinned_internal_only_and_has_locked_audio_dependency(self):
+    def test_image_uses_locked_current_build_backend_before_installing_moshi(self):
         root = ENTRYPOINT.parent
         dockerfile = (root / "Dockerfile").read_text(encoding="utf-8")
         requirements = (root / "requirements.lock").read_text(encoding="utf-8")
+        build_requirements_path = root / "build-requirements.lock"
 
         self.assertIn("@sha256:", dockerfile)
         self.assertNotIn("EXPOSE", dockerfile)
         self.assertIn("sounddevice==0.5.1", requirements)
         self.assertIn("--no-deps --no-build-isolation /opt/personaplex/moshi", dockerfile)
         self.assertIn("--require-hashes -r requirements.lock", dockerfile)
+        self.assertIn("--require-hashes -r build-requirements.lock", dockerfile)
+        self.assertTrue(build_requirements_path.is_file())
+        build_requirements = build_requirements_path.read_text(encoding="utf-8")
+        self.assertIn("setuptools==", build_requirements)
+        self.assertIn("wheel==", build_requirements)
+        self.assertIn("--hash=sha256:", build_requirements)
         self.assertIn("snapshot.ubuntu.com", dockerfile)
         self.assertIn("python3-setuptools", dockerfile)
         self.assertTrue((root / "uv.lock").is_file())
