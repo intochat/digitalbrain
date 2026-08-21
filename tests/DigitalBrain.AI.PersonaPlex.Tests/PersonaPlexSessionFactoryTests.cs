@@ -196,6 +196,41 @@ public sealed class PersonaPlexSessionFactoryTests
     }
 
     [Fact]
+    public async Task CancelledStopStillDrainsSessionsAndDisposesModelSet()
+    {
+        var modelDirectory = CreateInvalidFourGraphDirectory();
+        try
+        {
+            var modelSet = new ControllableModelSet();
+            await using var factory = CreateFactoryWithModelSet(modelDirectory, modelSet);
+            await factory.StartAsync(CancellationToken.None);
+            await factory.CreateAsync(
+                new PersonaPlexSessionRequest("connection-1"),
+                TestContext.Current.CancellationToken);
+            using var cancellationSource = new CancellationTokenSource();
+            cancellationSource.Cancel();
+
+            var stopTask = factory.StopAsync(cancellationSource.Token);
+            var firstCompletion = await Task.WhenAny(
+                modelSet.Session.DisposeStarted.Task,
+                stopTask);
+
+            modelSet.Session.AllowCompletion.TrySetResult();
+            var stopException = await Record.ExceptionAsync(() => stopTask);
+
+            Assert.Same(modelSet.Session.DisposeStarted.Task, firstCompletion);
+            Assert.Null(stopException);
+            Assert.True(modelSet.DisposedAfterSession);
+            Assert.Equal(PersonaPlexReadinessState.Failed, factory.Readiness.State);
+            Assert.Equal("PersonaPlex runtime is stopped.", factory.Readiness.Message);
+        }
+        finally
+        {
+            Directory.Delete(modelDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task DisposeDrainsLiveSessionsBeforeDisposingModelSetAndMovesAwayFromReady()
     {
         var modelDirectory = CreateInvalidFourGraphDirectory();

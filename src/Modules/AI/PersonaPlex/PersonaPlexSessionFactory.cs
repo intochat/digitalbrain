@@ -181,7 +181,8 @@ public sealed class PersonaPlexSessionFactory : IPersonaPlexSessionFactory, IHos
             }
         }
 
-        await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        // Stopping is terminal; caller cancellation cannot abandon owned sessions or model resources.
+        await _lifecycleGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
         try
         {
             await DrainSessionsAsync().ConfigureAwait(false);
