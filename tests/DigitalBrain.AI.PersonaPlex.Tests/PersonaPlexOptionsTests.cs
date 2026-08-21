@@ -16,4 +16,18 @@ public sealed class PersonaPlexOptionsTests
 
         Assert.Throws<InvalidOperationException>(options.Validate);
     }
+
+    [Fact]
+    public void ValidateRejectsNonPositiveMaxSessions()
+    {
+        var options = new PersonaPlexOptions
+        {
+            Enabled = true,
+            MaxSessions = 0,
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(options.Validate);
+
+        Assert.Equal("PersonaPlex requires at least one session.", exception.Message);
+    }
 }

@@ -53,6 +53,68 @@ public sealed class PersonaPlexSessionFactoryTests
     }
 
     [Fact]
+    public async Task ConfiguredMaxSessionsAtomicallyRejectsAdditionalLiveSessions()
+    {
+        var modelDirectory = CreateInvalidFourGraphDirectory();
+        try
+        {
+            var options = new PersonaPlexOptions
+            {
+                Enabled = true,
+                ModelDirectory = modelDirectory,
+                MaxSessions = 1,
+            };
+
+            var modelSet = new InstantSessionModelSet();
+            await using var factory = new PersonaPlexSessionFactory(
+                Options.Create(options),
+                NullLogger<PersonaPlexSessionFactory>.Instance,
+                _ => modelSet);
+            await factory.StartAsync(CancellationToken.None);
+            var testCancellation = TestContext.Current.CancellationToken;
+
+            var attempts = await Task.WhenAll(Enumerable.Range(0, 8).Select(async index =>
+            {
+                try
+                {
+                    return new SessionAttempt(
+                        await factory.CreateAsync(
+                            new PersonaPlexSessionRequest($"connection-{index}"),
+                            testCancellation),
+                        null);
+                }
+                catch (Exception exception)
+                {
+                    return new SessionAttempt(null, exception);
+                }
+            }));
+
+            var grantedSessions = attempts
+                .Where(static attempt => attempt.Session is not null)
+                .Select(static attempt => attempt.Session!)
+                .ToArray();
+            var rejectedAttempts = attempts.Where(static attempt => attempt.Exception is not null).ToArray();
+
+            Assert.Single(grantedSessions);
+            Assert.Equal(7, rejectedAttempts.Length);
+            Assert.Equal(1, modelSet.SessionCreationCount);
+            Assert.All(
+                rejectedAttempts,
+                attempt => Assert.Equal("PersonaPlex session limit has been reached.", attempt.Exception!.Message));
+
+            await grantedSessions[0].DisposeAsync();
+            await using var replacement = await factory.CreateAsync(
+                new PersonaPlexSessionRequest("replacement"),
+                testCancellation);
+            Assert.Equal(2, modelSet.SessionCreationCount);
+        }
+        finally
+        {
+            Directory.Delete(modelDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ModelManifestRejectsTemporalGraphWithoutDeviceCacheOutputs()
     {
         var inputs = new HashSet<string>(["input_frame", "attention_mask"]);
@@ -105,6 +167,7 @@ public sealed class PersonaPlexSessionFactoryTests
         var configuration = new ConfigurationManager
         {
             [$"{PersonaPlexOptions.SectionName}:Enabled"] = "false",
+            [$"{PersonaPlexOptions.SectionName}:MaxSessions"] = "2",
         };
         var services = new ServiceCollection();
         services.AddLogging();
@@ -116,6 +179,7 @@ public sealed class PersonaPlexSessionFactoryTests
 
         Assert.Same(concreteFactory, provider.GetRequiredService<IPersonaPlexSessionFactory>());
         Assert.Contains(provider.GetServices<IHostedService>(), service => ReferenceEquals(service, concreteFactory));
+        Assert.Equal(2, provider.GetRequiredService<IOptions<PersonaPlexOptions>>().Value.MaxSessions);
     }
 
     [Fact]
@@ -457,6 +521,38 @@ public sealed class PersonaPlexSessionFactoryTests
             Disposed = true;
         }
     }
+
+    private sealed class InstantSessionModelSet : IPersonaPlexModelSet
+    {
+        private int _sessionCreationCount;
+
+        public int SessionCreationCount => Volatile.Read(ref _sessionCreationCount);
+
+        public IPersonaPlexSession CreateSession()
+        {
+            Interlocked.Increment(ref _sessionCreationCount);
+            return new InstantSession();
+        }
+
+        public ValueTask WarmUpAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class InstantSession : IPersonaPlexSession
+    {
+        public ValueTask<PersonaPlexAudioFrame> ProcessAsync(
+            PersonaPlexAudioFrame frame,
+            CancellationToken cancellationToken = default) => ValueTask.FromResult(frame);
+
+        public ValueTask ResetAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed record SessionAttempt(IPersonaPlexSession? Session, Exception? Exception);
 
     private sealed class BlockingSession : IPersonaPlexSession
     {

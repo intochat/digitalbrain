@@ -10,6 +10,8 @@ public sealed class PersonaPlexOptions
 
     public int CudaDeviceId { get; set; }
 
+    public int MaxSessions { get; set; } = 1;
+
     public string EncoderGraphPath => Path.Combine(ModelDirectory, "mimi_encoder", "model.onnx");
 
     public string TemporalGraphPath => Path.Combine(ModelDirectory, "temporal", "model.onnx");
@@ -20,6 +22,11 @@ public sealed class PersonaPlexOptions
 
     public void Validate()
     {
+        if (MaxSessions <= 0)
+        {
+            throw new InvalidOperationException("PersonaPlex requires at least one session.");
+        }
+
         if (!Enabled)
         {
             return;

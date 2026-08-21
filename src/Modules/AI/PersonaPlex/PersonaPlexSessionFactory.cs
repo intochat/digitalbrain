@@ -247,15 +247,19 @@ public sealed class PersonaPlexSessionFactory : IPersonaPlexSessionFactory, IHos
                     throw new InvalidOperationException(Readiness.Message);
                 }
 
-                var trackedSession = new TrackedPersonaPlexSession(
-                    modelSet.CreateSession(),
-                    RemoveSession);
                 lock (_sessionsLock)
                 {
-                    _sessions.Add(trackedSession);
-                }
+                    if (_sessions.Count >= _options.MaxSessions)
+                    {
+                        throw new InvalidOperationException("PersonaPlex session limit has been reached.");
+                    }
 
-                return trackedSession;
+                    var trackedSession = new TrackedPersonaPlexSession(
+                        modelSet.CreateSession(),
+                        RemoveSession);
+                    _sessions.Add(trackedSession);
+                    return trackedSession;
+                }
             }
         }
         finally
