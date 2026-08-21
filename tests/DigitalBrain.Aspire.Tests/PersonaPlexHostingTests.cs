@@ -8,6 +8,8 @@ using Xunit;
 
 namespace DigitalBrain.Aspire.Tests;
 
+#pragma warning disable ASPIREPROBES001 // Probe annotation is the Aspire resource-model assertion surface.
+
 [Collection(ModelCollection.Name)]
 public sealed class PersonaPlexHostingTests(ModelFixture fixture)
 {
@@ -49,8 +51,17 @@ public sealed class PersonaPlexHostingTests(ModelFixture fixture)
         Assert.Equal("/var/cache/huggingface", cache.Target);
         Assert.Equal("personaplex-huggingface-cache", cache.Source);
         Assert.Contains(runtime.Annotations, static annotation => annotation is HealthCheckAnnotation);
-        Assert.Contains(runtime.Annotations, static annotation => annotation is EndpointAnnotation endpoint
-            && endpoint.Name == "http" && !endpoint.IsProxied);
+        Assert.Contains(runtime.Annotations, static annotation => annotation is EndpointProbeAnnotation probe
+            && probe.Path == "/readyz" && probe.EndpointReference.EndpointName == "http");
+
+        var endpoint = Assert.Single(runtime.Annotations.OfType<EndpointAnnotation>());
+        Assert.Equal("http", endpoint.Name);
+        Assert.Equal(8080, endpoint.TargetPort);
+        // Aspire records the container's internal port here; IsExternal=false and
+        // IsProxied=false are the controls that prevent a host-published endpoint.
+        Assert.Equal(8080, endpoint.Port);
+        Assert.False(endpoint.IsExternal);
+        Assert.False(endpoint.IsProxied);
     }
 
     [Fact]
@@ -74,6 +85,16 @@ public sealed class PersonaPlexHostingTests(ModelFixture fixture)
         Assert.Equal("True", kernelEnvironment["DigitalBrain__AI__PersonaPlex__UseRemoteRuntime"]);
         Assert.DoesNotContain("HF_TOKEN", kernelEnvironment.Keys);
         Assert.DoesNotContain("personaplex-hugging-face-token", kernelEnvironment.Values, StringComparer.Ordinal);
+    }
+
+    [Fact]
+    public void KernelWaitsForPersonaPlexRuntimeReadiness()
+    {
+        var kernel = fixture.Model.Resource(ProductSurfaceResourceNames.Kernel);
+
+        Assert.Contains(kernel.Annotations, static annotation => annotation is WaitAnnotation wait
+            && wait.Resource.Name == "personaplex-runtime"
+            && wait.WaitType == WaitType.WaitUntilHealthy);
     }
 
     [Fact]
@@ -107,3 +128,5 @@ public sealed class PersonaPlexHostingTests(ModelFixture fixture)
         Assert.Equal("2", environment["DigitalBrain__AI__PersonaPlex__MaxSessions"]);
     }
 }
+
+#pragma warning restore ASPIREPROBES001

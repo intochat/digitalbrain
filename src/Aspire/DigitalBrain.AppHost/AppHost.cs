@@ -22,15 +22,23 @@ var personaPlexHuggingFaceToken = builder
 // HF_TOKEN, it is intentionally shared with the Kernel so it can call /stream.
 var personaPlexAdapterToken = builder.AddParameter("personaplex-adapter-token", secret: true);
 
+#pragma warning disable ASPIREPROBES001 // The readiness probe makes the runtime endpoint contract explicit in the resource model.
 var personaPlexRuntime = builder
     .AddDockerfile("personaplex-runtime", "../../Runtime/PersonaPlex")
     // No host proxy/port: only resources on Aspire's private network resolve it.
-    .WithHttpEndpoint(targetPort: 8080, name: "http", isProxied: false)
+    .WithEndpoint(
+        targetPort: 8080,
+        port: null,
+        scheme: "http",
+        name: "http",
+        isExternal: false,
+        isProxied: false)
     .WithEnvironment("HF_TOKEN", personaPlexHuggingFaceToken)
     .WithEnvironment("PERSONAPLEX_ADAPTER_TOKEN", personaPlexAdapterToken)
     .WithVolume("personaplex-huggingface-cache", "/var/cache/huggingface")
     .WithContainerRuntimeArgs("--gpus=all")
-    .WithHttpHealthCheck("/readyz", endpointName: "http");
+    .WithHttpProbe(ProbeType.Readiness, "/readyz", endpointName: "http");
+#pragma warning restore ASPIREPROBES001
 
 // AppHost is the product composition root: brain fabric + modules + runtimes.
 var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain);
