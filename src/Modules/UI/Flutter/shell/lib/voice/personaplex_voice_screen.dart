@@ -26,6 +26,7 @@ final class PersonaPlexVoiceScreen extends StatefulWidget {
 final class _PersonaPlexVoiceScreenState extends State<PersonaPlexVoiceScreen> {
   PersonaPlexVoiceController? _controller;
   Future<void>? _releaseFuture;
+  int _lifecycleGeneration = 0;
 
   PersonaPlexVoiceControllerFactory? get _factory {
     final injected = widget.controllerFactory;
@@ -46,28 +47,52 @@ final class _PersonaPlexVoiceScreenState extends State<PersonaPlexVoiceScreen> {
   @override
   void didUpdateWidget(covariant PersonaPlexVoiceScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.active && !widget.active) {
-      unawaited(_releaseController());
-    }
-    if (oldWidget.baseUri != widget.baseUri ||
+    if ((oldWidget.active && !widget.active) ||
+        oldWidget.baseUri != widget.baseUri ||
         oldWidget.controllerFactory != widget.controllerFactory) {
+      _lifecycleGeneration++;
       unawaited(_releaseController());
     }
   }
 
   Future<void> _start() async {
-    if (!widget.active) {
+    final generation = ++_lifecycleGeneration;
+    if (!_canStart(generation)) {
       return;
     }
     await _releaseController();
+    if (!_canStart(generation)) {
+      return;
+    }
     final factory = _factory;
-    if (factory == null || !mounted) {
+    if (factory == null) {
       return;
     }
     final controller = factory();
+    if (!_canStart(generation)) {
+      await _disposeController(controller);
+      return;
+    }
     _controller = controller..addListener(_onControllerChanged);
     setState(() {});
     await controller.start();
+    if (!_canStart(generation) || !identical(_controller, controller)) {
+      if (identical(_controller, controller)) {
+        _controller = null;
+      }
+      await _disposeController(controller);
+      if (mounted) {
+        setState(() {});
+      }
+    }
+  }
+
+  bool _canStart(int generation) =>
+      mounted && widget.active && generation == _lifecycleGeneration;
+
+  void _stop() {
+    _lifecycleGeneration++;
+    unawaited(_releaseController());
   }
 
   void _onControllerChanged() {
@@ -88,16 +113,21 @@ final class _PersonaPlexVoiceScreenState extends State<PersonaPlexVoiceScreen> {
       return;
     }
     _controller = null;
-    controller.removeListener(_onControllerChanged);
-    await controller.disposeAsync();
-    controller.dispose();
+    await _disposeController(controller);
     if (mounted) {
       setState(() {});
     }
   }
 
+  Future<void> _disposeController(PersonaPlexVoiceController controller) async {
+    controller.removeListener(_onControllerChanged);
+    await controller.disposeAsync();
+    controller.dispose();
+  }
+
   @override
   void dispose() {
+    _lifecycleGeneration++;
     final controller = _controller;
     _controller = null;
     if (controller != null) {
@@ -189,7 +219,7 @@ final class _PersonaPlexVoiceScreenState extends State<PersonaPlexVoiceScreen> {
                   onPressed: !available
                       ? null
                       : running
-                      ? () => unawaited(_releaseController())
+                      ? _stop
                       : () => unawaited(_start()),
                   icon: Icon(running ? Icons.stop : Icons.graphic_eq),
                   label: Text(running ? 'Stop voice' : 'Start voice'),

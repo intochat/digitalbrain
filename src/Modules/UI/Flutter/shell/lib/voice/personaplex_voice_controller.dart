@@ -58,20 +58,19 @@ final class RecordPersonaPlexAudioCapture implements PersonaPlexAudioCapture {
 
     final output = StreamController<Uint8List>();
     _stream = output;
-    await _recorder.setOnConfigChanged((config) {
-      if (config.sampleRate != PersonaPlexVoiceProtocol.sampleRate ||
-          config.numChannels != PersonaPlexVoiceProtocol.channelCount) {
-        output.addError(
-          PersonaPlexVoiceUnavailableException(
-            'Microphone capture changed to ${config.sampleRate} Hz / '
-            '${config.numChannels} channels; PersonaPlex requires exactly '
-            '24 kHz mono PCM16.',
-          ),
-        );
-      }
-    });
-
     try {
+      await _recorder.setOnConfigChanged((config) {
+        if (config.sampleRate != PersonaPlexVoiceProtocol.sampleRate ||
+            config.numChannels != PersonaPlexVoiceProtocol.channelCount) {
+          output.addError(
+            PersonaPlexVoiceUnavailableException(
+              'Microphone capture changed to ${config.sampleRate} Hz / '
+              '${config.numChannels} channels; PersonaPlex requires exactly '
+              '24 kHz mono PCM16.',
+            ),
+          );
+        }
+      });
       final source = await _recorder.startStream(_config);
       _sourceSubscription = source.listen(
         output.add,
@@ -83,10 +82,11 @@ final class RecordPersonaPlexAudioCapture implements PersonaPlexAudioCapture {
         },
       );
       return output.stream;
-    } on Object {
-      await _recorder.setOnConfigChanged(null);
-      await output.close();
-      rethrow;
+    } on Object catch (error, stackTrace) {
+      final cleanup = _CleanupFailures();
+      await cleanup.attempt(() => _recorder.setOnConfigChanged(null));
+      await cleanup.attempt(output.close);
+      Error.throwWithStackTrace(error, stackTrace);
     }
   }
 
@@ -94,32 +94,64 @@ final class RecordPersonaPlexAudioCapture implements PersonaPlexAudioCapture {
   Future<void> stop() => _stopFuture ??= _stop();
 
   Future<void> _stop() async {
+    final cleanup = _CleanupFailures();
     final startFuture = _startFuture;
     if (startFuture != null) {
-      try {
+      await cleanup.attempt(() async {
         await startFuture;
-      } on Object {
-        // Startup already owns its cleanup on failure.
-      }
+      });
     }
-    await _recorder.setOnConfigChanged(null);
-    if (await _recorder.isRecording()) {
-      await _recorder.stop();
+    await cleanup.attempt(() => _recorder.setOnConfigChanged(null));
+    var shouldStopRecorder = true;
+    await cleanup.attempt(() async {
+      shouldStopRecorder = await _recorder.isRecording();
+    });
+    if (shouldStopRecorder) {
+      await cleanup.attempt(() async {
+        await _recorder.stop();
+      });
     }
-    await _sourceSubscription?.cancel();
+    final sourceSubscription = _sourceSubscription;
     _sourceSubscription = null;
+    if (sourceSubscription != null) {
+      await cleanup.attempt(sourceSubscription.cancel);
+    }
     final output = _stream;
     if (output != null && !output.isClosed) {
-      await output.close();
+      await cleanup.attempt(output.close);
     }
+    cleanup.throwIfFailed();
   }
 
   @override
   Future<void> dispose() => _disposeFuture ??= _dispose();
 
   Future<void> _dispose() async {
-    await stop();
-    await _recorder.dispose();
+    final cleanup = _CleanupFailures();
+    await cleanup.attempt(stop);
+    await cleanup.attempt(_recorder.dispose);
+    cleanup.throwIfFailed();
+  }
+}
+
+final class _CleanupFailures {
+  Object? _firstError;
+  StackTrace? _firstStackTrace;
+
+  Future<void> attempt(FutureOr<void> Function() action) async {
+    try {
+      await action();
+    } on Object catch (error, stackTrace) {
+      _firstError ??= error;
+      _firstStackTrace ??= stackTrace;
+    }
+  }
+
+  void throwIfFailed() {
+    final error = _firstError;
+    if (error != null) {
+      Error.throwWithStackTrace(error, _firstStackTrace!);
+    }
   }
 }
 
@@ -409,6 +441,9 @@ final class PersonaPlexVoiceController extends ChangeNotifier {
 
   @override
   void dispose() {
+    if (_notifierDisposed) {
+      return;
+    }
     _notifierDisposed = true;
     unawaited(disposeAsync());
     super.dispose();

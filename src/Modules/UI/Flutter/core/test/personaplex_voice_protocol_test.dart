@@ -73,15 +73,42 @@ void main() {
 
     expect(channel.closeCount, 1);
   });
+
+  test('channel closes when message subscription cancellation fails', () async {
+    final channel = _FakeVoiceChannel(cancelError: StateError('cancel failed'));
+    final client = PersonaPlexVoiceClient(
+      baseUri: Uri.parse('http://127.0.0.1:5050'),
+      channelFactory: (_) => channel,
+    );
+
+    await client.start();
+    await client.close();
+
+    expect(channel.closeCount, 1);
+  });
 }
 
 final class _FakeVoiceChannel implements PersonaPlexVoiceChannel {
-  _FakeVoiceChannel({this.throwOnStop = false, Future<void>? ready})
-    : _ready = ready ?? Future<void>.value();
+  _FakeVoiceChannel({
+    this.throwOnStop = false,
+    this.cancelError,
+    Future<void>? ready,
+  }) : _ready = ready ?? Future<void>.value() {
+    _messages = StreamController<Object?>(
+      onCancel: () {
+        final error = cancelError;
+        if (error != null) {
+          return Future<void>.error(error);
+        }
+        return null;
+      },
+    );
+  }
 
   final bool throwOnStop;
+  final Object? cancelError;
   final Future<void> _ready;
-  final _messages = StreamController<Object?>.broadcast();
+  late final StreamController<Object?> _messages;
 
   final List<Object?> sent = [];
   int closeCount = 0;
@@ -103,6 +130,6 @@ final class _FakeVoiceChannel implements PersonaPlexVoiceChannel {
   @override
   Future<void> close() async {
     closeCount++;
-    await _messages.close();
+    unawaited(_messages.close());
   }
 }

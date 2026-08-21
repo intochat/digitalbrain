@@ -138,26 +138,33 @@ final class PersonaPlexVoiceClient implements PersonaPlexVoiceTransport {
     _closed = true;
     final subscription = _subscription;
     _subscription = null;
-    await subscription?.cancel();
+    if (subscription != null) {
+      await _ignoreFailure(subscription.cancel);
+    }
 
     final channel = _channel;
     _channel = null;
-    try {
-      if (channel != null) {
-        if (_startSent) {
-          try {
-            channel.send(jsonEncode(const {'type': 'stop'}));
-          } on Object {
-            // The peer may already be gone; closing the channel still matters.
-          }
-          _startSent = false;
+    if (channel != null) {
+      if (_startSent) {
+        try {
+          channel.send(jsonEncode(const {'type': 'stop'}));
+        } on Object {
+          // The peer may already be gone; closing the channel still matters.
         }
-        await channel.close();
+        _startSent = false;
       }
-    } finally {
-      if (!_events.isClosed) {
-        await _events.close();
-      }
+      await _ignoreFailure(channel.close);
+    }
+    if (!_events.isClosed) {
+      await _ignoreFailure(_events.close);
+    }
+  }
+
+  static Future<void> _ignoreFailure(FutureOr<void> Function() action) async {
+    try {
+      await action();
+    } on Object {
+      // Every independently owned socket resource still gets its close attempt.
     }
   }
 

@@ -5,6 +5,7 @@ import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_flutter_shell/voice/pcm_audio_output.dart';
 import 'package:digitalbrain_flutter_shell/voice/personaplex_voice_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:record/record.dart';
 
 void main() {
   test('stopping a session closes capture playback and socket once', () async {
@@ -19,6 +20,25 @@ void main() {
 
     await controller.start();
     await Future.wait([controller.stop(), controller.stop()]);
+    await controller.disposeAsync();
+
+    expect(capture.stopCount, 1);
+    expect(output.stopCount, 1);
+    expect(transport.closeCount, 1);
+  });
+
+  test('notifier disposal is idempotent during overlapping cleanup', () async {
+    final capture = _FakeCapture();
+    final output = _FakeOutput();
+    final transport = _FakeTransport();
+    final controller = PersonaPlexVoiceController(
+      capture: capture,
+      output: output,
+      transport: transport,
+    );
+
+    controller.dispose();
+    controller.dispose();
     await controller.disposeAsync();
 
     expect(capture.stopCount, 1);
@@ -219,6 +239,87 @@ void main() {
       expect(engine.createCount, 0);
       expect(engine.deinitializeCount, 1);
     },
+  );
+
+  for (final failurePoint in _RecorderFailurePoint.values) {
+    test(
+      'recorder $failurePoint failure cannot skip stream or direct disposal',
+      () async {
+        final recorder = _FailingAudioRecorder(failurePoint);
+        final capture = RecordPersonaPlexAudioCapture(recorder: recorder);
+        final outputDone = Completer<void>();
+        addTearDown(() => recorder.source.close());
+
+        final output = await capture.start();
+        output.listen((_) {}, onDone: outputDone.complete);
+
+        await expectLater(capture.stop(), throwsA(isA<StateError>()));
+        await expectLater(capture.dispose(), throwsA(isA<StateError>()));
+        await expectLater(capture.dispose(), throwsA(isA<StateError>()));
+        await Future<void>.delayed(Duration.zero);
+
+        expect(recorder.sourceCancelCount, 1);
+        expect(outputDone.isCompleted, isTrue);
+        expect(recorder.disposeCount, 1);
+      },
+    );
+  }
+}
+
+enum _RecorderFailurePoint { configRemoval, isRecording, stop }
+
+final class _FailingAudioRecorder implements AudioRecorder {
+  _FailingAudioRecorder(this.failurePoint) {
+    source = StreamController<Uint8List>(
+      onCancel: () {
+        sourceCancelCount++;
+      },
+    );
+  }
+
+  final _RecorderFailurePoint failurePoint;
+  late final StreamController<Uint8List> source;
+  int sourceCancelCount = 0;
+  int disposeCount = 0;
+
+  @override
+  Future<Stream<Uint8List>> startStream(RecordConfig config) async =>
+      source.stream;
+
+  @override
+  Future<void> setOnConfigChanged(
+    void Function(RecordConfig config)? callback,
+  ) async {
+    if (callback == null &&
+        failurePoint == _RecorderFailurePoint.configRemoval) {
+      throw StateError('config removal failed');
+    }
+  }
+
+  @override
+  Future<bool> isRecording() async {
+    if (failurePoint == _RecorderFailurePoint.isRecording) {
+      throw StateError('isRecording failed');
+    }
+    return true;
+  }
+
+  @override
+  Future<String?> stop() async {
+    if (failurePoint == _RecorderFailurePoint.stop) {
+      throw StateError('stop failed');
+    }
+    return null;
+  }
+
+  @override
+  Future<void> dispose() async {
+    disposeCount++;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnsupportedError(
+    '${invocation.memberName} is not used by this test.',
   );
 }
 

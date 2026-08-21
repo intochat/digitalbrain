@@ -103,9 +103,9 @@ final class SoLoudPcmAudioOutput implements PcmAudioOutput {
   Future<void> dispose() => stop();
 
   static String get _unavailableMessage => kIsWeb
-      ? 'Continuous 24 kHz mono PCM16 playback is unavailable in this web '
-            'host. flutter_soloud web audio requires a --wasm build or '
-            'cross-origin-isolated COOP/COEP hosting.'
+      ? 'Continuous 24 kHz mono PCM16 playback failed to initialize in this '
+            'browser. Verify flutter_soloud web loader scripts and browser '
+            'support.'
       : 'Continuous 24 kHz mono PCM16 playback is unavailable on this device.';
 
   static Future<void> _ignoreFailure(Future<void> future) async {
