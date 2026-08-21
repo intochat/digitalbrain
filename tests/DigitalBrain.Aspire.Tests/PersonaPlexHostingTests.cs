@@ -12,6 +12,19 @@ namespace DigitalBrain.Aspire.Tests;
 public sealed class PersonaPlexHostingTests(ModelFixture fixture)
 {
     [Fact]
+    public void AppHostExposesSecretPersonaPlexHuggingFaceTokenWithModelAccessGuidance()
+    {
+        var parameter = Assert.Single(
+            fixture.Model.Resources.OfType<ParameterResource>(),
+            static resource => resource.Name == "personaplex-hugging-face-token");
+
+        Assert.True(parameter.Secret);
+        Assert.True(parameter.EnableDescriptionMarkdown);
+        Assert.Contains("https://huggingface.co/nvidia/personaplex-7b-v1", parameter.Description, StringComparison.Ordinal);
+        Assert.Contains("https://huggingface.co/settings/tokens", parameter.Description, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task KernelRenderedEnvironmentContainsPersonaPlexEnabledSetting()
     {
         var environment = await fixture.Model.RenderedEnvironmentAsync(ProductSurfaceResourceNames.Kernel);

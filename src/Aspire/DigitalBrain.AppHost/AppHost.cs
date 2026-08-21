@@ -12,6 +12,12 @@ using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
+builder
+    .AddParameter("personaplex-hugging-face-token", secret: true)
+    .WithDescription(
+        "Required to download PersonaPlex model weights. First [accept the PersonaPlex model access terms](https://huggingface.co/nvidia/personaplex-7b-v1), then [create a read token](https://huggingface.co/settings/tokens). The token is secret and is not sent to the DigitalBrain Kernel.",
+        enableMarkdown: true);
+
 // AppHost is the product composition root: brain fabric + modules + runtimes.
 var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain);
 
