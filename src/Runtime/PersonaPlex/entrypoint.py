@@ -28,6 +28,9 @@ PCM_SAMPLE_RATE: Final = 24000
 PCM_FRAME_SAMPLES: Final = 1920
 PCM_FRAME_BYTES: Final = PCM_FRAME_SAMPLES * 2
 MAX_BUFFERED_FRAMES: Final = 4
+# The first model load includes a multi-gigabyte Hugging Face download and CUDA
+# warm-up. Do not mistake that normal cold-start work for a failed runtime.
+UPSTREAM_STARTUP_TIMEOUT_SECONDS: Final = 600
 
 LOGGER = logging.getLogger("personaplex-adapter")
 
@@ -194,14 +197,30 @@ async def stream_handler(request: web.Request) -> web.StreamResponse:
     return client
 
 
-async def _warm_up() -> None:
+async def _warm_up(process: subprocess.Popen[object]) -> None:
     _require_dependencies()
     upstream_url = os.environ["PERSONAPLEX_UPSTREAM_URL"]
-    async with ClientSession() as session:
-        async with session.ws_connect(upstream_url, max_msg_size=1024) as upstream:
-            response = await upstream.receive(timeout=15)
-            if response.type != WSMsgType.BINARY or response.data != b"\x00":
-                raise RuntimeError("official runtime warm-up handshake failed")
+    deadline = asyncio.get_running_loop().time() + UPSTREAM_STARTUP_TIMEOUT_SECONDS
+    while True:
+        if process.poll() is not None:
+            raise RuntimeError("official runtime exited during startup")
+        remaining_seconds = deadline - asyncio.get_running_loop().time()
+        if remaining_seconds <= 0:
+            raise RuntimeError("official runtime did not become ready before the startup deadline")
+        try:
+            async with ClientSession() as session:
+                async with session.ws_connect(
+                    upstream_url,
+                    max_msg_size=1024,
+                    timeout=min(5, remaining_seconds),
+                ) as upstream:
+                    response = await upstream.receive(timeout=min(5, remaining_seconds))
+                    if response.type == WSMsgType.BINARY and response.data == b"\x00":
+                        return
+        except Exception:
+            # The server has not bound its local socket yet; its exit status is
+            # checked on the next iteration and all details stay inside it.
+            await asyncio.sleep(1)
 
 
 async def supervise_runtime(app: web.Application) -> None:
@@ -217,7 +236,7 @@ async def supervise_runtime(app: web.Application) -> None:
         state.set_loading("Loading official PersonaPlex runtime.")
         process = subprocess.Popen(server_command(cpu_offload=cpu_offload))
         try:
-            await _warm_up()
+            await _warm_up(process)
             mode = "cpu-offload" if cpu_offload else "cuda"
             state.set_ready("Official PersonaPlex runtime is ready.", mode=mode)
             await asyncio.to_thread(process.wait)

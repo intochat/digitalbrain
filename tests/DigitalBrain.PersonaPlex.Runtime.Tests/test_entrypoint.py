@@ -137,6 +137,11 @@ class RuntimeStateTests(unittest.TestCase):
         self.assertEqual(command[command.index("--host") + 1], "127.0.0.1")
         self.assertEqual(command[command.index("--port") + 1], "8998")
 
+    def test_cold_start_budget_allows_the_official_model_to_load(self):
+        runtime = load_entrypoint()
+
+        self.assertGreaterEqual(runtime.UPSTREAM_STARTUP_TIMEOUT_SECONDS, 300)
+
     def test_missing_hugging_face_token_reports_safe_failed_readiness(self):
         runtime = load_entrypoint()
         state = runtime.RuntimeState()
