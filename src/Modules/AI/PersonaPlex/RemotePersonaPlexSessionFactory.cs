@@ -170,7 +170,12 @@ internal sealed class RemotePersonaPlexSessionFactory : IPersonaPlexSessionFacto
             {
                 socket = _webSocketFactory();
                 socket.Options.SetRequestHeader("Authorization", $"Bearer {_options.AdapterToken}");
-                await socket.ConnectAsync(BuildStreamUri(), cancellationToken).ConfigureAwait(false);
+                // Adapter upgrades immediately, then primes moshi and sends a one-byte ready
+                // marker. Wait for that marker before admitting the session to Flutter.
+                using var connectCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                connectCancellation.CancelAfter(TimeSpan.FromSeconds(180));
+                await socket.ConnectAsync(BuildStreamUri(), connectCancellation.Token).ConfigureAwait(false);
+                await WaitForAdapterReadyAsync(socket, connectCancellation.Token).ConfigureAwait(false);
 
                 lock (_sessionsLock)
                 {
@@ -336,6 +341,38 @@ internal sealed class RemotePersonaPlexSessionFactory : IPersonaPlexSessionFacto
             Query = string.Empty,
         };
         return builder.Uri;
+    }
+
+    private static async Task WaitForAdapterReadyAsync(ClientWebSocket socket, CancellationToken cancellationToken)
+    {
+        var marker = new byte[1];
+        var received = 0;
+        while (received < marker.Length)
+        {
+            var result = await socket
+                .ReceiveAsync(marker.AsMemory(received), cancellationToken)
+                .ConfigureAwait(false);
+            if (result.MessageType == WebSocketMessageType.Close)
+            {
+                throw new InvalidOperationException("PersonaPlex adapter closed before the stream was ready.");
+            }
+
+            if (result.MessageType != WebSocketMessageType.Binary)
+            {
+                throw new InvalidOperationException("PersonaPlex adapter returned a non-binary ready marker.");
+            }
+
+            received += result.Count;
+            if (result.EndOfMessage)
+            {
+                break;
+            }
+        }
+
+        if (received != 1 || marker[0] != 0)
+        {
+            throw new InvalidOperationException("PersonaPlex adapter did not complete its stream handshake.");
+        }
     }
 
     private async ValueTask DrainSessionsAsync()

@@ -92,6 +92,9 @@ def server_environment() -> dict[str, str]:
     environment = os.environ.copy()
     environment["TORCHDYNAMO_DISABLE"] = "1"
     environment["TORCH_COMPILE_DISABLE"] = "1"
+    environment["TORCH_CUDNN_V8_API_DISABLED"] = "1"
+    environment["CUDNN_CONV_ALGOS_SEARCH"] = "HEURISTIC"
+    environment["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
     return environment
 
 
@@ -140,15 +143,22 @@ async def stream_handler(request: web.Request) -> web.StreamResponse:
     if state.health()["state"] != "ready":
         return web.json_response(state.health(), status=503)
 
+    # Accept the Kernel socket immediately. Delaying the 101 until moshi finishes
+    # system-prompt priming (~60s) makes the Aspire/Docker proxy time out the
+    # upgrade (~10s), so Flutter sees "session ended" without ever getting ready.
+    # After moshi handshakes, send a one-byte ready marker; Kernel waits for that
+    # before telling Flutter the session is live.
+    upstream_url = request.app["upstream_url"]
     client = web.WebSocketResponse(max_msg_size=PCM_FRAME_BYTES)
     await client.prepare(request)
-    upstream_url = request.app["upstream_url"]
     try:
         async with ClientSession() as session:
             async with session.ws_connect(upstream_url, max_msg_size=2 * 1024 * 1024) as upstream:
-                handshake = await upstream.receive(timeout=15)
+                handshake = await upstream.receive(timeout=UPSTREAM_HANDSHAKE_TIMEOUT_SECONDS)
                 if handshake.type != WSMsgType.BINARY or handshake.data != b"\x00":
                     raise RuntimeError("official runtime did not complete its stream handshake")
+
+                await client.send_bytes(b"\x00")
 
                 opus_writer = sphn.OpusStreamWriter(PCM_SAMPLE_RATE)
                 opus_reader = sphn.OpusStreamReader(PCM_SAMPLE_RATE)
@@ -159,6 +169,8 @@ async def stream_handler(request: web.Request) -> web.StreamResponse:
                     async for message in client:
                         if message.type != WSMsgType.BINARY:
                             raise ValueError("PersonaPlex adapter accepts binary PCM frames only.")
+                        if message.data == b"\x00":
+                            continue
                         _pcm16_to_float(message.data)
                         await input_frames.put(message.data)
                     await input_frames.put(None)
@@ -202,10 +214,12 @@ async def stream_handler(request: web.Request) -> web.StreamResponse:
                 for task in done:
                     task.result()
     except (ValueError, RuntimeError, asyncio.TimeoutError):
-        await client.close(code=1002, message=b"Invalid PersonaPlex stream.")
+        if not client.closed:
+            await client.close(code=1002, message=b"Invalid PersonaPlex stream.")
     except Exception:
         LOGGER.exception("PersonaPlex stream failed with a non-sensitive error type.")
-        await client.close(code=1011, message=b"PersonaPlex runtime unavailable.")
+        if not client.closed:
+            await client.close(code=1011, message=b"PersonaPlex runtime unavailable.")
     return client
 
 
@@ -244,7 +258,9 @@ async def _warm_up(process: subprocess.Popen[object]) -> None:
 
 
 def _prefer_cpu_offload() -> bool:
-    # Full BF16 PersonaPlex weights are ~16.7GB; 16GB cards need CPU offload.
+    # Full BF16 PersonaPlex weights are ~16.7GB. On a 16GB card, full CUDA fills the
+    # device, then the next session prime / restart hits cuDNN INTERNAL_ERROR / OOM.
+    # Never escalate to full CUDA on small GPUs.
     try:
         import torch
 
@@ -256,6 +272,18 @@ def _prefer_cpu_offload() -> bool:
         return True
 
 
+async def _stop_process(process: subprocess.Popen[object]) -> None:
+    if process.poll() is None:
+        process.terminate()
+        try:
+            await asyncio.wait_for(asyncio.to_thread(process.wait), timeout=15)
+        except asyncio.TimeoutError:
+            process.kill()
+            await asyncio.to_thread(process.wait)
+    # Give the NVIDIA driver time to release the previous CUDA context.
+    await asyncio.sleep(5)
+
+
 async def supervise_runtime(app: web.Application) -> None:
     state: RuntimeState = app["runtime_state"]
     if not os.environ.get("HF_TOKEN"):
@@ -265,24 +293,38 @@ async def supervise_runtime(app: web.Application) -> None:
         state.set_failed("PersonaPlex adapter credentials are unavailable.")
         return
 
-    offload_order = (True, False) if _prefer_cpu_offload() else (False, True)
+    cpu_offload = _prefer_cpu_offload()
     environment = server_environment()
-    for index, cpu_offload in enumerate(offload_order):
+    consecutive_failures = 0
+    while True:
         state.set_loading("Loading official PersonaPlex runtime.")
         process = subprocess.Popen(server_command(cpu_offload=cpu_offload), env=environment)
         try:
             await _warm_up(process)
+            consecutive_failures = 0
             mode = "cpu-offload" if cpu_offload else "cuda"
             state.set_ready("Official PersonaPlex runtime is ready.", mode=mode)
             await asyncio.to_thread(process.wait)
+            LOGGER.warning("official runtime exited; restarting")
+            state.set_loading("Official PersonaPlex runtime stopped; restarting.")
+            await _stop_process(process)
+        except asyncio.CancelledError:
+            await _stop_process(process)
+            raise
         except Exception:
-            process.terminate()
-            await asyncio.to_thread(process.wait)
-            if index == len(offload_order) - 1:
+            consecutive_failures += 1
+            await _stop_process(process)
+            LOGGER.exception(
+                "official runtime startup failed; retry=%s offload=%s",
+                consecutive_failures,
+                cpu_offload,
+            )
+            if consecutive_failures >= 6:
                 state.set_failed("Official PersonaPlex runtime could not be started.")
+                return
+            await asyncio.sleep(min(30, 2 * consecutive_failures))
             continue
-        state.set_failed("Official PersonaPlex runtime stopped unexpectedly.")
-        return
+        await asyncio.sleep(2)
 
 
 async def on_startup(app: web.Application) -> None:

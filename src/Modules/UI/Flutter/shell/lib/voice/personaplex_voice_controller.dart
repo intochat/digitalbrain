@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_soloud/flutter_soloud.dart';
 import 'package:record/record.dart';
 
 import 'pcm_audio_output.dart';
@@ -10,7 +11,9 @@ import 'pcm_audio_output.dart';
 abstract interface class PersonaPlexAudioCapture {
   Future<bool> hasPermission();
   Future<bool> isPcm16Supported();
-  Future<Stream<Uint8List>> start();
+  Future<List<InputDevice>> listInputDevices();
+  Future<Stream<Uint8List>> start({InputDevice? device});
+  Future<Stream<Uint8List>> restart({InputDevice? device});
   Future<void> stop();
   Future<void> dispose();
 }
@@ -19,10 +22,11 @@ final class RecordPersonaPlexAudioCapture implements PersonaPlexAudioCapture {
   RecordPersonaPlexAudioCapture({AudioRecorder? recorder})
     : _recorder = recorder ?? AudioRecorder();
 
-  static const _config = RecordConfig(
+  static RecordConfig _configFor(InputDevice? device) => RecordConfig(
     encoder: AudioEncoder.pcm16bits,
     sampleRate: PersonaPlexVoiceProtocol.sampleRate,
     numChannels: PersonaPlexVoiceProtocol.channelCount,
+    device: device,
     autoGain: false,
     echoCancel: false,
     noiseSuppress: false,
@@ -35,6 +39,7 @@ final class RecordPersonaPlexAudioCapture implements PersonaPlexAudioCapture {
   Future<Stream<Uint8List>>? _startFuture;
   Future<void>? _stopFuture;
   Future<void>? _disposeFuture;
+  InputDevice? _device;
 
   @override
   Future<bool> hasPermission() => _recorder.hasPermission();
@@ -44,11 +49,26 @@ final class RecordPersonaPlexAudioCapture implements PersonaPlexAudioCapture {
       _recorder.isEncoderSupported(AudioEncoder.pcm16bits);
 
   @override
-  Future<Stream<Uint8List>> start() {
+  Future<List<InputDevice>> listInputDevices() => _recorder.listInputDevices();
+
+  @override
+  Future<Stream<Uint8List>> start({InputDevice? device}) {
     if (_stopFuture != null) {
       throw StateError('PersonaPlex capture has already stopped.');
     }
+    _device = device ?? _device;
     return _startFuture ??= _start();
+  }
+
+  @override
+  Future<Stream<Uint8List>> restart({InputDevice? device}) async {
+    await stop();
+    _stopFuture = null;
+    _startFuture = null;
+    _stream = null;
+    _sourceSubscription = null;
+    _device = device ?? _device;
+    return start(device: _device);
   }
 
   Future<Stream<Uint8List>> _start() async {
@@ -71,7 +91,7 @@ final class RecordPersonaPlexAudioCapture implements PersonaPlexAudioCapture {
           );
         }
       });
-      final source = await _recorder.startStream(_config);
+      final source = await _recorder.startStream(_configFor(_device));
       _sourceSubscription = source.listen(
         output.add,
         onError: output.addError,
@@ -196,8 +216,72 @@ final class PersonaPlexVoiceController extends ChangeNotifier {
   double microphoneLevel = 0;
   double speakerLevel = 0;
   int? latencyMilliseconds;
+  InputDevice? selectedMicrophone;
+  PlaybackDevice? selectedSpeaker;
+  List<InputDevice> microphones = const [];
+  List<PlaybackDevice> speakers = const [];
 
   bool get isActive => phase == PersonaPlexVoicePhase.active;
+
+  Future<void> refreshDevices() async {
+    try {
+      microphones = await _capture.listInputDevices();
+    } on Object {
+      microphones = const [];
+    }
+    try {
+      speakers = _output.listPlaybackDevices();
+      selectedSpeaker ??= speakers.cast<PlaybackDevice?>().firstWhere(
+        (device) => device?.isDefault ?? false,
+        orElse: () => speakers.isEmpty ? null : speakers.first,
+      );
+    } on Object {
+      speakers = const [];
+    }
+    selectedMicrophone ??= microphones.isEmpty ? null : microphones.first;
+    _notify();
+  }
+
+  Future<void> selectMicrophone(InputDevice? device) async {
+    selectedMicrophone = device;
+    _notify();
+    if (phase != PersonaPlexVoicePhase.active) {
+      return;
+    }
+    await _captureSubscription?.cancel();
+    _captureSubscription = null;
+    _captureBuffer.clear();
+    try {
+      final stream = await _capture.restart(device: selectedMicrophone);
+      _captureSubscription = stream.listen(
+        _handleCaptureBytes,
+        onError: (Object error, StackTrace stackTrace) {
+          unawaited(_fail(error));
+        },
+      );
+      statusMessage = 'Switched microphone to ${device?.label ?? 'default'}.';
+      _notify();
+    } on Object catch (error) {
+      await _fail(error);
+    }
+  }
+
+  Future<void> selectSpeaker(PlaybackDevice? device) async {
+    selectedSpeaker = device;
+    _notify();
+    if (device == null ||
+        (phase != PersonaPlexVoicePhase.active &&
+            phase != PersonaPlexVoicePhase.connecting)) {
+      return;
+    }
+    try {
+      await _output.setPlaybackDevice(device);
+      statusMessage = 'Switched speaker to ${device.name}.';
+      _notify();
+    } on Object catch (error) {
+      await _fail(error);
+    }
+  }
 
   Future<void> start() async {
     if (phase != PersonaPlexVoicePhase.idle) {
@@ -228,12 +312,16 @@ final class PersonaPlexVoiceController extends ChangeNotifier {
         );
         return;
       }
+      await refreshDevices();
+      if (_shutdownFuture != null) {
+        return;
+      }
 
       _setStatus(
         PersonaPlexVoicePhase.connecting,
-        'Connecting to PersonaPlex…',
+        'Connecting to PersonaPlex (model priming can take ~20s)…',
       );
-      await _output.start();
+      await _output.start(device: selectedSpeaker);
       if (_shutdownFuture != null) {
         return;
       }
@@ -308,7 +396,7 @@ final class PersonaPlexVoiceController extends ChangeNotifier {
 
   Future<void> _activateCapture() async {
     try {
-      final stream = await _capture.start();
+      final stream = await _capture.start(device: selectedMicrophone);
       if (_shutdownFuture != null) {
         return;
       }

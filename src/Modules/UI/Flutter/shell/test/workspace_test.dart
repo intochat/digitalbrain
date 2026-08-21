@@ -4,7 +4,9 @@ import 'dart:typed_data';
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_flutter_shell/chat_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_soloud/flutter_soloud.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:record/record.dart';
 
 import 'support/shell_test_support.dart';
 
@@ -153,7 +155,14 @@ final class _WorkspaceCapture implements PersonaPlexAudioCapture {
   Future<bool> isPcm16Supported() async => true;
 
   @override
-  Future<Stream<Uint8List>> start() async => _pcm.stream;
+  Future<List<InputDevice>> listInputDevices() async => const [];
+
+  @override
+  Future<Stream<Uint8List>> start({InputDevice? device}) async => _pcm.stream;
+
+  @override
+  Future<Stream<Uint8List>> restart({InputDevice? device}) =>
+      start(device: device);
 
   @override
   Future<void> stop() async {
@@ -169,7 +178,13 @@ final class _WorkspaceOutput implements PcmAudioOutput {
   int stopCount = 0;
 
   @override
-  Future<void> start() async {}
+  List<PlaybackDevice> listPlaybackDevices() => const [];
+
+  @override
+  Future<void> start({PlaybackDevice? device}) async {}
+
+  @override
+  Future<void> setPlaybackDevice(PlaybackDevice device) async {}
 
   @override
   Future<void> addPcm16(Uint8List pcm16Bytes) async {}

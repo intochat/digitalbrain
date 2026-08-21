@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Net.WebSockets;
 using System.Runtime.InteropServices;
+using System.Threading.Channels;
 
 namespace DigitalBrain.AI.PersonaPlex;
 
@@ -8,11 +9,22 @@ internal sealed class RemotePersonaPlexSession : IPersonaPlexSession
 {
     internal const int FrameSampleCount = 1920;
     internal const int FrameByteCount = FrameSampleCount * sizeof(short);
+    private static readonly TimeSpan FirstFrameTimeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan FrameTimeout = TimeSpan.FromSeconds(2);
 
     private readonly ClientWebSocket _socket;
-    private readonly SemaphoreSlim _gate = new(1, 1);
-    private readonly byte[] _receiveBuffer = new byte[FrameByteCount];
+    private readonly SemaphoreSlim _sendGate = new(1, 1);
+    private readonly Channel<byte[]> _outputs = Channel.CreateBounded<byte[]>(
+        new BoundedChannelOptions(8)
+        {
+            FullMode = BoundedChannelFullMode.DropOldest,
+            SingleReader = true,
+            SingleWriter = true,
+        });
+    private readonly CancellationTokenSource _receiveCancellation = new();
+    private readonly Task _receiveLoop;
     private bool _disposed;
+    private bool _receivedFirstFrame;
 
     internal RemotePersonaPlexSession(ClientWebSocket socket)
     {
@@ -23,6 +35,7 @@ internal sealed class RemotePersonaPlexSession : IPersonaPlexSession
         }
 
         _socket = socket;
+        _receiveLoop = ReceiveLoopAsync(_receiveCancellation.Token);
     }
 
     public async ValueTask<PersonaPlexAudioFrame> ProcessAsync(
@@ -32,7 +45,7 @@ internal sealed class RemotePersonaPlexSession : IPersonaPlexSession
         ArgumentNullException.ThrowIfNull(frame);
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        await _sendGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
@@ -48,31 +61,36 @@ internal sealed class RemotePersonaPlexSession : IPersonaPlexSession
             await _socket
                 .SendAsync(payload, WebSocketMessageType.Binary, endOfMessage: true, cancellationToken)
                 .ConfigureAwait(false);
+        }
+        finally
+        {
+            _sendGate.Release();
+        }
 
-            var received = await ReceiveExactBinaryAsync(cancellationToken).ConfigureAwait(false);
+        var timeout = _receivedFirstFrame ? FrameTimeout : FirstFrameTimeout;
+        using var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCancellation.CancelAfter(timeout);
+        try
+        {
+            var received = await _outputs.Reader
+                .ReadAsync(timeoutCancellation.Token)
+                .ConfigureAwait(false);
+            _receivedFirstFrame = true;
             var pcm = new short[FrameSampleCount];
             ReadPcm16LittleEndian(received, pcm);
             return PersonaPlexAudioFrame.Create(frame.Sequence, pcm);
         }
-        finally
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            _gate.Release();
+            // Keep the Kernel/Flutter pipeline moving while moshi catches up.
+            return PersonaPlexAudioFrame.Create(frame.Sequence, new short[FrameSampleCount]);
         }
     }
 
     public async ValueTask ResetAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
-        {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-            await CloseSocketAsync().ConfigureAwait(false);
-        }
-        finally
-        {
-            _gate.Release();
-        }
+        await CloseSocketAsync().ConfigureAwait(false);
     }
 
     public async ValueTask DisposeAsync()
@@ -82,22 +100,46 @@ internal sealed class RemotePersonaPlexSession : IPersonaPlexSession
             return;
         }
 
-        await _gate.WaitAsync().ConfigureAwait(false);
+        _disposed = true;
+        _receiveCancellation.Cancel();
+        await CloseSocketAsync().ConfigureAwait(false);
         try
         {
-            if (_disposed)
-            {
-                return;
-            }
+            await _receiveLoop.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (WebSocketException)
+        {
+        }
 
-            _disposed = true;
-            await CloseSocketAsync().ConfigureAwait(false);
+        _outputs.Writer.TryComplete();
+        _receiveCancellation.Dispose();
+        _sendGate.Dispose();
+        _socket.Dispose();
+    }
+
+    private async Task ReceiveLoopAsync(CancellationToken cancellationToken)
+    {
+        var buffer = new byte[FrameByteCount];
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested && _socket.State == WebSocketState.Open)
+            {
+                var payload = await ReceiveExactBinaryAsync(buffer, cancellationToken).ConfigureAwait(false);
+                await _outputs.Writer.WriteAsync(payload, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (WebSocketException)
+        {
         }
         finally
         {
-            _gate.Release();
-            _gate.Dispose();
-            _socket.Dispose();
+            _outputs.Writer.TryComplete();
         }
     }
 
@@ -117,18 +159,18 @@ internal sealed class RemotePersonaPlexSession : IPersonaPlexSession
         }
     }
 
-    private async Task<byte[]> ReceiveExactBinaryAsync(CancellationToken cancellationToken)
+    private async Task<byte[]> ReceiveExactBinaryAsync(byte[] scratch, CancellationToken cancellationToken)
     {
         var count = 0;
         while (true)
         {
             var result = await _socket
-                .ReceiveAsync(_receiveBuffer.AsMemory(count), cancellationToken)
+                .ReceiveAsync(scratch.AsMemory(count), cancellationToken)
                 .ConfigureAwait(false);
 
             if (result.MessageType == WebSocketMessageType.Close)
             {
-                throw new InvalidOperationException("PersonaPlex adapter closed the stream.");
+                throw new WebSocketException("PersonaPlex adapter closed the stream.");
             }
 
             if (result.MessageType != WebSocketMessageType.Binary)
@@ -150,7 +192,7 @@ internal sealed class RemotePersonaPlexSession : IPersonaPlexSession
                 }
 
                 var payload = new byte[FrameByteCount];
-                Buffer.BlockCopy(_receiveBuffer, 0, payload, 0, FrameByteCount);
+                Buffer.BlockCopy(scratch, 0, payload, 0, FrameByteCount);
                 return payload;
             }
         }

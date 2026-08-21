@@ -6,7 +6,9 @@ import 'package:digitalbrain_flutter_shell/voice/pcm_audio_output.dart';
 import 'package:digitalbrain_flutter_shell/voice/personaplex_voice_controller.dart';
 import 'package:digitalbrain_flutter_shell/voice/personaplex_voice_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_soloud/flutter_soloud.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:record/record.dart';
 
 void main() {
   testWidgets(
@@ -30,11 +32,11 @@ void main() {
           },
         ),
       );
-      await tester.tap(find.byKey(const Key('personaplex_voice_start')));
+      await _tapStart(tester);
       await tester.pumpAndSettle();
       expect(find.textContaining('permission denied'), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('personaplex_voice_start')));
+      await _tapStart(tester);
       await tester.pump();
       active.value = false;
       await tester.pump();
@@ -106,6 +108,13 @@ void main() {
   });
 }
 
+Future<void> _tapStart(WidgetTester tester) async {
+  final start = find.byKey(const Key('personaplex_voice_start'));
+  await tester.ensureVisible(start);
+  await tester.pumpAndSettle();
+  await tester.tap(start);
+}
+
 Widget _voiceHost({
   required ValueNotifier<bool> active,
   required PersonaPlexVoiceControllerFactory controllerFactory,
@@ -159,10 +168,17 @@ final class _ScreenCapture implements PersonaPlexAudioCapture {
   Future<bool> isPcm16Supported() async => true;
 
   @override
-  Future<Stream<Uint8List>> start() async {
+  Future<List<InputDevice>> listInputDevices() async => const [];
+
+  @override
+  Future<Stream<Uint8List>> start({InputDevice? device}) async {
     startCount++;
     return _pcm;
   }
+
+  @override
+  Future<Stream<Uint8List>> restart({InputDevice? device}) =>
+      start(device: device);
 
   @override
   Future<void> stop() async {
@@ -185,9 +201,15 @@ final class _ScreenOutput implements PcmAudioOutput {
   int disposeCount = 0;
 
   @override
-  Future<void> start() async {
+  List<PlaybackDevice> listPlaybackDevices() => const [];
+
+  @override
+  Future<void> start({PlaybackDevice? device}) async {
     startCount++;
   }
+
+  @override
+  Future<void> setPlaybackDevice(PlaybackDevice device) async {}
 
   @override
   Future<void> addPcm16(Uint8List pcm16Bytes) async {}

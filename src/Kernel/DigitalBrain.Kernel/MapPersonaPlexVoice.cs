@@ -90,6 +90,14 @@ internal static class PersonaPlexVoiceHttpMaps
                     "A PersonaPlex session must begin with a start control message.");
             }
 
+            await SendAsync(
+                socket,
+                PersonaPlexVoiceProtocol.EncodeStatus(
+                    "priming",
+                    "PersonaPlex is loading the voice persona (can take ~20–60s)…"),
+                WebSocketMessageType.Text,
+                cancellationToken).ConfigureAwait(false);
+
             session = await sessions
                 .CreateAsync(new PersonaPlexSessionRequest(connectionId), cancellationToken)
                 .ConfigureAwait(false);

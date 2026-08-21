@@ -12,14 +12,22 @@ final class PersonaPlexVoiceUnavailableException implements Exception {
 }
 
 abstract interface class PcmAudioOutput {
-  Future<void> start();
+  List<PlaybackDevice> listPlaybackDevices();
+  Future<void> start({PlaybackDevice? device});
+  Future<void> setPlaybackDevice(PlaybackDevice device);
   Future<void> addPcm16(Uint8List pcm16Bytes);
   Future<void> stop();
   Future<void> dispose();
 }
 
 abstract interface class PcmAudioEngine {
-  Future<void> initialize({required int sampleRate, required int channelCount});
+  List<PlaybackDevice> listPlaybackDevices();
+  Future<void> initialize({
+    required int sampleRate,
+    required int channelCount,
+    PlaybackDevice? device,
+  });
+  Future<void> changeDevice(PlaybackDevice device);
 
   Object createPcm16Stream();
   void addPcm16(Object stream, Uint8List pcm16Bytes);
@@ -39,7 +47,10 @@ final class SoLoudPcmAudioOutput implements PcmAudioOutput {
   bool _engineInitialized = false;
 
   @override
-  Future<void> start() async {
+  List<PlaybackDevice> listPlaybackDevices() => _engine.listPlaybackDevices();
+
+  @override
+  Future<void> start({PlaybackDevice? device}) async {
     if (_stream != null) {
       return;
     }
@@ -47,6 +58,7 @@ final class SoLoudPcmAudioOutput implements PcmAudioOutput {
       await _engine.initialize(
         sampleRate: PersonaPlexVoiceProtocol.sampleRate,
         channelCount: PersonaPlexVoiceProtocol.channelCount,
+        device: device,
       );
       if (_stopFuture != null) {
         await _ignoreFailure(_engine.deinitialize());
@@ -62,6 +74,10 @@ final class SoLoudPcmAudioOutput implements PcmAudioOutput {
       throw PersonaPlexVoiceUnavailableException(_unavailableMessage);
     }
   }
+
+  @override
+  Future<void> setPlaybackDevice(PlaybackDevice device) =>
+      _engine.changeDevice(device);
 
   @override
   Future<void> addPcm16(Uint8List pcm16Bytes) async {
@@ -122,19 +138,29 @@ final class _FlutterSoLoudPcmAudioEngine implements PcmAudioEngine {
   SoundHandle? _handle;
 
   @override
+  List<PlaybackDevice> listPlaybackDevices() => _soLoud.listPlaybackDevices();
+
+  @override
   Future<void> initialize({
     required int sampleRate,
     required int channelCount,
-  }) {
+    PlaybackDevice? device,
+  }) async {
     if (channelCount != 1) {
       throw ArgumentError.value(channelCount, 'channelCount', 'must be mono');
     }
-    return _soLoud.init(
+    await _soLoud.init(
       sampleRate: sampleRate,
       bufferSize: PersonaPlexVoiceProtocol.sampleCount,
       channels: Channels.mono,
       lowLatency: true,
+      device: device,
     );
+  }
+
+  @override
+  Future<void> changeDevice(PlaybackDevice device) async {
+    _soLoud.changeDevice(newDevice: device);
   }
 
   @override

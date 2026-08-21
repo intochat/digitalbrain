@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_flutter_shell/voice/pcm_audio_output.dart';
 import 'package:digitalbrain_flutter_shell/voice/personaplex_voice_controller.dart';
+import 'package:flutter_soloud/flutter_soloud.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:record/record.dart';
 
@@ -331,6 +332,7 @@ final class _FakeCapture implements PersonaPlexAudioCapture {
   final _pcm = StreamController<Uint8List>();
   bool started = false;
   int stopCount = 0;
+  InputDevice? lastDevice;
 
   @override
   Future<bool> hasPermission() => _permission;
@@ -339,10 +341,18 @@ final class _FakeCapture implements PersonaPlexAudioCapture {
   Future<bool> isPcm16Supported() async => true;
 
   @override
-  Future<Stream<Uint8List>> start() async {
+  Future<List<InputDevice>> listInputDevices() async => const [];
+
+  @override
+  Future<Stream<Uint8List>> start({InputDevice? device}) async {
+    lastDevice = device;
     started = true;
     return _pcm.stream;
   }
+
+  @override
+  Future<Stream<Uint8List>> restart({InputDevice? device}) =>
+      start(device: device);
 
   void add(Uint8List bytes) => _pcm.add(bytes);
 
@@ -364,10 +374,20 @@ final class _FakeOutput implements PcmAudioOutput {
   final List<Uint8List> added = [];
   int startCount = 0;
   int stopCount = 0;
+  PlaybackDevice? lastDevice;
 
   @override
-  Future<void> start() async {
+  List<PlaybackDevice> listPlaybackDevices() => const [];
+
+  @override
+  Future<void> start({PlaybackDevice? device}) async {
+    lastDevice = device;
     startCount++;
+  }
+
+  @override
+  Future<void> setPlaybackDevice(PlaybackDevice device) async {
+    lastDevice = device;
   }
 
   @override
@@ -438,19 +458,30 @@ final class _FakePcmAudioEngine implements PcmAudioEngine {
   final List<Uint8List> added = [];
   int? sampleRate;
   int? channelCount;
+  PlaybackDevice? device;
   int playCount = 0;
   int createCount = 0;
   int releaseCount = 0;
   int deinitializeCount = 0;
 
   @override
+  List<PlaybackDevice> listPlaybackDevices() => const [];
+
+  @override
   Future<void> initialize({
     required int sampleRate,
     required int channelCount,
+    PlaybackDevice? device,
   }) async {
     this.sampleRate = sampleRate;
     this.channelCount = channelCount;
+    this.device = device;
     await _initialization;
+  }
+
+  @override
+  Future<void> changeDevice(PlaybackDevice device) async {
+    this.device = device;
   }
 
   @override

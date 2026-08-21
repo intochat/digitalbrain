@@ -157,7 +157,7 @@ final class _PersonaPlexVoiceScreenState extends State<PersonaPlexVoiceScreen> {
         phase == PersonaPlexVoicePhase.connecting ||
         phase == PersonaPlexVoicePhase.active;
 
-    return ColoredBox(
+    return Material(
       key: const Key('personaplex_voice_screen'),
       color: BrainPalette.surface,
       child: Center(
@@ -181,16 +181,58 @@ final class _PersonaPlexVoiceScreenState extends State<PersonaPlexVoiceScreen> {
                 const SizedBox(height: 28),
                 _StatusCard(phase: phase, message: status),
                 const SizedBox(height: 20),
+                _DevicePicker(
+                  key: const Key('personaplex_microphone_picker'),
+                  label: 'Microphone',
+                  icon: Icons.mic_outlined,
+                  enabled: available && controller != null,
+                  selectedId: controller?.selectedMicrophone?.id,
+                  options: [
+                    for (final device in controller?.microphones ?? const [])
+                      _DeviceOption(
+                        id: device.id,
+                        label: device.label,
+                        onSelected: () => unawaited(
+                          controller?.selectMicrophone(device) ??
+                              Future<void>.value(),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _DevicePicker(
+                  key: const Key('personaplex_speaker_picker'),
+                  label: 'Speaker',
+                  icon: Icons.volume_up_outlined,
+                  enabled: available && controller != null,
+                  selectedId: controller?.selectedSpeaker == null
+                      ? null
+                      : '${controller!.selectedSpeaker!.id}',
+                  options: [
+                    for (final device in controller?.speakers ?? const [])
+                      _DeviceOption(
+                        id: '${device.id}',
+                        label: device.isDefault
+                            ? '${device.name} (default)'
+                            : device.name,
+                        onSelected: () => unawaited(
+                          controller?.selectSpeaker(device) ??
+                              Future<void>.value(),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 20),
                 _LevelMeter(
                   key: const Key('personaplex_microphone_level'),
-                  label: 'Microphone',
+                  label: 'Microphone level',
                   icon: Icons.mic_outlined,
                   value: controller?.microphoneLevel ?? 0,
                 ),
                 const SizedBox(height: 14),
                 _LevelMeter(
                   key: const Key('personaplex_speaker_level'),
-                  label: 'Speaker',
+                  label: 'Speaker level',
                   icon: Icons.volume_up_outlined,
                   value: controller?.speakerLevel ?? 0,
                 ),
@@ -279,6 +321,74 @@ final class _StatusCard extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(child: Text(message, style: BrainType.bodyMuted)),
         ],
+      ),
+    );
+  }
+}
+
+final class _DeviceOption {
+  const _DeviceOption({
+    required this.id,
+    required this.label,
+    required this.onSelected,
+  });
+
+  final String id;
+  final String label;
+  final VoidCallback onSelected;
+}
+
+final class _DevicePicker extends StatelessWidget {
+  const _DevicePicker({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.enabled,
+    required this.selectedId,
+    required this.options,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool enabled;
+  final String? selectedId;
+  final List<_DeviceOption> options;
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedExists =
+        selectedId != null &&
+        options.any((option) => option.id == selectedId);
+    final selectedLabel = selectedExists
+        ? options.firstWhere((option) => option.id == selectedId).label
+        : null;
+    return InputDecorator(
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+        border: const OutlineInputBorder(),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          isExpanded: true,
+          value: selectedExists ? selectedId : null,
+          hint: Text(selectedLabel ?? 'System default'),
+          onChanged: !enabled || options.isEmpty
+              ? null
+              : (id) {
+                  final match = options.where((option) => option.id == id);
+                  if (match.isNotEmpty) {
+                    match.first.onSelected();
+                  }
+                },
+          items: [
+            for (final option in options)
+              DropdownMenuItem<String>(
+                value: option.id,
+                child: Text(option.label, overflow: TextOverflow.ellipsis),
+              ),
+          ],
+        ),
       ),
     );
   }

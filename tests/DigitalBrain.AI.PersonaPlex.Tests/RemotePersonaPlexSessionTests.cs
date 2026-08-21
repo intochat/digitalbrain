@@ -190,6 +190,11 @@ public sealed class RemotePersonaPlexSessionTests
                 var socketContext = await context.AcceptWebSocketAsync(null).ConfigureAwait(false);
                 AuthorizedStreamCount++;
                 var socket = socketContext.WebSocket;
+                await socket.SendAsync(
+                    new byte[] { 0 },
+                    WebSocketMessageType.Binary,
+                    endOfMessage: true,
+                    CancellationToken.None).ConfigureAwait(false);
                 var buffer = new byte[RemotePersonaPlexSession.FrameByteCount];
                 while (socket.State == WebSocketState.Open)
                 {
