@@ -18,4 +18,7 @@
     <ProjectReference Include="../DigitalBrain.Core/DigitalBrain.Core.csproj" />
     <ProjectReference Include="../DigitalBrain.Client/DigitalBrain.Client.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.E2E.Tests" />
+  </ItemGroup>
 </Project>

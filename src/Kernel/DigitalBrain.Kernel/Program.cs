@@ -14,8 +14,10 @@ builder.Services.TryAddSingleton(static services =>
 
 var app = builder.Build();
 app.MapDefaultEndpoints();
+app.UseWebSockets();
 app.MapOwnerCommands();
 app.MapChatVoice();
+app.MapPersonaPlexVoice();
 app.MapChatStreams();
 app.MapSurfaceStreams();
 app.MapOrleansDashboard("/orleans");
