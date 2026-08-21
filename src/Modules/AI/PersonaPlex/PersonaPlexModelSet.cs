@@ -3,7 +3,14 @@ using Microsoft.ML.OnnxRuntime.Tensors;
 
 namespace DigitalBrain.AI.PersonaPlex;
 
-internal sealed class PersonaPlexModelSet : IDisposable
+internal interface IPersonaPlexModelSet : IDisposable
+{
+    IPersonaPlexSession CreateSession();
+
+    ValueTask WarmUpAsync(CancellationToken cancellationToken);
+}
+
+internal sealed class PersonaPlexModelSet : IPersonaPlexModelSet
 {
     private bool _disposed;
 
@@ -104,7 +111,9 @@ internal sealed class PersonaPlexModelSet : IDisposable
         }
     }
 
-    internal async ValueTask WarmUpAsync(CancellationToken cancellationToken)
+    public IPersonaPlexSession CreateSession() => new PersonaPlexSession(this);
+
+    public async ValueTask WarmUpAsync(CancellationToken cancellationToken)
     {
         await using var session = new PersonaPlexSession(this);
         var silence = PersonaPlexAudioFrame.Create(0, new short[PersonaPlexSession.FrameSampleCount]);
@@ -136,12 +145,9 @@ internal sealed class PersonaPlexModelSet : IDisposable
 
     private static InferenceSession CreateCudaSession(string graphPath, int cudaDeviceId)
     {
+        var settings = PersonaPlexOrtSessionSettings.Create(cudaDeviceId);
         using var cudaOptions = new OrtCUDAProviderOptions();
-        cudaOptions.UpdateOptions(new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["device_id"] = cudaDeviceId.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["use_tf32"] = "0",
-        });
+        cudaOptions.UpdateOptions(new Dictionary<string, string>(settings.ProviderOptions, StringComparer.Ordinal));
 
         using var sessionOptions = new SessionOptions
         {
@@ -149,9 +155,30 @@ internal sealed class PersonaPlexModelSet : IDisposable
             LogSeverityLevel = OrtLoggingLevel.ORT_LOGGING_LEVEL_WARNING,
         };
         sessionOptions.AppendExecutionProvider_CUDA(cudaOptions);
+        foreach (var (key, value) in settings.SessionConfigEntries)
+        {
+            sessionOptions.AddSessionConfigEntry(key, value);
+        }
 
         return new InferenceSession(graphPath, sessionOptions);
     }
+}
+
+internal sealed record PersonaPlexOrtSessionSettings(
+    IReadOnlyDictionary<string, string> ProviderOptions,
+    IReadOnlyDictionary<string, string> SessionConfigEntries)
+{
+    internal static PersonaPlexOrtSessionSettings Create(int cudaDeviceId)
+        => new(
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["device_id"] = cudaDeviceId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["use_tf32"] = "0",
+            },
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["session.disable_cpu_ep_fallback"] = "1",
+            });
 }
 
 internal static class PersonaPlexModelManifest

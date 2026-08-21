@@ -11,6 +11,15 @@ namespace DigitalBrain.AI.PersonaPlex.Tests;
 public sealed class PersonaPlexSessionFactoryTests
 {
     [Fact]
+    public void CudaSessionSettingsDisableCpuExecutionProviderFallback()
+    {
+        var settings = PersonaPlexOrtSessionSettings.Create(cudaDeviceId: 2);
+
+        Assert.Equal("1", settings.SessionConfigEntries["session.disable_cpu_ep_fallback"]);
+        Assert.Equal("2", settings.ProviderOptions["device_id"]);
+    }
+
+    [Fact]
     public async Task DisabledConfigurationReportsUnavailableWithoutOpeningOrtSessions()
     {
         await using var factory = new PersonaPlexSessionFactory(
@@ -61,7 +70,7 @@ public sealed class PersonaPlexSessionFactoryTests
     }
 
     [Fact]
-    public async Task EnabledRuntimeFailureIsReportedWithoutExposingTheModelPath()
+    public async Task MalformedGraphsAreReportedAsInvalidModelConfigurationWithoutExposingTheModelPath()
     {
         var modelDirectory = CreateInvalidFourGraphDirectory();
         try
@@ -77,9 +86,9 @@ public sealed class PersonaPlexSessionFactoryTests
             await factory.StartAsync(CancellationToken.None);
 
             Assert.Equal(PersonaPlexReadinessState.Failed, factory.Readiness.State);
-            Assert.True(factory.Readiness.IsModelConfigurationValid);
+            Assert.False(factory.Readiness.IsModelConfigurationValid);
             Assert.Equal(
-                "PersonaPlex CUDA runtime failed to load the configured model set.",
+                "PersonaPlex model set failed validation or CUDA initialization.",
                 factory.Readiness.Message);
             Assert.DoesNotContain(modelDirectory, factory.Readiness.Message, StringComparison.OrdinalIgnoreCase);
         }
@@ -108,6 +117,196 @@ public sealed class PersonaPlexSessionFactoryTests
         Assert.Contains(provider.GetServices<IHostedService>(), service => ReferenceEquals(service, concreteFactory));
     }
 
+    [Fact]
+    public async Task StopDrainsLiveSessionsBeforeDisposingModelSetAndRejectsNewSessions()
+    {
+        var modelDirectory = CreateInvalidFourGraphDirectory();
+        try
+        {
+            var modelSet = new ControllableModelSet();
+            await using var factory = CreateFactoryWithModelSet(modelDirectory, modelSet);
+            await factory.StartAsync(CancellationToken.None);
+            var testCancellation = TestContext.Current.CancellationToken;
+            var session = await factory.CreateAsync(
+                new PersonaPlexSessionRequest("connection-1"),
+                testCancellation);
+            var processTask = session.ProcessAsync(
+                PersonaPlexAudioFrame.Create(1, new short[1920]),
+                testCancellation).AsTask();
+            await modelSet.Session.ProcessStarted.Task.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                testCancellation);
+
+            var stopTask = factory.StopAsync(CancellationToken.None);
+            await modelSet.Session.DisposeStarted.Task.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                testCancellation);
+
+            Assert.False(modelSet.Disposed);
+
+            async Task CreateDuringStopAsync() =>
+                await factory.CreateAsync(new PersonaPlexSessionRequest("connection-2"), testCancellation);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(CreateDuringStopAsync);
+
+            modelSet.Session.AllowCompletion.TrySetResult();
+            await processTask;
+            await stopTask;
+
+            Assert.True(modelSet.DisposedAfterSession);
+            Assert.Equal(PersonaPlexReadinessState.Failed, factory.Readiness.State);
+            Assert.True(factory.Readiness.IsModelConfigurationValid);
+        }
+        finally
+        {
+            Directory.Delete(modelDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task StopAwaitsSessionDisposalAlreadyInProgressBeforeDisposingModelSet()
+    {
+        var modelDirectory = CreateInvalidFourGraphDirectory();
+        try
+        {
+            var modelSet = new ControllableModelSet();
+            await using var factory = CreateFactoryWithModelSet(modelDirectory, modelSet);
+            await factory.StartAsync(CancellationToken.None);
+            var session = await factory.CreateAsync(
+                new PersonaPlexSessionRequest("connection-1"),
+                TestContext.Current.CancellationToken);
+
+            var sessionDisposeTask = session.DisposeAsync().AsTask();
+            var stopTask = factory.StopAsync(CancellationToken.None);
+
+            Assert.True(modelSet.Session.DisposeStarted.Task.IsCompleted);
+            Assert.False(modelSet.Disposed);
+
+            modelSet.Session.AllowCompletion.TrySetResult();
+            await sessionDisposeTask;
+            await stopTask;
+
+            Assert.True(modelSet.DisposedAfterSession);
+        }
+        finally
+        {
+            Directory.Delete(modelDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task DisposeDrainsLiveSessionsBeforeDisposingModelSetAndMovesAwayFromReady()
+    {
+        var modelDirectory = CreateInvalidFourGraphDirectory();
+        try
+        {
+            var modelSet = new ControllableModelSet();
+            var factory = CreateFactoryWithModelSet(modelDirectory, modelSet);
+            await factory.StartAsync(CancellationToken.None);
+            var testCancellation = TestContext.Current.CancellationToken;
+            var session = await factory.CreateAsync(
+                new PersonaPlexSessionRequest("connection-1"),
+                testCancellation);
+            var processTask = session.ProcessAsync(
+                PersonaPlexAudioFrame.Create(1, new short[1920]),
+                testCancellation).AsTask();
+            await modelSet.Session.ProcessStarted.Task.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                testCancellation);
+
+            var disposeTask = factory.DisposeAsync().AsTask();
+
+            try
+            {
+                var firstCompletion = await Task.WhenAny(
+                    modelSet.Session.DisposeStarted.Task,
+                    disposeTask);
+
+                Assert.Same(modelSet.Session.DisposeStarted.Task, firstCompletion);
+                Assert.NotEqual(PersonaPlexReadinessState.Ready, factory.Readiness.State);
+                Assert.False(modelSet.Disposed);
+            }
+            finally
+            {
+                modelSet.Session.AllowCompletion.TrySetResult();
+                await processTask;
+                await disposeTask;
+            }
+
+            Assert.True(modelSet.DisposedAfterSession);
+            Assert.Equal(PersonaPlexReadinessState.Failed, factory.Readiness.State);
+        }
+        finally
+        {
+            Directory.Delete(modelDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task CancellationDuringWarmupTransitionsReadinessToFailed()
+    {
+        var modelDirectory = CreateInvalidFourGraphDirectory();
+        try
+        {
+            var modelSet = new CancelingWarmupModelSet();
+            await using var factory = CreateFactoryWithModelSet(modelDirectory, modelSet);
+            using var cancellationSource = new CancellationTokenSource();
+
+            var startTask = factory.StartAsync(cancellationSource.Token);
+            await modelSet.WarmupStarted.Task.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                TestContext.Current.CancellationToken);
+            await cancellationSource.CancelAsync();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => startTask);
+            Assert.Equal(PersonaPlexReadinessState.Failed, factory.Readiness.State);
+            Assert.True(factory.Readiness.IsModelConfigurationValid);
+            Assert.Equal("PersonaPlex startup was canceled.", factory.Readiness.Message);
+            Assert.True(modelSet.Disposed);
+        }
+        finally
+        {
+            Directory.Delete(modelDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task CancellationBeforeStartupBeginsTransitionsReadinessToFailed()
+    {
+        var modelDirectory = CreateInvalidFourGraphDirectory();
+        try
+        {
+            var modelSet = new ControllableModelSet();
+            await using var factory = CreateFactoryWithModelSet(modelDirectory, modelSet);
+            using var cancellationSource = new CancellationTokenSource();
+            cancellationSource.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => factory.StartAsync(cancellationSource.Token));
+
+            Assert.Equal(PersonaPlexReadinessState.Failed, factory.Readiness.State);
+            Assert.False(factory.Readiness.IsModelConfigurationValid);
+            Assert.Equal("PersonaPlex startup was canceled.", factory.Readiness.Message);
+            Assert.False(modelSet.Disposed);
+        }
+        finally
+        {
+            Directory.Delete(modelDirectory, recursive: true);
+        }
+    }
+
+    private static PersonaPlexSessionFactory CreateFactoryWithModelSet(
+        string modelDirectory,
+        IPersonaPlexModelSet modelSet)
+        => new(
+            Options.Create(new PersonaPlexOptions
+            {
+                Enabled = true,
+                ModelDirectory = modelDirectory,
+            }),
+            NullLogger<PersonaPlexSessionFactory>.Instance,
+            _ => modelSet);
+
     private static string CreateInvalidFourGraphDirectory()
     {
         var directory = Path.Combine(Path.GetTempPath(), $"personaplex-invalid-{Guid.NewGuid():N}");
@@ -118,5 +317,74 @@ public sealed class PersonaPlexSessionFactoryTests
         }
 
         return directory;
+    }
+
+    private sealed class ControllableModelSet : IPersonaPlexModelSet
+    {
+        public BlockingSession Session { get; } = new();
+
+        public bool Disposed { get; private set; }
+
+        public bool DisposedAfterSession { get; private set; }
+
+        public IPersonaPlexSession CreateSession() => Session;
+
+        public ValueTask WarmUpAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+        public void Dispose()
+        {
+            DisposedAfterSession = Session.Disposed;
+            Disposed = true;
+        }
+    }
+
+    private sealed class BlockingSession : IPersonaPlexSession
+    {
+        public TaskCompletionSource AllowCompletion { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource DisposeStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource ProcessStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool Disposed { get; private set; }
+
+        public async ValueTask<PersonaPlexAudioFrame> ProcessAsync(
+            PersonaPlexAudioFrame frame,
+            CancellationToken cancellationToken = default)
+        {
+            ProcessStarted.TrySetResult();
+            await AllowCompletion.Task.WaitAsync(cancellationToken);
+            return frame;
+        }
+
+        public ValueTask ResetAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+
+        public async ValueTask DisposeAsync()
+        {
+            DisposeStarted.TrySetResult();
+            await AllowCompletion.Task;
+            Disposed = true;
+        }
+    }
+
+    private sealed class CancelingWarmupModelSet : IPersonaPlexModelSet
+    {
+        public TaskCompletionSource WarmupStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool Disposed { get; private set; }
+
+        public IPersonaPlexSession CreateSession() => throw new NotSupportedException();
+
+        public async ValueTask WarmUpAsync(CancellationToken cancellationToken)
+        {
+            WarmupStarted.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
+
+        public void Dispose() => Disposed = true;
     }
 }
