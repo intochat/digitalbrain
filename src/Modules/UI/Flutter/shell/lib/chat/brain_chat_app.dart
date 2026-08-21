@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../brain_theme.dart';
 import '../user_actions/user_action_card.dart';
+import '../voice/personaplex_voice_controller.dart';
 import 'brain_workspace.dart';
 import 'chat_contracts.dart';
 
@@ -21,6 +22,8 @@ final class BrainChatApp extends StatelessWidget {
     this.onActivateButton,
     this.userActions = const [],
     this.statusMessage,
+    this.personaPlexBaseUri,
+    this.personaPlexVoiceControllerFactory,
   });
 
   final String chatName;
@@ -33,6 +36,8 @@ final class BrainChatApp extends StatelessWidget {
   final ActivateChatButton? onActivateButton;
   final List<UserActionCardModel> userActions;
   final String? statusMessage;
+  final Uri? personaPlexBaseUri;
+  final PersonaPlexVoiceControllerFactory? personaPlexVoiceControllerFactory;
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +56,8 @@ final class BrainChatApp extends StatelessWidget {
         onActivateButton: onActivateButton,
         userActions: userActions,
         statusMessage: statusMessage,
+        personaPlexBaseUri: personaPlexBaseUri,
+        personaPlexVoiceControllerFactory: personaPlexVoiceControllerFactory,
       ),
     );
   }

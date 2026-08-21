@@ -25,6 +25,7 @@ Future<void> main() async {
   runApp(
     BrainChatApp(
       chatName: chat,
+      personaPlexBaseUri: edge?.baseUri,
       statusMessage: status,
       turns: edge?.watchChatTurns(chatName: chat),
       onStream: edge == null
