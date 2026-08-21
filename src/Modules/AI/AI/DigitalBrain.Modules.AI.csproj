@@ -19,6 +19,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
+    <ProjectReference Include="../PersonaPlex/DigitalBrain.Modules.AI.PersonaPlex.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
     <ProjectReference Include="../../Memory/Contracts/DigitalBrain.Modules.Memory.Contracts.csproj" />

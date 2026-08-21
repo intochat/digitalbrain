@@ -22,6 +22,24 @@ brain.AddModule<AIModule>(ai =>
     ai.WithEmbedding<IEmbeddingGemma>();
     // Local Whisper STT (Foundry Local). Optional: swap IWhisperSmall / IWhisperTiny for weaker GPUs.
     ai.WithVoiceToText<IWhisperLargeV3Turbo>();
+    ai.WithPersonaPlex(options =>
+    {
+        options.Enabled = bool.TryParse(
+            builder.Configuration["AppHost:PersonaPlex:Enabled"],
+            out var enabled)
+            && enabled;
+        options.ModelDirectory = builder.Configuration["AppHost:PersonaPlex:ModelDirectory"] ?? string.Empty;
+        options.CudaDeviceId = int.TryParse(
+            builder.Configuration["AppHost:PersonaPlex:CudaDeviceId"],
+            out var cudaDeviceId)
+            ? cudaDeviceId
+            : 0;
+        options.MaxSessions = int.TryParse(
+            builder.Configuration["AppHost:PersonaPlex:MaxSessions"],
+            out var maxSessions)
+            ? maxSessions
+            : 1;
+    });
 });
 brain.AddModule<MemoryModule>(memory => memory.WithQdrant());
 brain.AddModule<TimeModule>();

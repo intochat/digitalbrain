@@ -21,6 +21,18 @@ public sealed class NamesConformanceTests(ModelFixture fixture)
         Assert.True(environment.ContainsKey("DigitalBrain__AI__Ollama__IEmbeddingGemma__Model"));
     }
 
+    [Theory]
+    [InlineData("DigitalBrain__AI__PersonaPlex__Enabled")]
+    [InlineData("DigitalBrain__AI__PersonaPlex__ModelDirectory")]
+    [InlineData("DigitalBrain__AI__PersonaPlex__CudaDeviceId")]
+    [InlineData("DigitalBrain__AI__PersonaPlex__MaxSessions")]
+    public async Task KernelRenderedEnvironmentContainsPersonaPlexConfiguration(string configurationKey)
+    {
+        var environment = await fixture.Model.RenderedEnvironmentAsync(ProductSurfaceResourceNames.Kernel);
+
+        Assert.True(environment.ContainsKey(configurationKey));
+    }
+
     [Fact]
     public async Task KernelRenderedEnvironmentContainsTheExplicitAppHostModuleManifest()
     {

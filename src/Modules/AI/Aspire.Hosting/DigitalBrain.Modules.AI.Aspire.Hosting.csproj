@@ -9,6 +9,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../AI/DigitalBrain.Modules.AI.csproj" />
+    <ProjectReference Include="../PersonaPlex/DigitalBrain.Modules.AI.PersonaPlex.csproj" />
     <ProjectReference Include="../../../Aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>

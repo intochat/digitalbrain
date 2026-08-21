@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI.Ollama;
+using DigitalBrain.AI.PersonaPlex;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -25,6 +26,7 @@ public sealed class AIModule : Core.IModule
         }
 
         VoiceToTextHosting.Add(builder.Services, builder.Configuration);
+        PersonaPlexHosting.AddPersonaPlex(builder.Services, builder.Configuration);
 
         // The unkeyed IChatClient IS the main model. Every other model use is an
         // explicit keyed choice (ask_llama).
