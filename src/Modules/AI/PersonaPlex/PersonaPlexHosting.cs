@@ -16,11 +16,27 @@ public static class PersonaPlexHosting
 
         services.AddOptions<PersonaPlexOptions>()
             .Bind(configuration.GetSection(PersonaPlexOptions.SectionName));
-        services.TryAddSingleton<PersonaPlexSessionFactory>();
-        services.TryAddSingleton<IPersonaPlexSessionFactory>(static provider =>
-            provider.GetRequiredService<PersonaPlexSessionFactory>());
-        services.AddSingleton<IHostedService>(static provider =>
-            provider.GetRequiredService<PersonaPlexSessionFactory>());
+
+        var useRemoteRuntime = configuration.GetValue(
+            $"{PersonaPlexOptions.SectionName}:UseRemoteRuntime",
+            false);
+
+        if (useRemoteRuntime)
+        {
+            services.TryAddSingleton<RemotePersonaPlexSessionFactory>();
+            services.TryAddSingleton<IPersonaPlexSessionFactory>(static provider =>
+                provider.GetRequiredService<RemotePersonaPlexSessionFactory>());
+            services.AddSingleton<IHostedService>(static provider =>
+                provider.GetRequiredService<RemotePersonaPlexSessionFactory>());
+        }
+        else
+        {
+            services.TryAddSingleton<PersonaPlexSessionFactory>();
+            services.TryAddSingleton<IPersonaPlexSessionFactory>(static provider =>
+                provider.GetRequiredService<PersonaPlexSessionFactory>());
+            services.AddSingleton<IHostedService>(static provider =>
+                provider.GetRequiredService<PersonaPlexSessionFactory>());
+        }
 
         return services;
     }

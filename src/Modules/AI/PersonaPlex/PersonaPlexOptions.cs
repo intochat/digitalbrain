@@ -12,13 +12,10 @@ public sealed class PersonaPlexOptions
 
     public int MaxSessions { get; set; } = 1;
 
-    /// <summary>True when inference is delegated to the private Aspire runtime adapter.</summary>
     public bool UseRemoteRuntime { get; set; }
 
-    /// <summary>Private adapter base URI injected by Aspire for Kernel use only.</summary>
     public string RuntimeEndpoint { get; set; } = string.Empty;
 
-    /// <summary>Credential for the Kernel-to-adapter stream; never expose this to clients.</summary>
     public string AdapterToken { get; set; } = string.Empty;
 
     public string EncoderGraphPath => Path.Combine(ModelDirectory, "mimi_encoder", "model.onnx");
@@ -38,6 +35,23 @@ public sealed class PersonaPlexOptions
 
         if (!Enabled)
         {
+            return;
+        }
+
+        if (UseRemoteRuntime)
+        {
+            if (string.IsNullOrWhiteSpace(RuntimeEndpoint))
+            {
+                throw new InvalidOperationException(
+                    "PersonaPlex remote runtime requires a non-empty RuntimeEndpoint.");
+            }
+
+            if (string.IsNullOrWhiteSpace(AdapterToken))
+            {
+                throw new InvalidOperationException(
+                    "PersonaPlex remote runtime requires a non-empty AdapterToken.");
+            }
+
             return;
         }
 

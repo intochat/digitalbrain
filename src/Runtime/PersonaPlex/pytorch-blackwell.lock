@@ -1,5 +1,8 @@
 # CUDA 13.0 is the first PyTorch wheel family compiled for Blackwell sm_120.
 # Keep the direct wheels hash-pinned because the regular PersonaPlex lock is
 # intentionally platform-neutral.
+# Torch is installed with --no-deps, so pin Triton explicitly. Torch 2.9.1
+# expects Triton 3.5.x for inductor/warmup compiles used by moshi.server.
 torch @ https://download-r2.pytorch.org/whl/cu130/torch-2.9.1%2Bcu130-cp310-cp310-manylinux_2_28_x86_64.whl#sha256=3a86534a97179758a1a10eb0ca3197bb484a3c4f865e89702c47300af440ba85
 nvidia-nvtx @ https://files.pythonhosted.org/packages/38/37/0d103c84e7884382a79a569b720965141f83dd1c5df9e3e00cbc02d7099c/nvidia_nvtx-13.0.39-py3-none-manylinux1_x86_64.manylinux_2_5_x86_64.whl#sha256=cc113127785c96db8a0fe715df92db9788777b4b3d1bd713d42f75969201b5ce
+triton @ https://files.pythonhosted.org/packages/fd/6e/676ab5019b4dde8b9b7bab71245102fc02778ef3df48218b298686b9ffd6/triton-3.5.1-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl#sha256=5fc53d849f879911ea13f4a877243afc513187bc7ee92d1f2c0f1ba3169e3c94

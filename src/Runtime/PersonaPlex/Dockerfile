@@ -7,8 +7,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1
 
 RUN apt-get update \
-    && apt-get install --no-install-recommends -y git libcusparselt0-cuda-13 python3 python3-pip python3-setuptools \
+    && apt-get install --no-install-recommends -y git libcusparselt0-cuda-13 libnvshmem3-cuda-13 python3 python3-dev python3-pip python3-setuptools \
     && printf '%s\n' '/usr/lib/x86_64-linux-gnu/libcusparseLt/13' > /etc/ld.so.conf.d/cusparselt.conf \
+    && printf '%s\n' '/usr/lib/x86_64-linux-gnu/nvshmem/13' > /etc/ld.so.conf.d/nvshmem.conf \
     && ldconfig \
     && rm -rf /var/lib/apt/lists/* \
     && git clone https://github.com/NVIDIA/personaplex.git /opt/personaplex \

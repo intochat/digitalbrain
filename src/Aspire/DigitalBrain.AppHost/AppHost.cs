@@ -39,6 +39,8 @@ var personaPlexRuntime = builder
         isProxied: false)
     .WithEnvironment("HF_TOKEN", personaPlexHuggingFaceToken)
     .WithEnvironment("PERSONAPLEX_ADAPTER_TOKEN", personaPlexAdapterToken)
+    .WithEnvironment("PERSONAPLEX_VOICE_PROMPT", "NATF0.pt")
+    .WithEnvironment("PERSONAPLEX_TEXT_PROMPT", "You are a friendly conversational assistant.")
     .WithVolume("personaplex-huggingface-cache", "/var/cache/huggingface")
     .WithContainerRuntimeArgs("--gpus=all")
     .WithHttpProbe(ProbeType.Readiness, "/readyz", endpointName: "http");
@@ -50,15 +52,14 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain);
 brain.AddModule<AIModule>(ai =>
 {
     ai.EnableSensitiveData = builder.Environment.IsDevelopment();
-    ai.WithLlm<IGemma4>();
-    ai.WithEmbedding<IEmbeddingGemma>();
+    //ai.WithLlm<IGemma4>();
+    //ai.WithEmbedding<IEmbeddingGemma>();
     // Local Whisper STT (Foundry Local). Optional: swap IWhisperSmall / IWhisperTiny for weaker GPUs.
-    ai.WithVoiceToText<IWhisperLargeV3Turbo>();
+    //ai.WithVoiceToText<IWhisperLargeV3Turbo>();
     ai.WithPersonaPlex(options =>
     {
-        // PersonaPlex now runs behind the private adapter resource. Do not start
-        // the legacy in-process ONNX host while the adapter owns CUDA/model state.
-        options.Enabled = false;
+        // Official Moshi adapter owns CUDA/model state; Kernel only relays PCM.
+        options.Enabled = true;
         options.UseRemoteRuntime = true;
     });
 });

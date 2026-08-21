@@ -21,3 +21,15 @@ Docker build installs its exported requirements with `pip --require-hashes`.
 The CUDA base image is pinned by digest; its OS package contents are therefore
 fixed by that immutable image boundary rather than resolved from a mutable apt
 repository during the adapter dependency install.
+
+PyTorch `cu130` Blackwell wheels also need host CUDA shared libraries that the
+base image does not put on the default loader path. The Dockerfile therefore
+installs `libcusparselt0-cuda-13` and `libnvshmem3-cuda-13`, then registers
+`/usr/lib/x86_64-linux-gnu/libcusparseLt/13` and
+`/usr/lib/x86_64-linux-gnu/nvshmem/13` with `ldconfig`. Without those entries,
+`import torch` fails with `libnvshmem_host.so.3: cannot open shared object file`.
+
+Torch is installed with `--no-deps`, so `pytorch-blackwell.lock` also pins
+Triton 3.5.1. Moshi warmup uses `torch.compile` / inductor and fails with
+`TritonMissing` when that wheel is absent. On GPUs with under ~22 GB VRAM the
+adapter prefers `--cpu-offload` first because the BF16 weights alone are ~16.7 GB.

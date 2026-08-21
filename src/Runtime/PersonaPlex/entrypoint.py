@@ -31,6 +31,9 @@ MAX_BUFFERED_FRAMES: Final = 4
 # The first model load includes a multi-gigabyte Hugging Face download and CUDA
 # warm-up. Do not mistake that normal cold-start work for a failed runtime.
 UPSTREAM_STARTUP_TIMEOUT_SECONDS: Final = 600
+# System-prompt priming on a 16GB GPU can take well over a few seconds. A short
+# receive timeout makes the adapter reconnect while moshi still holds its lock.
+UPSTREAM_HANDSHAKE_TIMEOUT_SECONDS: Final = 180
 
 LOGGER = logging.getLogger("personaplex-adapter")
 
@@ -81,6 +84,15 @@ def server_command(*, cpu_offload: bool) -> list[str]:
     if cpu_offload:
         command.append("--cpu-offload")
     return command
+
+
+def server_environment() -> dict[str, str]:
+    # Moshi warmup uses torch.compile/inductor. On this CUDA 13 + 16GB stack that
+    # path is fragile (Triton JIT + cuDNN), so run the official server without it.
+    environment = os.environ.copy()
+    environment["TORCHDYNAMO_DISABLE"] = "1"
+    environment["TORCH_COMPILE_DISABLE"] = "1"
+    return environment
 
 
 async def health_handler(request: web.Request) -> web.Response:
@@ -212,15 +224,36 @@ async def _warm_up(process: subprocess.Popen[object]) -> None:
                 async with session.ws_connect(
                     upstream_url,
                     max_msg_size=1024,
-                    timeout=min(5, remaining_seconds),
+                    timeout=min(30, remaining_seconds),
                 ) as upstream:
-                    response = await upstream.receive(timeout=min(5, remaining_seconds))
+                    response = await upstream.receive(
+                        timeout=min(UPSTREAM_HANDSHAKE_TIMEOUT_SECONDS, remaining_seconds)
+                    )
                     if response.type == WSMsgType.BINARY and response.data == b"\x00":
                         return
+                    LOGGER.warning(
+                        "warmup_unexpected_message type=%s; retrying after backoff",
+                        getattr(response, "type", "unknown"),
+                    )
         except Exception:
-            # The server has not bound its local socket yet; its exit status is
-            # checked on the next iteration and all details stay inside it.
-            await asyncio.sleep(1)
+            # The server has not bound its local socket yet, or priming is still
+            # in progress; exit status is checked on the next iteration.
+            await asyncio.sleep(2)
+            continue
+        await asyncio.sleep(2)
+
+
+def _prefer_cpu_offload() -> bool:
+    # Full BF16 PersonaPlex weights are ~16.7GB; 16GB cards need CPU offload.
+    try:
+        import torch
+
+        if not torch.cuda.is_available():
+            return True
+        total_bytes = torch.cuda.get_device_properties(0).total_memory
+        return total_bytes < 22 * 1024**3
+    except Exception:
+        return True
 
 
 async def supervise_runtime(app: web.Application) -> None:
@@ -232,9 +265,11 @@ async def supervise_runtime(app: web.Application) -> None:
         state.set_failed("PersonaPlex adapter credentials are unavailable.")
         return
 
-    for cpu_offload in (False, True):
+    offload_order = (True, False) if _prefer_cpu_offload() else (False, True)
+    environment = server_environment()
+    for index, cpu_offload in enumerate(offload_order):
         state.set_loading("Loading official PersonaPlex runtime.")
-        process = subprocess.Popen(server_command(cpu_offload=cpu_offload))
+        process = subprocess.Popen(server_command(cpu_offload=cpu_offload), env=environment)
         try:
             await _warm_up(process)
             mode = "cpu-offload" if cpu_offload else "cuda"
@@ -243,7 +278,7 @@ async def supervise_runtime(app: web.Application) -> None:
         except Exception:
             process.terminate()
             await asyncio.to_thread(process.wait)
-            if cpu_offload:
+            if index == len(offload_order) - 1:
                 state.set_failed("Official PersonaPlex runtime could not be started.")
             continue
         state.set_failed("Official PersonaPlex runtime stopped unexpectedly.")
@@ -266,9 +301,19 @@ def create_app() -> web.Application:
     app = web.Application()
     app["runtime_state"] = RuntimeState()
     app["adapter_token"] = os.environ.get("PERSONAPLEX_ADAPTER_TOKEN")
-    voice_prompt = os.environ.get("PERSONAPLEX_VOICE_PROMPT", "s0.pt")
+    # Official NVIDIA voice pack uses names like NATF0.pt / NATM0.pt, not s0.pt.
+    # Moshi requires a non-empty text_prompt; empty leaves text_prompt_tokens=None and
+    # crashes warmup with TypeError during step_system_prompts_async.
+    from urllib.parse import quote
+
+    voice_prompt = os.environ.get("PERSONAPLEX_VOICE_PROMPT", "NATF0.pt")
+    text_prompt = os.environ.get(
+        "PERSONAPLEX_TEXT_PROMPT",
+        "You are a friendly conversational assistant.",
+    )
     app["upstream_url"] = (
-        f"ws://{UPSTREAM_HOST}:{UPSTREAM_PORT}/api/chat?text_prompt=&voice_prompt={voice_prompt}"
+        f"ws://{UPSTREAM_HOST}:{UPSTREAM_PORT}/api/chat"
+        f"?text_prompt={quote(text_prompt)}&voice_prompt={quote(voice_prompt)}"
     )
     os.environ["PERSONAPLEX_UPSTREAM_URL"] = app["upstream_url"]
     app.router.add_get("/healthz", health_handler)
