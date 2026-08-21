@@ -2,6 +2,7 @@ using DigitalBrain.AI.PersonaPlex;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -295,16 +296,100 @@ public sealed class PersonaPlexSessionFactoryTests
         }
     }
 
+    [Fact]
+    public async Task StopDuringWarmupPreventsReadyPublicationSessionAdmissionAndRestart()
+    {
+        var modelDirectory = CreateInvalidFourGraphDirectory();
+        try
+        {
+            var logger = new ReadinessRecordingLogger();
+            var modelSet = new GatedWarmupModelSet();
+            await using var factory = CreateFactoryWithModelSet(modelDirectory, modelSet, logger);
+            logger.ReadReadiness = () => factory.Readiness;
+            var testCancellation = TestContext.Current.CancellationToken;
+
+            var startTask = factory.StartAsync(CancellationToken.None);
+            await modelSet.WarmupStarted.Task.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                testCancellation);
+
+            var stopTask = factory.StopAsync(CancellationToken.None);
+
+            async Task CreateDuringStopAsync() =>
+                await factory.CreateAsync(new PersonaPlexSessionRequest("connection-1"), testCancellation);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(CreateDuringStopAsync);
+            modelSet.AllowWarmupCompletion.TrySetResult();
+            await startTask;
+            await stopTask;
+
+            Assert.DoesNotContain(PersonaPlexReadinessState.Ready, logger.States);
+            Assert.Equal(0, modelSet.SessionCreationCount);
+            Assert.Equal(PersonaPlexReadinessState.Failed, factory.Readiness.State);
+
+            async Task RestartAsync() => await factory.StartAsync(CancellationToken.None);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(RestartAsync);
+            Assert.Equal(PersonaPlexReadinessState.Failed, factory.Readiness.State);
+        }
+        finally
+        {
+            Directory.Delete(modelDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task DisposeDuringWarmupPreventsReadyPublicationAndSessionAdmission()
+    {
+        var modelDirectory = CreateInvalidFourGraphDirectory();
+        try
+        {
+            var logger = new ReadinessRecordingLogger();
+            var modelSet = new GatedWarmupModelSet();
+            var factory = CreateFactoryWithModelSet(modelDirectory, modelSet, logger);
+            logger.ReadReadiness = () => factory.Readiness;
+            var testCancellation = TestContext.Current.CancellationToken;
+
+            var startTask = factory.StartAsync(CancellationToken.None);
+            await modelSet.WarmupStarted.Task.WaitAsync(
+                TimeSpan.FromSeconds(5),
+                testCancellation);
+
+            var disposeTask = factory.DisposeAsync().AsTask();
+
+            async Task CreateDuringDisposeAsync() =>
+                await factory.CreateAsync(new PersonaPlexSessionRequest("connection-1"), testCancellation);
+
+            var createException = await Record.ExceptionAsync(CreateDuringDisposeAsync);
+            modelSet.AllowWarmupCompletion.TrySetResult();
+            await startTask;
+            await disposeTask;
+
+            Assert.DoesNotContain(PersonaPlexReadinessState.Ready, logger.States);
+            Assert.IsType<ObjectDisposedException>(createException);
+            Assert.Equal(0, modelSet.SessionCreationCount);
+            Assert.Equal(PersonaPlexReadinessState.Failed, factory.Readiness.State);
+
+            await Assert.ThrowsAsync<ObjectDisposedException>(
+                () => factory.StartAsync(CancellationToken.None));
+        }
+        finally
+        {
+            Directory.Delete(modelDirectory, recursive: true);
+        }
+    }
+
     private static PersonaPlexSessionFactory CreateFactoryWithModelSet(
         string modelDirectory,
-        IPersonaPlexModelSet modelSet)
+        IPersonaPlexModelSet modelSet,
+        ILogger<PersonaPlexSessionFactory>? logger = null)
         => new(
             Options.Create(new PersonaPlexOptions
             {
                 Enabled = true,
                 ModelDirectory = modelDirectory,
             }),
-            NullLogger<PersonaPlexSessionFactory>.Instance,
+            logger ?? NullLogger<PersonaPlexSessionFactory>.Instance,
             _ => modelSet);
 
     private static string CreateInvalidFourGraphDirectory()
@@ -386,5 +471,76 @@ public sealed class PersonaPlexSessionFactoryTests
         }
 
         public void Dispose() => Disposed = true;
+    }
+
+    private sealed class GatedWarmupModelSet : IPersonaPlexModelSet
+    {
+        private int _sessionCreationCount;
+
+        public TaskCompletionSource AllowWarmupCompletion { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource WarmupStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public int SessionCreationCount => Volatile.Read(ref _sessionCreationCount);
+
+        public IPersonaPlexSession CreateSession()
+        {
+            Interlocked.Increment(ref _sessionCreationCount);
+            return new BlockingSession();
+        }
+
+        public async ValueTask WarmUpAsync(CancellationToken cancellationToken)
+        {
+            WarmupStarted.TrySetResult();
+            await AllowWarmupCompletion.Task.WaitAsync(cancellationToken);
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class ReadinessRecordingLogger : ILogger<PersonaPlexSessionFactory>
+    {
+        private readonly List<PersonaPlexReadinessState> _states = [];
+        private readonly Lock _statesLock = new();
+
+        public Func<PersonaPlexReadiness>? ReadReadiness { get; set; }
+
+        public IReadOnlyList<PersonaPlexReadinessState> States
+        {
+            get
+            {
+                lock (_statesLock)
+                {
+                    return [.. _states];
+                }
+            }
+        }
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            var readiness = ReadReadiness?.Invoke();
+            if (readiness is null)
+            {
+                return;
+            }
+
+            lock (_statesLock)
+            {
+                _states.Add(readiness.State);
+            }
+        }
     }
 }

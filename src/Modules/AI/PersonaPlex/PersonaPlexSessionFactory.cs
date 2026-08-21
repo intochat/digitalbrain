@@ -13,8 +13,10 @@ public sealed class PersonaPlexSessionFactory : IPersonaPlexSessionFactory, IHos
     private readonly PersonaPlexOptions _options;
     private readonly HashSet<TrackedPersonaPlexSession> _sessions = [];
     private readonly Lock _sessionsLock = new();
+    private readonly Lock _stateLock = new();
     private bool _acceptingSessions;
-    private volatile bool _disposed;
+    private bool _modelConfigurationValidated;
+    private FactoryLifecycleState _lifecycleState = FactoryLifecycleState.Active;
     private IPersonaPlexModelSet? _modelSet;
     private PersonaPlexReadiness _readiness;
 
@@ -48,7 +50,10 @@ public sealed class PersonaPlexSessionFactory : IPersonaPlexSessionFactory, IHos
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        lock (_stateLock)
+        {
+            ThrowIfStartupIsTerminal();
+        }
 
         if (!_enabled)
         {
@@ -62,57 +67,83 @@ public sealed class PersonaPlexSessionFactory : IPersonaPlexSessionFactory, IHos
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            Volatile.Write(ref _acceptingSessions, false);
-            SetReadiness(
-                PersonaPlexReadinessState.Failed,
-                "PersonaPlex startup was canceled.",
-                Readiness.IsModelConfigurationValid);
+            PublishStartupCancellationIfActive();
             throw;
         }
 
         try
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            lock (_stateLock)
+            {
+                ThrowIfStartupIsTerminal();
+            }
+
             if (_modelSet is not null)
             {
                 return;
             }
 
-            SetReadiness(PersonaPlexReadinessState.Loading, "PersonaPlex runtime is loading.", false);
-            var modelConfigurationValidated = false;
+            lock (_stateLock)
+            {
+                ThrowIfStartupIsTerminal();
+                SetReadiness(
+                    PersonaPlexReadinessState.Loading,
+                    "PersonaPlex runtime is loading.",
+                    _modelConfigurationValidated);
+            }
+
             IPersonaPlexModelSet? loadingModelSet = null;
             try
             {
                 _options.Validate();
                 loadingModelSet = _loadModelSet(_options);
-                modelConfigurationValidated = true;
+                lock (_stateLock)
+                {
+                    _modelConfigurationValidated = true;
+                }
+
                 await loadingModelSet.WarmUpAsync(cancellationToken).ConfigureAwait(false);
-                _modelSet = loadingModelSet;
-                loadingModelSet = null;
-                Volatile.Write(ref _acceptingSessions, true);
-                SetReadiness(PersonaPlexReadinessState.Ready, "PersonaPlex CUDA runtime is ready.", true);
+
+                lock (_stateLock)
+                {
+                    if (_lifecycleState == FactoryLifecycleState.Active)
+                    {
+                        _modelSet = loadingModelSet;
+                        loadingModelSet = null;
+                        _acceptingSessions = true;
+                        SetReadiness(
+                            PersonaPlexReadinessState.Ready,
+                            "PersonaPlex CUDA runtime is ready.",
+                            true);
+                    }
+                }
+
+                loadingModelSet?.Dispose();
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 loadingModelSet?.Dispose();
-                Volatile.Write(ref _acceptingSessions, false);
-                SetReadiness(
-                    PersonaPlexReadinessState.Failed,
-                    "PersonaPlex startup was canceled.",
-                    modelConfigurationValidated);
+                PublishStartupCancellationIfActive();
                 throw;
             }
             catch (Exception exception)
             {
                 loadingModelSet?.Dispose();
-                Volatile.Write(ref _acceptingSessions, false);
-                var message = modelConfigurationValidated
-                    ? "PersonaPlex CUDA runtime warm-up failed."
-                    : "PersonaPlex model set failed validation or CUDA initialization.";
-                SetReadiness(
-                    PersonaPlexReadinessState.Failed,
-                    message,
-                    modelConfigurationValidated);
+                lock (_stateLock)
+                {
+                    if (_lifecycleState == FactoryLifecycleState.Active)
+                    {
+                        _acceptingSessions = false;
+                        var message = _modelConfigurationValidated
+                            ? "PersonaPlex CUDA runtime warm-up failed."
+                            : "PersonaPlex model set failed validation or CUDA initialization.";
+                        SetReadiness(
+                            PersonaPlexReadinessState.Failed,
+                            message,
+                            _modelConfigurationValidated);
+                    }
+                }
+
                 _logger.LogError(
                     "PersonaPlex startup failed with error type {ErrorType}; model paths and payloads are omitted.",
                     exception.GetType().Name);
@@ -126,29 +157,50 @@ public sealed class PersonaPlexSessionFactory : IPersonaPlexSessionFactory, IHos
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        Volatile.Write(ref _acceptingSessions, false);
-        await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
+        lock (_stateLock)
         {
-            var isModelConfigurationValid = Readiness.IsModelConfigurationValid;
+            if (_lifecycleState is FactoryLifecycleState.Stopped
+                or FactoryLifecycleState.Disposing
+                or FactoryLifecycleState.Disposed)
+            {
+                return;
+            }
+
+            if (_lifecycleState == FactoryLifecycleState.Active)
+            {
+                _lifecycleState = FactoryLifecycleState.Stopping;
+            }
+
+            _acceptingSessions = false;
             if (_enabled)
             {
                 SetReadiness(
                     PersonaPlexReadinessState.Failed,
                     "PersonaPlex runtime is stopping.",
-                    isModelConfigurationValid);
+                    _modelConfigurationValidated);
             }
+        }
 
+        await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
             await DrainSessionsAsync().ConfigureAwait(false);
             var modelSet = Interlocked.Exchange(ref _modelSet, null);
             modelSet?.Dispose();
 
-            if (_enabled)
+            lock (_stateLock)
             {
-                SetReadiness(
-                    PersonaPlexReadinessState.Failed,
-                    "PersonaPlex runtime is stopped.",
-                    isModelConfigurationValid);
+                if (_lifecycleState == FactoryLifecycleState.Stopping)
+                {
+                    _lifecycleState = FactoryLifecycleState.Stopped;
+                    if (_enabled)
+                    {
+                        SetReadiness(
+                            PersonaPlexReadinessState.Failed,
+                            "PersonaPlex runtime is stopped.",
+                            _modelConfigurationValidated);
+                    }
+                }
             }
         }
         finally
@@ -163,39 +215,47 @@ public sealed class PersonaPlexSessionFactory : IPersonaPlexSessionFactory, IHos
     {
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         if (string.IsNullOrWhiteSpace(request.ConnectionId))
         {
             throw new ArgumentException("A PersonaPlex connection ID is required.", nameof(request));
         }
 
-        if (!Volatile.Read(ref _acceptingSessions))
+        lock (_stateLock)
         {
-            throw new InvalidOperationException(Readiness.Message);
+            ThrowIfDisposed();
+            if (_lifecycleState is FactoryLifecycleState.Stopping or FactoryLifecycleState.Stopped
+                || !_acceptingSessions)
+            {
+                throw new InvalidOperationException(Readiness.Message);
+            }
         }
 
         await _lifecycleGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-            var modelSet = _modelSet;
-            if (!Volatile.Read(ref _acceptingSessions)
-                || Readiness.State != PersonaPlexReadinessState.Ready
-                || modelSet is null)
+            lock (_stateLock)
             {
-                throw new InvalidOperationException(Readiness.Message);
-            }
+                ThrowIfDisposed();
+                var modelSet = _modelSet;
+                if (_lifecycleState is FactoryLifecycleState.Stopping or FactoryLifecycleState.Stopped
+                    || !_acceptingSessions
+                    || Readiness.State != PersonaPlexReadinessState.Ready
+                    || modelSet is null)
+                {
+                    throw new InvalidOperationException(Readiness.Message);
+                }
 
-            var trackedSession = new TrackedPersonaPlexSession(
-                modelSet.CreateSession(),
-                RemoveSession);
-            lock (_sessionsLock)
-            {
-                _sessions.Add(trackedSession);
-            }
+                var trackedSession = new TrackedPersonaPlexSession(
+                    modelSet.CreateSession(),
+                    RemoveSession);
+                lock (_sessionsLock)
+                {
+                    _sessions.Add(trackedSession);
+                }
 
-            return trackedSession;
+                return trackedSession;
+            }
         }
         finally
         {
@@ -205,45 +265,86 @@ public sealed class PersonaPlexSessionFactory : IPersonaPlexSessionFactory, IHos
 
     public async ValueTask DisposeAsync()
     {
-        if (_disposed)
+        lock (_stateLock)
         {
-            return;
-        }
+            if (_lifecycleState == FactoryLifecycleState.Disposed)
+            {
+                return;
+            }
 
-        Volatile.Write(ref _acceptingSessions, false);
-        if (_enabled)
-        {
-            SetReadiness(
-                PersonaPlexReadinessState.Failed,
-                "PersonaPlex runtime is disposing.",
-                Readiness.IsModelConfigurationValid);
+            _lifecycleState = FactoryLifecycleState.Disposing;
+            _acceptingSessions = false;
+            if (_enabled)
+            {
+                SetReadiness(
+                    PersonaPlexReadinessState.Failed,
+                    "PersonaPlex runtime is disposing.",
+                    _modelConfigurationValidated);
+            }
         }
 
         await _lifecycleGate.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (_disposed)
+            lock (_stateLock)
             {
-                return;
+                if (_lifecycleState == FactoryLifecycleState.Disposed)
+                {
+                    return;
+                }
             }
 
-            _disposed = true;
-            Volatile.Write(ref _acceptingSessions, false);
             await DrainSessionsAsync().ConfigureAwait(false);
             var modelSet = Interlocked.Exchange(ref _modelSet, null);
             modelSet?.Dispose();
 
-            if (_enabled)
+            lock (_stateLock)
             {
-                SetReadiness(
-                    PersonaPlexReadinessState.Failed,
-                    "PersonaPlex runtime is disposed.",
-                    Readiness.IsModelConfigurationValid);
+                _lifecycleState = FactoryLifecycleState.Disposed;
+                _acceptingSessions = false;
+                if (_enabled)
+                {
+                    SetReadiness(
+                        PersonaPlexReadinessState.Failed,
+                        "PersonaPlex runtime is disposed.",
+                        _modelConfigurationValidated);
+                }
             }
         }
         finally
         {
             _lifecycleGate.Release();
+        }
+    }
+
+    private void PublishStartupCancellationIfActive()
+    {
+        lock (_stateLock)
+        {
+            if (_lifecycleState != FactoryLifecycleState.Active)
+            {
+                return;
+            }
+
+            _acceptingSessions = false;
+            SetReadiness(
+                PersonaPlexReadinessState.Failed,
+                "PersonaPlex startup was canceled.",
+                _modelConfigurationValidated);
+        }
+    }
+
+    private void ThrowIfDisposed()
+        => ObjectDisposedException.ThrowIf(
+            _lifecycleState is FactoryLifecycleState.Disposing or FactoryLifecycleState.Disposed,
+            this);
+
+    private void ThrowIfStartupIsTerminal()
+    {
+        ThrowIfDisposed();
+        if (_lifecycleState is FactoryLifecycleState.Stopping or FactoryLifecycleState.Stopped)
+        {
+            throw new InvalidOperationException("PersonaPlex runtime has been stopped and cannot be restarted.");
         }
     }
 
@@ -325,5 +426,14 @@ public sealed class PersonaPlexSessionFactory : IPersonaPlexSessionFactory, IHos
 
             _disposeCompletion.TrySetResult();
         }
+    }
+
+    private enum FactoryLifecycleState
+    {
+        Active,
+        Stopping,
+        Stopped,
+        Disposing,
+        Disposed,
     }
 }
