@@ -12,11 +12,25 @@ using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-builder
+var personaPlexHuggingFaceToken = builder
     .AddParameter("personaplex-hugging-face-token", secret: true)
     .WithDescription(
         "Required to download PersonaPlex model weights. First [accept the PersonaPlex model access terms](https://huggingface.co/nvidia/personaplex-7b-v1), then [create a read token](https://huggingface.co/settings/tokens). The token is secret and is not sent to the DigitalBrain Kernel.",
         enableMarkdown: true);
+
+// This credential authenticates only the private Kernel-to-adapter stream. Unlike
+// HF_TOKEN, it is intentionally shared with the Kernel so it can call /stream.
+var personaPlexAdapterToken = builder.AddParameter("personaplex-adapter-token", secret: true);
+
+var personaPlexRuntime = builder
+    .AddDockerfile("personaplex-runtime", "../../Runtime/PersonaPlex")
+    // No host proxy/port: only resources on Aspire's private network resolve it.
+    .WithHttpEndpoint(targetPort: 8080, name: "http", isProxied: false)
+    .WithEnvironment("HF_TOKEN", personaPlexHuggingFaceToken)
+    .WithEnvironment("PERSONAPLEX_ADAPTER_TOKEN", personaPlexAdapterToken)
+    .WithVolume("personaplex-huggingface-cache", "/var/cache/huggingface")
+    .WithContainerRuntimeArgs("--gpus=all")
+    .WithHttpHealthCheck("/readyz", endpointName: "http");
 
 // AppHost is the product composition root: brain fabric + modules + runtimes.
 var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain);
@@ -30,21 +44,10 @@ brain.AddModule<AIModule>(ai =>
     ai.WithVoiceToText<IWhisperLargeV3Turbo>();
     ai.WithPersonaPlex(options =>
     {
-        options.Enabled = bool.TryParse(
-            builder.Configuration["AppHost:PersonaPlex:Enabled"],
-            out var enabled)
-            && enabled;
-        options.ModelDirectory = builder.Configuration["AppHost:PersonaPlex:ModelDirectory"] ?? string.Empty;
-        options.CudaDeviceId = int.TryParse(
-            builder.Configuration["AppHost:PersonaPlex:CudaDeviceId"],
-            out var cudaDeviceId)
-            ? cudaDeviceId
-            : 0;
-        options.MaxSessions = int.TryParse(
-            builder.Configuration["AppHost:PersonaPlex:MaxSessions"],
-            out var maxSessions)
-            ? maxSessions
-            : 1;
+        // PersonaPlex now runs behind the private adapter resource. Do not start
+        // the legacy in-process ONNX host while the adapter owns CUDA/model state.
+        options.Enabled = false;
+        options.UseRemoteRuntime = true;
     });
 });
 brain.AddModule<MemoryModule>(memory => memory.WithQdrant());
@@ -66,6 +69,13 @@ brain.AddModule<UiModule>(ui =>
 // via WithReference(brain) → WaitUntilHealthy on brain startup dependencies.
 var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceResources.Kernel)
     .WithReference(brain)
+    .WithReference(personaPlexRuntime.GetEndpoint("http"))
+    .WithEnvironment(
+        "DigitalBrain__AI__PersonaPlex__RuntimeEndpoint",
+        personaPlexRuntime.GetEndpoint("http"))
+    .WithEnvironment(
+        "DigitalBrain__AI__PersonaPlex__AdapterToken",
+        personaPlexAdapterToken)
     .WithEnvironment(
         ShellHostingExtensions.OwnerEnvironmentVariable,
         ShellHostingExtensions.DefaultOwner)
@@ -81,7 +91,8 @@ var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceReso
             Url = "/orleans",
             DisplayText = "Orleans Dashboard",
             Endpoint = endpoint,
-        });
+        })
+    .WaitFor(personaPlexRuntime);
 
 // Client processes share clustering and must wait for a live silo.
 var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.Mcp)

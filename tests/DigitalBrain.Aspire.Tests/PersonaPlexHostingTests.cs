@@ -25,11 +25,55 @@ public sealed class PersonaPlexHostingTests(ModelFixture fixture)
     }
 
     [Fact]
+    public void AppHostExposesSeparateSecretPersonaPlexAdapterToken()
+    {
+        var parameter = Assert.Single(
+            fixture.Model.Resources.OfType<ParameterResource>(),
+            static resource => resource.Name == "personaplex-adapter-token");
+
+        Assert.True(parameter.Secret);
+    }
+
+    [Fact]
+    public void AppHostDefinesPrivatePersonaPlexDockerfileRuntimeWithPersistentCacheAndReadiness()
+    {
+        var runtime = Assert.IsType<ContainerResource>(fixture.Model.Resource("personaplex-runtime"));
+        var dockerfile = Assert.Single(runtime.Annotations.OfType<DockerfileBuildAnnotation>());
+        var cache = Assert.Single(runtime.Annotations.OfType<ContainerMountAnnotation>());
+
+        Assert.EndsWith("src\\Runtime\\PersonaPlex", dockerfile.ContextPath, StringComparison.OrdinalIgnoreCase);
+        Assert.EndsWith(
+            Path.Combine("Runtime", "PersonaPlex", "Dockerfile"),
+            dockerfile.DockerfilePath,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("/var/cache/huggingface", cache.Target);
+        Assert.Equal("personaplex-huggingface-cache", cache.Source);
+        Assert.Contains(runtime.Annotations, static annotation => annotation is HealthCheckAnnotation);
+        Assert.Contains(runtime.Annotations, static annotation => annotation is EndpointAnnotation endpoint
+            && endpoint.Name == "http" && !endpoint.IsProxied);
+    }
+
+    [Fact]
     public async Task KernelRenderedEnvironmentContainsPersonaPlexEnabledSetting()
     {
         var environment = await fixture.Model.RenderedEnvironmentAsync(ProductSurfaceResourceNames.Kernel);
 
         Assert.True(environment.ContainsKey("DigitalBrain__AI__PersonaPlex__Enabled"));
+    }
+
+    [Fact]
+    public async Task PersonaPlexSecretsAndRuntimeEndpointAreInjectedOnlyIntoAuthorizedResources()
+    {
+        var runtimeEnvironment = await fixture.Model.RenderedEnvironmentAsync("personaplex-runtime");
+        var kernelEnvironment = await fixture.Model.RenderedEnvironmentAsync(ProductSurfaceResourceNames.Kernel);
+
+        Assert.Equal("{personaplex-hugging-face-token.value}", runtimeEnvironment["HF_TOKEN"]);
+        Assert.Equal("{personaplex-adapter-token.value}", runtimeEnvironment["PERSONAPLEX_ADAPTER_TOKEN"]);
+        Assert.Equal("{personaplex-adapter-token.value}", kernelEnvironment["DigitalBrain__AI__PersonaPlex__AdapterToken"]);
+        Assert.Contains("personaplex-runtime", kernelEnvironment["DigitalBrain__AI__PersonaPlex__RuntimeEndpoint"], StringComparison.Ordinal);
+        Assert.Equal("True", kernelEnvironment["DigitalBrain__AI__PersonaPlex__UseRemoteRuntime"]);
+        Assert.DoesNotContain("HF_TOKEN", kernelEnvironment.Keys);
+        Assert.DoesNotContain("personaplex-hugging-face-token", kernelEnvironment.Values, StringComparer.Ordinal);
     }
 
     [Fact]

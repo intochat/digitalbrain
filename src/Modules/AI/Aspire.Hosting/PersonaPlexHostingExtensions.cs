@@ -14,6 +14,9 @@ public sealed class PersonaPlexHostOptions
     public int CudaDeviceId { get; set; }
 
     public int MaxSessions { get; set; } = 1;
+
+    /// <summary>Uses the private Aspire-managed adapter instead of local ONNX graphs.</summary>
+    public bool UseRemoteRuntime { get; set; }
 }
 
 public static class PersonaPlexHostingExtensions
@@ -79,7 +82,8 @@ public static class PersonaPlexHostingExtensions
                 .WithEnvironment($"{ConfigurationPrefix}Enabled", _options.Enabled.ToString())
                 .WithEnvironment($"{ConfigurationPrefix}ModelDirectory", _options.ModelDirectory)
                 .WithEnvironment($"{ConfigurationPrefix}CudaDeviceId", _options.CudaDeviceId.ToString())
-                .WithEnvironment($"{ConfigurationPrefix}MaxSessions", _options.MaxSessions.ToString());
+                .WithEnvironment($"{ConfigurationPrefix}MaxSessions", _options.MaxSessions.ToString())
+                .WithEnvironment($"{ConfigurationPrefix}UseRemoteRuntime", _options.UseRemoteRuntime.ToString());
         }
     }
 }

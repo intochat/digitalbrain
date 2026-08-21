@@ -12,6 +12,15 @@ public sealed class PersonaPlexOptions
 
     public int MaxSessions { get; set; } = 1;
 
+    /// <summary>True when inference is delegated to the private Aspire runtime adapter.</summary>
+    public bool UseRemoteRuntime { get; set; }
+
+    /// <summary>Private adapter base URI injected by Aspire for Kernel use only.</summary>
+    public string RuntimeEndpoint { get; set; } = string.Empty;
+
+    /// <summary>Credential for the Kernel-to-adapter stream; never expose this to clients.</summary>
+    public string AdapterToken { get; set; } = string.Empty;
+
     public string EncoderGraphPath => Path.Combine(ModelDirectory, "mimi_encoder", "model.onnx");
 
     public string TemporalGraphPath => Path.Combine(ModelDirectory, "temporal", "model.onnx");
