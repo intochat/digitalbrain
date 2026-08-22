@@ -18,4 +18,9 @@ internal static class HttpSurfacePaths
 
     // Multipart voice note → STT → same durable chat.send path.
     public const string ChatVoicePath = "/chats/{chatName}/voice";
+
+    // Read-only kit entity state, resolved under the HTTP actor's own principal partition.
+    public const string KitChartPath = "/kit/charts/{chartName}";
+    public const string KitImagePath = "/kit/images/{imageName}";
+    public const string KitImageContentPath = "/kit/images/{imageName}/content";
 }
