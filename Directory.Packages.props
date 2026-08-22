@@ -24,6 +24,7 @@
     <PackageVersion Include="Aspire.Hosting.Testing" Version="13.5.0" />
     <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.5.0" />
     <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.5.0" />
+    <PackageVersion Include="Azure.Storage.Blobs" Version="12.29.1" />
     <PackageVersion Include="Qdrant.Client" Version="1.19.0" />
     <PackageVersion Include="Testcontainers" Version="4.14.0" />
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Ollama" Version="13.4.1-beta.706" />

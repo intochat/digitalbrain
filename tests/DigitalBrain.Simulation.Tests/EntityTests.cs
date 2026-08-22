@@ -36,4 +36,29 @@ public sealed class EntityTests(SimulationFixture fixture)
         Assert.Equal("Sales", read.Title);
         Assert.Equal(2, read.Points.Count);
     }
+
+    [Fact]
+    public async Task ImageEntityDescribesAndReadsItsState()
+    {
+        var image = fixture.Sim.Brain.GetEntity<IImage>(fixture.Sim.UniqueId("image"));
+        var state = new ImageState("a red fox", "gpt-image-1", "image/png", "test-image-1.png");
+
+        await image.Describe(state);
+        var read = await image.Read();
+
+        Assert.NotNull(read);
+        Assert.Equal("a red fox", read.Prompt);
+    }
+
+    [Fact]
+    public async Task MemoryImageStoreRoundTripsBytes()
+    {
+        var store = new MemoryKitImageStore();
+        await store.SaveAsync("x.png", new byte[] { 1, 2, 3 }, "image/png", CancellationToken.None);
+
+        var read = await store.ReadAsync("x.png", CancellationToken.None);
+
+        Assert.NotNull(read);
+        Assert.Equal(new byte[] { 1, 2, 3 }, read!.Value.Content);
+    }
 }
