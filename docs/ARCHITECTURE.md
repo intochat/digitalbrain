@@ -12,8 +12,8 @@ automations with `@Module` bindings.
 ## Core loop (chat + dynamic UI)
 
 1. Flutter → `IChat.Send` → durable turn → `ChatTurnWorker` (already built).
-2. Worker → `IAssistant` → keyed Microsoft.Extensions.AI `IChatClient`
-   (tier or explicit model) with an AI toolset.
+2. Worker → `IAssistant` → a Microsoft.Extensions.AI `IChatClient` (the
+   configured default model or an explicit marker) with an AI toolset.
 3. Every UI-kit component registers an AI tool (`render_chart`,
    `generate_image`, …) via `TurnBoundFunction`. A tool call creates/updates an
    `Entity<TState>` and posts a **reference card** `{componentKind, entityId,
@@ -47,14 +47,18 @@ KitGalleryScreen) is the starting point for the widget side.
   flagship line), Anthropic (Opus/Sonnet/Haiku current), Google (Gemini
   Pro/Flash current), xAI (Grok). Exact model ids pinned against provider docs
   at implementation time.
-- **Tiers**: `fast` / `balanced` / `reasoning` aliases so neurons ask for a
-  tier, not a vendor.
+- **Segregation** (no tiers — vetoed): model markers are pure types
+  (`IOpus5 : ILLM`) that select keyed `IChatClient`s; agents (`Agent` base:
+  instructions + tools, model chosen via `[Llm<TModel>]`) are the only
+  conversational citizens. The unkeyed default client follows
+  `DigitalBrain:AI:Default:Model`, else the first configured provider (cloud
+  before local).
 - **Local dev**: Ollama `IGemma4` + `IEmbeddingGemma` stay so dev and CI run
   offline. Production embeddings come from a cloud provider; embedding
   dimensions are config-driven because Qdrant index dims lock to them.
-- **Agent layer**: Microsoft Agent Framework. Assistant and SmartPromptRunner
-  are MAF agents; master's orchestration layer (Team/GroupChat/
-  MafParticipantAdapter) is restored from git history and modernized.
+- **Agent layer**: `Agent` neurons over MEAI clients today; MAF orchestration
+  (Team/GroupChat/MafParticipantAdapter) restores from master's git history as
+  a later build-order step.
 - **Voice**: Whisper STT (Foundry Local) stays dev-only. PersonaPlex is deleted
   (see Trash record); future voice = provider realtime APIs.
 
@@ -131,7 +135,7 @@ enabled, run refs.
 
 ## Build order
 
-1. AI providers + tiers (IAW port) — chat becomes real against cloud models.
+1. AI providers (IAW port, no tiers) — shipped 2026-08-22.
 2. Auth (UserAccountEntity, cookie + token) — multiuser boundary.
 3. UI kit, all 13 components on the template.
 4. Smart Prompts (entity, catalog, runner, triggers).

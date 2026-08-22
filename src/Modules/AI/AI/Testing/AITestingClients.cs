@@ -1,33 +1,32 @@
-using DigitalBrain.AI.Ollama;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace DigitalBrain.AI;
 
-// Testing-mode counterpart of AIClients: Gemma resolves to one deterministic text responder.
+// Testing-mode counterpart of AIClients: every model marker resolves to one
+// deterministic responder so suites run offline without provider credentials.
 internal static class AITestingClients
 {
-    private static readonly Type[] ModelKeys =
-    [
-        typeof(IGemma4),
-    ];
-
     internal static void Add(IServiceCollection services)
     {
         var scriptedClient = new TestChatClient();
         var embeddingGenerator = new TestEmbeddingGenerator();
-        foreach (var modelKey in ModelKeys)
+
+        foreach (var model in LLMModel.All)
         {
-            services.AddKeyedSingleton<IChatClient>(modelKey, scriptedClient);
+            services.AddKeyedSingleton<IChatClient>(model.Marker, scriptedClient);
         }
 
-        services.AddKeyedSingleton<IEmbeddingGenerator<string, Embedding<float>>>(
-            typeof(IEmbeddingGemma),
-            embeddingGenerator);
+        foreach (var model in EmbeddingModel.All)
+        {
+            services.AddKeyedSingleton<IEmbeddingGenerator<string, Embedding<float>>>(
+                model.Marker,
+                embeddingGenerator);
+        }
 
-        services.TryAddSingleton(static provider =>
-            provider.GetRequiredKeyedService<IChatClient>(typeof(IGemma4)));
+        services.TryAddSingleton<IChatClient>(scriptedClient);
+        services.TryAddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(embeddingGenerator);
     }
 
     private sealed class TestEmbeddingGenerator : IEmbeddingGenerator<string, Embedding<float>>

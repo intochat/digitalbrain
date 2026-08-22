@@ -1,97 +1,110 @@
-using DigitalBrain.AI.Ollama;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using OllamaSharp;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace DigitalBrain.AI;
 
 internal static class AIClients
 {
     internal const string ConfigurationRoot = "DigitalBrain:AI";
-    private const string EnableSensitiveDataKey =
-        $"{ConfigurationRoot}:Telemetry:EnableSensitiveData";
+    internal const string DefaultModelKey = $"{ConfigurationRoot}:Default:Model";
+    internal const string DefaultEmbeddingKey = $"{ConfigurationRoot}:Default:Embedding";
+    private const string EnableSensitiveDataKey = $"{ConfigurationRoot}:Telemetry:EnableSensitiveData";
     private const string TelemetrySource = "DigitalBrain.AI";
-    private static readonly TimeSpan RequestTimeout = TimeSpan.FromMinutes(5);
+
+    private static readonly IReadOnlyDictionary<LlmProvider, ILlmProviderFactory> Factories =
+        new ILlmProviderFactory[]
+        {
+            new OpenAIProviderFactory(),
+            new AnthropicProviderFactory(),
+            new GoogleProviderFactory(),
+            new XAIProviderFactory(),
+            new OllamaProviderFactory(),
+        }.ToDictionary(static factory => factory.Provider);
 
     internal static void Add(IServiceCollection services)
     {
-        AddOllamaModel<IGemma4>(services, "gemma4:12b");
-        AddOllamaEmbedding<IEmbeddingGemma>(services, "embeddinggemma");
+        foreach (var model in LLMModel.All)
+        {
+            services.AddKeyedSingleton<IChatClient>(
+                model.Marker,
+                (provider, _) => BuildChatPipeline(provider, model));
+        }
+
+        foreach (var model in EmbeddingModel.All)
+        {
+            services.AddKeyedSingleton<IEmbeddingGenerator<string, Embedding<float>>>(
+                model.Marker,
+                (provider, _) => Factories[model.Provider].CreateEmbeddingGenerator(
+                    model,
+                    provider.GetRequiredService<IConfiguration>()));
+        }
+
+        services.TryAddSingleton(DefaultChatClient);
+        services.TryAddSingleton(DefaultEmbeddingGenerator);
 
         services.AddHostedService<LlmWarmupHostedService>();
     }
 
-    private static void AddOllamaModel<TModel>(IServiceCollection services, string defaultTag)
-        where TModel : class
-        => services.AddKeyedSingleton<IChatClient>(
-            typeof(TModel),
-            (provider, _) => Ollama(
-                provider.GetRequiredService<IConfiguration>(),
-                typeof(TModel).Name,
-                defaultTag));
-
-    private static void AddOllamaEmbedding<TModel>(IServiceCollection services, string defaultTag)
-        where TModel : class
-        => services.AddKeyedSingleton<IEmbeddingGenerator<string, Embedding<float>>>(
-            typeof(TModel),
-            (provider, _) => OllamaEmbedding(
-                provider.GetRequiredService<IConfiguration>(),
-                typeof(TModel).Name,
-                defaultTag));
-
-    private static IEmbeddingGenerator<string, Embedding<float>> OllamaEmbedding(
-        IConfiguration configuration,
-        string modelName,
-        string defaultTag)
+    private static IChatClient BuildChatPipeline(IServiceProvider provider, LLMModel model)
     {
-        var endpoint = RequireOllamaEndpoint(configuration, modelName);
-        var tag = configuration[$"{ConfigurationRoot}:Ollama:{modelName}:Model"] ?? defaultTag;
-        var http = new HttpClient
-        {
-            BaseAddress = endpoint,
-            Timeout = RequestTimeout,
-        };
-
-        return new OllamaApiClient(http, tag);
-    }
-
-    private static IChatClient Ollama(
-        IConfiguration configuration,
-        string modelName,
-        string defaultTag)
-    {
-        var endpointUri = RequireOllamaEndpoint(configuration, modelName);
-        var tag = configuration[$"{ConfigurationRoot}:Ollama:{modelName}:Model"] ?? defaultTag;
-        var enableSensitiveData = configuration.GetValue<bool>(EnableSensitiveDataKey);
-
-        var http = new HttpClient
-        {
-            BaseAddress = endpointUri,
-            Timeout = RequestTimeout,
-        };
-
-        return new ChatClientBuilder(new OllamaApiClient(http, tag))
+        var configuration = provider.GetRequiredService<IConfiguration>();
+        return new ChatClientBuilder(Factories[model.Provider].CreateChatClient(model, configuration))
+            .UseFunctionInvocation()
             .UseOpenTelemetry(
-                sourceName: $"{TelemetrySource}.{modelName}",
-                configure: telemetry => telemetry.EnableSensitiveData = enableSensitiveData)
-            .Build();
+                sourceName: $"{TelemetrySource}.{model.Marker.Name}",
+                configure: telemetry => telemetry.EnableSensitiveData =
+                    configuration.GetValue<bool>(EnableSensitiveDataKey))
+            .Build(provider);
     }
 
-    private static Uri RequireOllamaEndpoint(IConfiguration configuration, string modelName)
+    private static IChatClient DefaultChatClient(IServiceProvider provider)
     {
-        var endpoint = configuration[$"{ConfigurationRoot}:Ollama:Endpoint"];
-        if (Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri)
-            && endpointUri is not null
-            && (string.Equals(endpointUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(endpointUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
+        var configuration = provider.GetRequiredService<IConfiguration>();
+        var model = configuration[DefaultModelKey] is { Length: > 0 } markerName
+            ? LLMModel.FindByMarkerName(markerName)
+                ?? throw UnknownMarker(DefaultModelKey, markerName, LLMModel.All.Select(static m => m.Marker.Name))
+            : FirstConfiguredModel(configuration);
+        return provider.GetRequiredKeyedService<IChatClient>(model.Marker);
+    }
+
+    private static LLMModel FirstConfiguredModel(IConfiguration configuration)
+        => LLMModel.All.FirstOrDefault(model => Factories[model.Provider].IsConfigured(configuration))
+            ?? throw new InvalidOperationException(
+                $"No LLM provider is configured. Supply a provider API key (for example "
+                + $"{ConfigurationRoot}:OpenAI:ApiKey) or an Ollama endpoint, or pin {DefaultModelKey}.");
+
+    private static IEmbeddingGenerator<string, Embedding<float>> DefaultEmbeddingGenerator(IServiceProvider provider)
+    {
+        var configuration = provider.GetRequiredService<IConfiguration>();
+
+        if (configuration[DefaultEmbeddingKey] is { Length: > 0 } markerName)
         {
-            return endpointUri;
+            var configured = EmbeddingModel.FindByMarkerName(markerName)
+                ?? throw UnknownMarker(DefaultEmbeddingKey, markerName, EmbeddingModel.All.Select(static m => m.Marker.Name));
+            return provider.GetRequiredKeyedService<IEmbeddingGenerator<string, Embedding<float>>>(configured.Marker);
         }
 
-        throw new InvalidOperationException(
-            $"{modelName} requires DigitalBrain:AI:Ollama:Endpoint to be an absolute HTTP(S) URI. Configure it through AIModule.WithLlm<{modelName}>() in AppHost.");
+        // The default embedding stays pinned to the local model unless explicitly
+        // configured: silently switching it changes vector dimensions and orphans
+        // every existing Qdrant collection.
+        var local = EmbeddingModel.All.Single(static model => model.Marker == typeof(Ollama.IEmbeddingGemma));
+        if (!Factories[local.Provider].IsConfigured(configuration))
+        {
+            throw new InvalidOperationException(
+                $"No embedding model is configured. Supply an Ollama endpoint for {local.Marker.Name}, "
+                + $"or pin {DefaultEmbeddingKey} to a configured cloud embedding "
+                + $"({string.Join(", ", EmbeddingModel.All.Select(static m => m.Marker.Name))}).");
+        }
+
+        return provider.GetRequiredKeyedService<IEmbeddingGenerator<string, Embedding<float>>>(local.Marker);
     }
 
+    private static InvalidOperationException UnknownMarker(
+        string configurationKey,
+        string markerName,
+        IEnumerable<string> knownMarkerNames)
+        => new($"{configurationKey} names unknown model '{markerName}'. "
+            + $"Known models: {string.Join(", ", knownMarkerNames)}.");
 }

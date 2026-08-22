@@ -21,6 +21,18 @@ public sealed class NamesConformanceTests(ModelFixture fixture)
         Assert.True(environment.ContainsKey("DigitalBrain__AI__Ollama__IEmbeddingGemma__Model"));
     }
 
+    [Theory]
+    [InlineData("DigitalBrain__AI__OpenAI__ApiKey")]
+    [InlineData("DigitalBrain__AI__Anthropic__ApiKey")]
+    [InlineData("DigitalBrain__AI__Google__ApiKey")]
+    [InlineData("DigitalBrain__AI__XAI__ApiKey")]
+    public async Task KernelRenderedEnvironmentWiresEveryCloudProviderApiKey(string configurationKey)
+    {
+        var environment = await fixture.Model.RenderedEnvironmentAsync(ProductSurfaceResourceNames.Kernel);
+
+        Assert.True(environment.ContainsKey(configurationKey));
+    }
+
     [Fact]
     public async Task KernelRenderedEnvironmentContainsTheExplicitAppHostModuleManifest()
     {

@@ -1,10 +1,11 @@
 using System.Runtime.CompilerServices;
-using DigitalBrain.Abstractions;
 using DigitalBrain.Core;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.AI;
 
+// The setup layer over a raw LLM: an agent owns its initial prompt and its
+// toolset; model/provider concerns live in the injected chat client.
 public abstract class Agent : Neuron, IAgent
 {
     private readonly IChatClient _chatClient;
@@ -16,7 +17,9 @@ public abstract class Agent : Neuron, IAgent
         _chatClient = chatClient;
     }
 
-    protected virtual string? Instructions => null;
+    protected abstract string Instructions { get; }
+
+    protected virtual IReadOnlyList<AITool> Tools => [];
 
     public async IAsyncEnumerable<ChatResponseUpdate> RespondStreaming(
         IReadOnlyList<ChatMessage> messages,
@@ -25,19 +28,15 @@ public abstract class Agent : Neuron, IAgent
         ArgumentNullException.ThrowIfNull(messages);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var options = new ChatOptions
+        var tools = Tools;
+        var options = new ChatOptions { MaxOutputTokens = 4096 };
+        if (tools.Count > 0)
         {
-            MaxOutputTokens = 4096,
-            AdditionalProperties = new AdditionalPropertiesDictionary
-            {
-                ["num_ctx"] = 16384,
-                ["think"] = false,
-            },
-        };
-        var instructions = Instructions;
-        IReadOnlyList<ChatMessage> request = string.IsNullOrWhiteSpace(instructions)
+            options.Tools = [.. tools];
+        }
+        IReadOnlyList<ChatMessage> request = string.IsNullOrWhiteSpace(Instructions)
             ? messages
-            : [new ChatMessage(ChatRole.System, instructions), .. messages];
+            : [new ChatMessage(ChatRole.System, Instructions), .. messages];
 
         await foreach (var update in _chatClient
             .GetStreamingResponseAsync(request, options, cancellationToken).ConfigureAwait(true))
@@ -51,12 +50,5 @@ public abstract class Agent : Neuron, IAgent
         ArgumentNullException.ThrowIfNull(messages);
 
         return RespondStreaming(messages).ToChatResponseAsync();
-    }
-
-    public Task<ChatResponse> Respond(IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(messages);
-
-        return RespondStreaming(messages, cancellationToken).ToChatResponseAsync(cancellationToken);
     }
 }
