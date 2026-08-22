@@ -18,6 +18,7 @@ public sealed class AIModule : Core.IModule
         else
         {
             AIClients.Add(builder.Services);
+            AIClients.AddImageGeneration(builder.Services, builder.Configuration);
         }
 
         VoiceToTextHosting.Add(builder.Services, builder.Configuration);

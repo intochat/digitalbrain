@@ -27,6 +27,7 @@ internal static class AITestingClients
 
         services.TryAddSingleton<IChatClient>(scriptedClient);
         services.TryAddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(embeddingGenerator);
+        services.TryAddSingleton<IImageGeneration, TestImageGeneration>();
     }
 
     private sealed class TestEmbeddingGenerator : IEmbeddingGenerator<string, Embedding<float>>

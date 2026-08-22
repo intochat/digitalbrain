@@ -83,16 +83,29 @@ public sealed class ProductionLlmRegistrationTests
         Assert.True(LLMModel.FindByMarker(typeof(DigitalBrain.AI.OpenAI.IGpt54))!.SupportsTools);
     }
 
+    [Fact]
+    public void ImageGenerationRegistersOnlyWhenOpenAIIsConfigured()
+    {
+        using var withKey = BuildProvider(AllProvidersConfigured);
+        Assert.NotNull(withKey.GetService<IImageGeneration>());
+
+        using var without = BuildProvider([]);
+        Assert.Null(without.GetService<IImageGeneration>());
+    }
+
     private static ServiceProvider BuildProvider(Dictionary<string, string?> configuration)
     {
         var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(new ConfigurationBuilder()
+        var configurationRoot = new ConfigurationBuilder()
             .AddInMemoryCollection(configuration)
-            .Build());
+            .Build();
+        services.AddSingleton<IConfiguration>(configurationRoot);
 
         var clients = typeof(AIModule).Assembly.GetType("DigitalBrain.AI.AIClients", throwOnError: true)!;
         clients.GetMethod("Add", BindingFlags.Static | BindingFlags.NonPublic)!
             .Invoke(null, [services]);
+        clients.GetMethod("AddImageGeneration", BindingFlags.Static | BindingFlags.NonPublic)!
+            .Invoke(null, [services, configurationRoot]);
 
         return services.BuildServiceProvider();
     }

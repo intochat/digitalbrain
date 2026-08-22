@@ -118,6 +118,14 @@ internal static class AIClients
         return provider.GetRequiredKeyedService<IEmbeddingGenerator<string, Embedding<float>>>(local.Marker);
     }
 
+    internal static void AddImageGeneration(IServiceCollection services, IConfiguration configuration)
+    {
+        if (configuration[$"{ConfigurationRoot}:OpenAI:ApiKey"] is { Length: > 0 })
+        {
+            services.AddSingleton<IImageGeneration, OpenAIImageGeneration>();
+        }
+    }
+
     private static InvalidOperationException UnknownMarker(
         string configurationKey,
         string markerName,
