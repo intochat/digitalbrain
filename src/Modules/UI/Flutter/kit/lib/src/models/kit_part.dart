@@ -17,6 +17,8 @@ sealed class KitPart {
       KitChartPart.kindName => KitChartPart.fromMetadata(metadata),
       KitCardPart.kindName => KitCardPart.fromMetadata(metadata),
       KitTimerPart.kindName => KitTimerPart.fromMetadata(metadata),
+      KitChartRefPart.kindName => KitChartRefPart.fromMetadata(metadata),
+      KitImageRefPart.kindName => KitImageRefPart.fromMetadata(metadata),
       _ => null,
     };
   }
@@ -188,5 +190,57 @@ final class KitCardPart extends KitPart {
         'fields': [
           for (final f in fields) {'label': f.label, 'value': f.value},
         ],
+      };
+}
+
+final class KitChartRefPart extends KitPart {
+  const KitChartRefPart({required this.name, required this.caption});
+
+  static const kindName = 'chart-ref';
+
+  final String name;
+  final String caption;
+
+  @override
+  String get kind => kindName;
+
+  factory KitChartRefPart.fromMetadata(Map<String, dynamic> metadata) {
+    return KitChartRefPart(
+      name: metadata['name'] as String? ?? '',
+      caption: metadata['caption'] as String? ?? '',
+    );
+  }
+
+  @override
+  Map<String, Object?> toMetadata() => {
+        'kind': kindName,
+        'name': name,
+        'caption': caption,
+      };
+}
+
+final class KitImageRefPart extends KitPart {
+  const KitImageRefPart({required this.name, required this.caption});
+
+  static const kindName = 'image-ref';
+
+  final String name;
+  final String caption;
+
+  @override
+  String get kind => kindName;
+
+  factory KitImageRefPart.fromMetadata(Map<String, dynamic> metadata) {
+    return KitImageRefPart(
+      name: metadata['name'] as String? ?? '',
+      caption: metadata['caption'] as String? ?? '',
+    );
+  }
+
+  @override
+  Map<String, Object?> toMetadata() => {
+        'kind': kindName,
+        'name': name,
+        'caption': caption,
       };
 }

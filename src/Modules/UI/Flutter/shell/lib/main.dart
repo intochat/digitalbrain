@@ -47,6 +47,8 @@ Future<void> main() async {
                   action: action,
                 ),
       onOpenSignIn: openExternalUrl,
+      onReadChart: edge?.readChart,
+      onReadImageBytes: edge?.readImageBytes,
     ),
   );
 }

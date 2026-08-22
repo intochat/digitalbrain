@@ -9,6 +9,7 @@ ChatTurnEvent shellTurn(
   bool fromUser,
   String text, {
   String? synapse,
+  List<KitCardRef> cards = const [],
 }) => ChatTurnEvent(
   sequence: sequence,
   fromUser: fromUser,
@@ -19,6 +20,7 @@ ChatTurnEvent shellTurn(
   caller: 'chat:owner/main',
   correlationId: 'correlation-$sequence',
   timestamp: DateTime.utc(2026, 7, 28, 8, 0, sequence),
+  cards: cards,
 );
 
 Future<void> prepareShellSurface(WidgetTester tester) async {

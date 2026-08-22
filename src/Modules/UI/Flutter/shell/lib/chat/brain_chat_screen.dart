@@ -30,6 +30,8 @@ final class BrainChatScreen extends StatefulWidget {
     this.onAttachmentTap,
     this.onOpenSignIn,
     this.onActivateButton,
+    this.onReadChart,
+    this.onReadImageBytes,
   });
 
   final String chatName;
@@ -40,6 +42,8 @@ final class BrainChatScreen extends StatefulWidget {
   final VoidCallback? onAttachmentTap;
   final OpenUrl? onOpenSignIn;
   final ActivateChatButton? onActivateButton;
+  final ReadChart? onReadChart;
+  final ReadImageBytes? onReadImageBytes;
 
   @override
   State<BrainChatScreen> createState() => _BrainChatScreenState();
@@ -498,6 +502,8 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
                         onButtonPressed: widget.onActivateButton == null
                             ? null
                             : _onKitButton,
+                        onReadChart: widget.onReadChart,
+                        onReadImageBytes: widget.onReadImageBytes,
                       ),
                 ),
                 ),

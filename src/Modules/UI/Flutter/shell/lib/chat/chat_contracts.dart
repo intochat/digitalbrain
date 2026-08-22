@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
 
@@ -12,6 +14,8 @@ typedef ActivateChatButton =
       required String buttonId,
       required String action,
     });
+typedef ReadChart = Future<ChatChartOffer?> Function(String name);
+typedef ReadImageBytes = Future<Uint8List?> Function(String name);
 
 const ownerUserId = 'owner';
 const assistantUserId = 'assistant';
@@ -38,5 +42,11 @@ extension ChatTurnKitParts on ChatTurnEvent {
       ),
     for (final timer in timers)
       KitTimerPart(label: timer.label, dueAt: timer.dueAt),
+    for (final card in cards)
+      ...switch (card.kind) {
+        'chart' => [KitChartRefPart(name: card.name, caption: card.caption)],
+        'image' => [KitImageRefPart(name: card.name, caption: card.caption)],
+        _ => const <KitPart>[],
+      },
   ];
 }

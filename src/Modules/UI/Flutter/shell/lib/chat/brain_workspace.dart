@@ -24,6 +24,8 @@ final class BrainWorkspace extends StatefulWidget {
     this.onAttachmentTap,
     this.onOpenSignIn,
     this.onActivateButton,
+    this.onReadChart,
+    this.onReadImageBytes,
     this.userActions = const [],
     this.statusMessage,
   });
@@ -36,6 +38,8 @@ final class BrainWorkspace extends StatefulWidget {
   final VoidCallback? onAttachmentTap;
   final OpenUrl? onOpenSignIn;
   final ActivateChatButton? onActivateButton;
+  final ReadChart? onReadChart;
+  final ReadImageBytes? onReadImageBytes;
   final List<UserActionCardModel> userActions;
   final String? statusMessage;
 
@@ -104,6 +108,8 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
             onAttachmentTap: widget.onAttachmentTap,
             onOpenSignIn: widget.onOpenSignIn,
             onActivateButton: widget.onActivateButton,
+            onReadChart: widget.onReadChart,
+            onReadImageBytes: widget.onReadImageBytes,
           ),
           ActivityScreen(
             turns: _session.projectedTurns,

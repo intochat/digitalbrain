@@ -12,6 +12,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  digitalbrain_flutter:
+    path: ../core
   flutter_chat_core: ^2.9.0
   graphic: ^2.7.0
 

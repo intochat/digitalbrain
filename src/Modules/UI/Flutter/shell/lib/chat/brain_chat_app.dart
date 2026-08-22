@@ -19,6 +19,8 @@ final class BrainChatApp extends StatelessWidget {
     this.onAttachmentTap,
     this.onOpenSignIn,
     this.onActivateButton,
+    this.onReadChart,
+    this.onReadImageBytes,
     this.userActions = const [],
     this.statusMessage,
   });
@@ -31,6 +33,8 @@ final class BrainChatApp extends StatelessWidget {
   final VoidCallback? onAttachmentTap;
   final OpenUrl? onOpenSignIn;
   final ActivateChatButton? onActivateButton;
+  final ReadChart? onReadChart;
+  final ReadImageBytes? onReadImageBytes;
   final List<UserActionCardModel> userActions;
   final String? statusMessage;
 
@@ -49,6 +53,8 @@ final class BrainChatApp extends StatelessWidget {
         onAttachmentTap: onAttachmentTap,
         onOpenSignIn: onOpenSignIn,
         onActivateButton: onActivateButton,
+        onReadChart: onReadChart,
+        onReadImageBytes: onReadImageBytes,
         userActions: userActions,
         statusMessage: statusMessage,
       ),
