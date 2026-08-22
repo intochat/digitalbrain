@@ -40,9 +40,14 @@ internal sealed class ChatTurnWorker : Neuron, IChatTurnWorker
 
         var responder = DefaultResponder(goal.Chat.Owner);
 
+        // The quoted value here is the chat's FULL grain key ("{owner}/{principal:N}.{local}"),
+        // not just its local Name: KitToolSource's render_chart/generate_image tools take
+        // chatName straight into IGrainFactory.GetGrain<IChat>(string) and KitInstanceNames.Sibling,
+        // both of which require the owner-qualified key (verified in Task 7/9 -- goal.Chat.Name
+        // alone 404s every kit lookup the tool call would make).
         var conversationContext = new ChatMessage(
             ChatRole.System,
-            $"This conversation lives in chat '{goal.Chat.Name}'. Send cards and notes by targeting 'chat:{goal.Chat.Name}'.");
+            $"This conversation lives in chat '{goal.Chat.GrainKey}'. Send cards and notes by targeting 'chat:{goal.Chat.Name}'.");
 
         var answer = new StringBuilder();
         using (VerifiedActor.Enter(goal.Actor))

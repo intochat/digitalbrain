@@ -10,12 +10,16 @@ internal static class AITestingClients
 {
     internal static void Add(IServiceCollection services)
     {
-        var scriptedClient = new TestChatClient();
+        // Mirrors AIClients.BuildChatPipeline's .UseFunctionInvocation() wrapping: without it,
+        // TestChatClient's scripted FunctionCallContent (render_chart/generate_image) would
+        // never actually run the tool or come back around for the follow-up round, so kit
+        // cards would never appear even in testing mode.
+        var chatClient = new ChatClientBuilder(new TestChatClient()).UseFunctionInvocation().Build();
         var embeddingGenerator = new TestEmbeddingGenerator();
 
         foreach (var model in LLMModel.All)
         {
-            services.AddKeyedSingleton<IChatClient>(model.Marker, scriptedClient);
+            services.AddKeyedSingleton<IChatClient>(model.Marker, chatClient);
         }
 
         foreach (var model in EmbeddingModel.All)
@@ -25,7 +29,7 @@ internal static class AITestingClients
                 embeddingGenerator);
         }
 
-        services.TryAddSingleton<IChatClient>(scriptedClient);
+        services.TryAddSingleton<IChatClient>(chatClient);
         services.TryAddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(embeddingGenerator);
         services.TryAddSingleton<IImageGeneration, TestImageGeneration>();
     }
