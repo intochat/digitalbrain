@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions.Entities;
 using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.UI;
 using Xunit;
 
 namespace DigitalBrain.Simulation.Tests;
@@ -21,4 +22,18 @@ public sealed class EntityTests(SimulationFixture fixture)
     [Fact]
     public void BareMarkerEntityContractIsRefused()
         => Assert.Throws<NeuronAuthorizationException>(() => fixture.Sim.Brain.GetEntity<IEntity>());
+
+    [Fact]
+    public async Task ChartEntityRendersAndReadsItsState()
+    {
+        var chart = fixture.Sim.Brain.GetEntity<IChart>(fixture.Sim.UniqueId("chart"));
+        var state = new ChartState("Sales", "bar", [new ChartPoint("Q1", 10), new ChartPoint("Q2", 20)]);
+
+        await chart.Render(state);
+        var read = await chart.Read();
+
+        Assert.NotNull(read);
+        Assert.Equal("Sales", read.Title);
+        Assert.Equal(2, read.Points.Count);
+    }
 }
