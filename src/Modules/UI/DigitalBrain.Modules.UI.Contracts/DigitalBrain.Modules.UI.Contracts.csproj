@@ -7,6 +7,6 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.AI.Abstractions" />
     <ProjectReference Include="../../../Kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
-    <None Include="flutter-wire-contracts.golden.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('flutter-wire-contracts.golden.json')" />
+    <None Include="flutter-wire-contracts.golden.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

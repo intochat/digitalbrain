@@ -1,3 +1,4 @@
+using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.AI;
 using DigitalBrain.Chat;
@@ -15,7 +16,13 @@ namespace DigitalBrain.Simulation.Tests;
 [Collection(SimulationCollection.Name)]
 public sealed class KitToolTests(SimulationFixture fixture)
 {
-    private static readonly OwnerId Owner = new("kit-tool-tests");
+    // Must equal fixture.Sim.Brain.Owner (BrainSimulationOptions defaults to
+    // DigitalBrainNames.DefaultOwner and SimulationCollection never overrides it): the
+    // chatName instances built by NewChatInstance() are prefixed with the brain's actual
+    // owner, and KitToolSource.ToolsFor(Owner) now refuses any chatName that doesn't start
+    // with "{owner.Value}/", so the two must agree or every non-guard test would trip the
+    // new owner guard.
+    private static readonly OwnerId Owner = new(DigitalBrainNames.DefaultOwner);
 
     // PrincipalScoped.InstanceName (src/Kernel/DigitalBrain.Kernel/Auth/Surfaces/PrincipalScoped.cs)
     // is an internal Kernel-side alias not reachable from this module test project; it
@@ -141,6 +148,37 @@ public sealed class KitToolTests(SimulationFixture fixture)
         Assert.Empty(transcript.Turns);
     }
 
+    // The model only ever echoes a chatName from its own conversation context, but nothing
+    // stops it from echoing a chat that belongs to a different owner (whether by mistake or
+    // by a crafted prompt). KitToolSource.ToolsFor closes over the caller's real owner and
+    // must refuse any chatName outside that owner's partition before it ever reaches a
+    // grain. The reply is asserted to equal the guard message exactly (not just "contains"),
+    // which rules out the tool having fallen through to the success path -- the success
+    // reply always embeds a generated card name, so an exact match on the guard text is
+    // itself proof no chart entity was created.
+    [Fact]
+    public async Task RenderChartToolRefusesAChatNameFromADifferentOwnerWithoutTouchingTheChat()
+    {
+        var otherOwnerChat = OtherOwnerChatInstance();
+        var tools = new KitToolSource(fixture.Sim.Grains, imageGeneration: null, imageStore: new MemoryKitImageStore());
+        var render = tools.ToolsFor(Owner).Single(tool => tool.Name == "render_chart");
+
+        var reply = await render.InvokeAsync(new AIFunctionArguments
+        {
+            ["chatName"] = otherOwnerChat,
+            ["title"] = "Sales",
+            ["chartKind"] = "bar",
+            ["labels"] = new[] { "Q1" },
+            ["values"] = new[] { 10.0 },
+        }, CancellationToken.None);
+
+        Assert.Equal(
+            $"chatName must be a chat key of this owner (starting with '{Owner.Value}/').",
+            reply!.ToString());
+        var transcript = await fixture.Sim.Grains.GetGrain<IChat>(otherOwnerChat).Read();
+        Assert.Empty(transcript.Turns);
+    }
+
     [Fact]
     public void GenerateImageToolIsAbsentWithoutAnImageGenerator()
     {
@@ -199,6 +237,32 @@ public sealed class KitToolTests(SimulationFixture fixture)
         Assert.Empty(transcript.Turns);
     }
 
+    // generate_image twin of RenderChartToolRefusesAChatNameFromADifferentOwnerWithoutTouchingTheChat
+    // above -- see that test's comment for why the exact-message assertion doubles as proof
+    // no image entity was created. CountingImageGeneration additionally proves the guard
+    // fires before the (paid) image generator would ever be invoked.
+    [Fact]
+    public async Task GenerateImageToolRefusesAChatNameFromADifferentOwnerWithoutCallingTheGeneratorOrTouchingTheChat()
+    {
+        var otherOwnerChat = OtherOwnerChatInstance();
+        var generator = new CountingImageGeneration();
+        var tools = new KitToolSource(fixture.Sim.Grains, generator, new MemoryKitImageStore());
+        var generate = tools.ToolsFor(Owner).Single(tool => tool.Name == "generate_image");
+
+        var reply = await generate.InvokeAsync(new AIFunctionArguments
+        {
+            ["chatName"] = otherOwnerChat,
+            ["prompt"] = "a red fox",
+        }, CancellationToken.None);
+
+        Assert.Equal(
+            $"chatName must be a chat key of this owner (starting with '{Owner.Value}/').",
+            reply!.ToString());
+        Assert.Equal(0, generator.CallCount);
+        var transcript = await fixture.Sim.Grains.GetGrain<IChat>(otherOwnerChat).Read();
+        Assert.Empty(transcript.Turns);
+    }
+
     // A tool-supplied chatName is the raw grain key the model was told in its context:
     // "{owner}/{principal:N}.{local}" (owner/name form Neuron.Id requires, wrapping a
     // principal-scoped name — mirrors MapOwnerCommands.TryPrincipalResource composed
@@ -206,6 +270,13 @@ public sealed class KitToolTests(SimulationFixture fixture)
     // local segment after the principal partition's '.', so tests need that full shape too.
     private string NewChatInstance()
         => $"{fixture.Sim.Brain.Owner.Value}/"
+            + PrincipalPartition.InstanceName(new PrincipalId(Guid.NewGuid()), fixture.Sim.UniqueId("chat"));
+
+    // A well-formed chat key -- valid "{owner}/{principal:N}.{local}" shape, KitInstanceNames.Sibling
+    // would happily parse it -- but scoped to an owner other than the one the tool was built
+    // for (Owner). Exercises the owner guard itself rather than any other validation path.
+    private string OtherOwnerChatInstance()
+        => "someone-else/"
             + PrincipalPartition.InstanceName(new PrincipalId(Guid.NewGuid()), fixture.Sim.UniqueId("chat"));
 
     private static string CardNameFrom(string replyText)

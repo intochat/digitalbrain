@@ -17,9 +17,23 @@ internal sealed class KitToolSource(
 {
     public IReadOnlyList<AIFunction> ToolsFor(OwnerId owner)
     {
+        // The model only ever echoes back a chatName it read from its own conversation
+        // context, so the two local wrapper functions below close over the trusted `owner`
+        // from this call rather than accepting it as a tool parameter (which would let the
+        // model supply -- and forge -- it). RenderChartAsync/GenerateImageAsync then refuse
+        // any chatName that isn't scoped under this owner before touching a grain.
+        Task<string> RenderChart(
+            [Description("The current chat's name, exactly as stated in the conversation context")] string chatName,
+            [Description("Short chart title")] string title,
+            [Description("bar or line")] string chartKind,
+            [Description("Point labels, one per value")] string[] labels,
+            [Description("Point values, one per label")] double[] values,
+            CancellationToken cancellationToken)
+            => RenderChartAsync(owner, chatName, title, chartKind, labels, values, cancellationToken);
+
         var tools = new List<AIFunction>
         {
-            AIFunctionFactory.Create(RenderChartAsync, new AIFunctionFactoryOptions
+            AIFunctionFactory.Create(RenderChart, new AIFunctionFactoryOptions
             {
                 Name = "render_chart",
                 Description = "Render a chart for the owner. It appears as a live card in the chat and can "
@@ -29,7 +43,13 @@ internal sealed class KitToolSource(
 
         if (imageGeneration is not null)
         {
-            tools.Add(AIFunctionFactory.Create(GenerateImageAsync, new AIFunctionFactoryOptions
+            Task<string> GenerateImage(
+                [Description("The current chat's name, exactly as stated in the conversation context")] string chatName,
+                [Description("What the image should depict")] string prompt,
+                CancellationToken cancellationToken)
+                => GenerateImageAsync(owner, chatName, prompt, cancellationToken);
+
+            tools.Add(AIFunctionFactory.Create(GenerateImage, new AIFunctionFactoryOptions
             {
                 Name = "generate_image",
                 Description = "Generate an image from a text prompt and show it as a card in the chat. "
@@ -40,14 +60,30 @@ internal sealed class KitToolSource(
         return tools;
     }
 
+    // Rejects a chatName the model echoed back that doesn't belong to this owner's
+    // partition, before either tool touches a grain.
+    private static string? OwnerGuardError(OwnerId owner, string chatName)
+    {
+        var ownerPrefix = $"{owner.Value}/";
+        return chatName.StartsWith(ownerPrefix, StringComparison.Ordinal)
+            ? null
+            : $"chatName must be a chat key of this owner (starting with '{ownerPrefix}').";
+    }
+
     private async Task<string> RenderChartAsync(
-        [Description("The current chat's name, exactly as stated in the conversation context")] string chatName,
-        [Description("Short chart title")] string title,
-        [Description("bar or line")] string chartKind,
-        [Description("Point labels, one per value")] string[] labels,
-        [Description("Point values, one per label")] double[] values,
+        OwnerId owner,
+        string chatName,
+        string title,
+        string chartKind,
+        string[] labels,
+        double[] values,
         CancellationToken cancellationToken)
     {
+        if (OwnerGuardError(owner, chatName) is { } ownerError)
+        {
+            return ownerError;
+        }
+
         if (string.IsNullOrWhiteSpace(title))
         {
             return "title must not be blank.";
@@ -71,10 +107,16 @@ internal sealed class KitToolSource(
     }
 
     private async Task<string> GenerateImageAsync(
-        [Description("The current chat's name, exactly as stated in the conversation context")] string chatName,
-        [Description("What the image should depict")] string prompt,
+        OwnerId owner,
+        string chatName,
+        string prompt,
         CancellationToken cancellationToken)
     {
+        if (OwnerGuardError(owner, chatName) is { } ownerError)
+        {
+            return ownerError;
+        }
+
         if (string.IsNullOrWhiteSpace(prompt))
         {
             return "prompt must not be blank.";
