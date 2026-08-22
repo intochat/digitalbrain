@@ -23,6 +23,44 @@ void main() {
     expect(event.timers.first.dueAt, DateTime.utc(2026, 8, 10, 12, 5));
   });
 
+  test('ChatTurnEvent parses kit card refs', () {
+    final event = ChatTurnEvent.fromJson({
+      'sequence': 8,
+      'fromUser': false,
+      'text': 'here is the chart',
+      'commandId': 'c',
+      'synapse': 'Responded',
+      'neuronId': 'n',
+      'caller': 'x',
+      'correlationId': 'y',
+      'timestamp': '2026-08-10T12:00:00Z',
+      'cards': [
+        {'kind': 'chart', 'name': 'weekly-usage', 'caption': 'Weekly usage'},
+      ],
+    });
+
+    expect(event.cards, hasLength(1));
+    expect(event.cards.first.kind, 'chart');
+    expect(event.cards.first.name, 'weekly-usage');
+    expect(event.cards.first.caption, 'Weekly usage');
+  });
+
+  test('ChatTurnEvent defaults cards to empty when absent', () {
+    final event = ChatTurnEvent.fromJson({
+      'sequence': 9,
+      'fromUser': false,
+      'text': 'no cards here',
+      'commandId': 'c',
+      'synapse': 'Responded',
+      'neuronId': 'n',
+      'caller': 'x',
+      'correlationId': 'y',
+      'timestamp': '2026-08-10T12:00:00Z',
+    });
+
+    expect(event.cards, isEmpty);
+  });
+
   test('SceneOpenedEvent reads JSON field names used by UI HTTP', () {
     final event = SceneOpenedEvent.fromJson({
       'sequence': 7,

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -211,6 +212,47 @@ final class DigitalBrainUiClient {
     for (final event in parser.flush()) {
       yield event;
     }
+  }
+
+  Future<ChatChartOffer?> readChart(String chartName) async {
+    final body = await _getKitEntity('/kit/charts/$chartName', 'kit chart');
+    return body == null ? null : ChatChartOffer.fromJson(body);
+  }
+
+  Future<Map<String, Object?>?> readImage(String imageName) =>
+      _getKitEntity('/kit/images/$imageName', 'kit image');
+
+  Future<Uint8List?> readImageBytes(String imageName) async {
+    final uri = baseUri.replace(path: '/kit/images/$imageName/content');
+    final streamed = await _http.send(http.Request('GET', uri));
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode == 404) {
+      return null;
+    }
+    if (response.statusCode != 200) {
+      throw StateError(
+        'kit image content read failed: ${response.statusCode} ${response.body}',
+      );
+    }
+    return response.bodyBytes;
+  }
+
+  Future<Map<String, Object?>?> _getKitEntity(
+    String path,
+    String description,
+  ) async {
+    final uri = baseUri.replace(path: path);
+    final streamed = await _http.send(http.Request('GET', uri));
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode == 404) {
+      return null;
+    }
+    if (response.statusCode != 200) {
+      throw StateError(
+        '$description read failed: ${response.statusCode} ${response.body}',
+      );
+    }
+    return jsonDecode(response.body) as Map<String, Object?>;
   }
 
   void close() {

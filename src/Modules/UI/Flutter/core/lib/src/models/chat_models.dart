@@ -118,6 +118,24 @@ final class ChatChartOffer {
   }
 }
 
+final class KitCardRef {
+  const KitCardRef({
+    required this.kind,
+    required this.name,
+    required this.caption,
+  });
+
+  final String kind;
+  final String name;
+  final String caption;
+
+  factory KitCardRef.fromJson(Map<String, Object?> json) => KitCardRef(
+    kind: json['kind'] as String? ?? '',
+    name: json['name'] as String? ?? '',
+    caption: json['caption'] as String? ?? '',
+  );
+}
+
 final class ChatTurnEvent {
   const ChatTurnEvent({
     required this.sequence,
@@ -132,6 +150,7 @@ final class ChatTurnEvent {
     this.buttons = const [],
     this.charts = const [],
     this.timers = const [],
+    this.cards = const [],
   });
 
   final int sequence;
@@ -146,6 +165,7 @@ final class ChatTurnEvent {
   final List<ChatButtonOffer> buttons;
   final List<ChatChartOffer> charts;
   final List<ChatTimerOffer> timers;
+  final List<KitCardRef> cards;
 
   factory ChatTurnEvent.fromJson(Map<String, Object?> json) {
     final rawButtons = json['buttons'];
@@ -171,6 +191,13 @@ final class ChatTurnEvent {
               .map((e) => ChatTimerOffer.fromJson(Map<String, Object?>.from(e)))
               .toList(growable: false)
         : const <ChatTimerOffer>[];
+    final rawCards = json['cards'];
+    final cards = rawCards is List
+        ? rawCards
+              .whereType<Map>()
+              .map((e) => KitCardRef.fromJson(Map<String, Object?>.from(e)))
+              .toList(growable: false)
+        : const <KitCardRef>[];
 
     return ChatTurnEvent(
       sequence: (json['sequence'] as num).toInt(),
@@ -185,6 +212,7 @@ final class ChatTurnEvent {
       buttons: buttons,
       charts: charts,
       timers: timers,
+      cards: cards,
     );
   }
 }
