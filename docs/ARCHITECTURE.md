@@ -137,7 +137,7 @@ enabled, run refs.
 
 1. AI providers (IAW port, no tiers) — shipped 2026-08-22.
 2. Auth (UserAccountEntity, cookie + token) — multiuser boundary.
-3. UI kit, all 13 components on the template.
+3. UI kit, all 13 components on the template. (template + Chart + Image shipped 2026-08-23)
 4. Smart Prompts (entity, catalog, runner, triggers).
 5. Google + Salesforce modules.
 6. MAF orchestration restore.

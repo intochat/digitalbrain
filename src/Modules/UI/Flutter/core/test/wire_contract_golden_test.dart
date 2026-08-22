@@ -30,6 +30,10 @@ void main() {
         'ui.open-surface',
         'ui.surface-opened',
         'ui.control-activated',
+        'ui.kit-card',
+        'ui.chart-state',
+        'ui.chart-point',
+        'ui.image-state',
       ]),
     );
   });
