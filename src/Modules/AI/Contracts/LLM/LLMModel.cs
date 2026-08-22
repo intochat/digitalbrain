@@ -8,6 +8,8 @@ public abstract class LLMModel
 
     public abstract Type Marker { get; }
 
+    public virtual bool SupportsTools => true;
+
     public bool IsLocal => Provider == LlmProvider.Ollama;
 
     // Cloud models precede local ones: when no default is configured, the first

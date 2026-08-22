@@ -50,7 +50,24 @@ internal static class AIClients
     private static IChatClient BuildChatPipeline(IServiceProvider provider, LLMModel model)
     {
         var configuration = provider.GetRequiredService<IConfiguration>();
-        return new ChatClientBuilder(Factories[model.Provider].CreateChatClient(model, configuration))
+        var pipeline = new ChatClientBuilder(Factories[model.Provider].CreateChatClient(model, configuration));
+        if (!model.SupportsTools)
+        {
+            // Models that cannot emit tool calls must never be told about tools —
+            // the assistant then answers capability questions honestly with "no".
+            pipeline = pipeline.Use(static async (messages, options, next, cancellationToken) =>
+            {
+                if (options?.Tools is { Count: > 0 })
+                {
+                    options = options.Clone();
+                    options.Tools = null;
+                    options.ToolMode = null;
+                }
+
+                await next(messages, options, cancellationToken).ConfigureAwait(false);
+            });
+        }
+        return pipeline
             .UseFunctionInvocation()
             .UseOpenTelemetry(
                 sourceName: $"{TelemetrySource}.{model.Marker.Name}",

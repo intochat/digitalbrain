@@ -76,6 +76,13 @@ public sealed class ProductionLlmRegistrationTests
         Assert.Contains(nameof(IGpt54), failure.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ToollessModelsNeverReceiveTools()
+    {
+        Assert.False(LLMModel.FindByMarker(typeof(DigitalBrain.AI.Ollama.IGemma4))!.SupportsTools);
+        Assert.True(LLMModel.FindByMarker(typeof(DigitalBrain.AI.OpenAI.IGpt54))!.SupportsTools);
+    }
+
     private static ServiceProvider BuildProvider(Dictionary<string, string?> configuration)
     {
         var services = new ServiceCollection();
