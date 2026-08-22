@@ -1,6 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
+using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
 using DigitalBrain.Testing;
@@ -76,5 +77,15 @@ public sealed class ChatTurnTests(SimulationFixture fixture)
         Assert.Equal(KitCardKinds.Chart, card.Kind);
         Assert.Equal("chart-abc12345", card.Name);
         Assert.Equal("Quarterly sales", card.Caption);
+    }
+
+    [Fact]
+    public async Task ChatRefusesAKitCardWithABlankCaption()
+    {
+        var chat = fixture.Sim.Brain.GetGrainProxy<IChat>("main");
+
+        await Assert.ThrowsAsync<NeuronAuthorizationException>(() => chat.HandleAsync(
+            new KitCardOffer(KitCardKinds.Chart, "chart-abc12345", "   "),
+            CancellationToken.None));
     }
 }

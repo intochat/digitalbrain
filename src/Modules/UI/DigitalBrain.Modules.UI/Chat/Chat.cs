@@ -194,7 +194,9 @@ internal sealed class Chat : Neuron, IChat
     {
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
-        if (string.IsNullOrWhiteSpace(synapse.Kind) || string.IsNullOrWhiteSpace(synapse.Name))
+        if (string.IsNullOrWhiteSpace(synapse.Kind)
+            || string.IsNullOrWhiteSpace(synapse.Name)
+            || string.IsNullOrWhiteSpace(synapse.Caption))
         {
             throw new NeuronAuthorizationException($"Chat '{Id}' refuses an incomplete kit card.");
         }
