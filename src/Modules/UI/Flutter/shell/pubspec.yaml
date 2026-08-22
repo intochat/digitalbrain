@@ -25,7 +25,6 @@ dependencies:
   web: ^1.1.1
   graphic: ^2.7.0
   record: ^7.1.1
-  flutter_soloud: ^4.1.7
   path_provider: ^2.1.6
   http: ^1.6.0
 

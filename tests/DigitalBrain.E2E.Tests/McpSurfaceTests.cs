@@ -49,9 +49,8 @@ public sealed class McpSurfaceTests(AppHostFixture fixture)
             },
             cancellationToken: cancellationToken);
 
-        Assert.False(result.IsError);
-        Assert.Equal(
-            "Test assistant reply.",
-            Assert.Single(result.Content.OfType<TextContentBlock>()).Text);
+        var responseText = string.Join("\n", result.Content.OfType<TextContentBlock>().Select(static block => block.Text));
+        Assert.False(result.IsError is true, $"send_chat_message returned an error: {responseText}");
+        Assert.Equal("Test assistant reply.", responseText);
     }
 }

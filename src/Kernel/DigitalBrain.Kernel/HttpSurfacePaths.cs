@@ -18,7 +18,4 @@ internal static class HttpSurfacePaths
 
     // Multipart voice note → STT → same durable chat.send path.
     public const string ChatVoicePath = "/chats/{chatName}/voice";
-
-    // Full-duplex native PersonaPlex PCM; independent from chat/STT/Orleans.
-    public const string PersonaPlexVoicePath = "/voice/personaplex";
 }

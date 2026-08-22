@@ -15,10 +15,8 @@ typedef ActivateChatButton =
 
 const ownerUserId = 'owner';
 const assistantUserId = 'assistant';
-const voiceDestinationIndex = 1;
-const behaviorsDestinationIndex = 3;
-const kitDestinationIndex = 4;
-const windowingDestinationIndex = 5;
+const behaviorsDestinationIndex = 2;
+const kitDestinationIndex = 3;
 
 extension ChatTurnKitParts on ChatTurnEvent {
   List<KitPart> get kitParts => [

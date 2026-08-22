@@ -7,8 +7,6 @@ import 'package:flutter/material.dart';
 import '../activity_screen.dart';
 import '../behaviors/behavior_workspace.dart';
 import '../user_actions/user_action_card.dart';
-import '../voice/personaplex_voice_controller.dart';
-import '../voice/personaplex_voice_screen.dart';
 import '../windowing/windowing_screen.dart';
 import 'brain_chat_screen.dart';
 import 'chat_contracts.dart';
@@ -28,8 +26,6 @@ final class BrainWorkspace extends StatefulWidget {
     this.onActivateButton,
     this.userActions = const [],
     this.statusMessage,
-    this.personaPlexBaseUri,
-    this.personaPlexVoiceControllerFactory,
   });
 
   final String chatName;
@@ -42,8 +38,6 @@ final class BrainWorkspace extends StatefulWidget {
   final ActivateChatButton? onActivateButton;
   final List<UserActionCardModel> userActions;
   final String? statusMessage;
-  final Uri? personaPlexBaseUri;
-  final PersonaPlexVoiceControllerFactory? personaPlexVoiceControllerFactory;
 
   @override
   State<BrainWorkspace> createState() => _BrainWorkspaceState();
@@ -110,11 +104,6 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
             onAttachmentTap: widget.onAttachmentTap,
             onOpenSignIn: widget.onOpenSignIn,
             onActivateButton: widget.onActivateButton,
-          ),
-          PersonaPlexVoiceScreen(
-            active: _destination == voiceDestinationIndex,
-            baseUri: widget.personaPlexBaseUri,
-            controllerFactory: widget.personaPlexVoiceControllerFactory,
           ),
           ActivityScreen(
             turns: _session.projectedTurns,
