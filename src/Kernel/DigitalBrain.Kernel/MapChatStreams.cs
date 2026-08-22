@@ -84,7 +84,8 @@ internal static class ChatStreamsHttpMaps
             string synapseName,
             NeuronId chat,
             string? turnId = null,
-            string? status = null)
+            string? status = null,
+            KitCardOffer[]? cards = null)
             => new(
                 delivery.Sequence,
                 fromUser,
@@ -96,7 +97,8 @@ internal static class ChatStreamsHttpMaps
                 delivery.CorrelationId.ToString(),
                 delivery.Timestamp,
                 turnId,
-                status);
+                status,
+                cards);
 
         return delivery.Synapse switch
         {
@@ -108,7 +110,8 @@ internal static class ChatStreamsHttpMaps
                     responded.Text,
                     responded.CommandId,
                     nameof(Responded),
-                    responded.Chat),
+                    responded.Chat,
+                    cards: responded.Cards),
             TurnLifecycle life =>
                 Turn(
                     false,

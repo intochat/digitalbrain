@@ -190,6 +190,20 @@ internal sealed class Chat : Neuron, IChat
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
+    public async Task HandleAsync(KitCardOffer synapse, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(synapse);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(synapse.Kind) || string.IsNullOrWhiteSpace(synapse.Name))
+        {
+            throw new NeuronAuthorizationException($"Chat '{Id}' refuses an incomplete kit card.");
+        }
+
+        Remember(new ChatTurn(FromUser: false, synapse.Caption));
+        await EmitAsync(new Responded(CommandId.New(), Id, synapse.Caption, Author: Id.Name, Cards: [synapse]))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
+
     // A fresh activation cannot resume an in-flight worker call (the awaiting task died with
     // the previous activation), so a durably Running head is settled as Failed.
     private async Task FailTurnInterruptedByRestartAsync()

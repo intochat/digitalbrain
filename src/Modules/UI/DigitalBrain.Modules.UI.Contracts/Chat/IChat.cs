@@ -9,7 +9,8 @@ namespace DigitalBrain.Chat;
 public partial interface IChat :
     INeuron,
     IHandle<ReadTranscriptRequest>,
-    IHandle<Note>
+    IHandle<Note>,
+    IHandle<KitCardOffer>
 {
     [Alias(nameof(Send))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]

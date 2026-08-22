@@ -12,4 +12,5 @@ public sealed record Responded(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] NeuronId Chat,
     [property: Id(2)] string Text,
-    [property: Id(3)] string Author = "") : Synapse;
+    [property: Id(3)] string Author = "",
+    [property: Id(4)] KitCardOffer[]? Cards = null) : Synapse;

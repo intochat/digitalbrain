@@ -48,4 +48,33 @@ public sealed class ChatTurnTests(SimulationFixture fixture)
         Assert.Equal(accepted.TurnId, lifecycle.TurnId);
 
     }
+
+    [Fact]
+    public async Task KitCardOfferLandsInTheChatJournalAsARespondedCard()
+    {
+        var brain = fixture.Sim.Brain;
+        var chat = brain.GetGrainProxy<IChat>("main");
+
+        await chat.HandleAsync(
+            new KitCardOffer(KitCardKinds.Chart, "chart-abc12345", "Quarterly sales"),
+            CancellationToken.None);
+
+        var transcript = await chat.Read();
+        Assert.Contains(transcript.Turns, turn => !turn.FromUser && turn.Text == "Quarterly sales");
+
+        var chatId = NeuronId.For<IChat>(brain.Owner, "main");
+        var responded = await JournalWait.ForAsync(
+            brain,
+            chatId,
+            JournalKind.Outgoing,
+            delivery => delivery.Synapse is Responded reply && reply.Text == "Quarterly sales",
+            TurnTimeout);
+
+        var cards = Assert.IsType<Responded>(responded.Synapse).Cards;
+        Assert.NotNull(cards);
+        var card = Assert.Single(cards);
+        Assert.Equal(KitCardKinds.Chart, card.Kind);
+        Assert.Equal("chart-abc12345", card.Name);
+        Assert.Equal("Quarterly sales", card.Caption);
+    }
 }
