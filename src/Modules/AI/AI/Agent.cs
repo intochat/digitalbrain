@@ -32,7 +32,9 @@ public abstract class Agent : Neuron, IAgent
         var options = new ChatOptions { MaxOutputTokens = 4096 };
         if (tools.Count > 0)
         {
-            options.Tools = [.. tools];
+            var turnScheduler = TaskScheduler.Current;
+            options.Tools = [.. tools.Select(tool =>
+                tool is AIFunction capability ? new TurnBoundFunction(capability, turnScheduler) : tool)];
         }
         IReadOnlyList<ChatMessage> request = string.IsNullOrWhiteSpace(Instructions)
             ? messages
