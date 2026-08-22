@@ -31,6 +31,21 @@ public sealed class KitToolTests(SimulationFixture fixture)
         Assert.Equal(PrincipalPartition.InstanceName(principal, "chart-abc12345"), chart);
     }
 
+    // Owner values are only forbidden from containing '/' or whitespace (IdentityPart.Validated),
+    // so a dotted owner like "some.owner" is legal. Sibling must find the principal partition's
+    // '.' after the owner/name '/' split, not the first '.' in the whole key, or a dotted owner
+    // silently truncates (e.g. "vlad.horbachov" collapsing to "vlad").
+    [Fact]
+    public void KitEntityNamesSurviveADottedOwnerName()
+    {
+        var principalHex = Guid.NewGuid().ToString("N");
+        var chat = $"some.owner/{principalHex}.main";
+
+        var chart = KitInstanceNames.Sibling(chat, "chart-abc12345");
+
+        Assert.Equal($"some.owner/{principalHex}.chart-abc12345", chart);
+    }
+
     [Fact]
     public async Task RenderChartToolCreatesTheEntityAndPostsACard()
     {
@@ -111,6 +126,26 @@ public sealed class KitToolTests(SimulationFixture fixture)
         Assert.Equal("image/png", blob!.Value.MediaType);
     }
 
+    [Fact]
+    public async Task GenerateImageToolRefusesABlankPromptWithoutCallingTheGeneratorOrTouchingTheChat()
+    {
+        var chatInstance = NewChatInstance();
+        var generator = new CountingImageGeneration();
+        var tools = new KitToolSource(fixture.Sim.Grains, generator, new MemoryKitImageStore());
+        var generate = tools.ToolsFor(Owner).Single(tool => tool.Name == "generate_image");
+
+        var reply = await generate.InvokeAsync(new AIFunctionArguments
+        {
+            ["chatName"] = chatInstance,
+            ["prompt"] = "   ",
+        }, CancellationToken.None);
+
+        Assert.Contains("blank", reply!.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, generator.CallCount);
+        var transcript = await fixture.Sim.Grains.GetGrain<IChat>(chatInstance).Read();
+        Assert.Empty(transcript.Turns);
+    }
+
     // A tool-supplied chatName is the raw grain key the model was told in its context:
     // "{owner}/{principal:N}.{local}" (owner/name form Neuron.Id requires, wrapping a
     // principal-scoped name — mirrors MapOwnerCommands.TryPrincipalResource composed
@@ -126,5 +161,20 @@ public sealed class KitToolTests(SimulationFixture fixture)
         var start = replyText.IndexOf(Marker, StringComparison.Ordinal) + Marker.Length;
         var end = replyText.IndexOf('\'', start);
         return replyText[start..end];
+    }
+
+    // Proves the blank-prompt guard short-circuits before ever reaching the image
+    // generator (not just before the grain/chat calls that follow it).
+    private sealed class CountingImageGeneration : IImageGeneration
+    {
+        private readonly TestImageGeneration _inner = new();
+
+        public int CallCount { get; private set; }
+
+        public Task<GeneratedKitImage> GenerateAsync(string prompt, CancellationToken cancellationToken)
+        {
+            CallCount++;
+            return _inner.GenerateAsync(prompt, cancellationToken);
+        }
     }
 }
