@@ -65,7 +65,8 @@ internal sealed partial class TestChatClient : IChatClient
                     ["labels"] = new[] { "A", "B" },
                     ["values"] = new[] { 1.0, 2.0 },
                 }),
-            ]) { FinishReason = ChatFinishReason.ToolCalls };
+            ])
+            { FinishReason = ChatFinishReason.ToolCalls };
             yield break;
         }
 
@@ -79,7 +80,8 @@ internal sealed partial class TestChatClient : IChatClient
                     ["chatName"] = ChatNameFromContext(conversation),
                     ["prompt"] = "Test image",
                 }),
-            ]) { FinishReason = ChatFinishReason.ToolCalls };
+            ])
+            { FinishReason = ChatFinishReason.ToolCalls };
             yield break;
         }
 

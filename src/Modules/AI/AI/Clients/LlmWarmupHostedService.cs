@@ -7,6 +7,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace DigitalBrain.AI;
+
 internal sealed class LlmWarmupHostedService(
     IServiceProvider services,
     IConfiguration configuration,

@@ -9,19 +9,75 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   DOTNET_NOLOGO: 'true'
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
 
 jobs:
-  source-build:
+  dotnet-build-test:
+    name: .NET build and test
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
+
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
-      - name: build
-        run: dotnet build DigitalBrain.slnx -c Release -warnaserror --nologo
-        timeout-minutes: 12
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v5
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', 'global.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - run: dotnet restore DigitalBrain.slnx
+
+      - run: dotnet format whitespace DigitalBrain.slnx --verify-no-changes --no-restore --verbosity minimal
+
+      - run: dotnet build DigitalBrain.slnx -c Release --no-restore -warnaserror --nologo
+
+      # Simulation is the durable in-process gate. Aspire/E2E need a live AppHost and stay out of the default PR gate.
+      - name: Simulation tests
+        run: >
+          dotnet test tests/DigitalBrain.Simulation.Tests/DigitalBrain.Simulation.Tests.csproj
+          -c Release --nologo
+
+  flutter-web-build:
+    name: Flutter web build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: src/Modules/UI/Flutter/shell
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Pub get (shell + path deps)
+        run: flutter pub get
+
+      - name: Dart format
+        working-directory: src/Modules/UI/Flutter
+        run: dart format --output=none --set-exit-if-changed core kit shell
+
+      - name: Core package tests
+        working-directory: src/Modules/UI/Flutter/core
+        run: dart test
+
+      - name: Shell tests
+        run: flutter test
+
+      - name: Web release build
+        run: flutter build web --release --base-href "/" --no-tree-shake-icons
+
