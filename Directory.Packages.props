@@ -17,10 +17,10 @@
     <PackageVersion Include="xunit.v3.assert" Version="4.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <PackageVersion Include="Aspire.Hosting" Version="13.5.0" />
-    <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.5.0" />
-    <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.5.0" />
-    <PackageVersion Include="Aspire.Hosting.Qdrant" Version="13.5.0" />
+    <PackageVersion Include="Aspire.Hosting" Version="13.5.2" />
+    <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.5.2" />
+    <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.5.2" />
+    <PackageVersion Include="Aspire.Hosting.Qdrant" Version="13.5.2" />
     <PackageVersion Include="Aspire.Hosting.Testing" Version="13.5.0" />
     <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.5.0" />
     <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.5.0" />
