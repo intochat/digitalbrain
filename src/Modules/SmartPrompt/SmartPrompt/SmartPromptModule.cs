@@ -1,7 +1,12 @@
+using Microsoft.Extensions.DependencyInjection;
+
 namespace DigitalBrain.SmartPrompt;
 
 public sealed class SmartPromptModule : Core.IModule
 {
     public void Configure(ISiloBuilder builder)
-        => ArgumentNullException.ThrowIfNull(builder);
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        builder.AddStartupTask<DefaultSmartPromptStartupTask>();
+    }
 }

@@ -79,31 +79,41 @@ internal sealed class KitToolSource(
         double[] values,
         CancellationToken cancellationToken)
     {
-        if (OwnerGuardError(owner, chatName) is { } ownerError)
+        try
         {
-            return ownerError;
-        }
+            if (OwnerGuardError(owner, chatName) is { } ownerError)
+            {
+                return ownerError;
+            }
 
-        if (string.IsNullOrWhiteSpace(title))
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                return "title must not be blank.";
+            }
+
+            labels ??= [];
+            values ??= [];
+            if (labels.Length == 0 || labels.Length != values.Length)
+            {
+                return "labels and values must be non-empty and the same length.";
+            }
+
+            var trimmedTitle = title.Trim();
+            var kind = string.IsNullOrWhiteSpace(chartKind) ? "bar" : chartKind.Trim();
+            var name = $"chart-{Guid.NewGuid():N}"[..14];
+            var instance = KitInstanceNames.Sibling(chatName, name);
+            var points = labels.Zip(values, static (label, value) => new ChartPoint(label, value)).ToList();
+
+            await grains.GetGrain<IChart>(instance).Render(new ChartState(trimmedTitle, kind, points));
+            await grains.GetGrain<IChat>(chatName)
+                .HandleAsync(new KitCardOffer(KitCardKinds.Chart, name, trimmedTitle), cancellationToken);
+
+            return $"Chart '{trimmedTitle}' is now showing in the chat as card '{name}'.";
+        }
+        catch (Exception ex)
         {
-            return "title must not be blank.";
+            return $"render_chart failed: {ex.GetType().Name}: {ex.Message}";
         }
-
-        if (labels.Length == 0 || labels.Length != values.Length)
-        {
-            return "labels and values must be non-empty and the same length.";
-        }
-
-        var trimmedTitle = title.Trim();
-        var name = $"chart-{Guid.NewGuid():N}"[..14];
-        var instance = KitInstanceNames.Sibling(chatName, name);
-        var points = labels.Zip(values, static (label, value) => new ChartPoint(label, value)).ToList();
-
-        await grains.GetGrain<IChart>(instance).Render(new ChartState(trimmedTitle, chartKind, points));
-        await grains.GetGrain<IChat>(chatName)
-            .HandleAsync(new KitCardOffer(KitCardKinds.Chart, name, trimmedTitle), cancellationToken);
-
-        return $"Chart '{trimmedTitle}' is now showing in the chat as card '{name}'.";
     }
 
     private async Task<string> GenerateImageAsync(

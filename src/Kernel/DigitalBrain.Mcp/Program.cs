@@ -8,7 +8,8 @@ builder.AddDigitalBrainClient();
 builder.Services
     .AddMcpServer()
     .WithHttpTransport(options => options.Stateless = true)
-    .WithTools<ChatTools>();
+    .WithTools<ChatTools>()
+    .WithTools<SmartPromptTools>();
 
 var app = builder.Build();
 app.MapDefaultEndpoints();
