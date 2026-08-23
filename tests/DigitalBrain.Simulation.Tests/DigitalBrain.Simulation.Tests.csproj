@@ -6,9 +6,8 @@
     <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
     <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
-    <!-- Host pin for Foundry Local native assets; CI passes -r linux-x64 explicitly. -->
-    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and $([MSBuild]::IsOSPlatform('Windows'))">win-x64</RuntimeIdentifier>
-    <RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>
+    <!-- Host pin for Foundry Local native assets on Windows desktop runs only. -->
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and '$(CI)' != 'true' and $([MSBuild]::IsOSPlatform('Windows'))">win-x64</RuntimeIdentifier>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="xunit.v3.mtp-v2" />

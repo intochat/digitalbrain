@@ -1,0 +1,8 @@
+<Project>
+  <!-- Runs after SDK/package props. Keep CI solution builds framework-dependent / portable. -->
+  <PropertyGroup Condition="'$(CI)' == 'true'">
+    <RuntimeIdentifier></RuntimeIdentifier>
+    <EnableSdkContainerSupport>false</EnableSdkContainerSupport>
+    <UseAppHost>false</UseAppHost>
+  </PropertyGroup>
+</Project>

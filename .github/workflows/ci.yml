@@ -37,22 +37,19 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
-      # Pin linux-x64 for restore+build+test together. Host RID inference (Web SDK /
-      # Foundry native assets) otherwise requests net11.0/linux-x64 after a RID-less restore.
-      - run: dotnet restore DigitalBrain.slnx -r linux-x64
+      - run: dotnet restore DigitalBrain.slnx
 
       - run: dotnet format whitespace DigitalBrain.slnx --verify-no-changes --no-restore --verbosity minimal
 
-      - run: >
-          dotnet build DigitalBrain.slnx -c Release -r linux-x64 --no-restore -warnaserror --nologo
-          -p:EnableSdkContainerSupport=false
+      # Solution builds cannot take -r. Directory.Build.props clears host RID under CI=true
+      # so Web SDK / Foundry do not demand net11.0/linux-x64 after a portable restore.
+      - run: dotnet build DigitalBrain.slnx -c Release --no-restore -warnaserror --nologo
 
       # Simulation is the durable in-process gate. Aspire/E2E need a live AppHost and stay out of the default PR gate.
       - name: Simulation tests
         run: >
           dotnet test tests/DigitalBrain.Simulation.Tests/DigitalBrain.Simulation.Tests.csproj
-          -c Release -r linux-x64 --nologo
-          -p:EnableSdkContainerSupport=false
+          -c Release --nologo
 
   flutter-web-build:
     name: Flutter web build
