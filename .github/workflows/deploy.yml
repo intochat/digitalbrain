@@ -1,6 +1,6 @@
 name: deploy
 
-# Release-gated Flutter web deployment.
+# Release-gated Flutter web deployment and kernel image publication.
 on:
   release:
     types: [published]
@@ -9,70 +9,75 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-flutter
+  group: deploy-production
   cancel-in-progress: false
 
 jobs:
-  # Kernel and MCP image publication is intentionally commented out for now.
-  #
-  # publish-images:
-  #   runs-on: ubuntu-latest
-  #   environment:
-  #     name: production
-  #   env:
-  #     TAG: ${{ github.event.release.tag_name || github.sha }}
-  #     DOTNET_NOLOGO: 'true'
-  #     DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
-  #   steps:
-  #     - uses: actions/checkout@v7
-  #
-  #     - uses: actions/setup-dotnet@v6
-  #       with:
-  #         global-json-file: global.json
-  #
-  #     - name: Cache NuGet packages
-  #       uses: actions/cache@v6
-  #       with:
-  #         path: ~/.nuget/packages
-  #         key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', 'global.json') }}
-  #         restore-keys: |
-  #           ${{ runner.os }}-nuget-
-  #
-  #     - run: dotnet restore DigitalBrain.slnx
-  #
-  #     - name: Build
-  #       run: dotnet build DigitalBrain.slnx -c Release --no-restore -warnaserror --nologo
-  #
-  #     - name: Simulation tests
-  #       run: |
-  #         set -eu
-  #         out=tests/DigitalBrain.Simulation.Tests/bin/Release/net11.0
-  #         chmod +x "$out/DigitalBrain.Simulation.Tests"
-  #         "$out/DigitalBrain.Simulation.Tests"
-  #
-  #     - name: Log in to Docker Hub
-  #       uses: docker/login-action@v4
-  #       with:
-  #         username: ${{ vars.DOCKERHUB_USERNAME }}
-  #         password: ${{ secrets.DOCKERHUB_TOKEN }}
-  #
-  #     - name: Publish kernel image
-  #       run: |
-  #         dotnet publish src/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj \
-  #           -c Release -r linux-x64 /t:PublishContainer \
-  #           -p:PublishProfile=Container \
-  #           -p:ContainerRegistry=docker.io \
-  #           -p:ContainerRepository=${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-kernel \
-  #           -p:ContainerImageTags="${TAG};latest"
-  #
-  #     - name: Publish MCP image
-  #       run: |
-  #         dotnet publish src/Kernel/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj \
-  #           -c Release -r linux-x64 /t:PublishContainer \
-  #           -p:PublishProfile=Container \
-  #           -p:ContainerRegistry=docker.io \
-  #           -p:ContainerRepository=${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-mcp \
-  #           -p:ContainerImageTags="${TAG};latest"
+  publish-kernel-image:
+    name: Publish kernel image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+    env:
+      DOTNET_NOLOGO: 'true'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', 'global.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - run: dotnet restore DigitalBrain.slnx
+
+      - name: Build
+        run: dotnet build DigitalBrain.slnx -c Release --no-restore -warnaserror --nologo
+
+      - name: Simulation tests
+        run: |
+          set -eu
+          out=tests/DigitalBrain.Simulation.Tests/bin/Release/net11.0
+          chmod +x "$out/DigitalBrain.Simulation.Tests"
+          "$out/DigitalBrain.Simulation.Tests"
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Publish kernel image
+        env:
+          ContainerImageTags: ${{ github.event.release.tag_name }};latest
+        run: |
+          dotnet publish src/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj \
+            -c Release -r linux-x64 /t:PublishContainer \
+            -p:PublishProfile=Container \
+            -p:EnableSdkContainerSupport=true \
+            -p:ContainerRegistry=docker.io \
+            -p:ContainerRepository=${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-kernel
+
+      # MCP image publication remains intentionally commented out for now.
+      #
+      # - name: Publish MCP image
+      #   env:
+      #     ContainerImageTags: ${{ github.event.release.tag_name }};latest
+      #   run: |
+      #     dotnet publish src/Kernel/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj \
+      #       -c Release -r linux-x64 /t:PublishContainer \
+      #       -p:PublishProfile=Container \
+      #       -p:EnableSdkContainerSupport=true \
+      #       -p:ContainerRegistry=docker.io \
+      #       -p:ContainerRepository=${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-mcp
 
   deploy-flutter-web:
     name: Deploy Flutter web
