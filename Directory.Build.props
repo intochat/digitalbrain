@@ -9,6 +9,9 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <IsPackable>false</IsPackable>
     <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
+    <!-- Web SDK defaults this true; on Linux CI that forces RID=linux-x64 for every project.
+         Container publishes opt back in via PublishProfiles/Container.pubxml + deploy.yml. -->
+    <EnableSdkContainerSupport>false</EnableSdkContainerSupport>
   </PropertyGroup>
   <PropertyGroup>
     <VersionPrefix>0.1.0</VersionPrefix>
