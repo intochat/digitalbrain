@@ -8,8 +8,9 @@
     <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
     <ContainerRepository>digitalbrain-kernel</ContainerRepository>
     <ContainerBaseImage>mcr.microsoft.com/dotnet/aspnet:11.0-preview</ContainerBaseImage>
+    <!-- RID is passed at publish time (-r linux-x64). Do not set RuntimeIdentifiers here —
+         it forces the whole ProjectReference graph (AI/tests) onto linux-x64 during CI build. -->
     <ContainerRuntimeIdentifier>linux-x64</ContainerRuntimeIdentifier>
-    <RuntimeIdentifiers>linux-x64;win-x64</RuntimeIdentifiers>
   </PropertyGroup>
   <ItemGroup>
     <ContainerPort Include="8080" Type="tcp" />
