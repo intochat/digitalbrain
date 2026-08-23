@@ -47,9 +47,18 @@ jobs:
 
       # Simulation is the durable in-process gate. Aspire/E2E need a live AppHost and stay out of the default PR gate.
       - name: Simulation tests
-        run: >
-          dotnet test tests/DigitalBrain.Simulation.Tests/DigitalBrain.Simulation.Tests.csproj
-          -c Release --nologo
+        run: |
+          set -euo pipefail
+          out=tests/DigitalBrain.Simulation.Tests/bin/Release/net11.0
+          ls -la "$out" | head -n 40
+          chmod +x "$out/DigitalBrain.Simulation.Tests" || true
+          # Prefer the apphost so a native crash prints stderr (MTP handshake exit 5).
+          if ! "$out/DigitalBrain.Simulation.Tests" --list-tests; then
+            echo "apphost --list-tests failed; falling back to dotnet exec"
+            dotnet exec "$out/DigitalBrain.Simulation.Tests.dll" --list-tests
+          fi
+          dotnet test tests/DigitalBrain.Simulation.Tests/DigitalBrain.Simulation.Tests.csproj \
+            -c Release --no-build --nologo
 
   flutter-web-build:
     name: Flutter web build
