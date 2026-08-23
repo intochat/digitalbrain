@@ -22,6 +22,7 @@ public sealed class ExecutionIdTests
     {
         Assert.Equal("gmail.search", new ContextPath(" /gmail.search/ ").Value);
         Assert.Throws<ArgumentException>(() => new ContextPath(" "));
+        Assert.Throws<ArgumentException>(() => new ContextPath("/"));
         Assert.Throws<ArgumentException>(() => new ContextPath(null!));
     }
 

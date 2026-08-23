@@ -14,7 +14,13 @@ public readonly record struct ContextPath
             throw new ArgumentException("A context path is required.", nameof(value));
         }
 
-        Value = value.Trim().Trim('/');
+        var normalized = value.Trim().Trim('/');
+        if (normalized.Length == 0)
+        {
+            throw new ArgumentException("A context path is required.", nameof(value));
+        }
+
+        Value = normalized;
     }
 
     [Id(0)]
