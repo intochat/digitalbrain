@@ -64,6 +64,9 @@ public sealed class ExecutionNeuron : Neuron, IExecution
             await context.Ensure(synapse.ExecutionId)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
+            await AdmitRelatedContextAsync(context, synapse.RelatedExecutions, cancellationToken)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
             for (var i = 0; i < grants.Length; i++)
             {
                 var grant = grants[i];
@@ -121,6 +124,42 @@ public sealed class ExecutionNeuron : Neuron, IExecution
             : null;
 
     private void Stage(ExecutionState data) => _state.Value = _states.SerializeToArray(data);
+
+    private async Task AdmitRelatedContextAsync(
+        IExecutionContext context,
+        IReadOnlyList<ExecutionId>? relatedExecutions,
+        CancellationToken cancellationToken)
+    {
+        if (relatedExecutions is not { Count: > 0 })
+        {
+            return;
+        }
+
+        for (var i = 0; i < relatedExecutions.Count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var relatedId = relatedExecutions[i];
+            var related = GrainFactory.GetGrain<IExecutionContext>(
+                EntityId.For<IExecutionContext>(Id.Owner, relatedId.ToString()).ToGrainId());
+            var state = await related.Read()
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            if (state?.Slots is not { Count: > 0 } slots)
+            {
+                continue;
+            }
+
+            for (var slotIndex = 0; slotIndex < slots.Count; slotIndex++)
+            {
+                var slot = slots[slotIndex];
+                await context.ApplyDelta(new ContextDelta(
+                        slot.Path,
+                        slot.Entry.SchemaHash,
+                        slot.Entry.PayloadJson,
+                        slot.Entry.BlobRef))
+                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            }
+        }
+    }
 
     private void RequireMatchingExecution(ExecutionId executionId)
     {

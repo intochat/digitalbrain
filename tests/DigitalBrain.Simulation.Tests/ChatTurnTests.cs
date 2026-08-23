@@ -1,9 +1,11 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.Execution;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
+using DigitalBrain.Execution;
 using DigitalBrain.Testing;
 using Xunit;
 
@@ -48,6 +50,38 @@ public sealed class ChatTurnTests(SimulationFixture fixture)
 
         Assert.Equal(accepted.TurnId, lifecycle.TurnId);
 
+    }
+
+    [Fact]
+    public async Task SendSetsChatActiveExecutionIdOnTheExecutionSpine()
+    {
+        var brain = fixture.Sim.Brain;
+        var command = CommandId.New();
+        var actor = new ActorContext(new PrincipalId(Guid.NewGuid()), "owner");
+        var chat = brain.GetGrainProxy<IChat>("active-execution");
+
+        Assert.Null(await chat.ReadActiveExecution());
+
+        var accepted = await chat.Send(new SendMessage(command, "hello execution", actor));
+
+        var chatId = NeuronId.For<IChat>(brain.Owner, "active-execution");
+        var terminal = await JournalWait.ForAsync(
+            brain,
+            chatId,
+            JournalKind.Outgoing,
+            delivery => delivery.Synapse is TurnLifecycle { Status: ChatTurnStatus.Completed or ChatTurnStatus.Failed or ChatTurnStatus.Cancelled },
+            TurnTimeout);
+        var lifecycle = Assert.IsType<TurnLifecycle>(terminal.Synapse);
+        Assert.True(lifecycle.Status == ChatTurnStatus.Completed, lifecycle.Detail);
+
+        var active = await chat.ReadActiveExecution();
+        Assert.NotNull(active);
+
+        var execution = brain.GetGrainProxy<IExecution>(active!.Value.ToString());
+        var projection = await execution.Read();
+        Assert.Equal(active.Value, projection.ExecutionId);
+        Assert.Equal(ExecutionStatus.Completed, projection.Status);
+        Assert.Equal(accepted.TurnId.Value, Assert.IsType<ChatTurnWorkload>(projection.Workload).TurnId);
     }
 
     [Fact]

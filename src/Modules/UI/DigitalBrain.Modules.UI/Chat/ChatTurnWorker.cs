@@ -1,9 +1,11 @@
 using System.Text;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.Execution;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.AI;
 using DigitalBrain.Chat;
 using DigitalBrain.Core;
+using DigitalBrain.Execution;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.UI;
@@ -16,6 +18,8 @@ internal sealed class ChatTurnWorker : Neuron, IChatTurnWorker
 {
     internal const string GrainTypeName = "chat-turn-worker";
 
+    private static readonly CapabilityId GmailSearch = CapabilityId.Parse("gmail.search");
+
     public static NeuronId ForChat(NeuronId chat)
         => new(GrainTypeName, chat.Owner, chat.Name);
 
@@ -24,9 +28,41 @@ internal sealed class ChatTurnWorker : Neuron, IChatTurnWorker
         ArgumentNullException.ThrowIfNull(goal);
         cancellationToken.ThrowIfCancellationRequested();
 
+        await StartTurnExecutionAsync(goal, cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
         var (answer, author) = await RunResponderAsync(goal, cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return new ChatTurnResult(answer, author);
+    }
+
+    private async Task StartTurnExecutionAsync(ChatTurnGoal goal, CancellationToken cancellationToken)
+    {
+        var chat = GrainFactory.GetGrain<IChat>(goal.Chat.ToGrainId());
+        var prior = await chat.ReadActiveExecution()
+            .WaitAsync(cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        var executionId = ExecutionId.New();
+        IReadOnlyList<ExecutionId>? related = prior is { } active ? [active] : null;
+
+        var execution = GrainFactory.GetGrain<IExecution>(
+            NeuronId.For<IExecution>(goal.Chat.Owner, executionId.ToString()).ToGrainId());
+
+        await execution.HandleAsync(
+                new StartExecution(
+                    CommandId.New(),
+                    executionId,
+                    new ChatTurnWorkload(goal.Chat, goal.TurnId, goal.Text),
+                    ExecutionDriverKind.Agent,
+                    [GmailSearch],
+                    related),
+                cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        await chat.SetActiveExecution(executionId)
+            .WaitAsync(cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private async Task<(string Answer, string Author)> RunResponderAsync(

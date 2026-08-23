@@ -124,4 +124,63 @@ public sealed class ExecutionSpineTests(ExecutionSimulationFixture fixture)
         Assert.Equal("gmail.search.v1", entry!.SchemaHash);
         Assert.Contains("New Customer", entry.PayloadJson, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task StartExecution_admits_related_execution_context_slots()
+    {
+        var brain = fixture.Sim.Brain;
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        var firstId = ExecutionId.New();
+        var firstName = firstId.ToString();
+        var first = brain.GetGrainProxy<IExecution>(firstName);
+
+        await first.HandleAsync(
+            new StartExecution(
+                CommandId.New(),
+                firstId,
+                new ChatTurnWorkload(new NeuronId("chat", brain.Owner, "main"), Guid.NewGuid(), "search"),
+                ExecutionDriverKind.Agent,
+                [CapabilityId.Parse("gmail.search")]),
+            cancellationToken);
+
+        await JournalWait.ForAsync(
+            brain,
+            NeuronId.For<IExecution>(brain.Owner, firstName),
+            JournalKind.Outgoing,
+            delivery => delivery.Synapse is ExecutionLifecycle
+            {
+                Status: ExecutionStatus.Completed
+            });
+
+        var secondId = ExecutionId.New();
+        var secondName = secondId.ToString();
+        var second = brain.GetGrainProxy<IExecution>(secondName);
+
+        await second.HandleAsync(
+            new StartExecution(
+                CommandId.New(),
+                secondId,
+                new ChatTurnWorkload(new NeuronId("chat", brain.Owner, "main"), Guid.NewGuid(), "follow-up"),
+                ExecutionDriverKind.Agent,
+                Grants: [],
+                RelatedExecutions: [firstId]),
+            cancellationToken);
+
+        await JournalWait.ForAsync(
+            brain,
+            NeuronId.For<IExecution>(brain.Owner, secondName),
+            JournalKind.Outgoing,
+            delivery => delivery.Synapse is ExecutionLifecycle
+            {
+                Status: ExecutionStatus.Completed
+            });
+
+        var secondContext = brain.GetEntity<IExecutionContext>(secondName);
+        var entry = await secondContext.Query(new ContextQuery(new ContextPath("gmail.search")));
+
+        Assert.NotNull(entry);
+        Assert.Equal("gmail.search.v1", entry!.SchemaHash);
+        Assert.Contains("New Customer", entry.PayloadJson, StringComparison.Ordinal);
+    }
 }

@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.Execution;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Chat;
@@ -18,9 +19,11 @@ internal sealed class Chat : Neuron, IChat
     private const string TranscriptName = "chat.transcript";
     private const string TurnLogName = "chat.turn-log";
     private const string QueueStateName = "chat.turn-queue";
+    private const string ExecutionFocusName = "chat.execution-focus";
     private const int RememberedCommands = 64;
     private const int RetainedTurns = 64;
     private const int RetainedTurnRecords = 64;
+    private const int MaxRelatedExecutions = 8;
 
     // One turn is one awaited worker call; the budget mirrors the kernel SSE edge and the
     // call's own ResponseTimeout. The deadline timer is the belt for a call that never
@@ -34,10 +37,12 @@ internal sealed class Chat : Neuron, IChat
     private readonly IDurableList<byte[]> _transcript;
     private readonly IDurableList<byte[]> _turnLog;
     private readonly IDurableValue<byte[]> _queueState;
+    private readonly IDurableValue<byte[]> _executionFocus;
     private readonly Serializer<OwnerCommand> _commands;
     private readonly Serializer<ChatTurn> _turns;
     private readonly Serializer<DurableTurnRecord> _turnRecords;
     private readonly Serializer<TurnQueueState> _queues;
+    private readonly Serializer<ChatExecutionFocus> _focusStates;
 
     // The in-flight worker call, fire-and-tracked: the task settles the turn when the call
     // returns or throws; the token is the turn-scoped cancel; the timer fails a call that
@@ -54,10 +59,12 @@ internal sealed class Chat : Neuron, IChat
         _transcript = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(TranscriptName);
         _turnLog = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(TurnLogName);
         _queueState = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(QueueStateName);
+        _executionFocus = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(ExecutionFocusName);
         _commands = ServiceProvider.GetRequiredService<Serializer<OwnerCommand>>();
         _turns = ServiceProvider.GetRequiredService<Serializer<ChatTurn>>();
         _turnRecords = ServiceProvider.GetRequiredService<Serializer<DurableTurnRecord>>();
         _queues = ServiceProvider.GetRequiredService<Serializer<TurnQueueState>>();
+        _focusStates = ServiceProvider.GetRequiredService<Serializer<ChatExecutionFocus>>();
     }
 
     protected override async Task OnNeuronActivatedAsync(CancellationToken cancellationToken)
@@ -159,6 +166,32 @@ internal sealed class Chat : Neuron, IChat
                 new CommandId(turn.CommandId),
                 turn.Text,
                 turn.Status))]);
+
+    public Task<ExecutionId?> ReadActiveExecution()
+        => Task.FromResult(LoadFocus().ActiveExecutionId);
+
+    public Task SetActiveExecution(ExecutionId? id)
+    {
+        var focus = LoadFocus();
+        var related = new List<ExecutionId>(focus.RelatedExecutionIds);
+        if (focus.ActiveExecutionId is { } previous && previous != id)
+        {
+            related.RemoveAll(existing => existing == previous);
+            related.Insert(0, previous);
+            while (related.Count > MaxRelatedExecutions)
+            {
+                related.RemoveAt(related.Count - 1);
+            }
+        }
+
+        if (id is { } active)
+        {
+            related.RemoveAll(existing => existing == active);
+        }
+
+        SaveFocus(new ChatExecutionFocus(id, related));
+        return Task.CompletedTask;
+    }
 
     public async Task HandleAsync(ReadTranscriptRequest synapse, CancellationToken cancellationToken)
     {
@@ -578,6 +611,19 @@ internal sealed class Chat : Neuron, IChat
 
     private void SaveQueue(TurnQueueState queue)
         => _queueState.Value = _queues.SerializeToArray(queue);
+
+    private ChatExecutionFocus LoadFocus()
+    {
+        if (_executionFocus.Value is not { Length: > 0 } bytes)
+        {
+            return new ChatExecutionFocus(null, []);
+        }
+
+        return _focusStates.Deserialize(bytes);
+    }
+
+    private void SaveFocus(ChatExecutionFocus focus)
+        => _executionFocus.Value = _focusStates.SerializeToArray(focus);
 
     private static void RequireActor(ActorContext? actor, string command)
     {

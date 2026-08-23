@@ -1,8 +1,9 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.Execution;
+using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.UI;
 using Microsoft.Extensions.AI;
 
-using DigitalBrain.Abstractions.Neurons;
 namespace DigitalBrain.Chat;
 
 [Alias("chat")]
@@ -29,4 +30,10 @@ public partial interface IChat :
 
     [Alias(nameof(ReadTurns))]
     Task<IReadOnlyList<ChatTurnSnapshot>> ReadTurns();
+
+    [Alias(nameof(ReadActiveExecution))]
+    Task<ExecutionId?> ReadActiveExecution();
+
+    [Alias(nameof(SetActiveExecution))]
+    Task SetActiveExecution(ExecutionId? id);
 }
