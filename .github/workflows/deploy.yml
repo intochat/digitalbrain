@@ -49,9 +49,11 @@ jobs:
         run: dotnet build DigitalBrain.slnx -c Release --no-restore -warnaserror --nologo
 
       - name: Simulation tests
-        run: >
-          dotnet test tests/DigitalBrain.Simulation.Tests/DigitalBrain.Simulation.Tests.csproj
-          -c Release --nologo
+        run: |
+          set -eu
+          out=tests/DigitalBrain.Simulation.Tests/bin/Release/net11.0
+          chmod +x "$out/DigitalBrain.Simulation.Tests"
+          "$out/DigitalBrain.Simulation.Tests"
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
