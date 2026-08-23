@@ -1,80 +1,127 @@
 name: deploy
 
-# Release-gated image publish (v0.1.18 pattern, v2 layout).
-# Publishes Kernel (+ MCP) to Docker Hub. Azure ACA / SWA / Pulumi come back in a later step.
+# Release-gated Flutter web deployment.
 on:
   release:
     types: [published]
   workflow_dispatch:
-    inputs:
-      tag:
-        description: Container image tag (defaults to GITHUB_SHA)
-        required: false
-        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: deploy-images
+  group: deploy-flutter
   cancel-in-progress: false
 
 jobs:
-  publish-images:
+  # Kernel and MCP image publication is intentionally commented out for now.
+  #
+  # publish-images:
+  #   runs-on: ubuntu-latest
+  #   environment:
+  #     name: production
+  #   env:
+  #     TAG: ${{ github.event.release.tag_name || github.sha }}
+  #     DOTNET_NOLOGO: 'true'
+  #     DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+  #   steps:
+  #     - uses: actions/checkout@v7
+  #
+  #     - uses: actions/setup-dotnet@v6
+  #       with:
+  #         global-json-file: global.json
+  #
+  #     - name: Cache NuGet packages
+  #       uses: actions/cache@v5
+  #       with:
+  #         path: ~/.nuget/packages
+  #         key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', 'global.json') }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-nuget-
+  #
+  #     - run: dotnet restore DigitalBrain.slnx
+  #
+  #     - name: Build
+  #       run: dotnet build DigitalBrain.slnx -c Release --no-restore -warnaserror --nologo
+  #
+  #     - name: Simulation tests
+  #       run: |
+  #         set -eu
+  #         out=tests/DigitalBrain.Simulation.Tests/bin/Release/net11.0
+  #         chmod +x "$out/DigitalBrain.Simulation.Tests"
+  #         "$out/DigitalBrain.Simulation.Tests"
+  #
+  #     - name: Log in to Docker Hub
+  #       uses: docker/login-action@v3
+  #       with:
+  #         username: ${{ vars.DOCKERHUB_USERNAME }}
+  #         password: ${{ secrets.DOCKERHUB_TOKEN }}
+  #
+  #     - name: Publish kernel image
+  #       run: |
+  #         dotnet publish src/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj \
+  #           -c Release -r linux-x64 /t:PublishContainer \
+  #           -p:PublishProfile=Container \
+  #           -p:ContainerRegistry=docker.io \
+  #           -p:ContainerRepository=${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-kernel \
+  #           -p:ContainerImageTags="${TAG};latest"
+  #
+  #     - name: Publish MCP image
+  #       run: |
+  #         dotnet publish src/Kernel/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj \
+  #           -c Release -r linux-x64 /t:PublishContainer \
+  #           -p:PublishProfile=Container \
+  #           -p:ContainerRegistry=docker.io \
+  #           -p:ContainerRepository=${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-mcp \
+  #           -p:ContainerImageTags="${TAG};latest"
+
+  deploy-flutter-web:
+    name: Deploy Flutter web
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     environment:
       name: production
-    env:
-      TAG: ${{ github.event.release.tag_name || inputs.tag || github.sha }}
-      DOTNET_NOLOGO: 'true'
-      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+      url: https://purple-sky-0f80f110f.7.azurestaticapps.net/
+    defaults:
+      run:
+        working-directory: src/Modules/UI/Flutter/shell
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v6
+      - uses: subosito/flutter-action@v2
         with:
-          global-json-file: global.json
+          channel: stable
+          flutter-version: '3.44.8'
+          cache: true
 
-      - name: Cache NuGet packages
-        uses: actions/cache@v5
+      - name: Pub get (core, kit, shell)
+        working-directory: src/Modules/UI/Flutter
+        run: |
+          (cd core && dart pub get)
+          (cd kit && flutter pub get)
+          (cd shell && flutter pub get)
+
+      - name: Dart format
+        working-directory: src/Modules/UI/Flutter
+        run: dart format --output=none --set-exit-if-changed core kit shell
+
+      - name: Core package tests
+        working-directory: src/Modules/UI/Flutter/core
+        run: dart test
+
+      - name: Shell tests
+        run: flutter test
+
+      - name: Web release build
+        run: flutter build web --release --base-href "/" --no-tree-shake-icons
+
+      - name: Deploy Flutter web
+        uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9
         with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', 'global.json') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
-
-      - run: dotnet restore DigitalBrain.slnx
-
-      - name: Build
-        run: dotnet build DigitalBrain.slnx -c Release --no-restore -warnaserror --nologo
-
-      - name: Simulation tests
-        run: |
-          set -eu
-          out=tests/DigitalBrain.Simulation.Tests/bin/Release/net11.0
-          chmod +x "$out/DigitalBrain.Simulation.Tests"
-          "$out/DigitalBrain.Simulation.Tests"
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Publish kernel image
-        run: |
-          dotnet publish src/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj \
-            -c Release -r linux-x64 /t:PublishContainer \
-            -p:PublishProfile=Container \
-            -p:ContainerRegistry=docker.io \
-            -p:ContainerRepository=${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-kernel \
-            -p:ContainerImageTags="${TAG};latest"
-
-      - name: Publish MCP image
-        run: |
-          dotnet publish src/Kernel/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj \
-            -c Release -r linux-x64 /t:PublishContainer \
-            -p:PublishProfile=Container \
-            -p:ContainerRegistry=docker.io \
-            -p:ContainerRepository=${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-mcp \
-            -p:ContainerImageTags="${TAG};latest"
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          action: upload
+          app_location: src/Modules/UI/Flutter/shell/build/web
+          api_location: ''
+          output_location: ''
+          skip_app_build: true
+          skip_api_build: true
