@@ -22,7 +22,7 @@ public sealed class ExecutionSession(
         CapabilityId capability,
         string requestJson,
         CancellationToken cancellationToken)
-        => broker.InvokeAsync(id, capability, requestJson, grants, cancellationToken);
+        => broker.InvokeAsync(id, owner, capability, requestJson, grants, cancellationToken);
 
     private IExecutionContext Context()
         => grains.GetGrain<IExecutionContext>(

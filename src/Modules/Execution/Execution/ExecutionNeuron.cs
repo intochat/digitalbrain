@@ -17,12 +17,14 @@ public sealed class ExecutionNeuron : Neuron, IExecution
     private readonly IDurableValue<byte[]> _state;
     private readonly Serializer<ExecutionState> _states;
     private readonly EffectBroker _broker;
+    private readonly IExecutionContextProvider[] _providers;
 
     public ExecutionNeuron()
     {
         _state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName);
         _states = ServiceProvider.GetRequiredService<Serializer<ExecutionState>>();
         _broker = ServiceProvider.GetRequiredService<EffectBroker>();
+        _providers = [.. ServiceProvider.GetServices<IExecutionContextProvider>()];
     }
 
     public Task<ExecutionProjection> Read()
@@ -30,7 +32,12 @@ public sealed class ExecutionNeuron : Neuron, IExecution
         var data = LoadRecorded()
             ?? throw new InvalidOperationException($"Execution '{Id}' has not been started.");
         return Task.FromResult(
-            new ExecutionProjection(data.ExecutionId, data.Status, data.Driver, data.Workload));
+            new ExecutionProjection(
+                data.ExecutionId,
+                data.Status,
+                data.Driver,
+                data.Workload,
+                data.PromptBlocks));
     }
 
     public async Task HandleAsync(StartExecution synapse, CancellationToken cancellationToken)
@@ -67,6 +74,30 @@ public sealed class ExecutionNeuron : Neuron, IExecution
             await AdmitRelatedContextAsync(context, synapse.RelatedExecutions, cancellationToken)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
+            var seed = new ExecutionSeedBuilder(
+                synapse.ExecutionId,
+                Id.Owner,
+                synapse.Workload,
+                synapse.RelatedExecutions ?? []);
+            for (var providerIndex = 0; providerIndex < _providers.Length; providerIndex++)
+            {
+                await _providers[providerIndex]
+                    .ContributeAsync(seed, cancellationToken)
+                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            }
+
+            for (var deltaIndex = 0; deltaIndex < seed.SeedDeltas.Count; deltaIndex++)
+            {
+                await session.ApplyDeltaAsync(seed.SeedDeltas[deltaIndex])
+                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            }
+
+            var promptBlocks = seed.PromptBlocks.Count == 0
+                ? null
+                : (IReadOnlyList<string>)seed.PromptBlocks.ToArray();
+            Stage(LoadRecorded()! with { PromptBlocks = promptBlocks });
+
+            var requestJson = $$"""{"workload":"{{synapse.Workload.GetType().Name}}"}""";
             for (var i = 0; i < grants.Length; i++)
             {
                 var grant = grants[i];
@@ -75,7 +106,7 @@ public sealed class ExecutionNeuron : Neuron, IExecution
                     continue;
                 }
 
-                var delta = await session.CallAsync(grant, "{}", cancellationToken)
+                var delta = await session.CallAsync(grant, requestJson, cancellationToken)
                     .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
                 await session.ApplyDeltaAsync(delta)
                     .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);

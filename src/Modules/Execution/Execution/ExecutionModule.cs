@@ -9,5 +9,13 @@ public sealed class ExecutionModule : Core.IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.TryAddSingleton<EffectBroker>();
+        builder.Services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IExecutionContextProvider, PreferenceContextProvider>());
+        builder.Services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IExecutionContextProvider, TranscriptContextProvider>());
+        builder.Services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IExecutionContextProvider, RelatedExecutionProvider>());
+        builder.Services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<ICapabilityHandler, ExplainabilityHandler>());
     }
 }

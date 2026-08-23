@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions.Execution;
+using DigitalBrain.Abstractions.Identity;
 
 namespace DigitalBrain.Execution;
 
@@ -12,6 +13,7 @@ public sealed class EffectBroker(IEnumerable<ICapabilityHandler> handlers)
 
     public Task<ContextDelta> InvokeAsync(
         ExecutionId executionId,
+        OwnerId owner,
         CapabilityId capability,
         string requestJson,
         IReadOnlyList<CapabilityId> grants,
@@ -32,7 +34,7 @@ public sealed class EffectBroker(IEnumerable<ICapabilityHandler> handlers)
                 $"No handler is registered for capability '{capability}'.");
         }
 
-        return handler.InvokeAsync(executionId, requestJson, cancellationToken);
+        return handler.InvokeAsync(executionId, owner, requestJson, cancellationToken);
     }
 
     private static bool IsGranted(IReadOnlyList<CapabilityId> grants, CapabilityId capability)
