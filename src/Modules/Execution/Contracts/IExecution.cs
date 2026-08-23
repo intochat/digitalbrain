@@ -2,7 +2,7 @@ using DigitalBrain.Abstractions.Neurons;
 
 namespace DigitalBrain.Execution;
 
-[Alias("db.execution")]
+[Alias("execution")]
 public partial interface IExecution :
     INeuron,
     IHandle<StartExecution>,
