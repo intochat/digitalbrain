@@ -19,3 +19,9 @@ public sealed record SmartPromptWorkload(
     [property: Id(0)] Guid SmartPromptId,
     [property: Id(1)] Guid RevisionId,
     [property: Id(2)] string GoalText) : WorkloadDescriptor;
+
+[GenerateSerializer]
+[Alias("db.workload.team.v1")]
+public sealed record TeamWorkload(
+    [property: Id(0)] string Goal,
+    [property: Id(1)] IReadOnlyList<string> ParticipantNames) : WorkloadDescriptor;

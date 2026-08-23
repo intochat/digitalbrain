@@ -1,3 +1,4 @@
+using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Execution;
 using DigitalBrain.Abstractions.Identity;
@@ -98,17 +99,15 @@ public sealed class ExecutionNeuron : Neuron, IExecution
             Stage(LoadRecorded()! with { PromptBlocks = promptBlocks });
 
             var requestJson = $$"""{"workload":"{{synapse.Workload.GetType().Name}}"}""";
-            for (var i = 0; i < grants.Length; i++)
+            // MAF Workflows can wrap this later; sequential phases keep one shared ExecutionSession.
+            if (synapse.Driver == ExecutionDriverKind.Team || synapse.Workload is TeamWorkload)
             {
-                var grant = grants[i];
-                if (!_broker.IsRegistered(grant))
-                {
-                    continue;
-                }
-
-                var delta = await session.CallAsync(grant, requestJson, cancellationToken)
+                await RunTeamPhasesAsync(session, synapse.Workload, grants, requestJson, cancellationToken)
                     .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-                await session.ApplyDeltaAsync(delta)
+            }
+            else
+            {
+                await RunGrantedCapabilitiesAsync(session, grants, requestJson, cancellationToken)
                     .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             }
 
@@ -155,6 +154,119 @@ public sealed class ExecutionNeuron : Neuron, IExecution
             : null;
 
     private void Stage(ExecutionState data) => _state.Value = _states.SerializeToArray(data);
+
+    private async Task RunTeamPhasesAsync(
+        ExecutionSession session,
+        WorkloadDescriptor workload,
+        CapabilityId[] grants,
+        string requestJson,
+        CancellationToken cancellationToken)
+    {
+        var participantNames = workload is TeamWorkload team && team.ParticipantNames is { Count: > 0 }
+            ? team.ParticipantNames
+            : ["researcher", "closer"];
+        var researcherName = ResolveParticipantName(participantNames, "researcher");
+        var closerName = ResolveParticipantName(participantNames, "closer");
+
+        var researcherCapabilities = await RunMatchingGrantsAsync(
+                session,
+                grants,
+                IsResearcherGrant,
+                requestJson,
+                cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        var closerCapabilities = await RunMatchingGrantsAsync(
+                session,
+                grants,
+                IsCloserGrant,
+                requestJson,
+                cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        var traceJson = JsonSerializer.Serialize(new
+        {
+            participants = new[]
+            {
+                new { name = researcherName, capabilities = researcherCapabilities },
+                new { name = closerName, capabilities = closerCapabilities },
+            },
+        });
+        await session.ApplyDeltaAsync(new ContextDelta(
+                new ContextPath("team.trace"),
+                SchemaHash: "team.trace.v1",
+                PayloadJson: traceJson,
+                BlobRef: null))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
+
+    private async Task RunGrantedCapabilitiesAsync(
+        ExecutionSession session,
+        CapabilityId[] grants,
+        string requestJson,
+        CancellationToken cancellationToken)
+    {
+        for (var i = 0; i < grants.Length; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var grant = grants[i];
+            if (!_broker.IsRegistered(grant))
+            {
+                continue;
+            }
+
+            var delta = await session.CallAsync(grant, requestJson, cancellationToken)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await session.ApplyDeltaAsync(delta)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
+    }
+
+    private async Task<List<string>> RunMatchingGrantsAsync(
+        ExecutionSession session,
+        CapabilityId[] grants,
+        Func<CapabilityId, bool> matches,
+        string requestJson,
+        CancellationToken cancellationToken)
+    {
+        var ranCapabilities = new List<string>();
+        for (var i = 0; i < grants.Length; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var grant = grants[i];
+            if (!matches(grant) || !_broker.IsRegistered(grant))
+            {
+                continue;
+            }
+
+            var delta = await session.CallAsync(grant, requestJson, cancellationToken)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await session.ApplyDeltaAsync(delta)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            ranCapabilities.Add(grant.Value);
+        }
+
+        return ranCapabilities;
+    }
+
+    private static string ResolveParticipantName(IReadOnlyList<string> names, string role)
+    {
+        for (var i = 0; i < names.Count; i++)
+        {
+            if (string.Equals(names[i], role, StringComparison.OrdinalIgnoreCase))
+            {
+                return names[i];
+            }
+        }
+
+        return role;
+    }
+
+    private static bool IsResearcherGrant(CapabilityId grant)
+        => grant.Value.StartsWith("gmail.", StringComparison.Ordinal)
+            || grant.Value.StartsWith("websearch.", StringComparison.Ordinal);
+
+    private static bool IsCloserGrant(CapabilityId grant)
+        => grant.Value.StartsWith("salesforce.", StringComparison.Ordinal);
 
     private async Task AdmitRelatedContextAsync(
         IExecutionContext context,
