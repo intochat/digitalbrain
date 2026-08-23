@@ -12,6 +12,7 @@
     <ProjectReference Include="../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../Modules/Execution/Execution/DigitalBrain.Modules.Execution.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../Modules/Integrations/DigitalBrain.Modules.Integrations.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../Modules/SmartPrompt/SmartPrompt/DigitalBrain.Modules.SmartPrompt.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
     <ProjectReference Include="../../Kernel/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />

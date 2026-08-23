@@ -16,6 +16,7 @@
     <ProjectReference Include="../../Modules/Memory/Memory/DigitalBrain.Modules.Memory.csproj" />
     <ProjectReference Include="../../Modules/Execution/Execution/DigitalBrain.Modules.Execution.csproj" />
     <ProjectReference Include="../../Modules/Integrations/DigitalBrain.Modules.Integrations.csproj" />
+    <ProjectReference Include="../../Modules/SmartPrompt/SmartPrompt/DigitalBrain.Modules.SmartPrompt.csproj" />
     <ProjectReference Include="../../Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
     <ProjectReference Include="../DigitalBrain.Core/DigitalBrain.Core.csproj" />
     <ProjectReference Include="../DigitalBrain.Client/DigitalBrain.Client.csproj" />

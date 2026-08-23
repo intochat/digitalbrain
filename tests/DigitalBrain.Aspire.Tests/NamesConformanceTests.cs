@@ -52,6 +52,7 @@ public sealed class NamesConformanceTests(ModelFixture fixture)
                 "DigitalBrain.Time.TimeModule, DigitalBrain.Modules.Time",
                 "DigitalBrain.Execution.ExecutionModule, DigitalBrain.Modules.Execution",
                 "DigitalBrain.Integrations.IntegrationsModule, DigitalBrain.Modules.Integrations",
+                "DigitalBrain.SmartPrompt.SmartPromptModule, DigitalBrain.Modules.SmartPrompt",
                 "DigitalBrain.UI.UIModule, DigitalBrain.Modules.UI",
             ],
             modules);

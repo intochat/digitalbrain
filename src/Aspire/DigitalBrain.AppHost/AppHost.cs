@@ -11,6 +11,7 @@ using DigitalBrain.Execution;
 using DigitalBrain.Integrations;
 using DigitalBrain.Memory;
 using DigitalBrain.Memory.Aspire.Hosting;
+using DigitalBrain.SmartPrompt;
 using DigitalBrain.Time;
 using DigitalBrain.UI;
 using DigitalBrain.UI.Aspire.Hosting;
@@ -43,6 +44,7 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
     .AddModule<TimeModule>()
     .AddModule<ExecutionModule>()
     .AddModule<IntegrationsModule>()
+    .AddModule<SmartPromptModule>()
     .AddModule<UIModule>(ui =>
     {
         ui.WithWindowHost();
