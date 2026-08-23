@@ -3,6 +3,5 @@
   <PropertyGroup Condition="'$(CI)' == 'true'">
     <RuntimeIdentifier></RuntimeIdentifier>
     <EnableSdkContainerSupport>false</EnableSdkContainerSupport>
-    <UseAppHost>false</UseAppHost>
   </PropertyGroup>
 </Project>
