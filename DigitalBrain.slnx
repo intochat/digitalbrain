@@ -8,6 +8,7 @@
     <Project Path="src/Kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
     <Project Path="src/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
     <Project Path="src/Kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
+    <Project Path="src/Kernel/DigitalBrain.Scripting/DigitalBrain.Scripting.csproj" />
   </Folder>
   <Folder Name="/Modules/" />
   <Folder Name="/Modules/AI/">

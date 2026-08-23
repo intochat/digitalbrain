@@ -18,6 +18,7 @@ public sealed class ExecutionNeuron : Neuron, IExecution
     private readonly IDurableValue<byte[]> _state;
     private readonly Serializer<ExecutionState> _states;
     private readonly EffectBroker _broker;
+    private readonly IScriptDriver _scriptDriver;
     private readonly IExecutionContextProvider[] _providers;
 
     public ExecutionNeuron()
@@ -25,6 +26,7 @@ public sealed class ExecutionNeuron : Neuron, IExecution
         _state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName);
         _states = ServiceProvider.GetRequiredService<Serializer<ExecutionState>>();
         _broker = ServiceProvider.GetRequiredService<EffectBroker>();
+        _scriptDriver = ServiceProvider.GetRequiredService<IScriptDriver>();
         _providers = [.. ServiceProvider.GetServices<IExecutionContextProvider>()];
     }
 
@@ -98,15 +100,24 @@ public sealed class ExecutionNeuron : Neuron, IExecution
                 : (IReadOnlyList<string>)seed.PromptBlocks.ToArray();
             Stage(LoadRecorded()! with { PromptBlocks = promptBlocks });
 
-            var requestJson = $$"""{"workload":"{{synapse.Workload.GetType().Name}}"}""";
-            // MAF Workflows can wrap this later; sequential phases keep one shared ExecutionSession.
-            if (synapse.Driver == ExecutionDriverKind.Team || synapse.Workload is TeamWorkload)
+            // Script never runs the in-neuron agent/team loop — IScriptDriver owns that path.
+            // Production AppHost will start DigitalBrain.Scripting (out of process); Testing/Fakes
+            // use InProcessAllowListedScriptDriver to prove the seam without loading generated C#.
+            if (synapse.Driver == ExecutionDriverKind.Script)
             {
+                await _scriptDriver.RunAsync(session, synapse.Workload, grants, cancellationToken)
+                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            }
+            else if (synapse.Driver == ExecutionDriverKind.Team || synapse.Workload is TeamWorkload)
+            {
+                // MAF Workflows can wrap this later; sequential phases keep one shared ExecutionSession.
+                var requestJson = $$"""{"workload":"{{synapse.Workload.GetType().Name}}"}""";
                 await RunTeamPhasesAsync(session, synapse.Workload, grants, requestJson, cancellationToken)
                     .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             }
             else
             {
+                var requestJson = $$"""{"workload":"{{synapse.Workload.GetType().Name}}"}""";
                 await RunGrantedCapabilitiesAsync(session, grants, requestJson, cancellationToken)
                     .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             }

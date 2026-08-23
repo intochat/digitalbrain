@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>DigitalBrain.Scripting</RootNamespace>
+    <Description>Out-of-process Scripting host stub. Kernel must never reference or load this assembly.</Description>
+  </PropertyGroup>
+</Project>

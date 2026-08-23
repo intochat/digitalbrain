@@ -184,6 +184,52 @@ public sealed class ExecutionSpineTests(ExecutionSimulationFixture fixture)
         Assert.Contains("New Customer", entry.PayloadJson, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("test.echo", "test.echo", "test.echo.v1", "pong")]
+    [InlineData("gmail.search", "gmail.search", "gmail.search.v1", "New Customer")]
+    public async Task StartExecution_ScriptDriver_invokes_allow_listed_capability(
+        string capability,
+        string contextPath,
+        string schemaHash,
+        string payloadSnippet)
+    {
+        var brain = fixture.Sim.Brain;
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var executionId = ExecutionId.New();
+        var name = executionId.ToString();
+        var exec = brain.GetGrainProxy<IExecution>(name);
+
+        await exec.HandleAsync(
+            new StartExecution(
+                CommandId.New(),
+                executionId,
+                new SmartPromptWorkload(Guid.NewGuid(), Guid.NewGuid(), "script seam"),
+                ExecutionDriverKind.Script,
+                [CapabilityId.Parse(capability)]),
+            cancellationToken);
+
+        await JournalWait.ForAsync(
+            brain,
+            NeuronId.For<IExecution>(brain.Owner, name),
+            JournalKind.Outgoing,
+            delivery => delivery.Synapse is ExecutionLifecycle
+            {
+                Status: ExecutionStatus.Completed
+            });
+
+        var ctx = brain.GetEntity<IExecutionContext>(name);
+        var entry = await ctx.Query(new ContextQuery(new ContextPath(contextPath)));
+
+        Assert.NotNull(entry);
+        Assert.Equal(schemaHash, entry!.SchemaHash);
+        Assert.Contains(payloadSnippet, entry.PayloadJson, StringComparison.Ordinal);
+
+        var projection = await exec.Read();
+        Assert.Equal(ExecutionStatus.Completed, projection.Status);
+        Assert.Equal(ExecutionDriverKind.Script, projection.Driver);
+        Assert.IsType<SmartPromptWorkload>(projection.Workload);
+    }
+
     [Fact]
     public async Task StartExecution_TeamWorkload_runs_researcher_then_closer_and_writes_team_trace()
     {

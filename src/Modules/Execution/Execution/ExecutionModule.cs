@@ -1,3 +1,4 @@
+using DigitalBrain.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -17,5 +18,29 @@ public sealed class ExecutionModule : Core.IModule
             ServiceDescriptor.Singleton<IExecutionContextProvider, RelatedExecutionProvider>());
         builder.Services.TryAddEnumerable(
             ServiceDescriptor.Singleton<ICapabilityHandler, ExplainabilityHandler>());
+
+        if (UseAllowListedScriptDriver(builder.Configuration))
+        {
+            builder.Services.TryAddSingleton<IScriptDriver, InProcessAllowListedScriptDriver>();
+        }
+        else
+        {
+            builder.Services.TryAddSingleton<IScriptDriver, NotImplementedScriptDriver>();
+        }
+    }
+
+    private static bool UseAllowListedScriptDriver(Microsoft.Extensions.Configuration.IConfiguration configuration)
+    {
+        if (string.Equals(
+                configuration[DigitalBrainNames.Mode],
+                DigitalBrainNames.TestingMode,
+                StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        var fakes = configuration[DigitalBrainNames.Fakes];
+        return string.Equals(fakes, "true", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(fakes, "1", StringComparison.OrdinalIgnoreCase);
     }
 }
