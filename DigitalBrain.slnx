@@ -29,6 +29,9 @@
     <Project Path="src/Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <Project Path="src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
   </Folder>
+  <Folder Name="/Modules/Execution/">
+    <Project Path="src/Modules/Execution/Contracts/DigitalBrain.Modules.Execution.Contracts.csproj" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
   </Folder>

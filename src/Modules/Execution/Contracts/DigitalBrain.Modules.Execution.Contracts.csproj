@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Execution module contracts: Run aggregate, ExecutionContext, ContextDelta, workloads.</Description>
+    <RootNamespace>DigitalBrain.Execution</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
+  </ItemGroup>
+</Project>
