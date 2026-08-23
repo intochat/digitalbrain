@@ -77,9 +77,10 @@ public sealed class ProductionLlmRegistrationTests
     }
 
     [Fact]
-    public void ToollessModelsNeverReceiveTools()
+    public void CatalogModelsAdvertiseNativeToolSupport()
     {
-        Assert.False(LLMModel.FindByMarker(typeof(DigitalBrain.AI.Ollama.IGemma4))!.SupportsTools);
+        // gemma4 via Ollama supports native tool/function calling; GPT does too.
+        Assert.True(LLMModel.FindByMarker(typeof(DigitalBrain.AI.Ollama.IGemma4))!.SupportsTools);
         Assert.True(LLMModel.FindByMarker(typeof(DigitalBrain.AI.OpenAI.IGpt54))!.SupportsTools);
     }
 
