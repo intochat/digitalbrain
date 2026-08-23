@@ -7,6 +7,7 @@ using DigitalBrain.Aspire;
 using DigitalBrain.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Xunit;
 
@@ -43,6 +44,18 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
         var appBuilder = await DistributedApplicationTestingBuilder
             .CreateAsync<TAppHost>(options.Args)
             .ConfigureAwait(false);
+
+        // Keep test output readable: only warnings and errors reach the console. The apphost
+        // re-logs every resource's console line under DigitalBrain.AppHost.Resources.* at
+        // Information, and configuration rules outrank SetMinimumLevel, so the quieting must
+        // go through configuration. Failure diagnostics are unaffected —
+        // DescribeUnhealthyResources reads resource logs from ResourceLoggerService, which
+        // streams regardless of console log level. Set DIGITALBRAIN_TEST_VERBOSE=1 to get the
+        // full resource-log narrative back when diagnosing a run.
+        if (Environment.GetEnvironmentVariable("DIGITALBRAIN_TEST_VERBOSE") is not "1")
+        {
+            appBuilder.Configuration["Logging:LogLevel:Default"] = nameof(LogLevel.Warning);
+        }
 
         StubParameters(appBuilder);
         IsolateContainers(appBuilder);
@@ -379,6 +392,7 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
         var clustering = await App.GetConnectionStringAsync(DigitalBrainNames.Clustering).ConfigureAwait(false);
 
         var hostBuilder = Host.CreateApplicationBuilder();
+        hostBuilder.Logging.SetMinimumLevel(LogLevel.Warning);
         hostBuilder.Configuration[$"ConnectionStrings:{DigitalBrainNames.Clustering}"] = clustering;
         foreach (var (configurationKey, value) in await CaptureOrleansClientConfigurationAsync(clientResource).ConfigureAwait(false))
         {

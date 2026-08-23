@@ -47,7 +47,9 @@ jobs:
         run: dotnet build DigitalBrain.slnx -c Release --no-restore
 
       - name: Run tests
-        run: dotnet test DigitalBrain.slnx -c Release --no-build --no-restore --verbosity minimal
+        # One test module at a time: the E2E suite boots the full AppHost (containers, silos,
+        # kernel) and starves on a shared 2-core runner when the other suites run beside it.
+        run: dotnet test DigitalBrain.slnx -c Release --no-build --no-restore --verbosity minimal --max-parallel-test-modules 1
 
   flutter-web-build:
     name: Flutter web build

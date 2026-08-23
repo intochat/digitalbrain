@@ -61,6 +61,10 @@ var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceReso
         port: ProductSurfaceResources.UiHttpPort,
         name: ShellHostingExtensions.HttpEndpointName,
         isProxied: false)
+    // Without this, "kernel healthy" means only "process launched": Kestrel binds AFTER the
+    // Orleans silo and brain activation finish, so waiters would proceed while 5080 still
+    // refuses connections (observed on loaded CI runners).
+    .WithHttpHealthCheck("/health", endpointName: ShellHostingExtensions.HttpEndpointName)
     .WithUrlForEndpoint(
         ShellHostingExtensions.HttpEndpointName,
         endpoint => new ResourceUrlAnnotation

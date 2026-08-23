@@ -3,6 +3,7 @@ using DigitalBrain.Client;
 using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.TestingHost;
@@ -43,6 +44,7 @@ public sealed class BrainSimulation : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(options);
 
         var builder = new InProcessTestClusterBuilder(1);
+        builder.ConfigureHost(static host => host.Logging.SetMinimumLevel(LogLevel.Warning));
         if (options.Configuration is { Count: > 0 } configuration)
         {
             builder.ConfigureHost(host => host.Configuration.AddInMemoryCollection(configuration));
