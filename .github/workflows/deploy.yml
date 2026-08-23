@@ -63,8 +63,7 @@ jobs:
         run: |
           dotnet publish src/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj \
             -c Release -r linux-x64 /t:PublishContainer \
-            -p:EnableSdkContainerSupport=true \
-            -p:ContainerRuntimeIdentifier=linux-x64 \
+            -p:PublishProfile=Container \
             -p:ContainerRegistry=docker.io \
             -p:ContainerRepository=${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-kernel \
             -p:ContainerImageTags="${TAG};latest"
@@ -73,8 +72,7 @@ jobs:
         run: |
           dotnet publish src/Kernel/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj \
             -c Release -r linux-x64 /t:PublishContainer \
-            -p:EnableSdkContainerSupport=true \
-            -p:ContainerRuntimeIdentifier=linux-x64 \
+            -p:PublishProfile=Container \
             -p:ContainerRegistry=docker.io \
             -p:ContainerRepository=${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-mcp \
             -p:ContainerImageTags="${TAG};latest"

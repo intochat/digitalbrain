@@ -3,23 +3,7 @@
     <NoWarn>$(NoWarn);CA2007;CA1812</NoWarn>
     <!-- Host pin for Foundry Local native assets on Windows desktop runs only. -->
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and $([MSBuild]::IsOSPlatform('Windows'))">win-x64</RuntimeIdentifier>
-    <!-- SDK container metadata for PublishContainer (deploy.yml). Web SDK already supports
-         /t:PublishContainer — do not set EnableSdkContainerSupport/ContainerRuntimeIdentifier
-         here; on Linux CI those force net11.0/linux-x64 during plain `dotnet build`. -->
-    <ContainerRepository>digitalbrain-kernel</ContainerRepository>
-    <ContainerBaseImage>mcr.microsoft.com/dotnet/aspnet:11.0-preview</ContainerBaseImage>
   </PropertyGroup>
-  <ItemGroup>
-    <ContainerPort Include="8080" Type="tcp" />
-    <!-- Production module set matching AppHost AddModule declarations (overridable at run). -->
-    <ContainerEnvironmentVariable Include="DigitalBrain__Modules__0" Value="DigitalBrain.AI.AIModule, DigitalBrain.Modules.AI" />
-    <ContainerEnvironmentVariable Include="DigitalBrain__Modules__1" Value="DigitalBrain.Memory.MemoryModule, DigitalBrain.Modules.Memory" />
-    <ContainerEnvironmentVariable Include="DigitalBrain__Modules__2" Value="DigitalBrain.Time.TimeModule, DigitalBrain.Modules.Time" />
-    <ContainerEnvironmentVariable Include="DigitalBrain__Modules__3" Value="DigitalBrain.Execution.ExecutionModule, DigitalBrain.Modules.Execution" />
-    <ContainerEnvironmentVariable Include="DigitalBrain__Modules__4" Value="DigitalBrain.Integrations.IntegrationsModule, DigitalBrain.Modules.Integrations" />
-    <ContainerEnvironmentVariable Include="DigitalBrain__Modules__5" Value="DigitalBrain.SmartPrompt.SmartPromptModule, DigitalBrain.Modules.SmartPrompt" />
-    <ContainerEnvironmentVariable Include="DigitalBrain__Modules__6" Value="DigitalBrain.UI.UIModule, DigitalBrain.Modules.UI" />
-  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.AI" />
     <!-- Native Foundry assets for the host process; STT code lives in AI module. -->

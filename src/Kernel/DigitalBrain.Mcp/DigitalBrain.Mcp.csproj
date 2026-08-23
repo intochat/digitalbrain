@@ -2,12 +2,7 @@
   <PropertyGroup>
     <RootNamespace>DigitalBrain.Mcp</RootNamespace>
     <NoWarn>$(NoWarn);CA2007;CA1812</NoWarn>
-    <ContainerRepository>digitalbrain-mcp</ContainerRepository>
-    <ContainerBaseImage>mcr.microsoft.com/dotnet/aspnet:11.0-preview</ContainerBaseImage>
   </PropertyGroup>
-  <ItemGroup>
-    <ContainerPort Include="5000" Type="tcp" />
-  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="ModelContextProtocol.AspNetCore" />
   </ItemGroup>
