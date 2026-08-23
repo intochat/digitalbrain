@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <NoWarn>$(NoWarn);CA2007;CA1812</NoWarn>
-    <!-- Host pin for Foundry Local native assets on Windows desktop runs only. -->
+    <!-- Host pin for Foundry Local native assets; CI passes -r linux-x64 explicitly. -->
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and $([MSBuild]::IsOSPlatform('Windows'))">win-x64</RuntimeIdentifier>
+    <RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.AI" />
