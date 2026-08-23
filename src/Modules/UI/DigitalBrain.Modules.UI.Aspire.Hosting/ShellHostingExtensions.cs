@@ -26,23 +26,23 @@ public static class ShellHostingExtensions
     public const string WebPlatformDirectoryName = ShellNames.WebPlatformDirectoryName;
     public const string HttpEndpointName = ShellNames.HttpEndpointName;
 
-    public static DigitalBrainModuleBuilder<UiModule> WithHeadlessHost(
-        this DigitalBrainModuleBuilder<UiModule> module,
+    public static DigitalBrainModuleBuilder<UIModule> WithHeadlessHost(
+        this DigitalBrainModuleBuilder<UIModule> module,
         Action<FlutterHostOptions>? configure = null)
         => ConfigureFlutterHost(module, FlutterHostKind.Headless, configure);
 
-    public static DigitalBrainModuleBuilder<UiModule> WithWindowHost(
-        this DigitalBrainModuleBuilder<UiModule> module,
+    public static DigitalBrainModuleBuilder<UIModule> WithWindowHost(
+        this DigitalBrainModuleBuilder<UIModule> module,
         Action<FlutterHostOptions>? configure = null)
         => ConfigureFlutterHost(module, FlutterHostKind.Window, configure);
 
-    public static DigitalBrainModuleBuilder<UiModule> WithWebHost(
-        this DigitalBrainModuleBuilder<UiModule> module,
+    public static DigitalBrainModuleBuilder<UIModule> WithWebHost(
+        this DigitalBrainModuleBuilder<UIModule> module,
         Action<FlutterHostOptions>? configure = null)
         => ConfigureFlutterHost(module, FlutterHostKind.Web, configure);
 
-    private static DigitalBrainModuleBuilder<UiModule> ConfigureFlutterHost(
-        DigitalBrainModuleBuilder<UiModule> module,
+    private static DigitalBrainModuleBuilder<UIModule> ConfigureFlutterHost(
+        DigitalBrainModuleBuilder<UIModule> module,
         FlutterHostKind kind,
         Action<FlutterHostOptions>? configure)
     {
@@ -59,7 +59,7 @@ public static class ShellHostingExtensions
         return module;
     }
 
-    private static ShellHostingState GetOrCreateState(DigitalBrainModuleBuilder<UiModule> module)
+    private static ShellHostingState GetOrCreateState(DigitalBrainModuleBuilder<UIModule> module)
     {
         var state = module.Brain.GetOrAddState(
             static brain => new ShellHostingState(brain),
@@ -111,9 +111,40 @@ public static class ShellHostingExtensions
             var host = appHost
                 .AddExecutable(resourceName, launch.Command, launch.WorkingDirectory, launch.Args)
                 .WithEnvironment(ShellEnvironmentVariable, shell)
-                .WithEnvironment(ChatEnvironmentVariable, chat);
+                .WithEnvironment(ChatEnvironmentVariable, chat)
+                .WithParentRelationship(brain.Resource);
 
-            if (appHost.ExecutionContext.IsRunMode && kind is FlutterHostKind.Window or FlutterHostKind.Web)
+            if (kind == FlutterHostKind.Web)
+            {
+                // FlutterHostLaunch.ResolveWeb pins --web-port/--web-hostname to these same
+                // values, so this unproxied endpoint is the address flutter actually serves on.
+                // The health check proves the dev server is up and answering; it cannot prove
+                // the build has landed (the server answers "/" with 200 within seconds of
+                // launch, before the web build completes -- observed live), so consumers that
+                // need the app itself must tolerate one early page load (see UiEvidenceTests'
+                // reload fallback).
+                host
+                    .WithHttpEndpoint(
+                        port: ShellNames.FlutterWebPort,
+                        name: HttpEndpointName,
+                        isProxied: false)
+                    .WithEndpoint(
+                        HttpEndpointName,
+                        static endpoint => endpoint.TargetHost = ShellNames.FlutterWebHostname,
+                        createIfNotExists: false)
+                    .WithHttpHealthCheck("/");
+            }
+
+            // Hot reload rides the Dart VM service, which the headless web-server target no
+            // longer exposes (it runs --release; see FlutterHostLaunch.ResolveWeb). Window and
+            // browser-driving web targets (e.g. "chrome" via the configure hook) keep it.
+            var hasVmService = kind == FlutterHostKind.Window
+                || (kind == FlutterHostKind.Web
+                    && !string.Equals(
+                        launch.DeviceTarget,
+                        ShellNames.DefaultWebDeviceTarget,
+                        StringComparison.OrdinalIgnoreCase));
+            if (appHost.ExecutionContext.IsRunMode && hasVmService)
             {
                 ArmHotReload(host, launch.WorkingDirectory);
             }

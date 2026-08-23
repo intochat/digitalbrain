@@ -1,6 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <ProjectReference Include="../../../Aspire/Brain.Aspire.Hosting/Brain.Aspire.Hosting.csproj" />
-    <ProjectReference Include="../Runtime/Brain.Modules.UI.csproj" />
-  </ItemGroup>
-</Project>

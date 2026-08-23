@@ -10,29 +10,16 @@
 #
 # No secrets are baked into this image. Inject at run/deploy (Azure Key Vault → env):
 #
-#   Google Gmail OAuth (config root DigitalBrain:Google:Gmail)
-#     DigitalBrain__Google__Gmail__ClientId
-#     DigitalBrain__Google__Gmail__ClientSecret
-#     DigitalBrain__Google__Gmail__RedirectUri     # UI base + /oauth/callback
-#
-#   Salesforce OAuth (config root DigitalBrain:Salesforce; no client secret required)
-#     DigitalBrain__Salesforce__ClientId
-#     DigitalBrain__Salesforce__RedirectUri        # UI base + /oauth/callback
-#
-#   Models (L2)
+#   Models selected by AppHost
 #     DigitalBrain__AI__Ollama__Endpoint           # e.g. http://host.docker.internal:11434
-#     DigitalBrain__AI__Ollama__Gemma4__Model      # optional model tag overrides
-#     DigitalBrain__AI__Ollama__Llama32__Model
-#     DigitalBrain__AI__OpenAI__Endpoint           # Azure OpenAI / OpenAI-compatible
-#     DigitalBrain__AI__OpenAI__ApiKey
-#     DigitalBrain__AI__OpenAI__Gpt56__Model
+#     DigitalBrain__AI__Ollama__IGemma4__Model
+#     DigitalBrain__AI__Ollama__IEmbeddingGemma__Model
+#     DigitalBrain__AI__Whisper__ModelId
 #
-#   Durable state protection
-#     DigitalBrain__Security__StateProtectionKey
-#
-#   Azure Storage (Orleans clustering, reminders, journal)
-#     ConnectionStrings__brain-clustering
-#     ConnectionStrings__brain-reminders
+#   Azure Storage (Orleans clustering, reminders, grain state, journal)
+#     ConnectionStrings__clustering
+#     ConnectionStrings__reminders
+#     ConnectionStrings__grainstate
 #     ConnectionStrings__journal
 #
 #   Qdrant vector memory (platform dependency — not this image)
@@ -40,8 +27,8 @@
 #     DigitalBrain__Memory__Qdrant__ConnectionName=memory-qdrant
 #     ConnectionStrings__memory-qdrant             # Endpoint=http://qdrant:6334;Key=...
 #
-#   Module composition is reflected from ModuleAssemblies (ComposedModules /
-#   AppHost AddModule) — no DigitalBrain__Modules__N class-gate env vars.
+#   AppHost writes the explicit module manifest through
+#   DigitalBrain__Modules__N. The runtime loads only those module types.
 #
 # Ports: 8080 silo HTTP (broker + health), 5000 northbound MCP (/mcp)
 

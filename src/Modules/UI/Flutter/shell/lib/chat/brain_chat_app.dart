@@ -13,32 +13,28 @@ final class BrainChatApp extends StatelessWidget {
     super.key,
     required this.chatName,
     this.turns,
-    this.authorizations,
-    this.graphChanges,
-    this.onLoadTopology,
     this.onSend,
     this.onStream,
     this.onStreamVoice,
     this.onAttachmentTap,
     this.onOpenSignIn,
     this.onActivateButton,
-    this.behaviorClient,
+    this.onReadChart,
+    this.onReadImageBytes,
     this.userActions = const [],
     this.statusMessage,
   });
 
   final String chatName;
   final Stream<ChatTurnEvent>? turns;
-  final Stream<AuthorizationEvent>? authorizations;
-  final Stream<GraphChangeEvent>? graphChanges;
-  final LoadTopology? onLoadTopology;
   final SendMessage? onSend;
   final StreamMessage? onStream;
   final StreamVoice? onStreamVoice;
   final VoidCallback? onAttachmentTap;
   final OpenUrl? onOpenSignIn;
   final ActivateChatButton? onActivateButton;
-  final BehaviorClient? behaviorClient;
+  final ReadChart? onReadChart;
+  final ReadImageBytes? onReadImageBytes;
   final List<UserActionCardModel> userActions;
   final String? statusMessage;
 
@@ -51,16 +47,14 @@ final class BrainChatApp extends StatelessWidget {
       home: BrainWorkspace(
         chatName: chatName,
         turns: turns,
-        authorizations: authorizations,
-        graphChanges: graphChanges,
-        onLoadTopology: onLoadTopology,
         onSend: onSend,
         onStream: onStream,
         onStreamVoice: onStreamVoice,
         onAttachmentTap: onAttachmentTap,
         onOpenSignIn: onOpenSignIn,
         onActivateButton: onActivateButton,
-        behaviorClient: behaviorClient,
+        onReadChart: onReadChart,
+        onReadImageBytes: onReadImageBytes,
         userActions: userActions,
         statusMessage: statusMessage,
       ),

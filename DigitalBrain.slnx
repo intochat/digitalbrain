@@ -5,77 +5,56 @@
     <Project Path="src/Aspire/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/Kernel/">
-    <Project Path="srcv2/Kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
-    <Project Path="srcv2/Kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
-    <Project Path="srcv2/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
-    <Project Path="srcv2/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
+    <Project Path="src/Kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
+    <Project Path="src/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
+    <Project Path="src/Kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
+    <Project Path="src/Kernel/DigitalBrain.Scripting/DigitalBrain.Scripting.csproj" />
   </Folder>
   <Folder Name="/Modules/" />
   <Folder Name="/Modules/AI/">
-    <Project Path="srcv2/Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
-    <Project Path="srcv2/Modules/AI/Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" />
-    <Project Path="srcv2/Modules/AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
-  </Folder>
-  <Folder Name="/Modules/Execution/">
-    <Project Path="srcv2/Modules/Execution/Contracts/DigitalBrain.Modules.Execution.Contracts.csproj" />
-    <Project Path="srcv2/Modules/Execution/Execution/DigitalBrain.Modules.Execution.csproj" />
-  </Folder>
-  <Folder Name="/Modules/Google/">
-    <Project Path="srcv2/Modules/Google/Aspire.Hosting/DigitalBrain.Modules.Google.Aspire.Hosting.csproj" />
-    <Project Path="srcv2/Modules/Google/Contracts/DigitalBrain.Modules.Google.Contracts.csproj" />
-    <Project Path="srcv2/Modules/Google/Google/DigitalBrain.Modules.Google.csproj" />
-  </Folder>
-  <Folder Name="/Modules/Introspection/">
-    <Project Path="srcv2/Modules/Introspection/Contracts/DigitalBrain.Modules.Introspection.Contracts.csproj" />
-    <Project Path="srcv2/Modules/Introspection/Introspection/DigitalBrain.Modules.Introspection.csproj" />
+    <Project Path="src/Modules/AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
+    <Project Path="src/Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
+    <Project Path="src/Modules/AI/Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" />
   </Folder>
   <Folder Name="/Modules/Memory/">
-    <Project Path="srcv2/Modules/Memory/Aspire.Hosting/DigitalBrain.Modules.Memory.Aspire.Hosting.csproj" />
-    <Project Path="srcv2/Modules/Memory/Contracts/DigitalBrain.Modules.Memory.Contracts.csproj" />
-    <Project Path="srcv2/Modules/Memory/Memory/DigitalBrain.Modules.Memory.csproj" />
-  </Folder>
-  <Folder Name="/Modules/SalesForce/">
-    <Project Path="srcv2/Modules/SalesForce/Aspire.Hosting/DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" />
-    <Project Path="srcv2/Modules/SalesForce/Contracts/DigitalBrain.Modules.Salesforce.Contracts.csproj" />
-    <Project Path="srcv2/Modules/SalesForce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
-  </Folder>
-  <Folder Name="/Modules/Time/">
-    <Project Path="srcv2/Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
-    <Project Path="srcv2/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
+    <Project Path="src/Modules/Memory/Contracts/DigitalBrain.Modules.Memory.Contracts.csproj" />
+    <Project Path="src/Modules/Memory/Memory/DigitalBrain.Modules.Memory.csproj" />
+    <Project Path="src/Modules/Memory/Aspire.Hosting/DigitalBrain.Modules.Memory.Aspire.Hosting.csproj" />
   </Folder>
   <Folder Name="/Modules/UI/">
-    <Project Path="srcv2/Modules/UI/DigitalBrain.Modules.UI.Aspire.Hosting/DigitalBrain.Modules.UI.Aspire.Hosting.csproj" />
-    <Project Path="srcv2/Modules/UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />
-    <Project Path="srcv2/Modules/UI/DigitalBrain.Modules.UI/DigitalBrain.Modules.UI.csproj" />
+    <Project Path="src/Modules/UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />
+    <Project Path="src/Modules/UI/DigitalBrain.Modules.UI/DigitalBrain.Modules.UI.csproj" />
+    <Project Path="src/Modules/UI/DigitalBrain.Modules.UI.Aspire.Hosting/DigitalBrain.Modules.UI.Aspire.Hosting.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Time/">
+    <Project Path="src/Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
+    <Project Path="src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Execution/">
+    <Project Path="src/Modules/Execution/Contracts/DigitalBrain.Modules.Execution.Contracts.csproj" />
+    <Project Path="src/Modules/Execution/Execution/DigitalBrain.Modules.Execution.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Integrations/">
+    <Project Path="src/Modules/Integrations/DigitalBrain.Modules.Integrations.csproj" />
+  </Folder>
+  <Folder Name="/Modules/SmartPrompt/">
+    <Project Path="src/Modules/SmartPrompt/Contracts/DigitalBrain.Modules.SmartPrompt.Contracts.csproj" />
+    <Project Path="src/Modules/SmartPrompt/SmartPrompt/DigitalBrain.Modules.SmartPrompt.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
   </Folder>
-  <Folder Name="/srcv2/">
-    <Project Path="srcv2/CoreV2/Brain.Abstractions/Brain.Abstractions.csproj" />
-    <Project Path="srcv2/CoreV2/Brain.Core/Brain.Core.csproj" />
-    <Project Path="srcv2/CoreV2/Brain.Product.Abstractions/Brain.Product.Abstractions.csproj" />
-    <Project Path="srcv2/CoreV2/Brain.Testing/Brain.Testing.csproj" />
-    <Project Path="srcv2/CoreV2/DigitalBrain.ProductHost/DigitalBrain.ProductHost.csproj" />
-    <Project Path="srcv2/CoreV2/DigitalBrain.RuntimeHost/DigitalBrain.RuntimeHost.csproj" />
+  <Folder Name="/Testing/">
+    <Project Path="src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+    <Project Path="src/Testing/DigitalBrain.Testing.Bdd/DigitalBrain.Testing.Bdd.csproj" />
+    <Project Path="src/Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
   </Folder>
-  <Folder Name="/srcv2/Modules/Proof/">
-    <Project Path="srcv2/CoreV2/Modules/Proof/Contracts/Brain.Modules.Proof.Contracts.csproj" />
-    <Project Path="srcv2/CoreV2/Modules/Proof/Runtime/Brain.Modules.Proof.csproj" />
-  </Folder>
-  <Folder Name="/srcv2/Modules/" />
-  <Folder Name="/srcv2/Modules/AI/">
-    <Project Path="srcv2/CoreV2/Modules/AI/Aspire.Hosting/Brain.Modules.AI.Aspire.Hosting.csproj" />
-    <Project Path="srcv2/CoreV2/Modules/AI/Contracts/Brain.Modules.AI.Contracts.csproj" />
-    <Project Path="srcv2/CoreV2/Modules/AI/Runtime/Brain.Modules.AI.csproj" />
-  </Folder>
-  <Folder Name="/srcv2/Modules/UI/">
-    <Project Path="srcv2/CoreV2/Modules/UI/Aspire.Hosting/Brain.Modules.UI.Aspire.Hosting.csproj" />
-    <Project Path="srcv2/CoreV2/Modules/UI/Contracts/Brain.Modules.UI.Contracts.csproj" />
-    <Project Path="srcv2/CoreV2/Modules/UI/Runtime/Brain.Modules.UI.csproj" />
+  <Folder Name="/Tests/">
+    <Project Path="tests/DigitalBrain.Aspire.Tests/DigitalBrain.Aspire.Tests.csproj" />
+    <Project Path="tests/DigitalBrain.E2E.Tests/DigitalBrain.E2E.Tests.csproj" />
+    <Project Path="tests/DigitalBrain.Simulation.Tests/DigitalBrain.Simulation.Tests.csproj" />
   </Folder>
   <Project Path="src/Aspire/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
-  <Project Path="srcv2/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
-  <Project Path="srcv2/Kernel/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
-  <Project Path="srcv2/Kernel/DigitalBrain.Scripting/DigitalBrain.Scripting.csproj" />
+  <Project Path="src/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
+  <Project Path="src/Kernel/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
 </Solution>

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Execution module contracts: durable run, worker, attempt, operation, and blocker vocabulary.</Description>
+    <Description>Execution module contracts: Run aggregate, ExecutionContext, ContextDelta, workloads.</Description>
     <RootNamespace>DigitalBrain.Execution</RootNamespace>
   </PropertyGroup>
   <ItemGroup>

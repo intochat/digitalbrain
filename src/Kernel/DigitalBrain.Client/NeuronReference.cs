@@ -1,5 +1,8 @@
 using DigitalBrain.Abstractions;
 
+using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Messaging;
 namespace DigitalBrain.Client;
 
 public readonly struct NeuronReference<TNeuron> : IEquatable<NeuronReference<TNeuron>>

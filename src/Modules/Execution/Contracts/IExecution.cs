@@ -1,16 +1,13 @@
-using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.Neurons;
 
 namespace DigitalBrain.Execution;
 
-[ClientEntryPoint]
-[Alias("db.execution")]
+[Alias("execution")]
 public partial interface IExecution :
     INeuron,
-    IHandle<ApplyExecution>
+    IHandle<StartExecution>,
+    IHandle<CancelExecution>
 {
-    [Alias(nameof(Apply))]
-    Task<ExecutionSnapshot> Apply(ApplyExecution command);
-
     [Alias(nameof(Read))]
-    Task<ExecutionSnapshot> Read();
+    Task<ExecutionProjection> Read();
 }

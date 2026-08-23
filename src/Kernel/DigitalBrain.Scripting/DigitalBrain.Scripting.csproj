@@ -2,10 +2,6 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <RootNamespace>DigitalBrain.Scripting</RootNamespace>
-    <NoWarn>$(NoWarn);CA2007;CA1812;CA1303</NoWarn>
-    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <Description>Out-of-process Scripting host stub. Kernel must never reference or load this assembly.</Description>
   </PropertyGroup>
-  <ItemGroup>
-    <Compile Include="Program.cs" />
-  </ItemGroup>
 </Project>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>DigitalBrain end-to-end testing SDK: boots the production AppHost and connects the IDigitalBrain facade across processes.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3.extensibility.core" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="../../Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,99 +1,135 @@
-using System.ClientModel;
-using DigitalBrain.AI.Ollama;
-using DigitalBrain.AI.OpenAI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using OllamaSharp;
-using OpenAI;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace DigitalBrain.AI;
 
 internal static class AIClients
 {
     internal const string ConfigurationRoot = "DigitalBrain:AI";
-    private const string EnableSensitiveDataKey =
-        $"{ConfigurationRoot}:Telemetry:EnableSensitiveData";
+    internal const string DefaultModelKey = $"{ConfigurationRoot}:Default:Model";
+    internal const string DefaultEmbeddingKey = $"{ConfigurationRoot}:Default:Embedding";
+    private const string EnableSensitiveDataKey = $"{ConfigurationRoot}:Telemetry:EnableSensitiveData";
     private const string TelemetrySource = "DigitalBrain.AI";
-    private static readonly TimeSpan RequestTimeout = TimeSpan.FromMinutes(5);
+
+    private static readonly IReadOnlyDictionary<LlmProvider, ILlmProviderFactory> Factories =
+        new ILlmProviderFactory[]
+        {
+            new OpenAIProviderFactory(),
+            new AnthropicProviderFactory(),
+            new GoogleProviderFactory(),
+            new XAIProviderFactory(),
+            new OllamaProviderFactory(),
+        }.ToDictionary(static factory => factory.Provider);
 
     internal static void Add(IServiceCollection services)
     {
-        AddOllamaModel<Llama32>(services, "llama3.2");
-        AddOllamaModel<Gemma4>(services, "gemma4:12b");
-        AddOllamaModel<Qwen35>(services, "qwen3.5:9b");
-        AddOllamaModel<Granite41>(services, "granite4.1:8b");
+        foreach (var model in LLMModel.All)
+        {
+            services.AddKeyedSingleton<IChatClient>(
+                model.Marker,
+                (provider, _) => BuildChatPipeline(provider, model));
+        }
 
-        services.AddKeyedSingleton<IChatClient>(
-            typeof(Gpt56),
-            static (provider, _) => OpenAI(provider.GetRequiredService<IConfiguration>()));
+        foreach (var model in EmbeddingModel.All)
+        {
+            services.AddKeyedSingleton<IEmbeddingGenerator<string, Embedding<float>>>(
+                model.Marker,
+                (provider, _) => Factories[model.Provider].CreateEmbeddingGenerator(
+                    model,
+                    provider.GetRequiredService<IConfiguration>()));
+        }
+
+        services.TryAddSingleton(DefaultChatClient);
+        services.TryAddSingleton(DefaultEmbeddingGenerator);
 
         services.AddHostedService<LlmWarmupHostedService>();
     }
 
-    private static void AddOllamaModel<TModel>(IServiceCollection services, string defaultTag)
-        where TModel : LLM
-        => services.AddKeyedSingleton<IChatClient>(
-            typeof(TModel),
-            (provider, _) => Ollama(
-                provider.GetRequiredService<IConfiguration>(),
-                typeof(TModel).Name,
-                defaultTag));
-    private static IChatClient Ollama(
-        IConfiguration configuration,
-        string modelName,
-        string defaultTag)
+    private static IChatClient BuildChatPipeline(IServiceProvider provider, LLMModel model)
     {
-        var endpoint = configuration[$"{ConfigurationRoot}:Ollama:Endpoint"];
-        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri)
-            || endpointUri is null
-            || (!string.Equals(endpointUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(endpointUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
+        var configuration = provider.GetRequiredService<IConfiguration>();
+        var pipeline = new ChatClientBuilder(Factories[model.Provider].CreateChatClient(model, configuration));
+        if (!model.SupportsTools)
+        {
+            // Models that cannot emit tool calls must never be told about tools —
+            // the assistant then answers capability questions honestly with "no".
+            pipeline = pipeline.Use(static async (messages, options, next, cancellationToken) =>
+            {
+                if (options?.Tools is { Count: > 0 })
+                {
+                    options = options.Clone();
+                    options.Tools = null;
+                    options.ToolMode = null;
+                }
+
+                await next(messages, options, cancellationToken).ConfigureAwait(false);
+            });
+        }
+        return pipeline
+            .UseFunctionInvocation()
+            .UseOpenTelemetry(
+                sourceName: $"{TelemetrySource}.{model.Marker.Name}",
+                configure: telemetry => telemetry.EnableSensitiveData =
+                    configuration.GetValue<bool>(EnableSensitiveDataKey))
+            .Build(provider);
+    }
+
+    private static IChatClient DefaultChatClient(IServiceProvider provider)
+    {
+        var configuration = provider.GetRequiredService<IConfiguration>();
+        var model = configuration[DefaultModelKey] is { Length: > 0 } markerName
+            ? LLMModel.FindByMarkerName(markerName)
+                ?? throw UnknownMarker(DefaultModelKey, markerName, LLMModel.All.Select(static m => m.Marker.Name))
+            : FirstConfiguredModel(configuration);
+        return provider.GetRequiredKeyedService<IChatClient>(model.Marker);
+    }
+
+    private static LLMModel FirstConfiguredModel(IConfiguration configuration)
+        => LLMModel.All.FirstOrDefault(model => Factories[model.Provider].IsConfigured(configuration))
+            ?? throw new InvalidOperationException(
+                $"No LLM provider is configured. Supply a provider API key (for example "
+                + $"{ConfigurationRoot}:OpenAI:ApiKey) or an Ollama endpoint, or pin {DefaultModelKey}.");
+
+    private static IEmbeddingGenerator<string, Embedding<float>> DefaultEmbeddingGenerator(IServiceProvider provider)
+    {
+        var configuration = provider.GetRequiredService<IConfiguration>();
+
+        if (configuration[DefaultEmbeddingKey] is { Length: > 0 } markerName)
+        {
+            var configured = EmbeddingModel.FindByMarkerName(markerName)
+                ?? throw UnknownMarker(DefaultEmbeddingKey, markerName, EmbeddingModel.All.Select(static m => m.Marker.Name));
+            return provider.GetRequiredKeyedService<IEmbeddingGenerator<string, Embedding<float>>>(configured.Marker);
+        }
+
+        // The default embedding stays pinned to the local model unless explicitly
+        // configured: silently switching it changes vector dimensions and orphans
+        // every existing Qdrant collection.
+        var local = EmbeddingModel.All.Single(static model => model.Marker == typeof(Ollama.IEmbeddingGemma));
+        if (!Factories[local.Provider].IsConfigured(configuration))
         {
             throw new InvalidOperationException(
-                $"{modelName} requires DigitalBrain:AI:Ollama:Endpoint to be an absolute HTTP(S) URI. Configure it through AIModule.WithLlm<{modelName}>() in AppHost.");
+                $"No embedding model is configured. Supply an Ollama endpoint for {local.Marker.Name}, "
+                + $"or pin {DefaultEmbeddingKey} to a configured cloud embedding "
+                + $"({string.Join(", ", EmbeddingModel.All.Select(static m => m.Marker.Name))}).");
         }
 
-        var tag = configuration[$"{ConfigurationRoot}:Ollama:{modelName}:Model"] ?? defaultTag;
-        var enableSensitiveData = configuration.GetValue<bool>(EnableSensitiveDataKey);
-
-        var http = new HttpClient
-        {
-            BaseAddress = endpointUri,
-            Timeout = RequestTimeout,
-        };
-
-        return new ChatClientBuilder(new OllamaApiClient(http, tag))
-            .UseOpenTelemetry(
-                sourceName: $"{TelemetrySource}.{modelName}",
-                configure: telemetry => telemetry.EnableSensitiveData = enableSensitiveData)
-            .Build();
+        return provider.GetRequiredKeyedService<IEmbeddingGenerator<string, Embedding<float>>>(local.Marker);
     }
 
-    private static IChatClient OpenAI(IConfiguration configuration)
+    internal static void AddImageGeneration(IServiceCollection services, IConfiguration configuration)
     {
-        var apiKey = configuration[$"{ConfigurationRoot}:OpenAI:ApiKey"]
-            ?? throw new InvalidOperationException(
-                "Gpt56 requires DigitalBrain:AI:OpenAI:ApiKey. Configure it through AIModule.WithLlm<Gpt56>() in AppHost.");
-        var model = configuration[$"{ConfigurationRoot}:OpenAI:Gpt56:Model"] ?? "gpt-5.6";
-        var enableSensitiveData = configuration.GetValue<bool>(EnableSensitiveDataKey);
-        var options = new OpenAIClientOptions();
-
-        if (configuration[$"{ConfigurationRoot}:OpenAI:Endpoint"] is { } endpoint)
+        if (configuration[$"{ConfigurationRoot}:OpenAI:ApiKey"] is { Length: > 0 })
         {
-            options.Endpoint = new Uri(endpoint, UriKind.Absolute);
+            services.AddSingleton<IImageGeneration, OpenAIImageGeneration>();
         }
-
-        var client = new OpenAIClient(new ApiKeyCredential(apiKey), options)
-            .GetChatClient(model)
-            .AsIChatClient();
-
-        return new ChatClientBuilder(client)
-            .UseStreamingUsage()
-            .UseOpenTelemetry(
-                sourceName: $"{TelemetrySource}.{nameof(Gpt56)}",
-                configure: telemetry => telemetry.EnableSensitiveData = enableSensitiveData)
-            .Build();
     }
+
+    private static InvalidOperationException UnknownMarker(
+        string configurationKey,
+        string markerName,
+        IEnumerable<string> knownMarkerNames)
+        => new($"{configurationKey} names unknown model '{markerName}'. "
+            + $"Known models: {string.Join(", ", knownMarkerNames)}.");
 }

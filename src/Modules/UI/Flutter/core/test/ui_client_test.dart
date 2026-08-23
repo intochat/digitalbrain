@@ -6,7 +6,7 @@ import 'package:http/testing.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test('openScene POSTs OpenSceneRequest to UI HTTP root path', () async {
+  test('openScene POSTs the explicit surface command', () async {
     http.Request? seen;
     final client = DigitalBrainUiClient(
       baseUri: Uri.parse('http://ui.example:5080'),
@@ -20,8 +20,13 @@ void main() {
 
     expect(seen, isNotNull);
     expect(seen!.method, 'POST');
-    expect(seen!.url.toString(), 'http://ui.example:5080/shells/desk/scenes');
-    expect(jsonDecode(seen!.body), {'sceneKey': 'home', 'title': 'Home'});
+    expect(seen!.url.toString(), 'http://ui.example:5080/owner/commands');
+    expect(jsonDecode(seen!.body), {
+      'kind': 'surface.open',
+      'surfaceName': 'desk',
+      'surfaceKey': 'home',
+      'title': 'Home',
+    });
   });
 
   test(
@@ -50,7 +55,7 @@ data: {"sequence":5,"sceneKey":"countdown","title":"Countdown","commandId":"d","
           expect(request.method, 'GET');
           expect(
             request.url.toString(),
-            'http://ui.example:5080/shells/desk/events?afterSequence=0',
+            'http://ui.example:5080/surfaces/desk/events?afterSequence=0',
           );
           return http.Response(
             body,
@@ -71,48 +76,6 @@ data: {"sequence":5,"sceneKey":"countdown","title":"Countdown","commandId":"d","
       expect(surface.latest?.title, 'Countdown');
     },
   );
-
-  test('watchAuthorizations streams authorization journal SSE', () async {
-    const body = '''
-: connected
-
-id: 1
-event: authorization
-data: {"sequence":1,"kind":"AuthorizationRequired","commandId":"c1","serverKey":"google.gmail","serverDisplayName":"DigitalBrain Gmail","signInUrl":"https://ui.test/oauth?state=s1","state":"s1","timestamp":"2026-07-28T08:00:00Z"}
-
-id: 2
-event: noise
-data: {"sequence":2,"kind":"AuthorizationRequired","commandId":"c2","serverKey":"x","state":"x","timestamp":"2026-07-28T08:00:01Z"}
-
-id: 3
-event: authorization
-data: {"sequence":3,"kind":"AuthorizationCompleted","commandId":"c1","serverKey":"google.gmail","state":"s1","timestamp":"2026-07-28T08:00:02Z"}
-
-''';
-
-    final client = DigitalBrainUiClient(
-      baseUri: Uri.parse('http://ui.example:5080'),
-      httpClient: MockClient((request) async {
-        expect(request.method, 'GET');
-        expect(
-          request.url.toString(),
-          'http://ui.example:5080/authorizations/events?afterSequence=0',
-        );
-        return http.Response(
-          body,
-          200,
-          headers: {'content-type': 'text/event-stream'},
-        );
-      }),
-    );
-
-    final events = await client.watchAuthorizations().toList();
-    expect(events, hasLength(2));
-    expect(events[0].isRequired, isTrue);
-    expect(events[0].serverDisplayName, 'DigitalBrain Gmail');
-    expect(events[1].isCompleted, isTrue);
-    expect(SignInCardProjection.project(events), isEmpty);
-  });
 
   test(
     'watchShellEvents multi-event SSE projects into one ShellSurfaceController without restart',
@@ -139,7 +102,7 @@ data: {"sequence":3,"sceneKey":"home","title":"Home refreshed","commandId":"c","
         httpClient: MockClient((request) async {
           expect(
             request.url.toString(),
-            'http://ui.example:5080/shells/desk/events?afterSequence=0',
+            'http://ui.example:5080/surfaces/desk/events?afterSequence=0',
           );
           return http.Response(
             body,
@@ -173,7 +136,7 @@ data: {"sequence":3,"sceneKey":"home","title":"Home refreshed","commandId":"c","
   );
 
   test(
-    'streamMessage POSTs to /messages/stream and yields chat-delta frames',
+    'streamMessage POSTs the explicit chat command and yields chat-delta frames',
     () async {
       const body = '''
 event: chat-delta
@@ -195,9 +158,13 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
           expect(request.method, 'POST');
           expect(
             request.url.toString(),
-            'http://ui.example:5080/chats/pulse/messages/stream',
+            'http://ui.example:5080/owner/commands',
           );
-          expect(jsonDecode(request.body), {'text': 'hello'});
+          expect(jsonDecode(request.body), {
+            'kind': 'chat.send',
+            'chatName': 'pulse',
+            'text': 'hello',
+          });
           return http.Response(
             body,
             200,
@@ -212,12 +179,15 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
 
       expect(seen, isNotNull);
       expect(frames, hasLength(2));
-      expect(frames.map((frame) => frame.text).join(), 'the edge probe answered');
+      expect(
+        frames.map((frame) => frame.text).join(),
+        'the edge probe answered',
+      );
       expect(frames.every((frame) => frame.role == 'assistant'), isTrue);
     },
   );
 
-  test('openScene and activateControl reject non-202', () async {
+  test('openScene rejects non-202', () async {
     final client = DigitalBrainUiClient(
       baseUri: Uri.parse('http://ui.example:5080'),
       httpClient: MockClient((request) async => http.Response('nope', 500)),
@@ -227,38 +197,22 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
       client.openScene(shellName: 'desk', sceneKey: 'home', title: 'Home'),
       throwsA(isA<StateError>()),
     );
-    await expectLater(
-      client.activateControl(
-        sceneName: 'home',
-        controlId: 'primary',
-        intent: 'submit',
-      ),
-      throwsA(isA<StateError>()),
-    );
   });
 
-  test('readBrainTopology loads modules and active neurons once', () async {
-    var requestCount = 0;
+  test('readChart GETs /kit/charts/{name} and parses the chart offer', () async {
+    http.BaseRequest? seen;
     final client = DigitalBrainUiClient(
       baseUri: Uri.parse('http://ui.example:5080'),
       httpClient: MockClient((request) async {
-        expect(request.method, 'GET');
-        expect(request.url.toString(), 'http://ui.example:5080/brain/topology');
-        requestCount++;
+        seen = request;
         return http.Response(
           jsonEncode({
-            'modules': [
-              {'id': 'DigitalBrain.Chat.ChatModule'},
+            'title': 'Weekly usage',
+            'chartKind': 'bar',
+            'points': [
+              {'label': 'Mon', 'value': 1},
+              {'label': 'Tue', 'value': 2},
             ],
-            'neurons': [
-              {
-                'id': 'chat:owner/main',
-                'grainType': 'chat',
-                'identity': 'owner/main',
-                'placement': 'cluster-1',
-              },
-            ],
-            'observedAt': '2026-07-28T08:00:00Z',
           }),
           200,
           headers: {'content-type': 'application/json'},
@@ -266,72 +220,113 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
       }),
     );
 
-    final snapshot = await client.readBrainTopology();
+    final chart = await client.readChart('weekly-usage');
 
-    expect(requestCount, 1);
-    expect(snapshot.modules.single.id, 'DigitalBrain.Chat.ChatModule');
-    expect(snapshot.neurons.single.id, 'chat:owner/main');
+    expect(seen, isNotNull);
+    expect(seen!.method, 'GET');
+    expect(
+      seen!.url.toString(),
+      'http://ui.example:5080/kit/charts/weekly-usage',
+    );
+    expect(chart, isNotNull);
+    expect(chart!.title, 'Weekly usage');
+    expect(chart.chartKind, 'bar');
+    expect(chart.points.map((p) => p.label), ['Mon', 'Tue']);
   });
 
-  test('readBrainTopology surfaces a failed topology response', () async {
+  test('readChart returns null on 404', () async {
     final client = DigitalBrainUiClient(
       baseUri: Uri.parse('http://ui.example:5080'),
-      httpClient: MockClient(
-        (request) async => http.Response('temporarily unavailable', 503),
-      ),
+      httpClient: MockClient((request) async => http.Response('', 404)),
+    );
+
+    expect(await client.readChart('missing'), isNull);
+  });
+
+  test('readChart throws StateError on non-200/404', () async {
+    final client = DigitalBrainUiClient(
+      baseUri: Uri.parse('http://ui.example:5080'),
+      httpClient: MockClient((request) async => http.Response('bad', 400)),
     );
 
     await expectLater(
-      client.readBrainTopology(),
+      client.readChart('bad name'),
       throwsA(isA<StateError>()),
     );
   });
 
-  test('readBrainTopology aborts a hung request', () async {
-    final httpClient = _AbortThenSucceedClient();
+  test('readImage GETs /kit/images/{name} and returns the raw map', () async {
+    http.BaseRequest? seen;
     final client = DigitalBrainUiClient(
       baseUri: Uri.parse('http://ui.example:5080'),
-      httpClient: httpClient,
-    );
-
-    await expectLater(
-      client.readBrainTopology(requestTimeout: const Duration(milliseconds: 1)),
-      throwsA(isA<http.RequestAbortedException>()),
-    );
-
-    expect(httpClient.requests, 1);
-    expect(httpClient.sawAbortableRequest, isTrue);
-  });
-}
-
-final class _AbortThenSucceedClient extends http.BaseClient {
-  int requests = 0;
-  bool sawAbortableRequest = false;
-
-  @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) async {
-    requests++;
-    if (requests == 1) {
-      sawAbortableRequest = request is http.AbortableRequest;
-      final abortable = request as http.AbortableRequest;
-      await abortable.abortTrigger;
-      throw http.RequestAbortedException(request.url);
-    }
-
-    return http.StreamedResponse(
-      Stream.value(
-        utf8.encode(
+      httpClient: MockClient((request) async {
+        seen = request;
+        return http.Response(
           jsonEncode({
-            'modules': [
-              {'id': 'DigitalBrain.Chat.ChatModule'},
-            ],
-            'neurons': const [],
-            'observedAt': '2026-07-28T08:00:00Z',
+            'prompt': 'a cat',
+            'model': 'dall-e',
+            'mediaType': 'image/png',
           }),
-        ),
-      ),
-      200,
-      headers: {'content-type': 'application/json'},
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
     );
-  }
+
+    final image = await client.readImage('cat-pic');
+
+    expect(seen, isNotNull);
+    expect(seen!.method, 'GET');
+    expect(
+      seen!.url.toString(),
+      'http://ui.example:5080/kit/images/cat-pic',
+    );
+    expect(image, {'prompt': 'a cat', 'model': 'dall-e', 'mediaType': 'image/png'});
+  });
+
+  test('readImage returns null on 404', () async {
+    final client = DigitalBrainUiClient(
+      baseUri: Uri.parse('http://ui.example:5080'),
+      httpClient: MockClient((request) async => http.Response('', 404)),
+    );
+
+    expect(await client.readImage('missing'), isNull);
+  });
+
+  test(
+    'readImageBytes GETs /kit/images/{name}/content and returns raw bytes',
+    () async {
+      http.BaseRequest? seen;
+      final client = DigitalBrainUiClient(
+        baseUri: Uri.parse('http://ui.example:5080'),
+        httpClient: MockClient((request) async {
+          seen = request;
+          return http.Response.bytes(
+            [1, 2, 3, 4],
+            200,
+            headers: {'content-type': 'image/png'},
+          );
+        }),
+      );
+
+      final bytes = await client.readImageBytes('cat-pic');
+
+      expect(seen, isNotNull);
+      expect(seen!.method, 'GET');
+      expect(
+        seen!.url.toString(),
+        'http://ui.example:5080/kit/images/cat-pic/content',
+      );
+      expect(bytes, [1, 2, 3, 4]);
+    },
+  );
+
+  test('readImageBytes returns null on 404', () async {
+    final client = DigitalBrainUiClient(
+      baseUri: Uri.parse('http://ui.example:5080'),
+      httpClient: MockClient((request) async => http.Response('', 404)),
+    );
+
+    expect(await client.readImageBytes('missing'), isNull);
+  });
 }

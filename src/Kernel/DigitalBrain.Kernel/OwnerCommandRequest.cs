@@ -9,9 +9,6 @@ internal sealed record OwnerCommandRequest(
     [property: JsonPropertyName("text")] string? Text = null,
     [property: JsonPropertyName("commandId")] string? CommandId = null,
     [property: JsonPropertyName("turnId")] string? TurnId = null,
-    [property: JsonPropertyName("offerCommandId")] string? OfferCommandId = null,
-    [property: JsonPropertyName("buttonId")] string? ButtonId = null,
-    [property: JsonPropertyName("action")] string? Action = null,
     [property: JsonPropertyName("surfaceName")] string? SurfaceName = null,
     [property: JsonPropertyName("surfaceKey")] string? SurfaceKey = null,
     [property: JsonPropertyName("title")] string? Title = null);

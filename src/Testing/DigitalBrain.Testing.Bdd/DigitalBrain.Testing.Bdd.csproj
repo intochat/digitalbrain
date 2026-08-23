@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Not packable while BddBrainHost references the (non-packable) AppHost project; the
+         phase-5 restructure moves the boot hook to the consumer so the steps stay SDK-pure. -->
+    <IsPackable>false</IsPackable>
+    <Description>DigitalBrain BDD testing SDK: the Reqnroll step vocabulary that drives the kernel HTTP edge of a booted AppHost.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Reqnroll" />
+    <PackageReference Include="xunit.v3.assert" />
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
+    <ProjectReference Include="../../Modules/UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />
+    <ProjectReference Include="../../Modules/Memory/Contracts/DigitalBrain.Modules.Memory.Contracts.csproj" />
+    <!-- Names the AppHost BddBrainHost boots (Projects.DigitalBrain_AppHost); not an Aspire
+         resource of this library, same as the E2E test project's reference. -->
+    <ProjectReference Include="../../Aspire/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" IsAspireProjectResource="false" />
+  </ItemGroup>
+</Project>

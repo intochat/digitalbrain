@@ -1,12 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Execution module: durable execution lifecycle, operation ledger, and worker attempt coordination.</Description>
+    <Description>Execution module: ExecutionNeuron, ExecutionContext entity, EffectBroker Sdk.</Description>
     <RootNamespace>DigitalBrain.Execution</RootNamespace>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Execution.Contracts.csproj" />
+    <ProjectReference Include="../../UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
   </ItemGroup>
 </Project>

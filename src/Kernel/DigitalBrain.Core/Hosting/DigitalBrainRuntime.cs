@@ -9,46 +9,19 @@ namespace DigitalBrain.Core;
 [EditorBrowsable(EditorBrowsableState.Never)]
 public static class DigitalBrainRuntime
 {
-    public static void Add(ISiloBuilder builder, ModuleAssemblies modules)
+    public static void Add(ISiloBuilder builder, ModuleManifest modules)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(modules);
 
-        var manifests = ManifestsOf(modules);
-        var capabilities = ActiveCapabilityCatalog.Create(manifests);
-        builder.Services.AddSingleton(CapabilityIndex.Build(manifests));
-
         builder.AddJournalStorage();
-        builder.UseJsonJournalFormat(JournalJson.TypeInfoResolver);
-        builder.AddIncomingGrainCallFilter<IncomingReificationFilter>();
-        builder.AddIncomingGrainCallFilter<OwnerBoundCallFilter>();
-        builder.AddOutgoingGrainCallFilter<OutgoingReificationFilter>();
-        builder.Services.AddSingleton(capabilities);
-        builder.Services.AddSingleton(
-            ActiveModuleContractTypeMap.Create(
-                modules.Contracts.Concat(modules.Implementations),
-                capabilities));
-        builder.Services.AddSingleton(services =>
-        {
-            var catalog = new BroadcastCatalog();
-
-            foreach (var configure in services.GetServices<IConfigureBroadcastCatalog>())
-            {
-                configure.Configure(catalog);
-            }
-
-            return catalog;
-        });
-        builder.Services.AddSingleton(services =>
-            new BroadcastTopology(services.GetRequiredService<BroadcastCatalog>().Routes()));
-
+        builder.UseJsonJournalFormat(DurableStateJson.TypeInfoResolver);
+        // Awaited publish: a subscriber's failure surfaces to the publisher, matching the
+        // direct-call delivery semantics of Send.
+        builder.AddBroadcastChannel(
+            DigitalBrainNames.BroadcastChannelProvider,
+            options => options.FireAndForgetDelivery = false);
         ModelPayloadSerialization.AddModelPayloadSerialization(builder.Services);
-
-        foreach (var implementation in modules.Implementations)
-        {
-            builder.Services.AddSingleton<IConfigureBroadcastCatalog>(
-                new AssemblyBroadcastHandlers(implementation));
-        }
 
         foreach (var hook in ModuleHooksOf(modules))
         {
@@ -56,24 +29,17 @@ public static class DigitalBrainRuntime
         }
     }
 
-    public static IReadOnlyList<CapabilityManifest> ManifestsOf(ModuleAssemblies modules)
-    {
-        ArgumentNullException.ThrowIfNull(modules);
+    private static IEnumerable<IModule> ModuleHooksOf(ModuleManifest modules)
+        => modules.Types.Select(static type =>
+        {
+            if (type is not { IsClass: true, IsAbstract: false }
+                || !typeof(IModule).IsAssignableFrom(type)
+                || type.GetConstructor(Type.EmptyTypes) is null)
+            {
+                throw new InvalidOperationException(
+                    $"Configured module '{type.FullName}' must be a concrete {nameof(IModule)} with a public parameterless constructor.");
+            }
 
-        return
-        [
-            .. modules.Contracts
-                .Select(ModuleReflection.ManifestOf)
-                .OrderBy(static manifest => manifest.ModuleId.Value, StringComparer.Ordinal),
-        ];
-    }
-
-    private static IEnumerable<IModule> ModuleHooksOf(ModuleAssemblies modules)
-        => modules.Implementations
-            .SelectMany(static assembly => assembly.GetTypes())
-            .Where(static type => type is { IsClass: true, IsAbstract: false }
-                && typeof(IModule).IsAssignableFrom(type)
-                && type.GetConstructor(Type.EmptyTypes) is not null)
-            .OrderBy(static type => type.FullName, StringComparer.Ordinal)
-            .Select(static type => (IModule)Activator.CreateInstance(type)!);
+            return (IModule)Activator.CreateInstance(type)!;
+        });
 }

@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using DigitalBrain.AI.Ollama;
-using DigitalBrain.AI.OpenAI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,10 +27,7 @@ internal sealed class LlmWarmupHostedService(
 
     private static readonly (Type Key, string ConfiguredModelKey)[] OllamaTargets =
     [
-        (typeof(Gemma4), $"{AIClients.ConfigurationRoot}:Ollama:Gemma4:Model"),
-        (typeof(Llama32), $"{AIClients.ConfigurationRoot}:Ollama:Llama32:Model"),
-        (typeof(Qwen35), $"{AIClients.ConfigurationRoot}:Ollama:Qwen35:Model"),
-        (typeof(Granite41), $"{AIClients.ConfigurationRoot}:Ollama:Granite41:Model"),
+        (typeof(IGemma4), $"{AIClients.ConfigurationRoot}:Ollama:IGemma4:Model"),
     ];
 
     private CancellationTokenSource? _warmup;
@@ -74,11 +70,6 @@ internal sealed class LlmWarmupHostedService(
             {
                 yield return target;
             }
-        }
-
-        if (!string.IsNullOrWhiteSpace(configuration[$"{AIClients.ConfigurationRoot}:OpenAI:ApiKey"]))
-        {
-            yield return (typeof(Gpt56), $"{AIClients.ConfigurationRoot}:OpenAI:Gpt56:Model");
         }
     }
     private async Task WarmOneAsync(Type modelKey, CancellationToken cancellationToken)

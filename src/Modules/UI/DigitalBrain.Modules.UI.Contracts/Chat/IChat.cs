@@ -1,16 +1,17 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.Execution;
+using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.UI;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.Chat;
 
-[ClientEntryPoint]
 [Alias("chat")]
 public partial interface IChat :
     INeuron,
     IHandle<ReadTranscriptRequest>,
     IHandle<Note>,
-    IHandle<TimerCard>
+    IHandle<KitCardOffer>
 {
     [Alias(nameof(Send))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
@@ -29,4 +30,10 @@ public partial interface IChat :
 
     [Alias(nameof(ReadTurns))]
     Task<IReadOnlyList<ChatTurnSnapshot>> ReadTurns();
+
+    [Alias(nameof(ReadActiveExecution))]
+    Task<ExecutionId?> ReadActiveExecution();
+
+    [Alias(nameof(SetActiveExecution))]
+    Task SetActiveExecution(ExecutionId? id);
 }

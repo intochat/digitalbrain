@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Core;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;

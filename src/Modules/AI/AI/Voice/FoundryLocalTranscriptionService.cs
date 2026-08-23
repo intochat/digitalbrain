@@ -21,8 +21,8 @@ public sealed class FoundryLocalTranscriptionService :
     private readonly IConfiguration _configuration;
     private readonly IAudioConverter? _audioConverter;
     private readonly ILogger<FoundryLocalTranscriptionService> _logger;
-    private Model? _model;
-    private ModelVariant? _cpuFallbackVariant;
+    private IModel? _model;
+    private IModel? _cpuFallbackVariant;
     private bool _cudaFailed;
 
     public FoundryLocalTranscriptionService(
@@ -286,7 +286,7 @@ public sealed class FoundryLocalTranscriptionService :
             || ex.ToString().Contains("CUDA", StringComparison.OrdinalIgnoreCase)
             || ex.GetType().Name.Contains("OnnxRuntimeGenAI", StringComparison.OrdinalIgnoreCase);
 
-    private async Task<Model> ResolveModelAsync(ICatalog catalog)
+    private async Task<IModel> ResolveModelAsync(ICatalog catalog)
     {
         var configuredId = _configuration[ModelIdConfigurationKey];
         if (!string.IsNullOrEmpty(configuredId))

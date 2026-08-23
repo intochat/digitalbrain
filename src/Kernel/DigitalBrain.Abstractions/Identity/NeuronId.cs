@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 
+using DigitalBrain.Abstractions.Neurons;
 namespace DigitalBrain.Abstractions.Identity;
 
 [GenerateSerializer]
@@ -34,30 +35,34 @@ public readonly record struct NeuronId
     public static NeuronId BroadcastReceiver(string type, OwnerId owner, CorrelationId correlation)
         => new(type, owner, correlation.Value.ToString("D"));
 
-    public static string GrainTypeNameOf(Type neuronType)
+    public static string GrainTypeNameOf(Type neuronType) => GrainTypeNames.Of(neuronType);
+
+    // The "type:name" instance shape tool surfaces accept. A "type:owner/name" form is
+    // refused rather than silently re-owned: the owner always comes from the calling surface.
+    public static bool TryParseInstance(string? instance, OwnerId owner, out NeuronId id)
     {
-        ArgumentNullException.ThrowIfNull(neuronType);
-
-        var declared = neuronType.GetCustomAttributesData()
-            .FirstOrDefault(attribute => attribute.AttributeType == typeof(GrainTypeAttribute))?
-            .ConstructorArguments[0].Value as string;
-
-        if (declared is not null)
+        id = default;
+        if (string.IsNullOrWhiteSpace(instance))
         {
-            return declared;
+            return false;
         }
 
-        const string OrleansGrainSuffix = "Grain";
-        var name = neuronType.Name;
-
-        if (neuronType.IsInterface && name.Length > 1 && name[0] == 'I' && char.IsUpper(name[1]))
+        var trimmed = instance.Trim();
+        var separator = trimmed.IndexOf(':', StringComparison.Ordinal);
+        if (separator <= 0 || separator == trimmed.Length - 1)
         {
-            return name[1..];
+            return false;
         }
 
-        return name.Length > OrleansGrainSuffix.Length && name.EndsWith(OrleansGrainSuffix, StringComparison.Ordinal)
-            ? name[..^OrleansGrainSuffix.Length]
-            : name;
+        try
+        {
+            id = new NeuronId(trimmed[..separator], owner, trimmed[(separator + 1)..]);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
     }
 
     public static NeuronId FromGrainKey(string type, string grainKey)

@@ -5,12 +5,14 @@ using DigitalBrain.Chat;
 using DigitalBrain.Client;
 using Microsoft.Extensions.AI;
 
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Journals;
 namespace DigitalBrain.Kernel;
 
 // Upload voice → local Whisper → durable chat turn (server-orchestrated).
 internal static class ChatVoiceHttpMaps
 {
-    public const long MaxUploadBytes = VoiceToTextNeuron.MaxAudioBytes;
+    public const long MaxUploadBytes = VoiceUploadLimits.MaxBytes;
 
     public static IEndpointRouteBuilder MapChatVoice(this IEndpointRouteBuilder endpoints)
     {
@@ -30,11 +32,7 @@ internal static class ChatVoiceHttpMaps
                 ArgumentNullException.ThrowIfNull(transcription);
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (!HttpActor.TryGet(http, out var actor))
-                {
-                    http.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                    return;
-                }
+                var actor = HttpActor.Current;
 
                 if (string.IsNullOrWhiteSpace(chatName)
                     || !TryPrincipalResource(actor.PrincipalId, chatName, out var chatInstance))

@@ -1,25 +1,25 @@
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Reflection;
 using DigitalBrain.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
-using Orleans.Serialization;
 
+using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Journals;
 namespace DigitalBrain.Core;
 
 public abstract class Neuron :
     DurableGrain,
-    INeuron,
-    IOutboxDrain
+    INeuron
 {
-    private const string OutboxName = "outbox";
-    private const string HandledName = "handled";
-    private const int RememberedDeliveries = 4096;
+    private delegate Task HandlerInvoker(object neuron, Synapse synapse, CancellationToken cancellationToken);
 
-    private readonly NeuronCapabilityCoordinator _capabilities;
+    private static readonly ConcurrentDictionary<Type, IReadOnlyDictionary<Type, HandlerInvoker>> HandlersByNeuronType = new();
     private readonly NeuronJournal _journal;
-    private readonly NeuronMessagePipeline _messages;
-    private readonly NeuronOutbox _outbox;
-    private readonly NeuronStreamRegistry _streams;
-    private readonly NeuronTurnCoordinator _turn;
+    private SynapseDelivery? _handling;
 
     protected Neuron()
     {
@@ -28,22 +28,6 @@ public abstract class Neuron :
             ?? System.TimeProvider.System;
 
         _journal = new NeuronJournal(this, ServiceProvider);
-        _outbox = new NeuronOutbox(
-            this,
-            ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(OutboxName),
-            ServiceProvider.GetRequiredService<Serializer<OutboxEntry>>());
-        var deliveries = new NeuronDeliveryMemory(
-            this,
-            ServiceProvider.GetRequiredKeyedService<IDurableList<Guid>>(HandledName));
-        _turn = new NeuronTurnCoordinator(
-            this,
-            _journal,
-            _outbox,
-            deliveries,
-            ServiceProvider.GetRequiredService<Serializer<Synapse>>());
-        _streams = new NeuronStreamRegistry(this);
-        _messages = new NeuronMessagePipeline(this, _journal, _outbox, _turn, _streams);
-        _capabilities = new NeuronCapabilityCoordinator(this, _journal, _outbox, _turn);
     }
 
     public NeuronId Id
@@ -53,32 +37,6 @@ public abstract class Neuron :
 
     protected TimeProvider TimeProvider { get; }
 
-    internal virtual int RememberedDeliveryBound => RememberedDeliveries;
-
-    internal IServiceProvider NeuronServices => ServiceProvider;
-
-    internal IGrainFactory NeuronGrainFactory => GrainFactory;
-
-    internal TimeProvider NeuronTimeProvider => TimeProvider;
-
-    protected NeuronId? CurrentDeliveryCaller => _turn.Handling?.Caller;
-
-    protected SynapseId? CurrentDeliverySynapseId => _turn.Handling?.SynapseId;
-
-    // A handler stamping provenance needs the correlation of the request that asked for it;
-    // the unforgeable half of a provenance record can only come from the delivery.
-    protected CorrelationId? CurrentDeliveryCorrelation => _turn.Handling?.CorrelationId;
-
-    protected int CurrentDeliveryDepth => _turn.CurrentDepth;
-
-    protected CancellationToken TurnCancellationToken => _turn.CancellationToken;
-
-    internal CorrelationId? AmbientClientEntryCorrelation => _streams.AmbientClientCorrelation;
-
-    internal IReadOnlyList<Guid> BoundStreamedEnumerations => _streams.BoundEnumerations;
-
-    internal int PendingStreamedCapabilityRequests => _streams.PendingCapabilityRequests;
-
     public sealed override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         NeuronConcurrency.RequireSerializedTurns(GetType());
@@ -86,12 +44,9 @@ public abstract class Neuron :
         await base.OnActivateAsync(cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        _turn.Activate();
-        await _outbox.ActivateAsync()
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
         await OnNeuronActivatedAsync(cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
     }
 
     protected virtual Task OnNeuronActivatedAsync(CancellationToken cancellationToken)
@@ -100,8 +55,13 @@ public abstract class Neuron :
     public async Task Deliver(
         SynapseDelivery delivery,
         CancellationToken cancellationToken = default)
-        => await _turn.DeliverAsync(delivery, cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(delivery);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        await DispatchDeliveryAsync(delivery, cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
 
     public Task<JournalRead> ReadJournal(JournalKind kind, long afterSequence)
         => Task.FromResult(_journal.Read(kind, afterSequence));
@@ -119,41 +79,59 @@ public abstract class Neuron :
         return Task.CompletedTask;
     }
 
-    async Task IOutboxDrain.Drain()
-        => await _outbox.DrainFromWakeupAsync()
+    protected async Task<SynapseDelivery> SendAsync(NeuronId receiver, Synapse synapse)
+    {
+        ArgumentNullException.ThrowIfNull(synapse);
+
+        var delivery = await StageOutgoingAsync(synapse, _handling)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-    protected Task FlushOutboxAsync(CancellationToken cancellationToken)
-        => _outbox.FlushAsync(cancellationToken);
+        await DeliverToAsync(receiver, delivery)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-    protected Task<SynapseDelivery> SendAsync(NeuronId receiver, Synapse synapse)
-        => _messages.SendAsync(receiver, synapse);
+        return delivery;
+    }
 
     protected Task EmitAsync(Synapse synapse)
-        => _messages.EmitAsync(synapse);
+    {
+        ArgumentNullException.ThrowIfNull(synapse);
+        return EmitAsync(synapse, ResolveEmissionCorrelation());
+    }
 
     protected CorrelationId ResolveEmissionCorrelation()
-        => _messages.ResolveEmissionCorrelation();
+        => _handling?.CorrelationId
+            ?? CorrelationId.New();
 
-    protected Task EmitAsync(Synapse synapse, CorrelationId correlation)
-        => _messages.EmitAsync(synapse, correlation);
+    protected async Task EmitAsync(Synapse synapse, CorrelationId correlation)
+    {
+        ArgumentNullException.ThrowIfNull(synapse);
 
-    protected Task EmitAtDepthAsync(
-        Synapse synapse,
-        CorrelationId correlation,
-        int deliveryDepth)
-        => _messages.EmitAtDepthAsync(synapse, correlation, deliveryDepth);
+        var delivery = await StageOutgoingAsync(synapse, _handling, correlation)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-    protected Task ReplyAsync(
+        _ = delivery;
+    }
+
+    protected async Task ReplyAsync(
         Synapse response,
         CancellationToken cancellationToken = default)
-        => _messages.ReplyAsync(response, cancellationToken);
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        cancellationToken.ThrowIfCancellationRequested();
 
-    protected void ValidateCapabilityCaller(NeuronId expectedCaller)
-        => _turn.ValidateCapabilityCaller(expectedCaller);
+        var handling = _handling
+            ?? throw new InvalidOperationException(
+                "ReplyAsync requires an active delivery context. Reply only from a "
+                + "HandleAsync turn.");
 
-    protected void EnlistTurnRollback(Action rollback)
-        => _turn.EnlistRollback(rollback);
+        var delivery = await StageOutgoingAsync(response, handling, handling.CorrelationId)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        // The caller's turn is awaiting this one, so an awaited call back into the caller
+        // would deadlock two serialized grains. The reply rides an unawaited grain call
+        // (queued even when the caller is this neuron); a lost reply is telemetry.
+        _ = DeliverReplyAsync(handling.Caller, delivery);
+    }
 
     // Refusing an unhandled synapse here is correct in principle but is NOT this slice's work:
     // ReplyAsync addresses the caller, and callers routinely have no IHandle for the reply
@@ -164,9 +142,6 @@ public abstract class Neuron :
         CancellationToken cancellationToken)
         => Task.CompletedTask;
 
-    internal SynapseDelivery StageIncomingOutcome(Synapse outcome, SynapseDelivery cause)
-        => _messages.StageIncomingOutcome(outcome, cause);
-
     protected new IDisposable RegisterTimer(
         Func<object, Task> callback,
         object state,
@@ -176,108 +151,117 @@ public abstract class Neuron :
             $"{nameof(RegisterTimer)} creates interleaving callbacks, but neurons require "
             + "serialized turns.");
 
-    internal ClientEntryCorrelationScope EnterClientEntryCorrelation(CorrelationId correlation)
+    internal async Task<SynapseDelivery> StageOutgoingAsync(
+        Synapse synapse,
+        SynapseDelivery? cause,
+        CorrelationId? correlation = null)
     {
-        var previous = _streams.EnterClientCorrelation(correlation);
-        return new ClientEntryCorrelationScope(this, previous);
+        var delivery = SynapseDelivery.Create(
+            synapse,
+            Id,
+            _journal.OutgoingNextSequence,
+            cause,
+            TimeProvider,
+            correlation,
+            principal: VerifiedActor.Current?.PrincipalId ?? cause?.Principal);
+
+        _journal.AppendOutgoing(delivery);
+        await WriteStateAsync().ConfigureAwait(true);
+        await _journal.NotifyWatchersAsync()
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        return delivery;
     }
 
-    internal void RegisterClientStreamCorrelation(Guid enumerationId, CorrelationId correlation)
-        => _streams.RegisterClientCorrelation(enumerationId, correlation);
-
-    internal bool TryGetClientStreamCorrelation(
-        Guid enumerationId,
-        out CorrelationId correlation)
-        => _streams.TryGetClientCorrelation(enumerationId, out correlation);
-
-    internal void ForgetClientStreamCorrelation(Guid enumerationId)
-        => _streams.ForgetClientCorrelation(enumerationId);
-
-    internal void BindStreamedEnumeration(Guid enumerationId, GrainId? initiator)
-        => _streams.BindEnumeration(enumerationId, initiator);
-
-    internal void RequireStreamedEnumerationInitiator(Guid enumerationId, GrainId? caller)
-        => _streams.RequireEnumerationInitiator(enumerationId, caller);
-
-    internal void ReleaseStreamedEnumeration(Guid enumerationId)
-        => _streams.ReleaseEnumeration(enumerationId);
-
-    internal Task<SynapseDelivery> BeginCapabilityRequestAsync(
-        string contract,
-        string method,
-        NeuronId target)
-        => _capabilities.BeginRequestAsync(contract, method, target);
-
-    internal bool TryRegisterStreamedCapabilityRequest(
-        Guid enumerationId,
-        SynapseDelivery request)
-        => _streams.TryRegisterCapabilityRequest(enumerationId, request);
-
-    internal bool TryClaimStreamedCapabilityRequest(
-        Guid enumerationId,
-        out SynapseDelivery request)
-        => _streams.TryClaimCapabilityRequest(enumerationId, out request);
-
-    internal Task RecordCapabilityOutcomeAsync(
-        CapabilityOutcome outcome,
-        SynapseDelivery request)
-        => _capabilities.RecordOutcomeAsync(outcome, request);
-
-    internal Task RecordStreamedCapabilityRequestAsync(
+    private async Task DispatchDeliveryAsync(
         SynapseDelivery delivery,
-        GrainId? source)
-        => _capabilities.RecordStreamedRequestAsync(delivery, source);
+        CancellationToken cancellationToken)
+    {
+        using var handling = SynapseTelemetry.Source.StartActivity("handle");
 
-    internal Task<CapabilityTurn> BeginIncomingCapabilityRequestAsync(
-        SynapseDelivery delivery,
-        GrainId? source)
-        => _capabilities.BeginIncomingRequestAsync(delivery, source);
+        handling?.SetTag(SynapseTelemetry.ReceiverTag, Id.ToString());
+        handling?.SetTag(SynapseTelemetry.SynapseTag, delivery.Synapse.GetType().Name);
+        handling?.SetTag(SynapseTelemetry.CorrelationTag, delivery.CorrelationId.ToString());
 
-    internal Task CompleteIncomingCapabilityRequestAsync(CapabilityTurn turn)
-        => _capabilities.CompleteIncomingRequestAsync(turn);
+        var previousHandling = _handling;
+        _handling = delivery;
 
-    internal Task FailIncomingCapabilityRequestAsync(CapabilityTurn turn)
-        => _capabilities.FailIncomingRequestAsync(turn);
+        // Re-enter the verified principal that rode the delivery so grants, graph
+        // partition, and stamps apply on the receiving turn.
+        using var principalScope = VerifiedActor.Enter(
+            delivery.Principal is { } principal
+                ? new ActorContext(principal, "_delivery")
+                : null);
 
-    internal Task DispatchSynapseAsync(Synapse synapse, CancellationToken cancellationToken)
-        => SynapseDispatch.HandlersFor(GetType()).TryGetValue(synapse.GetType(), out var handler)
+        try
+        {
+            await DispatchSynapseAsync(delivery.Synapse, cancellationToken)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+            _journal.AppendIncoming(delivery);
+            await WriteStateAsync(cancellationToken).ConfigureAwait(true);
+            await _journal.NotifyWatchersAsync()
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
+        catch (Exception failure)
+        {
+            handling?.SetStatus(ActivityStatusCode.Error, failure.Message);
+            throw;
+        }
+        finally
+        {
+            _handling = previousHandling;
+        }
+    }
+
+    private Task DeliverToAsync(NeuronId receiver, SynapseDelivery delivery)
+        => receiver == Id
+            // A grain call to self would deadlock the serialized turn; dispatch in place.
+            ? DispatchDeliveryAsync(delivery, CancellationToken.None)
+            : GrainFactory.GetGrain<INeuron>(receiver.ToGrainId()).Deliver(delivery);
+
+    private async Task DeliverReplyAsync(NeuronId receiver, SynapseDelivery delivery)
+    {
+        try
+        {
+            await GrainFactory.GetGrain<INeuron>(receiver.ToGrainId())
+                .Deliver(delivery)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
+        catch (Exception undelivered)
+        {
+            SynapseTelemetry.ReplyDropped(Id, receiver, undelivered);
+        }
+    }
+
+    private Task DispatchSynapseAsync(Synapse synapse, CancellationToken cancellationToken)
+        => HandlersFor(GetType()).TryGetValue(synapse.GetType(), out var handler)
             ? handler(this, synapse, cancellationToken)
             : OnUnboundSynapseAsync(synapse, cancellationToken);
 
-    internal ValueTask WriteNeuronStateAsync(CancellationToken cancellationToken)
-        => WriteStateAsync(cancellationToken);
+    private static IReadOnlyDictionary<Type, HandlerInvoker> HandlersFor(Type neuronType)
+        => HandlersByNeuronType.GetOrAdd(neuronType, static type => BuildHandlers(type));
 
-    internal IGrainTimer RegisterNeuronTimer(
-        Func<CancellationToken, Task> callback,
-        TimeSpan dueTime,
-        TimeSpan period)
-        => this.RegisterGrainTimer(callback, dueTime, period);
-
-    internal readonly struct ClientEntryCorrelationScope : IDisposable
+    private static Dictionary<Type, HandlerInvoker> BuildHandlers(Type neuronType)
     {
-        private readonly Neuron _neuron;
-        private readonly CorrelationId? _previous;
+        var handlers = new Dictionary<Type, HandlerInvoker>();
 
-        public ClientEntryCorrelationScope(Neuron neuron, CorrelationId? previous)
+        foreach (var handled in neuronType.GetInterfaces()
+            .Where(candidate => candidate.IsGenericType && candidate.GetGenericTypeDefinition() == typeof(IHandle<>)))
         {
-            _neuron = neuron;
-            _previous = previous;
+            var synapseType = handled.GetGenericArguments()[0];
+            var handleMethod = handled.GetMethod(nameof(IHandle<>.HandleAsync))
+                ?? throw new MissingMethodException(handled.FullName, nameof(IHandle<>.HandleAsync));
+
+            handlers[synapseType] = (neuron, synapse, cancellationToken) => (Task)handleMethod.Invoke(
+                neuron,
+                BindingFlags.DoNotWrapExceptions,
+                binder: null,
+                [synapse, cancellationToken],
+                culture: null)!;
         }
 
-        public void Dispose() => _neuron._streams.RestoreClientCorrelation(_previous);
+        return handlers;
     }
 
-    internal readonly record struct CapabilityTurn(
-        int CommittedOutbox,
-        NeuronFeedCheckpoint Outgoing,
-        IReadOnlyList<Action> PreviousRollbacks,
-        SynapseDelivery? PreviousHandling,
-        int PreviousDepth,
-        TurnCheckpoint? PreviousCheckpoint);
-
-    internal readonly record struct TurnCheckpoint(
-        int CommittedOutbox,
-        bool InboundCommitted,
-        NeuronFeedCheckpoint Incoming,
-        NeuronFeedCheckpoint Outgoing);
 }

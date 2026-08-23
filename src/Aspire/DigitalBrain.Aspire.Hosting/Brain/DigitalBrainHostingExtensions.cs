@@ -5,73 +5,44 @@ namespace DigitalBrain.Aspire.Hosting;
 
 public static class DigitalBrainHostingExtensions
 {
-    public static string JournalConnectionName => DigitalBrainNames.JournalConnection;
-
-    public static string StateProtectionKeyConfigurationKey => DigitalBrainNames.StateProtectionKey;
+    public static string DurableStateConnectionName => DigitalBrainNames.JournalConnection;
 
     public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
+        var resource = builder.AddResource(new DigitalBrainResource(name))
+            .ExcludeFromManifest()
+            .WithInitialState(new CustomResourceSnapshot
+            {
+                ResourceType = "DigitalBrain",
+                CreationTimeStamp = DateTime.UtcNow,
+                State = KnownResourceStates.Running,
+                Properties = [new(CustomResourceKnownProperties.Source, "DigitalBrain fabric")],
+            });
         var storage = builder
             .AddAzureStorage(DigitalBrainNames.Storage)
             .RunAsEmulator(static emulator => emulator
                 .WithDataVolume()
-                .WithLifetime(ContainerLifetime.Persistent));
+                .WithLifetime(ContainerLifetime.Persistent))
+            .WithParentRelationship(resource);
         var clustering = storage.AddTables(DigitalBrainNames.Clustering);
         var reminders = storage.AddTables(DigitalBrainNames.Reminders);
-        var journal = storage.AddBlobs(DigitalBrainNames.Journal);
-        var streams = storage.AddQueues(DigitalBrainNames.Streams);
-        var pubSub = storage.AddTables(DigitalBrainNames.PubSub);
+        var durableStateStore = storage.AddBlobs(DigitalBrainNames.Journal);
+        var grainState = storage.AddBlobs(DigitalBrainNames.GrainState);
         var orleans = builder
             .AddOrleans(name)
             .WithClustering(clustering)
             .WithReminders(reminders)
-            .WithGrainStorage(DigitalBrainNames.PubSubStore, pubSub)
-            .WithStreaming(DigitalBrainNames.StreamProvider, streams);
-        var brain = new DigitalBrainBuilder(builder, name, orleans, journal, streams, pubSub);
+            .WithGrainStorage(DigitalBrainNames.DefaultGrainStorage, grainState);
+        var brain = new DigitalBrainBuilder(builder, name, resource, orleans, durableStateStore, grainState);
 
-        // Silo and clients WaitUntilHealthy for the full fabric before starting.
         brain.RequireHealthyBeforeStart(storage.Resource);
         brain.RequireHealthyBeforeStart(clustering.Resource);
         brain.RequireHealthyBeforeStart(reminders.Resource);
-        brain.RequireHealthyBeforeStart(journal.Resource);
-        brain.RequireHealthyBeforeStart(streams.Resource);
-        brain.RequireHealthyBeforeStart(pubSub.Resource);
-        return brain;
-    }
-
-    public static DigitalBrainBuilder WithOwner(this DigitalBrainBuilder brain, string owner)
-    {
-        ArgumentNullException.ThrowIfNull(brain);
-        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
-        brain.UseOwner(owner);
-        return brain;
-    }
-
-    public static DigitalBrainBuilder WithLocalDevelopmentOAuthCallback(
-        this DigitalBrainBuilder brain,
-        Uri callbackUri)
-    {
-        ArgumentNullException.ThrowIfNull(brain);
-        ArgumentNullException.ThrowIfNull(callbackUri);
-        if (!callbackUri.IsAbsoluteUri)
-        {
-            throw new ArgumentException(
-                "The local-development OAuth callback must be an absolute URI.",
-                nameof(callbackUri));
-        }
-
-        if (!OAuthCallbackPaths.EndsWithCanonicalCallback(callbackUri))
-        {
-            throw new ArgumentException(
-                $"The local-development OAuth callback must end with '{OAuthCallbackPaths.RelativePath}' "
-                + $"(the path the kernel serves). Received '{callbackUri}'.",
-                nameof(callbackUri));
-        }
-
-        brain.UseLocalDevelopmentOAuthCallback(callbackUri.AbsoluteUri);
+        brain.RequireHealthyBeforeStart(durableStateStore.Resource);
+        brain.RequireHealthyBeforeStart(grainState.Resource);
         return brain;
     }
 
@@ -84,8 +55,30 @@ public static class DigitalBrainHostingExtensions
     {
         ArgumentNullException.ThrowIfNull(brain);
         ArgumentNullException.ThrowIfNull(configure);
+        brain.AddModule(typeof(TModule));
         configure(new DigitalBrainModuleBuilder<TModule>(brain));
         return brain;
+    }
+
+    public static DigitalBrainBuilder WithDigitalBrainFakes(this DigitalBrainBuilder brain)
+    {
+        ArgumentNullException.ThrowIfNull(brain);
+
+        var state = brain.GetOrAddState(static _ => new FakesHostingState(), out var added);
+        if (added)
+        {
+            brain.AddProjection(state);
+        }
+
+        state.Enable();
+        return brain;
+    }
+
+    public static IResourceBuilder<T> WithDigitalBrainFakes<T>(this IResourceBuilder<T> builder)
+        where T : IResourceWithEnvironment
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        return builder.WithEnvironment("DigitalBrain__Fakes__Enabled", "true");
     }
 
     public static IResourceBuilder<TResource> WithReference<TResource>(this IResourceBuilder<TResource> builder, DigitalBrainBuilder brain)
@@ -95,19 +88,18 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(brain);
 
         builder.WithReference(brain.Orleans);
-        builder.WithReference(brain.Journal, DigitalBrainNames.JournalConnection);
-        builder.WithReference(brain.Streams);
-        builder.WithReference(brain.PubSub);
+        builder.WithReference(brain.DurableStateStore, DigitalBrainNames.JournalConnection);
+        builder.WithReference(brain.GrainState, DigitalBrainNames.GrainState);
 
-        ApplyOwner(builder, brain);
-        WaitUntilHealthy(builder, brain.StartupDependencies);
-
-        if (brain.StateProtectionKey is not null)
+        for (var index = 0; index < brain.Modules.Count; index++)
         {
+            var module = brain.Modules[index];
             builder.WithEnvironment(
-                ConfigurationEnvironment(DigitalBrainNames.StateProtectionKey),
-                brain.StateProtectionKey);
+                $"DigitalBrain__Modules__{index}",
+                $"{module.FullName}, {module.Assembly.GetName().Name}");
         }
+
+        WaitUntilHealthy(builder, brain.StartupDependencies);
 
         foreach (var projection in brain.Projections)
         {
@@ -117,16 +109,13 @@ public static class DigitalBrainHostingExtensions
         return builder;
     }
 
-    public static IResourceBuilder<TResource> WithReference<TResource>(this IResourceBuilder<TResource> builder, ClientDigitalBrainReference client)
+    public static IResourceBuilder<TResource> WithReference<TResource>(this IResourceBuilder<TResource> builder, DigitalBrainClientReference client)
         where TResource : IResourceWithEnvironment, IResourceWithEndpoints
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(client);
 
         builder.WithReference(client.Brain.Orleans.AsClient());
-        builder.WithReference(client.Brain.Streams);
-        ApplyOwner(builder, client.Brain);
-        // Client processes need clustering tables + streams up before connecting.
         WaitUntilHealthy(builder, client.Brain.StartupDependencies);
         return builder;
     }
@@ -142,33 +131,21 @@ public static class DigitalBrainHostingExtensions
         }
     }
 
-    public static IResourceBuilder<TResource> WithStateProtectionKey<TResource>(
-        this IResourceBuilder<TResource> builder,
-        DigitalBrainBuilder brain)
-        where TResource : IResourceWithEnvironment
+    private sealed class FakesHostingState : DigitalBrainModuleProjection
     {
-        ArgumentNullException.ThrowIfNull(builder);
-        ArgumentNullException.ThrowIfNull(brain);
+        private bool _enabled;
 
-        brain.RequireStateProtection();
-        if (brain.StateProtectionKey is not null)
+        internal void Enable() => _enabled = true;
+
+        public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {
-            builder.WithEnvironment(
-                ConfigurationEnvironment(DigitalBrainNames.StateProtectionKey),
-                brain.StateProtectionKey);
+            ArgumentNullException.ThrowIfNull(builder);
+            if (!_enabled)
+            {
+                return;
+            }
+
+            builder.WithEnvironment("DigitalBrain__Fakes__Enabled", "true");
         }
-
-        return builder;
     }
-
-    private static void ApplyOwner<TResource>(IResourceBuilder<TResource> builder, DigitalBrainBuilder brain)
-        where TResource : IResourceWithEnvironment
-    {
-        builder.WithEnvironment(
-            ConfigurationEnvironment(DigitalBrainNames.Owner),
-            brain.Owner);
-    }
-
-    private static string ConfigurationEnvironment(string configurationKey)
-        => configurationKey.Replace(":", "__", StringComparison.Ordinal);
 }

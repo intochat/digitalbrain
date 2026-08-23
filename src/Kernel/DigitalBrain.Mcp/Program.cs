@@ -7,12 +7,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddDigitalBrainClient();
 builder.Services
     .AddMcpServer()
-    .WithHttpTransport(static options => options.Stateless = true)
+    .WithHttpTransport(options => options.Stateless = true)
     .WithTools<ChatTools>()
-    .WithTools<IntrospectionTools>()
-    .WithTools<RegistryTools>()
-    .WithTools<TimeTools>()
-    .WithTools<LibraryBehaviorTools>();
+    .WithTools<SmartPromptTools>();
 
 var app = builder.Build();
 app.MapDefaultEndpoints();

@@ -3,6 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;
 
+using DigitalBrain.Abstractions.Journals;
+using DigitalBrain.Abstractions.Messaging;
 namespace DigitalBrain.Core;
 
 internal sealed class NeuronFeed

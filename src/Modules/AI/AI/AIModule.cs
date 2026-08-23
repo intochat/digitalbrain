@@ -1,8 +1,4 @@
-using DigitalBrain.AI.Ollama;
-using DigitalBrain.Modules.Sdk;
-using Microsoft.Extensions.AI;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
+using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.AI;
 
@@ -12,14 +8,19 @@ public sealed class AIModule : Core.IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        DurablePayloadProtectionHosting.Configure(builder.Services, builder.Configuration);
-        AIClients.Add(builder.Services);
-        VoiceToTextHosting.Add(builder.Services, builder.Configuration);
+        if (string.Equals(
+                builder.Configuration[DigitalBrainNames.Mode],
+                DigitalBrainNames.TestingMode,
+                StringComparison.Ordinal))
+        {
+            AITestingClients.Add(builder.Services);
+        }
+        else
+        {
+            AIClients.Add(builder.Services);
+            AIClients.AddImageGeneration(builder.Services, builder.Configuration);
+        }
 
-        // The unkeyed IChatClient IS the main model. Every other model use is an
-        // explicit keyed choice (ask_llama, convene_model_team).
-        builder.Services.TryAddSingleton(static services =>
-            services.GetRequiredKeyedService<IChatClient>(typeof(Gemma4)));
+        VoiceToTextHosting.Add(builder.Services, builder.Configuration);
     }
 }
-

@@ -3,6 +3,12 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Journals;
+using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Entities;
+using DigitalBrain.Abstractions.Brain;
 namespace DigitalBrain.Client;
 
 public sealed class DigitalBrainClient : IDigitalBrain
@@ -31,7 +37,7 @@ public sealed class DigitalBrainClient : IDigitalBrain
     public Task ActivateAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Brain().Activate();
+        return Session().Activate();
     }
 
     public NeuronReference<TNeuron> Get<TNeuron>(string name = "default")
@@ -52,6 +58,15 @@ public sealed class DigitalBrainClient : IDigitalBrain
         return _grains.GetGrain<TNeuron>(NeuronId.For<TNeuron>(Owner, name).ToGrainId());
     }
 
+    public TEntity GetEntity<TEntity>(string name = "default")
+        where TEntity : class, IEntity
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        RequireDomainEntityContract(typeof(TEntity));
+
+        return _grains.GetGrain<TEntity>(EntityId.For<TEntity>(Owner, name).ToGrainId());
+    }
+
     public Task FireAsync<TNeuron>(string name, Synapse synapse, CancellationToken cancellationToken = default)
         where TNeuron : INeuron
     {
@@ -60,36 +75,6 @@ public sealed class DigitalBrainClient : IDigitalBrain
         ArgumentNullException.ThrowIfNull(synapse);
         cancellationToken.ThrowIfCancellationRequested();
         return Get<TNeuron>(name).FireAsync(synapse, cancellationToken);
-    }
-
-    public async Task FireAsync(NeuronId receiver, Synapse synapse, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(synapse);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        if (receiver.Owner != Owner)
-        {
-            throw new NeuronAuthorizationException(
-                $"Client owner '{Owner}' cannot send to neuron '{receiver}' owned by '{receiver.Owner}'.");
-        }
-
-        if (string.Equals(receiver.Type, ISessionNeuron.GrainTypeName, StringComparison.Ordinal)
-            || string.Equals(receiver.Type, IDigitalBrainNeuron.GrainTypeName, StringComparison.Ordinal))
-        {
-            throw new NeuronAuthorizationException(
-                "The owner DigitalBrain and session are not Fire targets. Use ActivateAsync, domain Get, FireAsync to a named neuron, and FireAsync without a receiver to broadcast.");
-        }
-
-        await SendToAsync(receiver, synapse, cancellationToken).ConfigureAwait(false);
-    }
-
-    public async Task FireAsync(Synapse synapse, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(synapse);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        await ActivateAsync(cancellationToken).ConfigureAwait(false);
-        await Session().Emit(synapse).ConfigureAwait(false);
     }
 
     public Task<JournalRead> ReadJournalAsync(
@@ -216,9 +201,6 @@ public sealed class DigitalBrainClient : IDigitalBrain
         }
     }
 
-    private IDigitalBrainNeuron Brain()
-        => _grains.GetGrain<IDigitalBrainNeuron>(IDigitalBrainNeuron.ForOwner(Owner).ToGrainId());
-
     private ISessionNeuron Session()
         => _grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(Owner).ToGrainId());
 
@@ -263,16 +245,11 @@ public sealed class DigitalBrainClient : IDigitalBrain
         }
     }
 
-    // A settled refusal never produces the awaited reply, so without this the caller waits
-    // out its own token on a request the kernel has already declined.
+    // An unrouted emission never produces the awaited reply, so without this the caller
+    // waits out its own token on a request nothing was connected to receive. (Settled
+    // refusals throw out of Session().Fire directly.)
     private static void RequireNoRefusal(Synapse candidate, CorrelationId correlation)
     {
-        if (candidate is RouteOutcome outcome && outcome.Correlation == correlation)
-        {
-            throw new NeuronAuthorizationException(
-                $"{outcome.Kind} by {outcome.Receiver}: {outcome.Reason}");
-        }
-
         if (candidate is Unrouted unrouted && unrouted.Correlation == correlation)
         {
             throw new NeuronAuthorizationException(
@@ -367,11 +344,19 @@ public sealed class DigitalBrainClient : IDigitalBrain
     private static void RequireDomainNeuronContract(Type neuronType)
     {
         if (neuronType == typeof(INeuron)
-            || typeof(ISessionNeuron).IsAssignableFrom(neuronType)
-            || typeof(IDigitalBrainNeuron).IsAssignableFrom(neuronType))
+            || typeof(ISessionNeuron).IsAssignableFrom(neuronType))
         {
             throw new NeuronAuthorizationException(
                 $"'{neuronType.Name}' is not addressable through IDigitalBrain.Get. Activate the brain with ActivateAsync; address domain neuron contracts with Get; fire synapses through FireAsync; observe journals through ReadJournalAsync and WatchJournalAsync.");
+        }
+    }
+
+    private static void RequireDomainEntityContract(Type entityType)
+    {
+        if (entityType == typeof(IEntity))
+        {
+            throw new NeuronAuthorizationException(
+                $"'{entityType.Name}' is not addressable through IDigitalBrain.GetEntity. Address a concrete entity contract with GetEntity.");
         }
     }
 }

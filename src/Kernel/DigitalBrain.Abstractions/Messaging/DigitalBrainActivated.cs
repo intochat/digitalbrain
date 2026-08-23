@@ -1,3 +1,4 @@
+using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.Abstractions.Messaging;
 
 [GenerateSerializer]

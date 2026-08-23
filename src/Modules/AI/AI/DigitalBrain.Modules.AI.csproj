@@ -1,17 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>AI module: typed LLM neurons and direct Concurrent/GroupChat MAF orchestration outside the kernel.</Description>
+    <Description>AI module: multi-provider LLM and embedding clients, agents, and voice transcription.</Description>
     <RootNamespace>DigitalBrain.AI</RootNamespace>
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812</NoWarn>
     <!-- Kernel host builds this library with -r win-x64 for Foundry natives. -->
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Agents.AI.Workflows" />
     <PackageReference Include="Microsoft.Extensions.AI" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
-    <PackageReference Include="Microsoft.Orleans.Journaling" />
+    <PackageReference Include="Anthropic" />
     <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
     <PackageReference Include="OllamaSharp" />
     <!-- Private so Foundry native RID does not force AppHost/Aspire.Hosting to win-x64. -->
@@ -24,7 +23,6 @@
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
-    <ProjectReference Include="../../../Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
     <ProjectReference Include="../../Memory/Contracts/DigitalBrain.Modules.Memory.Contracts.csproj" />
   </ItemGroup>
 </Project>

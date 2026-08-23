@@ -22,6 +22,9 @@ node_modules/
 .config/codegraph-tool/
 .config/context7-tool/
 
+# Repo-local Playwright browser cache (UiEvidenceTests sets PLAYWRIGHT_BROWSERS_PATH here)
+.playwright/
+
 # Dart / Flutter clients
 **/.dart_tool/
 **/packages/pubspec_overrides.yaml
@@ -36,3 +39,4 @@ plans/stage1/logs/
 # local runtime logs
 apphost.out.log
 apphost.err.log
+*.log

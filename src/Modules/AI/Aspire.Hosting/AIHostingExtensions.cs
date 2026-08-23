@@ -1,8 +1,6 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
-using Aspire.Hosting.OpenAI;
-using DigitalBrain.AI.Ollama;
-using DigitalBrain.AI.OpenAI;
+using DigitalBrain.AI.FoundryLocal;
 using DigitalBrain.Aspire.Hosting;
 
 namespace DigitalBrain.AI.Aspire.Hosting;
@@ -11,12 +9,6 @@ public static class AIHostingExtensions
 {
     private const string EnableSensitiveDataEnvironmentKey =
         "DigitalBrain__AI__Telemetry__EnableSensitiveData";
-
-    public const string Llama32Feature = "ai.llm.llama32";
-    public const string Gemma4Feature = "ai.llm.gemma4";
-    public const string Qwen35Feature = "ai.llm.qwen35";
-    public const string Granite41Feature = "ai.llm.granite41";
-    public const string Gpt56Feature = "ai.llm.gpt56";
 
     extension(DigitalBrainModuleBuilder<AIModule> module)
     {
@@ -28,13 +20,38 @@ public static class AIHostingExtensions
     }
 
     public static DigitalBrainModuleBuilder<AIModule> WithLlm<TModel>(this DigitalBrainModuleBuilder<AIModule> module)
-        where TModel : class, ILLM
+        where TModel : ILLM
     {
-        State(module).Add<TModel>();
+        ArgumentNullException.ThrowIfNull(module);
+        State(module).AddLlm(typeof(TModel));
         return module;
     }
 
-    // Local Whisper STT (Foundry Local). Marker types: IWhisperTiny / IWhisperSmall / IWhisperLargeV3Turbo.
+    public static DigitalBrainModuleBuilder<AIModule> WithEmbedding<TModel>(this DigitalBrainModuleBuilder<AIModule> module)
+        where TModel : IEmbedding
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        State(module).AddEmbedding(typeof(TModel));
+        return module;
+    }
+
+    public static DigitalBrainModuleBuilder<AIModule> WithDefaultLlm<TModel>(this DigitalBrainModuleBuilder<AIModule> module)
+        where TModel : ILLM
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        State(module).SetDefaultLlm(typeof(TModel));
+        return module;
+    }
+
+    public static DigitalBrainModuleBuilder<AIModule> WithDefaultEmbedding<TModel>(this DigitalBrainModuleBuilder<AIModule> module)
+        where TModel : IEmbedding
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        State(module).SetDefaultEmbedding(typeof(TModel));
+        return module;
+    }
+
+    // Local Whisper STT (Foundry Local). Marker types live in DigitalBrain.AI.FoundryLocal.
     public static DigitalBrainModuleBuilder<AIModule> WithVoiceToText<TModel>(
         this DigitalBrainModuleBuilder<AIModule> module)
         where TModel : class
@@ -62,7 +79,6 @@ public static class AIHostingExtensions
         var state = module.Brain.GetOrAddState(static brain => new AIHostingState(brain), out var added);
         if (added)
         {
-            module.RequireStateProtection();
             module.AddProjection(state);
         }
 
@@ -73,48 +89,43 @@ public static class AIHostingExtensions
     {
         private const string OllamaImageTag = "latest";
 
-        private static readonly Dictionary<Type, (string ResourceName, string Tag, string Feature)> OllamaModelCatalog = new()
-        {
-            [typeof(Llama32)] = ("llama32-3b", "llama3.2", Llama32Feature),
-            [typeof(Gemma4)] = ("gemma4-12b", "gemma4:12b", Gemma4Feature),
-            [typeof(Qwen35)] = ("qwen35-9b", "qwen3.5:9b", Qwen35Feature),
-            [typeof(Granite41)] = ("granite41-8b", "granite4.1:8b", Granite41Feature),
-        };
-
-        private readonly HashSet<Type> _models = [];
+        private readonly HashSet<Type> _markers = [];
         private readonly Dictionary<Type, IResourceBuilder<OllamaModelResource>> _ollamaModels = [];
+        private readonly Dictionary<LlmProvider, IResourceBuilder<ParameterResource>> _providerApiKeys = [];
         private IResourceBuilder<OllamaResource>? _ollama;
-        private IResourceBuilder<OpenAIResource>? _openAI;
-        private IResourceBuilder<OpenAIModelResource>? _gpt56;
-        private IResourceBuilder<ParameterResource>? _openAIKey;
+        private Type? _defaultLlmMarker;
+        private Type? _defaultEmbeddingMarker;
 
         internal bool EnableSensitiveData { get; set; }
 
-        internal string Add<TModel>()
-            where TModel : class, ILLM
+        internal void AddLlm(Type marker)
         {
-            var model = typeof(TModel);
+            var model = LLMModel.FindByMarker(marker)
+                ?? throw new NotSupportedException(
+                    $"{marker.FullName} is not a known LLM model marker. Add it to LLMModel.All first.");
 
-            if (!_models.Add(model))
-            {
-                throw new InvalidOperationException(
-                    $"{model.FullName} is already configured on brain '{brain.Name}'. Add each model exactly once.");
-            }
+            AddModel(marker, model.Provider, model.Id);
+        }
 
-            if (OllamaModelCatalog.TryGetValue(model, out var ollama))
-            {
-                AddOllamaModel(model, ollama.ResourceName, ollama.Tag);
-                return ollama.Feature;
-            }
+        internal void AddEmbedding(Type marker)
+        {
+            var model = EmbeddingModel.FindByMarker(marker)
+                ?? throw new NotSupportedException(
+                    $"{marker.FullName} is not a known embedding model marker. Add it to EmbeddingModel.All first.");
 
-            if (model == typeof(Gpt56))
-            {
-                AddGpt56();
-                return Gpt56Feature;
-            }
+            AddModel(marker, model.Provider, model.Id);
+        }
 
-            throw new NotSupportedException(
-                $"{model.FullName} has no Aspire integration. The AI module must own the provider resource for every concrete LLM.");
+        internal void SetDefaultLlm(Type marker)
+        {
+            RequireAdded(marker);
+            _defaultLlmMarker = marker;
+        }
+
+        internal void SetDefaultEmbedding(Type marker)
+        {
+            RequireAdded(marker);
+            _defaultEmbeddingMarker = marker;
         }
 
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
@@ -125,53 +136,85 @@ public static class AIHostingExtensions
                 EnableSensitiveDataEnvironmentKey,
                 EnableSensitiveData.ToString());
 
-            foreach (var (model, resource) in _ollamaModels)
+            foreach (var (marker, resource) in _ollamaModels)
             {
                 builder
                     .WithAnnotation(new WaitAnnotation(resource.Resource, WaitType.WaitUntilHealthy, exitCode: 0))
                     .WithEnvironment("DigitalBrain__AI__Ollama__Endpoint", resource.Resource.Parent.UriExpression)
-                    .WithEnvironment($"DigitalBrain__AI__Ollama__{model.Name}__Model", resource.Resource.ModelName);
+                    .WithEnvironment($"DigitalBrain__AI__Ollama__{marker.Name}__Model", resource.Resource.ModelName);
             }
 
-            if (_gpt56 is not null)
+            foreach (var (provider, apiKey) in _providerApiKeys)
             {
-                builder
-                    .WithEnvironment("DigitalBrain__AI__OpenAI__ApiKey", _openAIKey!)
-                    .WithEnvironment("DigitalBrain__AI__OpenAI__Endpoint", _gpt56.Resource.Parent.UriExpression)
-                    .WithEnvironment("DigitalBrain__AI__OpenAI__Gpt56__Model", _gpt56.Resource.Model);
+                builder.WithEnvironment($"DigitalBrain__AI__{provider}__ApiKey", apiKey);
+            }
+
+            if (_defaultLlmMarker is { } llmMarker)
+            {
+                builder.WithEnvironment("DigitalBrain__AI__Default__Model", llmMarker.Name);
+            }
+
+            if (_defaultEmbeddingMarker is { } embeddingMarker)
+            {
+                builder.WithEnvironment("DigitalBrain__AI__Default__Embedding", embeddingMarker.Name);
             }
         }
 
-        private void AddOllamaModel(Type model, string resourceName, string tag)
+        private void AddModel(Type marker, LlmProvider provider, string id)
         {
-            var builder = brain.ApplicationBuilder;
-            _ollama ??= builder
+            if (!_markers.Add(marker))
+            {
+                throw new InvalidOperationException(
+                    $"{marker.FullName} is already configured on brain '{brain.Name}'. Add each model exactly once.");
+            }
+
+            if (provider == LlmProvider.Ollama)
+            {
+                _ollamaModels[marker] = EnsureOllama().AddModel(OllamaResourceName(id), id);
+            }
+            else
+            {
+                EnsureProviderApiKey(provider);
+            }
+        }
+
+        private void RequireAdded(Type marker)
+        {
+            if (!_markers.Contains(marker))
+            {
+                throw new InvalidOperationException(
+                    $"{marker.Name} must be added with WithLlm/WithEmbedding before it can become the default.");
+            }
+        }
+
+        private void EnsureProviderApiKey(LlmProvider provider)
+        {
+            if (_providerApiKeys.ContainsKey(provider))
+            {
+                return;
+            }
+
+            // Empty default keeps boot and test hosts unblocked; real values come
+            // from user secrets in dev and Key Vault-injected parameters in prod.
+            _providerApiKeys[provider] = brain.ApplicationBuilder.AddParameter(
+                $"{provider.ToString().ToLowerInvariant()}-api-key",
+                string.Empty,
+                publishValueAsDefault: false,
+                secret: true);
+        }
+
+        private static string OllamaResourceName(string id)
+            => id.ToLowerInvariant().Replace(':', '-').Replace('.', '-').Replace('/', '-');
+
+        private IResourceBuilder<OllamaResource> EnsureOllama()
+            => _ollama ??= brain.ApplicationBuilder
                 .AddOllama("ollama")
                 .WithImageTag(OllamaImageTag)
                 .WithGPUSupport()
                 .WithDataVolume()
                 .WithLifetime(ContainerLifetime.Persistent)
                 .WithEnvironment("OLLAMA_KEEP_ALIVE", "-1")
-                .WithOpenWebUI(
-                    uiContainer => uiContainer.WithLifetime(ContainerLifetime.Persistent),
-                    containerName: "openwebui");
-
-            _ollamaModels[model] = _ollama.AddModel(resourceName, tag);
-        }
-
-        private void AddGpt56()
-        {
-            var builder = brain.ApplicationBuilder;
-            _openAIKey ??= builder
-                .AddParameter("openai-api-key", secret: true)
-                .WithDescription(
-                    "Create or manage an API key at [OpenAI Platform](https://platform.openai.com/api-keys).",
-                    enableMarkdown: true);
-            _openAI ??= builder
-                .AddOpenAI("openai")
-                .WithApiKey(_openAIKey);
-            _gpt56 = _openAI.AddModel("gpt56", "gpt-5.6");
-        }
+                .WithParentRelationship(brain.Resource);
     }
 
     private sealed class VoiceToTextHostingState(DigitalBrainBuilder brain) : DigitalBrainModuleProjection

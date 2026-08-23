@@ -1,9 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <IsPackable>true</IsPackable>
-    <Description>CoreV2 AI assistant contracts.</Description>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="../../../Brain.Abstractions/Brain.Abstractions.csproj" />
-  </ItemGroup>
-</Project>

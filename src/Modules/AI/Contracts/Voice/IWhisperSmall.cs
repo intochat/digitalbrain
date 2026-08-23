@@ -1,3 +1,3 @@
-namespace DigitalBrain.AI;
+namespace DigitalBrain.AI.FoundryLocal;
 
 public interface IWhisperSmall;

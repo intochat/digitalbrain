@@ -1,6 +1,11 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Journals;
+using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Entities;
 namespace DigitalBrain.Client;
 
 public interface IDigitalBrain
@@ -12,16 +17,15 @@ public interface IDigitalBrain
     NeuronReference<TNeuron> Get<TNeuron>(string name = "default")
         where TNeuron : INeuron;
 
+    TEntity GetEntity<TEntity>(string name = "default")
+        where TEntity : class, IEntity;
+
     [EditorBrowsable(EditorBrowsableState.Never)]
     TNeuron GetGrainProxy<TNeuron>(string name = "default")
         where TNeuron : class, INeuron;
 
     Task FireAsync<TNeuron>(string name, Synapse synapse, CancellationToken cancellationToken = default)
         where TNeuron : INeuron;
-
-    Task FireAsync(NeuronId receiver, Synapse synapse, CancellationToken cancellationToken = default);
-
-    Task FireAsync(Synapse synapse, CancellationToken cancellationToken = default);
 
     Task<JournalRead> ReadJournalAsync(
         NeuronId subject,

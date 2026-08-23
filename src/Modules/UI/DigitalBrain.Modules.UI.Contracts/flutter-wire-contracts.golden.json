@@ -44,13 +44,6 @@
       "methods": []
     },
     {
-      "name": "IButton",
-      "kind": "interface",
-      "alias": "ui.button",
-      "properties": [],
-      "methods": []
-    },
-    {
       "name": "ButtonClicked",
       "kind": "record",
       "alias": "ui.button-clicked",
@@ -58,6 +51,50 @@
         { "name": "OfferCommandId", "type": "CommandId" },
         { "name": "ButtonId", "type": "String" },
         { "name": "Action", "type": "String" }
+      ],
+      "methods": []
+    },
+    {
+      "name": "KitCardOffer",
+      "kind": "record",
+      "alias": "ui.kit-card",
+      "properties": [
+        { "name": "Kind", "type": "String" },
+        { "name": "Name", "type": "String" },
+        { "name": "Caption", "type": "String" }
+      ],
+      "methods": []
+    },
+    {
+      "name": "ChartState",
+      "kind": "record",
+      "alias": "ui.chart-state",
+      "properties": [
+        { "name": "Title", "type": "String" },
+        { "name": "ChartKind", "type": "String" },
+        { "name": "Points", "type": "IReadOnlyList<ChartPoint>" }
+      ],
+      "methods": []
+    },
+    {
+      "name": "ChartPoint",
+      "kind": "record",
+      "alias": "ui.chart-point",
+      "properties": [
+        { "name": "Label", "type": "String" },
+        { "name": "Value", "type": "Double" }
+      ],
+      "methods": []
+    },
+    {
+      "name": "ImageState",
+      "kind": "record",
+      "alias": "ui.image-state",
+      "properties": [
+        { "name": "Prompt", "type": "String" },
+        { "name": "Model", "type": "String" },
+        { "name": "MediaType", "type": "String" },
+        { "name": "BlobName", "type": "String" }
       ],
       "methods": []
     }

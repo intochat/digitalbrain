@@ -9,7 +9,7 @@
 #   docker compose build
 #
 # Secrets: never commit real values. Prefer env file or Key Vault-injected env
-# (see headers in srcv2/Kernel/DigitalBrain.Kernel/Dockerfile).
+# (see headers in src/Kernel/DigitalBrain.Kernel/Dockerfile).
 # Kernel HTTP serves chat streams + OAuth on 8080 (map host 5080 for stable OAuth if needed).
 
 services:
@@ -34,7 +34,7 @@ services:
     image: digitalbrain:local
     build:
       context: .
-      dockerfile: srcv2/Kernel/DigitalBrain.Kernel/Dockerfile
+      dockerfile: src/Kernel/DigitalBrain.Kernel/Dockerfile
     ports:
       - "8080:8080"
       - "5080:8080"
@@ -50,10 +50,10 @@ services:
       # DigitalBrain__AI__Ollama__Endpoint: http://host.docker.internal:11434
       # DigitalBrain__AI__OpenAI__ApiKey:
       # DigitalBrain__AI__OpenAI__Endpoint:
-      # DigitalBrain__Security__StateProtectionKey:   # required for durable payload protection
       ConnectionStrings__clustering: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;TableEndpoint=http://azurite:10002/devstoreaccount1;"
       ConnectionStrings__reminders: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;TableEndpoint=http://azurite:10002/devstoreaccount1;"
       ConnectionStrings__journal: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
+      ConnectionStrings__grainstate: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
       DigitalBrain__Memory__Provider: Qdrant
       DigitalBrain__Memory__Qdrant__ConnectionName: memory-qdrant
       # Point at external Qdrant (host or uncommented qdrant service):

@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions;
 
+using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.Kernel;
 
 // Host-side alias for PrincipalPartition — chat/surface map authenticated principals here.

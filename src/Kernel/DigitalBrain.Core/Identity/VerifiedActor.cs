@@ -1,11 +1,12 @@
 using DigitalBrain.Abstractions;
 using Orleans.Runtime;
 
+using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.Core;
 
 // Ambient verified principal for the current authenticated turn. Uses Orleans
 // RequestContext so it propagates Chat → Agent grain calls (AsyncLocal does not).
-// Chat.SendStreaming enters with SendMessage.Actor; SystemTools.fire stamps it.
+// Chat.SendStreaming enters with SendMessage.Actor and propagates it over grain calls.
 public static class VerifiedActor
 {
     private const string PrincipalKey = "db.verified-actor.principal";

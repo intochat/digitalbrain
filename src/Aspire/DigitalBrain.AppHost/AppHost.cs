@@ -1,45 +1,68 @@
 using DigitalBrain.AI;
+using DigitalBrain.AI.Anthropic;
 using DigitalBrain.AI.Aspire.Hosting;
+using DigitalBrain.AI.FoundryLocal;
+using DigitalBrain.AI.Google;
 using DigitalBrain.AI.Ollama;
+using DigitalBrain.AI.OpenAI;
+using DigitalBrain.AI.XAI;
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Google;
-using DigitalBrain.Google.Aspire.Hosting;
+using DigitalBrain.Execution;
+using DigitalBrain.Integrations;
 using DigitalBrain.Memory;
 using DigitalBrain.Memory.Aspire.Hosting;
-using DigitalBrain.Salesforce;
-using DigitalBrain.Salesforce.Aspire.Hosting;
+using DigitalBrain.SmartPrompt;
+using DigitalBrain.Time;
 using DigitalBrain.UI;
 using DigitalBrain.UI.Aspire.Hosting;
+using Aspire.Hosting;
 using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-var brain = builder
-    .AddDigitalBrain(ProductSurfaceResources.Brain)
-    .WithLocalDevelopmentOAuthCallback(new Uri(ProductSurfaceResources.LocalDevelopmentOAuthCallbackUri));
+var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
+    .AddModule<AIModule>(ai =>
+    {
+        ai.EnableSensitiveData = builder.Environment.IsDevelopment();
+        ai.WithLlm<IGpt54>();
+        ai.WithLlm<IGpt54Mini>();
+        ai.WithLlm<IGpt54Nano>();
+        ai.WithLlm<IOpus5>();
+        ai.WithLlm<ISonnet5>();
+        ai.WithLlm<IHaiku45>();
+        ai.WithLlm<IGemini36Pro>();
+        ai.WithLlm<IGemini36Flash>();
+        ai.WithLlm<IGrok46>();
+        ai.WithLlm<IGemma4>();
+        ai.WithEmbedding<ITextEmbedding3Small>();
+        ai.WithEmbedding<ITextEmbedding3Large>();
+        ai.WithEmbedding<IGeminiEmbedding>();
+        ai.WithEmbedding<IEmbeddingGemma>();
+        ai.WithVoiceToText<IWhisperLargeV3Turbo>();
+    })
+    .AddModule<MemoryModule>(memory => memory.WithQdrant())
+    .AddModule<TimeModule>()
+    .AddModule<ExecutionModule>()
+    .AddModule<IntegrationsModule>()
+    .AddModule<SmartPromptModule>()
+    .AddModule<UIModule>(ui =>
+    {
+        ui.WithWindowHost();
+    });
 
-brain.AddModule<AIModule>(ai =>
+if (builder.Environment.IsDevelopment())
 {
-    ai.EnableSensitiveData = builder.Environment.IsDevelopment();
-    ai.WithLlm<Gemma4>();
-    //ai.WithLlm<Llama32>();
-    // Local Whisper STT (Foundry Local). Optional: swap IWhisperSmall / IWhisperTiny for weaker GPUs.
-    ai.WithVoiceToText<IWhisperLargeV3Turbo>();
-});
-brain.AddModule<MemoryModule>(memory => memory.WithQdrant());
-brain.AddModule<UiModule>(ui => ui.WithWindowHost());
-brain.AddModule<GoogleModule>(google => google.WithGmail());
-brain.AddModule<SalesforceModule>(salesforce => salesforce.WithSalesforce());
+    brain.WithDigitalBrainFakes();
+}
 
 var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceResources.Kernel)
     .WithReference(brain)
     .WithHttpEndpoint(
         port: ProductSurfaceResources.UiHttpPort,
-        name: ProductSurfaceResources.HttpEndpointName,
+        name: ShellHostingExtensions.HttpEndpointName,
         isProxied: false)
-    .WithHttpHealthCheck("/health")
     .WithUrlForEndpoint(
-        ProductSurfaceResources.HttpEndpointName,
+        ShellHostingExtensions.HttpEndpointName,
         endpoint => new ResourceUrlAnnotation
         {
             Url = "/orleans",
@@ -47,17 +70,19 @@ var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceReso
             Endpoint = endpoint,
         });
 
-builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.Mcp)
+var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.Mcp)
+    .WithMcpServer(ProductSurfaceResources.McpPath, ProductSurfaceResources.McpHttpEndpointName)
     .WithReference(brain.AsClient())
+    .WithEnvironment(
+        ShellHostingExtensions.OwnerEnvironmentVariable,
+        ShellHostingExtensions.DefaultOwner)
     .WithHttpEndpoint(
         port: ProductSurfaceResources.McpHttpPort,
         name: ProductSurfaceResources.McpHttpEndpointName)
     .WithHttpHealthCheck("/health", endpointName: ProductSurfaceResources.McpHttpEndpointName)
-    .WithMcpServer(ProductSurfaceResources.McpPath, ProductSurfaceResources.McpHttpEndpointName)
     .WaitFor(kernel);
 
-builder.AddProject<Projects.DigitalBrain_Scripting>(ProductSurfaceResources.Scripting)
-    .WithReference(brain.AsClient())
-    .WaitFor(kernel);
+// Later: AddProject<Projects.DigitalBrain_Scripting>(...) as a sibling resource for Script driver IPC.
+// Do not reference DigitalBrain.Scripting from Kernel — generated C# stays out of process.
 
 builder.Build().Run();

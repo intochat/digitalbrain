@@ -51,6 +51,24 @@ void main() {
     expect(custom.metadata?['kind'], 'button');
   });
 
+  test('KitChartRefPart round-trips name and caption', () {
+    const part = KitChartRefPart(name: 'daily-sales', caption: 'Daily sales');
+    final parsed = KitPart.tryParse(part.toMetadata());
+    expect(parsed, isA<KitChartRefPart>());
+    final ref = parsed! as KitChartRefPart;
+    expect(ref.name, 'daily-sales');
+    expect(ref.caption, 'Daily sales');
+  });
+
+  test('KitImageRefPart round-trips name and caption', () {
+    const part = KitImageRefPart(name: 'sunset', caption: 'Sunset over bay');
+    final parsed = KitPart.tryParse(part.toMetadata());
+    expect(parsed, isA<KitImageRefPart>());
+    final ref = parsed! as KitImageRefPart;
+    expect(ref.name, 'sunset');
+    expect(ref.caption, 'Sunset over bay');
+  });
+
   test('KitTimerPart round-trips its due instant', () {
     final part = KitTimerPart(
       label: 'tea in five',

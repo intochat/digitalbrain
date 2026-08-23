@@ -1,12 +1,14 @@
-using DigitalBrain.Abstractions;
-
+using DigitalBrain.Abstractions.Entities;
 namespace DigitalBrain.UI;
 
+// Deliberately no [ClientEntryPoint] here (same wall as IChart): Read() arrives through
+// IEntity<TState>'s entry point, while Open stays reachable only to an attributed,
+// same-owner grain call (UIRenderer's OpenSurface handler).
 [Alias("ui.surface")]
-public partial interface ISurface :
-    INeuron,
-    IHandle<OpenSurface>,
-    IHandle<ControlActivated>
+public interface ISurface : IEntity<SurfaceState>
 {
     const string DefaultInstanceName = "desk";
+
+    [Alias(nameof(Open))]
+    Task Open(SurfaceScene scene, int cap);
 }

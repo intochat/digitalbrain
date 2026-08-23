@@ -10,6 +10,4 @@ public enum ChatTurnStatus
     Failed = 3,
     Cancelled = 4,
     Cancelling = 5,
-    // Execution parked (OutcomeUncertain / InputRequired) while this turn is still FIFO head.
-    Waiting = 6,
 }

@@ -1,6 +1,6 @@
 {
-  "appHostPath": "srcv2/CoreV2/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj",
+  "appHostPath": "src/Aspire/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj",
   "appHost": {
-    "path": "srcv2/CoreV2/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj"
+    "path": "src/Aspire/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj"
   }
 }

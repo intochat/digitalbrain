@@ -1,4 +1,5 @@
 using DigitalBrain.Aspire;
+using DigitalBrain.Core;
 using Microsoft.Extensions.Hosting;
 
 namespace DigitalBrain.Kernel;
@@ -6,5 +7,5 @@ namespace DigitalBrain.Kernel;
 internal static class DigitalBrainHost
 {
     internal static IHostApplicationBuilder AddDigitalBrain(this IHostApplicationBuilder builder)
-        => builder.AddDigitalBrain(ProductModules.Assemblies);
+        => builder.AddDigitalBrain(ModuleManifest.FromConfiguration(builder.Configuration));
 }

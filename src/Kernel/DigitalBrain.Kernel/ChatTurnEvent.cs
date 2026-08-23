@@ -1,6 +1,5 @@
 using System.Text.Json.Serialization;
-using DigitalBrain.UI;
-
+using DigitalBrain.Chat;
 namespace DigitalBrain.Kernel;
 
 internal sealed record ChatTurnEvent(
@@ -13,9 +12,7 @@ internal sealed record ChatTurnEvent(
     string Caller,
     string CorrelationId,
     DateTimeOffset Timestamp,
-    ChatButtonOffer[]? Buttons = null,
-    ChatChartOffer[]? Charts = null,
-    ChatTimerOffer[]? Timers = null,
     string? TurnId = null,
-    string? Status = null);
+    string? Status = null,
+    KitCardOffer[]? Cards = null);
 

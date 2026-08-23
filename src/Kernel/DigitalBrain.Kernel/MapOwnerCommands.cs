@@ -6,6 +6,9 @@ using DigitalBrain.Client;
 using DigitalBrain.UI;
 using Microsoft.Extensions.AI;
 
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Journals;
+using DigitalBrain.Abstractions.Neurons;
 namespace DigitalBrain.Kernel;
 
 internal static class OwnerCommandsHttpMaps
@@ -30,11 +33,7 @@ internal static class OwnerCommandsHttpMaps
                 ArgumentNullException.ThrowIfNull(brain);
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (!HttpActor.TryGet(http, out var actor))
-                {
-                    http.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                    return;
-                }
+                var actor = HttpActor.Current;
 
                 if (string.IsNullOrWhiteSpace(request.Kind))
                 {
@@ -88,31 +87,6 @@ internal static class OwnerCommandsHttpMaps
                     return;
                 }
 
-                if (string.Equals(request.Kind, HttpSurfacePaths.KindChatButton, StringComparison.Ordinal))
-                {
-                    if (string.IsNullOrWhiteSpace(request.ChatName)
-                        || string.IsNullOrWhiteSpace(request.ButtonId)
-                        || string.IsNullOrWhiteSpace(request.Action)
-                        || !TryParseCommandId(request.OfferCommandId, out var offerCommandId))
-                    {
-                        http.Response.StatusCode = StatusCodes.Status400BadRequest;
-                        return;
-                    }
-
-                    if (!TryPrincipalResource(actor.PrincipalId, request.ChatName, out var chatInstance))
-                    {
-                        http.Response.StatusCode = StatusCodes.Status400BadRequest;
-                        return;
-                    }
-
-                    await brain.FireAsync<IButton>(
-                        ChatButtons.OfferedInstanceName(chatInstance, offerCommandId, request.ButtonId),
-                        new ButtonClicked(offerCommandId, request.ButtonId, request.Action),
-                        cancellationToken).ConfigureAwait(false);
-                    http.Response.StatusCode = StatusCodes.Status202Accepted;
-                    return;
-                }
-
                 if (string.Equals(request.Kind, HttpSurfacePaths.KindSurfaceOpen, StringComparison.Ordinal))
                 {
                     if (string.IsNullOrWhiteSpace(request.SurfaceName)
@@ -134,7 +108,7 @@ internal static class OwnerCommandsHttpMaps
                         return;
                     }
 
-                    await brain.FireAsync<ISurface>(
+                    await brain.FireAsync<IUIRenderer>(
                         surfaceInstance,
                         new OpenSurface(CommandId.New(), request.SurfaceKey, request.Title),
                         cancellationToken).ConfigureAwait(false);
@@ -174,7 +148,7 @@ internal static class OwnerCommandsHttpMaps
         return true;
     }
 
-    // Observer-only SSE: durable Send starts the Execution; request abort detaches this
+    // Observer-only SSE: durable Send starts the turn; request abort detaches this
     // watch without cancelling the turn (P0-2).
     private static async IAsyncEnumerable<SseItem<ChatResponseUpdate>> StreamDeltasAsync(
         IDigitalBrain brain,

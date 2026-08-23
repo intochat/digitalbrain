@@ -2,7 +2,6 @@ namespace DigitalBrain.Abstractions.Neurons;
 
 [GenerateSerializer]
 [Alias("db.authorization-error")]
-[SettledDeliveryFailure]
 public sealed class NeuronAuthorizationException : Exception
 {
     public NeuronAuthorizationException()

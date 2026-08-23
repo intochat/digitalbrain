@@ -1,11 +1,12 @@
-using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.Entities;
 
 namespace DigitalBrain.UI;
 
-[ClientEntryPoint]
+// Same wall as ISurface: Read() is the client-facing query via IEntity<TState>;
+// Render stays a same-silo grain call (kit tools drive it).
 [Alias("ui.chart")]
-public partial interface IChart : INeuron, IHandle<ChartPoint>
+public interface IChart : IEntity<ChartState>
 {
-    [Alias(nameof(Read))]
-    Task<IReadOnlyList<ChartPoint>> Read();
+    [Alias(nameof(Render))]
+    Task Render(ChartState state);
 }

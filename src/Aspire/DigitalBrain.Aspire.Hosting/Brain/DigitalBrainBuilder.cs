@@ -1,14 +1,13 @@
-using System.Security.Cryptography;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Orleans;
-using Aspire.Hosting.Publishing;
 
 namespace DigitalBrain.Aspire.Hosting;
 
 public sealed class DigitalBrainBuilder
 {
+    private readonly List<Type> _modules = [];
     private readonly List<DigitalBrainModuleProjection> _projections = [];
     private readonly List<IResource> _startupDependencies = [];
     private readonly Dictionary<Type, object> _states = [];
@@ -16,34 +15,32 @@ public sealed class DigitalBrainBuilder
     internal DigitalBrainBuilder(
         IDistributedApplicationBuilder builder,
         string name,
+        IResourceBuilder<DigitalBrainResource> resource,
         OrleansService orleans,
-        IResourceBuilder<AzureBlobStorageResource> journal,
-        IResourceBuilder<AzureQueueStorageResource> streams,
-        IResourceBuilder<AzureTableStorageResource> pubSub)
+        IResourceBuilder<AzureBlobStorageResource> durableStateStore,
+        IResourceBuilder<AzureBlobStorageResource> grainState)
     {
-        ArgumentNullException.ThrowIfNull(journal);
-        ArgumentNullException.ThrowIfNull(streams);
-        ArgumentNullException.ThrowIfNull(pubSub);
+        ArgumentNullException.ThrowIfNull(resource);
+        ArgumentNullException.ThrowIfNull(durableStateStore);
+        ArgumentNullException.ThrowIfNull(grainState);
 
         ApplicationBuilder = builder;
         Name = name;
+        Resource = resource;
         Orleans = orleans;
-        Journal = journal;
-        Streams = streams;
-        PubSub = pubSub;
+        DurableStateStore = durableStateStore;
+        GrainState = grainState;
     }
 
     public string Name { get; }
 
     public IDistributedApplicationBuilder ApplicationBuilder { get; }
 
-    internal string Owner { get; private set; } = DigitalBrainNames.DefaultOwner;
+    public IResourceBuilder<DigitalBrainResource> Resource { get; }
 
-    internal IResourceBuilder<AzureBlobStorageResource> Journal { get; }
+    internal IResourceBuilder<AzureBlobStorageResource> DurableStateStore { get; }
 
-    internal IResourceBuilder<AzureQueueStorageResource> Streams { get; }
-
-    internal IResourceBuilder<AzureTableStorageResource> PubSub { get; }
+    internal IResourceBuilder<AzureBlobStorageResource> GrainState { get; }
 
     internal OrleansService Orleans { get; }
 
@@ -51,21 +48,16 @@ public sealed class DigitalBrainBuilder
 
     internal IReadOnlyList<IResource> StartupDependencies => _startupDependencies;
 
-    internal IResourceBuilder<ParameterResource>? StateProtectionKey { get; private set; }
+    internal IReadOnlyList<Type> Modules => _modules;
 
-    internal string? LocalDevelopmentOAuthCallbackUri { get; private set; }
-
-    internal void UseOwner(string owner) => Owner = owner;
-
-    internal void UseLocalDevelopmentOAuthCallback(string callbackUri)
+    internal void AddModule(Type module)
     {
-        if (LocalDevelopmentOAuthCallbackUri is not null)
-        {
-            throw new InvalidOperationException(
-                $"A local-development OAuth callback is already configured on brain '{Name}'. Configure it exactly once.");
-        }
+        ArgumentNullException.ThrowIfNull(module);
 
-        LocalDevelopmentOAuthCallbackUri = callbackUri;
+        if (!_modules.Contains(module))
+        {
+            _modules.Add(module);
+        }
     }
 
     public TState GetOrAddState<TState>(Func<DigitalBrainBuilder, TState> create, out bool added)
@@ -85,7 +77,7 @@ public sealed class DigitalBrainBuilder
         return state;
     }
 
-    internal void AddProjection(DigitalBrainModuleProjection projection)
+    public void AddProjection(DigitalBrainModuleProjection projection)
     {
         ArgumentNullException.ThrowIfNull(projection);
 
@@ -108,21 +100,5 @@ public sealed class DigitalBrainBuilder
         }
     }
 
-    internal void RequireStateProtection()
-    {
-        if (StateProtectionKey is not null)
-        {
-            return;
-        }
-
-        var name = $"{Name}-state-protection-key";
-        StateProtectionKey = (ApplicationBuilder.ExecutionContext.IsRunMode
-                ? ApplicationBuilder.AddParameter(name, new StateProtectionKeyParameterDefault(), secret: true, persist: true)
-                : ApplicationBuilder.AddParameter(name, secret: true))
-            .WithDescription(
-                "Base64-encoded 256-bit key shared by every silo that recovers encrypted durable module state.");
-    }
-
-    public ClientDigitalBrainReference AsClient() => new(this);
-
+    public DigitalBrainClientReference AsClient() => new(this);
 }
