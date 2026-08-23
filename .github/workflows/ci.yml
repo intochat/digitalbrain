@@ -50,15 +50,10 @@ jobs:
         run: |
           set -eu
           out=tests/DigitalBrain.Simulation.Tests/bin/Release/net11.0
-          ls -la "$out" | head -n 40 || true
-          chmod +x "$out/DigitalBrain.Simulation.Tests" || true
-          # Prefer the apphost so a native crash prints stderr (MTP handshake exit 5).
-          if ! "$out/DigitalBrain.Simulation.Tests" --list-tests; then
-            echo "apphost --list-tests failed; falling back to dotnet exec"
-            dotnet exec "$out/DigitalBrain.Simulation.Tests.dll" --list-tests
-          fi
-          dotnet test tests/DigitalBrain.Simulation.Tests/DigitalBrain.Simulation.Tests.csproj \
-            -c Release --no-build --nologo
+          chmod +x "$out/DigitalBrain.Simulation.Tests"
+          # xunit.v3 MTP apphost runs cleanly; `dotnet test` MTP handshake fails on this SDK
+          # (exit 5 / zero tests) even though --list-tests via the apphost succeeds.
+          "$out/DigitalBrain.Simulation.Tests"
 
   flutter-web-build:
     name: Flutter web build
