@@ -49,7 +49,12 @@ public sealed class EntityTests(SimulationFixture fixture)
         Assert.NotNull(read);
         Assert.Equal("a red fox", read.Prompt);
     }
+}
 
+// Pure in-memory NeuronTest -- no cluster, so it stays outside the serialized simulation
+// collection and runs in parallel for free.
+public sealed class MemoryKitImageStoreTests
+{
     [Fact]
     public async Task MemoryImageStoreRoundTripsBytes()
     {

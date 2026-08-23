@@ -15,6 +15,9 @@ public sealed class McpSurfaceTests(AppHostFixture fixture)
     // InternalsVisibleTo.
     private const string McpPath = "/mcp";
     private const string SendChatMessageTool = "send_chat_message";
+    private const string ListSmartPromptsTool = "list_smart_prompts";
+    private const string SaveSmartPromptTool = "save_smart_prompt";
+    private const string RunSmartPromptTool = "run_smart_prompt";
 
     [Fact]
     public async Task TheFrozenMcpToolInvokesChatOverTheRealProtocol()
@@ -36,7 +39,9 @@ public sealed class McpSurfaceTests(AppHostFixture fixture)
 
         var tools = await client.ListToolsAsync(cancellationToken: cancellationToken);
         var toolNames = tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
-        Assert.Equal([SendChatMessageTool], toolNames.OrderBy(static name => name, StringComparer.Ordinal));
+        Assert.Equal(
+            [ListSmartPromptsTool, RunSmartPromptTool, SaveSmartPromptTool, SendChatMessageTool],
+            toolNames.OrderBy(static name => name, StringComparer.Ordinal));
 
         var result = await client.CallToolAsync(
             SendChatMessageTool,

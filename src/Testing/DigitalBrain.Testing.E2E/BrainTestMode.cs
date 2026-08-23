@@ -2,7 +2,7 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Abstractions;
 
-namespace DigitalBrain.Testing;
+namespace DigitalBrain.Testing.E2E;
 
 public static class BrainTestMode
 {

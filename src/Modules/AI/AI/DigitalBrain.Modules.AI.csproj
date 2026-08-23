@@ -20,6 +20,9 @@
     <PackageReference Include="NAudio" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Simulation.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />

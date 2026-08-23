@@ -22,27 +22,20 @@ public sealed class ChatTurnTests(SimulationFixture fixture)
     public async Task SendRunsAWholeTurnThroughTheScriptedResponder()
     {
         var brain = fixture.Sim.Brain;
+        var chatName = fixture.Sim.UniqueId("chat");
         var command = CommandId.New();
         var actor = new ActorContext(new PrincipalId(Guid.NewGuid()), "owner");
 
-        var accepted = await brain.GetGrainProxy<IChat>("main")
+        var accepted = await brain.GetGrainProxy<IChat>(chatName)
             .Send(new SendMessage(command, "hello", actor));
 
         Assert.Equal(command, accepted.CommandId);
 
-        var chatId = NeuronId.For<IChat>(brain.Owner, "main");
-        var terminal = await JournalWait.ForAsync(
-            brain,
-            chatId,
-            JournalKind.Outgoing,
-            delivery => delivery.Synapse is TurnLifecycle { Status: ChatTurnStatus.Completed or ChatTurnStatus.Failed or ChatTurnStatus.Cancelled },
-            TurnTimeout);
-        var lifecycle = Assert.IsType<TurnLifecycle>(terminal.Synapse);
-        Assert.True(lifecycle.Status == ChatTurnStatus.Completed, lifecycle.Detail);
+        var lifecycle = await ChatTurnDriver.AwaitCompletedTurnAsync(brain, chatName);
 
         var responded = await JournalWait.ForAsync(
             brain,
-            chatId,
+            NeuronId.For<IChat>(brain.Owner, chatName),
             JournalKind.Outgoing,
             delivery => delivery.Synapse is Responded reply && reply.CommandId == command,
             TurnTimeout);
@@ -56,23 +49,16 @@ public sealed class ChatTurnTests(SimulationFixture fixture)
     public async Task SendSetsChatActiveExecutionIdOnTheExecutionSpine()
     {
         var brain = fixture.Sim.Brain;
+        var chatName = fixture.Sim.UniqueId("active-execution");
         var command = CommandId.New();
         var actor = new ActorContext(new PrincipalId(Guid.NewGuid()), "owner");
-        var chat = brain.GetGrainProxy<IChat>("active-execution");
+        var chat = brain.GetGrainProxy<IChat>(chatName);
 
         Assert.Null(await chat.ReadActiveExecution());
 
         var accepted = await chat.Send(new SendMessage(command, "hello execution", actor));
 
-        var chatId = NeuronId.For<IChat>(brain.Owner, "active-execution");
-        var terminal = await JournalWait.ForAsync(
-            brain,
-            chatId,
-            JournalKind.Outgoing,
-            delivery => delivery.Synapse is TurnLifecycle { Status: ChatTurnStatus.Completed or ChatTurnStatus.Failed or ChatTurnStatus.Cancelled },
-            TurnTimeout);
-        var lifecycle = Assert.IsType<TurnLifecycle>(terminal.Synapse);
-        Assert.True(lifecycle.Status == ChatTurnStatus.Completed, lifecycle.Detail);
+        await ChatTurnDriver.AwaitCompletedTurnAsync(brain, chatName);
 
         var active = await chat.ReadActiveExecution();
         Assert.NotNull(active);
@@ -88,7 +74,8 @@ public sealed class ChatTurnTests(SimulationFixture fixture)
     public async Task KitCardOfferLandsInTheChatJournalAsARespondedCard()
     {
         var brain = fixture.Sim.Brain;
-        var chat = brain.GetGrainProxy<IChat>("main");
+        var chatName = fixture.Sim.UniqueId("chat");
+        var chat = brain.GetGrainProxy<IChat>(chatName);
 
         await chat.HandleAsync(
             new KitCardOffer(KitCardKinds.Chart, "chart-abc12345", "Quarterly sales"),
@@ -97,7 +84,7 @@ public sealed class ChatTurnTests(SimulationFixture fixture)
         var transcript = await chat.Read();
         Assert.Contains(transcript.Turns, turn => !turn.FromUser && turn.Text == "Quarterly sales");
 
-        var chatId = NeuronId.For<IChat>(brain.Owner, "main");
+        var chatId = NeuronId.For<IChat>(brain.Owner, chatName);
         var responded = await JournalWait.ForAsync(
             brain,
             chatId,
@@ -116,7 +103,7 @@ public sealed class ChatTurnTests(SimulationFixture fixture)
     [Fact]
     public async Task ChatRefusesAKitCardWithABlankCaption()
     {
-        var chat = fixture.Sim.Brain.GetGrainProxy<IChat>("main");
+        var chat = fixture.Sim.Brain.GetGrainProxy<IChat>(fixture.Sim.UniqueId("chat"));
 
         await Assert.ThrowsAsync<NeuronAuthorizationException>(() => chat.HandleAsync(
             new KitCardOffer(KitCardKinds.Chart, "chart-abc12345", "   "),

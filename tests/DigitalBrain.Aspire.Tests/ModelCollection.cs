@@ -1,9 +1,9 @@
-using DigitalBrain.Testing;
+using DigitalBrain.Testing.E2E;
 using Xunit;
 
 namespace DigitalBrain.Aspire.Tests;
 
-// Tier 1: one shared BrainModel per assembly. Building the AppHost model takes seconds
+// One shared BrainModel per assembly. Building the AppHost model takes seconds
 // (project discovery, parameter stubbing); every test against it then runs in milliseconds
 // because nothing is started.
 public sealed class ModelFixture : IAsyncLifetime

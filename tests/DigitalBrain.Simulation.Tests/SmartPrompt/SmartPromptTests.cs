@@ -1,9 +1,9 @@
-using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Execution;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Execution;
+using DigitalBrain.Simulation.Tests.Execution;
 using DigitalBrain.SmartPrompt;
 using DigitalBrain.Testing;
 using Xunit;
@@ -56,14 +56,7 @@ public sealed class SmartPromptTests(SimulationFixture fixture)
         var runStarted = Assert.IsType<SmartPromptRunStarted>(started.Synapse);
         var executionName = runStarted.ExecutionId.ToString();
 
-        await JournalWait.ForAsync(
-            brain,
-            NeuronId.For<IExecution>(brain.Owner, executionName),
-            JournalKind.Outgoing,
-            delivery => delivery.Synapse is ExecutionLifecycle
-            {
-                Status: ExecutionStatus.Completed
-            });
+        await ExecutionTestDriver.AwaitCompletionAsync(brain, executionName);
 
         var context = brain.GetEntity<IExecutionContext>(executionName);
         var gmail = await context.Query(new ContextQuery(new ContextPath("gmail.search")));

@@ -53,39 +53,17 @@ public sealed class KitToolTests(SimulationFixture fixture)
         Assert.Equal($"some.owner/{principalHex}.chart-abc12345", chart);
     }
 
-    // Task 8 review: the two prior tests pin Sibling's own math in isolation, and Task 8's
-    // E2E test seeds through the endpoint's own PrincipalScoped+GetEntity path -- neither
-    // proves the TOOL's write path (raw IGrainFactory.GetGrain<IChart>(Sibling(...))) and the
-    // ENDPOINT's read path (IDigitalBrain.GetEntity, which resolves to
-    // EntityId.For<TEntity>(Owner, name).GrainKey -- see DigitalBrainClient.GetEntity,
-    // src/Kernel/DigitalBrain.Client/DigitalBrainClient.cs:61-68) land on the same grain key.
-    // If Sibling's owner/principal-boundary math and EntityId's "{owner}/{name}" scheme ever
-    // diverge, tool-created cards would 404 forever from the kernel's /kit endpoints while
-    // every other test here (which only exercises one side or the other) stays green.
-    [Fact]
-    public void KitToolKeysResolveThroughTheBrainClientEntityAccessor()
-    {
-        var owner = new OwnerId("kit-bridge-owner");
-        var principal = new PrincipalId(Guid.NewGuid());
-        var chat = $"{owner.Value}/{PrincipalPartition.InstanceName(principal, "main")}";
-        const string CardName = "chart-abc12345";
-
-        var toolGrainKey = KitInstanceNames.Sibling(chat, CardName);
-
-        var endpointInstanceName = PrincipalPartition.InstanceName(principal, CardName);
-        var endpointGrainKey = EntityId.For<IChart>(owner, endpointInstanceName).GrainKey;
-
-        Assert.Equal(endpointGrainKey, toolGrainKey);
-    }
-
-    // Behavioral twin of the test above: writes through the tool's exact call shape (raw
-    // IGrainFactory.GetGrain<IChart>(string) against a Sibling-computed key) and reads back
-    // through the kernel endpoint's exact call shape (IDigitalBrain.GetEntity against a
-    // PrincipalPartition-computed local name), against the same running silo. This also
-    // proves grain-TYPE resolution agrees between the two APIs (GetGrain<T>(string) infers
-    // its Orleans grain type from T directly; GetEntity goes through
-    // EntityId.For<T>->GrainTypeNames.Of(T)->GrainId.Create) -- something the string-equality
-    // test above cannot observe on its own.
+    // The two prior tests pin Sibling's own math in isolation -- neither proves the TOOL's
+    // write path (raw IGrainFactory.GetGrain<IChart>(Sibling(...))) and the ENDPOINT's read
+    // path (IDigitalBrain.GetEntity, which resolves to EntityId.For<TEntity>(Owner, name).GrainKey)
+    // land on the same grain. This test writes through the tool's exact call shape and reads
+    // back through the kernel endpoint's exact call shape against the same running silo, which
+    // covers both the key math and grain-TYPE resolution (GetGrain<T>(string) infers its
+    // Orleans grain type from T directly; GetEntity goes through
+    // EntityId.For<T>->GrainTypeNames.Of(T)->GrainId.Create). If Sibling's
+    // owner/principal-boundary math and EntityId's "{owner}/{name}" scheme ever diverge,
+    // tool-created cards would 404 forever from the kernel's /kit endpoints while every other
+    // test here stays green.
     [Fact]
     public async Task ChartWrittenThroughTheToolsRawGrainKeyIsReadableThroughTheBrainClientEntityAccessor()
     {
@@ -282,8 +260,13 @@ public sealed class KitToolTests(SimulationFixture fixture)
     private static string CardNameFrom(string replyText)
     {
         const string Marker = "card '";
-        var start = replyText.IndexOf(Marker, StringComparison.Ordinal) + Marker.Length;
+        var markerIndex = replyText.IndexOf(Marker, StringComparison.Ordinal);
+        Assert.True(markerIndex >= 0, $"Reply did not name a card: {replyText}");
+
+        var start = markerIndex + Marker.Length;
         var end = replyText.IndexOf('\'', start);
+        Assert.True(end > start, $"Reply's card name was not quote-terminated: {replyText}");
+
         return replyText[start..end];
     }
 

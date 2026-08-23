@@ -1,15 +1,15 @@
 using System.Net;
-using System.Net.Http.Json;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Messaging;
 using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Testing;
 using Xunit;
 
 namespace DigitalBrain.E2E.Tests;
 
-// Tier 3: the first live run of the whole BrainAppHostFixture pipeline -- a real AppHost boot
-// (Azurite, silos, kernel, mcp) driving the facade across process boundaries, not the in-memory
-// simulation Tiers 1/2 exercise.
+// The first live run of the whole BrainAppHostFixture pipeline -- a real AppHost boot
+// (Azurite, silos, kernel, mcp) driving the facade across process boundaries, unlike the
+// in-process simulation DigitalBrainTests.
 [Collection(E2ECollection.Name)]
 public sealed class BootSmokeTests(AppHostFixture fixture)
 {
@@ -25,19 +25,20 @@ public sealed class BootSmokeTests(AppHostFixture fixture)
     [Fact]
     public async Task FacadeFiresAcrossProcessesAndJournals()
     {
-        await using var session = await fixture.OpenSessionAsync();
+        var brain = fixture.BrainFor($"e2e-{Guid.NewGuid().ToString("N")[..8]}");
+        await brain.ActivateAsync(TestContext.Current.CancellationToken);
 
-        // Activation already fired during OpenSessionAsync; observe its journal footprint using
-        // the same subject/kind Tier 2's JournalSmokeTests.ActivationLandsInTheSessionJournal
-        // pinned: DigitalBrainActivated lands in the owner session's OWN Outgoing journal.
-        var subject = ISessionNeuron.ForOwner(session.Owner);
-        var delivery = await session.WaitForJournalAsync(
+        // Observe the activation's journal footprint using the same subject/kind the simulation
+        // suite's JournalSmokeTests.ActivationLandsInTheSessionJournal pins: DigitalBrainActivated
+        // lands in the owner session's OWN Outgoing journal.
+        var subject = ISessionNeuron.ForOwner(brain.Owner);
+        var delivery = await JournalWait.ForAsync(
+            brain,
             subject,
             JournalKind.Outgoing,
-            static d => d.Synapse is DigitalBrainActivated,
+            static delivery => delivery.Synapse is DigitalBrainActivated,
             TimeSpan.FromSeconds(60));
 
-        Assert.NotNull(delivery.Synapse);
+        Assert.IsType<DigitalBrainActivated>(delivery.Synapse);
     }
-
 }

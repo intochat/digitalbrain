@@ -1,6 +1,5 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.AI;
 using DigitalBrain.Chat;
 using DigitalBrain.Core;
@@ -12,13 +11,12 @@ using Xunit;
 namespace DigitalBrain.Simulation.Tests;
 
 // Proves the IAgentToolSource seam end to end: a tool source registered in the silo's DI
-// container reaches the model call as an AITool on ChatOptions.Tools. Runs its own
-// BrainSimulation (rather than the shared SimulationFixture) because it needs a
-// ConfigureSilo override that the shared fixture does not apply.
+// container reaches the model call as an AITool on ChatOptions.Tools. Deliberately runs its
+// own BrainSimulation: CapturingChatClient must REPLACE the deterministic test responder to
+// observe ChatOptions, and doing that in the shared SimulationFixture would change the reply
+// text every other chat test asserts on.
 public sealed class AgentToolTests
 {
-    private static readonly TimeSpan TurnTimeout = TimeSpan.FromSeconds(60);
-
     [Fact]
     public async Task AssistantOffersToolsFromRegisteredToolSources()
     {
@@ -51,13 +49,7 @@ public sealed class AgentToolTests
 
         await brain.GetGrainProxy<IChat>("main").Send(new SendMessage(command, "hello", actor));
 
-        var chatId = NeuronId.For<IChat>(brain.Owner, "main");
-        await JournalWait.ForAsync(
-            brain,
-            chatId,
-            JournalKind.Outgoing,
-            delivery => delivery.Synapse is TurnLifecycle { Status: ChatTurnStatus.Completed or ChatTurnStatus.Failed or ChatTurnStatus.Cancelled },
-            TurnTimeout);
+        await ChatTurnDriver.AwaitCompletedTurnAsync(brain, "main");
 
         Assert.NotNull(capturing.LastOptions);
         Assert.NotNull(capturing.LastOptions!.Tools);

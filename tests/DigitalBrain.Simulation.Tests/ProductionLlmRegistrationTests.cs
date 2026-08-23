@@ -1,4 +1,3 @@
-using System.Reflection;
 using DigitalBrain.AI;
 using DigitalBrain.AI.OpenAI;
 using Microsoft.Extensions.AI;
@@ -94,6 +93,19 @@ public sealed class ProductionLlmRegistrationTests
         Assert.Null(without.GetService<IImageGeneration>());
     }
 
+    [Fact]
+    public void ExplicitOllamaEmbeddingModelResolvesAsAnEmbeddingGenerator()
+    {
+        using var provider = BuildProvider(new Dictionary<string, string?>
+        {
+            ["DigitalBrain:AI:Ollama:Endpoint"] = "http://127.0.0.1:11434",
+            ["DigitalBrain:AI:Ollama:IEmbeddingGemma:Model"] = "embeddinggemma",
+        });
+
+        Assert.NotNull(provider.GetRequiredKeyedService<IEmbeddingGenerator<string, Embedding<float>>>(
+            typeof(DigitalBrain.AI.Ollama.IEmbeddingGemma)));
+    }
+
     private static ServiceProvider BuildProvider(Dictionary<string, string?> configuration)
     {
         var services = new ServiceCollection();
@@ -102,11 +114,8 @@ public sealed class ProductionLlmRegistrationTests
             .Build();
         services.AddSingleton<IConfiguration>(configurationRoot);
 
-        var clients = typeof(AIModule).Assembly.GetType("DigitalBrain.AI.AIClients", throwOnError: true)!;
-        clients.GetMethod("Add", BindingFlags.Static | BindingFlags.NonPublic)!
-            .Invoke(null, [services]);
-        clients.GetMethod("AddImageGeneration", BindingFlags.Static | BindingFlags.NonPublic)!
-            .Invoke(null, [services, configurationRoot]);
+        AIClients.Add(services);
+        AIClients.AddImageGeneration(services, configurationRoot);
 
         return services.BuildServiceProvider();
     }

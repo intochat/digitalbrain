@@ -9,14 +9,10 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="xunit.v3.mtp-v2" />
-    <PackageReference Include="Reqnroll.xunit.v3" />
-    <PackageReference Include="Reqnroll.Tools.MsBuild.Generation" />
     <PackageReference Include="ModelContextProtocol.Core" />
-    <PackageReference Include="Microsoft.Playwright" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
-    <ProjectReference Include="../../src/Testing/DigitalBrain.Testing.Bdd/DigitalBrain.Testing.Bdd.csproj" />
     <ProjectReference Include="../../src/Aspire/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../src/Modules/UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />
     <ProjectReference Include="../../src/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />

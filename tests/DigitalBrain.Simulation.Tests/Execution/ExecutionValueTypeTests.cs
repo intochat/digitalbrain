@@ -3,7 +3,8 @@ using Xunit;
 
 namespace DigitalBrain.Simulation.Tests.Execution;
 
-public sealed class ExecutionIdTests
+// Value-object NeuronTests for the execution identifiers: plain xunit, no cluster.
+public sealed class ExecutionValueTypeTests
 {
     [Fact]
     public void New_produces_non_empty_id_and_round_trips_string_key()

@@ -10,7 +10,7 @@
     <PackageReference Include="xunit.v3.mtp-v2" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="../../src/Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
     <ProjectReference Include="../../src/Aspire/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" IsAspireProjectResource="false" />
   </ItemGroup>
 </Project>

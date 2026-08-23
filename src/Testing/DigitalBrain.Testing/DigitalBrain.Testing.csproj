@@ -1,11 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>DigitalBrain testing SDK: model-level assertions and in-process brain simulation.</Description>
+    <Description>DigitalBrain testing SDK: in-process brain simulation and journal waits.</Description>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Aspire.Hosting.Testing" />
     <PackageReference Include="Microsoft.Orleans.TestingHost" />
   </ItemGroup>
   <ItemGroup>

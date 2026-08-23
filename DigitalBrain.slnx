@@ -47,7 +47,6 @@
   </Folder>
   <Folder Name="/Testing/">
     <Project Path="src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
-    <Project Path="src/Testing/DigitalBrain.Testing.Bdd/DigitalBrain.Testing.Bdd.csproj" />
     <Project Path="src/Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
   </Folder>
   <Folder Name="/Tests/">

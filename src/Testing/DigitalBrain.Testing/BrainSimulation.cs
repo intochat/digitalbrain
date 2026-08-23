@@ -13,10 +13,6 @@ public sealed class BrainSimulationOptions
 {
     public required ModuleManifest Modules { get; init; }
 
-    public string Owner { get; init; } = DigitalBrainNames.DefaultOwner;
-
-    public int SiloCount { get; init; } = 1;
-
     public Action<ISiloBuilder>? ConfigureSilo { get; init; }
 
     // Host configuration values visible to module Configure hooks (ISiloBuilder.Configuration),
@@ -31,11 +27,11 @@ public sealed class BrainSimulation : IAsyncDisposable
 {
     private readonly InProcessTestCluster _cluster;
 
-    private BrainSimulation(InProcessTestCluster cluster, string owner)
+    private BrainSimulation(InProcessTestCluster cluster)
     {
         _cluster = cluster;
         Grains = cluster.Client;
-        Brain = DigitalBrainClient.Connect(cluster.Client, owner);
+        Brain = DigitalBrainClient.Connect(cluster.Client, DigitalBrainNames.DefaultOwner);
     }
 
     public IGrainFactory Grains { get; }
@@ -46,7 +42,7 @@ public sealed class BrainSimulation : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        var builder = new InProcessTestClusterBuilder((short)options.SiloCount);
+        var builder = new InProcessTestClusterBuilder(1);
         if (options.Configuration is { Count: > 0 } configuration)
         {
             builder.ConfigureHost(host => host.Configuration.AddInMemoryCollection(configuration));
@@ -72,7 +68,7 @@ public sealed class BrainSimulation : IAsyncDisposable
 
         var cluster = builder.Build();
         await cluster.DeployAsync().ConfigureAwait(false);
-        return new BrainSimulation(cluster, options.Owner);
+        return new BrainSimulation(cluster);
     }
 
     public IDigitalBrain BrainFor(string owner)

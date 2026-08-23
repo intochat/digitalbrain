@@ -121,8 +121,7 @@ public static class ShellHostingExtensions
                 // The health check proves the dev server is up and answering; it cannot prove
                 // the build has landed (the server answers "/" with 200 within seconds of
                 // launch, before the web build completes -- observed live), so consumers that
-                // need the app itself must tolerate one early page load (see UiEvidenceTests'
-                // reload fallback).
+                // need the app itself must tolerate one early page load and retry.
                 host
                     .WithHttpEndpoint(
                         port: ShellNames.FlutterWebPort,

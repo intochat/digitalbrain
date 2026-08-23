@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
@@ -6,7 +5,6 @@ using Aspire.Hosting.Testing;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Aspire;
 using DigitalBrain.Client;
-using DigitalBrain.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans;
@@ -19,12 +17,6 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
 {
     private const int DiagnosticLogLineCount = 40;
 
-    // No current AppHost wiring requests a "{brain.Name}-state-protection-key" parameter (the
-    // durable-payload-protection feature that produced it was removed as dead code), but an
-    // AppHost's brain isn't necessarily named "brain" — matching on the stable suffix keeps this
-    // stub correct if the parameter ever comes back, at zero cost while it stays absent.
-    private const string StateProtectionParameterSuffix = "-state-protection-key";
-
     private ResourceLogCollector? _logCollector;
     private IHost? _scriptHost;
     private IGrainFactory? _grains;
@@ -35,8 +27,8 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
     {
     }
 
-    // Options-first construction for hosts that build the fixture themselves (e.g. the Reqnroll
-    // BDD boot) instead of letting xunit instantiate it and subclasses override Configure().
+    // Options-first construction for tests that build the fixture themselves; the parameterless
+    // ctor exists so xunit can instantiate collection-fixture subclasses with default options.
     public BrainAppHostFixture(BrainE2EOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -45,22 +37,18 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
 
     public DistributedApplication App { get; private set; } = null!;
 
-    public IReadOnlyList<string> StrippedWaits { get; private set; } = [];
-
-    public virtual BrainE2EOptions Configure() => _options ?? new();
-
     public async ValueTask InitializeAsync()
     {
-        var options = Configure();
+        var options = _options ?? new();
         var appBuilder = await DistributedApplicationTestingBuilder
             .CreateAsync<TAppHost>(options.Args)
             .ConfigureAwait(false);
 
-        StubParameters(appBuilder, options.ParameterOverrides);
+        StubParameters(appBuilder);
         IsolateContainers(appBuilder);
         RandomizeProxiedPorts(appBuilder);
         ArmExplicitStart(appBuilder, options.ExplicitStart);
-        StrippedWaits = StripNeverStartingWaits(appBuilder, options.ExplicitStart);
+        StripNeverStartingWaits(appBuilder, options.ExplicitStart);
         ArmProjectResources(appBuilder, options.ProjectEnvironment);
 
         App = await appBuilder.BuildAsync().ConfigureAwait(false);
@@ -72,7 +60,7 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
 
             await WaitForExpectedHealthyAsync(options).ConfigureAwait(false);
 
-            _scriptHost = await ConnectScriptHostAsync().ConfigureAwait(false);
+            _scriptHost = await ConnectScriptHostAsync(options.ClientResource).ConfigureAwait(false);
             _grains = _scriptHost.Services.GetRequiredService<IGrainFactory>();
         }
         catch
@@ -126,44 +114,19 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
         return DigitalBrainClient.Connect(_grains, owner);
     }
 
-    public Task<IGrainFactory> GrainsAsync()
-    {
-        if (_grains is null)
-        {
-            throw new InvalidOperationException(
-                $"{nameof(GrainsAsync)} was called before {nameof(InitializeAsync)} completed.");
-        }
-
-        return Task.FromResult(_grains);
-    }
-
-    public async Task<BrainSession> OpenSessionAsync()
-    {
-        var ownerHex = Guid.NewGuid().ToString("N")[..8];
-        var brain = BrainFor($"e2e-{ownerHex}");
-        await brain.ActivateAsync().ConfigureAwait(false);
-        return new BrainSession(brain);
-    }
-
     public HttpClient CreateHttpClient(string resource, string? endpointName = null)
         => App.CreateHttpClient(resource, endpointName);
 
-    private static void StubParameters(
-        IDistributedApplicationTestingBuilder appBuilder,
-        IReadOnlyDictionary<string, string> overrides)
+    private static void StubParameters(IDistributedApplicationTestingBuilder appBuilder)
     {
         foreach (var parameter in appBuilder.Resources.OfType<ParameterResource>())
         {
-            appBuilder.Configuration[$"Parameters:{parameter.Name}"] = overrides.TryGetValue(parameter.Name, out var overrideValue)
-                ? overrideValue
-                : parameter.Name.EndsWith(StateProtectionParameterSuffix, StringComparison.Ordinal)
-                    ? Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
-                    : "test";
+            appBuilder.Configuration[$"Parameters:{parameter.Name}"] = "test";
         }
     }
 
     // TripRadar's container-isolation pattern: never reuse a container, its name, or its volume
-    // state across test runs. A ground-truth model probe (see task-5-report.md) proved "storage"
+    // state across test runs. A ground-truth model probe proved "storage"
     // (the Azurite emulator) has CLR type AzureStorageResource, not ContainerResource — so this
     // walks IsContainer() (carries a ContainerImageAnnotation, the same test Aspire's own
     // ContainerResourceExtensions.IsContainer uses) rather than OfType<ContainerResource>(), and
@@ -241,10 +204,14 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
     {
         foreach (var resourceName in explicitStart)
         {
-            if (appBuilder.Resources.TryGetByName(resourceName, out var resource))
+            if (!appBuilder.Resources.TryGetByName(resourceName, out var resource))
             {
-                appBuilder.CreateResourceBuilder(resource).WithExplicitStart();
+                var available = string.Join(", ", appBuilder.Resources.Select(static r => r.Name));
+                throw new InvalidOperationException(
+                    $"ExplicitStart names unknown resource '{resourceName}'. Available: [{available}].");
             }
+
+            appBuilder.CreateResourceBuilder(resource).WithExplicitStart();
         }
     }
 
@@ -254,7 +221,7 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
     // started, that DCP-level "enter Running" wait blocks forever, upstream of and invisible to
     // WaitForResourceHealthyAsync. Strip every wait that targets an explicit-start resource or a
     // descendant of one, so kernel never blocks on a resource this fixture chose not to start.
-    private static IReadOnlyList<string> StripNeverStartingWaits(
+    private static void StripNeverStartingWaits(
         IDistributedApplicationTestingBuilder appBuilder,
         IReadOnlyList<string> explicitStart)
     {
@@ -276,7 +243,6 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
             }
         }
 
-        var stripped = new List<string>();
         foreach (var resource in appBuilder.Resources)
         {
             var waitsOnNeverStarting = resource.Annotations
@@ -287,15 +253,12 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
             foreach (var wait in waitsOnNeverStarting)
             {
                 resource.Annotations.Remove(wait);
-                stripped.Add($"{resource.Name} -> {wait.Resource.Name} ({wait.WaitType})");
             }
         }
-
-        return stripped;
     }
 
     // Walks the resource's parent chain up to the root, reporting whether any ancestor is one of
-    // the never-started resources. A ground-truth model probe (see task-5-report.md) proved the
+    // the never-started resources. A ground-truth model probe proved the
     // AI module's gemma4-12b model resource declares its parent purely through
     // IResourceWithParent<T>.Parent (CommunityToolkit's OllamaModelResource) and carries no
     // ResourceRelationshipAnnotation at all, so that interface is checked first; the
@@ -411,13 +374,13 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
     // BrainFor needs the shared IGrainFactory for many owners, not a single bound IDigitalBrain,
     // so this builds its own host — reusing RequireStorage and AddDigitalBrainClient so the
     // Orleans wiring itself stays in one place.
-    private async Task<IHost> ConnectScriptHostAsync()
+    private async Task<IHost> ConnectScriptHostAsync(string clientResource)
     {
         var clustering = await App.GetConnectionStringAsync(DigitalBrainNames.Clustering).ConfigureAwait(false);
 
         var hostBuilder = Host.CreateApplicationBuilder();
         hostBuilder.Configuration[$"ConnectionStrings:{DigitalBrainNames.Clustering}"] = clustering;
-        foreach (var (configurationKey, value) in await CaptureOrleansClientConfigurationAsync().ConfigureAwait(false))
+        foreach (var (configurationKey, value) in await CaptureOrleansClientConfigurationAsync(clientResource).ConfigureAwait(false))
         {
             hostBuilder.Configuration[configurationKey] = value;
         }
@@ -444,59 +407,48 @@ public class BrainAppHostFixture<TAppHost> : IAsyncLifetime
     // which Aspire injects into referencing projects as Orleans__* environment variables
     // (AppHost side: WithReference(brain.AsClient())). A freestanding HostApplicationBuilder
     // receives none of that, so Orleans' ClientClusteringValidator throws "Clustering has not
-    // been configured". Mirror the section verbatim from a client-shaped project in the running
-    // model — clustering configured, but no silo-only Reminders/GrainStorage sections — so
+    // been configured". Mirror the section verbatim from the named client-shaped project so
     // ClusterId, ServiceId, and provider service keys match the silo exactly.
-    private async Task<IReadOnlyDictionary<string, string>> CaptureOrleansClientConfigurationAsync()
+    private async Task<IReadOnlyDictionary<string, string>> CaptureOrleansClientConfigurationAsync(string clientResource)
     {
         var model = App.Services.GetRequiredService<DistributedApplicationModel>();
         var executionContext = App.Services.GetRequiredService<DistributedApplicationExecutionContext>();
-        var failures = new List<string>();
 
-        foreach (var project in model.GetProjectResources())
+        var project = model.GetProjectResources()
+            .FirstOrDefault(candidate => string.Equals(candidate.Name, clientResource, StringComparison.Ordinal))
+            ?? throw new InvalidOperationException(
+                $"No project resource named '{clientResource}' exists in the model; point "
+                + $"{nameof(BrainE2EOptions)}.{nameof(BrainE2EOptions.ClientResource)} at the Orleans-client-shaped project.");
+
+        var executionConfiguration = await ExecutionConfigurationBuilder.Create(project)
+            .WithEnvironmentVariablesConfig()
+            .BuildAsync(executionContext)
+            .ConfigureAwait(false);
+        if (executionConfiguration.Exception is not null)
         {
-            Dictionary<string, string> environment;
-            try
-            {
-                var executionConfiguration = await ExecutionConfigurationBuilder.Create(project)
-                    .WithEnvironmentVariablesConfig()
-                    .BuildAsync(executionContext)
-                    .ConfigureAwait(false);
-                if (executionConfiguration.Exception is not null)
-                {
-                    failures.Add($"{project.Name}: {executionConfiguration.Exception.Message}");
-                    continue;
-                }
-
-                environment = executionConfiguration.EnvironmentVariables.ToDictionary();
-            }
-            catch (Exception exception)
-            {
-                failures.Add($"{project.Name}: {exception.Message}");
-                continue;
-            }
-
-            var orleansConfiguration = environment
-                .Where(variable => variable.Key.StartsWith("Orleans__", StringComparison.Ordinal))
-                .ToDictionary(
-                    variable => variable.Key.Replace("__", ":", StringComparison.Ordinal),
-                    variable => variable.Value,
-                    StringComparer.Ordinal);
-
-            var isClientShaped = orleansConfiguration.ContainsKey("Orleans:Clustering:ProviderType")
-                && !orleansConfiguration.Keys.Any(key =>
-                    key.StartsWith("Orleans:Reminders:", StringComparison.Ordinal)
-                    || key.StartsWith("Orleans:GrainStorage:", StringComparison.Ordinal));
-            if (isClientShaped)
-            {
-                return orleansConfiguration;
-            }
+            throw new InvalidOperationException(
+                $"Environment could not be resolved for '{clientResource}': {executionConfiguration.Exception.Message}");
         }
 
-        throw new InvalidOperationException(
-            "No project resource exposes Orleans client configuration (an Orleans__Clustering__ProviderType "
-            + "environment variable without silo-only Reminders/GrainStorage sections), so the fixture "
-            + "cannot configure clustering for its own Orleans client host."
-            + (failures.Count == 0 ? string.Empty : $" Environment could not be resolved for: {string.Join("; ", failures)}"));
+        var orleansConfiguration = executionConfiguration.EnvironmentVariables
+            .Where(variable => variable.Key.StartsWith("Orleans__", StringComparison.Ordinal))
+            .ToDictionary(
+                variable => variable.Key.Replace("__", ":", StringComparison.Ordinal),
+                variable => variable.Value,
+                StringComparer.Ordinal);
+
+        var isClientShaped = orleansConfiguration.ContainsKey("Orleans:Clustering:ProviderType")
+            && !orleansConfiguration.Keys.Any(static key =>
+                key.StartsWith("Orleans:Reminders:", StringComparison.Ordinal)
+                || key.StartsWith("Orleans:GrainStorage:", StringComparison.Ordinal));
+        if (!isClientShaped)
+        {
+            throw new InvalidOperationException(
+                $"'{clientResource}' does not expose Orleans client configuration (an Orleans__Clustering__ProviderType "
+                + "environment variable without silo-only Reminders/GrainStorage sections); point "
+                + $"{nameof(BrainE2EOptions)}.{nameof(BrainE2EOptions.ClientResource)} at the client-shaped project.");
+        }
+
+        return orleansConfiguration;
     }
 }

@@ -1,7 +1,6 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Execution;
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Core;
 using DigitalBrain.Execution;
 using DigitalBrain.Integrations;
@@ -52,77 +51,40 @@ public sealed class ExecutionSimulationCollection : ICollectionFixture<Execution
 [Collection(ExecutionSimulationCollection.Name)]
 public sealed class ExecutionSpineTests(ExecutionSimulationFixture fixture)
 {
-    [Fact]
-    public async Task StartExecution_creates_context_and_runs_echo_capability()
+    [Theory]
+    [InlineData(ExecutionDriverKind.Agent, "test.echo", "test.echo.v1", "pong")]
+    [InlineData(ExecutionDriverKind.Agent, "gmail.search", "gmail.search.v1", "New Customer")]
+    [InlineData(ExecutionDriverKind.Script, "test.echo", "test.echo.v1", "pong")]
+    [InlineData(ExecutionDriverKind.Script, "gmail.search", "gmail.search.v1", "New Customer")]
+    public async Task StartExecution_invokes_allow_listed_capability(
+        ExecutionDriverKind driver,
+        string capability,
+        string schemaHash,
+        string payloadSnippet)
     {
         var brain = fixture.Sim.Brain;
-        var cancellationToken = TestContext.Current.CancellationToken;
         var executionId = ExecutionId.New();
-        var name = executionId.ToString();
-        var exec = brain.GetGrainProxy<IExecution>(name);
 
-        await exec.HandleAsync(
-            new StartExecution(
-                CommandId.New(),
-                executionId,
-                new SmartPromptWorkload(Guid.NewGuid(), Guid.NewGuid(), "hi"),
-                ExecutionDriverKind.Agent,
-                [CapabilityId.Parse("test.echo")]),
-            cancellationToken);
-
-        await JournalWait.ForAsync(
+        var execution = await ExecutionTestDriver.StartAndCompleteAsync(
             brain,
-            NeuronId.For<IExecution>(brain.Owner, name),
-            JournalKind.Outgoing,
-            delivery => delivery.Synapse is ExecutionLifecycle
-            {
-                Status: ExecutionStatus.Completed
-            });
+            executionId,
+            new SmartPromptWorkload(Guid.NewGuid(), Guid.NewGuid(), "hi"),
+            driver,
+            [CapabilityId.Parse(capability)],
+            cancellationToken: TestContext.Current.CancellationToken);
 
-        var ctx = brain.GetEntity<IExecutionContext>(name);
-        var entry = await ctx.Query(new ContextQuery(new ContextPath("test.echo")));
+        var executionContext = brain.GetEntity<IExecutionContext>(executionId.ToString());
+        var entry = await executionContext.Query(new ContextQuery(new ContextPath(capability)));
 
         Assert.NotNull(entry);
-        Assert.Contains("pong", entry!.PayloadJson, StringComparison.Ordinal);
+        Assert.Equal(schemaHash, entry!.SchemaHash);
+        Assert.Contains(payloadSnippet, entry.PayloadJson, StringComparison.Ordinal);
 
-        var projection = await exec.Read();
+        var projection = await execution.Read();
         Assert.Equal(ExecutionStatus.Completed, projection.Status);
         Assert.Equal(executionId, projection.ExecutionId);
-    }
-
-    [Fact]
-    public async Task FakeGmail_search_writes_schema_shaped_context()
-    {
-        var brain = fixture.Sim.Brain;
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var executionId = ExecutionId.New();
-        var name = executionId.ToString();
-        var exec = brain.GetGrainProxy<IExecution>(name);
-
-        await exec.HandleAsync(
-            new StartExecution(
-                CommandId.New(),
-                executionId,
-                new SmartPromptWorkload(Guid.NewGuid(), Guid.NewGuid(), "hi"),
-                ExecutionDriverKind.Agent,
-                [CapabilityId.Parse("gmail.search")]),
-            cancellationToken);
-
-        await JournalWait.ForAsync(
-            brain,
-            NeuronId.For<IExecution>(brain.Owner, name),
-            JournalKind.Outgoing,
-            delivery => delivery.Synapse is ExecutionLifecycle
-            {
-                Status: ExecutionStatus.Completed
-            });
-
-        var ctx = brain.GetEntity<IExecutionContext>(name);
-        var entry = await ctx.Query(new ContextQuery(new ContextPath("gmail.search")));
-
-        Assert.NotNull(entry);
-        Assert.Equal("gmail.search.v1", entry!.SchemaHash);
-        Assert.Contains("New Customer", entry.PayloadJson, StringComparison.Ordinal);
+        Assert.Equal(driver, projection.Driver);
+        Assert.IsType<SmartPromptWorkload>(projection.Workload);
     }
 
     [Fact]
@@ -132,51 +94,25 @@ public sealed class ExecutionSpineTests(ExecutionSimulationFixture fixture)
         var cancellationToken = TestContext.Current.CancellationToken;
 
         var firstId = ExecutionId.New();
-        var firstName = firstId.ToString();
-        var first = brain.GetGrainProxy<IExecution>(firstName);
-
-        await first.HandleAsync(
-            new StartExecution(
-                CommandId.New(),
-                firstId,
-                new SmartPromptWorkload(Guid.NewGuid(), Guid.NewGuid(), "search"),
-                ExecutionDriverKind.Agent,
-                [CapabilityId.Parse("gmail.search")]),
-            cancellationToken);
-
-        await JournalWait.ForAsync(
+        await ExecutionTestDriver.StartAndCompleteAsync(
             brain,
-            NeuronId.For<IExecution>(brain.Owner, firstName),
-            JournalKind.Outgoing,
-            delivery => delivery.Synapse is ExecutionLifecycle
-            {
-                Status: ExecutionStatus.Completed
-            });
+            firstId,
+            new SmartPromptWorkload(Guid.NewGuid(), Guid.NewGuid(), "search"),
+            ExecutionDriverKind.Agent,
+            [CapabilityId.Parse("gmail.search")],
+            cancellationToken: cancellationToken);
 
         var secondId = ExecutionId.New();
-        var secondName = secondId.ToString();
-        var second = brain.GetGrainProxy<IExecution>(secondName);
-
-        await second.HandleAsync(
-            new StartExecution(
-                CommandId.New(),
-                secondId,
-                new ChatTurnWorkload(new NeuronId("chat", brain.Owner, "main"), Guid.NewGuid(), "follow-up"),
-                ExecutionDriverKind.Agent,
-                Grants: [],
-                RelatedExecutions: [firstId]),
-            cancellationToken);
-
-        await JournalWait.ForAsync(
+        await ExecutionTestDriver.StartAndCompleteAsync(
             brain,
-            NeuronId.For<IExecution>(brain.Owner, secondName),
-            JournalKind.Outgoing,
-            delivery => delivery.Synapse is ExecutionLifecycle
-            {
-                Status: ExecutionStatus.Completed
-            });
+            secondId,
+            new ChatTurnWorkload(new NeuronId("chat", brain.Owner, "main"), Guid.NewGuid(), "follow-up"),
+            ExecutionDriverKind.Agent,
+            grants: [],
+            relatedExecutions: [firstId],
+            cancellationToken: cancellationToken);
 
-        var secondContext = brain.GetEntity<IExecutionContext>(secondName);
+        var secondContext = brain.GetEntity<IExecutionContext>(secondId.ToString());
         var entry = await secondContext.Query(new ContextQuery(new ContextPath("gmail.search")));
 
         Assert.NotNull(entry);
@@ -184,90 +120,31 @@ public sealed class ExecutionSpineTests(ExecutionSimulationFixture fixture)
         Assert.Contains("New Customer", entry.PayloadJson, StringComparison.Ordinal);
     }
 
-    [Theory]
-    [InlineData("test.echo", "test.echo", "test.echo.v1", "pong")]
-    [InlineData("gmail.search", "gmail.search", "gmail.search.v1", "New Customer")]
-    public async Task StartExecution_ScriptDriver_invokes_allow_listed_capability(
-        string capability,
-        string contextPath,
-        string schemaHash,
-        string payloadSnippet)
-    {
-        var brain = fixture.Sim.Brain;
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var executionId = ExecutionId.New();
-        var name = executionId.ToString();
-        var exec = brain.GetGrainProxy<IExecution>(name);
-
-        await exec.HandleAsync(
-            new StartExecution(
-                CommandId.New(),
-                executionId,
-                new SmartPromptWorkload(Guid.NewGuid(), Guid.NewGuid(), "script seam"),
-                ExecutionDriverKind.Script,
-                [CapabilityId.Parse(capability)]),
-            cancellationToken);
-
-        await JournalWait.ForAsync(
-            brain,
-            NeuronId.For<IExecution>(brain.Owner, name),
-            JournalKind.Outgoing,
-            delivery => delivery.Synapse is ExecutionLifecycle
-            {
-                Status: ExecutionStatus.Completed
-            });
-
-        var ctx = brain.GetEntity<IExecutionContext>(name);
-        var entry = await ctx.Query(new ContextQuery(new ContextPath(contextPath)));
-
-        Assert.NotNull(entry);
-        Assert.Equal(schemaHash, entry!.SchemaHash);
-        Assert.Contains(payloadSnippet, entry.PayloadJson, StringComparison.Ordinal);
-
-        var projection = await exec.Read();
-        Assert.Equal(ExecutionStatus.Completed, projection.Status);
-        Assert.Equal(ExecutionDriverKind.Script, projection.Driver);
-        Assert.IsType<SmartPromptWorkload>(projection.Workload);
-    }
-
     [Fact]
     public async Task StartExecution_TeamWorkload_runs_researcher_then_closer_and_writes_team_trace()
     {
         var brain = fixture.Sim.Brain;
-        var cancellationToken = TestContext.Current.CancellationToken;
         var executionId = ExecutionId.New();
-        var name = executionId.ToString();
-        var exec = brain.GetGrainProxy<IExecution>(name);
 
-        await exec.HandleAsync(
-            new StartExecution(
-                CommandId.New(),
-                executionId,
-                new TeamWorkload(
-                    Goal: "Research lead then close in Salesforce",
-                    ParticipantNames: ["researcher", "closer"]),
-                ExecutionDriverKind.Team,
-                [
-                    CapabilityId.Parse("gmail.search"),
-                    CapabilityId.Parse("websearch.company"),
-                    CapabilityId.Parse("salesforce.upsert"),
-                ]),
-            cancellationToken);
-
-        await JournalWait.ForAsync(
+        var execution = await ExecutionTestDriver.StartAndCompleteAsync(
             brain,
-            NeuronId.For<IExecution>(brain.Owner, name),
-            JournalKind.Outgoing,
-            delivery => delivery.Synapse is ExecutionLifecycle
-            {
-                Status: ExecutionStatus.Completed
-            });
+            executionId,
+            new TeamWorkload(
+                Goal: "Research lead then close in Salesforce",
+                ParticipantNames: ["researcher", "closer"]),
+            ExecutionDriverKind.Team,
+            [
+                CapabilityId.Parse("gmail.search"),
+                CapabilityId.Parse("websearch.company"),
+                CapabilityId.Parse("salesforce.upsert"),
+            ],
+            cancellationToken: TestContext.Current.CancellationToken);
 
-        var ctx = brain.GetEntity<IExecutionContext>(name);
-        var gmail = await ctx.Query(new ContextQuery(new ContextPath("gmail.search")));
-        var websearch = await ctx.Query(new ContextQuery(new ContextPath("websearch.company")));
-        var salesforce = await ctx.Query(new ContextQuery(new ContextPath("salesforce.upsert")));
-        var teamTrace = await ctx.Query(new ContextQuery(new ContextPath("team.trace")));
+        var executionContext = brain.GetEntity<IExecutionContext>(executionId.ToString());
+        var gmail = await executionContext.Query(new ContextQuery(new ContextPath("gmail.search")));
+        var websearch = await executionContext.Query(new ContextQuery(new ContextPath("websearch.company")));
+        var salesforce = await executionContext.Query(new ContextQuery(new ContextPath("salesforce.upsert")));
+        var teamTrace = await executionContext.Query(new ContextQuery(new ContextPath("team.trace")));
 
         Assert.NotNull(gmail);
         Assert.Equal("gmail.search.v1", gmail!.SchemaHash);
@@ -283,7 +160,7 @@ public sealed class ExecutionSpineTests(ExecutionSimulationFixture fixture)
         Assert.Contains("websearch.company", teamTrace.PayloadJson, StringComparison.Ordinal);
         Assert.Contains("salesforce.upsert", teamTrace.PayloadJson, StringComparison.Ordinal);
 
-        var projection = await exec.Read();
+        var projection = await execution.Read();
         Assert.Equal(ExecutionStatus.Completed, projection.Status);
         Assert.Equal(ExecutionDriverKind.Team, projection.Driver);
         Assert.IsType<TeamWorkload>(projection.Workload);

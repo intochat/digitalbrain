@@ -1,8 +1,9 @@
+using System.Globalization;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Testing;
+using DigitalBrain.Testing.E2E;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -19,7 +20,7 @@ public sealed class NamesConformanceTests(ModelFixture fixture)
     {
         var environment = await fixture.Model.RenderedEnvironmentAsync(ProductSurfaceResourceNames.Kernel);
 
-        Assert.True(environment.ContainsKey("DigitalBrain__AI__Ollama__IEmbeddingGemma__Model"));
+        Assert.Contains("DigitalBrain__AI__Ollama__IEmbeddingGemma__Model", environment.Keys);
     }
 
     [Theory]
@@ -31,7 +32,7 @@ public sealed class NamesConformanceTests(ModelFixture fixture)
     {
         var environment = await fixture.Model.RenderedEnvironmentAsync(ProductSurfaceResourceNames.Kernel);
 
-        Assert.True(environment.ContainsKey(configurationKey));
+        Assert.Contains(configurationKey, environment.Keys);
     }
 
     [Fact]
@@ -39,9 +40,16 @@ public sealed class NamesConformanceTests(ModelFixture fixture)
     {
         var environment = await fixture.Model.RenderedEnvironmentAsync(ProductSurfaceResourceNames.Kernel);
 
+        // Sorted by the numeric index suffix, not ordinally: an ordinal key sort would place
+        // DigitalBrain__Modules__10 before __2 once the manifest reaches eleven modules.
+        // Non-index keys (e.g. a future DigitalBrain__Modules__0__Type) are filtered out
+        // rather than crashing the parse.
+        const string ModuleKeyPrefix = "DigitalBrain__Modules__";
         var modules = environment
-            .Where(static pair => pair.Key.StartsWith("DigitalBrain__Modules__", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(static pair => pair.Key, StringComparer.Ordinal)
+            .Where(static pair => pair.Key.StartsWith(ModuleKeyPrefix, StringComparison.OrdinalIgnoreCase))
+            .Select(static pair => (Suffix: pair.Key[ModuleKeyPrefix.Length..], pair.Value))
+            .Where(static pair => int.TryParse(pair.Suffix, NumberStyles.None, CultureInfo.InvariantCulture, out _))
+            .OrderBy(static pair => int.Parse(pair.Suffix, CultureInfo.InvariantCulture))
             .Select(static pair => pair.Value)
             .ToArray();
 
@@ -76,20 +84,7 @@ public sealed class NamesConformanceTests(ModelFixture fixture)
     [Fact]
     public async Task WithBrainTestModeStampsTestingModeEnvironmentVariable()
     {
-        // Throwaway builder/resource, unrelated to the shared AppHost model: this exercises the
-        // WithBrainTestMode() SDK helper itself, not product topology. AddExecutable + the same
-        // ExecutionConfigurationBuilder rendering path BrainModel.RenderedEnvironmentAsync uses
-        // keeps this model-only — building it never starts anything.
-        var builder = DistributedApplication.CreateBuilder([]);
-        var throwaway = builder.AddExecutable("throwaway", "true", ".").WithBrainTestMode();
-
-        var configuration = await ExecutionConfigurationBuilder.Create(throwaway.Resource)
-            .WithEnvironmentVariablesConfig()
-            .BuildAsync(
-                new(DistributedApplicationOperation.Publish),
-                NullLogger.Instance,
-                TestContext.Current.CancellationToken);
-        var environment = configuration.EnvironmentVariables.ToDictionary();
+        var environment = await RenderStampedThrowawayAsync(static throwaway => throwaway.WithBrainTestMode());
 
         Assert.True(environment.TryGetValue("DigitalBrain__Mode", out var mode));
         Assert.Equal(DigitalBrainNames.TestingMode, mode);
@@ -98,9 +93,21 @@ public sealed class NamesConformanceTests(ModelFixture fixture)
     [Fact]
     public async Task WithDigitalBrainFakesStampsFakesEnabledEnvironmentVariable()
     {
+        var environment = await RenderStampedThrowawayAsync(static throwaway => throwaway.WithDigitalBrainFakes());
+
+        Assert.True(environment.TryGetValue("DigitalBrain__Fakes__Enabled", out var enabled));
+        Assert.Equal("true", enabled);
+    }
+
+    // Throwaway builder/resource, unrelated to the shared AppHost model: these two tests exercise
+    // an SDK stamping helper itself, not product topology. AddExecutable + the same
+    // ExecutionConfigurationBuilder rendering path BrainModel.RenderedEnvironmentAsync uses keeps
+    // this model-only — building it never starts anything.
+    private static async Task<Dictionary<string, string>> RenderStampedThrowawayAsync(
+        Func<IResourceBuilder<ExecutableResource>, IResourceBuilder<ExecutableResource>> stamp)
+    {
         var builder = DistributedApplication.CreateBuilder([]);
-        var throwaway = builder.AddExecutable("throwaway", "true", ".")
-            .WithDigitalBrainFakes();
+        var throwaway = stamp(builder.AddExecutable("throwaway", "true", "."));
 
         var configuration = await ExecutionConfigurationBuilder.Create(throwaway.Resource)
             .WithEnvironmentVariablesConfig()
@@ -108,9 +115,6 @@ public sealed class NamesConformanceTests(ModelFixture fixture)
                 new(DistributedApplicationOperation.Publish),
                 NullLogger.Instance,
                 TestContext.Current.CancellationToken);
-        var environment = configuration.EnvironmentVariables.ToDictionary();
-
-        Assert.True(environment.TryGetValue("DigitalBrain__Fakes__Enabled", out var enabled));
-        Assert.Equal("true", enabled);
+        return configuration.EnvironmentVariables.ToDictionary();
     }
 }

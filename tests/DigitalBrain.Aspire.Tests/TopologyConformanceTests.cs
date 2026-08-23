@@ -11,16 +11,26 @@ namespace DigitalBrain.Aspire.Tests;
 public sealed class TopologyConformanceTests(ModelFixture fixture)
 {
     [Theory]
-    [InlineData(DigitalBrainNames.Storage)]
     [InlineData(DigitalBrainNames.Clustering)]
     [InlineData(DigitalBrainNames.Reminders)]
     [InlineData(DigitalBrainNames.Journal)]
     [InlineData(DigitalBrainNames.GrainState)]
     public void FabricResourceExists(string resourceName)
     {
+        // Model.Resource throws with the available names when the resource is missing — that
+        // throw IS the existence assertion; the connection-string check adds the shape the
+        // fabric contract relies on (kernel consumes each fabric resource as a connection string).
         var resource = fixture.Model.Resource(resourceName);
 
-        Assert.Equal(resourceName, resource.Name);
+        Assert.IsAssignableFrom<IResourceWithConnectionString>(resource);
+    }
+
+    [Fact]
+    public void StorageResourceExists()
+    {
+        // The emulator parent exposes no connection string itself (its blob/table children do,
+        // covered above) — existence is the assertion, via Resource's throwing lookup.
+        Assert.NotNull(fixture.Model.Resource(DigitalBrainNames.Storage));
     }
 
     [Theory]
@@ -30,7 +40,7 @@ public sealed class TopologyConformanceTests(ModelFixture fixture)
     {
         var resource = fixture.Model.Resource(resourceName);
 
-        Assert.Equal(resourceName, resource.Name);
+        Assert.IsAssignableFrom<ProjectResource>(resource);
     }
 
     [Fact]

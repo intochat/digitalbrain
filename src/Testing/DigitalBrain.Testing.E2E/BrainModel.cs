@@ -3,10 +3,10 @@ using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace DigitalBrain.Testing;
+namespace DigitalBrain.Testing.E2E;
 
-// Tier 1: builds the AppHost model without starting any resource, for
-// topology/env-var assertions that run in milliseconds.
+// Builds the AppHost model without starting any resource, for topology/env-var
+// conformance assertions that run in milliseconds.
 public sealed class BrainModel : IAsyncDisposable
 {
     private readonly DistributedApplication _app;
@@ -27,9 +27,8 @@ public sealed class BrainModel : IAsyncDisposable
             .ConfigureAwait(false);
 
         // Plain "test" for every parameter is safe here specifically because BrainModel never
-        // calls StartAsync — nothing reads or shape-validates a parameter's value (e.g. the
-        // state-protection key's required 256-bit length) unless a resource's process actually
-        // starts, which only Tier 3's BrainAppHostFixture does.
+        // calls StartAsync — nothing reads or shape-validates a parameter's value unless a
+        // resource's process actually starts, which only BrainAppHostFixture does.
         foreach (var parameter in builder.Resources.OfType<ParameterResource>())
         {
             builder.Configuration[$"Parameters:{parameter.Name}"] = "test";

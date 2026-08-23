@@ -13,22 +13,7 @@ namespace DigitalBrain.Testing;
 // instead adopts the earliest still-readable sequence, so the retained window gets scanned
 // rather than silently skipped.
 // Distinct from TimeoutException: this is "unknowable", not "not yet".
-public sealed class JournalCompactedException : InvalidOperationException
-{
-    public JournalCompactedException()
-    {
-    }
-
-    public JournalCompactedException(string message)
-        : base(message)
-    {
-    }
-
-    public JournalCompactedException(string message, Exception innerException)
-        : base(message, innerException)
-    {
-    }
-}
+public sealed class JournalCompactedException(string message) : InvalidOperationException(message);
 
 public static class JournalWait
 {

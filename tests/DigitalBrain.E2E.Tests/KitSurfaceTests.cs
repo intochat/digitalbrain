@@ -33,17 +33,21 @@ public sealed class KitSurfaceTests(AppHostFixture fixture)
         var response = await http.GetAsync("/kit/charts/chart-e2e", cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        Assert.Contains("\"title\":\"Sales\"", body, StringComparison.Ordinal);
-        Assert.Contains("\"label\":\"Q1\"", body, StringComparison.Ordinal);
+        var payload = await response.Content.ReadFromJsonAsync<ChartState>(WireJson, cancellationToken);
+        Assert.NotNull(payload);
+        Assert.Equal("Sales", payload!.Title);
+        Assert.Equal("bar", payload.ChartKind);
+        Assert.Contains(payload.Points, point => point.Label == "Q1");
     }
 
-    [Fact]
-    public async Task UnknownChartNameReturnsNotFound()
+    [Theory]
+    [InlineData("/kit/charts/no-such-chart")]
+    [InlineData("/kit/images/no-such-image")]
+    [InlineData("/kit/images/no-such-image/content")]
+    public async Task UnknownKitEntityNameReturnsNotFound(string route)
     {
         using var http = fixture.CreateHttpClient("kernel");
-        var response = await http.GetAsync(
-            "/kit/charts/no-such-chart", TestContext.Current.CancellationToken);
+        var response = await http.GetAsync(route, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -62,29 +66,13 @@ public sealed class KitSurfaceTests(AppHostFixture fixture)
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        Assert.Contains("\"prompt\":\"a red fox\"", body, StringComparison.Ordinal);
-        Assert.Contains("\"mediaType\":\"image/png\"", body, StringComparison.Ordinal);
+        // The one deliberate wire-level negative: blobName is storage-internal and must never
+        // appear in the serialized image JSON under any name or casing.
         Assert.DoesNotContain("blobName", body, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task UnknownImageNameReturnsNotFound()
-    {
-        using var http = fixture.CreateHttpClient("kernel");
-        var response = await http.GetAsync(
-            "/kit/images/no-such-image", TestContext.Current.CancellationToken);
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task ImageContentForAnUnknownNameReturnsNotFound()
-    {
-        using var http = fixture.CreateHttpClient("kernel");
-        var response = await http.GetAsync(
-            "/kit/images/no-such-image/content", TestContext.Current.CancellationToken);
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var payload = JsonSerializer.Deserialize<KitImageStateResponse>(body, WireJson);
+        Assert.NotNull(payload);
+        Assert.Equal("a red fox", payload!.Prompt);
+        Assert.Equal("image/png", payload.MediaType);
     }
 
     // PrincipalPartition.InstanceName rejects whitespace in the local name (IdentityPart's
@@ -125,8 +113,8 @@ public sealed class KitSurfaceTests(AppHostFixture fixture)
 
         var chart = await http.GetAsync($"/kit/charts/{cardName}", cancellationToken);
         Assert.Equal(HttpStatusCode.OK, chart.StatusCode);
-        var body = await chart.Content.ReadAsStringAsync(cancellationToken);
-        Assert.Contains("\"title\":\"Test chart\"", body, StringComparison.Ordinal);
+        var payload = await chart.Content.ReadFromJsonAsync<ChartState>(WireJson, cancellationToken);
+        Assert.Equal("Test chart", payload?.Title);
     }
 
     // UC2 end to end, closing the image-content 200 coverage gap deferred from Task 8: the
@@ -154,8 +142,8 @@ public sealed class KitSurfaceTests(AppHostFixture fixture)
 
         var image = await http.GetAsync($"/kit/images/{cardName}", cancellationToken);
         Assert.Equal(HttpStatusCode.OK, image.StatusCode);
-        var body = await image.Content.ReadAsStringAsync(cancellationToken);
-        Assert.Contains("\"mediaType\":\"image/png\"", body, StringComparison.Ordinal);
+        var payload = await image.Content.ReadFromJsonAsync<KitImageStateResponse>(WireJson, cancellationToken);
+        Assert.Equal("image/png", payload?.MediaType);
 
         var content = await http.GetAsync($"/kit/images/{cardName}/content", cancellationToken);
         Assert.Equal(HttpStatusCode.OK, content.StatusCode);
@@ -189,7 +177,7 @@ public sealed class KitSurfaceTests(AppHostFixture fixture)
                         continue;
                     }
 
-                    var turn = JsonSerializer.Deserialize<TurnPayload>(sseEvent.Data, EventJson);
+                    var turn = JsonSerializer.Deserialize<TurnPayload>(sseEvent.Data, WireJson);
                     var card = turn?.Cards?.FirstOrDefault(
                         c => string.Equals(c.Kind, expectedKind, StringComparison.Ordinal));
                     if (card is not null)
@@ -208,7 +196,13 @@ public sealed class KitSurfaceTests(AppHostFixture fixture)
         return null!; // Unreachable: Assert.Fail throws.
     }
 
-    private static readonly JsonSerializerOptions EventJson = new(JsonSerializerDefaults.Web);
+    // Deliberately case-SENSITIVE camelCase (not JsonSerializerDefaults.Web, whose
+    // case-insensitive matching would let a wire-casing change slip through): the Flutter
+    // shell parses these exact keys, so the tests must pin them.
+    private static readonly JsonSerializerOptions WireJson = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
 
     private sealed record TurnPayload(TurnCard[]? Cards);
 
