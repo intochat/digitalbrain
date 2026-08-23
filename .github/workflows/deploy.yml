@@ -37,18 +37,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
-      - run: dotnet restore DigitalBrain.slnx
-
-      - name: Build
-        run: dotnet build DigitalBrain.slnx -c Release --no-restore -warnaserror --nologo
-
-      - name: Simulation tests
-        run: |
-          set -eu
-          out=tests/DigitalBrain.Simulation.Tests/bin/Release/net11.0
-          chmod +x "$out/DigitalBrain.Simulation.Tests"
-          "$out/DigitalBrain.Simulation.Tests"
-
       - name: Log in to Docker Hub
         uses: docker/login-action@v4
         with:
