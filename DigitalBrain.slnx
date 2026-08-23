@@ -33,6 +33,9 @@
     <Project Path="src/Modules/Execution/Contracts/DigitalBrain.Modules.Execution.Contracts.csproj" />
     <Project Path="src/Modules/Execution/Execution/DigitalBrain.Modules.Execution.csproj" />
   </Folder>
+  <Folder Name="/Modules/Integrations/">
+    <Project Path="src/Modules/Integrations/DigitalBrain.Modules.Integrations.csproj" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
   </Folder>

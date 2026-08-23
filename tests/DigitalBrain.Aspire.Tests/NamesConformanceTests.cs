@@ -1,6 +1,7 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -49,6 +50,8 @@ public sealed class NamesConformanceTests(ModelFixture fixture)
                 "DigitalBrain.AI.AIModule, DigitalBrain.Modules.AI",
                 "DigitalBrain.Memory.MemoryModule, DigitalBrain.Modules.Memory",
                 "DigitalBrain.Time.TimeModule, DigitalBrain.Modules.Time",
+                "DigitalBrain.Execution.ExecutionModule, DigitalBrain.Modules.Execution",
+                "DigitalBrain.Integrations.IntegrationsModule, DigitalBrain.Modules.Integrations",
                 "DigitalBrain.UI.UIModule, DigitalBrain.Modules.UI",
             ],
             modules);
@@ -89,5 +92,24 @@ public sealed class NamesConformanceTests(ModelFixture fixture)
 
         Assert.True(environment.TryGetValue("DigitalBrain__Mode", out var mode));
         Assert.Equal(DigitalBrainNames.TestingMode, mode);
+    }
+
+    [Fact]
+    public async Task WithDigitalBrainFakesStampsFakesEnabledEnvironmentVariable()
+    {
+        var builder = DistributedApplication.CreateBuilder([]);
+        var throwaway = builder.AddExecutable("throwaway", "true", ".")
+            .WithDigitalBrainFakes();
+
+        var configuration = await ExecutionConfigurationBuilder.Create(throwaway.Resource)
+            .WithEnvironmentVariablesConfig()
+            .BuildAsync(
+                new(DistributedApplicationOperation.Publish),
+                NullLogger.Instance,
+                TestContext.Current.CancellationToken);
+        var environment = configuration.EnvironmentVariables.ToDictionary();
+
+        Assert.True(environment.TryGetValue("DigitalBrain__Fakes__Enabled", out var enabled));
+        Assert.Equal("true", enabled);
     }
 }

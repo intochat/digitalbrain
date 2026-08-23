@@ -4,6 +4,7 @@ using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Core;
 using DigitalBrain.Execution;
+using DigitalBrain.Integrations;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -22,6 +23,7 @@ public sealed class ExecutionSimulationFixture : IAsyncLifetime
             Modules = new ModuleManifest(
                 [
                     typeof(ExecutionModule),
+                    typeof(IntegrationsModule),
                     typeof(DigitalBrain.Time.TimeModule),
                 ]),
             Configuration = new Dictionary<string, string?>
@@ -86,5 +88,40 @@ public sealed class ExecutionSpineTests(ExecutionSimulationFixture fixture)
         var projection = await exec.Read();
         Assert.Equal(ExecutionStatus.Completed, projection.Status);
         Assert.Equal(executionId, projection.ExecutionId);
+    }
+
+    [Fact]
+    public async Task FakeGmail_search_writes_schema_shaped_context()
+    {
+        var brain = fixture.Sim.Brain;
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var executionId = ExecutionId.New();
+        var name = executionId.ToString();
+        var exec = brain.GetGrainProxy<IExecution>(name);
+
+        await exec.HandleAsync(
+            new StartExecution(
+                CommandId.New(),
+                executionId,
+                new ChatTurnWorkload(new NeuronId("chat", brain.Owner, "main"), Guid.NewGuid(), "hi"),
+                ExecutionDriverKind.Agent,
+                [CapabilityId.Parse("gmail.search")]),
+            cancellationToken);
+
+        await JournalWait.ForAsync(
+            brain,
+            NeuronId.For<IExecution>(brain.Owner, name),
+            JournalKind.Outgoing,
+            delivery => delivery.Synapse is ExecutionLifecycle
+            {
+                Status: ExecutionStatus.Completed
+            });
+
+        var ctx = brain.GetEntity<IExecutionContext>(name);
+        var entry = await ctx.Query(new ContextQuery(new ContextPath("gmail.search")));
+
+        Assert.NotNull(entry);
+        Assert.Equal("gmail.search.v1", entry!.SchemaHash);
+        Assert.Contains("New Customer", entry.PayloadJson, StringComparison.Ordinal);
     }
 }

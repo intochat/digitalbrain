@@ -7,6 +7,8 @@ using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.OpenAI;
 using DigitalBrain.AI.XAI;
 using DigitalBrain.Aspire.Hosting;
+using DigitalBrain.Execution;
+using DigitalBrain.Integrations;
 using DigitalBrain.Memory;
 using DigitalBrain.Memory.Aspire.Hosting;
 using DigitalBrain.Time;
@@ -39,10 +41,17 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
     })
     .AddModule<MemoryModule>(memory => memory.WithQdrant())
     .AddModule<TimeModule>()
+    .AddModule<ExecutionModule>()
+    .AddModule<IntegrationsModule>()
     .AddModule<UIModule>(ui =>
     {
         ui.WithWindowHost();
     });
+
+if (builder.Environment.IsDevelopment())
+{
+    brain.WithDigitalBrainFakes();
+}
 
 var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceResources.Kernel)
     .WithReference(brain)
