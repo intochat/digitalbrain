@@ -72,7 +72,7 @@ public sealed class ContextProviderTests(ExecutionSimulationFixture fixture)
             new StartExecution(
                 CommandId.New(),
                 executionId,
-                new ChatTurnWorkload(new NeuronId("chat", brain.Owner, "main"), Guid.NewGuid(), "why?"),
+                new SmartPromptWorkload(Guid.NewGuid(), Guid.NewGuid(), "why?"),
                 ExecutionDriverKind.Agent,
                 [CapabilityId.Parse("explain.why")]),
             cancellationToken);
@@ -91,7 +91,7 @@ public sealed class ContextProviderTests(ExecutionSimulationFixture fixture)
         Assert.NotNull(entry);
         Assert.Equal("explain.trace.v1", entry!.SchemaHash);
         Assert.Contains(executionId.ToString(), entry.PayloadJson, StringComparison.Ordinal);
-        Assert.Contains("ChatTurnWorkload", entry.PayloadJson, StringComparison.Ordinal);
+        Assert.Contains("SmartPromptWorkload", entry.PayloadJson, StringComparison.Ordinal);
         Assert.Contains("preferences.rules", entry.PayloadJson, StringComparison.Ordinal);
         Assert.Contains("Never share personal emails.", entry.PayloadJson, StringComparison.Ordinal);
         Assert.Contains("Based on active execution context and preferences.", entry.PayloadJson, StringComparison.Ordinal);

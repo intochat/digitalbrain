@@ -64,21 +64,18 @@ KitGalleryScreen) is the starting point for the widget side.
 
 ## Smart Prompts
 
-`SmartPromptEntity`: name, plain-English prompt, resolved bindings, trigger,
-enabled, run refs.
+Canonical design: [docs/superpowers/specs/2026-08-23-smart-prompt-execution-architecture-design.md](superpowers/specs/2026-08-23-smart-prompt-execution-architecture-design.md).
 
-- `@Gmail` in a prompt = hard binding to the Google module's `IGmail` neuron
-  toolset — deterministic, no retrieval.
-- Unpinned capability comes from vector retrieval: every module publishes tool
-  descriptions into a Qdrant capability-catalog collection; the runner
-  retrieves top-k tools for the prompt text.
-- `SmartPromptRunner` neuron (ChatTurnWorker pattern) executes with exactly the
-  bound + retrieved toolset; progress via ProgressCard; output cards land in
-  the owning chat.
-- Triggers v1: manual, scheduled (Time module), chat-invoked. Event-driven
-  (Gmail push etc.) is phase 2.
-- Creation: by hand (Form component) or by asking the chat
-  (`create_smart_prompt` tool). Same entity either way.
+Product surface: English + binding chips (logos), not generated C#. Under the hood each
+fire is `StartExecution(SmartPromptWorkload)` on the shared Execution Neuron with an
+`ExecutionContext` Entity. Façade modules (Gmail/Salesforce/Search) return `ContextDelta`
+via Fake transports today; real MCP swaps behind `I*Transport` later.
+
+- Chips bind Capability grants + Account EntityRefs (deterministic).
+- Chat turns also start Executions; `ActiveExecutionId` + related Context lineage
+  support follow-ups.
+- Triggers v1: manual Run now + schedule reminder; event-driven later.
+- Preferences / context providers / explainability seed Executions (IAW-inspired).
 
 ## Integration modules
 

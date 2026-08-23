@@ -29,6 +29,7 @@ public sealed class AgentToolTests
             Modules = new ModuleManifest(
                 [
                     typeof(DigitalBrain.Time.TimeModule),
+                    typeof(DigitalBrain.Execution.ExecutionModule),
                     typeof(DigitalBrain.UI.UIModule),
                     typeof(DigitalBrain.AI.AIModule),
                     typeof(DigitalBrain.Memory.MemoryModule),

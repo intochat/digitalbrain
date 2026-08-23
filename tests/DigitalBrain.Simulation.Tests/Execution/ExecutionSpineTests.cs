@@ -65,7 +65,7 @@ public sealed class ExecutionSpineTests(ExecutionSimulationFixture fixture)
             new StartExecution(
                 CommandId.New(),
                 executionId,
-                new ChatTurnWorkload(new NeuronId("chat", brain.Owner, "main"), Guid.NewGuid(), "hi"),
+                new SmartPromptWorkload(Guid.NewGuid(), Guid.NewGuid(), "hi"),
                 ExecutionDriverKind.Agent,
                 [CapabilityId.Parse("test.echo")]),
             cancellationToken);
@@ -103,7 +103,7 @@ public sealed class ExecutionSpineTests(ExecutionSimulationFixture fixture)
             new StartExecution(
                 CommandId.New(),
                 executionId,
-                new ChatTurnWorkload(new NeuronId("chat", brain.Owner, "main"), Guid.NewGuid(), "hi"),
+                new SmartPromptWorkload(Guid.NewGuid(), Guid.NewGuid(), "hi"),
                 ExecutionDriverKind.Agent,
                 [CapabilityId.Parse("gmail.search")]),
             cancellationToken);
@@ -139,7 +139,7 @@ public sealed class ExecutionSpineTests(ExecutionSimulationFixture fixture)
             new StartExecution(
                 CommandId.New(),
                 firstId,
-                new ChatTurnWorkload(new NeuronId("chat", brain.Owner, "main"), Guid.NewGuid(), "search"),
+                new SmartPromptWorkload(Guid.NewGuid(), Guid.NewGuid(), "search"),
                 ExecutionDriverKind.Agent,
                 [CapabilityId.Parse("gmail.search")]),
             cancellationToken);
