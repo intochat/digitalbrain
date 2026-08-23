@@ -1,0 +1,76 @@
+name: deploy
+
+# Release-gated image publish (v0.1.18 pattern, v2 layout).
+# Publishes Kernel (+ MCP) to Docker Hub. Azure ACA / SWA / Pulumi come back in a later step.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Container image tag (defaults to GITHUB_SHA)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-images
+  cancel-in-progress: false
+
+jobs:
+  publish-images:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag || github.sha }}
+      DOTNET_NOLOGO: 'true'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v5
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', 'global.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - run: dotnet restore DigitalBrain.slnx
+
+      - name: Build
+        run: dotnet build DigitalBrain.slnx -c Release --no-restore -warnaserror --nologo
+
+      - name: Simulation tests
+        run: >
+          dotnet test tests/DigitalBrain.Simulation.Tests/DigitalBrain.Simulation.Tests.csproj
+          -c Release --nologo
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Publish kernel image
+        run: |
+          dotnet publish src/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj \
+            -c Release -r linux-x64 /t:PublishContainer \
+            -p:ContainerRegistry=docker.io \
+            -p:ContainerRepository=${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-kernel \
+            -p:ContainerImageTags="${TAG};latest"
+
+      - name: Publish MCP image
+        run: |
+          dotnet publish src/Kernel/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj \
+            -c Release -r linux-x64 /t:PublishContainer \
+            -p:ContainerRegistry=docker.io \
+            -p:ContainerRepository=${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-mcp \
+            -p:ContainerImageTags="${TAG};latest"

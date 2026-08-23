@@ -1,20 +1,20 @@
 # syntax=docker/dockerfile:1
 #
-# Product image: digitalbrain
-#   - Orleans silo (DigitalBrain.Kernel) — brokers + health on 8080
-#   - Northbound MCP (DigitalBrain.Mcp) as cluster client at /mcp on port 5000
-#   - AppHost remains separate for local aspire run; Docker does not include AppHost
+# Local/smoke multi-process image (silo + MCP supervised together).
+# Production Hub pushes use SDK PublishContainer from .github/workflows/deploy.yml
+# (same pattern as v0.1.18): separate digitalbrain-kernel and digitalbrain-mcp images.
 #
 # Build (repo root):
-#   docker build -f src/Kernel/DigitalBrain.Kernel/Dockerfile -t digitalbrain .
+#   docker build -f src/Kernel/DigitalBrain.Kernel/Dockerfile -t vhorbachov/digitalbrain-kernel:local .
 #
 # No secrets are baked into this image. Inject at run/deploy (Azure Key Vault → env):
 #
-#   Models selected by AppHost
-#     DigitalBrain__AI__Ollama__Endpoint           # e.g. http://host.docker.internal:11434
-#     DigitalBrain__AI__Ollama__IGemma4__Model
-#     DigitalBrain__AI__Ollama__IEmbeddingGemma__Model
-#     DigitalBrain__AI__Whisper__ModelId
+#   Models (cloud prod — prefer API keys; Ollama is local/dev)
+#     DigitalBrain__AI__OpenAI__ApiKey
+#     DigitalBrain__AI__Anthropic__ApiKey
+#     DigitalBrain__AI__Google__ApiKey
+#     DigitalBrain__AI__XAI__ApiKey
+#     DigitalBrain__AI__Default__Model
 #
 #   Azure Storage (Orleans clustering, reminders, grain state, journal)
 #     ConnectionStrings__clustering
@@ -27,8 +27,7 @@
 #     DigitalBrain__Memory__Qdrant__ConnectionName=memory-qdrant
 #     ConnectionStrings__memory-qdrant             # Endpoint=http://qdrant:6334;Key=...
 #
-#   AppHost writes the explicit module manifest through
-#   DigitalBrain__Modules__N. The runtime loads only those module types.
+#   Module manifest defaults are set below; override DigitalBrain__Modules__N if needed.
 #
 # Ports: 8080 silo HTTP (broker + health), 5000 northbound MCP (/mcp)
 
@@ -40,10 +39,14 @@ COPY src/ ./src/
 
 RUN dotnet publish src/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj \
       -c Release \
+      -r linux-x64 \
+      --self-contained false \
       -o /out/silo \
       --nologo \
  && dotnet publish src/Kernel/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj \
       -c Release \
+      -r linux-x64 \
+      --self-contained false \
       -o /out/mcp \
       --nologo
 
@@ -54,8 +57,16 @@ COPY --from=build /out/silo /app/silo
 COPY --from=build /out/mcp /app/mcp
 COPY --chmod=755 src/Kernel/DigitalBrain.Kernel/docker-entrypoint.sh /app/docker-entrypoint.sh
 
+# Production module set matching AppHost AddModule declarations.
 ENV ASPNETCORE_ENVIRONMENT=Production \
-    DOTNET_EnableDiagnostics=0
+    DOTNET_EnableDiagnostics=0 \
+    DigitalBrain__Modules__0="DigitalBrain.AI.AIModule, DigitalBrain.Modules.AI" \
+    DigitalBrain__Modules__1="DigitalBrain.Memory.MemoryModule, DigitalBrain.Modules.Memory" \
+    DigitalBrain__Modules__2="DigitalBrain.Time.TimeModule, DigitalBrain.Modules.Time" \
+    DigitalBrain__Modules__3="DigitalBrain.Execution.ExecutionModule, DigitalBrain.Modules.Execution" \
+    DigitalBrain__Modules__4="DigitalBrain.Integrations.IntegrationsModule, DigitalBrain.Modules.Integrations" \
+    DigitalBrain__Modules__5="DigitalBrain.SmartPrompt.SmartPromptModule, DigitalBrain.Modules.SmartPrompt" \
+    DigitalBrain__Modules__6="DigitalBrain.UI.UIModule, DigitalBrain.Modules.UI"
 
 EXPOSE 8080 5000
 
