@@ -3,10 +3,9 @@
     <NoWarn>$(NoWarn);CA2007;CA1812</NoWarn>
     <!-- Host pin for Foundry Local native assets on Windows desktop runs only. -->
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' and $([MSBuild]::IsOSPlatform('Windows'))">win-x64</RuntimeIdentifier>
-    <!-- SDK container publish (release workflow → Docker Hub), same pattern as v0.1.18.
-         Do NOT set ContainerRuntimeIdentifier/RuntimeIdentifiers here — on Linux CI that
-         forces net11.0/linux-x64 assets during plain `dotnet build` and breaks AI/tests. -->
-    <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
+    <!-- SDK container metadata for PublishContainer (deploy.yml). Web SDK already supports
+         /t:PublishContainer — do not set EnableSdkContainerSupport/ContainerRuntimeIdentifier
+         here; on Linux CI those force net11.0/linux-x64 during plain `dotnet build`. -->
     <ContainerRepository>digitalbrain-kernel</ContainerRepository>
     <ContainerBaseImage>mcr.microsoft.com/dotnet/aspnet:11.0-preview</ContainerBaseImage>
   </PropertyGroup>

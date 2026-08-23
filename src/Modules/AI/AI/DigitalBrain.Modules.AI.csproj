@@ -4,8 +4,8 @@
     <Description>AI module: multi-provider LLM and embedding clients, agents, and voice transcription.</Description>
     <RootNamespace>DigitalBrain.AI</RootNamespace>
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812</NoWarn>
-    <!-- Kernel host builds this library with -r win-x64 for Foundry natives. -->
-    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <!-- Foundry natives are Windows-only; do not declare RuntimeIdentifiers on Linux CI. -->
+    <RuntimeIdentifiers Condition="$([MSBuild]::IsOSPlatform('Windows'))">win-x64</RuntimeIdentifiers>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.AI" />

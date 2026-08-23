@@ -12,3 +12,9 @@
 
 *.sh text eol=lf
 *.bash text eol=lf
+
+# Dart/Flutter tooling expects LF (dart format on Linux CI).
+*.dart text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+pubspec.lock text eol=lf
