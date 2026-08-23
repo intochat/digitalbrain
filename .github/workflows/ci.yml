@@ -48,9 +48,9 @@ jobs:
       # Simulation is the durable in-process gate. Aspire/E2E need a live AppHost and stay out of the default PR gate.
       - name: Simulation tests
         run: |
-          set -euo pipefail
+          set -eu
           out=tests/DigitalBrain.Simulation.Tests/bin/Release/net11.0
-          ls -la "$out" | head -n 40
+          ls -la "$out" | head -n 40 || true
           chmod +x "$out/DigitalBrain.Simulation.Tests" || true
           # Prefer the apphost so a native crash prints stderr (MTP handshake exit 5).
           if ! "$out/DigitalBrain.Simulation.Tests" --list-tests; then
