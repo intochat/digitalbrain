@@ -64,8 +64,12 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Pub get (shell + path deps)
-        run: flutter pub get
+      - name: Pub get (core, kit, shell)
+        working-directory: src/Modules/UI/Flutter
+        run: |
+          (cd core && dart pub get)
+          (cd kit && flutter pub get)
+          (cd shell && flutter pub get)
 
       - name: Dart format
         working-directory: src/Modules/UI/Flutter
@@ -80,4 +84,3 @@ jobs:
 
       - name: Web release build
         run: flutter build web --release --base-href "/" --no-tree-shake-icons
-
