@@ -77,10 +77,18 @@ final class GraphPainter extends CustomPainter {
           ..color = color.withValues(alpha: recent ? 0.95 : depthAlpha),
       );
 
-      final tip =
-          graphQuadraticPoint(edge.from.center, control, edge.to.center, 0.86);
-      final tail =
-          graphQuadraticPoint(edge.from.center, control, edge.to.center, 0.78);
+      final tip = graphQuadraticPoint(
+        edge.from.center,
+        control,
+        edge.to.center,
+        0.86,
+      );
+      final tail = graphQuadraticPoint(
+        edge.from.center,
+        control,
+        edge.to.center,
+        0.78,
+      );
       final direction = (tip - tail).direction;
       const arrow = 6.0;
       final head = Path()
@@ -100,8 +108,12 @@ final class GraphPainter extends CustomPainter {
       );
 
       if (edge.edge.decorated) {
-        final bead =
-            graphQuadraticPoint(edge.from.center, control, edge.to.center, 0.5);
+        final bead = graphQuadraticPoint(
+          edge.from.center,
+          control,
+          edge.to.center,
+          0.5,
+        );
         canvas.drawCircle(
           bead,
           3.2,
@@ -138,13 +150,15 @@ final class GraphPainter extends CustomPainter {
       return;
     }
 
-    final target =
-        nodes.where((node) => node.node.id == active.toId).firstOrNull;
+    final target = nodes
+        .where((node) => node.node.id == active.toId)
+        .firstOrNull;
     if (target == null) {
       return;
     }
-    final source =
-        nodes.where((node) => node.node.id == active.fromId).firstOrNull;
+    final source = nodes
+        .where((node) => node.node.id == active.fromId)
+        .firstOrNull;
 
     final radius = math.min(size.width, size.height) * 0.34;
     final wave = math.sin(pulseValue * math.pi).abs();
@@ -178,8 +192,9 @@ final class GraphPainter extends CustomPainter {
   void _paintNodes(Canvas canvas) {
     for (final projected in nodes) {
       final node = projected.node;
-      final color =
-          node.kind == GraphNodeKind.hub ? KitPalette.signal : KitPalette.owner;
+      final color = node.kind == GraphNodeKind.hub
+          ? KitPalette.signal
+          : KitPalette.owner;
       final dimFactor = node.dimmed ? 0.45 : 1.0;
       final depthAlpha =
           ((0.5 + (projected.depth + 1) * 0.22).clamp(0.35, 1.0)) * dimFactor;

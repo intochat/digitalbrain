@@ -26,10 +26,7 @@ final class KitView extends StatelessWidget {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Text(
-          'No KitView for kind "$kind"',
-          style: KitType.body,
-        ),
+        child: Text('No KitView for kind "$kind"', style: KitType.body),
       ),
     );
   }

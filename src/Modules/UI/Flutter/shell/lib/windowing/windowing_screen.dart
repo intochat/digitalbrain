@@ -115,17 +115,18 @@ final class _GridPainter extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
     }
     final wash = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          BrainPalette.owner.withValues(alpha: 0.08),
-          Colors.transparent,
-        ],
-      ).createShader(
-        Rect.fromCircle(
-          center: Offset(size.width * 0.55, size.height * 0.4),
-          radius: size.shortestSide * 0.55,
-        ),
-      );
+      ..shader =
+          RadialGradient(
+            colors: [
+              BrainPalette.owner.withValues(alpha: 0.08),
+              Colors.transparent,
+            ],
+          ).createShader(
+            Rect.fromCircle(
+              center: Offset(size.width * 0.55, size.height * 0.4),
+              radius: size.shortestSide * 0.55,
+            ),
+          );
     canvas.drawRect(Offset.zero & size, wash);
   }
 
@@ -358,16 +359,18 @@ final class _PanelBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (kind) {
-      WindowPanelKind.clock => const Center(child: SizedBox(width: 150, height: 150, child: KitClock())),
+      WindowPanelKind.clock => const Center(
+        child: SizedBox(width: 150, height: 150, child: KitClock()),
+      ),
       WindowPanelKind.metrics => const _MetricsBody(),
       WindowPanelKind.notes => const _NotesBody(),
       WindowPanelKind.activity => const _ActivityBody(),
       WindowPanelKind.inspector => const _InspectorBody(),
       WindowPanelKind.chart => const ShellBarChartDemo(height: 200),
       WindowPanelKind.timeChart => const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 4),
-          child: KitTimeChart(),
-        ),
+        padding: EdgeInsets.symmetric(horizontal: 4),
+        child: KitTimeChart(),
+      ),
     };
   }
 }
@@ -468,10 +471,7 @@ final class _InspectorBody extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 8),
             child: Row(
               children: [
-                SizedBox(
-                  width: 72,
-                  child: Text(f.$1, style: BrainType.meta),
-                ),
+                SizedBox(width: 72, child: Text(f.$1, style: BrainType.meta)),
                 Expanded(child: Text(f.$2, style: BrainType.body)),
               ],
             ),

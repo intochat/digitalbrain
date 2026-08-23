@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/shell_test_support.dart';
+
 void main() {
   testWidgets('activity shows journal facts without message content', (
     tester,
@@ -77,4 +78,3 @@ void main() {
     await drainShellTimers(tester);
   });
 }
-

@@ -39,7 +39,9 @@ List<ProjectedGraphNode> projectGraphNodes(
   double rotationY,
 ) {
   final hubs = nodes.where((node) => node.kind == GraphNodeKind.hub).toList();
-  final leaves = nodes.where((node) => node.kind == GraphNodeKind.leaf).toList();
+  final leaves = nodes
+      .where((node) => node.kind == GraphNodeKind.leaf)
+      .toList();
 
   final placed = <({GraphNode node, double x, double y, double z})>[
     for (var index = 0; index < hubs.length; index++)

@@ -47,11 +47,7 @@ final class KitGalleryScreen extends StatelessWidget {
               const SizedBox(height: 28),
               const Text('View · calculator', style: KitType.title),
               const SizedBox(height: 12),
-              const KitView(
-                kind: 'calculator',
-                display: '42',
-                phase: 'result',
-              ),
+              const KitView(kind: 'calculator', display: '42', phase: 'result'),
               const SizedBox(height: 28),
               const Text('Button', style: KitType.title),
               const SizedBox(height: 12),
@@ -80,11 +76,7 @@ final class KitGalleryScreen extends StatelessWidget {
                       label: 'Feed',
                       kind: GraphNodeKind.hub,
                     ),
-                    GraphNode(
-                      id: 'relay',
-                      label: 'relay',
-                      dimmed: true,
-                    ),
+                    GraphNode(id: 'relay', label: 'relay', dimmed: true),
                     GraphNode(id: 'chart', label: 'chart'),
                   ],
                   edges: [

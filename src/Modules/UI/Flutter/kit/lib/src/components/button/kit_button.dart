@@ -29,10 +29,15 @@ final class KitButton extends StatelessWidget {
             horizontal: dense ? 14 : 18,
             vertical: dense ? 10 : 12,
           ),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
         onPressed: onPressed == null ? null : () => onPressed!(part),
-        child: Text(part.label, style: KitType.metaStrong.copyWith(color: KitPalette.surface)),
+        child: Text(
+          part.label,
+          style: KitType.metaStrong.copyWith(color: KitPalette.surface),
+        ),
       ),
     );
   }

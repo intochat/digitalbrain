@@ -8,10 +8,7 @@ import 'package:flutter/foundation.dart';
 /// Keeps durable chat session state out of the widget tree so the shell
 /// can rebuild chrome without re-owning SSE bookkeeping.
 final class WorkspaceSession extends ChangeNotifier {
-  WorkspaceSession({
-    required this.chatName,
-    Stream<ChatTurnEvent>? turns,
-  }) {
+  WorkspaceSession({required this.chatName, Stream<ChatTurnEvent>? turns}) {
     listenTurns(turns);
   }
 

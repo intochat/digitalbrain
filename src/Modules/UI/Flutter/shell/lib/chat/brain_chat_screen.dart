@@ -16,7 +16,8 @@ import '../brain_theme.dart';
 import 'brain_chat_composer.dart';
 import 'chat_contracts.dart';
 import 'stream_state_store.dart';
-import 'voice_file_io.dart' if (dart.library.html) 'voice_file_web.dart'
+import 'voice_file_io.dart'
+    if (dart.library.html) 'voice_file_web.dart'
     as voice_file;
 
 final class BrainChatScreen extends StatefulWidget {
@@ -97,8 +98,7 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
       );
       // Voice path: server text arrives only after STT; clear on any new user turn.
       final matchedNewUser = turns.any(
-        (turn) =>
-            turn.fromUser && !_appliedSequences.contains(turn.sequence),
+        (turn) => turn.fromUser && !_appliedSequences.contains(turn.sequence),
       );
       if (matchedExact || matchedNewUser) {
         _pendingUserMessageId = null;
@@ -259,7 +259,10 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
       }
 
       final dir = await getTemporaryDirectory();
-      final path = voice_file.joinVoicePath(dir.path, 'voice_${_uuid.v4()}.wav');
+      final path = voice_file.joinVoicePath(
+        dir.path,
+        'voice_${_uuid.v4()}.wav',
+      );
 
       await _recorder.start(
         const RecordConfig(
@@ -436,76 +439,76 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
               child: ChangeNotifierProvider.value(
                 value: _voice,
                 child: Chat(
-                key: const Key('chat_surface'),
-                chatController: _controller,
-                currentUserId: ownerUserId,
-                resolveUser: (id) async => switch (id) {
-                  ownerUserId => _owner,
-                  assistantUserId => _assistant,
-                  _ => null,
-                },
-                theme: BrainChatTheme.dark(),
-                onMessageSend: canSend ? _handleSend : null,
-                onAttachmentTap: widget.onAttachmentTap,
-                builders: Builders(
-                  composerBuilder: (context) => BrainChatComposer(
-                    canVoice: canVoice,
-                    onVoiceTap: () => unawaited(_toggleVoice()),
-                  ),
-                  textMessageBuilder:
-                      (
-                        context,
-                        message,
-                        index, {
-                        required bool isSentByMe,
-                        MessageGroupStatus? groupStatus,
-                      }) => FlyerChatTextMessage(
-                        message: message,
-                        index: index,
-                        showTime: false,
-                        showStatus: false,
-                      ),
-                  textStreamMessageBuilder:
-                      (
-                        context,
-                        message,
-                        index, {
-                        required bool isSentByMe,
-                        MessageGroupStatus? groupStatus,
-                      }) {
-                        final streamState = context
-                            .watch<StreamStateStore>()
-                            .stateFor(message.streamId);
-                        return FlyerChatTextStreamMessage(
+                  key: const Key('chat_surface'),
+                  chatController: _controller,
+                  currentUserId: ownerUserId,
+                  resolveUser: (id) async => switch (id) {
+                    ownerUserId => _owner,
+                    assistantUserId => _assistant,
+                    _ => null,
+                  },
+                  theme: BrainChatTheme.dark(),
+                  onMessageSend: canSend ? _handleSend : null,
+                  onAttachmentTap: widget.onAttachmentTap,
+                  builders: Builders(
+                    composerBuilder: (context) => BrainChatComposer(
+                      canVoice: canVoice,
+                      onVoiceTap: () => unawaited(_toggleVoice()),
+                    ),
+                    textMessageBuilder:
+                        (
+                          context,
+                          message,
+                          index, {
+                          required bool isSentByMe,
+                          MessageGroupStatus? groupStatus,
+                        }) => FlyerChatTextMessage(
                           message: message,
                           index: index,
-                          streamState: streamState,
                           showTime: false,
                           showStatus: false,
-                        );
-                      },
-                  // Flyer Chat: CustomMessage + customMessageBuilder
-                  // https://pub.dev/packages/flutter_chat_ui
-                  customMessageBuilder:
-                      (
-                        context,
-                        message,
-                        index, {
-                        required bool isSentByMe,
-                        MessageGroupStatus? groupStatus,
-                      }) => KitChatBuilders.customMessageBuilder(
-                        context,
-                        message,
-                        index,
-                        isSentByMe: isSentByMe,
-                        groupStatus: groupStatus,
-                        onButtonPressed: widget.onActivateButton == null
-                            ? null
-                            : _onKitButton,
-                        onReadChart: widget.onReadChart,
-                        onReadImageBytes: widget.onReadImageBytes,
-                      ),
-                ),
+                        ),
+                    textStreamMessageBuilder:
+                        (
+                          context,
+                          message,
+                          index, {
+                          required bool isSentByMe,
+                          MessageGroupStatus? groupStatus,
+                        }) {
+                          final streamState = context
+                              .watch<StreamStateStore>()
+                              .stateFor(message.streamId);
+                          return FlyerChatTextStreamMessage(
+                            message: message,
+                            index: index,
+                            streamState: streamState,
+                            showTime: false,
+                            showStatus: false,
+                          );
+                        },
+                    // Flyer Chat: CustomMessage + customMessageBuilder
+                    // https://pub.dev/packages/flutter_chat_ui
+                    customMessageBuilder:
+                        (
+                          context,
+                          message,
+                          index, {
+                          required bool isSentByMe,
+                          MessageGroupStatus? groupStatus,
+                        }) => KitChatBuilders.customMessageBuilder(
+                          context,
+                          message,
+                          index,
+                          isSentByMe: isSentByMe,
+                          groupStatus: groupStatus,
+                          onButtonPressed: widget.onActivateButton == null
+                              ? null
+                              : _onKitButton,
+                          onReadChart: widget.onReadChart,
+                          onReadImageBytes: widget.onReadImageBytes,
+                        ),
+                  ),
                 ),
               ),
             ),
@@ -538,4 +541,3 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
     return true;
   }
 }
-

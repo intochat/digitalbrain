@@ -199,40 +199,43 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
     );
   });
 
-  test('readChart GETs /kit/charts/{name} and parses the chart offer', () async {
-    http.BaseRequest? seen;
-    final client = DigitalBrainUiClient(
-      baseUri: Uri.parse('http://ui.example:5080'),
-      httpClient: MockClient((request) async {
-        seen = request;
-        return http.Response(
-          jsonEncode({
-            'title': 'Weekly usage',
-            'chartKind': 'bar',
-            'points': [
-              {'label': 'Mon', 'value': 1},
-              {'label': 'Tue', 'value': 2},
-            ],
-          }),
-          200,
-          headers: {'content-type': 'application/json'},
-        );
-      }),
-    );
+  test(
+    'readChart GETs /kit/charts/{name} and parses the chart offer',
+    () async {
+      http.BaseRequest? seen;
+      final client = DigitalBrainUiClient(
+        baseUri: Uri.parse('http://ui.example:5080'),
+        httpClient: MockClient((request) async {
+          seen = request;
+          return http.Response(
+            jsonEncode({
+              'title': 'Weekly usage',
+              'chartKind': 'bar',
+              'points': [
+                {'label': 'Mon', 'value': 1},
+                {'label': 'Tue', 'value': 2},
+              ],
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
 
-    final chart = await client.readChart('weekly-usage');
+      final chart = await client.readChart('weekly-usage');
 
-    expect(seen, isNotNull);
-    expect(seen!.method, 'GET');
-    expect(
-      seen!.url.toString(),
-      'http://ui.example:5080/kit/charts/weekly-usage',
-    );
-    expect(chart, isNotNull);
-    expect(chart!.title, 'Weekly usage');
-    expect(chart.chartKind, 'bar');
-    expect(chart.points.map((p) => p.label), ['Mon', 'Tue']);
-  });
+      expect(seen, isNotNull);
+      expect(seen!.method, 'GET');
+      expect(
+        seen!.url.toString(),
+        'http://ui.example:5080/kit/charts/weekly-usage',
+      );
+      expect(chart, isNotNull);
+      expect(chart!.title, 'Weekly usage');
+      expect(chart.chartKind, 'bar');
+      expect(chart.points.map((p) => p.label), ['Mon', 'Tue']);
+    },
+  );
 
   test('readChart returns null on 404', () async {
     final client = DigitalBrainUiClient(
@@ -249,10 +252,7 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
       httpClient: MockClient((request) async => http.Response('bad', 400)),
     );
 
-    await expectLater(
-      client.readChart('bad name'),
-      throwsA(isA<StateError>()),
-    );
+    await expectLater(client.readChart('bad name'), throwsA(isA<StateError>()));
   });
 
   test('readImage GETs /kit/images/{name} and returns the raw map', () async {
@@ -277,11 +277,12 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
 
     expect(seen, isNotNull);
     expect(seen!.method, 'GET');
-    expect(
-      seen!.url.toString(),
-      'http://ui.example:5080/kit/images/cat-pic',
-    );
-    expect(image, {'prompt': 'a cat', 'model': 'dall-e', 'mediaType': 'image/png'});
+    expect(seen!.url.toString(), 'http://ui.example:5080/kit/images/cat-pic');
+    expect(image, {
+      'prompt': 'a cat',
+      'model': 'dall-e',
+      'mediaType': 'image/png',
+    });
   });
 
   test('readImage returns null on 404', () async {

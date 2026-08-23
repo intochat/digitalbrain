@@ -19,11 +19,7 @@ final class UserActionCardModel {
 }
 
 final class UserActionCard extends StatelessWidget {
-  const UserActionCard({
-    super.key,
-    required this.model,
-    this.onAuthorize,
-  });
+  const UserActionCard({super.key, required this.model, this.onAuthorize});
 
   final UserActionCardModel model;
   final VoidCallback? onAuthorize;
@@ -46,7 +42,10 @@ final class UserActionCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(model.displayText, style: BrainType.body),
           const SizedBox(height: 8),
-          Text('Task ${model.taskId} · ${model.continuationState}', style: BrainType.meta),
+          Text(
+            'Task ${model.taskId} · ${model.continuationState}',
+            style: BrainType.meta,
+          ),
           const SizedBox(height: 12),
           FilledButton(
             key: Key('user_action_authorize_${model.moduleId}'),

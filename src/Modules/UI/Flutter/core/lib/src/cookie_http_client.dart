@@ -56,7 +56,10 @@ final class CookieHttpClient extends http.BaseClient {
       if (raw[i] == ',') {
         final slice = raw.substring(start, i);
         // Expires=Wed, 26 Aug … — keep reading if this looks like a date comma.
-        if (RegExp(r'expires\s*=\s*\w+$', caseSensitive: false).hasMatch(slice.trimRight())) {
+        if (RegExp(
+          r'expires\s*=\s*\w+$',
+          caseSensitive: false,
+        ).hasMatch(slice.trimRight())) {
           i++;
           continue;
         }

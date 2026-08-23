@@ -91,7 +91,9 @@ final class ShellBarChartDemo extends StatelessWidget {
             ),
           Defaults.verticalAxis
             ..line = PaintStyle(strokeColor: BrainPalette.line)
-            ..grid = PaintStyle(strokeColor: BrainPalette.line.withValues(alpha: 0.5))
+            ..grid = PaintStyle(
+              strokeColor: BrainPalette.line.withValues(alpha: 0.5),
+            )
             ..label = LabelStyle(
               textStyle: BrainType.meta.copyWith(color: BrainPalette.textMuted),
             ),
@@ -143,7 +145,9 @@ final class KitLineChart extends StatelessWidget {
             ),
           Defaults.verticalAxis
             ..line = PaintStyle(strokeColor: BrainPalette.line)
-            ..grid = PaintStyle(strokeColor: BrainPalette.line.withValues(alpha: 0.5))
+            ..grid = PaintStyle(
+              strokeColor: BrainPalette.line.withValues(alpha: 0.5),
+            )
             ..label = LabelStyle(
               textStyle: BrainType.meta.copyWith(color: BrainPalette.textMuted),
             ),
@@ -268,8 +272,9 @@ final class KitTimeChart extends StatelessWidget {
               Defaults.horizontalAxis
                 ..line = PaintStyle(strokeColor: BrainPalette.line)
                 ..label = LabelStyle(
-                  textStyle:
-                      BrainType.meta.copyWith(color: BrainPalette.textMuted),
+                  textStyle: BrainType.meta.copyWith(
+                    color: BrainPalette.textMuted,
+                  ),
                 ),
               Defaults.verticalAxis
                 ..line = null
@@ -277,8 +282,9 @@ final class KitTimeChart extends StatelessWidget {
                   strokeColor: BrainPalette.line.withValues(alpha: 0.55),
                 )
                 ..label = LabelStyle(
-                  textStyle:
-                      BrainType.meta.copyWith(color: BrainPalette.textMuted),
+                  textStyle: BrainType.meta.copyWith(
+                    color: BrainPalette.textMuted,
+                  ),
                 ),
             ],
             padding: (_) => const EdgeInsets.fromLTRB(40, 8, 8, 24),
@@ -306,11 +312,7 @@ final class KitTimeChart extends StatelessWidget {
 }
 
 final class KitChartCard extends StatelessWidget {
-  const KitChartCard({
-    super.key,
-    required this.title,
-    required this.child,
-  });
+  const KitChartCard({super.key, required this.title, required this.child});
 
   final String title;
   final Widget child;

@@ -1,7 +1,9 @@
 import 'process_environment_stub.dart'
-    if (dart.library.io) 'process_environment_io.dart' as process_env;
+    if (dart.library.io) 'process_environment_io.dart'
+    as process_env;
 import 'runtime_surface_io.dart'
-    if (dart.library.html) 'runtime_surface_web.dart' as surface;
+    if (dart.library.html) 'runtime_surface_web.dart'
+    as surface;
 
 abstract final class DigitalBrainHostEnv {
   static const uiBaseVariable = 'DIGITALBRAIN_UI_BASE';
@@ -78,5 +80,4 @@ abstract final class DigitalBrainHostEnv {
     }
     return raw;
   }
-
 }

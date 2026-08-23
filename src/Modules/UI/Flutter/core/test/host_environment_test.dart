@@ -42,32 +42,35 @@ void main() {
     expect(raw, 'http://localhost:5100');
   });
 
-  test('requireUiBaseUri parses process env and rejects missing base on VM', () {
-    final uri = DigitalBrainHostEnv.requireUiBaseUri(
-      fromDefine: '',
-      processEnvironment: {
-        DigitalBrainHostEnv.uiBaseVariable: 'http://localhost:5100/',
-      },
-    );
-    expect(uri.scheme, 'http');
-    expect(uri.host, 'localhost');
-    expect(uri.port, 5100);
-
-    // Pure-Dart VM host has no browser same-origin fallback.
-    expect(
-      () => DigitalBrainHostEnv.requireUiBaseUri(
+  test(
+    'requireUiBaseUri parses process env and rejects missing base on VM',
+    () {
+      final uri = DigitalBrainHostEnv.requireUiBaseUri(
         fromDefine: '',
-        processEnvironment: const {},
-      ),
-      throwsA(
-        isA<StateError>().having(
-          (e) => e.message,
-          'message',
-          contains(DigitalBrainHostEnv.uiBaseVariable),
+        processEnvironment: {
+          DigitalBrainHostEnv.uiBaseVariable: 'http://localhost:5100/',
+        },
+      );
+      expect(uri.scheme, 'http');
+      expect(uri.host, 'localhost');
+      expect(uri.port, 5100);
+
+      // Pure-Dart VM host has no browser same-origin fallback.
+      expect(
+        () => DigitalBrainHostEnv.requireUiBaseUri(
+          fromDefine: '',
+          processEnvironment: const {},
         ),
-      ),
-    );
-  });
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains(DigitalBrainHostEnv.uiBaseVariable),
+          ),
+        ),
+      );
+    },
+  );
 
   test('resolveShell prefers define, then process, then default desk', () {
     expect(
@@ -97,16 +100,13 @@ void main() {
     );
   });
 
-  test(
-    'DigitalBrainUiClient.fromEnvironment reads injected process map',
-    () {
-      final client = DigitalBrainUiClient.fromEnvironment(
-        processEnvironment: {
-          DigitalBrainHostEnv.uiBaseVariable: 'http://edge.test:7',
-        },
-      );
-      expect(client.baseUri.toString(), 'http://edge.test:7');
-      client.close();
-    },
-  );
+  test('DigitalBrainUiClient.fromEnvironment reads injected process map', () {
+    final client = DigitalBrainUiClient.fromEnvironment(
+      processEnvironment: {
+        DigitalBrainHostEnv.uiBaseVariable: 'http://edge.test:7',
+      },
+    );
+    expect(client.baseUri.toString(), 'http://edge.test:7');
+    client.close();
+  });
 }

@@ -70,8 +70,9 @@ final class PanelManager extends ChangeNotifier {
     return List.unmodifiable(ordered);
   }
 
-  List<WindowPanel> get minimized =>
-      List.unmodifiable(_panels.where((p) => p.state == WindowPanelState.minimized));
+  List<WindowPanel> get minimized => List.unmodifiable(
+    _panels.where((p) => p.state == WindowPanelState.minimized),
+  );
 
   void setCanvasSize(Size size) {
     if (size.width <= 0 || size.height <= 0) return;
@@ -210,10 +211,9 @@ final class PanelManager extends ChangeNotifier {
   }
 
   void autoLayout() {
-    final visible = _panels
-        .where((p) => p.state == WindowPanelState.normal)
-        .toList()
-      ..sort((a, b) => a.z.compareTo(b.z));
+    final visible =
+        _panels.where((p) => p.state == WindowPanelState.normal).toList()
+          ..sort((a, b) => a.z.compareTo(b.z));
     if (visible.isEmpty) return;
 
     const margin = 28.0;

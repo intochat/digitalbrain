@@ -12,13 +12,11 @@ import 'sse_frames.dart';
 import 'ui_models.dart';
 
 final class DigitalBrainUiClient {
-  DigitalBrainUiClient({
-    required this.baseUri,
-    http.Client? httpClient,
-  }) : _http = httpClient is CookieHttpClient
-           ? httpClient
-           : CookieHttpClient(httpClient ?? http.Client()),
-       _ownsClient = httpClient == null;
+  DigitalBrainUiClient({required this.baseUri, http.Client? httpClient})
+    : _http = httpClient is CookieHttpClient
+          ? httpClient
+          : CookieHttpClient(httpClient ?? http.Client()),
+      _ownsClient = httpClient == null;
 
   factory DigitalBrainUiClient.fromEnvironment({
     http.Client? httpClient,

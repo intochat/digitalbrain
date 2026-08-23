@@ -20,7 +20,8 @@ void main() {
       reason: 'flutter-wire-contracts.golden.json not found at $goldenUri',
     );
 
-    final manifest = jsonDecode(golden.readAsStringSync()) as Map<String, Object?>;
+    final manifest =
+        jsonDecode(golden.readAsStringSync()) as Map<String, Object?>;
     expect(manifest['namespace'], 'DigitalBrain.UI');
     expect(manifest['version'], 1);
 
@@ -43,10 +44,11 @@ void main() {
     Map<String, Object?> typeNamed(String alias) =>
         types.firstWhere((t) => t['alias'] == alias, orElse: () => {});
 
-    Set<String> propertyNamesOf(String alias) => (typeNamed(alias)['properties'] as List? ?? [])
-        .cast<Map<String, Object?>>()
-        .map((p) => p['name'] as String)
-        .toSet();
+    Set<String> propertyNamesOf(String alias) =>
+        (typeNamed(alias)['properties'] as List? ?? [])
+            .cast<Map<String, Object?>>()
+            .map((p) => p['name'] as String)
+            .toSet();
 
     // Shape assertions pin each alias's property names to the C# record they mirror, so a
     // renamed/added/removed property on either side fails this test instead of silently
@@ -70,7 +72,8 @@ void main() {
     expect(
       propertyNamesOf('ui.image-state'),
       {'Prompt', 'Model', 'MediaType', 'BlobName'},
-      reason: 'ui.image-state must mirror ImageState(Prompt, Model, MediaType, BlobName)',
+      reason:
+          'ui.image-state must mirror ImageState(Prompt, Model, MediaType, BlobName)',
     );
   });
 }

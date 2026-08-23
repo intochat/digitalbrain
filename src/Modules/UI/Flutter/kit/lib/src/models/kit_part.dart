@@ -47,10 +47,10 @@ final class KitTimerPart extends KitPart {
 
   @override
   Map<String, Object?> toMetadata() => {
-        'kind': kindName,
-        'label': label,
-        'dueAt': dueAt.toUtc().toIso8601String(),
-      };
+    'kind': kindName,
+    'label': label,
+    'dueAt': dueAt.toUtc().toIso8601String(),
+  };
 }
 
 final class KitButtonPart extends KitPart {
@@ -82,12 +82,12 @@ final class KitButtonPart extends KitPart {
 
   @override
   Map<String, Object?> toMetadata() => {
-        'kind': kindName,
-        'buttonId': buttonId,
-        'label': label,
-        'action': action,
-        if (offerCommandId != null) 'offerCommandId': offerCommandId,
-      };
+    'kind': kindName,
+    'buttonId': buttonId,
+    'label': label,
+    'action': action,
+    if (offerCommandId != null) 'offerCommandId': offerCommandId,
+  };
 }
 
 final class KitChartPoint {
@@ -126,9 +126,9 @@ final class KitChartPart extends KitPart {
     final raw = metadata['points'];
     final points = raw is List
         ? raw
-            .whereType<Map>()
-            .map((e) => KitChartPoint.fromJson(Map<String, dynamic>.from(e)))
-            .toList(growable: false)
+              .whereType<Map>()
+              .map((e) => KitChartPoint.fromJson(Map<String, dynamic>.from(e)))
+              .toList(growable: false)
         : const <KitChartPoint>[];
     return KitChartPart(
       title: metadata['title'] as String? ?? 'Chart',
@@ -139,11 +139,11 @@ final class KitChartPart extends KitPart {
 
   @override
   Map<String, Object?> toMetadata() => {
-        'kind': kindName,
-        'title': title,
-        'chartKind': chartKind,
-        'points': [for (final p in points) p.toJson()],
-      };
+    'kind': kindName,
+    'title': title,
+    'chartKind': chartKind,
+    'points': [for (final p in points) p.toJson()],
+  };
 }
 
 final class KitCardPart extends KitPart {
@@ -166,14 +166,14 @@ final class KitCardPart extends KitPart {
     final raw = metadata['fields'];
     final fields = raw is List
         ? raw
-            .whereType<Map>()
-            .map(
-              (e) => (
-                label: e['label'] as String? ?? '',
-                value: e['value'] as String? ?? '',
-              ),
-            )
-            .toList(growable: false)
+              .whereType<Map>()
+              .map(
+                (e) => (
+                  label: e['label'] as String? ?? '',
+                  value: e['value'] as String? ?? '',
+                ),
+              )
+              .toList(growable: false)
         : const <({String label, String value})>[];
     return KitCardPart(
       title: metadata['title'] as String? ?? '',
@@ -184,13 +184,13 @@ final class KitCardPart extends KitPart {
 
   @override
   Map<String, Object?> toMetadata() => {
-        'kind': kindName,
-        'title': title,
-        'body': body,
-        'fields': [
-          for (final f in fields) {'label': f.label, 'value': f.value},
-        ],
-      };
+    'kind': kindName,
+    'title': title,
+    'body': body,
+    'fields': [
+      for (final f in fields) {'label': f.label, 'value': f.value},
+    ],
+  };
 }
 
 final class KitChartRefPart extends KitPart {
@@ -213,10 +213,10 @@ final class KitChartRefPart extends KitPart {
 
   @override
   Map<String, Object?> toMetadata() => {
-        'kind': kindName,
-        'name': name,
-        'caption': caption,
-      };
+    'kind': kindName,
+    'name': name,
+    'caption': caption,
+  };
 }
 
 final class KitImageRefPart extends KitPart {
@@ -239,8 +239,8 @@ final class KitImageRefPart extends KitPart {
 
   @override
   Map<String, Object?> toMetadata() => {
-        'kind': kindName,
-        'name': name,
-        'caption': caption,
-      };
+    'kind': kindName,
+    'name': name,
+    'caption': caption,
+  };
 }

@@ -6,11 +6,7 @@ import '../../theme/kit_theme.dart';
 
 /// Product chart control. Same widget for surface galleries and chat bubbles.
 final class KitChart extends StatelessWidget {
-  const KitChart({
-    super.key,
-    required this.part,
-    this.height = 200,
-  });
+  const KitChart({super.key, required this.part, this.height = 200});
 
   final KitChartPart part;
   final double height;
@@ -22,7 +18,9 @@ final class KitChart extends StatelessWidget {
     ];
     final maxValue = part.points.isEmpty
         ? 1.0
-        : part.points.map((p) => p.value.toDouble()).reduce((a, b) => a > b ? a : b);
+        : part.points
+              .map((p) => p.value.toDouble())
+              .reduce((a, b) => a > b ? a : b);
 
     return DecoratedBox(
       key: Key('kit_chart_${part.title}'),
@@ -61,10 +59,7 @@ final class KitChart extends StatelessWidget {
                           size: SizeEncode(value: 14),
                         ),
                       ],
-                      axes: [
-                        Defaults.horizontalAxis,
-                        Defaults.verticalAxis,
-                      ],
+                      axes: [Defaults.horizontalAxis, Defaults.verticalAxis],
                     ),
             ),
           ],

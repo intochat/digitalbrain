@@ -52,8 +52,7 @@ final class _KitGraphState extends State<KitGraph>
   @override
   void didUpdateWidget(covariant KitGraph oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final pulseChanged =
-        widget.pulse?.signature != oldWidget.pulse?.signature;
+    final pulseChanged = widget.pulse?.signature != oldWidget.pulse?.signature;
     if (widget.pulse == null) {
       if (pulseChanged || oldWidget.pulse != null) {
         _pulse.reset();
@@ -96,18 +95,18 @@ final class _KitGraphState extends State<KitGraph>
                 _rotationX,
                 _rotationY,
               );
-              final projectedEdges =
-                  projectGraphEdges(widget.edges, projected);
-              final canvasCenter =
-                  Offset(size.width * 0.5, size.height * 0.51);
+              final projectedEdges = projectGraphEdges(widget.edges, projected);
+              final canvasCenter = Offset(size.width * 0.5, size.height * 0.51);
               final pulseValue = disableAnimations ? 1.0 : _pulse.value;
 
               return GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onPanUpdate: _rotate,
                 onTapUp: (details) {
-                  final node =
-                      hitTestGraphNodes(projected, details.localPosition);
+                  final node = hitTestGraphNodes(
+                    projected,
+                    details.localPosition,
+                  );
                   if (node != null) {
                     widget.onNodeTap?.call(node.node);
                     return;

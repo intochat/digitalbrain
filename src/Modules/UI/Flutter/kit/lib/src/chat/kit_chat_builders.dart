@@ -53,24 +53,24 @@ abstract final class KitChatBuilders {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: switch (part) {
         KitButtonPart(:final buttonId) => KitButton(
-            key: Key('chat_kit_button_$buttonId'),
-            part: part,
-            dense: true,
-            onPressed: onButtonPressed,
-          ),
+          key: Key('chat_kit_button_$buttonId'),
+          part: part,
+          dense: true,
+          onPressed: onButtonPressed,
+        ),
         KitChartPart() => KitChart(part: part, height: 180),
         KitCardPart() => KitCard(part: part),
         KitTimerPart() => KitClock(part: part),
         KitChartRefPart(:final name, :final caption) => _KitChartRefLoader(
-            name: name,
-            caption: caption,
-            reader: onReadChart,
-          ),
+          name: name,
+          caption: caption,
+          reader: onReadChart,
+        ),
         KitImageRefPart(:final name, :final caption) => _KitImageRefLoader(
-            name: name,
-            caption: caption,
-            reader: onReadImageBytes,
-          ),
+          name: name,
+          caption: caption,
+          reader: onReadImageBytes,
+        ),
       },
     );
   }
@@ -82,14 +82,14 @@ abstract final class KitChatBuilders {
     KitImageRefReader? onReadImageBytes,
   }) {
     return Builders(
-      customMessageBuilder: (
-        context,
-        message,
-        index, {
-        required bool isSentByMe,
-        MessageGroupStatus? groupStatus,
-      }) =>
-          customMessageBuilder(
+      customMessageBuilder:
+          (
+            context,
+            message,
+            index, {
+            required bool isSentByMe,
+            MessageGroupStatus? groupStatus,
+          }) => customMessageBuilder(
             context,
             message,
             index,
