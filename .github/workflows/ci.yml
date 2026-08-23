@@ -30,7 +30,7 @@ jobs:
           global-json-file: global.json
 
       - name: Cache NuGet packages
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', 'global.json') }}
@@ -71,12 +71,9 @@ jobs:
           flutter-version: '3.44.8'
           cache: true
 
-      - name: Pub get (core, kit, shell)
+      - name: Resolve Flutter workspace
         working-directory: src/Modules/UI/Flutter
-        run: |
-          (cd core && dart pub get)
-          (cd kit && flutter pub get)
-          (cd shell && flutter pub get)
+        run: flutter pub get --enforce-lockfile
 
       - name: Dart format
         working-directory: src/Modules/UI/Flutter
@@ -86,8 +83,12 @@ jobs:
         working-directory: src/Modules/UI/Flutter/core
         run: dart test
 
+      - name: Kit package tests
+        working-directory: src/Modules/UI/Flutter/kit
+        run: flutter test --no-pub
+
       - name: Shell tests
-        run: flutter test
+        run: flutter test --no-pub
 
       - name: Web release build
-        run: flutter build web --release --base-href "/" --no-tree-shake-icons
+        run: flutter build web --release --base-href "/" --no-tree-shake-icons --no-pub

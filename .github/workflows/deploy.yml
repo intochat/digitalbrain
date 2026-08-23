@@ -4,7 +4,6 @@ name: deploy
 on:
   release:
     types: [published]
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -32,7 +31,7 @@ jobs:
   #         global-json-file: global.json
   #
   #     - name: Cache NuGet packages
-  #       uses: actions/cache@v5
+  #       uses: actions/cache@v6
   #       with:
   #         path: ~/.nuget/packages
   #         key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', 'global.json') }}
@@ -52,7 +51,7 @@ jobs:
   #         "$out/DigitalBrain.Simulation.Tests"
   #
   #     - name: Log in to Docker Hub
-  #       uses: docker/login-action@v3
+  #       uses: docker/login-action@v4
   #       with:
   #         username: ${{ vars.DOCKERHUB_USERNAME }}
   #         password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -94,12 +93,9 @@ jobs:
           flutter-version: '3.44.8'
           cache: true
 
-      - name: Pub get (core, kit, shell)
+      - name: Resolve Flutter workspace
         working-directory: src/Modules/UI/Flutter
-        run: |
-          (cd core && dart pub get)
-          (cd kit && flutter pub get)
-          (cd shell && flutter pub get)
+        run: flutter pub get --enforce-lockfile
 
       - name: Dart format
         working-directory: src/Modules/UI/Flutter
@@ -109,14 +105,18 @@ jobs:
         working-directory: src/Modules/UI/Flutter/core
         run: dart test
 
+      - name: Kit package tests
+        working-directory: src/Modules/UI/Flutter/kit
+        run: flutter test --no-pub
+
       - name: Shell tests
-        run: flutter test
+        run: flutter test --no-pub
 
       - name: Web release build
-        run: flutter build web --release --base-href "/" --no-tree-shake-icons
+        run: flutter build web --release --base-href "/" --no-tree-shake-icons --no-pub
 
       - name: Deploy Flutter web
-        uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9
+        uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           action: upload
@@ -124,4 +124,3 @@ jobs:
           api_location: ''
           output_location: ''
           skip_app_build: true
-          skip_api_build: true
