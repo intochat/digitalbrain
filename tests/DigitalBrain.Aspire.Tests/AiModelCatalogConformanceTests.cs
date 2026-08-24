@@ -21,15 +21,22 @@ public sealed class AiModelCatalogConformanceTests
         string Name,
         Type Base,
         Type MarkerRoot,
-        IReadOnlyList<AiModel> Catalog);
+        IReadOnlyList<AiModel> Catalog,
+        Func<Type, AiModel?> FindByMarker,
+        Func<string, AiModel?> FindByMarkerName);
 
-    // A later phase adds the image kind here; every test below picks it up with no
-    // further change.
+    // Adding a kind here is all a new model family needs; every test below picks
+    // it up with no further change.
     private static readonly ModelKind[] Kinds =
     [
-        new("LLM", typeof(LLMModel), typeof(ILLM), LLMModel.All),
-        new("Embedding", typeof(EmbeddingModel), typeof(IEmbedding), EmbeddingModel.All),
-        new("Transcription", typeof(TranscriptionModel), typeof(ITranscription), TranscriptionModel.All),
+        new("Image", typeof(ImageModel), typeof(IImageModel), ImageModel.All,
+            ImageModel.FindByMarker, ImageModel.FindByMarkerName),
+        new("LLM", typeof(LLMModel), typeof(ILLM), LLMModel.All,
+            LLMModel.FindByMarker, LLMModel.FindByMarkerName),
+        new("Embedding", typeof(EmbeddingModel), typeof(IEmbedding), EmbeddingModel.All,
+            EmbeddingModel.FindByMarker, EmbeddingModel.FindByMarkerName),
+        new("Transcription", typeof(TranscriptionModel), typeof(ITranscription), TranscriptionModel.All,
+            TranscriptionModel.FindByMarker, TranscriptionModel.FindByMarkerName),
     ];
 
     [Fact]
@@ -88,6 +95,32 @@ public sealed class AiModelCatalogConformanceTests
         }
 
         Assert.True(wrong.Count == 0, string.Join(Environment.NewLine, wrong));
+    }
+
+    [Fact]
+    public void EveryMarkerRoundTripsThroughItsCatalogue()
+    {
+        // Both lookups back a config key: FindByMarkerName resolves what
+        // Default:Model, Default:Embedding, and Default:Transcription name.
+        var broken = new List<string>();
+
+        foreach (var kind in Kinds)
+        {
+            foreach (var model in kind.Catalog)
+            {
+                if (kind.FindByMarker(model.Marker) != model)
+                {
+                    broken.Add($"{kind.Name}: FindByMarker({model.Marker.Name}) did not return {model.GetType().Name}");
+                }
+
+                if (kind.FindByMarkerName(model.Marker.Name) != model)
+                {
+                    broken.Add($"{kind.Name}: FindByMarkerName(\"{model.Marker.Name}\") did not return {model.GetType().Name}");
+                }
+            }
+        }
+
+        Assert.True(broken.Count == 0, string.Join(Environment.NewLine, broken));
     }
 
     [Fact]

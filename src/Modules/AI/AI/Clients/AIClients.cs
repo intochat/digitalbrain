@@ -11,6 +11,7 @@ internal static class AIClients
     internal const string DefaultModelKey = $"{ConfigurationRoot}:Default:Model";
     internal const string DefaultEmbeddingKey = $"{ConfigurationRoot}:Default:Embedding";
     internal const string DefaultTranscriptionKey = $"{ConfigurationRoot}:Default:Transcription";
+    internal const string DefaultImageKey = $"{ConfigurationRoot}:Default:Image";
     private const string EnableSensitiveDataKey = $"{ConfigurationRoot}:Telemetry:EnableSensitiveData";
     private const string TelemetrySource = "DigitalBrain.AI";
 
@@ -121,9 +122,17 @@ internal static class AIClients
 
     internal static void AddImageGeneration(IServiceCollection services, IConfiguration configuration)
     {
-        if (configuration[$"{ConfigurationRoot}:OpenAI:ApiKey"] is { Length: > 0 })
+        // The marker names the model, as with chat and embeddings; an unpinned
+        // key keeps the catalogue's first entry.
+        var model = configuration[DefaultImageKey] is { Length: > 0 } markerName
+            ? ImageModel.FindByMarkerName(markerName)
+                ?? throw UnknownMarker(DefaultImageKey, markerName, ImageModel.All.Select(static m => m.Marker.Name))
+            : ImageModel.All[0];
+
+        if (configuration[$"{ConfigurationRoot}:{model.Provider}:ApiKey"] is { Length: > 0 })
         {
-            services.AddSingleton<IImageGeneration, OpenAIImageGeneration>();
+            services.AddSingleton<IImageGeneration>(sp =>
+                new OpenAIImageGeneration(model, sp.GetRequiredService<IConfiguration>()));
         }
     }
 
