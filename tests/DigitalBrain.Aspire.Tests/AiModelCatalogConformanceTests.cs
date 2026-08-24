@@ -1,5 +1,6 @@
 using System.Reflection;
 using DigitalBrain.AI;
+using OpenAI.Images;
 using Xunit;
 
 namespace DigitalBrain.Aspire.Tests;
@@ -174,6 +175,22 @@ public sealed class AiModelCatalogConformanceTests
             .ToList();
 
         Assert.True(invalid.Count == 0, string.Join(Environment.NewLine, invalid));
+    }
+
+    [Fact]
+    public void ImageModelsOnlyRequestAResponseFormatWhenTheyAcceptOne()
+    {
+        // Found in production: gpt-image-1 answers HTTP 400 unknown_parameter when
+        // sent a response format. The request must carry the option only for models
+        // that take it.
+        foreach (var model in ImageModel.All)
+        {
+            var options = OpenAIImageGeneration.OptionsFor(model);
+
+            Assert.Equal(
+                model.AcceptsResponseFormat ? GeneratedImageFormat.Bytes : null,
+                options.ResponseFormat);
+        }
     }
 
     [Fact]

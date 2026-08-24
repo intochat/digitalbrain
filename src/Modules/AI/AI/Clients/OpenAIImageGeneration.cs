@@ -18,9 +18,25 @@ internal sealed class OpenAIImageGeneration(ImageModel model, IConfiguration con
         var client = new OpenAIClient(new ApiKeyCredential(apiKey)).GetImageClient(model.Id);
         var image = await client.GenerateImageAsync(
             prompt,
-            new ImageGenerationOptions { ResponseFormat = GeneratedImageFormat.Bytes },
+            OptionsFor(model),
             cancellationToken).ConfigureAwait(false);
 
-        return new GeneratedKitImage(image.Value.ImageBytes.ToArray(), model.MediaType, model.Id);
+        var bytes = image.Value.ImageBytes
+            ?? throw new InvalidOperationException(
+                $"{model.DisplayName} returned no image bytes. A model that answers with a URL must set "
+                + $"{nameof(ImageModel.AcceptsResponseFormat)} so bytes are requested explicitly.");
+
+        return new GeneratedKitImage(bytes.ToArray(), model.MediaType, model.Id);
+    }
+
+    // Asking gpt-image-1 for a response format is HTTP 400 unknown_parameter: it
+    // always answers with base64. Only models that accept the option get it.
+    internal static ImageGenerationOptions OptionsFor(ImageModel model)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+
+        return model.AcceptsResponseFormat
+            ? new ImageGenerationOptions { ResponseFormat = GeneratedImageFormat.Bytes }
+            : new ImageGenerationOptions();
     }
 }
