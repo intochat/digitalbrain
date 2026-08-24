@@ -51,17 +51,18 @@ public static class AIHostingExtensions
         return module;
     }
 
-    // Local Whisper STT (Foundry Local). Marker types live in DigitalBrain.AI.FoundryLocal.
+    // Speech-to-text, local or hosted. ITranscription constrains the marker, so a
+    // marker of the wrong kind is a compile error rather than a runtime lookup miss.
     public static DigitalBrainModuleBuilder<AIModule> WithVoiceToText<TModel>(
         this DigitalBrainModuleBuilder<AIModule> module)
-        where TModel : class
+        where TModel : ITranscription
     {
         ArgumentNullException.ThrowIfNull(module);
         var marker = typeof(TModel);
-        var whisper = WhisperModel.FindByMarker(marker)
+        var whisper = TranscriptionModel.FindByMarker(marker)
             ?? throw new NotSupportedException(
-                $"{marker.FullName} is not a known Whisper model marker. "
-                + "Use IWhisperTiny, IWhisperSmall, or IWhisperLargeV3Turbo.");
+                $"{marker.FullName} is not a catalogued transcription model. "
+                + $"Known models: {string.Join(", ", TranscriptionModel.All.Select(static m => m.Marker.Name))}.");
 
         var voice = module.Brain.GetOrAddState(static brain => new VoiceToTextHostingState(brain), out var added);
         if (added)
@@ -219,10 +220,12 @@ public static class AIHostingExtensions
 
     private sealed class VoiceToTextHostingState(DigitalBrainBuilder brain) : DigitalBrainModuleProjection
     {
-        private const string ModelIdEnvironmentKey = "DigitalBrain__AI__Whisper__ModelId";
-        private WhisperModel? _model;
+        // One key for every transcription model, matching Default__Model and
+        // Default__Embedding. The provider on the model picks the implementation.
+        private const string TranscriptionEnvironmentKey = "DigitalBrain__AI__Default__Transcription";
+        private TranscriptionModel? _model;
 
-        internal void SetModel(WhisperModel model)
+        internal void SetModel(TranscriptionModel model)
         {
             ArgumentNullException.ThrowIfNull(model);
             if (_model is not null && !string.Equals(_model.Id, model.Id, StringComparison.Ordinal))
@@ -243,7 +246,7 @@ public static class AIHostingExtensions
                 return;
             }
 
-            builder.WithEnvironment(ModelIdEnvironmentKey, _model.Id);
+            builder.WithEnvironment(TranscriptionEnvironmentKey, _model.Marker.Name);
         }
     }
 }

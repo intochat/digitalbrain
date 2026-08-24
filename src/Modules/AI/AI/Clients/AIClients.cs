@@ -10,6 +10,7 @@ internal static class AIClients
     internal const string ConfigurationRoot = "DigitalBrain:AI";
     internal const string DefaultModelKey = $"{ConfigurationRoot}:Default:Model";
     internal const string DefaultEmbeddingKey = $"{ConfigurationRoot}:Default:Embedding";
+    internal const string DefaultTranscriptionKey = $"{ConfigurationRoot}:Default:Transcription";
     private const string EnableSensitiveDataKey = $"{ConfigurationRoot}:Telemetry:EnableSensitiveData";
     private const string TelemetrySource = "DigitalBrain.AI";
 

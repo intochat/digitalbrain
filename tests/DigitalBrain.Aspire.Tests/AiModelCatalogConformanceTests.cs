@@ -23,12 +23,13 @@ public sealed class AiModelCatalogConformanceTests
         Type MarkerRoot,
         IReadOnlyList<AiModel> Catalog);
 
-    // Later phases add transcription and image kinds here; every test below picks
-    // them up with no further change.
+    // A later phase adds the image kind here; every test below picks it up with no
+    // further change.
     private static readonly ModelKind[] Kinds =
     [
         new("LLM", typeof(LLMModel), typeof(ILLM), LLMModel.All),
         new("Embedding", typeof(EmbeddingModel), typeof(IEmbedding), EmbeddingModel.All),
+        new("Transcription", typeof(TranscriptionModel), typeof(ITranscription), TranscriptionModel.All),
     ];
 
     [Fact]
@@ -140,6 +141,34 @@ public sealed class AiModelCatalogConformanceTests
             .ToList();
 
         Assert.True(invalid.Count == 0, string.Join(Environment.NewLine, invalid));
+    }
+
+    [Fact]
+    public void EveryTranscriptionModelCanReturnPlainText()
+    {
+        // The voice endpoint wants text and nothing else. A model that cannot
+        // produce it has no way to serve that path, so it must not be catalogued
+        // as though it could.
+        var unusable = TranscriptionModel.All
+            .Where(static model => !model.Formats.HasFlag(TranscriptionFormats.Text))
+            .Select(static model => $"{model.GetType().Name} declares {model.Formats} and cannot return text")
+            .ToList();
+
+        Assert.True(unusable.Count == 0, string.Join(Environment.NewLine, unusable));
+    }
+
+    [Fact]
+    public void LocalTranscriptionModelsArePreferredBestFirst()
+    {
+        // The Foundry service walks the local entries in catalogue order when the
+        // configured model is absent from the machine. That ordering replaced
+        // WhisperModel.Priority, so it is load-bearing rather than cosmetic.
+        var local = TranscriptionModel.All
+            .Where(static model => model.Provider is AiProvider.FoundryLocal)
+            .Select(static model => model.Id)
+            .ToList();
+
+        Assert.Equal(["whisper-large-v3-turbo", "whisper-small", "whisper-tiny"], local);
     }
 
     // Only each type's NAME SHAPE matters here, never what the type is:

@@ -12,7 +12,12 @@ public sealed class FoundryLocalTranscriptionService :
     IHostedService,
     IAsyncDisposable
 {
-    public const string ModelIdConfigurationKey = VoiceToTextHosting.ModelIdConfigurationKey;
+    public const string DefaultTranscriptionKey = VoiceToTextHosting.DefaultTranscriptionKey;
+
+    // Catalogue order expresses local preference, the job WhisperModel.Priority
+    // used to do: best-first, walked when the configured model is absent.
+    private static readonly TranscriptionModel[] LocalModels =
+        [.. TranscriptionModel.All.Where(static model => model.Provider is AiProvider.FoundryLocal)];
 
     private static readonly string[] OggExtensions = [".ogg", ".opus", ".oga"];
     private static readonly TimeSpan DownloadTimeout = TimeSpan.FromMinutes(5);
@@ -288,7 +293,9 @@ public sealed class FoundryLocalTranscriptionService :
 
     private async Task<IModel> ResolveModelAsync(ICatalog catalog)
     {
-        var configuredId = _configuration[ModelIdConfigurationKey];
+        // The key names a marker; the Foundry catalogue is keyed by wire id.
+        var configuredId = TranscriptionModel
+            .FindByMarkerName(_configuration[DefaultTranscriptionKey] ?? string.Empty)?.Id;
         if (!string.IsNullOrEmpty(configuredId))
         {
             var configured = await catalog.GetModelAsync(configuredId).ConfigureAwait(false);
@@ -300,7 +307,7 @@ public sealed class FoundryLocalTranscriptionService :
             _logger.LogWarning("Configured whisper model '{ModelId}' not found; falling back", configuredId);
         }
 
-        foreach (var whisperModel in WhisperModel.All.OrderByDescending(m => m.Priority))
+        foreach (var whisperModel in LocalModels)
         {
             var found = await catalog.GetModelAsync(whisperModel.Id).ConfigureAwait(false);
             if (found is not null)
@@ -311,6 +318,6 @@ public sealed class FoundryLocalTranscriptionService :
 
         throw new InvalidOperationException(
             "No whisper model found in Foundry Local catalog. "
-            + $"Expected one of: {string.Join(", ", WhisperModel.All.Select(m => m.Id))}");
+            + $"Expected one of: {string.Join(", ", LocalModels.Select(static m => m.Id))}");
     }
 }
