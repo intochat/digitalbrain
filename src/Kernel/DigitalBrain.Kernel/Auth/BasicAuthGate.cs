@@ -17,6 +17,9 @@ internal static class BasicAuthGate
 
     private const string BasicScheme = "Basic";
 
+    // Generous for "user:pass" while keeping the decode buffer stack-safe.
+    private const int MaxEncodedCredentialChars = 1024;
+
     // Probed by the shell's login screen and by container probes; never gated.
     private static readonly string[] AnonymousPaths = ["/health", "/alive"];
 
@@ -31,7 +34,7 @@ internal static class BasicAuthGate
             return app;
         }
 
-        app.Use(async (context, next) =>
+        app.Use(async (HttpContext context, RequestDelegate next) =>
         {
             if (IsAnonymous(context.Request) || credential.Matches(context.Request.Headers.Authorization))
             {

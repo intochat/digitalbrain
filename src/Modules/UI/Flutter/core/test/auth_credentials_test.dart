@@ -28,7 +28,10 @@ void main() {
       ),
       httpClient: MockClient((request) async {
         seen[request.url.path] = request.headers['authorization'];
-        return http.Response('{}', 200);
+        // openScene demands 202; the kit read wants a 200 body.
+        return request.method == 'POST'
+            ? http.Response('', 202)
+            : http.Response('{}', 200);
       }),
     );
 
