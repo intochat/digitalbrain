@@ -1,5 +1,6 @@
 export 'src/ui_models.dart';
 export 'src/ui_client.dart';
+export 'src/basic_credentials.dart';
 export 'src/cookie_http_client.dart';
 export 'src/host_environment.dart';
 export 'src/shell_surface.dart';

@@ -1,18 +1,30 @@
 import 'package:http/http.dart' as http;
 
+import 'basic_credentials.dart';
+
 /// Captures Set-Cookie from the kernel and re-sends Cookie on later calls.
 /// Loopback dev auth does not need cookies once a bootstrap owner exists, but
 /// login/bootstrap cookies keep Flutter working when loopback cannot apply.
 final class CookieHttpClient extends http.BaseClient {
-  CookieHttpClient(this._inner);
+  CookieHttpClient(this._inner, {this.credentials});
 
   final http.Client _inner;
   final Map<String, String> _cookies = {};
+
+  /// Attached to every outgoing request. The single choke point every call
+  /// funnels through, so SSE streams and multipart voice uploads are covered
+  /// without touching their own send sites.
+  final BasicCredentials? credentials;
 
   Map<String, String> get cookies => Map.unmodifiable(_cookies);
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final credential = credentials;
+    if (credential != null && !request.headers.containsKey('authorization')) {
+      request.headers['authorization'] = credential.authorizationHeader;
+    }
+
     if (_cookies.isNotEmpty && !request.headers.containsKey('cookie')) {
       request.headers['cookie'] = _cookies.entries
           .map((entry) => '${entry.key}=${entry.value}')

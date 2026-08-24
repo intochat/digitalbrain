@@ -1,6 +1,7 @@
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:flutter/material.dart';
 
+import 'auth/brain_session_gate.dart';
 import 'chat_screen.dart';
 import 'open_url_io.dart'
     if (dart.library.html) 'open_url_web.dart'
@@ -11,45 +12,48 @@ Future<void> main() async {
 
   final chat = DigitalBrainHostEnv.resolveChat();
 
-  DigitalBrainUiClient? client;
-  String? status;
-  try {
-    client = DigitalBrainUiClient.fromEnvironment();
-  } on Object catch (error) {
-    status = error.toString();
-    debugPrint('DigitalBrain session failed: $error');
-  }
-
-  final edge = client;
-
+  // The gate owns client construction now: it must hold the credentials the
+  // kernel accepted before any stream opens.
   runApp(
-    BrainChatApp(
-      chatName: chat,
-      statusMessage: status,
-      turns: edge?.watchChatTurns(chatName: chat),
-      onStream: edge == null
-          ? null
-          : (text) => edge.streamMessage(chatName: chat, text: text),
-      onStreamVoice: edge == null
-          ? null
-          : (audioBytes, {fileName = 'voice.wav'}) => edge.streamVoice(
-              chatName: chat,
-              audioBytes: audioBytes,
-              fileName: fileName,
-            ),
-      onActivateButton: edge == null
-          ? null
-          : ({required offerCommandId, required buttonId, required action}) =>
-                edge.activateChatButton(
-                  chatName: chat,
-                  offerCommandId: offerCommandId,
-                  buttonId: buttonId,
-                  action: action,
-                ),
-      onOpenSignIn: openExternalUrl,
-      onReadChart: edge?.readChart,
-      onReadImageBytes: edge?.readImageBytes,
+    BrainSessionGate(
+      builder: (client, status) =>
+          buildShell(chat: chat, edge: client, statusMessage: status),
     ),
+  );
+}
+
+@visibleForTesting
+Widget buildShell({
+  required String chat,
+  required DigitalBrainUiClient? edge,
+  String? statusMessage,
+}) {
+  return BrainChatApp(
+    chatName: chat,
+    statusMessage: statusMessage,
+    turns: edge?.watchChatTurns(chatName: chat),
+    onStream: edge == null
+        ? null
+        : (text) => edge.streamMessage(chatName: chat, text: text),
+    onStreamVoice: edge == null
+        ? null
+        : (audioBytes, {fileName = 'voice.wav'}) => edge.streamVoice(
+            chatName: chat,
+            audioBytes: audioBytes,
+            fileName: fileName,
+          ),
+    onActivateButton: edge == null
+        ? null
+        : ({required offerCommandId, required buttonId, required action}) =>
+              edge.activateChatButton(
+                chatName: chat,
+                offerCommandId: offerCommandId,
+                buttonId: buttonId,
+                action: action,
+              ),
+    onOpenSignIn: openExternalUrl,
+    onReadChart: edge?.readChart,
+    onReadImageBytes: edge?.readImageBytes,
   );
 }
 
