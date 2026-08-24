@@ -6,6 +6,9 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Reqnroll" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.SmartPrompt.Contracts.csproj" />
     <ProjectReference Include="../../Execution/Contracts/DigitalBrain.Modules.Execution.Contracts.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
