@@ -26,6 +26,13 @@ final class BrainWorkspace extends StatefulWidget {
     this.onActivateButton,
     this.onReadChart,
     this.onReadImageBytes,
+    this.onLoadBehaviors,
+    this.onLoadBehaviorSteps,
+    this.onSaveBehavior,
+    this.onTestBehavior,
+    this.onActivateBehavior,
+    this.onRunBehaviorFake,
+    this.onGenerateBehavior,
     this.userActions = const [],
     this.statusMessage,
   });
@@ -40,6 +47,13 @@ final class BrainWorkspace extends StatefulWidget {
   final ActivateChatButton? onActivateButton;
   final ReadChart? onReadChart;
   final ReadImageBytes? onReadImageBytes;
+  final LoadBehaviors? onLoadBehaviors;
+  final LoadBehaviorSteps? onLoadBehaviorSteps;
+  final SaveBehavior? onSaveBehavior;
+  final TestBehavior? onTestBehavior;
+  final ActivateBehavior? onActivateBehavior;
+  final RunBehaviorFake? onRunBehaviorFake;
+  final GenerateBehavior? onGenerateBehavior;
   final List<UserActionCardModel> userActions;
   final String? statusMessage;
 
@@ -117,8 +131,13 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
             onOpenUserAction: widget.onOpenSignIn,
           ),
           BehaviorWorkspace(
-            userActions: widget.userActions,
-            onOpenUserAction: widget.onOpenSignIn,
+            onLoad: widget.onLoadBehaviors,
+            onLoadSteps: widget.onLoadBehaviorSteps,
+            onSave: widget.onSaveBehavior,
+            onTest: widget.onTestBehavior,
+            onActivate: widget.onActivateBehavior,
+            onRunFake: widget.onRunBehaviorFake,
+            onGenerate: widget.onGenerateBehavior,
           ),
         ],
       );

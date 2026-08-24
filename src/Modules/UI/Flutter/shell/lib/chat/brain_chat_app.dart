@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../brain_theme.dart';
 import '../user_actions/user_action_card.dart';
 import 'brain_workspace.dart';
+import '../behaviors/behavior_workspace.dart';
 import 'chat_contracts.dart';
 
 export 'chat_contracts.dart';
@@ -21,6 +22,13 @@ final class BrainChatApp extends StatelessWidget {
     this.onActivateButton,
     this.onReadChart,
     this.onReadImageBytes,
+    this.onLoadBehaviors,
+    this.onLoadBehaviorSteps,
+    this.onSaveBehavior,
+    this.onTestBehavior,
+    this.onActivateBehavior,
+    this.onRunBehaviorFake,
+    this.onGenerateBehavior,
     this.userActions = const [],
     this.statusMessage,
   });
@@ -35,6 +43,13 @@ final class BrainChatApp extends StatelessWidget {
   final ActivateChatButton? onActivateButton;
   final ReadChart? onReadChart;
   final ReadImageBytes? onReadImageBytes;
+  final LoadBehaviors? onLoadBehaviors;
+  final LoadBehaviorSteps? onLoadBehaviorSteps;
+  final SaveBehavior? onSaveBehavior;
+  final TestBehavior? onTestBehavior;
+  final ActivateBehavior? onActivateBehavior;
+  final RunBehaviorFake? onRunBehaviorFake;
+  final GenerateBehavior? onGenerateBehavior;
   final List<UserActionCardModel> userActions;
   final String? statusMessage;
 
@@ -55,6 +70,13 @@ final class BrainChatApp extends StatelessWidget {
         onActivateButton: onActivateButton,
         onReadChart: onReadChart,
         onReadImageBytes: onReadImageBytes,
+        onLoadBehaviors: onLoadBehaviors,
+        onLoadBehaviorSteps: onLoadBehaviorSteps,
+        onSaveBehavior: onSaveBehavior,
+        onTestBehavior: onTestBehavior,
+        onActivateBehavior: onActivateBehavior,
+        onRunBehaviorFake: onRunBehaviorFake,
+        onGenerateBehavior: onGenerateBehavior,
         userActions: userActions,
         statusMessage: statusMessage,
       ),

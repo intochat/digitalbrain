@@ -96,54 +96,84 @@ final class _BrainChatComposerState extends State<BrainChatComposer> {
         key: _key,
         color: theme.surfaceLow,
         padding: EdgeInsets.fromLTRB(8, 8, 8, 8 + bottomSafe),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            IconButton(
-              key: const Key('chat_attach_button'),
-              tooltip: 'Attach',
-              icon: const Icon(Icons.attachment),
-              color: muted,
-              onPressed: onAttach,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: TextField(
-                controller: _text,
-                focusNode: context.read<VoiceComposerController>().focus,
-                minLines: 1,
-                maxLines: 3,
-                textCapitalization: TextCapitalization.sentences,
-                textInputAction: TextInputAction.newline,
-                style: theme.bodyMedium.copyWith(color: theme.onSurface),
-                decoration: InputDecoration(
-                  hintText: 'Type a message',
-                  hintStyle: theme.bodyMedium.copyWith(color: muted),
-                  border: const OutlineInputBorder(
-                    borderSide: BorderSide.none,
-                    borderRadius: BorderRadius.all(Radius.circular(24)),
-                  ),
-                  filled: true,
-                  fillColor: theme.surfaceHigh.withValues(alpha: 0.8),
-                  hoverColor: Colors.transparent,
+            if (onSend != null)
+              SizedBox(
+                height: 34,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    _AssistantHint(
+                      label: 'Run Bitcoin fake',
+                      prompt: 'Run the bitcoin behavior with fake data',
+                      onSend: onSend,
+                    ),
+                    _AssistantHint(
+                      label: 'Show 8 examples',
+                      prompt: 'Show me the eight available behavior examples',
+                      onSend: onSend,
+                    ),
+                    _AssistantHint(
+                      label: 'Create a behavior',
+                      prompt:
+                          'Create a behavior for me and compile its paired tests',
+                      onSend: onSend,
+                    ),
+                  ],
                 ),
-                onSubmitted: _submit,
               ),
-            ),
-            if (widget.canVoice) ...[
-              const SizedBox(width: 8),
-              _VoiceButton(onTap: widget.onVoiceTap),
-            ],
-            const SizedBox(width: 8),
-            ValueListenableBuilder<bool>(
-              valueListenable: _hasText,
-              builder: (context, hasText, _) => IconButton(
-                tooltip: 'Send',
-                icon: const Icon(Icons.send),
-                color: muted,
-                onPressed: hasText && onSend != null
-                    ? () => _submit(_text.text)
-                    : null,
-              ),
+            Row(
+              children: [
+                IconButton(
+                  key: const Key('chat_attach_button'),
+                  tooltip: 'Attach',
+                  icon: const Icon(Icons.attachment),
+                  color: muted,
+                  onPressed: onAttach,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _text,
+                    focusNode: context.read<VoiceComposerController>().focus,
+                    minLines: 1,
+                    maxLines: 3,
+                    textCapitalization: TextCapitalization.sentences,
+                    textInputAction: TextInputAction.newline,
+                    style: theme.bodyMedium.copyWith(color: theme.onSurface),
+                    decoration: InputDecoration(
+                      hintText: 'Type a message',
+                      hintStyle: theme.bodyMedium.copyWith(color: muted),
+                      border: const OutlineInputBorder(
+                        borderSide: BorderSide.none,
+                        borderRadius: BorderRadius.all(Radius.circular(24)),
+                      ),
+                      filled: true,
+                      fillColor: theme.surfaceHigh.withValues(alpha: 0.8),
+                      hoverColor: Colors.transparent,
+                    ),
+                    onSubmitted: _submit,
+                  ),
+                ),
+                if (widget.canVoice) ...[
+                  const SizedBox(width: 8),
+                  _VoiceButton(onTap: widget.onVoiceTap),
+                ],
+                const SizedBox(width: 8),
+                ValueListenableBuilder<bool>(
+                  valueListenable: _hasText,
+                  builder: (context, hasText, _) => IconButton(
+                    tooltip: 'Send',
+                    icon: const Icon(Icons.send),
+                    color: muted,
+                    onPressed: hasText && onSend != null
+                        ? () => _submit(_text.text)
+                        : null,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -172,6 +202,29 @@ final class _BrainChatComposerState extends State<BrainChatComposer> {
       box.size.height - MediaQuery.of(context).padding.bottom,
     );
   }
+}
+
+final class _AssistantHint extends StatelessWidget {
+  const _AssistantHint({
+    required this.label,
+    required this.prompt,
+    required this.onSend,
+  });
+
+  final String label;
+  final String prompt;
+  final OnMessageSendCallback onSend;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(right: 8),
+    child: ActionChip(
+      key: Key('assistant_hint_${label.toLowerCase().replaceAll(' ', '_')}'),
+      avatar: const Icon(Icons.auto_awesome, size: 15),
+      label: Text(label),
+      onPressed: () => onSend(prompt),
+    ),
+  );
 }
 
 final class _VoiceButton extends StatelessWidget {

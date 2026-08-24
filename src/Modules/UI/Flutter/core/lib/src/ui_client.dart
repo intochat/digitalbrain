@@ -11,6 +11,7 @@ import 'sse_chat_delta_frames.dart';
 import 'sse_chat_frames.dart';
 import 'sse_frames.dart';
 import 'ui_models.dart';
+import 'behavior_models.dart';
 
 final class DigitalBrainUiClient {
   /// Gated on the kernel; 404 when the kernel runs ungated.
@@ -66,6 +67,76 @@ final class DigitalBrainUiClient {
   final Uri baseUri;
   final CookieHttpClient _http;
   final bool _ownsClient;
+
+  Future<List<BehaviorSummary>> listBehaviors() async {
+    final response = await _request('GET', '/behaviors');
+    return (jsonDecode(response.body) as List<Object?>)
+        .cast<Map<String, Object?>>()
+        .map(BehaviorSummary.fromJson)
+        .toList();
+  }
+
+  Future<List<BehaviorStepSuggestion>> listBehaviorSteps() async {
+    final response = await _request('GET', '/behaviors/steps');
+    return (jsonDecode(response.body) as List<Object?>)
+        .cast<Map<String, Object?>>()
+        .map(BehaviorStepSuggestion.fromJson)
+        .toList();
+  }
+
+  Future<void> saveBehavior(String name, String source) async {
+    await _request('PUT', '/behaviors/$name', body: {'source': source});
+  }
+
+  Future<BehaviorTestReport> testBehavior(String name) async {
+    final response = await _request('POST', '/behaviors/$name/test');
+    return BehaviorTestReport.fromJson(
+      jsonDecode(response.body) as Map<String, Object?>,
+    );
+  }
+
+  Future<void> activateBehavior(String name, {required bool active}) async {
+    await _request(
+      'POST',
+      '/behaviors/$name/${active ? 'activate' : 'disable'}',
+    );
+  }
+
+  Future<String> runBehaviorFake(String name) async {
+    final response = await _request('POST', '/behaviors/$name/fake');
+    return (jsonDecode(response.body) as Map<String, Object?>)['description']
+        as String;
+  }
+
+  Future<BehaviorGeneration> generateBehavior(String request) async {
+    final response = await _request(
+      'POST',
+      '/behaviors/generate',
+      body: {'request': request},
+    );
+    return BehaviorGeneration.fromJson(
+      jsonDecode(response.body) as Map<String, Object?>,
+    );
+  }
+
+  Future<http.Response> _request(
+    String method,
+    String path, {
+    Map<String, Object?>? body,
+  }) async {
+    final request = http.Request(method, baseUri.replace(path: path));
+    if (body != null) {
+      request.headers['content-type'] = 'application/json';
+      request.body = jsonEncode(body);
+    }
+    final response = await http.Response.fromStream(await _http.send(request));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(
+        '$method $path failed: ${response.statusCode} ${response.body}',
+      );
+    }
+    return response;
+  }
 
   Future<void> openScene({
     required String shellName,

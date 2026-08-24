@@ -330,4 +330,81 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
 
     expect(await client.readImageBytes('missing'), isNull);
   });
+
+  test(
+    'behavior client lists, saves, tests, runs fake data, and generates',
+    () async {
+      final requests = <String>[];
+      final client = DigitalBrainUiClient(
+        baseUri: Uri.parse('http://ui.example:5080'),
+        httpClient: MockClient((request) async {
+          requests.add('${request.method} ${request.url.path}');
+          if (request.url.path == '/behaviors' && request.method == 'GET') {
+            return http.Response(
+              jsonEncode([
+                {
+                  'name': 'bitcoin-tracker',
+                  'title': 'Bitcoin',
+                  'source': 'Feature: Bitcoin',
+                  'active': true,
+                  'lastTest': {
+                    'allGreen': true,
+                    'scenarios': 1,
+                    'failures': [],
+                  },
+                  'diagnostics': [],
+                },
+              ]),
+              200,
+            );
+          }
+          if (request.url.path.endsWith('/test')) {
+            return http.Response(
+              jsonEncode({'allGreen': true, 'scenarios': 1, 'failures': []}),
+              200,
+            );
+          }
+          if (request.url.path.endsWith('/fake')) {
+            return http.Response(
+              jsonEncode({'eventId': 'fake-1', 'description': 'x.post fake'}),
+              200,
+            );
+          }
+          if (request.url.path == '/behaviors/generate') {
+            return http.Response(
+              jsonEncode({
+                'source': 'Feature: Generated',
+                'model': 'gemma4:12b',
+                'compilation': {'success': true, 'diagnostics': []},
+              }),
+              200,
+            );
+          }
+          return http.Response('{}', 200);
+        }),
+      );
+
+      final listed = await client.listBehaviors();
+      await client.saveBehavior('bitcoin-tracker', 'Feature: Bitcoin');
+      final report = await client.testBehavior('bitcoin-tracker');
+      final fake = await client.runBehaviorFake('bitcoin-tracker');
+      final generated = await client.generateBehavior('track bitcoin');
+
+      expect(listed.single.active, isTrue);
+      expect(report.allGreen, isTrue);
+      expect(fake, 'x.post fake');
+      expect(generated.model, 'gemma4:12b');
+      expect(generated.success, isTrue);
+      expect(
+        requests,
+        containsAll([
+          'GET /behaviors',
+          'PUT /behaviors/bitcoin-tracker',
+          'POST /behaviors/bitcoin-tracker/test',
+          'POST /behaviors/bitcoin-tracker/fake',
+          'POST /behaviors/generate',
+        ]),
+      );
+    },
+  );
 }

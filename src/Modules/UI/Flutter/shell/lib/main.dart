@@ -54,6 +54,13 @@ Widget buildShell({
     onOpenSignIn: openExternalUrl,
     onReadChart: edge?.readChart,
     onReadImageBytes: edge?.readImageBytes,
+    onLoadBehaviors: edge?.listBehaviors,
+    onLoadBehaviorSteps: edge?.listBehaviorSteps,
+    onSaveBehavior: edge?.saveBehavior,
+    onTestBehavior: edge?.testBehavior,
+    onActivateBehavior: edge?.activateBehavior,
+    onRunBehaviorFake: edge?.runBehaviorFake,
+    onGenerateBehavior: edge?.generateBehavior,
   );
 }
 
