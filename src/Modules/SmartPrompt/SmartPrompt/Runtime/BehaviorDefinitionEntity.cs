@@ -25,12 +25,9 @@ internal sealed class BehaviorDefinitionEntity(
     public async Task<BehaviorTestReport> Test()
     {
         var current = State ?? throw new InvalidOperationException("Save the feature before running its tests.");
-        var failures = current.Compilation.Diagnostics
-            .Where(static diagnostic => diagnostic.Severity == BehaviorDiagnosticSeverity.Error)
-            .Select(static diagnostic => $"line {diagnostic.Line}: {diagnostic.Message}")
-            .ToArray();
-        var scenarios = current.Compilation.Plan?.Tests.Count ?? 0;
-        var report = new BehaviorTestReport(failures.Length == 0 && scenarios > 0, failures, scenarios);
+        var report = BehaviorTestInterpreter.Validate(
+            current.Compilation.Plan,
+            current.Compilation.Diagnostics);
         await SaveAsync(current with { LastTest = report });
         return report;
     }

@@ -23,4 +23,13 @@ internal static class HttpSurfacePaths
     public const string KitChartPath = "/kit/charts/{chartName}";
     public const string KitImagePath = "/kit/images/{imageName}";
     public const string KitImageContentPath = "/kit/images/{imageName}/content";
+
+    public const string BehaviorsPath = "/behaviors";
+    public const string BehaviorPath = "/behaviors/{name}";
+    public const string BehaviorTestPath = "/behaviors/{name}/test";
+    public const string BehaviorActivatePath = "/behaviors/{name}/activate";
+    public const string BehaviorDisablePath = "/behaviors/{name}/disable";
+    public const string BehaviorFakePath = "/behaviors/{name}/fake";
+    public const string BehaviorStepsPath = "/behaviors/steps";
+    public const string BehaviorGeneratePath = "/behaviors/generate";
 }

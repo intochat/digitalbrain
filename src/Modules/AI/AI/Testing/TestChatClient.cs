@@ -15,6 +15,8 @@ internal sealed partial class TestChatClient : IChatClient
     private const string GeneratedReply = "Generated.";
     private const string RenderChartToolName = "render_chart";
     private const string GenerateImageToolName = "generate_image";
+    private const string GenerateBehaviorToolName = "generate_behavior_feature";
+    private const string RunBehaviorToolName = "run_behavior_example";
     private const string FallbackChatName = "main";
 
     public Task<ChatResponse> GetResponseAsync(
@@ -43,13 +45,54 @@ internal sealed partial class TestChatClient : IChatClient
                 .FirstOrDefault();
             var reply = string.Equals(priorCall?.Name, GenerateImageToolName, StringComparison.Ordinal)
                 ? GeneratedReply
-                : RenderedReply;
+                : priorCall?.Name is GenerateBehaviorToolName or RunBehaviorToolName
+                    ? "Behavior ready."
+                    : RenderedReply;
             yield return new ChatResponseUpdate(ChatRole.Assistant, reply) { FinishReason = ChatFinishReason.Stop };
             yield break;
         }
 
         var lastUser = conversation.LastOrDefault(static m => m.Role == ChatRole.User)?.Text ?? "";
         var tools = options?.Tools?.OfType<AIFunction>().ToList() ?? [];
+
+        if (conversation.Any(static message => message.Role == ChatRole.System
+            && message.Text.Contains("DigitalBrain Behavior feature compiler", StringComparison.Ordinal)))
+        {
+            yield return new ChatResponseUpdate(ChatRole.Assistant, GeneratedBehaviorFeature)
+            {
+                FinishReason = ChatFinishReason.Stop,
+            };
+            yield break;
+        }
+
+        var runBehavior = tools.FirstOrDefault(static tool => tool.Name == RunBehaviorToolName);
+        if (runBehavior is not null
+            && lastUser.Contains("behavior", StringComparison.OrdinalIgnoreCase)
+            && lastUser.Contains("run", StringComparison.OrdinalIgnoreCase))
+        {
+            var name = lastUser.Contains("bitcoin", StringComparison.OrdinalIgnoreCase)
+                ? "bitcoin-tracker"
+                : "urgent-email";
+            yield return new ChatResponseUpdate(ChatRole.Assistant,
+            [new FunctionCallContent("call-1", RunBehaviorToolName, new Dictionary<string, object?> { ["name"] = name })])
+            { FinishReason = ChatFinishReason.ToolCalls };
+            yield break;
+        }
+
+        var generateBehavior = tools.FirstOrDefault(static tool => tool.Name == GenerateBehaviorToolName);
+        if (generateBehavior is not null
+            && lastUser.Contains("behavior", StringComparison.OrdinalIgnoreCase)
+            && lastUser.Contains("create", StringComparison.OrdinalIgnoreCase))
+        {
+            yield return new ChatResponseUpdate(ChatRole.Assistant,
+            [new FunctionCallContent("call-1", GenerateBehaviorToolName, new Dictionary<string, object?>
+            {
+                ["name"] = "generated-bitcoin-alert",
+                ["request"] = lastUser,
+            })])
+            { FinishReason = ChatFinishReason.ToolCalls };
+            yield break;
+        }
 
         // Precedence: "chart" beats "image" when a message somehow mentions both.
         var renderChart = tools.FirstOrDefault(static tool => tool.Name == RenderChartToolName);
@@ -118,4 +161,20 @@ internal sealed partial class TestChatClient : IChatClient
 
     [GeneratedRegex("chat '([^']+)'")]
     private static partial Regex ChatNameInContext();
+
+    private const string GeneratedBehaviorFeature =
+        """
+        Feature: Generated Bitcoin alert
+          @behavior
+          Scenario: Notify on a high Bitcoin price
+            Given Market.Symbol("BTCUSD")
+            When Market.Price changes
+            And the event value is above 90000
+            Then notify UI.Chat("main")
+          @test
+          Scenario: A high Bitcoin price notifies the chat
+            Given fake event "market.price" from "BTCUSD" with text "BTC breakout" and value 95000
+            When behavior "Notify on a high Bitcoin price" runs
+            Then UI.Chat("main") contains a behavior notification
+        """;
 }

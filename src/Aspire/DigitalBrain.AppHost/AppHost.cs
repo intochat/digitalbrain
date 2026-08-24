@@ -34,10 +34,12 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
         ai.WithLlm<IGemini36Flash>();
         ai.WithLlm<IGrok46>();
         ai.WithLlm<IGemma4>();
+        ai.WithDefaultLlm<IGemma4>();
         ai.WithEmbedding<ITextEmbedding3Small>();
         ai.WithEmbedding<ITextEmbedding3Large>();
         ai.WithEmbedding<IGeminiEmbedding>();
         ai.WithEmbedding<IEmbeddingGemma>();
+        ai.WithDefaultEmbedding<IEmbeddingGemma>();
         ai.WithVoiceToText<IWhisperLargeV3Turbo>();
     })
     .AddModule<MemoryModule>(memory => memory.WithQdrant())

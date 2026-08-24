@@ -83,6 +83,28 @@ public interface IBehaviorCompiler
 }
 
 [GenerateSerializer]
+[Alias("db.behavior.generation.v1")]
+public sealed record BehaviorGeneration(
+    [property: Id(0)] string Source,
+    [property: Id(1)] BehaviorCompilation Compilation,
+    [property: Id(2)] string Model);
+
+public interface IBehaviorFeatureGenerator
+{
+    Task<BehaviorGeneration> Generate(string request, CancellationToken cancellationToken = default);
+}
+
+[GenerateSerializer]
+[Alias("db.behavior.summary.v1")]
+public sealed record BehaviorSummary(
+    [property: Id(0)] string Name,
+    [property: Id(1)] string Title,
+    [property: Id(2)] string Source,
+    [property: Id(3)] bool Active,
+    [property: Id(4)] BehaviorTestReport? LastTest,
+    [property: Id(5)] IReadOnlyList<BehaviorDiagnostic> Diagnostics);
+
+[GenerateSerializer]
 [Alias("db.behavior.event.v1")]
 public sealed record BehaviorEvent(
     [property: Id(0)] string EventId,
