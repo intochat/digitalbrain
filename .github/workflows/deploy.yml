@@ -94,18 +94,49 @@ jobs:
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --image "docker.io/${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-kernel:${{ github.event.release.tag_name }}"
 
-      - name: Wait for the new revision to report healthy
+      - name: Wait for the new revision to take traffic
+        # The old revision keeps serving the public FQDN until the new one is
+        # ready, so polling /health alone goes green against the code we are
+        # replacing. Gate on the new revision by name first.
         run: |
+          revision=$(az containerapp revision list \
+            --name "${{ vars.AZURE_CONTAINERAPP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --query "[?contains(properties.template.containers[0].image, ':${{ github.event.release.tag_name }}')] | [-1].name" \
+            --output tsv)
+          if [ -z "$revision" ]; then
+            echo "no revision found running ${{ github.event.release.tag_name }}"
+            exit 1
+          fi
+          echo "waiting on revision ${revision}"
+
           for attempt in $(seq 1 40); do
-            status=$(curl -s -o /dev/null -w "%{http_code}" "${{ vars.KERNEL_PUBLIC_URL }}/health" || true)
-            if [ "$status" = "200" ]; then
-              echo "kernel healthy after ${attempt} attempt(s)"
-              exit 0
-            fi
-            echo "attempt ${attempt}: /health returned ${status}"
+            state=$(az containerapp revision show \
+              --name "${{ vars.AZURE_CONTAINERAPP_NAME }}" \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --revision "$revision" \
+              --query properties.runningState --output tsv || true)
+            case "$state" in
+              Running|RunningAtMaxScale)
+                echo "revision ${revision} is ${state}"
+                status=$(curl -s -o /dev/null -w "%{http_code}" "${{ vars.KERNEL_PUBLIC_URL }}/health" || true)
+                if [ "$status" = "200" ]; then
+                  echo "kernel healthy on the new revision"
+                  exit 0
+                fi
+                echo "revision up but /health returned ${status}"
+                ;;
+              Failed|Degraded)
+                echo "revision ${revision} reported ${state}"
+                exit 1
+                ;;
+              *)
+                echo "attempt ${attempt}: revision ${state:-unknown}"
+                ;;
+            esac
             sleep 15
           done
-          echo "kernel did not report healthy within 10 minutes"
+          echo "revision ${revision} did not take traffic within 10 minutes"
           exit 1
 
   deploy-flutter-web:
