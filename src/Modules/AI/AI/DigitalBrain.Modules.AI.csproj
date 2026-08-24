@@ -25,6 +25,9 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Simulation.Tests" />
+    <!-- Voice-to-text selection is internal wiring; its conformance tests live beside
+         the other single-source-of-truth suites. -->
+    <InternalsVisibleTo Include="DigitalBrain.Aspire.Tests" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />

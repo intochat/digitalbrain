@@ -36,18 +36,27 @@ internal static class VoiceToTextHosting
         }
 
         // The provider decides the implementation — one key, no second flag.
-        if (model.Provider is AiProvider.FoundryLocal)
+        switch (model.Provider)
         {
-            services.TryAddSingleton<FoundryLocalTranscriptionService>();
-            services.TryAddSingleton<IAudioTranscriptionService>(static sp =>
-                sp.GetRequiredService<FoundryLocalTranscriptionService>());
-            services.AddHostedService(static sp => sp.GetRequiredService<FoundryLocalTranscriptionService>());
-            return;
-        }
+            case AiProvider.FoundryLocal:
+                services.TryAddSingleton<FoundryLocalTranscriptionService>();
+                services.TryAddSingleton<IAudioTranscriptionService>(static sp =>
+                    sp.GetRequiredService<FoundryLocalTranscriptionService>());
+                services.AddHostedService(static sp =>
+                    sp.GetRequiredService<FoundryLocalTranscriptionService>());
+                break;
 
-        services.TryAddSingleton<IAudioTranscriptionService>(
-            new UnavailableTranscriptionService(
-                $"{model.DisplayName} is served by {model.Provider}, which has no transcription "
-                + "implementation yet."));
+            case AiProvider.OpenAI:
+                services.TryAddSingleton<IAudioTranscriptionService>(sp =>
+                    new OpenAITranscriptionService(model, sp.GetRequiredService<IConfiguration>()));
+                break;
+
+            default:
+                services.TryAddSingleton<IAudioTranscriptionService>(
+                    new UnavailableTranscriptionService(
+                        $"{model.DisplayName} is served by {model.Provider}, which has no "
+                        + "transcription implementation."));
+                break;
+        }
     }
 }
