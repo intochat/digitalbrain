@@ -34,7 +34,7 @@ internal static class BasicAuthGate
             return app;
         }
 
-        app.Use(async (HttpContext context, RequestDelegate next) =>
+        app.Use(async (context, next) =>
         {
             if (IsAnonymous(context.Request) || credential.Matches(context.Request.Headers.Authorization))
             {
