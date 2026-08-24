@@ -161,6 +161,17 @@ subscription Owner is sufficient. Subject
 container app alone. Its client id and the target names live in the `production`
 environment variables, which override the stale repo-level `AZURE_*` vars left
 over from a different tenant.
+Two things the v0.1.21 rollout taught us:
+
+- The org enforces GitHub's immutable-ID OIDC subject claims, so the presented
+  subject is `repo:intochat@290989167/digitalbrain@1275877089:environment:production`,
+  not the documented plain-path form. The identity carries a federated credential
+  for each (`github-production`, `github-production-ids`); the plain one never
+  matches while that org setting stands.
+- A rollout keeps the old revision serving the public FQDN until the new one is
+  ready, so polling `/health` alone reports success against the code being
+  replaced. The release job resolves the new revision by name and waits for its
+  `runningState` before trusting `/health`.
 ## Section B — Code and pipeline changes (one release)
 
 1. **Kernel Basic-auth middleware** (`src/Kernel/DigitalBrain.Kernel/Auth/`): active only when both `DigitalBrain__Auth__Username` and `__Password` are configured — unset means open, so local dev, Aspire, and the E2E fixture stay untouched. Constant-time comparison (`CryptographicOperations.FixedTimeEquals`). Returns 401 WITHOUT `WWW-Authenticate` (avoids the browser's native prompt). Exempt: `/health`, `/alive`, and OPTIONS preflights. Everything else — `/owner/commands`, SSE streams, `/kit/*`, voice, and the currently wide-open `/orleans` dashboard — is behind it.
