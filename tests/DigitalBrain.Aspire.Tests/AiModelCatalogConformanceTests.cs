@@ -187,9 +187,17 @@ public sealed class AiModelCatalogConformanceTests
         {
             var options = OpenAIImageGeneration.OptionsFor(model);
 
-            Assert.Equal(
-                model.AcceptsResponseFormat ? GeneratedImageFormat.Bytes : null,
-                options.ResponseFormat);
+            // Branches rather than a ternary: GeneratedImageFormat is a struct with
+            // an implicit conversion from string, so `cond ? Bytes : null` converts
+            // the null through string and throws inside the SDK.
+            if (model.AcceptsResponseFormat)
+            {
+                Assert.Equal(GeneratedImageFormat.Bytes, options.ResponseFormat);
+            }
+            else
+            {
+                Assert.Null(options.ResponseFormat);
+            }
         }
     }
 
