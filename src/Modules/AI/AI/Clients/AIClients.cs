@@ -13,7 +13,7 @@ internal static class AIClients
     private const string EnableSensitiveDataKey = $"{ConfigurationRoot}:Telemetry:EnableSensitiveData";
     private const string TelemetrySource = "DigitalBrain.AI";
 
-    private static readonly IReadOnlyDictionary<LlmProvider, ILlmProviderFactory> Factories =
+    private static readonly IReadOnlyDictionary<AiProvider, ILlmProviderFactory> Factories =
         new ILlmProviderFactory[]
         {
             new OpenAIProviderFactory(),

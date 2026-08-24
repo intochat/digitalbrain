@@ -1,15 +1,7 @@
 namespace DigitalBrain.AI;
 
-public abstract class EmbeddingModel
+public abstract class EmbeddingModel : AiModel
 {
-    public abstract string Id { get; }
-
-    public abstract LlmProvider Provider { get; }
-
-    public abstract Type Marker { get; }
-
-    public bool IsLocal => Provider == LlmProvider.Ollama;
-
     public static IReadOnlyList<EmbeddingModel> All { get; } =
     [
         new OpenAI.TextEmbedding3Small(),

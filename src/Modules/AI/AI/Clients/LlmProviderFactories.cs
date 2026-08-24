@@ -9,7 +9,7 @@ namespace DigitalBrain.AI;
 
 internal interface ILlmProviderFactory
 {
-    LlmProvider Provider { get; }
+    AiProvider Provider { get; }
 
     bool IsConfigured(IConfiguration configuration);
 
@@ -22,7 +22,7 @@ internal interface ILlmProviderFactory
 
 internal abstract class ApiKeyProviderFactory : ILlmProviderFactory
 {
-    public abstract LlmProvider Provider { get; }
+    public abstract AiProvider Provider { get; }
 
     public bool IsConfigured(IConfiguration configuration)
         => !string.IsNullOrEmpty(configuration[ApiKeyConfigurationKey]);
@@ -78,14 +78,14 @@ internal abstract class OpenAICompatibleProviderFactory : ApiKeyProviderFactory
 
 internal sealed class OpenAIProviderFactory : OpenAICompatibleProviderFactory
 {
-    public override LlmProvider Provider => LlmProvider.OpenAI;
+    public override AiProvider Provider => AiProvider.OpenAI;
 
     protected override Uri? DefaultEndpoint => null;
 }
 
 internal sealed class GoogleProviderFactory : OpenAICompatibleProviderFactory
 {
-    public override LlmProvider Provider => LlmProvider.Google;
+    public override AiProvider Provider => AiProvider.Google;
 
     protected override Uri? DefaultEndpoint { get; } =
         new("https://generativelanguage.googleapis.com/v1beta/openai/");
@@ -93,14 +93,14 @@ internal sealed class GoogleProviderFactory : OpenAICompatibleProviderFactory
 
 internal sealed class XAIProviderFactory : OpenAICompatibleProviderFactory
 {
-    public override LlmProvider Provider => LlmProvider.XAI;
+    public override AiProvider Provider => AiProvider.XAI;
 
     protected override Uri? DefaultEndpoint { get; } = new("https://api.x.ai/v1");
 }
 
 internal sealed class AnthropicProviderFactory : ApiKeyProviderFactory
 {
-    public override LlmProvider Provider => LlmProvider.Anthropic;
+    public override AiProvider Provider => AiProvider.Anthropic;
 
     public override IChatClient CreateChatClient(LLMModel model, IConfiguration configuration)
         => new AnthropicClient
@@ -119,7 +119,7 @@ internal sealed class OllamaProviderFactory : ILlmProviderFactory
 {
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromMinutes(5);
 
-    public LlmProvider Provider => LlmProvider.Ollama;
+    public AiProvider Provider => AiProvider.Ollama;
 
     public bool IsConfigured(IConfiguration configuration)
         => !string.IsNullOrEmpty(configuration[EndpointConfigurationKey]);

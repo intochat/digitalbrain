@@ -1,16 +1,8 @@
 namespace DigitalBrain.AI;
 
-public abstract class LLMModel
+public abstract class LLMModel : AiModel
 {
-    public abstract string Id { get; }
-
-    public abstract LlmProvider Provider { get; }
-
-    public abstract Type Marker { get; }
-
     public virtual bool SupportsTools => true;
-
-    public bool IsLocal => Provider == LlmProvider.Ollama;
 
     // Cloud models precede local ones: when no default is configured, the first
     // model whose provider has credentials becomes the default chat model.

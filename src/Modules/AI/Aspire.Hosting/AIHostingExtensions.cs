@@ -91,7 +91,7 @@ public static class AIHostingExtensions
 
         private readonly HashSet<Type> _markers = [];
         private readonly Dictionary<Type, IResourceBuilder<OllamaModelResource>> _ollamaModels = [];
-        private readonly Dictionary<LlmProvider, IResourceBuilder<ParameterResource>> _providerApiKeys = [];
+        private readonly Dictionary<AiProvider, IResourceBuilder<ParameterResource>> _providerApiKeys = [];
         private IResourceBuilder<OllamaResource>? _ollama;
         private Type? _defaultLlmMarker;
         private Type? _defaultEmbeddingMarker;
@@ -160,7 +160,7 @@ public static class AIHostingExtensions
             }
         }
 
-        private void AddModel(Type marker, LlmProvider provider, string id)
+        private void AddModel(Type marker, AiProvider provider, string id)
         {
             if (!_markers.Add(marker))
             {
@@ -168,7 +168,7 @@ public static class AIHostingExtensions
                     $"{marker.FullName} is already configured on brain '{brain.Name}'. Add each model exactly once.");
             }
 
-            if (provider == LlmProvider.Ollama)
+            if (provider == AiProvider.Ollama)
             {
                 _ollamaModels[marker] = EnsureOllama().AddModel(OllamaResourceName(id), id);
             }
@@ -187,7 +187,7 @@ public static class AIHostingExtensions
             }
         }
 
-        private void EnsureProviderApiKey(LlmProvider provider)
+        private void EnsureProviderApiKey(AiProvider provider)
         {
             if (_providerApiKeys.ContainsKey(provider))
             {
