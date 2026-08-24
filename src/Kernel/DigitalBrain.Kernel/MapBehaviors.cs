@@ -1,5 +1,6 @@
 using DigitalBrain.Client;
 using DigitalBrain.SmartPrompt;
+using DigitalBrain.UI;
 
 namespace DigitalBrain.Kernel;
 
@@ -115,6 +116,51 @@ internal static class BehaviorHttpMaps
                 return Results.Ok(new BehaviorFakeResponse(behaviorEvent.EventId, FakeBehaviorEvents.Describe(behaviorEvent)));
             });
 
+        endpoints.MapGet(HttpSurfacePaths.BehaviorChartPath,
+            static async Task<IResult> (string chartName, IDigitalBrain brain) =>
+            {
+                if (!ValidName(chartName.Replace('_', '-')))
+                {
+                    return Results.BadRequest();
+                }
+                var chart = await brain.GetEntity<IChart>(chartName).Read();
+                return chart is null ? Results.NotFound() : Results.Ok(chart);
+            });
+
+        endpoints.MapPost(HttpSurfacePaths.XPostIngressPath,
+            static async Task<IResult> (
+                XPostIngressRequest post,
+                HttpRequest request,
+                IConfiguration configuration,
+                IGrainFactory grains) =>
+            {
+                var expectedKey = configuration["DigitalBrain:Behaviors:IngressKey"];
+                if (!string.IsNullOrEmpty(expectedKey)
+                    && !string.Equals(request.Headers["X-DigitalBrain-Ingress-Key"], expectedKey, StringComparison.Ordinal))
+                {
+                    return Results.Unauthorized();
+                }
+                if (string.IsNullOrWhiteSpace(post.Id)
+                    || string.IsNullOrWhiteSpace(post.Account)
+                    || string.IsNullOrWhiteSpace(post.Text)
+                    || !Uri.TryCreate(post.SourceUri, UriKind.Absolute, out _))
+                {
+                    return Results.BadRequest(new { error = "id, account, text, and an absolute sourceUri are required" });
+                }
+                var behaviorEvent = new BehaviorEvent(
+                    post.Id.Trim(),
+                    "x.post",
+                    post.Account.Trim().TrimStart('@'),
+                    post.Text.Trim(),
+                    post.Value,
+                    post.SourceUri,
+                    post.OccurredAt ?? DateTimeOffset.UtcNow);
+                await grains.GetGrain<IBehaviorIngress>(BehaviorIngressNames.Shared).Publish(behaviorEvent);
+                return Results.Accepted(value: new BehaviorFakeResponse(
+                    behaviorEvent.EventId,
+                    FakeBehaviorEvents.Describe(behaviorEvent)));
+            });
+
         return endpoints;
     }
 
@@ -131,3 +177,10 @@ internal static class BehaviorHttpMaps
 internal sealed record BehaviorSaveRequest(string Source);
 internal sealed record BehaviorGenerateRequest(string Request);
 internal sealed record BehaviorFakeResponse(string EventId, string Description);
+internal sealed record XPostIngressRequest(
+    string Id,
+    string Account,
+    string Text,
+    double Value,
+    string SourceUri,
+    DateTimeOffset? OccurredAt);

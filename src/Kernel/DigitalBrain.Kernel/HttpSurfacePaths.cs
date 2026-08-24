@@ -32,4 +32,6 @@ internal static class HttpSurfacePaths
     public const string BehaviorFakePath = "/behaviors/{name}/fake";
     public const string BehaviorStepsPath = "/behaviors/steps";
     public const string BehaviorGeneratePath = "/behaviors/generate";
+    public const string BehaviorChartPath = "/behavior-charts/{chartName}";
+    public const string XPostIngressPath = "/ingress/x/posts";
 }
