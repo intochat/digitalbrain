@@ -72,9 +72,12 @@ public sealed class OpenAITranscriptionService : IAudioTranscriptionService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(audioFilePath);
 
-        await using var stream = File.OpenRead(audioFilePath).ConfigureAwait(false);
-        return await TranscribeAsync(stream, Path.GetFileName(audioFilePath), cancellationToken)
-            .ConfigureAwait(false);
+        var stream = File.OpenRead(audioFilePath);
+        await using (stream.ConfigureAwait(false))
+        {
+            return await TranscribeAsync(stream, Path.GetFileName(audioFilePath), cancellationToken)
+                .ConfigureAwait(false);
+        }
     }
 
     public async Task<string> TranscribeAsync(
