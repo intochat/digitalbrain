@@ -7,7 +7,7 @@ public sealed class Gemma4 : LLMModel<IGemma4>
     public override AiProvider Provider => AiProvider.Ollama;
 
     // gemma4 via Ollama supports native tool/function calling (2026).
-    public override bool SupportsTools => true;
+    public override LlmCapabilities Capabilities => LlmCapabilities.Tools;
 }
 
 public interface IGemma4 : ILLM;

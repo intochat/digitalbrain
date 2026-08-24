@@ -2,7 +2,14 @@ namespace DigitalBrain.AI;
 
 public abstract class LLMModel : AiModel
 {
-    public virtual bool SupportsTools => true;
+    /// <summary>
+    /// Defaults to tool-calling only. Every catalogued model has always been
+    /// treated as tool-capable; vision and structured output go undeclared until
+    /// a model is actually confirmed to support them.
+    /// </summary>
+    public virtual LlmCapabilities Capabilities => LlmCapabilities.Tools;
+
+    public bool SupportsTools => Capabilities.HasFlag(LlmCapabilities.Tools);
 
     // Cloud models precede local ones: when no default is configured, the first
     // model whose provider has credentials becomes the default chat model.

@@ -129,29 +129,37 @@ public sealed class AiModelCatalogConformanceTests
         Assert.True(blank.Count == 0, string.Join(Environment.NewLine, blank));
     }
 
+    [Fact]
+    public void EveryEmbeddingModelDeclaresAPositiveVectorWidth()
+    {
+        // A stored collection is keyed to one width; a zero or negative one could
+        // only ever be an unfilled placeholder.
+        var invalid = EmbeddingModel.All
+            .Where(static model => model.Dimensions <= 0)
+            .Select(static model => $"{model.GetType().Name} declares Dimensions = {model.Dimensions}")
+            .ToList();
+
+        Assert.True(invalid.Count == 0, string.Join(Environment.NewLine, invalid));
+    }
+
+    // Only each type's NAME SHAPE matters here, never what the type is:
+    //   ILLM   -> 'I' + uppercase, a real interface prefix
+    //   Int32  -> 'I' + lowercase, a word that merely starts with I
+    //   String -> no prefix at all
+    // Borrowing existing types beats declaring deliberately misnamed ones, which
+    // the repo's naming rules reject outright.
     [Theory]
-    [InlineData(typeof(IPrefixedMarker), "PrefixedMarker")]
-    [InlineData(typeof(Ideal), "Ideal")]
-    [InlineData(typeof(Unprefixed), "Unprefixed")]
-    public void DefaultDisplayNameDropsOnlyAnInterfacePrefix(Type marker, string expected)
+    [InlineData(typeof(ILLM), "LLM")]
+    [InlineData(typeof(int), "Int32")]
+    [InlineData(typeof(string), "String")]
+    public void DefaultDisplayNameDropsOnlyAnInterfacePrefix(Type markerNameSource, string expected)
     {
         // DisplayName is presentation, never a lookup key. This redesign exists in
         // part to delete a lookup that worked by chopping a leading 'I', so the one
         // surviving cosmetic use of that trick is pinned here — including the cases
-        // it must NOT fire on: a name whose second character is lowercase, and one
-        // with no interface prefix at all. Real models stay free to override
-        // DisplayName outright.
-        Assert.Equal(expected, new DisplayNameProbe(marker).DisplayName);
+        // it must NOT fire on. Real models stay free to override DisplayName.
+        Assert.Equal(expected, new DisplayNameProbe(markerNameSource).DisplayName);
     }
-
-    private interface IPrefixedMarker : IAiMarker;
-
-    // 'I' followed by a lowercase letter is a word, not a prefix.
-    private interface Ideal : IAiMarker;
-
-#pragma warning disable CA1715 // Deliberately unprefixed: the case the strip must not fire on.
-    private interface Unprefixed : IAiMarker;
-#pragma warning restore CA1715
 
     private sealed class DisplayNameProbe(Type marker) : AiModel
     {
