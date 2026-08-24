@@ -14,13 +14,11 @@ public sealed class AIModule : Core.IModule
                 StringComparison.Ordinal))
         {
             AITestingClients.Add(builder.Services);
-        }
-        else
-        {
-            AIClients.Add(builder.Services);
-            AIClients.AddImageGeneration(builder.Services, builder.Configuration);
+            return;
         }
 
+        AIClients.Add(builder.Services);
+        AIClients.AddImageGeneration(builder.Services, builder.Configuration);
         VoiceToTextHosting.Add(builder.Services, builder.Configuration);
     }
 }

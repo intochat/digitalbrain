@@ -32,6 +32,12 @@ internal static class AITestingClients
         services.TryAddSingleton<IChatClient>(chatClient);
         services.TryAddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(embeddingGenerator);
         services.TryAddSingleton<IImageGeneration, TestImageGeneration>();
+
+        // Voice too, and for the same reason: testing mode must not reach a real
+        // provider. Registered here rather than through VoiceToTextHosting so no
+        // pinned marker can route a suite at a billed endpoint.
+        services.TryAddSingleton<IAudioConverter, OggOpusToWavConverter>();
+        services.TryAddSingleton<IAudioTranscriptionService, TestTranscriptionService>();
     }
 
     private sealed class TestEmbeddingGenerator : IEmbeddingGenerator<string, Embedding<float>>

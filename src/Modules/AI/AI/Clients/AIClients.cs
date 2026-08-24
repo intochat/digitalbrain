@@ -124,10 +124,21 @@ internal static class AIClients
     {
         // The marker names the model, as with chat and embeddings; an unpinned
         // key keeps the catalogue's first entry.
-        var model = configuration[DefaultImageKey] is { Length: > 0 } markerName
-            ? ImageModel.FindByMarkerName(markerName)
-                ?? throw UnknownMarker(DefaultImageKey, markerName, ImageModel.All.Select(static m => m.Marker.Name))
-            : ImageModel.All[0];
+        var markerName = configuration[DefaultImageKey];
+        var model = string.IsNullOrEmpty(markerName)
+            ? ImageModel.All[0]
+            : ImageModel.FindByMarkerName(markerName);
+
+        // Resolution failure is deferred into the factory rather than thrown here:
+        // this runs during service registration, so throwing would take the whole
+        // silo down over a typo in a peripheral feature. Default:Model does the
+        // same, and Default:Transcription degrades to a 503 with the reason.
+        if (model is null)
+        {
+            services.AddSingleton<IImageGeneration>(_ => throw UnknownMarker(
+                DefaultImageKey, markerName!, ImageModel.All.Select(static m => m.Marker.Name)));
+            return;
+        }
 
         if (configuration[$"{ConfigurationRoot}:{model.Provider}:ApiKey"] is { Length: > 0 })
         {

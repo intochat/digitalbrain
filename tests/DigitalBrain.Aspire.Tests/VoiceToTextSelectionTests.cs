@@ -88,6 +88,10 @@ public sealed class VoiceToTextSelectionTests
     [InlineData("blob", "voice.wav")]
     [InlineData("clip.bin", "voice.wav")]
     [InlineData("", "voice.wav")]
+    // Opus rides in an Ogg container the provider accepts, but .opus is not in its
+    // extension list. Relabelling it .wav would announce Ogg bytes as WAV.
+    [InlineData("note.opus", "note.ogg")]
+    [InlineData("NOTE.OPUS", "NOTE.ogg")]
     public void UnrecognisedContainersFallBackToWav(string given, string expected)
     {
         // An extension the provider does not know is a 400 that would surface as an

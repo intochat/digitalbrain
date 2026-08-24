@@ -20,6 +20,7 @@ public sealed class OpenAITranscriptionService : IAudioTranscriptionService
         [".flac", ".m4a", ".mp3", ".mp4", ".mpeg", ".mpga", ".oga", ".ogg", ".wav", ".webm"];
 
     private const string FallbackFileName = "voice.wav";
+    private const string OpusExtension = ".opus";
 
     private readonly TranscriptionModel _model;
     private readonly Lazy<AudioClient>? _client;
@@ -111,8 +112,20 @@ public sealed class OpenAITranscriptionService : IAudioTranscriptionService
         }
 
         var extension = Path.GetExtension(fileName);
-        return AcceptedExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase)
-            ? fileName
-            : FallbackFileName;
+        if (AcceptedExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
+        {
+            return fileName;
+        }
+
+        // Opus rides in an Ogg container, which the provider does accept, but it is
+        // not in its extension list. Relabelling it .wav like any other unknown
+        // extension would hand it Ogg bytes announced as WAV; the Foundry path
+        // already treats .opus as an Ogg container, so these uploads are real.
+        if (OpusExtension.Equals(extension, StringComparison.OrdinalIgnoreCase))
+        {
+            return Path.ChangeExtension(fileName, ".ogg");
+        }
+
+        return FallbackFileName;
     }
 }

@@ -70,6 +70,16 @@ public static class AIHostingExtensions
             module.AddProjection(voice);
         }
 
+        // A hosted transcription model needs its provider key like any other model.
+        // WithLlm/WithEmbedding get this through AddModel; voice has its own
+        // projection, so without this an AppHost that pins a hosted model without
+        // also registering a chat model of the same provider ships no key, and the
+        // endpoint answers 503 forever with no host-side way to fix it.
+        if (!whisper.IsLocal)
+        {
+            State(module).EnsureProviderApiKey(whisper.Provider);
+        }
+
         voice.SetModel(whisper);
         return module;
     }
@@ -188,7 +198,7 @@ public static class AIHostingExtensions
             }
         }
 
-        private void EnsureProviderApiKey(AiProvider provider)
+        internal void EnsureProviderApiKey(AiProvider provider)
         {
             if (_providerApiKeys.ContainsKey(provider))
             {
