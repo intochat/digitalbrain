@@ -10,7 +10,7 @@ Date: 2026-08-24. Status: ratified in interview; implementation pending.
 | Auth | Basic auth everywhere: kernel middleware validates `Authorization: Basic` against env creds; Flutter login screen; token-free by design (dev stand, replaced by real auth later) |
 | AI | OpenAI API key as a Container App secret; `Default__Model=IGpt54Nano`, `Default__Embedding=ITextEmbedding3Small` (embedding pin is mandatory in cloud — the code default is local Ollama and throws). No Azure OpenAI: the code has no such provider |
 | Vector memory | Qdrant Cloud free tier (external), via `ConnectionStrings__memory-qdrant` |
-| Region / scale | `westeurope`; min 1 / max 1 replicas (always-on; the silo has no clustering ports, so >1 replica is forbidden) |
+| Region / scale | `polandcentral`; min 1 / max 1 replicas (always-on). The original ">1 replica is forbidden" rationale was WRONG — see "Clustering across replicas" below |
 
 ## Inputs the owner provides
 
@@ -172,6 +172,52 @@ Two things the v0.1.21 rollout taught us:
   ready, so polling `/health` alone reports success against the code being
   replaced. The release job resolves the new revision by name and waits for its
   `runningState` before trusting `/health`.
+## Clustering across replicas — the original premise was wrong
+
+Section A claimed the silo "has no clustering ports, so >1 replica is forbidden."
+The v0.1.21 rollout disproved it. Container Apps never restarts a revision in
+place: it starts the new one, waits for health, shifts traffic, then stops the
+old one, so two silos share the cluster for ~45-95s on every release. The logs
+from that window:
+
+```
+14:24:33 [--0000001] Establishing connection to endpoint S100.100.207.183:11111:146537383
+14:24:33 [--0000001] Connected to endpoint S100.100.207.183:11111:146537383
+14:24:32 [--w4n3tlb] Will watch (actively ping) 1 silos: [S100.100.204.201:11111:146586270]
+14:24:32 [--w4n3tlb] Received gossip: [Version: 4, 2 silos, Silo_846f0 Active, Silo_3be25 Active]
+14:26:05 [--0000001] Received gossip: [Version: 5, Silo_846f0 ShuttingDown]
+14:26:06 [--0000001] Received gossip: [Version: 6, Silo_846f0 Dead]
+14:26:06 [--0000001] Will watch (actively ping) 0 silos: []
+```
+
+Replicas in one Container Apps environment DO reach each other on the default
+silo port 11111. The silos connected, gossiped, actively pinged, and handed over
+cleanly. `OrleansSiloInstances` corroborates it: each dead silo's
+`SuspectingSilos` is its OWN address (graceful self-shutdown), never the other
+silo's — no mutual suspicion, no split-brain, membership version advancing
+normally.
+
+So the overlap is ordinary Orleans behavior, not a hazard, and `max-replicas 1`
+is a deliberate cost choice rather than a correctness constraint. Scaling out
+is available if wanted.
+
+## Qdrant needs an explicit `:6334`
+
+Qdrant Cloud hands you a cluster URL with no port. Left as-is it resolves to
+443, and the code builds a **gRPC** client (`new QdrantClient(endpoint, apiKey)`),
+while 443 and 6333 serve REST — only 6334 speaks gRPC. Verified against the live
+cluster: `GET /collections` returns JSON on 443 and 6333, and a binary gRPC frame
+on 6334.
+
+The connection string must therefore carry the port explicitly:
+
+```
+Endpoint=https://<cluster>.aws.cloud.qdrant.io:6334;Key=<key>
+```
+
+This bit the first configuration pass — the kernel booted healthy either way,
+because the client is built lazily on first vector-memory use, so the mistake
+would only have surfaced later, far from its cause.
 ## Section B — Code and pipeline changes (one release)
 
 1. **Kernel Basic-auth middleware** (`src/Kernel/DigitalBrain.Kernel/Auth/`): active only when both `DigitalBrain__Auth__Username` and `__Password` are configured — unset means open, so local dev, Aspire, and the E2E fixture stay untouched. Constant-time comparison (`CryptographicOperations.FixedTimeEquals`). Returns 401 WITHOUT `WWW-Authenticate` (avoids the browser's native prompt). Exempt: `/health`, `/alive`, and OPTIONS preflights. Everything else — `/owner/commands`, SSE streams, `/kit/*`, voice, and the currently wide-open `/orleans` dashboard — is behind it.
@@ -198,4 +244,4 @@ Two things the v0.1.21 rollout taught us:
 - Real auth (multi-user principals replacing the fixed `HttpActor` GUID) — the middleware and login screen are its placeholders.
 - Managed identity for storage (requires a `ServiceUri` overload in `AzureOrleansJournalHosting`).
 - Multi-replica Orleans (silo/gateway ports + ACA internal TCP).
-- Verify at rollout: Qdrant connection parser accepts the cloud endpoint format; if the `Key=` segment is rejected for any reason, fix the parser rather than dropping auth.
+- ~~Verify the Qdrant parser accepts the cloud endpoint format~~ — done at rollout. The parser is fine; the trap is the PORT, see "Qdrant needs an explicit :6334" below.
