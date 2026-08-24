@@ -81,3 +81,59 @@ public interface IBehaviorCompiler
 
     IReadOnlyList<BehaviorStepSuggestion> Suggestions { get; }
 }
+
+[GenerateSerializer]
+[Alias("db.behavior.event.v1")]
+public sealed record BehaviorEvent(
+    [property: Id(0)] string EventId,
+    [property: Id(1)] string Kind,
+    [property: Id(2)] string Source,
+    [property: Id(3)] string Text,
+    [property: Id(4)] double Value,
+    [property: Id(5)] string SourceUri,
+    [property: Id(6)] DateTimeOffset OccurredAt)
+{
+    public string TriggerKey => Kind.Equals("x.post", StringComparison.OrdinalIgnoreCase)
+        ? $"x.post/account:{Source.Trim().ToLowerInvariant()}"
+        : $"{Kind.Trim().ToLowerInvariant()}/source:{Source.Trim().ToLowerInvariant()}";
+}
+
+[GenerateSerializer]
+[Alias("db.behavior.subscription.v1")]
+public sealed record BehaviorSubscription(
+    [property: Id(0)] string Owner,
+    [property: Id(1)] string BehaviorName,
+    [property: Id(2)] string ScenarioName,
+    [property: Id(3)] string RevisionHash);
+
+[GenerateSerializer]
+[Alias("db.behavior.test-report.v1")]
+public sealed record BehaviorTestReport(
+    [property: Id(0)] bool AllGreen,
+    [property: Id(1)] IReadOnlyList<string> Failures,
+    [property: Id(2)] int Scenarios);
+
+[GenerateSerializer]
+[Alias("db.behavior.definition-state.v1")]
+public sealed record BehaviorDefinitionState(
+    [property: Id(0)] string Source,
+    [property: Id(1)] BehaviorCompilation Compilation,
+    [property: Id(2)] bool Active,
+    [property: Id(3)] BehaviorTestReport? LastTest);
+
+[GenerateSerializer]
+[Alias("db.behavior.directory-stats.v1")]
+public sealed record BehaviorDirectoryStats(
+    [property: Id(0)] int SubscriptionCount,
+    [property: Id(1)] int ActivePartitions,
+    [property: Id(2)] int ConfiguredPartitions);
+
+public static class BehaviorRouting
+{
+    public const int PartitionCount = 64;
+}
+
+public static class BehaviorIngressNames
+{
+    public const string Shared = "shared";
+}

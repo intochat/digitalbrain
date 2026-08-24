@@ -14,4 +14,19 @@ internal sealed class ChartEntity(
         ArgumentNullException.ThrowIfNull(state);
         await SaveAsync(state);
     }
+
+    public async Task Append(ChartPoint point, string title)
+    {
+        ArgumentNullException.ThrowIfNull(point);
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+
+        var current = State ?? new ChartState(title.Trim(), "line", []);
+        if (!string.IsNullOrWhiteSpace(point.EventId)
+            && current.Points.Any(existing => string.Equals(existing.EventId, point.EventId, StringComparison.Ordinal)))
+        {
+            return;
+        }
+
+        await SaveAsync(current with { Points = [.. current.Points, point] });
+    }
 }

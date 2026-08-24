@@ -9,4 +9,7 @@ public interface IChart : IEntity<ChartState>
 {
     [Alias(nameof(Render))]
     Task Render(ChartState state);
+
+    [Alias(nameof(Append))]
+    Task Append(ChartPoint point, string title);
 }
