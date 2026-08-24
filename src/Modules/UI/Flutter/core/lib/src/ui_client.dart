@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import 'basic_credentials.dart';
 import 'cookie_http_client.dart';
 import 'host_environment.dart';
 import 'sse_chat_delta_frames.dart';
@@ -12,21 +13,53 @@ import 'sse_frames.dart';
 import 'ui_models.dart';
 
 final class DigitalBrainUiClient {
-  DigitalBrainUiClient({required this.baseUri, http.Client? httpClient})
-    : _http = httpClient is CookieHttpClient
-          ? httpClient
-          : CookieHttpClient(httpClient ?? http.Client()),
-      _ownsClient = httpClient == null;
+  /// Gated on the kernel; 404 when the kernel runs ungated.
+  static const authCheckPath = '/auth/check';
+
+  DigitalBrainUiClient({
+    required this.baseUri,
+    http.Client? httpClient,
+    BasicCredentials? credentials,
+  }) : _http = httpClient is CookieHttpClient
+           ? httpClient
+           : CookieHttpClient(
+               httpClient ?? http.Client(),
+               credentials: credentials,
+             ),
+       _ownsClient = httpClient == null;
 
   factory DigitalBrainUiClient.fromEnvironment({
     http.Client? httpClient,
     Map<String, String>? processEnvironment,
+    BasicCredentials? credentials,
   }) {
     return DigitalBrainUiClient(
       baseUri: DigitalBrainHostEnv.requireUiBaseUri(
         processEnvironment: processEnvironment,
       ),
       httpClient: httpClient,
+      credentials: credentials,
+    );
+  }
+
+  /// Probes the kernel's gated `/auth/check`.
+  ///
+  /// Returns true when the kernel accepts the attached credentials — including
+  /// the ungated case, where the endpoint is absent and any request already
+  /// succeeds. Returns false only on an explicit 401, so a wrong password is
+  /// distinguishable from an unreachable kernel, which throws.
+  Future<bool> checkAuth() async {
+    final uri = baseUri.replace(path: authCheckPath);
+    final streamed = await _http.send(http.Request('GET', uri));
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode == 401) {
+      return false;
+    }
+    if (response.statusCode == 204 || response.statusCode == 404) {
+      return true;
+    }
+    throw StateError(
+      'auth check failed: ${response.statusCode} ${response.body}',
     );
   }
 

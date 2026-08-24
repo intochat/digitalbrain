@@ -129,6 +129,38 @@ Notes:
 - Orleans membership tables, journal/grain-state containers, and `kit-images` are created by the app on first boot; the account needs no pre-created tables/containers.
 - First boot with the `v0.1.20` image runs but is UNGATED and CORS-less — the stand is considered live only after the Section B release is deployed. Don't publicize the FQDN before that.
 
+## As built (2026-08-24)
+
+Section A ran against different names than planned; these are authoritative:
+
+| Planned | As built |
+| --- | --- |
+| `rg-digitalbrain-dev` | `intochat-rg` |
+| `westeurope` | `polandcentral` |
+| `stdigitalbraindev` | `stdbraindeve2c940` |
+| — | SWA is `intochat-ui-webapp` (Free), serving purple-sky |
+
+`cae-digitalbrain-dev` and `ca-digitalbrain-kernel` kept their names. The kernel
+FQDN is `ca-digitalbrain-kernel.niceforest-c1f54c12.polandcentral.azurecontainerapps.io`.
+
+Two corrections to Section A as written:
+
+- `az containerapp secret set` alone changes nothing. Secrets are inert until an
+  env var references them with `secretref:`; the app was created with only
+  `storage-conn`, so the OpenAI, Qdrant, and auth env vars must be added in the
+  same pass that creates their secrets.
+- Health probes (step 6) were never applied. The rolled deployment relies on the
+  release pipeline's `/health` poll instead.
+
+The "auto-update the Container App image from deploy.yml" follow-up is now done,
+and did NOT need an Entra app registration — the owner is a guest in the tenant
+and cannot create one. A **user-assigned managed identity** (`id-digitalbrain-deploy`)
+carries the GitHub federated credential instead: it is an ARM resource, so
+subscription Owner is sufficient. Subject
+`repo:intochat/digitalbrain:environment:production`, scoped Contributor on the
+container app alone. Its client id and the target names live in the `production`
+environment variables, which override the stale repo-level `AZURE_*` vars left
+over from a different tenant.
 ## Section B — Code and pipeline changes (one release)
 
 1. **Kernel Basic-auth middleware** (`src/Kernel/DigitalBrain.Kernel/Auth/`): active only when both `DigitalBrain__Auth__Username` and `__Password` are configured — unset means open, so local dev, Aspire, and the E2E fixture stay untouched. Constant-time comparison (`CryptographicOperations.FixedTimeEquals`). Returns 401 WITHOUT `WWW-Authenticate` (avoids the browser's native prompt). Exempt: `/health`, `/alive`, and OPTIONS preflights. Everything else — `/owner/commands`, SSE streams, `/kit/*`, voice, and the currently wide-open `/orleans` dashboard — is behind it.
