@@ -1,6 +1,7 @@
 using DigitalBrain.SmartPrompt;
 using DigitalBrain.Testing;
 using DigitalBrain.UI;
+using DigitalBrain.Chat;
 using Xunit;
 
 namespace DigitalBrain.Simulation.Tests.SmartPrompt;
@@ -9,13 +10,52 @@ namespace DigitalBrain.Simulation.Tests.SmartPrompt;
 public sealed class BehaviorRuntimeTests(SimulationFixture fixture)
 {
     [Fact]
+    public async Task All_eight_seeded_examples_execute_their_paired_fake_scenarios()
+    {
+        var brain = fixture.Sim.Brain;
+        var ingress = fixture.Sim.Grains.GetGrain<IBehaviorIngress>(BehaviorIngressNames.Shared);
+        var chat = brain.GetGrainProxy<IChat>("main");
+        var beforeChat = (await chat.Read()).Turns.Count;
+
+        foreach (var example in BehaviorExamples.All)
+        {
+            var definition = await brain.GetEntity<IBehaviorDefinition>(example.Name).Read();
+            Assert.NotNull(definition);
+            Assert.True(definition!.Active, example.Name);
+            Assert.True(definition.LastTest?.AllGreen, example.Name);
+            await ingress.Publish(FakeBehaviorEvents.Create(
+                example.Name,
+                $"paired-{example.Name}-{Guid.NewGuid():N}"));
+        }
+
+        var bitcoin = await brain.GetEntity<IChart>("bitcoin_tracker").Read();
+        var portfolio = await brain.GetEntity<IChart>("portfolio").Read();
+        var health = await brain.GetEntity<IChart>("health").Read();
+        Assert.Contains(bitcoin!.Points, static point => point.Value == 95000 && point.SourceUri is not null);
+        Assert.Contains(portfolio!.Points, static point => point.Value == 95000 && point.SourceUri is not null);
+        Assert.Contains(health!.Points, static point => point.Value == 135 && point.SourceUri is not null);
+
+        var addedTurns = (await chat.Read()).Turns.Skip(beforeChat).Select(static turn => turn.Text).ToArray();
+        Assert.Contains(addedTurns, static text => text.StartsWith("Explain urgent work email:", StringComparison.Ordinal));
+        Assert.Contains(addedTurns, static text => text.StartsWith("Prepare for a travel event:", StringComparison.Ordinal));
+        Assert.Contains(addedTurns, static text => text.StartsWith("Summarize an incoming document:", StringComparison.Ordinal));
+        Assert.Contains(addedTurns, static text => text.StartsWith("Triage a new issue:", StringComparison.Ordinal));
+        Assert.Contains(addedTurns, static text => text.StartsWith("Remind me when I arrive home:", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Activated_X_behavior_routes_one_shared_event_to_one_linked_chart_point()
     {
         var brain = fixture.Sim.Brain;
-        var definition = brain.GetEntity<IBehaviorDefinition>("bitcoin-tracker-test");
+        var suffix = Guid.NewGuid().ToString("N")[..10];
+        var chartName = $"bitcoin_tracker_{suffix}";
+        var definition = brain.GetEntity<IBehaviorDefinition>($"bitcoin-tracker-{suffix}");
         var example = BehaviorExamples.Find("bitcoin-tracker")!;
 
-        var compilation = await definition.Save(example.Source);
+        var compilation = await definition.Save(example.Source.Replace(
+            "bitcoin_tracker",
+            chartName,
+            StringComparison.Ordinal));
         Assert.True(compilation.Success);
         var report = await definition.Test();
         Assert.True(report.AllGreen, string.Join(Environment.NewLine, report.Failures));
@@ -23,7 +63,7 @@ public sealed class BehaviorRuntimeTests(SimulationFixture fixture)
 
         var ingress = fixture.Sim.Grains.GetGrain<IBehaviorIngress>(BehaviorIngressNames.Shared);
         var post = new BehaviorEvent(
-            "post-42",
+            $"post-{suffix}",
             "x.post",
             "elonmusk",
             "Bitcoin reaches 95000",
@@ -33,7 +73,7 @@ public sealed class BehaviorRuntimeTests(SimulationFixture fixture)
         await ingress.Publish(post);
         await ingress.Publish(post);
 
-        var chart = brain.GetEntity<IChart>("bitcoin_tracker");
+        var chart = brain.GetEntity<IChart>(chartName);
         var state = await WaitForChart(chart, static candidate => candidate.Points.Count == 1);
         var point = Assert.Single(state.Points);
         Assert.Equal(95000, point.Value);
