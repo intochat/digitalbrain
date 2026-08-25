@@ -17,14 +17,15 @@ public sealed class BehaviorSurfaceTests(AppHostFixture fixture)
         var behaviors = await http.GetFromJsonAsync<List<BehaviorSummary>>(
             "/behaviors", TestContext.Current.CancellationToken);
         Assert.NotNull(behaviors);
-        Assert.Equal(8, behaviors.Count);
-        Assert.All(behaviors, item =>
+        var seeded = behaviors.Where(item => BehaviorExamples.Find(item.Name) is not null).ToArray();
+        Assert.Equal(8, seeded.Length);
+        Assert.All(seeded, item =>
         {
             Assert.True(item.Active, item.Name);
             Assert.True(item.LastTest?.AllGreen, item.Name);
         });
 
-        foreach (var behavior in behaviors)
+        foreach (var behavior in seeded)
         {
             var response = await http.PostAsync(
                 $"/behaviors/{behavior.Name}/fake", null, TestContext.Current.CancellationToken);
@@ -106,5 +107,9 @@ public sealed class BehaviorSurfaceTests(AppHostFixture fixture)
             cancellationToken: TestContext.Current.CancellationToken);
         Assert.True(behavior?.Active);
         Assert.True(behavior?.LastTest?.AllGreen);
+
+        var catalog = await http.GetFromJsonAsync<List<BehaviorSummary>>(
+            "/behaviors", TestContext.Current.CancellationToken);
+        Assert.Contains(catalog!, item => item.Name == "generated-bitcoin-alert");
     }
 }

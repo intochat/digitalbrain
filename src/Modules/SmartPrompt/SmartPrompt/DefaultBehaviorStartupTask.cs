@@ -16,9 +16,12 @@ internal sealed class DefaultBehaviorStartupTask(
     {
         var configured = configuration[DigitalBrainNames.Owner];
         var owner = new OwnerId(string.IsNullOrWhiteSpace(configured) ? DigitalBrainNames.DefaultOwner : configured);
+        var catalog = grains.GetGrain<IBehaviorCatalog>(
+            EntityId.For<IBehaviorCatalog>(owner, "catalog").ToGrainId());
         foreach (var example in BehaviorExamples.All)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            await catalog.Add(example.Name);
             var definition = grains.GetGrain<IBehaviorDefinition>(
                 EntityId.For<IBehaviorDefinition>(owner, example.Name).ToGrainId());
             var existing = await definition.Read();

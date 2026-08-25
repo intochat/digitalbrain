@@ -11,11 +11,21 @@ internal static class BehaviorHttpMaps
         endpoints.MapGet(HttpSurfacePaths.BehaviorsPath,
             static async Task<IResult> (IDigitalBrain brain) =>
             {
-                var summaries = new List<BehaviorSummary>(BehaviorExamples.All.Count);
-                foreach (var example in BehaviorExamples.All)
+                var catalog = await brain.GetEntity<IBehaviorCatalog>("catalog").Read();
+                var names = BehaviorExamples.All.Select(static example => example.Name)
+                    .Concat(catalog?.Names ?? [])
+                    .Distinct(StringComparer.Ordinal)
+                    .Order(StringComparer.Ordinal);
+                var summaries = new List<BehaviorSummary>();
+                foreach (var name in names)
                 {
-                    var state = await brain.GetEntity<IBehaviorDefinition>(example.Name).Read();
-                    summaries.Add(Summary(example.Name, example.Title, example.Source, state));
+                    var example = BehaviorExamples.Find(name);
+                    var state = await brain.GetEntity<IBehaviorDefinition>(name).Read();
+                    if (state is not null || example is not null)
+                    {
+                        summaries.Add(Summary(name, example?.Title ?? state!.Compilation.Plan?.Feature ?? name,
+                            state?.Source ?? example!.Source, state));
+                    }
                 }
                 return Results.Ok(summaries);
             });
@@ -58,6 +68,7 @@ internal static class BehaviorHttpMaps
                     return Results.BadRequest();
                 }
                 var compilation = await brain.GetEntity<IBehaviorDefinition>(name).Save(request.Source);
+                await brain.GetEntity<IBehaviorCatalog>("catalog").Add(name);
                 return Results.Ok(compilation);
             });
 

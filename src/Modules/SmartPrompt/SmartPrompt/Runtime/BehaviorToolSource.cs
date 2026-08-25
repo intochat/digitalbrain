@@ -29,6 +29,7 @@ internal sealed class BehaviorToolSource(
             }
             var definition = Definition(owner, name);
             await definition.Save(generated.Source);
+            await Catalog(owner).Add(name);
             var report = await definition.Test();
             if (report.AllGreen)
             {
@@ -78,6 +79,9 @@ internal sealed class BehaviorToolSource(
 
     private IBehaviorDefinition Definition(OwnerId owner, string name)
         => grains.GetGrain<IBehaviorDefinition>(EntityId.For<IBehaviorDefinition>(owner, name).ToGrainId());
+
+    private IBehaviorCatalog Catalog(OwnerId owner)
+        => grains.GetGrain<IBehaviorCatalog>(EntityId.For<IBehaviorCatalog>(owner, "catalog").ToGrainId());
 
     private static bool ValidName(string name)
         => !string.IsNullOrWhiteSpace(name)

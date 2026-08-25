@@ -144,6 +144,11 @@ public sealed record BehaviorDefinitionState(
     [property: Id(3)] BehaviorTestReport? LastTest);
 
 [GenerateSerializer]
+[Alias("db.behavior.catalog-state.v1")]
+public sealed record BehaviorCatalogState(
+    [property: Id(0)] IReadOnlyList<string> Names);
+
+[GenerateSerializer]
 [Alias("db.behavior.directory-stats.v1")]
 public sealed record BehaviorDirectoryStats(
     [property: Id(0)] int SubscriptionCount,

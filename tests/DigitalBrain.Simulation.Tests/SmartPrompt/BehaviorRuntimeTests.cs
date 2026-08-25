@@ -10,6 +10,20 @@ namespace DigitalBrain.Simulation.Tests.SmartPrompt;
 public sealed class BehaviorRuntimeTests(SimulationFixture fixture)
 {
     [Fact]
+    public async Task Behavior_catalog_persists_generated_behavior_names_without_duplicates()
+    {
+        var catalog = fixture.Sim.Brain.GetEntity<IBehaviorCatalog>("catalog");
+        var name = $"generated-{Guid.NewGuid():N}";
+
+        await catalog.Add(name);
+        await catalog.Add(name);
+
+        var state = await catalog.Read();
+        Assert.NotNull(state);
+        Assert.Equal(1, state!.Names.Count(candidate => candidate == name));
+    }
+
+    [Fact]
     public async Task All_eight_seeded_examples_execute_their_paired_fake_scenarios()
     {
         var brain = fixture.Sim.Brain;

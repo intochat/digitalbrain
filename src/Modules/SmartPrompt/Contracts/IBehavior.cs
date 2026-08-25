@@ -18,6 +18,13 @@ public interface IBehaviorDefinition : IEntity<BehaviorDefinitionState>
     Task Disable();
 }
 
+[Alias("behavior-catalog")]
+public interface IBehaviorCatalog : IEntity<BehaviorCatalogState>
+{
+    [Alias(nameof(Add))]
+    Task Add(string name);
+}
+
 [Alias("behavior-ingress")]
 public interface IBehaviorIngress : IGrainWithStringKey
 {
