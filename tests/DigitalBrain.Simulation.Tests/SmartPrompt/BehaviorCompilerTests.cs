@@ -67,4 +67,36 @@ public sealed class BehaviorCompilerTests
         Assert.False(compilation.Success);
         Assert.Contains(compilation.Diagnostics, static d => d.Code == "BEH006");
     }
+
+    [Fact]
+    public void Suggestions_are_human_Gherkin_not_binding_regular_expressions()
+    {
+        var suggestions = BehaviorCompiler.CreateDefault().Suggestions;
+
+        Assert.Contains(suggestions, static suggestion =>
+            suggestion.Keyword == "When" && suggestion.Template == "a new X.Post is published");
+        Assert.DoesNotContain(suggestions, static suggestion => suggestion.Template.Contains('\\'));
+    }
+
+    [Fact]
+    public void Every_behavior_scenario_requires_exactly_one_paired_test()
+    {
+        var secondBehavior =
+            """
+
+          @behavior
+          Scenario: Track every Elon post
+            Given X.Account("elonmusk")
+            When a new X.Post is published
+            Then notify UI.Chat("main")
+
+        """;
+        var source = ValidFeature.Replace("  @test", secondBehavior + "  @test", StringComparison.Ordinal);
+
+        var compilation = BehaviorCompiler.CreateDefault().Compile(source);
+
+        Assert.False(compilation.Success);
+        Assert.Contains(compilation.Diagnostics, static diagnostic =>
+            diagnostic.Code == "BEH008" && diagnostic.Message.Contains("Track every Elon post", StringComparison.Ordinal));
+    }
 }

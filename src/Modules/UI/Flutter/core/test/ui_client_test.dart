@@ -374,7 +374,7 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
             return http.Response(
               jsonEncode({
                 'source': 'Feature: Generated',
-                'model': 'gemma4:12b',
+                'model': 'gemma4:e2b',
                 'compilation': {'success': true, 'diagnostics': []},
               }),
               200,
@@ -393,7 +393,7 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
       expect(listed.single.active, isTrue);
       expect(report.allGreen, isTrue);
       expect(fake, 'x.post fake');
-      expect(generated.model, 'gemma4:12b');
+      expect(generated.model, 'gemma4:e2b');
       expect(generated.success, isTrue);
       expect(
         requests,

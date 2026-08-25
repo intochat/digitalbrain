@@ -109,7 +109,7 @@ void main() {
         },
         onGenerateBehavior: (_) async => const BehaviorGeneration(
           source: source,
-          model: 'gemma4:12b',
+          model: 'gemma4:e2b',
           success: true,
           diagnostics: [],
         ),

@@ -2,7 +2,10 @@ namespace DigitalBrain.AI.Ollama;
 
 public sealed class Gemma4 : LLMModel<IGemma4>
 {
-    public override string Id => "gemma4:12b";
+    // The E2B edge profile keeps the complete Gemma 4 instruction/tool surface while fitting
+    // inside the 8 GB Docker Desktop budget used by the native development AppHost. The 12B
+    // workstation profile needs more than 9 GB once llama.cpp repacking and KV caches are loaded.
+    public override string Id => "gemma4:e2b";
 
     public override AiProvider Provider => AiProvider.Ollama;
 

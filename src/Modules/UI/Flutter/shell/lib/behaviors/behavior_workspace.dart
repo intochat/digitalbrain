@@ -83,6 +83,14 @@ final class _BehaviorWorkspaceState extends State<BehaviorWorkspace> {
     setState(() {});
   }
 
+  void _replaceSelected(BehaviorSummary behavior) {
+    final index = _behaviors.indexWhere((item) => item.name == behavior.name);
+    if (index >= 0) {
+      _behaviors = [..._behaviors]..[index] = behavior;
+    }
+    _selected = behavior;
+  }
+
   Future<void> _perform(
     String progress,
     Future<String> Function() action,
@@ -265,6 +273,9 @@ final class _BehaviorWorkspaceState extends State<BehaviorWorkspace> {
                       ? null
                       : () => _perform('Compiling…', () async {
                           await widget.onSave!(selected.name, _source.text);
+                          _replaceSelected(
+                            selected.copyWith(source: _source.text),
+                          );
                           return 'Saved and compiled ${selected.name}';
                         }),
                   icon: const Icon(Icons.save_outlined),
@@ -276,6 +287,7 @@ final class _BehaviorWorkspaceState extends State<BehaviorWorkspace> {
                       ? null
                       : () => _perform('Running paired scenarios…', () async {
                           final report = await widget.onTest!(selected.name);
+                          _replaceSelected(selected.copyWith(lastTest: report));
                           return report.allGreen
                               ? '${report.scenarios} scenarios green'
                               : report.failures.join('; ');
@@ -304,6 +316,9 @@ final class _BehaviorWorkspaceState extends State<BehaviorWorkspace> {
                           await widget.onActivate!(
                             selected.name,
                             active: !selected.active,
+                          );
+                          _replaceSelected(
+                            selected.copyWith(active: !selected.active),
                           );
                           return selected.active
                               ? 'Behavior disabled'

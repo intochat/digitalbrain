@@ -10,7 +10,7 @@ internal static class BuiltInBehaviorSteps
     public static Task XAccount(string account) => Completed(account);
 
     [When("a new X\\.Post is published")]
-    [BehaviorStep(BehaviorStepRole.Trigger, "Trigger when the selected X account publishes a post.")]
+    [BehaviorStep(BehaviorStepRole.Trigger, "Trigger when the selected X account publishes a post.", "a new X.Post is published")]
     public static Task NewXPost() => Task.CompletedTask;
 
     [When("the post mentions \"([^\"]+)\"")]
@@ -42,7 +42,7 @@ internal static class BuiltInBehaviorSteps
     public static Task EmailAccount(string account) => Completed(account);
 
     [When("a new Email is received")]
-    [BehaviorStep(BehaviorStepRole.Trigger, "Trigger for a newly received email.")]
+    [BehaviorStep(BehaviorStepRole.Trigger, "Trigger for a newly received email.", "a new Email is received")]
     public static Task NewEmail() => Task.CompletedTask;
 
     [Given("Calendar\\(\"([^\"]+)\"\\)")]
@@ -50,7 +50,7 @@ internal static class BuiltInBehaviorSteps
     public static Task Calendar(string calendar) => Completed(calendar);
 
     [When("Calendar\\.Event starts")]
-    [BehaviorStep(BehaviorStepRole.Trigger, "Trigger when a calendar event starts.")]
+    [BehaviorStep(BehaviorStepRole.Trigger, "Trigger when a calendar event starts.", "Calendar.Event starts")]
     public static Task CalendarEventStarts() => Task.CompletedTask;
 
     [Given("Market\\.Symbol\\(\"([^\"]+)\"\\)")]
@@ -58,7 +58,7 @@ internal static class BuiltInBehaviorSteps
     public static Task MarketSymbol(string symbol) => Completed(symbol);
 
     [When("Market\\.Price changes")]
-    [BehaviorStep(BehaviorStepRole.Trigger, "Trigger when the selected market price changes.")]
+    [BehaviorStep(BehaviorStepRole.Trigger, "Trigger when the selected market price changes.", "Market.Price changes")]
     public static Task MarketPriceChanges() => Task.CompletedTask;
 
     [Given("Folder\\(\"([^\"]+)\"\\)")]
@@ -66,7 +66,7 @@ internal static class BuiltInBehaviorSteps
     public static Task Folder(string folder) => Completed(folder);
 
     [When("File\\.Created")]
-    [BehaviorStep(BehaviorStepRole.Trigger, "Trigger when a file is created.")]
+    [BehaviorStep(BehaviorStepRole.Trigger, "Trigger when a file is created.", "File.Created")]
     public static Task FileCreated() => Task.CompletedTask;
 
     [Given("Health\\.Metric\\(\"([^\"]+)\"\\)")]
@@ -74,7 +74,7 @@ internal static class BuiltInBehaviorSteps
     public static Task HealthMetric(string metric) => Completed(metric);
 
     [When("Health\\.Metric is recorded")]
-    [BehaviorStep(BehaviorStepRole.Trigger, "Trigger when a health metric is recorded.")]
+    [BehaviorStep(BehaviorStepRole.Trigger, "Trigger when a health metric is recorded.", "Health.Metric is recorded")]
     public static Task HealthMetricRecorded() => Task.CompletedTask;
 
     [Given("GitHub\\.Repository\\(\"([^\"]+)\"\\)")]
@@ -82,7 +82,7 @@ internal static class BuiltInBehaviorSteps
     public static Task GitHubRepository(string repository) => Completed(repository);
 
     [When("GitHub\\.Issue is opened")]
-    [BehaviorStep(BehaviorStepRole.Trigger, "Trigger when a GitHub issue is opened.")]
+    [BehaviorStep(BehaviorStepRole.Trigger, "Trigger when a GitHub issue is opened.", "GitHub.Issue is opened")]
     public static Task GitHubIssueOpened() => Task.CompletedTask;
 
     [Given("Geofence\\(\"([^\"]+)\"\\)")]
@@ -90,7 +90,7 @@ internal static class BuiltInBehaviorSteps
     public static Task Geofence(string place) => Completed(place);
 
     [When("Location enters the geofence")]
-    [BehaviorStep(BehaviorStepRole.Trigger, "Trigger when the owner enters the geofence.")]
+    [BehaviorStep(BehaviorStepRole.Trigger, "Trigger when the owner enters the geofence.", "Location enters the geofence")]
     public static Task LocationEntered() => Task.CompletedTask;
 
     [When("the event text contains \"([^\"]+)\"")]

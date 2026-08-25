@@ -104,6 +104,18 @@ public sealed class BehaviorCompiler : IBehaviorCompiler
         {
             diagnostics.Add(Error("BEH006", "A feature requires at least one paired @test scenario."));
         }
+        foreach (var behavior in behaviors)
+        {
+            var pairCount = tests.Count(test => test.Steps.Any(step =>
+                step.Role == BehaviorStepRole.Invoke
+                && string.Equals(step.Arguments.FirstOrDefault(), behavior.Name, StringComparison.Ordinal)));
+            if (pairCount != 1)
+            {
+                diagnostics.Add(Error(
+                    "BEH008",
+                    $"Behavior scenario '{behavior.Name}' must be invoked by exactly one @test scenario; found {pairCount}."));
+            }
+        }
 
         if (diagnostics.Any(static diagnostic => diagnostic.Severity == BehaviorDiagnosticSeverity.Error))
         {

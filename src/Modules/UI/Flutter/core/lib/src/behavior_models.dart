@@ -73,6 +73,20 @@ final class BehaviorSummary {
   final bool active;
   final BehaviorTestReport? lastTest;
   final List<BehaviorDiagnostic> diagnostics;
+
+  BehaviorSummary copyWith({
+    String? source,
+    bool? active,
+    BehaviorTestReport? lastTest,
+    List<BehaviorDiagnostic>? diagnostics,
+  }) => BehaviorSummary(
+    name: name,
+    title: title,
+    source: source ?? this.source,
+    active: active ?? this.active,
+    lastTest: lastTest ?? this.lastTest,
+    diagnostics: diagnostics ?? this.diagnostics,
+  );
 }
 
 final class BehaviorStepSuggestion {

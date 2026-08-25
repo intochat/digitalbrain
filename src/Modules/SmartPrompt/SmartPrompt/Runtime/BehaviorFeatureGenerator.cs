@@ -9,7 +9,7 @@ internal sealed class BehaviorFeatureGenerator(
     [FromKeyedServices(typeof(IGemma4))] IChatClient gemma,
     IBehaviorCompiler compiler) : IBehaviorFeatureGenerator
 {
-    private const string ModelName = "gemma4:12b";
+    private const string ModelName = "gemma4:e2b";
 
     public async Task<BehaviorGeneration> Generate(
         string request,

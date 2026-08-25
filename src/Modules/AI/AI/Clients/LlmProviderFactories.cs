@@ -129,7 +129,9 @@ internal sealed class OllamaProviderFactory : ILlmProviderFactory
             .ConfigureOptions(static options =>
             {
                 options.AdditionalProperties ??= [];
-                options.AdditionalProperties["num_ctx"] = 16384;
+                // A feature/chat turn fits comfortably in 4K and this avoids allocating a
+                // workstation-sized KV cache for edge Gemma models in Docker Desktop.
+                options.AdditionalProperties["num_ctx"] = 4096;
                 options.AdditionalProperties["think"] = false;
             })
             .Build();
