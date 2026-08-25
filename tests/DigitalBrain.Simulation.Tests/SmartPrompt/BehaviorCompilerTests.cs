@@ -99,4 +99,20 @@ public sealed class BehaviorCompilerTests
         Assert.Contains(compilation.Diagnostics, static diagnostic =>
             diagnostic.Code == "BEH008" && diagnostic.Message.Contains("Track every Elon post", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void Compiler_fallback_preserves_the_requested_domain_and_numeric_threshold()
+    {
+        var source = BehaviorFeatureFallback.FromRequest(
+            "Record a portfolio chart point when the market price is above 100000.");
+
+        var compilation = BehaviorCompiler.CreateDefault().Compile(source);
+
+        Assert.True(compilation.Success,
+            string.Join(Environment.NewLine, compilation.Diagnostics.Select(static diagnostic => diagnostic.Message)));
+        Assert.Contains("Market.Price changes", source, StringComparison.Ordinal);
+        Assert.Contains("the event value is above 100000", source, StringComparison.Ordinal);
+        Assert.Contains("value 100001", source, StringComparison.Ordinal);
+        Assert.Contains("has point 100001", source, StringComparison.Ordinal);
+    }
 }

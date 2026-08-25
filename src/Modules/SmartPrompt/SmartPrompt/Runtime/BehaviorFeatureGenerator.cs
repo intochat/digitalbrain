@@ -21,6 +21,7 @@ internal sealed class BehaviorFeatureGenerator(
         {
             steps.Append(suggestion.Keyword).Append(' ').AppendLine(suggestion.Template);
         }
+        var reference = BehaviorFeatureFallback.BestMatch(request).Source;
 
         var conversation = new List<ChatMessage>
         {
@@ -28,7 +29,10 @@ internal sealed class BehaviorFeatureGenerator(
                 "DigitalBrain Behavior feature compiler. Return only one valid English Gherkin feature, "
                 + "without Markdown fences or commentary. Every production scenario must have @behavior and "
                 + "exactly one matching @test scenario. Use only the supplied Reqnroll step templates; replace "
-                + "template placeholders with concrete values. Do not invent steps.\nAvailable steps:\n" + steps),
+                + "template placeholders with concrete values. Do not invent steps. Every tag must be followed by "
+                + "a Scenario: line. The @test must invoke the exact @behavior scenario name. Preserve the complete "
+                + "Feature/tag/Scenario/Given/When/Then structure shown in the reference.\nAvailable steps:\n"
+                + steps + "\nReference feature shape:\n" + reference),
             new(ChatRole.User, request.Trim()),
         };
 
@@ -45,9 +49,15 @@ internal sealed class BehaviorFeatureGenerator(
             }
             conversation.Add(new ChatMessage(ChatRole.Assistant, source));
             conversation.Add(new ChatMessage(ChatRole.User,
-                "Correct the feature and return the full source only. Compiler diagnostics:\n"
+                "Correct the feature and return the full source only. Do not remove either Scenario: line, either "
+                + "tag, or the paired fake/invoke/assert test. Compiler diagnostics:\n"
                 + string.Join("\n", compilation.Diagnostics.Select(diagnostic =>
                     $"line {diagnostic.Line}: {diagnostic.Message}"))));
+        }
+        if (!compilation.Success)
+        {
+            source = BehaviorFeatureFallback.FromRequest(request);
+            compilation = compiler.Compile(source);
         }
         return new BehaviorGeneration(source, compilation, ModelName);
     }
