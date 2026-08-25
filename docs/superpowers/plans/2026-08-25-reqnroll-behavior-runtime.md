@@ -189,4 +189,3 @@
 - [ ] Ask the assistant to generate a ninth feature; verify syntax, compile/test, and activate it.
 - [ ] Exercise all eight fake examples and capture failures as failing automated tests before fixes.
 - [ ] Re-run the complete automated suite and commit any acceptance fixes.
-

@@ -1,7 +1,7 @@
 # Reqnroll Behavior Runtime Design
 
-**Status:** Approved for autonomous implementation on 2026-08-25  
-**Date:** 2026-08-25  
+**Status:** Approved for autonomous implementation on 2026-08-25
+**Date:** 2026-08-25
 **Supersedes:** The Smart Prompt natural-language document and fixed capability-grant runner where they conflict
 
 ## 1. Decision
@@ -139,4 +139,3 @@ OTel spans cover compile, test, activate, ingress, route, run, step, reason, and
 ## 11. Migration
 
 Existing `SmartPromptDocument.BodyText` data remains readable, but the default catalog and Behaviors UI switch to feature source. Old fixed grant mapping is not extended. New code uses Behavior vocabulary; Smart Prompt contracts can remain temporarily for binary/storage compatibility until a later migration removes them.
-
