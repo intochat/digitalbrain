@@ -57,6 +57,13 @@ if (builder.Environment.IsDevelopment())
     brain.WithDigitalBrainFakes();
 }
 
+// Isolated Aspire runs reuse the persistent Azurite volume while assigning new random silo
+// ports. A per-run development cluster avoids trying to contact a dead membership row from the
+// previous run; the service id remains stable, so grain and reminder state are still preserved.
+var developmentClusterId = builder.Environment.IsDevelopment()
+    ? $"digitalbrain-{Guid.NewGuid():N}"
+    : null;
+
 var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceResources.Kernel)
     .WithReference(brain)
     .WithHttpEndpoint(
@@ -74,7 +81,14 @@ var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceReso
             Url = "/orleans",
             DisplayText = "Orleans Dashboard",
             Endpoint = endpoint,
-        });
+        })
+    .WithEnvironment(context =>
+    {
+        if (developmentClusterId is not null)
+        {
+            context.EnvironmentVariables["Orleans__ClusterId"] = developmentClusterId;
+        }
+    });
 
 var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.Mcp)
     .WithMcpServer(ProductSurfaceResources.McpPath, ProductSurfaceResources.McpHttpEndpointName)
@@ -82,6 +96,13 @@ var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.
     .WithEnvironment(
         ShellHostingExtensions.OwnerEnvironmentVariable,
         ShellHostingExtensions.DefaultOwner)
+    .WithEnvironment(context =>
+    {
+        if (developmentClusterId is not null)
+        {
+            context.EnvironmentVariables["Orleans__ClusterId"] = developmentClusterId;
+        }
+    })
     .WithHttpEndpoint(
         port: ProductSurfaceResources.McpHttpPort,
         name: ProductSurfaceResources.McpHttpEndpointName)
