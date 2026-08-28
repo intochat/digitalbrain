@@ -115,4 +115,22 @@ public sealed class BehaviorCompilerTests
         Assert.Contains("value 100001", source, StringComparison.Ordinal);
         Assert.Contains("has point 100001", source, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Salesforce_correction_fallback_edits_the_active_feature_and_adds_a_regression()
+    {
+        var parent = BehaviorExamples.Find("salesforce-account-enrichment")!.Source;
+
+        var corrected = BehaviorFeatureFallback.ApplyCorrection(
+            parent,
+            "Preserve verified Salesforce fields.");
+        var compilation = BehaviorCompiler.CreateDefault().Compile(corrected);
+
+        Assert.True(compilation.Success, string.Join(Environment.NewLine,
+            compilation.Diagnostics.Select(static diagnostic => diagnostic.Message)));
+        Assert.Contains("Scenario: IntoChat email enriches its Salesforce account", corrected, StringComparison.Ordinal);
+        Assert.Contains("Scenario: Verified Salesforce description is preserved", corrected, StringComparison.Ordinal);
+        Assert.Contains("And preserve verified Salesforce fields", corrected, StringComparison.Ordinal);
+        Assert.Equal(2, compilation.Plan!.Tests.Count);
+    }
 }

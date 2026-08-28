@@ -6,6 +6,9 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Simulation.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Reqnroll" />
   </ItemGroup>
   <ItemGroup>
@@ -14,5 +17,6 @@
     <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
     <ProjectReference Include="../../AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="../../UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />
+    <ProjectReference Include="../../Integrations/DigitalBrain.Modules.Integrations.csproj" />
   </ItemGroup>
 </Project>

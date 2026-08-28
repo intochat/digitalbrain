@@ -26,6 +26,8 @@ public static class FakeBehaviorEvents
                 "https://github.com/example/digitalbrain/issues/42", at),
             "arrival-reminder" => Event(id, "location.entered", "home", "pick up the parcel", 1,
                 "digitalbrain://location/home/fake", at),
+            "salesforce-account-enrichment" => Event(id, "email.received", "vlad@intochat.io",
+                "new company email from IntoChat", 1, "digitalbrain://gmail/thread-intochat", at),
             _ => throw new ArgumentException($"Unknown built-in behavior '{behaviorName}'.", nameof(behaviorName)),
         };
     }

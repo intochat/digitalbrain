@@ -2,13 +2,16 @@ using System.ComponentModel;
 using DigitalBrain.Abstractions.Entities;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.AI;
+using DigitalBrain.Integrations.Gmail;
 using Microsoft.Extensions.AI;
+using System.Text.Json;
 
 namespace DigitalBrain.SmartPrompt;
 
 internal sealed class BehaviorToolSource(
     IGrainFactory grains,
-    IBehaviorFeatureGenerator generator) : IAgentToolSource
+    IBehaviorFeatureGenerator generator,
+    IGmailTransport gmail) : IAgentToolSource
 {
     public IReadOnlyList<AIFunction> ToolsFor(OwnerId owner)
     {
@@ -62,6 +65,108 @@ internal sealed class BehaviorToolSource(
             return $"Ran '{name}' with {FakeBehaviorEvents.Describe(behaviorEvent)}.";
         }
 
+        async Task<string> ListExperiences()
+        {
+            var catalog = await Catalog(owner).Read();
+            var items = new List<object>();
+            foreach (var name in catalog?.Names ?? [])
+            {
+                var state = await Definition(owner, name).Read();
+                items.Add(new
+                {
+                    name,
+                    active = state?.Active ?? false,
+                    revision = state?.ActiveRevision ?? 0,
+                    candidateRevision = state?.CandidateRevision,
+                    green = state?.LastTest?.AllGreen ?? false,
+                });
+            }
+            return JsonSerializer.Serialize(items);
+        }
+
+        async Task<string> RunSalesforceAccountEnrichment(
+            [Description("Sender email address to find in Gmail; use vlad@intochat.io for the built-in experience")] string email,
+            CancellationToken cancellationToken)
+        {
+            const string name = "salesforce-account-enrichment";
+            var example = BehaviorExamples.Find(name)!;
+            var definition = Definition(owner, name);
+            if (await definition.Read() is null)
+            {
+                await definition.Save(example.Source);
+                var report = await definition.Test();
+                if (!report.AllGreen)
+                {
+                    return $"Experience '{name}' is red: {string.Join("; ", report.Failures)}";
+                }
+                await definition.Activate();
+                await Catalog(owner).Add(name);
+            }
+
+            var gmailJson = await gmail.SearchJsonAsync(email, "new company email", cancellationToken);
+            using var document = JsonDocument.Parse(gmailJson);
+            var thread = document.RootElement.GetProperty("threads").EnumerateArray().FirstOrDefault();
+            if (thread.ValueKind == JsonValueKind.Undefined)
+            {
+                return $"No Gmail thread matched {email}.";
+            }
+            var message = thread.GetProperty("messages").EnumerateArray().FirstOrDefault();
+            if (message.ValueKind == JsonValueKind.Undefined)
+            {
+                return $"Gmail thread '{thread.GetProperty("id").GetString()}' contains no messages.";
+            }
+            var sender = message.GetProperty("sender").GetString() ?? email;
+            var text = string.Join(' ', new[]
+            {
+                message.TryGetProperty("subject", out var subject) ? subject.GetString() : null,
+                message.TryGetProperty("snippet", out var snippet) ? snippet.GetString() : null,
+            }.Where(static part => !string.IsNullOrWhiteSpace(part)));
+            var behaviorEvent = new BehaviorEvent(
+                message.GetProperty("id").GetString() ?? $"gmail-{Guid.NewGuid():N}",
+                "email.received",
+                sender,
+                text,
+                1,
+                $"digitalbrain://gmail/{thread.GetProperty("id").GetString()}",
+                DateTimeOffset.UtcNow);
+            await grains.GetGrain<IBehaviorIngress>(BehaviorIngressNames.Shared).Publish(behaviorEvent);
+            return $"Experience '{name}' enriched the Salesforce account for {sender}.";
+        }
+
+        async Task<string> CorrectExperience(
+            [Description("Lowercase experience identifier")] string name,
+            [Description("How the user wants the experience to work now")] string request,
+            [Description("The user's explicit correction, preserved as learning evidence")] string evidence,
+            CancellationToken cancellationToken)
+        {
+            if (!ValidName(name))
+            {
+                return "name must use only lowercase letters, numbers, and hyphens.";
+            }
+            var definition = Definition(owner, name);
+            var current = await definition.Read();
+            if (current is null)
+            {
+                return $"Experience '{name}' does not exist yet, so there is no active revision to correct.";
+            }
+            var generated = await generator.GenerateCorrection(current.Source, request, cancellationToken);
+            if (!generated.Compilation.Success)
+            {
+                return "The correction is red and was not activated: " + string.Join("; ",
+                    generated.Compilation.Diagnostics.Select(static diagnostic => diagnostic.Message));
+            }
+            var revision = await definition.ApplyCorrection(generated.Source, evidence);
+            await Catalog(owner).Add(name);
+            return $"Experience '{name}' learned revision {revision.Number}; its tests are green and it is active.";
+        }
+
+        async Task<string> UndoExperienceCorrection(
+            [Description("Lowercase experience identifier")] string name)
+        {
+            var revision = await Definition(owner, name).UndoLastCorrection();
+            return $"Experience '{name}' restored revision {revision.Number}.";
+        }
+
         return
         [
             AIFunctionFactory.Create(GenerateBehavior, new AIFunctionFactoryOptions
@@ -72,7 +177,37 @@ internal sealed class BehaviorToolSource(
             AIFunctionFactory.Create(RunBehaviorExample, new AIFunctionFactoryOptions
             {
                 Name = "run_behavior_example",
-                Description = "Run one of the eight built-in Behaviors with deterministic fake provider data so the owner can safely preview it.",
+                Description = "Run one of the nine built-in Experiences with deterministic fake provider data so the owner can safely preview it.",
+            }),
+            AIFunctionFactory.Create(ListExperiences, new AIFunctionFactoryOptions
+            {
+                Name = "list_experiences",
+                Description = "List the owner's learned Experiences and their active, green, and revision status.",
+            }),
+            AIFunctionFactory.Create(RunBehaviorExample, new AIFunctionFactoryOptions
+            {
+                Name = "run_experience",
+                Description = "Run a named Experience with deterministic provider data.",
+            }),
+            AIFunctionFactory.Create(RunSalesforceAccountEnrichment, new AIFunctionFactoryOptions
+            {
+                Name = "run_salesforce_account_enrichment",
+                Description = "Find a new company email in Gmail, run the active account-enrichment Experience, research the company, and update Salesforce through MCP.",
+            }),
+            AIFunctionFactory.Create(CorrectExperience, new AIFunctionFactoryOptions
+            {
+                Name = "correct_experience",
+                Description = "Learn an explicit user correction as a new immutable Experience revision, test it, and activate it only when green.",
+            }),
+            AIFunctionFactory.Create(CorrectExperience, new AIFunctionFactoryOptions
+            {
+                Name = "learn_experience",
+                Description = "Learn only an explicit user correction: prove its regression is red on the parent, green on the candidate, then activate the immutable revision.",
+            }),
+            AIFunctionFactory.Create(UndoExperienceCorrection, new AIFunctionFactoryOptions
+            {
+                Name = "undo_experience_correction",
+                Description = "Undo the most recent active Experience correction without deleting revision history.",
             }),
         ];
     }

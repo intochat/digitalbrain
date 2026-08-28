@@ -1,9 +1,11 @@
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.Chat;
+using DigitalBrain.Integrations.Salesforce;
 using DigitalBrain.UI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
+using System.Text.Json;
 
 namespace DigitalBrain.SmartPrompt;
 
@@ -44,7 +46,10 @@ internal sealed class GemmaBehaviorReasoner(
     }
 }
 
-internal sealed class BehaviorActionExecutor(IGrainFactory grains, IBehaviorReasoner reasoner)
+internal sealed class BehaviorActionExecutor(
+    IGrainFactory grains,
+    IBehaviorReasoner reasoner,
+    ISalesforceTransport salesforce)
     : IBehaviorActionExecutor
 {
     public async Task Execute(
@@ -54,12 +59,59 @@ internal sealed class BehaviorActionExecutor(IGrainFactory grains, IBehaviorReas
         CancellationToken cancellationToken = default)
     {
         string? analysis = null;
+        var preserveVerifiedSalesforceFields = scenario.Steps.Any(static step =>
+            step.Role == BehaviorStepRole.Action
+            && step.Binding == nameof(BuiltInBehaviorSteps.PreserveVerifiedSalesforceFields));
         foreach (var action in scenario.Steps.Where(static step => step.Role == BehaviorStepRole.Action))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (action.Binding == nameof(BuiltInBehaviorSteps.AnalyzeWithGemma))
             {
                 analysis = await reasoner.Analyze(behaviorEvent, action.Arguments[0], cancellationToken);
+                continue;
+            }
+            if (action.Binding == nameof(BuiltInBehaviorSteps.ResearchSenderCompany))
+            {
+                var agent = grains.GetGrain<ICompanyResearchAgent>(
+                    NeuronId.For<ICompanyResearchAgent>(owner, "company-research").ToGrainId());
+                var response = await agent.Respond(
+                    [new ChatMessage(ChatRole.User, $"{behaviorEvent.Source} {behaviorEvent.Text}")]);
+                analysis = response.Text;
+                continue;
+            }
+            if (action.Binding == nameof(BuiltInBehaviorSteps.EnrichSalesforceAccount))
+            {
+                var domain = behaviorEvent.Source.Contains('@', StringComparison.Ordinal)
+                    ? behaviorEvent.Source[(behaviorEvent.Source.LastIndexOf('@') + 1)..]
+                    : behaviorEvent.Source;
+                var query = await salesforce.QueryJsonAsync(
+                    $"SELECT Id, Name, Website, Description, DescriptionVerified FROM Account WHERE Website LIKE '%{domain.Replace("'", "''", StringComparison.Ordinal)}%' LIMIT 2",
+                    cancellationToken);
+                using var queryDocument = JsonDocument.Parse(query);
+                var record = queryDocument.RootElement.GetProperty("records").EnumerateArray().FirstOrDefault();
+                if (record.ValueKind == JsonValueKind.Undefined)
+                {
+                    throw new InvalidOperationException(
+                        $"No Salesforce Account matched sender domain '{domain}'.");
+                }
+                var id = record.GetProperty("Id").GetString()
+                    ?? throw new InvalidOperationException("Salesforce query returned an account without Id.");
+                var body = new Dictionary<string, object?>
+                {
+                    ["Website"] = $"https://{domain}",
+                };
+                var descriptionIsVerified = record.TryGetProperty("DescriptionVerified", out var verified)
+                    && verified.ValueKind == JsonValueKind.True;
+                if (!preserveVerifiedSalesforceFields || !descriptionIsVerified)
+                {
+                    body["Description"] = analysis ?? behaviorEvent.Text;
+                }
+                var payload = JsonSerializer.Serialize(new { id, body });
+                analysis = await salesforce.UpsertJsonAsync("Account", payload, cancellationToken);
+                continue;
+            }
+            if (action.Binding == nameof(BuiltInBehaviorSteps.PreserveVerifiedSalesforceFields))
+            {
                 continue;
             }
             if (action.Binding == nameof(BuiltInBehaviorSteps.AddChartPoint))

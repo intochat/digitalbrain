@@ -17,6 +17,8 @@ internal sealed partial class TestChatClient : IChatClient
     private const string GenerateImageToolName = "generate_image";
     private const string GenerateBehaviorToolName = "generate_behavior_feature";
     private const string RunBehaviorToolName = "run_behavior_example";
+    private const string RunSalesforceEnrichmentToolName = "run_salesforce_account_enrichment";
+    private const string LearnExperienceToolName = "learn_experience";
     private const string FallbackChatName = "main";
 
     public Task<ChatResponse> GetResponseAsync(
@@ -46,7 +48,8 @@ internal sealed partial class TestChatClient : IChatClient
             var reply = string.Equals(priorCall?.Name, GenerateImageToolName, StringComparison.Ordinal)
                 ? GeneratedReply
                 : priorCall?.Name is GenerateBehaviorToolName or RunBehaviorToolName
-                    ? "Behavior ready."
+                    or RunSalesforceEnrichmentToolName or LearnExperienceToolName
+                    ? "Experience ready."
                     : RenderedReply;
             yield return new ChatResponseUpdate(ChatRole.Assistant, reply) { FinishReason = ChatFinishReason.Stop };
             yield break;
@@ -54,6 +57,39 @@ internal sealed partial class TestChatClient : IChatClient
 
         var lastUser = conversation.LastOrDefault(static m => m.Role == ChatRole.User)?.Text ?? "";
         var tools = options?.Tools?.OfType<AIFunction>().ToList() ?? [];
+
+        var learnExperience = tools.FirstOrDefault(static tool => tool.Name == LearnExperienceToolName);
+        if (learnExperience is not null
+            && lastUser.Contains("preserve", StringComparison.OrdinalIgnoreCase)
+            && lastUser.Contains("verified", StringComparison.OrdinalIgnoreCase))
+        {
+            yield return new ChatResponseUpdate(ChatRole.Assistant,
+            [new FunctionCallContent("call-1", LearnExperienceToolName, new Dictionary<string, object?>
+            {
+                ["name"] = "salesforce-account-enrichment",
+                ["request"] = lastUser,
+                ["evidence"] = lastUser,
+            })])
+            { FinishReason = ChatFinishReason.ToolCalls };
+            yield break;
+        }
+
+        var runEnrichment = tools.FirstOrDefault(static tool => tool.Name == RunSalesforceEnrichmentToolName);
+        if (runEnrichment is not null
+            && lastUser.Contains("enrich", StringComparison.OrdinalIgnoreCase)
+            && (lastUser.Contains("salesforce", StringComparison.OrdinalIgnoreCase)
+                || lastUser.Contains("company", StringComparison.OrdinalIgnoreCase)))
+        {
+            yield return new ChatResponseUpdate(ChatRole.Assistant,
+            [new FunctionCallContent("call-1", RunSalesforceEnrichmentToolName, new Dictionary<string, object?>
+            {
+                ["email"] = lastUser.Contains("vlad@intochat.io", StringComparison.OrdinalIgnoreCase)
+                    ? "vlad@intochat.io"
+                    : "vlad@intochat.io",
+            })])
+            { FinishReason = ChatFinishReason.ToolCalls };
+            yield break;
+        }
 
         if (conversation.Any(static message => message.Role == ChatRole.System
             && message.Text.Contains("DigitalBrain Behavior feature compiler", StringComparison.Ordinal)))

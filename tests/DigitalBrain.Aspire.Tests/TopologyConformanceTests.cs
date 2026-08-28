@@ -36,6 +36,8 @@ public sealed class TopologyConformanceTests(ModelFixture fixture)
     [Theory]
     [InlineData(ProductSurfaceResourceNames.Kernel)]
     [InlineData(ProductSurfaceResourceNames.Mcp)]
+    [InlineData(ProductSurfaceResourceNames.FakeGmailMcp)]
+    [InlineData(ProductSurfaceResourceNames.FakeSalesforceMcp)]
     public void ProductSurfaceResourceExists(string resourceName)
     {
         var resource = fixture.Model.Resource(resourceName);

@@ -29,6 +29,7 @@ internal sealed class LlmWarmupHostedService(
     private static readonly (Type Key, string ConfiguredModelKey)[] OllamaTargets =
     [
         (typeof(IGemma4), $"{AIClients.ConfigurationRoot}:Ollama:IGemma4:Model"),
+        (typeof(IQwen35), $"{AIClients.ConfigurationRoot}:Ollama:IQwen35:Model"),
     ];
 
     private CancellationTokenSource? _warmup;

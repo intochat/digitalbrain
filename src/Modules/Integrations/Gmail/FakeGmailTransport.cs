@@ -6,6 +6,6 @@ public sealed class FakeGmailTransport : IGmailTransport
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(
-            """{"messages":[{"id":"1","subject":"New Customer","from":"lead@acme.test"}]}""");
+            """{"threads":[{"id":"thread-intochat","messages":[{"id":"message-intochat","subject":"New Customer","snippet":"Please send company information.","sender":"vlad@intochat.io"}]}]}""");
     }
 }

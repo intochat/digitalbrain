@@ -62,6 +62,46 @@ public static partial class BehaviorFeatureFallback
         return BehaviorExamples.Find(name)!;
     }
 
+    public static string ApplyCorrection(string activeSource, string request)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(activeSource);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request);
+
+        var asksToPreserveVerifiedSalesforceFields =
+            request.Contains("preserve", StringComparison.OrdinalIgnoreCase)
+            && request.Contains("verified", StringComparison.OrdinalIgnoreCase)
+            && request.Contains("salesforce", StringComparison.OrdinalIgnoreCase);
+        if (!asksToPreserveVerifiedSalesforceFields)
+        {
+            return activeSource;
+        }
+
+        var source = activeSource;
+        const string enrichment = "    And enrich Salesforce.Account with verified company research through MCP";
+        const string preservation = "    And preserve verified Salesforce fields";
+        if (!source.Contains(preservation, StringComparison.Ordinal))
+        {
+            source = source.Replace(enrichment, preservation + Environment.NewLine + enrichment,
+                StringComparison.Ordinal);
+        }
+
+        const string regressionName = "Scenario: Verified Salesforce description is preserved";
+        if (source.Contains(regressionName, StringComparison.Ordinal))
+        {
+            return source;
+        }
+
+        return source.TrimEnd() + Environment.NewLine
+            + """
+
+              @test
+              Scenario: Verified Salesforce description is preserved
+                Given fake event "email.received" from "vlad@intochat.io" with text "new company email from IntoChat" and value 1
+                When behavior "Enrich Salesforce account from a new company email" runs
+                Then Salesforce.Account preserves its verified Description
+            """;
+    }
+
     [GeneratedRegex(@"(?:above|over|greater than|exceeds?)\s*\$?([0-9]+(?:\.[0-9]+)?)", RegexOptions.IgnoreCase)]
     private static partial Regex Threshold();
 

@@ -46,6 +46,7 @@
     <File Path="Directory.Packages.props" />
   </Folder>
   <Folder Name="/Testing/">
+    <Project Path="src/Testing/DigitalBrain.Integrations.Fakes/DigitalBrain.Integrations.Fakes.csproj" />
     <Project Path="src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
     <Project Path="src/Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
   </Folder>

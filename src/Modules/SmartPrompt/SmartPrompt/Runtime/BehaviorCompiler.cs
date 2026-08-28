@@ -109,11 +109,11 @@ public sealed class BehaviorCompiler : IBehaviorCompiler
             var pairCount = tests.Count(test => test.Steps.Any(step =>
                 step.Role == BehaviorStepRole.Invoke
                 && string.Equals(step.Arguments.FirstOrDefault(), behavior.Name, StringComparison.Ordinal)));
-            if (pairCount != 1)
+            if (pairCount == 0)
             {
                 diagnostics.Add(Error(
                     "BEH008",
-                    $"Behavior scenario '{behavior.Name}' must be invoked by exactly one @test scenario; found {pairCount}."));
+                    $"Behavior scenario '{behavior.Name}' must be invoked by at least one @test scenario; found none."));
             }
         }
 

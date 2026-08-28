@@ -2,6 +2,9 @@ using DigitalBrain.Abstractions.Entities;
 
 namespace DigitalBrain.SmartPrompt;
 
+[Alias("company-research-agent")]
+public interface ICompanyResearchAgent : DigitalBrain.AI.IAgent;
+
 [Alias("behavior-definition")]
 public interface IBehaviorDefinition : IEntity<BehaviorDefinitionState>
 {
@@ -16,6 +19,12 @@ public interface IBehaviorDefinition : IEntity<BehaviorDefinitionState>
 
     [Alias(nameof(Disable))]
     Task Disable();
+
+    [Alias(nameof(ApplyCorrection))]
+    Task<BehaviorRevision> ApplyCorrection(string source, string evidence);
+
+    [Alias(nameof(UndoLastCorrection))]
+    Task<BehaviorRevision> UndoLastCorrection();
 }
 
 [Alias("behavior-catalog")]

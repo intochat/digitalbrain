@@ -3,6 +3,9 @@ using System.Net.Http.Json;
 using DigitalBrain.SmartPrompt;
 using DigitalBrain.UI;
 using DigitalBrain.Kernel;
+using DigitalBrain.Abstractions;
+using DigitalBrain.Chat;
+using DigitalBrain.Integrations.Mcp;
 using Xunit;
 
 namespace DigitalBrain.E2E.Tests;
@@ -11,14 +14,14 @@ namespace DigitalBrain.E2E.Tests;
 public sealed class BehaviorSurfaceTests(AppHostFixture fixture)
 {
     [Fact]
-    public async Task Eight_seeded_behaviors_are_green_and_fake_runnable()
+    public async Task Nine_seeded_behaviors_are_green_and_fake_runnable()
     {
         using var http = fixture.CreateHttpClient("kernel");
         var behaviors = await http.GetFromJsonAsync<List<BehaviorSummary>>(
             "/behaviors", TestContext.Current.CancellationToken);
         Assert.NotNull(behaviors);
         var seeded = behaviors.Where(item => BehaviorExamples.Find(item.Name) is not null).ToArray();
-        Assert.Equal(8, seeded.Length);
+        Assert.Equal(9, seeded.Length);
         Assert.All(seeded, item =>
         {
             Assert.True(item.Active, item.Name);
@@ -111,5 +114,82 @@ public sealed class BehaviorSurfaceTests(AppHostFixture fixture)
         var catalog = await http.GetFromJsonAsync<List<BehaviorSummary>>(
             "/behaviors", TestContext.Current.CancellationToken);
         Assert.Contains(catalog!, item => item.Name == "generated-bitcoin-alert");
+    }
+
+    [Fact]
+    public async Task Assistant_chat_learns_then_runs_the_salesforce_enrichment_experience_through_fake_mcps()
+    {
+        using var http = fixture.CreateHttpClient("kernel");
+        var correction = await http.PostAsJsonAsync(
+            HttpSurfacePaths.OwnerCommandsPath,
+            new
+            {
+                kind = "chat.send",
+                chatName = $"learning-tool-{Guid.NewGuid():N}",
+                text = "Do this differently: preserve verified Salesforce fields when enriching accounts.",
+            },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, correction.StatusCode);
+
+        var learned = false;
+        using (var learningTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(30)))
+        {
+            while (!learningTimeout.IsCancellationRequested)
+            {
+                var experience = await http.GetFromJsonAsync<BehaviorSummary>(
+                    "/behaviors/salesforce-account-enrichment", learningTimeout.Token);
+                if (experience is { Active: true }
+                    && experience.Source.Contains("preserve verified Salesforce fields", StringComparison.Ordinal))
+                {
+                    learned = true;
+                    break;
+                }
+                await Task.Delay(100, learningTimeout.Token);
+            }
+        }
+        Assert.True(learned, "Assistant did not learn and activate the explicit correction.");
+
+        var main = fixture.BrainFor(DigitalBrainNames.DefaultOwner).GetGrainProxy<IChat>("main");
+        var before = (await main.Read()).Turns.Count;
+        var send = await http.PostAsJsonAsync(
+            HttpSurfacePaths.OwnerCommandsPath,
+            new
+            {
+                kind = "chat.send",
+                chatName = $"enrichment-tool-{Guid.NewGuid():N}",
+                text = "Enrich the company account for the new email from vlad@intochat.io in Salesforce.",
+            },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, send.StatusCode);
+
+        var completed = false;
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        while (!timeout.IsCancellationRequested)
+        {
+            if ((await main.Read()).Turns.Skip(before)
+                .Any(turn => turn.Text.Contains("001INTOCHAT", StringComparison.Ordinal)))
+            {
+                completed = true;
+                break;
+            }
+            await Task.Delay(100, timeout.Token);
+        }
+        Assert.True(completed, "Chat did not complete the MCP-backed Salesforce enrichment experience.");
+
+        using var salesforceHttp = fixture.CreateHttpClient("fake-salesforce-mcp", "http");
+        var mcp = new McpIntegrationClient();
+        var account = await mcp.CallAsync(
+            new McpIntegrationEndpoint(
+                "fake-salesforce-mcp",
+                new Uri(salesforceHttp.BaseAddress!, "/mcp")),
+            "soqlQuery",
+            new Dictionary<string, object?>
+            {
+                ["query"] = "SELECT Id, Description, DescriptionVerified FROM Account WHERE Id = '001INTOCHAT' LIMIT 1",
+            },
+            TestContext.Current.CancellationToken);
+        var record = Assert.Single(account.GetProperty("records").EnumerateArray());
+        Assert.True(record.GetProperty("DescriptionVerified").GetBoolean());
+        Assert.Equal("Verified customer conversation platform.", record.GetProperty("Description").GetString());
     }
 }

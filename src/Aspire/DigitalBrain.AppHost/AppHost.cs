@@ -34,7 +34,8 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
         ai.WithLlm<IGemini36Flash>();
         ai.WithLlm<IGrok46>();
         ai.WithLlm<IGemma4>();
-        ai.WithDefaultLlm<IGemma4>();
+        ai.WithLlm<IQwen35>();
+        ai.WithDefaultLlm<IQwen35>();
         ai.WithEmbedding<ITextEmbedding3Small>();
         ai.WithEmbedding<ITextEmbedding3Large>();
         ai.WithEmbedding<IGeminiEmbedding>();
@@ -56,6 +57,21 @@ if (builder.Environment.IsDevelopment())
 {
     brain.WithDigitalBrainFakes();
 }
+
+var fakeGmailMcp = builder.Environment.IsDevelopment()
+    ? builder.AddProject<Projects.DigitalBrain_Integrations_Fakes>(ProductSurfaceResources.FakeGmailMcp)
+        .WithEnvironment("FakeMcp__Provider", "gmail")
+        .WithMcpServer(ProductSurfaceResources.McpPath, ProductSurfaceResources.FakeIntegrationMcpHttpEndpointName)
+        .WithHttpEndpoint(name: ProductSurfaceResources.FakeIntegrationMcpHttpEndpointName)
+        .WithHttpHealthCheck("/health", endpointName: ProductSurfaceResources.FakeIntegrationMcpHttpEndpointName)
+    : null;
+var fakeSalesforceMcp = builder.Environment.IsDevelopment()
+    ? builder.AddProject<Projects.DigitalBrain_Integrations_Fakes>(ProductSurfaceResources.FakeSalesforceMcp)
+        .WithEnvironment("FakeMcp__Provider", "salesforce")
+        .WithMcpServer(ProductSurfaceResources.McpPath, ProductSurfaceResources.FakeIntegrationMcpHttpEndpointName)
+        .WithHttpEndpoint(name: ProductSurfaceResources.FakeIntegrationMcpHttpEndpointName)
+        .WithHttpHealthCheck("/health", endpointName: ProductSurfaceResources.FakeIntegrationMcpHttpEndpointName)
+    : null;
 
 // Isolated Aspire runs reuse the persistent Azurite volume while assigning new random silo
 // ports. A per-run development cluster avoids trying to contact a dead membership row from the
@@ -89,6 +105,21 @@ var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceReso
             context.EnvironmentVariables["Orleans__ClusterId"] = developmentClusterId;
         }
     });
+
+if (fakeGmailMcp is not null && fakeSalesforceMcp is not null)
+{
+    kernel
+        .WithReference(fakeGmailMcp)
+        .WithReference(fakeSalesforceMcp)
+        .WithEnvironment(
+            IntegrationsModule.GmailMcpEndpointEnvironmentVariable,
+            ReferenceExpression.Create($"{fakeGmailMcp.GetEndpoint(ProductSurfaceResources.FakeIntegrationMcpHttpEndpointName)}/mcp"))
+        .WithEnvironment(
+            IntegrationsModule.SalesforceMcpEndpointEnvironmentVariable,
+            ReferenceExpression.Create($"{fakeSalesforceMcp.GetEndpoint(ProductSurfaceResources.FakeIntegrationMcpHttpEndpointName)}/mcp"))
+        .WaitFor(fakeGmailMcp)
+        .WaitFor(fakeSalesforceMcp);
+}
 
 var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.Mcp)
     .WithMcpServer(ProductSurfaceResources.McpPath, ProductSurfaceResources.McpHttpEndpointName)

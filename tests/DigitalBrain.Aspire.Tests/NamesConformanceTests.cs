@@ -99,6 +99,20 @@ public sealed class NamesConformanceTests(ModelFixture fixture)
         Assert.Equal("true", enabled);
     }
 
+    [Theory]
+    [InlineData("DigitalBrain__Integrations__Gmail__Mcp__Endpoint", "fake-gmail-mcp")]
+    [InlineData("DigitalBrain__Integrations__Salesforce__Mcp__Endpoint", "fake-salesforce-mcp")]
+    public async Task KernelRenderedEnvironmentContainsFakeIntegrationMcpEndpoint(
+        string key,
+        string resourceName)
+    {
+        var environment = await fixture.Model.RenderedEnvironmentAsync(ProductSurfaceResourceNames.Kernel);
+
+        Assert.True(environment.TryGetValue(key, out var endpoint));
+        Assert.Contains(resourceName, endpoint, StringComparison.Ordinal);
+        Assert.EndsWith("/mcp", endpoint, StringComparison.Ordinal);
+    }
+
     // Throwaway builder/resource, unrelated to the shared AppHost model: these two tests exercise
     // an SDK stamping helper itself, not product topology. AddExecutable + the same
     // ExecutionConfigurationBuilder rendering path BrainModel.RenderedEnvironmentAsync uses keeps

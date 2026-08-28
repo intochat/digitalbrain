@@ -105,6 +105,18 @@ internal static class BuiltInBehaviorSteps
     [BehaviorStep(BehaviorStepRole.Action, "Post the behavior result to a chat.", "notify UI.Chat(\"main\")")]
     public static Task NotifyChat(string chat) => Completed(chat);
 
+    [Then("research the sender company with Web\\.Agent")]
+    [BehaviorStep(BehaviorStepRole.Action, "Research the sender's company with the web-search agent.", "research the sender company with Web.Agent")]
+    public static Task ResearchSenderCompany() => Task.CompletedTask;
+
+    [Then("enrich Salesforce\\.Account with verified company research through MCP")]
+    [BehaviorStep(BehaviorStepRole.Action, "Query and update a Salesforce account through its generic MCP tool catalog.", "enrich Salesforce.Account with verified company research through MCP")]
+    public static Task EnrichSalesforceAccount() => Task.CompletedTask;
+
+    [Then("preserve verified Salesforce fields")]
+    [BehaviorStep(BehaviorStepRole.Action, "Keep Salesforce values that are marked as verified.", "preserve verified Salesforce fields")]
+    public static Task PreserveVerifiedSalesforceFields() => Task.CompletedTask;
+
     [Given("fake event \"([^\"]+)\" from \"([^\"]+)\" with text \"([^\"]+)\" and value ([0-9]+(?:\\.[0-9]+)?)")]
     [BehaviorStep(BehaviorStepRole.Fake, "Create a deterministic provider-neutral fake event.", "fake event \"kind\" from \"source\" with text \"text\" and value 1")]
     public static Task FakeEvent(string kind, string source, string text, string value) => Completed(kind, source, text, value);
@@ -112,6 +124,10 @@ internal static class BuiltInBehaviorSteps
     [Then("UI\\.Chat\\(\"([^\"]+)\"\\) contains a behavior notification")]
     [BehaviorStep(BehaviorStepRole.Assert, "Assert that the behavior notified a chat.", "UI.Chat(\"main\") contains a behavior notification")]
     public static Task AssertChatNotification(string chat) => Completed(chat);
+
+    [Then("Salesforce\\.Account preserves its verified Description")]
+    [BehaviorStep(BehaviorStepRole.Assert, "Assert enrichment preserves a verified Salesforce description.", "Salesforce.Account preserves its verified Description")]
+    public static Task AssertVerifiedSalesforceDescriptionPreserved() => Task.CompletedTask;
 
     private static Task Completed(params string[] values)
     {

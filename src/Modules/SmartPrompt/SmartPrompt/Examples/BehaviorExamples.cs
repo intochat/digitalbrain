@@ -14,6 +14,7 @@ public static class BehaviorExamples
         new("health-anomaly", "Explain health anomalies", HealthAnomaly, "health.metric"),
         new("github-triage", "Triage GitHub issues", GitHubTriage, "github.issue"),
         new("arrival-reminder", "Remind on arrival", ArrivalReminder, "location.entered"),
+        new("salesforce-account-enrichment", "Enrich Salesforce accounts from company email", SalesforceAccountEnrichment, "email.received"),
     ];
 
     public static BehaviorExample? Find(string name)
@@ -150,6 +151,23 @@ public static class BehaviorExamples
           Scenario: Arrival posts the reminder
             Given fake event "location.entered" from "home" with text "pick up the parcel" and value 1
             When behavior "Remind me when I arrive home" runs
+            Then UI.Chat("main") contains a behavior notification
+        """;
+
+    private const string SalesforceAccountEnrichment =
+        """
+        Feature: Salesforce account enrichment
+          @behavior
+          Scenario: Enrich Salesforce account from a new company email
+            Given Email.Account("vlad@intochat.io")
+            When a new Email is received
+            Then research the sender company with Web.Agent
+            And enrich Salesforce.Account with verified company research through MCP
+            And notify UI.Chat("main")
+          @test
+          Scenario: IntoChat email enriches its Salesforce account
+            Given fake event "email.received" from "vlad@intochat.io" with text "new company email from IntoChat" and value 1
+            When behavior "Enrich Salesforce account from a new company email" runs
             Then UI.Chat("main") contains a behavior notification
         """;
 }

@@ -92,6 +92,11 @@ public sealed record BehaviorGeneration(
 public interface IBehaviorFeatureGenerator
 {
     Task<BehaviorGeneration> Generate(string request, CancellationToken cancellationToken = default);
+
+    Task<BehaviorGeneration> GenerateCorrection(
+        string activeSource,
+        string request,
+        CancellationToken cancellationToken = default);
 }
 
 [GenerateSerializer]
@@ -136,12 +141,30 @@ public sealed record BehaviorTestReport(
     [property: Id(2)] int Scenarios);
 
 [GenerateSerializer]
+[Alias("db.behavior.revision.v1")]
+public sealed record BehaviorRevision(
+    [property: Id(0)] int Number,
+    [property: Id(1)] string Source,
+    [property: Id(2)] BehaviorCompilation Compilation,
+    [property: Id(3)] BehaviorTestReport? Test,
+    [property: Id(4)] string Evidence,
+    [property: Id(5)] DateTimeOffset CreatedAt,
+    [property: Id(6)] string SourceHash,
+    [property: Id(7)] int? ParentNumber,
+    [property: Id(8)] string? ParentSourceHash,
+    [property: Id(9)] BehaviorTestReport? ParentTest);
+
+[GenerateSerializer]
 [Alias("db.behavior.definition-state.v1")]
 public sealed record BehaviorDefinitionState(
     [property: Id(0)] string Source,
     [property: Id(1)] BehaviorCompilation Compilation,
     [property: Id(2)] bool Active,
-    [property: Id(3)] BehaviorTestReport? LastTest);
+    [property: Id(3)] BehaviorTestReport? LastTest,
+    [property: Id(4)] IReadOnlyList<BehaviorRevision> Revisions,
+    [property: Id(5)] int ActiveRevision,
+    [property: Id(6)] int? PreviousActiveRevision,
+    [property: Id(7)] int? CandidateRevision);
 
 [GenerateSerializer]
 [Alias("db.behavior.catalog-state.v1")]
