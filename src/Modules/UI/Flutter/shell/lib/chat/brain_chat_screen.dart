@@ -14,6 +14,7 @@ import 'package:uuid/uuid.dart';
 
 import '../brain_theme.dart';
 import '../user_actions/chat_login_action.dart';
+import '../user_actions/gmail_login_card.dart';
 import '../user_actions/salesforce_login_card.dart';
 import 'brain_chat_composer.dart';
 import 'chat_contracts.dart';
@@ -531,13 +532,23 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
                             final login =
                                 _loginActions[message.metadata?['actionKey']];
                             if (login == null) return const SizedBox.shrink();
-                            return SalesforceLoginCard(
-                              key: ValueKey(login.key),
-                              login: login,
-                              kernelBaseUri: widget.kernelBaseUri,
-                              onOpenSignIn: widget.onOpenSignIn,
-                              onCancelTurn: widget.onCancelTurn,
-                            );
+                            return switch (login.action.provider) {
+                              'salesforce' => SalesforceLoginCard(
+                                key: ValueKey(login.key),
+                                login: login,
+                                kernelBaseUri: widget.kernelBaseUri,
+                                onOpenSignIn: widget.onOpenSignIn,
+                                onCancelTurn: widget.onCancelTurn,
+                              ),
+                              'gmail' => GmailLoginCard(
+                                key: ValueKey(login.key),
+                                login: login,
+                                kernelBaseUri: widget.kernelBaseUri,
+                                onOpenSignIn: widget.onOpenSignIn,
+                                onCancelTurn: widget.onCancelTurn,
+                              ),
+                              _ => const SizedBox.shrink(),
+                            };
                           }
                           return KitChatBuilders.customMessageBuilder(
                             context,

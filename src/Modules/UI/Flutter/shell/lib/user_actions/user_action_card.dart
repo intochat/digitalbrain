@@ -31,6 +31,7 @@ final class UserActionCard extends StatelessWidget {
     this.onAuthorize,
     this.onCancel,
     this.leading,
+    this.authorizeButton,
     this.showCancel = false,
   });
 
@@ -38,6 +39,7 @@ final class UserActionCard extends StatelessWidget {
   final VoidCallback? onAuthorize;
   final VoidCallback? onCancel;
   final Widget? leading;
+  final Widget? authorizeButton;
   final bool showCancel;
 
   @override
@@ -78,11 +80,12 @@ final class UserActionCard extends StatelessWidget {
             spacing: 10,
             runSpacing: 8,
             children: [
-              FilledButton(
-                key: Key('user_action_authorize_${model.moduleId}'),
-                onPressed: onAuthorize,
-                child: Text(model.actionLabel),
-              ),
+              authorizeButton ??
+                  FilledButton(
+                    key: Key('user_action_authorize_${model.moduleId}'),
+                    onPressed: onAuthorize,
+                    child: Text(model.actionLabel),
+                  ),
               if (showCancel)
                 OutlinedButton(
                   key: Key('user_action_cancel_${model.moduleId}'),

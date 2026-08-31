@@ -9,9 +9,6 @@ internal static class ProductSurfaceResources
     public const string McpPath = "/mcp";
     public const int McpHttpPort = 5000;
 
-    public const string FakeGmailMcp = "fake-gmail-mcp";
-    public const string FakeSalesforceMcp = "fake-salesforce-mcp";
-    public const string FakeIntegrationMcpHttpEndpointName = "http";
-
     public const int UiHttpPort = 5080;
+    public const string KernelPublicOrigin = "http://localhost:5080";
 }

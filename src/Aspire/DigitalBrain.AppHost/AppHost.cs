@@ -6,6 +6,7 @@ using XaiModels = DigitalBrain.AI.XAI;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Aspire.Hosting;
 using DigitalBrain.AI.FoundryLocal;
+using DigitalBrain.Abstractions;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Execution;
 using DigitalBrain.Integrations;
@@ -35,7 +36,7 @@ var salesforceConsumerSecret = builder.AddParameter("salesforce-consumer-secret"
 var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
     .AddModule<AIModule>(ai =>
     {
-        ai.EnableSensitiveData = builder.Environment.IsDevelopment();
+        ai.EnableSensitiveData = false;
 
         // --- OpenAI ---
         //ai.WithLlm<OpenAIModels.IGpt56Sol>();
@@ -81,18 +82,13 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
         ui.WithWindowHost();
     });
 
-if (builder.Environment.IsDevelopment())
+var fakesEnabled = string.Equals(builder.Configuration[DigitalBrainNames.Fakes], "true", StringComparison.OrdinalIgnoreCase)
+    || string.Equals(builder.Configuration[DigitalBrainNames.Fakes], "1", StringComparison.OrdinalIgnoreCase)
+    || string.Equals(builder.Configuration[DigitalBrainNames.Mode], DigitalBrainNames.TestingMode, StringComparison.Ordinal);
+if (fakesEnabled)
 {
     brain.WithDigitalBrainFakes();
 }
-
-var fakeGmailMcp = builder.Environment.IsDevelopment()
-    ? builder.AddProject<Projects.DigitalBrain_Integrations_Fakes>(ProductSurfaceResources.FakeGmailMcp)
-        .WithEnvironment("FakeMcp__Provider", "gmail")
-        .WithMcpServer(ProductSurfaceResources.McpPath, ProductSurfaceResources.FakeIntegrationMcpHttpEndpointName)
-        .WithHttpEndpoint(name: ProductSurfaceResources.FakeIntegrationMcpHttpEndpointName)
-        .WithHttpHealthCheck("/health", endpointName: ProductSurfaceResources.FakeIntegrationMcpHttpEndpointName)
-    : null;
 
 // Isolated Aspire runs reuse the persistent Azurite volume while assigning new random silo
 // ports. A per-run development cluster avoids trying to contact a dead membership row from the
@@ -105,10 +101,13 @@ var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceReso
     .WithReference(brain)
     .WithEnvironment(IntegrationsModule.SalesforceConsumerKeyEnvironmentVariable, salesforceConsumerKey)
     .WithEnvironment(IntegrationsModule.SalesforceConsumerSecretEnvironmentVariable, salesforceConsumerSecret)
-    .WithEnvironment("DigitalBrain__Integrations__Salesforce__OAuth__PublicOrigin", "http://localhost:5080")
+    .WithEnvironment("DigitalBrain__Integrations__Salesforce__OAuth__PublicOrigin", ProductSurfaceResources.KernelPublicOrigin)
     .WithEnvironment(
         IntegrationsModule.SalesforceMcpEndpointEnvironmentVariable,
         "https://api.salesforce.com/platform/mcp/v1/platform/sobject-all")
+    .WithEnvironment("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", "false")
+    .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION", "false")
+    .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_HTTPCLIENT_DISABLE_URL_QUERY_REDACTION", "false")
     .WithHttpEndpoint(
         port: ProductSurfaceResources.UiHttpPort,
         name: ShellHostingExtensions.HttpEndpointName,
@@ -133,14 +132,22 @@ var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceReso
         }
     });
 
-if (fakeGmailMcp is not null)
+if (!fakesEnabled)
 {
+    var gmailClientId = builder.AddParameter("gmail-client-id")
+        .WithDescription(
+            "OAuth client ID for a Google web client configured for the [Gmail MCP server](https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server). "
+            + "Register http://localhost:5080/integrations/gmail/callback. Only the kernel receives this value.",
+            enableMarkdown: true);
+    var gmailClientSecret = builder.AddParameter("gmail-client-secret", secret: true)
+        .WithDescription(
+            "OAuth client secret for the same Google web client. Only the kernel receives this secret; Gmail sign-in happens in your browser when the assistant needs access.",
+            enableMarkdown: true);
     kernel
-        .WithReference(fakeGmailMcp)
-        .WithEnvironment(
-            IntegrationsModule.GmailMcpEndpointEnvironmentVariable,
-            ReferenceExpression.Create($"{fakeGmailMcp.GetEndpoint(ProductSurfaceResources.FakeIntegrationMcpHttpEndpointName)}/mcp"))
-        .WaitFor(fakeGmailMcp);
+        .WithEnvironment("DigitalBrain__Integrations__Gmail__OAuth__ClientId", gmailClientId)
+        .WithEnvironment("DigitalBrain__Integrations__Gmail__OAuth__ClientSecret", gmailClientSecret)
+        .WithEnvironment("DigitalBrain__Integrations__Gmail__OAuth__PublicOrigin", ProductSurfaceResources.KernelPublicOrigin)
+        .WithEnvironment(IntegrationsModule.GmailMcpEndpointEnvironmentVariable, "https://gmailmcp.googleapis.com/mcp/v1");
 }
 
 var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.Mcp)
@@ -149,6 +156,9 @@ var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.
     .WithEnvironment(
         ShellHostingExtensions.OwnerEnvironmentVariable,
         ShellHostingExtensions.DefaultOwner)
+    .WithEnvironment("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", "false")
+    .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION", "false")
+    .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_HTTPCLIENT_DISABLE_URL_QUERY_REDACTION", "false")
     .WithEnvironment(context =>
     {
         if (developmentClusterId is not null)

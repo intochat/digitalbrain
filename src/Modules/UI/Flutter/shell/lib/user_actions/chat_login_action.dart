@@ -11,6 +11,11 @@ enum LoginActionStatus {
   unavailable,
 }
 
+const _providerLoginPaths = <String, String>{
+  'salesforce': '/integrations/salesforce/login',
+  'gmail': '/integrations/gmail/login',
+};
+
 /// Projects a single durable action against later events for the same command.
 final class ChatLoginAction {
   const ChatLoginAction({
@@ -68,7 +73,7 @@ final class ChatLoginAction {
       if (!turn.fromUser &&
           turn.synapse == 'Responded' &&
           offered != null &&
-          offered.provider == 'salesforce') {
+          _providerLoginPaths.containsKey(offered.provider)) {
         final key = '${turn.commandId}:${offered.id}';
         actions.putIfAbsent(
           key,
@@ -85,21 +90,22 @@ final class ChatLoginAction {
   }
 }
 
-/// Auth cards may open only the configured kernel's Salesforce login route.
-/// Neither an AI-generated external URL nor a redirect query is accepted.
-Uri? trustedSalesforceLoginUri(ChatUserAction action, Uri? kernelBaseUri) {
+/// Auth cards may open only a known provider's login route on the configured
+/// kernel. Neither an AI-generated external URL nor a redirect query is accepted.
+Uri? trustedLoginUri(ChatUserAction action, Uri? kernelBaseUri) {
   final uri = action.loginUrl;
   if (kernelBaseUri == null ||
-      action.provider != 'salesforce' ||
+      _providerLoginPaths[action.provider] == null ||
       !uri.hasAuthority ||
       uri.host.isEmpty ||
       uri.userInfo.isNotEmpty ||
       uri.hasFragment ||
       kernelBaseUri.userInfo.isNotEmpty ||
+      kernelBaseUri.hasFragment ||
       uri.scheme != kernelBaseUri.scheme ||
       uri.host != kernelBaseUri.host ||
       uri.port != kernelBaseUri.port ||
-      uri.path != '/integrations/salesforce/login') {
+      uri.path != _providerLoginPaths[action.provider]) {
     return null;
   }
   final loopback =
@@ -121,3 +127,7 @@ Uri? trustedSalesforceLoginUri(ChatUserAction action, Uri? kernelBaseUri) {
   }
   return uri;
 }
+
+/// Compatibility surface for existing Salesforce callers.
+Uri? trustedSalesforceLoginUri(ChatUserAction action, Uri? kernelBaseUri) =>
+    trustedLoginUri(action, kernelBaseUri);

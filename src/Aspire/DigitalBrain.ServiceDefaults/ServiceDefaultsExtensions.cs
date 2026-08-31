@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration;
@@ -101,8 +100,6 @@ public static class ServiceDefaultsExtensions
                 .AddHttpClientInstrumentation(options =>
                 {
                     options.FilterHttpRequestMessage = static request => !IsAzuriteRequest(request);
-                    options.EnrichWithHttpResponseMessage = static (activity, response) =>
-                        SoftenExpectedClientErrorStatus(activity, response.StatusCode);
                 }));
 
         AddOpenTelemetryExporters(builder);
@@ -113,17 +110,6 @@ public static class ServiceDefaultsExtensions
         var path = request.RequestUri?.AbsolutePath;
         return path is not null
             && path.Contains(AzuriteAccountPathSegment, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static void SoftenExpectedClientErrorStatus(Activity activity, HttpStatusCode statusCode)
-    {
-        if (statusCode is not (HttpStatusCode.NotFound or HttpStatusCode.Conflict))
-        {
-            return;
-        }
-
-        activity.SetStatus(ActivityStatusCode.Unset);
-        activity.SetTag("error.type", null);
     }
 
     private static bool IsAzureStorageNoiseName(string name)
