@@ -117,9 +117,10 @@ trace, or enrollment evidence before then.
 
 1. Verify preview enrollment, both APIs, consent-screen/test-user state, and
    the workspace administrator's client/scope policy for the selected account.
-2. In the visible UI, use the original read request: **"Search my Gmail for the
-   latest email from [sender] and show the subject only."** Verify the returned
-   account only after validated OIDC plus a successful read.
+2. In the visible UI, use the original read request: **“Use Gmail to tell me
+   which Google account is connected, then show subjects from up to three inbox
+   threads from the last seven days.”** This validates the connected-account
+   proof plus bounded inbox subjects from the last seven days.
 3. In a separate MCP principal/session, repeat an allowed read. Check that its
    owner and account isolation are independently correct.
 4. Request an **unconfirmed** draft preview and verify it displays only its
