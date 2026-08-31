@@ -20,6 +20,13 @@ using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
+var salesforceAccessToken = builder.AddParameter("salesforce-access-token", secret: true)
+    .WithDescription(
+        "Required short-lived Salesforce OAuth bearer token for hosted MCP access. "
+        + "Use an [External Client App](https://developer.salesforce.com/docs/platform/hosted-mcp-servers/guide/create-external-client-app.html) "
+        + "with the mcp_api scope. Enter only the token, without the Bearer prefix.",
+        enableMarkdown: true);
+
 var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
     .AddModule<AIModule>(ai =>
     {
@@ -81,13 +88,6 @@ var fakeGmailMcp = builder.Environment.IsDevelopment()
         .WithHttpEndpoint(name: ProductSurfaceResources.FakeIntegrationMcpHttpEndpointName)
         .WithHttpHealthCheck("/health", endpointName: ProductSurfaceResources.FakeIntegrationMcpHttpEndpointName)
     : null;
-var fakeSalesforceMcp = builder.Environment.IsDevelopment()
-    ? builder.AddProject<Projects.DigitalBrain_Integrations_Fakes>(ProductSurfaceResources.FakeSalesforceMcp)
-        .WithEnvironment("FakeMcp__Provider", "salesforce")
-        .WithMcpServer(ProductSurfaceResources.McpPath, ProductSurfaceResources.FakeIntegrationMcpHttpEndpointName)
-        .WithHttpEndpoint(name: ProductSurfaceResources.FakeIntegrationMcpHttpEndpointName)
-        .WithHttpHealthCheck("/health", endpointName: ProductSurfaceResources.FakeIntegrationMcpHttpEndpointName)
-    : null;
 
 // Isolated Aspire runs reuse the persistent Azurite volume while assigning new random silo
 // ports. A per-run development cluster avoids trying to contact a dead membership row from the
@@ -98,6 +98,10 @@ var developmentClusterId = builder.Environment.IsDevelopment()
 
 var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceResources.Kernel)
     .WithReference(brain)
+    .WithEnvironment(IntegrationsModule.SalesforceMcpAccessTokenEnvironmentVariable, salesforceAccessToken)
+    .WithEnvironment(
+        IntegrationsModule.SalesforceMcpEndpointEnvironmentVariable,
+        "https://api.salesforce.com/platform/mcp/v1/platform/sobject-all")
     .WithHttpEndpoint(
         port: ProductSurfaceResources.UiHttpPort,
         name: ShellHostingExtensions.HttpEndpointName,
@@ -122,19 +126,14 @@ var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceReso
         }
     });
 
-if (fakeGmailMcp is not null && fakeSalesforceMcp is not null)
+if (fakeGmailMcp is not null)
 {
     kernel
         .WithReference(fakeGmailMcp)
-        .WithReference(fakeSalesforceMcp)
         .WithEnvironment(
             IntegrationsModule.GmailMcpEndpointEnvironmentVariable,
             ReferenceExpression.Create($"{fakeGmailMcp.GetEndpoint(ProductSurfaceResources.FakeIntegrationMcpHttpEndpointName)}/mcp"))
-        .WithEnvironment(
-            IntegrationsModule.SalesforceMcpEndpointEnvironmentVariable,
-            ReferenceExpression.Create($"{fakeSalesforceMcp.GetEndpoint(ProductSurfaceResources.FakeIntegrationMcpHttpEndpointName)}/mcp"))
-        .WaitFor(fakeGmailMcp)
-        .WaitFor(fakeSalesforceMcp);
+        .WaitFor(fakeGmailMcp);
 }
 
 var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.Mcp)

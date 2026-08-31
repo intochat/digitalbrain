@@ -83,7 +83,7 @@ internal sealed class BehaviorActionExecutor(
                     ? behaviorEvent.Source[(behaviorEvent.Source.LastIndexOf('@') + 1)..]
                     : behaviorEvent.Source;
                 var query = await salesforce.QueryJsonAsync(
-                    $"SELECT Id, Name, Website, Description, DescriptionVerified FROM Account WHERE Website LIKE '%{domain.Replace("'", "''", StringComparison.Ordinal)}%' LIMIT 2",
+                    $"SELECT Id, Name, Website, Description FROM Account WHERE Website LIKE '%{domain.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("'", "\\'", StringComparison.Ordinal)}%' LIMIT 2",
                     cancellationToken);
                 using var queryDocument = JsonDocument.Parse(query);
                 var record = queryDocument.RootElement.GetProperty("records").EnumerateArray().FirstOrDefault();
@@ -98,12 +98,16 @@ internal sealed class BehaviorActionExecutor(
                 {
                     ["Website"] = $"https://{domain}",
                 };
-                var descriptionIsVerified = record.TryGetProperty("DescriptionVerified", out var verified)
-                    && verified.ValueKind == JsonValueKind.True;
+                // Real orgs have no standard DescriptionVerified field. When verification
+                // metadata is absent, preservation must fail closed rather than overwrite.
+                var descriptionIsVerified = !record.TryGetProperty("DescriptionVerified", out var verified)
+                    || verified.ValueKind != JsonValueKind.False;
                 if (!preserveVerifiedSalesforceFields || !descriptionIsVerified)
                 {
                     body["Description"] = analysis ?? behaviorEvent.Text;
                 }
+                // Hosted transport returns a proposal; apply it via the confirmation-gated
+                // assistant tool, never by broadcasting write approval with an email event.
                 var payload = JsonSerializer.Serialize(new { id, body });
                 analysis = await salesforce.UpsertJsonAsync("Account", payload, cancellationToken);
                 continue;

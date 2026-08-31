@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ModelContextProtocol.Client;
+using ModelContextProtocol.Protocol;
 
 namespace DigitalBrain.Integrations.Mcp;
 
@@ -15,7 +16,11 @@ public sealed class McpIntegrationClient : IMcpIntegrationClient
         ArgumentException.ThrowIfNullOrWhiteSpace(toolName);
         ArgumentNullException.ThrowIfNull(arguments);
 
-        using var http = new HttpClient();
+        var isSalesforce = string.Equals(endpoint.Name, "salesforce", StringComparison.OrdinalIgnoreCase);
+        using var handler = new HttpClientHandler { AllowAutoRedirect = !isSalesforce };
+        using var http = new HttpClient(handler);
+        // Set before connecting so initialization, discovery, and calls all authenticate.
+        endpoint.ConfigureHttpClient(http);
         var transport = new HttpClientTransport(
             new HttpClientTransportOptions
             {
@@ -38,12 +43,31 @@ public sealed class McpIntegrationClient : IMcpIntegrationClient
             toolName,
             arguments,
             cancellationToken: cancellationToken).ConfigureAwait(false);
-        if (result.StructuredContent is not JsonElement structured)
+        if (result.IsError == true)
         {
             throw new InvalidOperationException(
-                $"MCP tool '{endpoint.Name}/{toolName}' returned no structured content.");
+                $"MCP tool '{endpoint.Name}/{toolName}' reported an error. Check server permissions and request arguments.");
         }
 
-        return structured.Clone();
+        if (result.StructuredContent is JsonElement structured)
+        {
+            return structured.Clone();
+        }
+
+        // Hosted servers can return JSON in text content instead of structuredContent.
+        var text = string.Join('\n', result.Content.OfType<TextContentBlock>().Select(static block => block.Text));
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            throw new InvalidOperationException($"MCP tool '{endpoint.Name}/{toolName}' returned no content.");
+        }
+        try
+        {
+            using var document = JsonDocument.Parse(text);
+            return document.RootElement.Clone();
+        }
+        catch (JsonException)
+        {
+            return JsonSerializer.SerializeToElement(text);
+        }
     }
 }

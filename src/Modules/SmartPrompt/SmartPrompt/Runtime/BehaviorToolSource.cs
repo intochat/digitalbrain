@@ -62,7 +62,8 @@ internal sealed class BehaviorToolSource(
             }
             var behaviorEvent = FakeBehaviorEvents.Create(name);
             await grains.GetGrain<IBehaviorIngress>(BehaviorIngressNames.Shared).Publish(behaviorEvent);
-            return $"Ran '{name}' with {FakeBehaviorEvents.Describe(behaviorEvent)}.";
+            return $"Ran '{name}' with {FakeBehaviorEvents.Describe(behaviorEvent)}. "
+                + "Any hosted Salesforce changes are proposals only. Ask the user to review the Experience notification and confirm its exact fields before using salesforce_create_or_update.";
         }
 
         async Task<string> ListExperiences()
@@ -130,7 +131,8 @@ internal sealed class BehaviorToolSource(
                 $"digitalbrain://gmail/{thread.GetProperty("id").GetString()}",
                 DateTimeOffset.UtcNow);
             await grains.GetGrain<IBehaviorIngress>(BehaviorIngressNames.Shared).Publish(behaviorEvent);
-            return $"Experience '{name}' enriched the Salesforce account for {sender}.";
+            return $"Experience '{name}' prepared Salesforce enrichment for {sender}. "
+                + "Ask the user to review the proposal in the Experience notification, then use salesforce_create_or_update only after the user explicitly approves its exact fields.";
         }
 
         async Task<string> CorrectExperience(
@@ -177,7 +179,7 @@ internal sealed class BehaviorToolSource(
             AIFunctionFactory.Create(RunBehaviorExample, new AIFunctionFactoryOptions
             {
                 Name = "run_behavior_example",
-                Description = "Run one of the nine built-in Experiences with deterministic fake provider data so the owner can safely preview it.",
+                Description = "Run a built-in Experience with a sample event and configured providers. Hosted Salesforce changes are proposals only and require explicit confirmation via salesforce_create_or_update.",
             }),
             AIFunctionFactory.Create(ListExperiences, new AIFunctionFactoryOptions
             {
@@ -187,12 +189,12 @@ internal sealed class BehaviorToolSource(
             AIFunctionFactory.Create(RunBehaviorExample, new AIFunctionFactoryOptions
             {
                 Name = "run_experience",
-                Description = "Run a named Experience with deterministic provider data.",
+                Description = "Run a named Experience with a sample event and configured providers. Hosted Salesforce changes are proposals only; never claim records were updated.",
             }),
             AIFunctionFactory.Create(RunSalesforceAccountEnrichment, new AIFunctionFactoryOptions
             {
                 Name = "run_salesforce_account_enrichment",
-                Description = "Find a new company email in Gmail, run the active account-enrichment Experience, research the company, and update Salesforce through MCP.",
+                Description = "Find a company email in Gmail, research the company, and prepare a Salesforce enrichment proposal through hosted MCP reads. Show the proposal and ask for confirmation before using salesforce_create_or_update to apply it.",
             }),
             AIFunctionFactory.Create(CorrectExperience, new AIFunctionFactoryOptions
             {

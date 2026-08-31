@@ -2,6 +2,12 @@ namespace DigitalBrain.Integrations.Salesforce;
 
 public sealed class FakeSalesforceTransport : ISalesforceTransport
 {
+    public Task<string> GetUserInfoJsonAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult("""{"id":"005FAKEUSER00001","username":"fake@example.invalid","name":"Fake Salesforce User","fake":true}""");
+    }
+
     public Task<string> QueryJsonAsync(string query, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

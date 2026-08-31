@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.AI;
 using DigitalBrain.Execution;
 using DigitalBrain.Integrations.Gmail;
 using DigitalBrain.Integrations.Mcp;
@@ -13,8 +14,10 @@ public sealed class IntegrationsModule : Core.IModule
 {
     public const string GmailMcpEndpointConfigurationKey = "DigitalBrain:Integrations:Gmail:Mcp:Endpoint";
     public const string SalesforceMcpEndpointConfigurationKey = "DigitalBrain:Integrations:Salesforce:Mcp:Endpoint";
+    public const string SalesforceMcpAccessTokenConfigurationKey = "DigitalBrain:Integrations:Salesforce:Mcp:AccessToken";
     public const string GmailMcpEndpointEnvironmentVariable = "DigitalBrain__Integrations__Gmail__Mcp__Endpoint";
     public const string SalesforceMcpEndpointEnvironmentVariable = "DigitalBrain__Integrations__Salesforce__Mcp__Endpoint";
+    public const string SalesforceMcpAccessTokenEnvironmentVariable = "DigitalBrain__Integrations__Salesforce__Mcp__AccessToken";
 
     public void Configure(ISiloBuilder builder)
     {
@@ -55,6 +58,7 @@ public sealed class IntegrationsModule : Core.IModule
 
         if (salesforceEndpoint is not null)
         {
+            builder.Services.AddSingleton<IAgentToolSource, SalesforceToolSource>();
             builder.Services.TryAddSingleton<ISalesforceTransport>(services =>
                 new McpSalesforceTransport(
                     services.GetRequiredService<IMcpIntegrationClient>(),
@@ -95,7 +99,10 @@ public sealed class IntegrationsModule : Core.IModule
             throw new InvalidOperationException($"Configuration '{key}' is not an absolute URI.");
         }
 
-        return new McpIntegrationEndpoint(name, uri);
+        return new McpIntegrationEndpoint(
+            name,
+            uri,
+            name == "salesforce" ? configuration[SalesforceMcpAccessTokenConfigurationKey] : null);
     }
 
     private static bool UseFakeTransports(Microsoft.Extensions.Configuration.IConfiguration configuration)
