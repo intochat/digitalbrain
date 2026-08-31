@@ -28,10 +28,9 @@ public sealed class IntegrationsModule : Core.IModule
         builder.Services.AddSingleton<ICapabilityHandler, SalesforceUpsertHandler>();
         builder.Services.AddSingleton<ICapabilityHandler, WebSearchHandler>();
 
-        var gmailEndpoint = ReadEndpoint(
-            builder.Configuration,
-            GmailMcpEndpointConfigurationKey,
-            "gmail");
+        var gmailEndpoint = UseFakeTransports(builder.Configuration) ? null : ReadEndpoint(
+            builder.Configuration, GmailMcpEndpointConfigurationKey, "gmail")
+            ?? (UseFakeTransports(builder.Configuration) ? null : new McpIntegrationEndpoint("gmail", new Uri(McpIntegrationEndpoint.GmailUri)));
         var salesforceEndpoint = ReadEndpoint(
             builder.Configuration,
             SalesforceMcpEndpointConfigurationKey,
@@ -39,15 +38,24 @@ public sealed class IntegrationsModule : Core.IModule
         if (gmailEndpoint is not null || salesforceEndpoint is not null)
         {
             builder.Services.TryAddSingleton<IMcpIntegrationClient>(services =>
-                new McpIntegrationClient(services.GetService<SalesforceConnections>()));
+                new McpIntegrationClient(services.GetService<SalesforceConnections>(), services.GetService<GmailMcpSessions>()));
         }
 
         if (gmailEndpoint is not null)
         {
+            builder.Services.AddSingleton(new GmailOAuthConfiguration(builder.Configuration));
+            builder.Services.AddSingleton<GmailConnections>();
+            builder.Services.AddSingleton<GmailPendingActions>();
+            builder.Services.AddSingleton<GmailMcpSessions>();
+            builder.Services.AddSingleton<GmailDraftPreviews>();
+            builder.Services.AddSingleton<IUserActionSource>(s => s.GetRequiredService<GmailPendingActions>());
+            builder.Services.AddSingleton<ITrustedUserCommandHandler>(s => s.GetRequiredService<GmailDraftPreviews>());
+            builder.Services.AddSingleton<IAgentToolSource, GmailToolSource>();
+            builder.Services.AddHostedService<GmailCompletionWorker>();
             builder.Services.TryAddSingleton<IGmailTransport>(services =>
                 new McpGmailTransport(
                     services.GetRequiredService<IMcpIntegrationClient>(),
-                    gmailEndpoint));
+                    gmailEndpoint, services.GetRequiredService<GmailPendingActions>()));
         }
         else if (UseFakeTransports(builder.Configuration))
         {
@@ -108,7 +116,7 @@ public sealed class IntegrationsModule : Core.IModule
         return new McpIntegrationEndpoint(name, uri);
     }
 
-    private static bool UseFakeTransports(Microsoft.Extensions.Configuration.IConfiguration configuration)
+    internal static bool UseFakeTransports(Microsoft.Extensions.Configuration.IConfiguration configuration)
     {
         if (string.Equals(
                 configuration[DigitalBrainNames.Mode],

@@ -146,7 +146,6 @@ public static class SalesforceOAuthEndpoints
                 RedactCallbackActivity(context);
             }
         });
-        app.UseAuthentication();
         return app;
     }
 

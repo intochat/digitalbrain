@@ -1,3 +1,4 @@
+using DigitalBrain.Abstractions.Interactions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,7 +13,6 @@ internal static class AIClients
     internal const string DefaultEmbeddingKey = $"{ConfigurationRoot}:Default:Embedding";
     internal const string DefaultTranscriptionKey = $"{ConfigurationRoot}:Default:Transcription";
     internal const string DefaultImageKey = $"{ConfigurationRoot}:Default:Image";
-    private const string EnableSensitiveDataKey = $"{ConfigurationRoot}:Telemetry:EnableSensitiveData";
     private const string TelemetrySource = "DigitalBrain.AI";
 
     private static readonly IReadOnlyDictionary<AiProvider, ILlmProviderFactory> Factories =
@@ -27,6 +27,7 @@ internal static class AIClients
 
     internal static void Add(IServiceCollection services)
     {
+        services.TryAddSingleton<IUntrustedContentScreen, UntrustedContentScreen>();
         foreach (var model in LLMModel.All)
         {
             services.AddKeyedSingleton<IChatClient>(
@@ -73,8 +74,7 @@ internal static class AIClients
             .UseFunctionInvocation()
             .UseOpenTelemetry(
                 sourceName: $"{TelemetrySource}.{model.Marker.Name}",
-                configure: telemetry => telemetry.EnableSensitiveData =
-                    configuration.GetValue<bool>(EnableSensitiveDataKey))
+                configure: telemetry => telemetry.EnableSensitiveData = false)
             .Build(provider);
     }
 

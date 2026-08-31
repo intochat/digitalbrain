@@ -104,7 +104,7 @@ internal sealed class BehaviorToolSource(
                 await Catalog(owner).Add(name);
             }
 
-            var gmailJson = await gmail.SearchJsonAsync(email, "new company email", cancellationToken);
+            var gmailJson = await gmail.SearchJsonAsync(owner, email, "new company email", cancellationToken);
             using var document = JsonDocument.Parse(gmailJson);
             var thread = document.RootElement.GetProperty("threads").EnumerateArray().FirstOrDefault();
             if (thread.ValueKind == JsonValueKind.Undefined)

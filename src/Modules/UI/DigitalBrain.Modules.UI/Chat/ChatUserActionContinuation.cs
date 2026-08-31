@@ -5,6 +5,12 @@ namespace DigitalBrain.UI;
 
 internal sealed class ChatUserActionContinuation(IGrainFactory grains) : IUserActionContinuation
 {
+    public async Task<bool> IsWaitingAsync(AgentTurnContext context, string actionId, CancellationToken cancellationToken)
+    {
+        var turns = await grains.GetGrain<IChat>(context.Chat.ToGrainId()).ReadTurns().WaitAsync(cancellationToken).ConfigureAwait(false);
+        return turns.Any(turn => turn.CommandId == context.CommandId && turn.Status == ChatTurnStatus.WaitingForUser && turn.UserAction?.Id == actionId);
+    }
+
     public Task CompleteAsync(
         AgentTurnContext context,
         string actionId,

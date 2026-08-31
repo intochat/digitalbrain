@@ -119,6 +119,12 @@ internal sealed class Chat : Neuron, IChat
             return;
         }
 
+        var cancellationContext = new AgentTurnContext(Id, new CommandId(record.CommandId), record.Actor, record.AllowedToolNames);
+        foreach (var source in ServiceProvider.GetServices<IUserActionSource>())
+        {
+            source.Cancel(cancellationContext);
+        }
+
         if (record.Status is ChatTurnStatus.Pending or ChatTurnStatus.WaitingForUser)
         {
             turns[index] = record with
@@ -610,6 +616,15 @@ internal sealed class Chat : Neuron, IChat
             Id,
             status,
             detail)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        if (status == ChatTurnStatus.Completed && result is not null)
+        {
+            var publishedContext = new AgentTurnContext(Id, new CommandId(record.CommandId), record.Actor, record.AllowedToolNames);
+            foreach (var handler in ServiceProvider.GetServices<ITrustedUserCommandHandler>())
+            {
+                handler.ResponsePublished(publishedContext, result.Answer);
+            }
+        }
 
         var queue = LoadQueue();
         if (queue.ActiveTurnId == record.TurnId)

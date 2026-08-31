@@ -1,6 +1,7 @@
-using System.Text.Json;
 using System.Collections.Concurrent;
+using System.Text.Json;
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Integrations.Gmail;
 using DigitalBrain.Integrations.Salesforce;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -10,11 +11,20 @@ namespace DigitalBrain.Integrations.Mcp;
 public sealed class McpIntegrationClient : IMcpIntegrationClient, IAsyncDisposable
 {
     private readonly SalesforceConnections? _connections;
+    private readonly GmailMcpSessions? _gmail;
     private readonly ConcurrentDictionary<OwnerId, SessionSlot> _sessions = new();
 
     public McpIntegrationClient() { }
 
     internal McpIntegrationClient(SalesforceConnections? connections) => _connections = connections;
+    internal McpIntegrationClient(SalesforceConnections? connections, GmailMcpSessions? gmail)
+    { _connections = connections; _gmail = gmail; }
+
+    public Task<JsonElement> CallAsync(OwnerId owner, McpIntegrationEndpoint endpoint, string toolName,
+        IReadOnlyDictionary<string, object?> arguments, CancellationToken cancellationToken)
+        => string.Equals(endpoint.Name, "gmail", StringComparison.OrdinalIgnoreCase)
+            ? (_gmail ?? throw new GmailOperationException("Gmail is not configured.")).CallAsync(owner, endpoint, toolName, arguments, cancellationToken)
+            : CallAsync(endpoint, toolName, arguments, cancellationToken);
 
     public async Task<JsonElement> CallAsync(
         McpIntegrationEndpoint endpoint,
@@ -25,6 +35,10 @@ public sealed class McpIntegrationClient : IMcpIntegrationClient, IAsyncDisposab
         ArgumentNullException.ThrowIfNull(endpoint);
         ArgumentException.ThrowIfNullOrWhiteSpace(toolName);
         ArgumentNullException.ThrowIfNull(arguments);
+        if (string.Equals(endpoint.Name, "gmail", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new GmailOperationException("Gmail requires an explicit authenticated owner.");
+        }
 
         var isSalesforce = string.Equals(endpoint.Name, "salesforce", StringComparison.OrdinalIgnoreCase);
         if (isSalesforce && _connections is not null)

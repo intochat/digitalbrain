@@ -5,6 +5,7 @@ namespace DigitalBrain.Integrations.Mcp;
 // Credentials remain private, outside record formatting and JSON serialization.
 public sealed class McpIntegrationEndpoint
 {
+    public const string GmailUri = "https://gmailmcp.googleapis.com/mcp/v1";
     private readonly AuthenticationHeaderValue? _authorization;
 
     public McpIntegrationEndpoint(string name, Uri uri, string? accessToken = null)
@@ -13,6 +14,11 @@ public sealed class McpIntegrationEndpoint
         ArgumentNullException.ThrowIfNull(uri);
         Name = name;
         Uri = uri;
+
+        if (string.Equals(name, "gmail", StringComparison.OrdinalIgnoreCase))
+        {
+            ValidateGmailUri(uri);
+        }
 
         if (!string.Equals(name, "salesforce", StringComparison.OrdinalIgnoreCase))
         {
@@ -45,6 +51,14 @@ public sealed class McpIntegrationEndpoint
             || uri.UserInfo.Length != 0 || uri.Query.Length != 0 || uri.Fragment.Length != 0)
         {
             throw new InvalidOperationException("Salesforce MCP requires an HTTPS hosted MCP endpoint on api.salesforce.com.");
+        }
+    }
+
+    internal static void ValidateGmailUri(Uri uri)
+    {
+        if (!uri.IsAbsoluteUri || uri.AbsoluteUri != GmailUri)
+        {
+            throw new InvalidOperationException("Gmail MCP requires exactly https://gmailmcp.googleapis.com/mcp/v1.");
         }
     }
 

@@ -18,9 +18,8 @@ public sealed class GmailSearchHandler(IGmailTransport transport) : ICapabilityH
         CancellationToken cancellationToken)
     {
         _ = executionId;
-        _ = owner;
         var request = ParseRequest(requestJson);
-        var json = await transport.SearchJsonAsync(request.Account, request.Topic, cancellationToken)
+        var json = await transport.SearchJsonAsync(owner, request.Account, request.Topic, cancellationToken)
             .ConfigureAwait(false);
         return new ContextDelta(
             new ContextPath("gmail.search"),
@@ -56,6 +55,6 @@ public sealed class GmailSearchHandler(IGmailTransport transport) : ICapabilityH
 
     private sealed record GmailSearchRequest(string Account, string Topic)
     {
-        public static GmailSearchRequest Default { get; } = new("fake", "New Customer");
+        public static GmailSearchRequest Default { get; } = new("", "New Customer");
     }
 }
