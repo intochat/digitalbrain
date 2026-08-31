@@ -128,5 +128,8 @@ trace, or enrollment evidence before then.
    `confirm gmail draft <id>` in this validation pass.
 5. Inspect actual HTTP success/error trace URLs and attributes for status only:
    no mail/tool content, OAuth codes, access tokens, refresh tokens, or secrets.
-   Record the real trace URLs produced by the run, then stop Aspire with the
-   dashboard stop control (or the terminating `aspire` process).
+   Record the real trace URLs produced by the run, then stop Aspire with:
+
+   ```powershell
+   aspire stop --apphost src\Aspire\DigitalBrain.AppHost\DigitalBrain.AppHost.csproj
+   ```

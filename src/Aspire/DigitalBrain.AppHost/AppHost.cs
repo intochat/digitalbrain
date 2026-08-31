@@ -141,7 +141,8 @@ if (!fakesEnabled)
             enableMarkdown: true);
     var gmailClientSecret = builder.AddParameter("gmail-client-secret", secret: true)
         .WithDescription(
-            "OAuth client secret for the same Google web client. Only the kernel receives this secret; Gmail sign-in happens in your browser when the assistant needs access.",
+            "OAuth client secret for the same Google web client configured for the [Gmail MCP server](https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server). "
+            + "Only the kernel receives this secret; Gmail sign-in happens in your browser when the assistant needs access.",
             enableMarkdown: true);
     kernel
         .WithEnvironment("DigitalBrain__Integrations__Gmail__OAuth__ClientId", gmailClientId)

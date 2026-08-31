@@ -367,21 +367,6 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
   }
 
   Future<void> _onKitButton(KitButtonPart part) async {
-    final action = part.action;
-    final openUrl = Uri.tryParse(action);
-    if (openUrl != null &&
-        (openUrl.isScheme('https') || openUrl.isScheme('http')) &&
-        widget.onOpenSignIn != null) {
-      try {
-        await widget.onOpenSignIn!(openUrl);
-      } on Object catch (error) {
-        if (mounted) {
-          setState(() => _failure = '$error');
-        }
-      }
-      return;
-    }
-
     final activate = widget.onActivateButton;
     if (activate == null) {
       return;
