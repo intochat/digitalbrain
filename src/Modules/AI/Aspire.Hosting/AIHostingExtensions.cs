@@ -205,13 +205,18 @@ public static class AIHostingExtensions
                 return;
             }
 
-            // Empty default keeps boot and test hosts unblocked; real values come
-            // from user secrets in dev and Key Vault-injected parameters in prod.
-            _providerApiKeys[provider] = brain.ApplicationBuilder.AddParameter(
+            var apiKey = brain.ApplicationBuilder.AddParameter(
                 $"{provider.ToString().ToLowerInvariant()}-api-key",
-                string.Empty,
-                publishValueAsDefault: false,
                 secret: true);
+
+            if (provider is AiProvider.OpenAI)
+            {
+                apiKey.WithDescription(
+                    "Create an API key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys).",
+                    enableMarkdown: true);
+            }
+
+            _providerApiKeys[provider] = apiKey;
         }
 
         private static string OllamaResourceName(string id)

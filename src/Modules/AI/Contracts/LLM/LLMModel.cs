@@ -15,12 +15,17 @@ public abstract class LLMModel : AiModel
     // model whose provider has credentials becomes the default chat model.
     public static IReadOnlyList<LLMModel> All { get; } =
     [
+        new OpenAI.Gpt56Sol(),
+        new OpenAI.Gpt56Terra(),
+        new OpenAI.Gpt56Luna(),
         new OpenAI.Gpt54(),
         new OpenAI.Gpt54Mini(),
         new OpenAI.Gpt54Nano(),
+        new Anthropic.Fable5(),
         new Anthropic.Opus5(),
         new Anthropic.Sonnet5(),
         new Anthropic.Haiku45(),
+        new Google.Gemini31Pro(),
         new Google.Gemini36Pro(),
         new Google.Gemini36Flash(),
         new XAI.Grok46(),

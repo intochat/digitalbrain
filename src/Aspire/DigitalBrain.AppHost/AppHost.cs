@@ -1,11 +1,11 @@
+using AnthropicModels = DigitalBrain.AI.Anthropic;
+using GoogleModels = DigitalBrain.AI.Google;
+using OllamaModels = DigitalBrain.AI.Ollama;
+using OpenAIModels = DigitalBrain.AI.OpenAI;
+using XaiModels = DigitalBrain.AI.XAI;
 using DigitalBrain.AI;
-using DigitalBrain.AI.Anthropic;
 using DigitalBrain.AI.Aspire.Hosting;
 using DigitalBrain.AI.FoundryLocal;
-using DigitalBrain.AI.Google;
-using DigitalBrain.AI.Ollama;
-using DigitalBrain.AI.OpenAI;
-using DigitalBrain.AI.XAI;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Execution;
 using DigitalBrain.Integrations;
@@ -24,24 +24,40 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
     .AddModule<AIModule>(ai =>
     {
         ai.EnableSensitiveData = builder.Environment.IsDevelopment();
-        ai.WithLlm<IGpt54>();
-        ai.WithLlm<IGpt54Mini>();
-        ai.WithLlm<IGpt54Nano>();
-        ai.WithLlm<IOpus5>();
-        ai.WithLlm<ISonnet5>();
-        ai.WithLlm<IHaiku45>();
-        ai.WithLlm<IGemini36Pro>();
-        ai.WithLlm<IGemini36Flash>();
-        ai.WithLlm<IGrok46>();
-        ai.WithLlm<IGemma4>();
-        ai.WithLlm<IQwen35>();
-        ai.WithDefaultLlm<IQwen35>();
-        ai.WithEmbedding<ITextEmbedding3Small>();
-        ai.WithEmbedding<ITextEmbedding3Large>();
-        ai.WithEmbedding<IGeminiEmbedding>();
-        ai.WithEmbedding<IEmbeddingGemma>();
-        ai.WithDefaultEmbedding<IEmbeddingGemma>();
-        ai.WithVoiceToText<IWhisperLargeV3Turbo>();
+
+        // --- OpenAI ---
+        //ai.WithLlm<OpenAIModels.IGpt56Sol>();
+        //ai.WithLlm<OpenAIModels.IGpt56Terra>();
+        ai.WithLlm<OpenAIModels.IGpt56Luna>();
+        ai.WithDefaultLlm<OpenAIModels.IGpt56Luna>();
+        ai.WithEmbedding<OpenAIModels.ITextEmbedding3Small>();
+        ai.WithDefaultEmbedding<OpenAIModels.ITextEmbedding3Small>();
+
+        // --- Anthropic ---
+        // ai.WithLlm<AnthropicModels.IFable5>();
+        // ai.WithLlm<AnthropicModels.ISonnet5>();
+        // ai.WithLlm<AnthropicModels.IHaiku45>();
+        // ai.WithDefaultLlm<AnthropicModels.IFable5>();
+
+        // --- Google ---
+        // ai.WithLlm<GoogleModels.IGemini31Pro>();
+        // ai.WithLlm<GoogleModels.IGemini36Flash>();
+        // ai.WithDefaultLlm<GoogleModels.IGemini31Pro>();
+        // ai.WithEmbedding<GoogleModels.IGeminiEmbedding>();
+        // ai.WithDefaultEmbedding<GoogleModels.IGeminiEmbedding>();
+
+        // --- xAI ---
+        // ai.WithLlm<XaiModels.IGrok46>();
+        // ai.WithDefaultLlm<XaiModels.IGrok46>();
+
+        // --- Ollama ---
+        // ai.WithLlm<OllamaModels.IGemma4>();
+        // ai.WithLlm<OllamaModels.IQwen35>();
+        // ai.WithDefaultLlm<OllamaModels.IQwen35>();
+        // ai.WithEmbedding<OllamaModels.IEmbeddingGemma>();
+        // ai.WithDefaultEmbedding<OllamaModels.IEmbeddingGemma>();
+
+        //ai.WithVoiceToText<IWhisperLargeV3Turbo>();
     })
     .AddModule<MemoryModule>(memory => memory.WithQdrant())
     .AddModule<TimeModule>()
