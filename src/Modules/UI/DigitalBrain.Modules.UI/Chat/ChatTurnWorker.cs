@@ -2,11 +2,13 @@ using System.Text;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Execution;
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Interactions;
 using DigitalBrain.AI;
 using DigitalBrain.Chat;
 using DigitalBrain.Core;
 using DigitalBrain.Execution;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.UI;
 
@@ -29,9 +31,36 @@ internal sealed class ChatTurnWorker : Neuron, IChatTurnWorker
         var executionId = await StartTurnExecutionAsync(goal, cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        var (answer, author) = await RunResponderAsync(goal, executionId, cancellationToken)
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        return new ChatTurnResult(answer, author);
+        try
+        {
+            var (answer, author) = await RunResponderAsync(goal, executionId, cancellationToken)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            var action = FindUserAction(goal);
+            return new ChatTurnResult(action?.Message ?? answer, author, action);
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // A provider can require login before it can produce a model response.
+            // Expose only its public control message, never a transport exception.
+            var action = FindUserAction(goal);
+            if (action is null)
+            {
+                throw;
+            }
+
+            return new ChatTurnResult(action.Message, "assistant", action);
+        }
+    }
+
+    private UserActionRequest? FindUserAction(ChatTurnGoal goal)
+    {
+        using var scope = AgentTurnContext.Enter(
+            new AgentTurnContext(goal.Chat, goal.CommandId, goal.Actor, goal.AllowedToolNames));
+        return ServiceProvider.GetServices<IUserActionSource>()
+            .Select(source => source.Find(goal.Chat.Owner, goal.CommandId))
+            .FirstOrDefault(action => action is not null
+                && action.ExpiresAt > TimeProvider.GetUtcNow()
+                && !string.Equals(action.Id, goal.CompletedUserActionId, StringComparison.Ordinal));
     }
 
     private async Task<ExecutionId> StartTurnExecutionAsync(ChatTurnGoal goal, CancellationToken cancellationToken)
@@ -119,10 +148,19 @@ internal sealed class ChatTurnWorker : Neuron, IChatTurnWorker
             }
         }
 
+        if (goal.AllowedToolNames is not null)
+        {
+            system.Append(" The user completed a login action for this existing turn. ")
+                .Append("Complete only the original request below using the available read-only tools. ")
+                .Append("Do not perform writes or treat login consent as approval of a mutation. ")
+                .Append("Original request: ").Append(goal.Text);
+        }
+
         var conversationContext = new ChatMessage(ChatRole.System, system.ToString());
 
         var answer = new StringBuilder();
         using (VerifiedActor.Enter(goal.Actor))
+        using (AgentTurnContext.Enter(new AgentTurnContext(goal.Chat, goal.CommandId, goal.Actor, goal.AllowedToolNames)))
         {
             await foreach (var chunk in responder.RespondStreaming(
                 [conversationContext, .. transcript.Turns.Select(AsChatMessage)],

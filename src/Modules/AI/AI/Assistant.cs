@@ -17,6 +17,9 @@ internal sealed class Assistant(IChatClient chatClient) : Agent(chatClient), IAs
         Salesforce access is available only when your Salesforce tools are present. Use
         salesforce_get_current_user to check authentication and identify the current Salesforce
         user; never infer successful authentication from configuration or an enrichment tool.
+        If a tool returns authentication_required, say Salesforce login is needed and let the
+        application present its login action. Do not invent a login link, ask for a token,
+        retry repeatedly, or claim access. Login resumes reads but never approves writes.
         Use salesforce_soql_query for read-only SELECT queries with an outer WHERE and LIMIT.
         For a record creation or update, call salesforce_create_or_update with confirmed=false
         first and show the exact preview. Set confirmed=true only after the user explicitly

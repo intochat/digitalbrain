@@ -23,26 +23,29 @@ public sealed class McpIntegrationEndpoint
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(accessToken))
+        ValidateSalesforceUri(uri);
+        if (accessToken is null)
         {
-            throw new InvalidOperationException(
-                "Salesforce MCP has an endpoint but no access token. Supply the required "
-                + "salesforce-access-token secret (DigitalBrain:Integrations:Salesforce:Mcp:AccessToken).");
+            // Interactive OAuth is configured by IntegrationsModule. No fake fallback.
+            return;
         }
 
         // Fail without echoing the credential, including malformed input. Only send it to Salesforce.
-        if (accessToken.Any(static c => char.IsWhiteSpace(c) || char.IsControl(c)))
+        if (string.IsNullOrWhiteSpace(accessToken) || accessToken.Any(static c => char.IsWhiteSpace(c) || char.IsControl(c)))
         {
             throw new InvalidOperationException("Salesforce MCP requires a bearer token without whitespace or a Bearer prefix.");
         }
+        _authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+    }
+
+    internal static void ValidateSalesforceUri(Uri uri)
+    {
         if (!uri.IsAbsoluteUri || uri.Scheme != "https" || uri.Host != "api.salesforce.com"
             || !uri.IsDefaultPort || !uri.AbsolutePath.StartsWith("/platform/mcp/", StringComparison.Ordinal)
             || uri.UserInfo.Length != 0 || uri.Query.Length != 0 || uri.Fragment.Length != 0)
         {
             throw new InvalidOperationException("Salesforce MCP requires an HTTPS hosted MCP endpoint on api.salesforce.com.");
         }
-
-        _authorization = new AuthenticationHeaderValue("Bearer", accessToken);
     }
 
     public string Name { get; }

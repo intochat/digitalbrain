@@ -13,6 +13,8 @@ import 'package:record/record.dart';
 import 'package:uuid/uuid.dart';
 
 import '../brain_theme.dart';
+import '../user_actions/chat_login_action.dart';
+import '../user_actions/salesforce_login_card.dart';
 import 'brain_chat_composer.dart';
 import 'chat_contracts.dart';
 import 'stream_state_store.dart';
@@ -30,6 +32,8 @@ final class BrainChatScreen extends StatefulWidget {
     this.onStreamVoice,
     this.onAttachmentTap,
     this.onOpenSignIn,
+    this.kernelBaseUri,
+    this.onCancelTurn,
     this.onActivateButton,
     this.onReadChart,
     this.onReadImageBytes,
@@ -42,6 +46,8 @@ final class BrainChatScreen extends StatefulWidget {
   final StreamVoice? onStreamVoice;
   final VoidCallback? onAttachmentTap;
   final OpenUrl? onOpenSignIn;
+  final Uri? kernelBaseUri;
+  final CancelChatTurn? onCancelTurn;
   final ActivateChatButton? onActivateButton;
   final ReadChart? onReadChart;
   final ReadImageBytes? onReadImageBytes;
@@ -61,6 +67,7 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
   final _voice = VoiceComposerController();
   final _appliedSequences = <int>{};
   final _recorder = AudioRecorder();
+  Map<String, ChatLoginAction> _loginActions = const {};
   String? _pendingUserMessageId;
   String? _pendingUserText;
   String? _activeStreamId;
@@ -112,15 +119,38 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
       _activeStreamId = null;
     }
 
+    _loginActions = ChatLoginAction.project(turns);
+    final actionCommands = {
+      for (final login in _loginActions.values) login.offer.commandId,
+    };
+    final actionsBySequence = {
+      for (final login in _loginActions.values) login.offer.sequence: login,
+    };
     final messages = <Message>[
-      for (final turn in turns)
-        ...KitMessageFactory.messagesForTurn(
-          sequence: turn.sequence,
-          fromUser: turn.fromUser,
-          text: turn.text,
-          createdAt: turn.timestamp,
-          parts: turn.kitParts,
-        ),
+      for (final turn in turns) ...[
+        // The inline action card presents this command's lifecycle state.
+        if (turn.synapse != 'TurnLifecycle' ||
+            !actionCommands.contains(turn.commandId))
+          ...KitMessageFactory.messagesForTurn(
+            sequence: turn.sequence,
+            fromUser: turn.fromUser,
+            text: turn.text,
+            createdAt: turn.timestamp,
+            parts: turn.kitParts,
+          ),
+        if (actionsBySequence[turn.sequence] case final login?)
+          CustomMessage(
+            id: 'user_action_${login.key}',
+            authorId: assistantUserId,
+            createdAt: turn.timestamp,
+            metadata: {
+              'kind': 'user-action',
+              'actionKey': login.key,
+              'status': login.status.name,
+              'turnId': login.turnId,
+            },
+          ),
+      ],
     ];
 
     if (_pendingUserMessageId != null && _pendingUserText != null) {
@@ -496,18 +526,32 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
                           index, {
                           required bool isSentByMe,
                           MessageGroupStatus? groupStatus,
-                        }) => KitChatBuilders.customMessageBuilder(
-                          context,
-                          message,
-                          index,
-                          isSentByMe: isSentByMe,
-                          groupStatus: groupStatus,
-                          onButtonPressed: widget.onActivateButton == null
-                              ? null
-                              : _onKitButton,
-                          onReadChart: widget.onReadChart,
-                          onReadImageBytes: widget.onReadImageBytes,
-                        ),
+                        }) {
+                          if (message.metadata?['kind'] == 'user-action') {
+                            final login =
+                                _loginActions[message.metadata?['actionKey']];
+                            if (login == null) return const SizedBox.shrink();
+                            return SalesforceLoginCard(
+                              key: ValueKey(login.key),
+                              login: login,
+                              kernelBaseUri: widget.kernelBaseUri,
+                              onOpenSignIn: widget.onOpenSignIn,
+                              onCancelTurn: widget.onCancelTurn,
+                            );
+                          }
+                          return KitChatBuilders.customMessageBuilder(
+                            context,
+                            message,
+                            index,
+                            isSentByMe: isSentByMe,
+                            groupStatus: groupStatus,
+                            onButtonPressed: widget.onActivateButton == null
+                                ? null
+                                : _onKitButton,
+                            onReadChart: widget.onReadChart,
+                            onReadImageBytes: widget.onReadImageBytes,
+                          );
+                        },
                   ),
                 ),
               ),
@@ -534,7 +578,10 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
       if (a[i].sequence != b[i].sequence ||
           a[i].text != b[i].text ||
           a[i].buttons.length != b[i].buttons.length ||
-          a[i].charts.length != b[i].charts.length) {
+          a[i].charts.length != b[i].charts.length ||
+          a[i].status != b[i].status ||
+          a[i].turnId != b[i].turnId ||
+          a[i].userAction?.id != b[i].userAction?.id) {
         return false;
       }
     }

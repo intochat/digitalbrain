@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using DigitalBrain.Chat;
+using DigitalBrain.Abstractions.Interactions;
 namespace DigitalBrain.Kernel;
 
 internal sealed record ChatTurnEvent(
@@ -14,5 +15,7 @@ internal sealed record ChatTurnEvent(
     DateTimeOffset Timestamp,
     string? TurnId = null,
     string? Status = null,
-    KitCardOffer[]? Cards = null);
+    KitCardOffer[]? Cards = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    UserActionRequest? UserAction = null);
 

@@ -1,5 +1,6 @@
 using System.Net.ServerSentEvents;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.Interactions;
 using DigitalBrain.Chat;
 
 using DigitalBrain.Abstractions.Identity;
@@ -85,7 +86,8 @@ internal static class ChatStreamsHttpMaps
             NeuronId chat,
             string? turnId = null,
             string? status = null,
-            KitCardOffer[]? cards = null)
+            KitCardOffer[]? cards = null,
+            UserActionRequest? userAction = null)
             => new(
                 delivery.Sequence,
                 fromUser,
@@ -98,7 +100,8 @@ internal static class ChatStreamsHttpMaps
                 delivery.Timestamp,
                 turnId,
                 status,
-                cards);
+                cards,
+                userAction);
 
         return delivery.Synapse switch
         {
@@ -111,7 +114,10 @@ internal static class ChatStreamsHttpMaps
                     responded.CommandId,
                     nameof(Responded),
                     responded.Chat,
-                    cards: responded.Cards),
+                    turnId: responded.TurnId?.ToString(),
+                    status: responded.UserAction is null ? null : nameof(ChatTurnStatus.WaitingForUser),
+                    cards: responded.Cards,
+                    userAction: responded.UserAction),
             TurnLifecycle life =>
                 Turn(
                     false,

@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Execution;
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Interactions;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Chat;
 using DigitalBrain.Core;
@@ -70,6 +71,7 @@ internal sealed class Chat : Neuron, IChat
     protected override async Task OnNeuronActivatedAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        await FailUnavailableUserActionsAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         await FailTurnInterruptedByRestartAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
@@ -117,9 +119,15 @@ internal sealed class Chat : Neuron, IChat
             return;
         }
 
-        if (record.Status == ChatTurnStatus.Pending)
+        if (record.Status is ChatTurnStatus.Pending or ChatTurnStatus.WaitingForUser)
         {
-            turns[index] = record with { Status = ChatTurnStatus.Cancelled, Revision = record.Revision + 1 };
+            turns[index] = record with
+            {
+                Status = ChatTurnStatus.Cancelled,
+                Revision = record.Revision + 1,
+                UserAction = null,
+                Detail = "cancelled",
+            };
             SaveTurns(turns);
             var queue = LoadQueue();
             queue.PendingTurnIds.Remove(record.TurnId);
@@ -159,13 +167,109 @@ internal sealed class Chat : Neuron, IChat
 
     public Task<ChatTranscript> Read() => Task.FromResult(new ChatTranscript(Turns()));
 
-    public Task<IReadOnlyList<ChatTurnSnapshot>> ReadTurns()
-        => Task.FromResult<IReadOnlyList<ChatTurnSnapshot>>(
-            [.. LoadTurns().Select(static turn => new ChatTurnSnapshot(
+    public async Task<IReadOnlyList<ChatTurnSnapshot>> ReadTurns()
+    {
+        await FailUnavailableUserActionsAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        return [.. LoadTurns().Select(static turn => new ChatTurnSnapshot(
                 new TurnId(turn.TurnId),
                 new CommandId(turn.CommandId),
                 turn.Text,
-                turn.Status))]);
+                turn.Status,
+                turn.UserAction,
+                turn.Answer,
+                turn.Detail))];
+    }
+
+    public async Task CompleteUserAction(AgentTurnContext context, string actionId, bool accepted)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentException.ThrowIfNullOrWhiteSpace(actionId);
+        var turns = LoadTurns();
+        var index = turns.FindIndex(turn => turn.CommandId == context.CommandId.Value);
+        if (context.Chat != Id || index < 0)
+        {
+            return;
+        }
+
+        var record = turns[index];
+        if (record.Status != ChatTurnStatus.WaitingForUser
+            || record.Actor != context.Actor
+            || record.UserAction is not { } action
+            || !string.Equals(action.Id, actionId, StringComparison.Ordinal))
+        {
+            // Cancellation and an already-consumed callback both win permanently.
+            return;
+        }
+
+        if (!accepted || action.ExpiresAt <= TimeProvider.GetUtcNow())
+        {
+            await SettleTurnAsync(record.TurnId, ChatTurnStatus.Failed, null,
+                "Login was not completed or expired. Please send the request again.")
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            return;
+        }
+
+        if (action.ResumeToolNames.Length == 0)
+        {
+            await SettleTurnAsync(record.TurnId, ChatTurnStatus.Completed,
+                new ChatTurnResult(
+                    "Login completed. Please repeat your request and explicitly confirm any changes you want to make.",
+                    "assistant"), detail: null)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            return;
+        }
+
+        // Trust only the stored provider allowlist, never callback or user input.
+        turns[index] = record with
+        {
+            Status = ChatTurnStatus.Pending,
+            Revision = record.Revision + 1,
+            UserAction = null,
+            AllowedToolNames = [.. action.ResumeToolNames],
+            CompletedUserActionId = action.Id,
+            Answer = null,
+            Detail = null,
+        };
+        SaveTurns(turns);
+        var queue = LoadQueue();
+        if (!queue.PendingTurnIds.Contains(record.TurnId))
+        {
+            queue.PendingTurnIds.Add(record.TurnId);
+        }
+
+        SaveQueue(queue);
+        await EmitAsync(new TurnLifecycle(new TurnId(record.TurnId), context.CommandId, Id,
+            ChatTurnStatus.Pending, "login-completed"))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await TryStartNextAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
+
+    private async Task FailUnavailableUserActionsAsync()
+    {
+        var now = TimeProvider.GetUtcNow();
+        var sources = ServiceProvider.GetServices<IUserActionSource>().ToArray();
+        foreach (var record in LoadTurns().Where(turn => turn.Status == ChatTurnStatus.WaitingForUser))
+        {
+            var action = record.UserAction;
+            if (action is not null && action.ExpiresAt > now
+                && UserActionIsAvailable(record, action, sources))
+            {
+                continue;
+            }
+
+            await SettleTurnAsync(record.TurnId, ChatTurnStatus.Failed, null,
+                "Login expired or was interrupted by a restart. Please send the request again.")
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        }
+    }
+
+    private bool UserActionIsAvailable(
+        DurableTurnRecord record, UserActionRequest action, IEnumerable<IUserActionSource> sources)
+    {
+        var command = new CommandId(record.CommandId);
+        using var scope = AgentTurnContext.Enter(new AgentTurnContext(Id, command, record.Actor, record.AllowedToolNames));
+        return sources.Any(source => source.Find(Id.Owner, command)?.Id == action.Id);
+    }
 
     public Task<ExecutionId?> ReadActiveExecution()
         => Task.FromResult(LoadFocus().ActiveExecutionId);
@@ -265,6 +369,7 @@ internal sealed class Chat : Neuron, IChat
     private async Task<TurnAccepted> EnqueueTurnAsync(SendMessage message)
     {
         RequireActor(message.Actor, "send");
+        await FailUnavailableUserActionsAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         if (!IsUnseenCommand(message))
         {
             var existing = LoadTurns().FirstOrDefault(turn => turn.CommandId == message.CommandId.Value);
@@ -385,10 +490,14 @@ internal sealed class Chat : Neuron, IChat
                 new CommandId(record.CommandId),
                 record.Text,
                 record.Actor,
-                Id);
+                Id,
+                record.AllowedToolNames,
+                record.CompletedUserActionId);
             var result = await worker.RunAsync(goal, cancellationToken)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            await SettleTurnAsync(record.TurnId, ChatTurnStatus.Completed, result, detail: null)
+            await SettleTurnAsync(record.TurnId,
+                result.UserAction is null ? ChatTurnStatus.Completed : ChatTurnStatus.WaitingForUser,
+                result, detail: null)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -472,10 +581,24 @@ internal sealed class Chat : Neuron, IChat
         }
 
         var record = turns[index];
-        turns[index] = record with { Status = status, Revision = record.Revision + 1 };
+        if (record.Status == ChatTurnStatus.Cancelling)
+        {
+            status = ChatTurnStatus.Cancelled;
+            result = null;
+            detail = "cancelled";
+        }
+
+        turns[index] = record with
+        {
+            Status = status,
+            Revision = record.Revision + 1,
+            UserAction = status == ChatTurnStatus.WaitingForUser ? result?.UserAction : null,
+            Answer = result?.Answer,
+            Detail = detail,
+        };
         SaveTurns(turns);
 
-        if (status == ChatTurnStatus.Completed)
+        if (status is ChatTurnStatus.Completed or ChatTurnStatus.WaitingForUser)
         {
             await TryEmitRespondedAsync(record, result)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
@@ -509,7 +632,9 @@ internal sealed class Chat : Neuron, IChat
             new CommandId(record.CommandId),
             Id,
             result.Answer,
-            Author: result.Author))
+            Author: result.Author,
+            UserAction: result.UserAction,
+            TurnId: new TurnId(record.TurnId)))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         var existing = Turns();

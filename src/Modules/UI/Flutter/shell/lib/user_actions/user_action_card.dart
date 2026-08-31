@@ -9,6 +9,9 @@ final class UserActionCardModel {
     required this.actionUrl,
     required this.taskId,
     this.continuationState = 'waiting',
+    this.displayName,
+    this.actionLabel = 'Connect / Authorize',
+    this.statusText,
   });
 
   final String moduleId;
@@ -16,13 +19,26 @@ final class UserActionCardModel {
   final Uri actionUrl;
   final String taskId;
   final String continuationState;
+  final String? displayName;
+  final String actionLabel;
+  final String? statusText;
 }
 
 final class UserActionCard extends StatelessWidget {
-  const UserActionCard({super.key, required this.model, this.onAuthorize});
+  const UserActionCard({
+    super.key,
+    required this.model,
+    this.onAuthorize,
+    this.onCancel,
+    this.leading,
+    this.showCancel = false,
+  });
 
   final UserActionCardModel model;
   final VoidCallback? onAuthorize;
+  final VoidCallback? onCancel;
+  final Widget? leading;
+  final bool showCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -38,19 +54,42 @@ final class UserActionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(model.moduleId, style: BrainType.metaStrong),
+          Row(
+            children: [
+              if (leading != null) ...[leading!, const SizedBox(width: 12)],
+              Expanded(
+                child: Text(
+                  model.displayName ?? model.moduleId,
+                  style: BrainType.metaStrong,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
           Text(model.displayText, style: BrainType.body),
           const SizedBox(height: 8),
           Text(
-            'Task ${model.taskId} · ${model.continuationState}',
+            model.statusText ??
+                'Task ${model.taskId} · ${model.continuationState}',
             style: BrainType.meta,
           ),
           const SizedBox(height: 12),
-          FilledButton(
-            key: Key('user_action_authorize_${model.moduleId}'),
-            onPressed: onAuthorize,
-            child: const Text('Connect / Authorize'),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              FilledButton(
+                key: Key('user_action_authorize_${model.moduleId}'),
+                onPressed: onAuthorize,
+                child: Text(model.actionLabel),
+              ),
+              if (showCancel)
+                OutlinedButton(
+                  key: Key('user_action_cancel_${model.moduleId}'),
+                  onPressed: onCancel,
+                  child: const Text('Cancel'),
+                ),
+            ],
           ),
         ],
       ),

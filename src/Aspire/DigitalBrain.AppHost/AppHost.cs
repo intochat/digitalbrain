@@ -20,11 +20,16 @@ using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-var salesforceAccessToken = builder.AddParameter("salesforce-access-token", secret: true)
+var salesforceConsumerKey = builder.AddParameter("salesforce-consumer-key", secret: true)
     .WithDescription(
-        "Required short-lived Salesforce OAuth bearer token for hosted MCP access. "
-        + "Use an [External Client App](https://developer.salesforce.com/docs/platform/hosted-mcp-servers/guide/create-external-client-app.html) "
-        + "with the mcp_api scope. Enter only the token, without the Bearer prefix.",
+        "Consumer key (client ID) from your existing Salesforce "
+        + "[External Client App](https://developer.salesforce.com/docs/platform/hosted-mcp-servers/guide/create-external-client-app.html). "
+        + "Register http://localhost:5080/integrations/salesforce/callback, enable PKCE and JWT access tokens, and allow mcp_api and refresh_token.",
+        enableMarkdown: true);
+var salesforceConsumerSecret = builder.AddParameter("salesforce-consumer-secret", secret: true)
+    .WithDescription(
+        "Consumer secret from the same Salesforce External Client App. Enable Require Secret for Web Server Flow. "
+        + "Only the kernel receives this secret; Salesforce login happens in your browser when the assistant needs access.",
         enableMarkdown: true);
 
 var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
@@ -98,7 +103,9 @@ var developmentClusterId = builder.Environment.IsDevelopment()
 
 var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceResources.Kernel)
     .WithReference(brain)
-    .WithEnvironment(IntegrationsModule.SalesforceMcpAccessTokenEnvironmentVariable, salesforceAccessToken)
+    .WithEnvironment(IntegrationsModule.SalesforceConsumerKeyEnvironmentVariable, salesforceConsumerKey)
+    .WithEnvironment(IntegrationsModule.SalesforceConsumerSecretEnvironmentVariable, salesforceConsumerSecret)
+    .WithEnvironment("DigitalBrain__Integrations__Salesforce__OAuth__PublicOrigin", "http://localhost:5080")
     .WithEnvironment(
         IntegrationsModule.SalesforceMcpEndpointEnvironmentVariable,
         "https://api.salesforce.com/platform/mcp/v1/platform/sobject-all")

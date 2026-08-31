@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.Interactions;
 using DigitalBrain.AI;
 using DigitalBrain.Execution;
 using DigitalBrain.Integrations.Gmail;
@@ -14,10 +15,10 @@ public sealed class IntegrationsModule : Core.IModule
 {
     public const string GmailMcpEndpointConfigurationKey = "DigitalBrain:Integrations:Gmail:Mcp:Endpoint";
     public const string SalesforceMcpEndpointConfigurationKey = "DigitalBrain:Integrations:Salesforce:Mcp:Endpoint";
-    public const string SalesforceMcpAccessTokenConfigurationKey = "DigitalBrain:Integrations:Salesforce:Mcp:AccessToken";
+    public const string SalesforceConsumerKeyEnvironmentVariable = "DigitalBrain__Integrations__Salesforce__OAuth__ConsumerKey";
+    public const string SalesforceConsumerSecretEnvironmentVariable = "DigitalBrain__Integrations__Salesforce__OAuth__ConsumerSecret";
     public const string GmailMcpEndpointEnvironmentVariable = "DigitalBrain__Integrations__Gmail__Mcp__Endpoint";
     public const string SalesforceMcpEndpointEnvironmentVariable = "DigitalBrain__Integrations__Salesforce__Mcp__Endpoint";
-    public const string SalesforceMcpAccessTokenEnvironmentVariable = "DigitalBrain__Integrations__Salesforce__Mcp__AccessToken";
 
     public void Configure(ISiloBuilder builder)
     {
@@ -37,7 +38,8 @@ public sealed class IntegrationsModule : Core.IModule
             "salesforce");
         if (gmailEndpoint is not null || salesforceEndpoint is not null)
         {
-            builder.Services.TryAddSingleton<IMcpIntegrationClient, McpIntegrationClient>();
+            builder.Services.TryAddSingleton<IMcpIntegrationClient>(services =>
+                new McpIntegrationClient(services.GetService<SalesforceConnections>()));
         }
 
         if (gmailEndpoint is not null)
@@ -58,6 +60,10 @@ public sealed class IntegrationsModule : Core.IModule
 
         if (salesforceEndpoint is not null)
         {
+            builder.Services.AddSingleton(new SalesforceOAuthConfiguration(builder.Configuration));
+            builder.Services.AddSingleton<SalesforceConnections>();
+            builder.Services.AddHostedService<SalesforceCompletionWorker>();
+            builder.Services.AddSingleton<IUserActionSource>(services => services.GetRequiredService<SalesforceConnections>());
             builder.Services.AddSingleton<IAgentToolSource, SalesforceToolSource>();
             builder.Services.TryAddSingleton<ISalesforceTransport>(services =>
                 new McpSalesforceTransport(
@@ -99,10 +105,7 @@ public sealed class IntegrationsModule : Core.IModule
             throw new InvalidOperationException($"Configuration '{key}' is not an absolute URI.");
         }
 
-        return new McpIntegrationEndpoint(
-            name,
-            uri,
-            name == "salesforce" ? configuration[SalesforceMcpAccessTokenConfigurationKey] : null);
+        return new McpIntegrationEndpoint(name, uri);
     }
 
     private static bool UseFakeTransports(Microsoft.Extensions.Configuration.IConfiguration configuration)

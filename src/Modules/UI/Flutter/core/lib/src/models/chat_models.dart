@@ -136,6 +136,61 @@ final class KitCardRef {
   );
 }
 
+/// Non-secret information needed to continue a turn in the system browser.
+final class ChatUserAction {
+  const ChatUserAction({
+    required this.id,
+    required this.provider,
+    required this.displayName,
+    required this.message,
+    required this.loginUrl,
+    required this.expiresAt,
+    this.resumeToolNames = const [],
+  });
+
+  final String id;
+  final String provider;
+  final String displayName;
+  final String message;
+  final Uri loginUrl;
+  final DateTime expiresAt;
+  final List<String> resumeToolNames;
+
+  static ChatUserAction? tryParse(Object? value) {
+    if (value is! Map) return null;
+    final id = value['id'];
+    final provider = value['provider'];
+    final displayName = value['displayName'];
+    final message = value['message'];
+    final loginUrl = value['loginUrl'];
+    final expiresAt = value['expiresAt'];
+    if (id is! String ||
+        id.isEmpty ||
+        provider is! String ||
+        displayName is! String ||
+        message is! String ||
+        loginUrl is! String ||
+        expiresAt is! String) {
+      return null;
+    }
+    final uri = Uri.tryParse(loginUrl);
+    final expiry = DateTime.tryParse(expiresAt);
+    if (uri == null || expiry == null) return null;
+    final tools = value['resumeToolNames'];
+    return ChatUserAction(
+      id: id,
+      provider: provider,
+      displayName: displayName,
+      message: message,
+      loginUrl: uri,
+      expiresAt: expiry.toUtc(),
+      resumeToolNames: tools is List
+          ? List<String>.unmodifiable(tools.whereType<String>())
+          : const [],
+    );
+  }
+}
+
 final class ChatTurnEvent {
   const ChatTurnEvent({
     required this.sequence,
@@ -151,6 +206,9 @@ final class ChatTurnEvent {
     this.charts = const [],
     this.timers = const [],
     this.cards = const [],
+    this.turnId,
+    this.status,
+    this.userAction,
   });
 
   final int sequence;
@@ -166,6 +224,9 @@ final class ChatTurnEvent {
   final List<ChatChartOffer> charts;
   final List<ChatTimerOffer> timers;
   final List<KitCardRef> cards;
+  final String? turnId;
+  final String? status;
+  final ChatUserAction? userAction;
 
   factory ChatTurnEvent.fromJson(Map<String, Object?> json) {
     final rawButtons = json['buttons'];
@@ -213,6 +274,9 @@ final class ChatTurnEvent {
       charts: charts,
       timers: timers,
       cards: cards,
+      turnId: json['turnId'] as String?,
+      status: json['status'] as String?,
+      userAction: ChatUserAction.tryParse(json['userAction']),
     );
   }
 }

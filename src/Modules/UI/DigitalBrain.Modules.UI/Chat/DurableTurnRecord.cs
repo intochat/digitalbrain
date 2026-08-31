@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Interactions;
 using DigitalBrain.Chat;
 
 namespace DigitalBrain.UI;
@@ -11,4 +12,9 @@ internal sealed record DurableTurnRecord(
     [property: Id(2)] string Text,
     [property: Id(3)] ActorContext Actor,
     [property: Id(4)] ChatTurnStatus Status,
-    [property: Id(5)] long Revision);
+    [property: Id(5)] long Revision,
+    [property: Id(6)] UserActionRequest? UserAction = null,
+    [property: Id(7)] string[]? AllowedToolNames = null,
+    [property: Id(8)] string? Answer = null,
+    [property: Id(9)] string? Detail = null,
+    [property: Id(10)] string? CompletedUserActionId = null);

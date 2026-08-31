@@ -6,6 +6,7 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="ModelContextProtocol.Core" />
     <ProjectReference Include="../AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="../Execution/Contracts/DigitalBrain.Modules.Execution.Contracts.csproj" />

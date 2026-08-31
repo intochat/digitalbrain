@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.Interactions;
 using DigitalBrain.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -10,6 +11,7 @@ public sealed class UIModule : Core.IModule
     public void Configure(ISiloBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
+        builder.Services.TryAddSingleton<IUserActionContinuation, ChatUserActionContinuation>();
 
         if (string.Equals(
                 builder.Configuration[DigitalBrainNames.Mode],

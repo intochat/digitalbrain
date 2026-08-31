@@ -186,6 +186,23 @@ final class DigitalBrainUiClient {
     }
   }
 
+  Future<void> cancelTurn({
+    required String chatName,
+    required String commandId,
+    required String turnId,
+  }) async {
+    await _request(
+      'POST',
+      '/owner/commands',
+      body: {
+        'kind': 'chat.cancel-turn',
+        'chatName': chatName,
+        'commandId': commandId,
+        'turnId': turnId,
+      },
+    );
+  }
+
   Stream<SceneOpenedEvent> watchShellEvents({
     required String shellName,
     int afterSequence = 0,

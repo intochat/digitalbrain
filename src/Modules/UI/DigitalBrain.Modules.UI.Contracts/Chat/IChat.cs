@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Execution;
+using DigitalBrain.Abstractions.Interactions;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.UI;
 using Microsoft.Extensions.AI;
@@ -24,6 +25,9 @@ public partial interface IChat :
 
     [Alias(nameof(Cancel))]
     Task Cancel(CancelTurn command);
+
+    [Alias(nameof(CompleteUserAction))]
+    Task CompleteUserAction(AgentTurnContext context, string actionId, bool accepted);
 
     [Alias(nameof(Read))]
     Task<ChatTranscript> Read();

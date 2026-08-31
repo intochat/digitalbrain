@@ -52,6 +52,14 @@ Widget buildShell({
                 action: action,
               ),
     onOpenSignIn: openExternalUrl,
+    kernelBaseUri: edge?.baseUri,
+    onCancelTurn: edge == null
+        ? null
+        : ({required commandId, required turnId}) => edge.cancelTurn(
+            chatName: chat,
+            commandId: commandId,
+            turnId: turnId,
+          ),
     onReadChart: edge?.readChart,
     onReadImageBytes: edge?.readImageBytes,
     onLoadBehaviors: edge?.listBehaviors,

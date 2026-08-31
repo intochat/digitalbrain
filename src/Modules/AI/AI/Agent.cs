@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using DigitalBrain.Abstractions.Interactions;
 using DigitalBrain.Core;
 using Microsoft.Extensions.AI;
 
@@ -29,6 +30,13 @@ public abstract class Agent : Neuron, IAgent
         cancellationToken.ThrowIfCancellationRequested();
 
         var tools = Tools;
+        if (AgentTurnContext.Current?.AllowedToolNames is { } allowedToolNames)
+        {
+            var allowed = new HashSet<string>(allowedToolNames, StringComparer.Ordinal);
+            // Apply the trusted continuation allowlist to every tool type, including
+            // server-side tools. OAuth consent must never enable an automatic write.
+            tools = [.. tools.Where(tool => allowed.Contains(tool.Name))];
+        }
         var options = new ChatOptions { MaxOutputTokens = 4096 };
         if (tools.Count > 0)
         {

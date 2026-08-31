@@ -19,6 +19,8 @@ final class BrainChatApp extends StatelessWidget {
     this.onStreamVoice,
     this.onAttachmentTap,
     this.onOpenSignIn,
+    this.kernelBaseUri,
+    this.onCancelTurn,
     this.onActivateButton,
     this.onReadChart,
     this.onReadImageBytes,
@@ -40,6 +42,8 @@ final class BrainChatApp extends StatelessWidget {
   final StreamVoice? onStreamVoice;
   final VoidCallback? onAttachmentTap;
   final OpenUrl? onOpenSignIn;
+  final Uri? kernelBaseUri;
+  final CancelChatTurn? onCancelTurn;
   final ActivateChatButton? onActivateButton;
   final ReadChart? onReadChart;
   final ReadImageBytes? onReadImageBytes;
@@ -67,6 +71,8 @@ final class BrainChatApp extends StatelessWidget {
         onStreamVoice: onStreamVoice,
         onAttachmentTap: onAttachmentTap,
         onOpenSignIn: onOpenSignIn,
+        kernelBaseUri: kernelBaseUri,
+        onCancelTurn: onCancelTurn,
         onActivateButton: onActivateButton,
         onReadChart: onReadChart,
         onReadImageBytes: onReadImageBytes,

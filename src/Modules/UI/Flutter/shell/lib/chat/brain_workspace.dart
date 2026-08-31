@@ -23,6 +23,8 @@ final class BrainWorkspace extends StatefulWidget {
     this.onStreamVoice,
     this.onAttachmentTap,
     this.onOpenSignIn,
+    this.kernelBaseUri,
+    this.onCancelTurn,
     this.onActivateButton,
     this.onReadChart,
     this.onReadImageBytes,
@@ -44,6 +46,8 @@ final class BrainWorkspace extends StatefulWidget {
   final StreamVoice? onStreamVoice;
   final VoidCallback? onAttachmentTap;
   final OpenUrl? onOpenSignIn;
+  final Uri? kernelBaseUri;
+  final CancelChatTurn? onCancelTurn;
   final ActivateChatButton? onActivateButton;
   final ReadChart? onReadChart;
   final ReadImageBytes? onReadImageBytes;
@@ -121,6 +125,8 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
             onStreamVoice: widget.onStreamVoice,
             onAttachmentTap: widget.onAttachmentTap,
             onOpenSignIn: widget.onOpenSignIn,
+            kernelBaseUri: widget.kernelBaseUri,
+            onCancelTurn: widget.onCancelTurn,
             onActivateButton: widget.onActivateButton,
             onReadChart: widget.onReadChart,
             onReadImageBytes: widget.onReadImageBytes,

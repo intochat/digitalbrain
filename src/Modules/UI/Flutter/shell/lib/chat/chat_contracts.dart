@@ -8,6 +8,8 @@ typedef StreamMessage = Stream<ChatDelta> Function(String text);
 typedef StreamVoice =
     Stream<ChatDelta> Function(List<int> audioBytes, {String fileName});
 typedef OpenUrl = Future<void> Function(Uri url);
+typedef CancelChatTurn =
+    Future<void> Function({required String commandId, required String turnId});
 typedef ActivateChatButton =
     Future<void> Function({
       required String offerCommandId,

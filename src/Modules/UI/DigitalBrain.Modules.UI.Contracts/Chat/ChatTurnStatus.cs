@@ -10,4 +10,5 @@ public enum ChatTurnStatus
     Failed = 3,
     Cancelled = 4,
     Cancelling = 5,
+    WaitingForUser = 6,
 }

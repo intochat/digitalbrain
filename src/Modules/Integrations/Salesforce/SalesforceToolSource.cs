@@ -2,12 +2,13 @@ using System.ComponentModel;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Interactions;
 using DigitalBrain.AI;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.Integrations.Salesforce;
 
-internal sealed partial class SalesforceToolSource(ISalesforceTransport transport) : IAgentToolSource
+internal sealed partial class SalesforceToolSource(ISalesforceTransport transport, SalesforceConnections connections) : IAgentToolSource
 {
     public IReadOnlyList<AIFunction> ToolsFor(OwnerId owner)
     {
@@ -15,7 +16,7 @@ internal sealed partial class SalesforceToolSource(ISalesforceTransport transpor
         _ = owner;
         return
         [
-            AIFunctionFactory.Create(transport.GetUserInfoJsonAsync, new AIFunctionFactoryOptions
+            AIFunctionFactory.Create(GetCurrentUserAsync, new AIFunctionFactoryOptions
             {
                 Name = "salesforce_get_current_user",
                 Description = "Read-only authentication check: get the Salesforce user authenticated with the hosted MCP server.",
@@ -33,12 +34,15 @@ internal sealed partial class SalesforceToolSource(ISalesforceTransport transpor
         ];
     }
 
+    private Task<string> GetCurrentUserAsync(CancellationToken cancellationToken)
+        => WithLoginAsync(() => transport.GetUserInfoJsonAsync(cancellationToken), readOnly: true);
+
     private Task<string> QueryAsync(
         [Description("A single SELECT query with an outer WHERE and a positive LIMIT, for example SELECT Id, Name FROM Account WHERE Name = 'Acme' LIMIT 10.")] string query,
         CancellationToken cancellationToken)
     {
         SalesforceQueryGuard.Validate(query);
-        return transport.QueryJsonAsync(query, cancellationToken);
+        return WithLoginAsync(() => transport.QueryJsonAsync(query, cancellationToken), readOnly: true);
     }
 
     private async Task<string> CreateOrUpdateAsync(
@@ -89,8 +93,32 @@ internal sealed partial class SalesforceToolSource(ISalesforceTransport transpor
                 });
             }
 
+            if (AgentTurnContext.Current?.AllowedToolNames is not null)
+            {
+                return "Login only authorizes access. Request a new preview and explicit confirmation before writing.";
+            }
             var payload = JsonSerializer.Serialize(new { id, body, confirmed });
-            return await transport.UpsertJsonAsync(objectType, payload, cancellationToken).ConfigureAwait(false);
+            return await WithLoginAsync(() => transport.UpsertJsonAsync(objectType, payload, cancellationToken), readOnly: false)
+                .ConfigureAwait(false);
+        }
+    }
+
+    private async Task<string> WithLoginAsync(Func<Task<string>> operation, bool readOnly)
+    {
+        try
+        {
+            return await operation().ConfigureAwait(false);
+        }
+        catch (SalesforceAuthenticationRequiredException)
+        {
+            var action = connections.RequireLogin(readOnly);
+            // Only a safe status reaches the LLM. The UI/MCP edge obtains the URL separately.
+            return JsonSerializer.Serialize(new
+            {
+                status = "authentication_required",
+                actionId = action.Id,
+                message = "DigitalBrain is presenting a Salesforce login action. Tell the user to use it. Do not ask for credentials, invent a URL, or keep retrying. The read request resumes after authorization; writes need a new explicit confirmation.",
+            });
         }
     }
 
