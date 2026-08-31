@@ -27,7 +27,7 @@ internal sealed class BehaviorToolSource(
             var generated = await generator.Generate(request, cancellationToken);
             if (!generated.Compilation.Success)
             {
-                return "Gemma produced a feature that did not compile:\n" + string.Join("\n",
+                return "The configured AI model produced a feature that did not compile:\n" + string.Join("\n",
                     generated.Compilation.Diagnostics.Select(d => $"line {d.Line}: {d.Message}"));
             }
             var definition = Definition(owner, name);

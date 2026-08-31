@@ -1,15 +1,13 @@
 using System.Text;
-using DigitalBrain.AI.Ollama;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.SmartPrompt;
 
 internal sealed class BehaviorFeatureGenerator(
-    [FromKeyedServices(typeof(IGemma4))] IChatClient gemma,
+    IChatClient chatClient,
     IBehaviorCompiler compiler) : IBehaviorFeatureGenerator
 {
-    private const string ModelName = "gemma4:e2b";
+    private const string ModelName = "configured-default";
 
     public async Task<BehaviorGeneration> Generate(
         string request,
@@ -131,7 +129,7 @@ internal sealed class BehaviorFeatureGenerator(
     {
         try
         {
-            return await gemma.GetResponseAsync(conversation, cancellationToken: cancellationToken);
+            return await chatClient.GetResponseAsync(conversation, cancellationToken: cancellationToken);
         }
         catch (Exception failure) when (failure is HttpRequestException or TimeoutException
             || failure is OperationCanceledException && !cancellationToken.IsCancellationRequested)

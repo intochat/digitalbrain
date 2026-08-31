@@ -29,7 +29,7 @@ public static class BehaviorExamples
             Given X.Account("elonmusk")
             When a new X.Post is published
             And the post mentions "bitcoin"
-            Then analyze the event as "bitcoin market signal" with Gemma
+            Then analyze the event as "bitcoin market signal" with AI
             And add UI.Chart.Point to UI.Chart("bitcoin_tracker")
 
           @test
@@ -47,7 +47,7 @@ public static class BehaviorExamples
             Given Email.Account("work")
             When a new Email is received
             And the event text contains "urgent"
-            Then analyze the event as "urgency and next action" with Gemma
+            Then analyze the event as "urgency and next action" with AI
             And notify UI.Chat("main")
           @test
           Scenario: Urgent mail creates a notification
@@ -64,7 +64,7 @@ public static class BehaviorExamples
             Given Calendar("primary")
             When Calendar.Event starts
             And the event text contains "flight"
-            Then analyze the event as "travel preparation checklist" with Gemma
+            Then analyze the event as "travel preparation checklist" with AI
             And notify UI.Chat("main")
           @test
           Scenario: Flight event creates a checklist
@@ -96,7 +96,7 @@ public static class BehaviorExamples
           Scenario: Summarize an incoming document
             Given Folder("inbox")
             When File.Created
-            Then analyze the event as "document summary" with Gemma
+            Then analyze the event as "document summary" with AI
             And notify UI.Chat("main")
           @test
           Scenario: New document posts a summary
@@ -113,7 +113,7 @@ public static class BehaviorExamples
             Given Health.Metric("heart_rate")
             When Health.Metric is recorded
             And the event value is above 120
-            Then analyze the event as "health metric context, not medical advice" with Gemma
+            Then analyze the event as "health metric context, not medical advice" with AI
             And add UI.Chart.Point to UI.Chart("health")
           @test
           Scenario: High heart rate updates health chart
@@ -129,7 +129,7 @@ public static class BehaviorExamples
           Scenario: Triage a new issue
             Given GitHub.Repository("digitalbrain")
             When GitHub.Issue is opened
-            Then analyze the event as "severity, component, and next action" with Gemma
+            Then analyze the event as "severity, component, and next action" with AI
             And notify UI.Chat("main")
           @test
           Scenario: New issue posts triage
@@ -145,7 +145,7 @@ public static class BehaviorExamples
           Scenario: Remind me when I arrive home
             Given Geofence("home")
             When Location enters the geofence
-            Then analyze the event as "short context-aware reminder" with Gemma
+            Then analyze the event as "short context-aware reminder" with AI
             And notify UI.Chat("main")
           @test
           Scenario: Arrival posts the reminder

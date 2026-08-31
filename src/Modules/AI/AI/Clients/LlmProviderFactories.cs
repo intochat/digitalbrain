@@ -51,10 +51,28 @@ internal abstract class OpenAICompatibleProviderFactory : ApiKeyProviderFactory
     protected abstract Uri? DefaultEndpoint { get; }
 
     public override IChatClient CreateChatClient(LLMModel model, IConfiguration configuration)
-        => new ChatClientBuilder(
-                CreateClient(configuration, model.Marker, "WithLlm").GetChatClient(model.Id).AsIChatClient())
+    {
+        var builder = new ChatClientBuilder(
+            CreateClient(configuration, model.Marker, "WithLlm").GetChatClient(model.Id).AsIChatClient());
+
+        if (Provider is AiProvider.OpenAI)
+        {
+            builder.ConfigureOptions(static options =>
+            {
+                // GPT-5.6 Chat Completions rejects function tools when reasoning
+                // effort is omitted or enabled. Keep an explicit caller choice,
+                // but use the API-supported "none" value otherwise.
+                if (options.Tools is { Count: > 0 } && options.Reasoning is null)
+                {
+                    options.Reasoning = new ReasoningOptions { Effort = ReasoningEffort.None };
+                }
+            });
+        }
+
+        return builder
             .UseStreamingUsage()
             .Build();
+    }
 
     public override IEmbeddingGenerator<string, Embedding<float>> CreateEmbeddingGenerator(
         EmbeddingModel model,

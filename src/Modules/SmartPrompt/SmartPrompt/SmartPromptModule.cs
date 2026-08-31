@@ -9,7 +9,7 @@ public sealed class SmartPromptModule : Core.IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddSingleton<IBehaviorCompiler>(static _ => BehaviorCompiler.CreateDefault());
-        builder.Services.AddSingleton<IBehaviorReasoner, GemmaBehaviorReasoner>();
+        builder.Services.AddSingleton<IBehaviorReasoner, BehaviorReasoner>();
         builder.Services.AddSingleton<IBehaviorActionExecutor, BehaviorActionExecutor>();
         builder.Services.AddSingleton<IBehaviorFeatureGenerator, BehaviorFeatureGenerator>();
         builder.Services.AddSingleton<IAgentToolSource, BehaviorToolSource>();
