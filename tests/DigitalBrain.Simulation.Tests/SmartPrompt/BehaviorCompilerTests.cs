@@ -14,7 +14,7 @@ public sealed class BehaviorCompilerTests
             Given X.Account("elonmusk")
             When a new X.Post is published
             And the post mentions "bitcoin"
-            Then analyze the event as "bitcoin market signal" with Gemma
+            Then analyze the event as "bitcoin market signal" with AI
             And add UI.Chart.Point to UI.Chart("bitcoin_tracker")
 
           @test

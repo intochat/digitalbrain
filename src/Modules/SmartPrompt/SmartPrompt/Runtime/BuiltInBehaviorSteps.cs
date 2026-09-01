@@ -21,11 +21,6 @@ internal static class BuiltInBehaviorSteps
     [BehaviorStep(BehaviorStepRole.Action, "Analyze event context with the configured AI model.", "analyze the event as \"purpose\" with AI")]
     public static Task AnalyzeWithConfiguredLlm(string purpose) => Completed(purpose);
 
-    // Existing saved Experiences keep compiling after the provider-neutral step
-    // replaced the original Gemma-specific wording.
-    [Then("analyze the event as \"([^\"]+)\" with Gemma")]
-    public static Task AnalyzeWithGemma(string purpose) => AnalyzeWithConfiguredLlm(purpose);
-
     [Then("add UI\\.Chart\\.Point to UI\\.Chart\\(\"([^\"]+)\"\\)")]
     [BehaviorStep(BehaviorStepRole.Action, "Append an idempotent linked point to an owner chart.", "add UI.Chart.Point to UI.Chart(\"chart_name\")")]
     public static Task AddChartPoint(string chart) => Completed(chart);

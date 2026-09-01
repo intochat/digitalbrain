@@ -62,8 +62,7 @@ internal sealed class BehaviorActionExecutor(
         foreach (var action in scenario.Steps.Where(static step => step.Role == BehaviorStepRole.Action))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (action.Binding is nameof(BuiltInBehaviorSteps.AnalyzeWithConfiguredLlm)
-                or nameof(BuiltInBehaviorSteps.AnalyzeWithGemma))
+            if (action.Binding == nameof(BuiltInBehaviorSteps.AnalyzeWithConfiguredLlm))
             {
                 analysis = await reasoner.Analyze(behaviorEvent, action.Arguments[0], cancellationToken);
                 continue;

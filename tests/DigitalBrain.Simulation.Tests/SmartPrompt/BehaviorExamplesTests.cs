@@ -27,12 +27,12 @@ public sealed class BehaviorExamplesTests
     }
 
     [Fact]
-    public void X_example_preserves_the_source_link_and_local_reasoning_contract()
+    public void X_example_preserves_the_source_link_and_configured_reasoning_contract()
     {
         var example = Assert.Single(BehaviorExamples.All, static candidate => candidate.Name == "bitcoin-tracker");
         var behavior = Assert.Single(BehaviorCompiler.CreateDefault().Compile(example.Source).Plan!.Behaviors);
 
-        Assert.Contains(behavior.Steps, static step => step.Binding == "AnalyzeWithGemma");
+        Assert.Contains(behavior.Steps, static step => step.Binding == "AnalyzeWithConfiguredLlm");
         Assert.Contains(behavior.Steps, static step => step.Binding == "AddChartPoint");
         Assert.Equal("x.post/account:elonmusk", behavior.TriggerKey);
     }
