@@ -64,9 +64,10 @@ ENV ASPNETCORE_ENVIRONMENT=Production \
     DigitalBrain__Modules__1="DigitalBrain.Memory.MemoryModule, DigitalBrain.Modules.Memory" \
     DigitalBrain__Modules__2="DigitalBrain.Time.TimeModule, DigitalBrain.Modules.Time" \
     DigitalBrain__Modules__3="DigitalBrain.Execution.ExecutionModule, DigitalBrain.Modules.Execution" \
-    DigitalBrain__Modules__4="DigitalBrain.Integrations.IntegrationsModule, DigitalBrain.Modules.Integrations" \
-    DigitalBrain__Modules__5="DigitalBrain.SmartPrompt.SmartPromptModule, DigitalBrain.Modules.SmartPrompt" \
-    DigitalBrain__Modules__6="DigitalBrain.UI.UIModule, DigitalBrain.Modules.UI"
+    DigitalBrain__Modules__4="DigitalBrain.Google.GoogleModule, DigitalBrain.Modules.Google" \
+    DigitalBrain__Modules__5="DigitalBrain.Salesforce.SalesforceModule, DigitalBrain.Modules.Salesforce" \
+    DigitalBrain__Modules__6="DigitalBrain.SmartPrompt.SmartPromptModule, DigitalBrain.Modules.SmartPrompt" \
+    DigitalBrain__Modules__7="DigitalBrain.UI.UIModule, DigitalBrain.Modules.UI"
 
 EXPOSE 8080 5000
 
