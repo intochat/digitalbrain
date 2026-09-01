@@ -15,24 +15,25 @@ namespace DigitalBrain.Aspire.Tests;
 [Collection(ModelCollection.Name)]
 public sealed class NamesConformanceTests(ModelFixture fixture)
 {
-    [Fact]
-    public async Task KernelRenderedEnvironmentContainsTheSelectedEmbeddingModel()
+    [Theory]
+    [InlineData("DigitalBrain__AI__Default__Model", "IGpt56Luna")]
+    [InlineData("DigitalBrain__AI__Default__Embedding", "ITextEmbedding3Small")]
+    public async Task KernelRenderedEnvironmentContainsTheSelectedOpenAIDefaults(
+        string configurationKey,
+        string expectedModel)
     {
         var environment = await fixture.Model.RenderedEnvironmentAsync(ProductSurfaceResourceNames.Kernel);
 
-        Assert.Contains("DigitalBrain__AI__Ollama__IEmbeddingGemma__Model", environment.Keys);
+        Assert.True(environment.TryGetValue(configurationKey, out var configuredModel));
+        Assert.Equal(expectedModel, configuredModel);
     }
 
-    [Theory]
-    [InlineData("DigitalBrain__AI__OpenAI__ApiKey")]
-    [InlineData("DigitalBrain__AI__Anthropic__ApiKey")]
-    [InlineData("DigitalBrain__AI__Google__ApiKey")]
-    [InlineData("DigitalBrain__AI__XAI__ApiKey")]
-    public async Task KernelRenderedEnvironmentWiresEveryCloudProviderApiKey(string configurationKey)
+    [Fact]
+    public async Task KernelRenderedEnvironmentWiresTheConfiguredOpenAIApiKey()
     {
         var environment = await fixture.Model.RenderedEnvironmentAsync(ProductSurfaceResourceNames.Kernel);
 
-        Assert.Contains(configurationKey, environment.Keys);
+        Assert.Contains("DigitalBrain__AI__OpenAI__ApiKey", environment.Keys);
     }
 
     [Fact]

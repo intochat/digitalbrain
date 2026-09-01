@@ -36,7 +36,7 @@ public sealed class BehaviorSurfaceTests(AppHostFixture fixture)
     }
 
     [Fact]
-    public async Task Local_Gemma_generates_only_compilable_Reqnroll_source()
+    public async Task Configured_default_generates_only_compilable_Reqnroll_source()
     {
         using var http = fixture.CreateHttpClient("kernel");
         var response = await http.PostAsJsonAsync("/behaviors/generate",
@@ -46,7 +46,7 @@ public sealed class BehaviorSurfaceTests(AppHostFixture fixture)
         var generated = await response.Content.ReadFromJsonAsync<BehaviorGeneration>(
             cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(generated);
-        Assert.Equal("gemma4:e2b", generated.Model);
+        Assert.Equal("configured-default", generated.Model);
         Assert.True(generated.Compilation.Success,
             string.Join(Environment.NewLine, generated.Compilation.Diagnostics.Select(x => x.Message)));
     }
