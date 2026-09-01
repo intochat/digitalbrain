@@ -52,7 +52,7 @@
     <PackageVersion Include="Microsoft.Orleans.Server" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.Serialization.SystemTextJson" Version="10.2.2" />
     <PackageVersion Include="Microsoft.Orleans.TestingHost" Version="10.2.2" />
-    <PackageVersion Include="Microsoft.AI.Foundry.Local" Version="1.2.4" />
+    <PackageVersion Include="Microsoft.AI.Foundry.Local" Version="2.0.1" />
     <PackageVersion Include="Concentus" Version="2.2.2" />
     <PackageVersion Include="Concentus.Oggfile" Version="1.0.7" />
     <PackageVersion Include="NAudio" Version="3.0.2-preview.1" />
