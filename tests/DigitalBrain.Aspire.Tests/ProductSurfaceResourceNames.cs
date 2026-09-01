@@ -8,6 +8,4 @@ internal static class ProductSurfaceResourceNames
     public const string Brain = "brain";
     public const string Kernel = "kernel";
     public const string Mcp = "mcp";
-    public const string FakeGmailMcp = "fake-gmail-mcp";
-    public const string FakeSalesforceMcp = "fake-salesforce-mcp";
 }

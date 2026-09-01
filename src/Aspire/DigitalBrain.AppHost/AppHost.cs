@@ -1,37 +1,28 @@
+using Aspire.Hosting;
+using DigitalBrain.Abstractions;
+using DigitalBrain.AI;
+using DigitalBrain.AI.Aspire.Hosting;
+using DigitalBrain.AI.FoundryLocal;
+using DigitalBrain.Aspire.Hosting;
+using DigitalBrain.Execution;
+using DigitalBrain.Google;
+using DigitalBrain.Google.Aspire.Hosting;
+using DigitalBrain.Memory;
+using DigitalBrain.Memory.Aspire.Hosting;
+using DigitalBrain.Salesforce;
+using DigitalBrain.Salesforce.Aspire.Hosting;
+using DigitalBrain.SmartPrompt;
+using DigitalBrain.Time;
+using DigitalBrain.UI;
+using DigitalBrain.UI.Aspire.Hosting;
+using Microsoft.Extensions.Hosting;
 using AnthropicModels = DigitalBrain.AI.Anthropic;
 using GoogleModels = DigitalBrain.AI.Google;
 using OllamaModels = DigitalBrain.AI.Ollama;
 using OpenAIModels = DigitalBrain.AI.OpenAI;
 using XaiModels = DigitalBrain.AI.XAI;
-using DigitalBrain.AI;
-using DigitalBrain.AI.Aspire.Hosting;
-using DigitalBrain.AI.FoundryLocal;
-using DigitalBrain.Abstractions;
-using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Execution;
-using DigitalBrain.Integrations;
-using DigitalBrain.Memory;
-using DigitalBrain.Memory.Aspire.Hosting;
-using DigitalBrain.SmartPrompt;
-using DigitalBrain.Time;
-using DigitalBrain.UI;
-using DigitalBrain.UI.Aspire.Hosting;
-using Aspire.Hosting;
-using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
-
-var salesforceConsumerKey = builder.AddParameter("salesforce-consumer-key", secret: true)
-    .WithDescription(
-        "Consumer key (client ID) from your existing Salesforce "
-        + "[External Client App](https://developer.salesforce.com/docs/platform/hosted-mcp-servers/guide/create-external-client-app.html). "
-        + "Register http://localhost:5080/integrations/salesforce/callback, enable PKCE and JWT access tokens, and allow mcp_api and refresh_token.",
-        enableMarkdown: true);
-var salesforceConsumerSecret = builder.AddParameter("salesforce-consumer-secret", secret: true)
-    .WithDescription(
-        "Consumer secret from the same Salesforce External Client App. Enable Require Secret for Web Server Flow. "
-        + "Only the kernel receives this secret; Salesforce login happens in your browser when the assistant needs access.",
-        enableMarkdown: true);
 
 var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
     .AddModule<AIModule>(ai =>
@@ -75,7 +66,8 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
     .AddModule<MemoryModule>(memory => memory.WithQdrant())
     .AddModule<TimeModule>()
     .AddModule<ExecutionModule>()
-    .AddModule<IntegrationsModule>()
+    .AddModule<GoogleModule>(google => google.WithGmail())
+    .AddModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
     .AddModule<SmartPromptModule>()
     .AddModule<UIModule>(ui =>
     {
@@ -99,12 +91,6 @@ var developmentClusterId = builder.Environment.IsDevelopment()
 
 var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceResources.Kernel)
     .WithReference(brain)
-    .WithEnvironment(IntegrationsModule.SalesforceConsumerKeyEnvironmentVariable, salesforceConsumerKey)
-    .WithEnvironment(IntegrationsModule.SalesforceConsumerSecretEnvironmentVariable, salesforceConsumerSecret)
-    .WithEnvironment("DigitalBrain__Integrations__Salesforce__OAuth__PublicOrigin", ProductSurfaceResources.KernelPublicOrigin)
-    .WithEnvironment(
-        IntegrationsModule.SalesforceMcpEndpointEnvironmentVariable,
-        "https://api.salesforce.com/platform/mcp/v1/platform/sobject-all")
     .WithEnvironment("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", "false")
     .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION", "false")
     .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_HTTPCLIENT_DISABLE_URL_QUERY_REDACTION", "false")
@@ -131,25 +117,6 @@ var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>(ProductSurfaceReso
             context.EnvironmentVariables["Orleans__ClusterId"] = developmentClusterId;
         }
     });
-
-if (!fakesEnabled)
-{
-    var gmailClientId = builder.AddParameter("gmail-client-id")
-        .WithDescription(
-            "OAuth client ID for a Google web client configured for the [Gmail MCP server](https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server). "
-            + "Register http://localhost:5080/integrations/gmail/callback. Only the kernel receives this value.",
-            enableMarkdown: true);
-    var gmailClientSecret = builder.AddParameter("gmail-client-secret", secret: true)
-        .WithDescription(
-            "OAuth client secret for the same Google web client configured for the [Gmail MCP server](https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server). "
-            + "Only the kernel receives this secret; Gmail sign-in happens in your browser when the assistant needs access.",
-            enableMarkdown: true);
-    kernel
-        .WithEnvironment("DigitalBrain__Integrations__Gmail__OAuth__ClientId", gmailClientId)
-        .WithEnvironment("DigitalBrain__Integrations__Gmail__OAuth__ClientSecret", gmailClientSecret)
-        .WithEnvironment("DigitalBrain__Integrations__Gmail__OAuth__PublicOrigin", ProductSurfaceResources.KernelPublicOrigin)
-        .WithEnvironment(IntegrationsModule.GmailMcpEndpointEnvironmentVariable, "https://gmailmcp.googleapis.com/mcp/v1");
-}
 
 var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.Mcp)
     .WithMcpServer(ProductSurfaceResources.McpPath, ProductSurfaceResources.McpHttpEndpointName)

@@ -59,7 +59,8 @@ public sealed class NamesConformanceTests(ModelFixture fixture)
                 "DigitalBrain.Memory.MemoryModule, DigitalBrain.Modules.Memory",
                 "DigitalBrain.Time.TimeModule, DigitalBrain.Modules.Time",
                 "DigitalBrain.Execution.ExecutionModule, DigitalBrain.Modules.Execution",
-                "DigitalBrain.Integrations.IntegrationsModule, DigitalBrain.Modules.Integrations",
+                "DigitalBrain.Google.GoogleModule, DigitalBrain.Modules.Google",
+                "DigitalBrain.Salesforce.SalesforceModule, DigitalBrain.Modules.Salesforce",
                 "DigitalBrain.SmartPrompt.SmartPromptModule, DigitalBrain.Modules.SmartPrompt",
                 "DigitalBrain.UI.UIModule, DigitalBrain.Modules.UI",
             ],
@@ -100,17 +101,36 @@ public sealed class NamesConformanceTests(ModelFixture fixture)
     }
 
     [Theory]
-    [InlineData("DigitalBrain__Integrations__Gmail__Mcp__Endpoint", "fake-gmail-mcp")]
-    [InlineData("DigitalBrain__Integrations__Salesforce__Mcp__Endpoint", "fake-salesforce-mcp")]
-    public async Task KernelRenderedEnvironmentContainsFakeIntegrationMcpEndpoint(
-        string key,
-        string resourceName)
+    [InlineData("DigitalBrain__Google__Gmail__OAuth__ClientId", "gmail-client-id")]
+    [InlineData("DigitalBrain__Google__Gmail__OAuth__ClientSecret", "gmail-client-secret")]
+    [InlineData("DigitalBrain__Salesforce__OAuth__ConsumerKey", "salesforce-consumer-key")]
+    [InlineData("DigitalBrain__Salesforce__OAuth__ConsumerSecret", "salesforce-consumer-secret")]
+    public async Task KernelRenderedEnvironmentWiresModuleOwnedOAuthParameters(string key, string parameterName)
     {
         var environment = await fixture.Model.RenderedEnvironmentAsync(ProductSurfaceResourceNames.Kernel);
 
-        Assert.True(environment.TryGetValue(key, out var endpoint));
-        Assert.Contains(resourceName, endpoint, StringComparison.Ordinal);
-        Assert.EndsWith("/mcp", endpoint, StringComparison.Ordinal);
+        Assert.True(environment.TryGetValue(key, out var value));
+        Assert.Contains(parameterName, value, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("DigitalBrain__Google__Gmail__OAuth__PublicOrigin")]
+    [InlineData("DigitalBrain__Salesforce__OAuth__PublicOrigin")]
+    public async Task KernelRenderedEnvironmentDerivesPublicOriginFromItsOwnHttpEndpoint(string key)
+    {
+        var environment = await fixture.Model.RenderedEnvironmentAsync(ProductSurfaceResourceNames.Kernel);
+
+        Assert.True(environment.TryGetValue(key, out var origin));
+        Assert.Contains(ProductSurfaceResourceNames.Kernel, origin, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task KernelRenderedEnvironmentContainsTheHostedSalesforceMcpEndpoint()
+    {
+        var environment = await fixture.Model.RenderedEnvironmentAsync(ProductSurfaceResourceNames.Kernel);
+
+        Assert.True(environment.TryGetValue("DigitalBrain__Salesforce__Mcp__Endpoint", out var endpoint));
+        Assert.Equal("https://api.salesforce.com/platform/mcp/v1/platform/sobject-all", endpoint);
     }
 
     // Throwaway builder/resource, unrelated to the shared AppHost model: these two tests exercise

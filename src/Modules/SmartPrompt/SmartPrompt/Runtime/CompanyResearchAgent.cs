@@ -1,11 +1,10 @@
 using System.Runtime.CompilerServices;
 using DigitalBrain.Core;
-using DigitalBrain.Integrations.Search;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.SmartPrompt;
 
-internal sealed class CompanyResearchAgent(IWebSearchTransport webSearch) : Neuron, ICompanyResearchAgent
+internal sealed class CompanyResearchAgent(IWebSearch webSearch) : Neuron, ICompanyResearchAgent
 {
     public async Task<ChatResponse> Respond(IReadOnlyList<ChatMessage> messages)
     {

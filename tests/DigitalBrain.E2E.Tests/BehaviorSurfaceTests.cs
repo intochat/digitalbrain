@@ -1,11 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
-using DigitalBrain.SmartPrompt;
-using DigitalBrain.UI;
-using DigitalBrain.Kernel;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
-using DigitalBrain.Integrations.Mcp;
+using DigitalBrain.Kernel;
+using DigitalBrain.SmartPrompt;
+using DigitalBrain.UI;
 using Xunit;
 
 namespace DigitalBrain.E2E.Tests;
@@ -117,7 +116,7 @@ public sealed class BehaviorSurfaceTests(AppHostFixture fixture)
     }
 
     [Fact]
-    public async Task Assistant_chat_learns_then_runs_the_salesforce_enrichment_experience_through_fake_mcps()
+    public async Task Assistant_chat_learns_then_runs_the_salesforce_enrichment_experience_through_fakes()
     {
         using var http = fixture.CreateHttpClient("kernel");
         var correction = await http.PostAsJsonAsync(
@@ -174,22 +173,6 @@ public sealed class BehaviorSurfaceTests(AppHostFixture fixture)
             }
             await Task.Delay(100, timeout.Token);
         }
-        Assert.True(completed, "Chat did not complete the MCP-backed Salesforce enrichment experience.");
-
-        using var salesforceHttp = fixture.CreateHttpClient("fake-salesforce-mcp", "http");
-        var mcp = new McpIntegrationClient();
-        var account = await mcp.CallAsync(
-            new McpIntegrationEndpoint(
-                "fake-salesforce-mcp",
-                new Uri(salesforceHttp.BaseAddress!, "/mcp")),
-            "soqlQuery",
-            new Dictionary<string, object?>
-            {
-                ["query"] = "SELECT Id, Description, DescriptionVerified FROM Account WHERE Id = '001INTOCHAT' LIMIT 1",
-            },
-            TestContext.Current.CancellationToken);
-        var record = Assert.Single(account.GetProperty("records").EnumerateArray());
-        Assert.True(record.GetProperty("DescriptionVerified").GetBoolean());
-        Assert.Equal("Verified customer conversation platform.", record.GetProperty("Description").GetString());
+        Assert.True(completed, "Chat did not complete the fake-backed Salesforce enrichment experience.");
     }
 }

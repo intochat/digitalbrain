@@ -1,17 +1,17 @@
 using System.ComponentModel;
+using System.Text.Json;
 using DigitalBrain.Abstractions.Entities;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.AI;
-using DigitalBrain.Integrations.Gmail;
+using DigitalBrain.Google;
 using Microsoft.Extensions.AI;
-using System.Text.Json;
 
 namespace DigitalBrain.SmartPrompt;
 
 internal sealed class BehaviorToolSource(
     IGrainFactory grains,
     IBehaviorFeatureGenerator generator,
-    IGmailTransport gmail) : IAgentToolSource
+    IGmail gmail) : IAgentToolSource
 {
     public IReadOnlyList<AIFunction> ToolsFor(OwnerId owner)
     {

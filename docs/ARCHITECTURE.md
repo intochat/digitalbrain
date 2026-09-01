@@ -80,7 +80,17 @@ via Fake transports today; real MCP swaps behind `I*Transport` later.
 ## Integration modules
 
 `Modules/Google` and `Modules/Salesforce`, each the standard triple
-(Contracts / implementation / Aspire.Hosting).
+(Contracts / implementation / Aspire.Hosting). Both sit on `Kernel/DigitalBrain.Sdk`:
+`Sdk/Mcp` owns the hosted MCP tool client (per-owner sessions, bearer auth, catalog
+check, result normalization, the single read-only retry), `Sdk/OAuth` the browser
+login rail (`BrowserLogins` one-use request registry, `BrowserLoginSurface` for the
+login/callback paths, correlation claim, completion worker), `Sdk/Http` the
+`IHttpSurface` seam through which a module maps its callbacks without the kernel
+naming it. A module keeps only its provider policy: OAuth scheme and events, the
+credential store behind `IMcpCredentials`, tool definitions and confirmations.
+Each module's `Aspire.Hosting` project declares its own operator parameters
+(`WithGmail()`, `WithHostedMcp()`) and projects them onto the kernel; fakes mode
+declares none.
 
 - Per-user OAuth: `AccountEntity` per user per provider holds the refresh
   token; kernel HTTP serves the callback; every neuron call resolves the

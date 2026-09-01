@@ -1,0 +1,2037 @@
+From aef51555e016703df3d25a36a56a9b3a691f8600 Mon Sep 17 00:00:00 2001
+From: Vladyslav Horbachov <0965142838gvs@gmail.com>
+Date: Tue, 1 Sep 2026 11:33:04 +0000
+Subject: [PATCH 2/2] refactor(sdk): one browser login rail for Gmail and
+ Salesforce
+
+Sdk/OAuth replaces the two hand-rolled login pipelines with one:
+
+- BrowserLogins is the per-provider one-use request registry: mint for the
+  current verified turn, open once, claim once on the callback, publish
+  credentials only inside commitIfActive (publication and cancellation share
+  a lock), resume the durable turn exactly once. The Gmail semantics are the
+  base: reference-free turn matching, cancellation registration, the
+  "already resumed" guard, and the IsWaiting check before completion, which
+  closes the Salesforce race where the callback could finish before the
+  turn published its login card.
+- BrowserLoginSurface maps the login and callback paths with the private
+  headers, trace redaction, GET/origin guard and one-use begin; it is an
+  IHttpSurface, so the kernel keeps its single UseModuleHttpSurfaces call.
+- BrowserLoginCorrelation is the one-use claim both OAuth handlers add after
+  the framework's correlation check; LoginPage renders the fixed-string
+  result pages; BrowserLoginWorker<TLogins> is the completion worker.
+
+Gmail keeps GmailLogins (definition, read tools, compose scope), the OIDC
+scheme and Google identity checks, GmailConnections and the draft previews;
+Salesforce keeps SalesforceLogins, the OAuth scheme, and a SalesforceConnections
+that is now only the credential store. Both completion workers, both
+middlewares and the Salesforce pending-login state machine are gone.
+
+BrowserLoginsTests cover the registry's state machine, which previously had
+no test at all.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01E4GTMuXrb6yjgUfhPpzgD7
+---
+ docs/ARCHITECTURE.md                          |   8 +-
+ .../DigitalBrain.Sdk/DigitalBrain.Sdk.csproj  |   3 +
+ .../OAuth/BrowserLoginCorrelation.cs          |  35 +++
+ .../OAuth/BrowserLoginDefinition.cs           |  17 ++
+ .../OAuth/BrowserLoginSurface.cs              |  91 +++++++
+ .../OAuth/BrowserLoginWorker.cs               |  31 +++
+ .../DigitalBrain.Sdk/OAuth/BrowserLogins.cs   | 245 ++++++++++++++++++
+ .../DigitalBrain.Sdk/OAuth/LoginPage.cs       |  26 ++
+ ...uthEndpoints.cs => GmailAuthentication.cs} | 106 ++------
+ .../Google/Google/Gmail/GmailDraftPreviews.cs |   6 +-
+ .../Google/Google/Gmail/GmailLogins.cs        |  25 ++
+ .../Google/Gmail/GmailMaintenanceWorker.cs    |  16 ++
+ .../Google/Google/Gmail/GmailOAuthHandler.cs  |  18 +-
+ .../Google/Gmail/GmailPendingActions.cs       | 205 ---------------
+ .../Google/Google/Gmail/GmailToolSource.cs    |   4 +-
+ src/Modules/Google/Google/Gmail/McpGmail.cs   |   4 +-
+ src/Modules/Google/Google/GoogleModule.cs     |  11 +-
+ .../Salesforce/SalesforceAuthentication.cs    |  85 ++++++
+ .../Salesforce/SalesforceCompletionWorker.cs  |  35 ---
+ .../Salesforce/SalesforceConnections.cs       | 158 +----------
+ .../Salesforce/Salesforce/SalesforceLogins.cs |  24 ++
+ .../Salesforce/Salesforce/SalesforceModule.cs |   9 +-
+ .../Salesforce/SalesforceOAuthEndpoints.cs    | 173 -------------
+ .../Salesforce/SalesforceOAuthHandler.cs      |  22 +-
+ .../Salesforce/SalesforceToolSource.cs        |  12 +-
+ .../DigitalBrain.Simulation.Tests.csproj      |   1 +
+ .../Sdk/BrowserLoginsTests.cs                 | 171 ++++++++++++
+ 27 files changed, 843 insertions(+), 698 deletions(-)
+ create mode 100644 src/Kernel/DigitalBrain.Sdk/OAuth/BrowserLoginCorrelation.cs
+ create mode 100644 src/Kernel/DigitalBrain.Sdk/OAuth/BrowserLoginDefinition.cs
+ create mode 100644 src/Kernel/DigitalBrain.Sdk/OAuth/BrowserLoginSurface.cs
+ create mode 100644 src/Kernel/DigitalBrain.Sdk/OAuth/BrowserLoginWorker.cs
+ create mode 100644 src/Kernel/DigitalBrain.Sdk/OAuth/BrowserLogins.cs
+ create mode 100644 src/Kernel/DigitalBrain.Sdk/OAuth/LoginPage.cs
+ rename src/Modules/Google/Google/Gmail/{GmailOAuthEndpoints.cs => GmailAuthentication.cs} (55%)
+ create mode 100644 src/Modules/Google/Google/Gmail/GmailLogins.cs
+ create mode 100644 src/Modules/Google/Google/Gmail/GmailMaintenanceWorker.cs
+ delete mode 100644 src/Modules/Google/Google/Gmail/GmailPendingActions.cs
+ create mode 100644 src/Modules/Salesforce/Salesforce/SalesforceAuthentication.cs
+ delete mode 100644 src/Modules/Salesforce/Salesforce/SalesforceCompletionWorker.cs
+ create mode 100644 src/Modules/Salesforce/Salesforce/SalesforceLogins.cs
+ delete mode 100644 src/Modules/Salesforce/Salesforce/SalesforceOAuthEndpoints.cs
+ create mode 100644 tests/DigitalBrain.Simulation.Tests/Sdk/BrowserLoginsTests.cs
+
+diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
+index c846e6ac..311c9405 100644
+--- a/docs/ARCHITECTURE.md
++++ b/docs/ARCHITECTURE.md
+@@ -82,8 +82,12 @@ via Fake transports today; real MCP swaps behind `I*Transport` later.
+ `Modules/Google` and `Modules/Salesforce`, each the standard triple
+ (Contracts / implementation / Aspire.Hosting). Both sit on `Kernel/DigitalBrain.Sdk`:
+ `Sdk/Mcp` owns the hosted MCP tool client (per-owner sessions, bearer auth, catalog
+-check, result normalization, the single read-only retry), `Sdk/Http` the `IHttpSurface`
+-seam through which a module maps its browser callbacks without the kernel naming it.
++check, result normalization, the single read-only retry), `Sdk/OAuth` the browser
++login rail (`BrowserLogins` one-use request registry, `BrowserLoginSurface` for the
++login/callback paths, correlation claim, completion worker), `Sdk/Http` the
++`IHttpSurface` seam through which a module maps its callbacks without the kernel
++naming it. A module keeps only its provider policy: OAuth scheme and events, the
++credential store behind `IMcpCredentials`, tool definitions and confirmations.
+ Each module's `Aspire.Hosting` project declares its own operator parameters
+ (`WithGmail()`, `WithHostedMcp()`) and projects them onto the kernel; fakes mode
+ declares none.
+diff --git a/src/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj b/src/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj
+index 006e74f9..205fc5c4 100644
+--- a/src/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj
++++ b/src/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj
+@@ -8,6 +8,9 @@
+     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+     <PackageReference Include="ModelContextProtocol.Core" />
+   </ItemGroup>
++  <ItemGroup>
++    <InternalsVisibleTo Include="DigitalBrain.Simulation.Tests" />
++  </ItemGroup>
+   <ItemGroup>
+     <ProjectReference Include="../DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
+     <ProjectReference Include="../DigitalBrain.Core/DigitalBrain.Core.csproj" />
+diff --git a/src/Kernel/DigitalBrain.Sdk/OAuth/BrowserLoginCorrelation.cs b/src/Kernel/DigitalBrain.Sdk/OAuth/BrowserLoginCorrelation.cs
+new file mode 100644
+index 00000000..dd70b902
+--- /dev/null
++++ b/src/Kernel/DigitalBrain.Sdk/OAuth/BrowserLoginCorrelation.cs
+@@ -0,0 +1,35 @@
++using Microsoft.AspNetCore.Authentication;
++using Microsoft.AspNetCore.Http;
++
++namespace DigitalBrain.Sdk;
++
++// Keep the framework's state, browser correlation and PKCE implementation. Add only a
++// server-side one-use claim after correlation succeeds, before any authorization-code exchange.
++public static class BrowserLoginCorrelation
++{
++    private static readonly object VerifiedRequestKey = new();
++
++    public static bool Claim(HttpContext context, AuthenticationProperties properties, BrowserLogins logins)
++    {
++        ArgumentNullException.ThrowIfNull(context);
++        ArgumentNullException.ThrowIfNull(properties);
++        ArgumentNullException.ThrowIfNull(logins);
++        if (!properties.Items.TryGetValue(BrowserLoginSurface.RequestKey, out var request) || !logins.TryClaim(request))
++        {
++            return false;
++        }
++
++        context.Items[VerifiedRequestKey] = request;
++        return true;
++    }
++
++    // HttpContext survives exceptional framework failure paths where Properties is null.
++    public static string? VerifiedRequest(HttpContext context)
++    {
++        ArgumentNullException.ThrowIfNull(context);
++        return context.Items.TryGetValue(VerifiedRequestKey, out var request) ? request as string : null;
++    }
++
++    public static string? Scope(AuthenticationProperties? properties)
++        => properties?.Items.TryGetValue(BrowserLoginSurface.ScopeKey, out var scope) == true ? scope : null;
++}
+diff --git a/src/Kernel/DigitalBrain.Sdk/OAuth/BrowserLoginDefinition.cs b/src/Kernel/DigitalBrain.Sdk/OAuth/BrowserLoginDefinition.cs
+new file mode 100644
+index 00000000..6dea7ac2
+--- /dev/null
++++ b/src/Kernel/DigitalBrain.Sdk/OAuth/BrowserLoginDefinition.cs
+@@ -0,0 +1,17 @@
++namespace DigitalBrain.Sdk;
++
++// Provider identity for one browser login rail: the UserActionRequest fields the UI shows, the
++// kernel paths the provider's OAuth client must have registered, and the authentication scheme
++// the login path challenges.
++public sealed record BrowserLoginDefinition(
++    string Provider,
++    string DisplayName,
++    string Scheme,
++    string LoginPath,
++    string CallbackPath,
++    string Message)
++{
++    public TimeSpan Lifetime { get; init; } = TimeSpan.FromMinutes(10);
++
++    public int Capacity { get; init; } = 128;
++}
+diff --git a/src/Kernel/DigitalBrain.Sdk/OAuth/BrowserLoginSurface.cs b/src/Kernel/DigitalBrain.Sdk/OAuth/BrowserLoginSurface.cs
+new file mode 100644
+index 00000000..d7277930
+--- /dev/null
++++ b/src/Kernel/DigitalBrain.Sdk/OAuth/BrowserLoginSurface.cs
+@@ -0,0 +1,91 @@
++using System.Diagnostics;
++using Microsoft.AspNetCore.Authentication;
++using Microsoft.AspNetCore.Builder;
++using Microsoft.AspNetCore.Http;
++
++namespace DigitalBrain.Sdk;
++
++// The two exact login and callback paths carry their own one-use request capability and OAuth
++// correlation checks, so the kernel maps this surface before its authentication gate.
++public sealed class BrowserLoginSurface(BrowserLogins logins) : IHttpSurface
++{
++    public const string RequestKey = "login-request";
++    public const string ScopeKey = "login-scope";
++
++    public void Map(IApplicationBuilder app)
++    {
++        ArgumentNullException.ThrowIfNull(app);
++        var definition = logins.Definition;
++        app.Use(async (context, next) =>
++        {
++            var login = context.Request.Path.Equals(definition.LoginPath, StringComparison.Ordinal);
++            if (!login && !context.Request.Path.Equals(definition.CallbackPath, StringComparison.Ordinal))
++            {
++                await next(context).ConfigureAwait(false);
++                return;
++            }
++
++            LoginPage.PrivateHeaders(context);
++            Redact(context);
++            if (logins.ConfiguredOrigin is not { } origin)
++            {
++                await LoginPage.WriteAsync(context, $"{definition.DisplayName} setup is incomplete",
++                    "Configure the provider's OAuth client privately in Aspire, then ask again in DigitalBrain.", 503).ConfigureAwait(false);
++                return;
++            }
++
++            if (!HttpMethods.IsGet(context.Request.Method)
++                || !string.Equals(context.Request.Scheme, origin.Scheme, StringComparison.OrdinalIgnoreCase)
++                || !string.Equals(context.Request.Host.Value, origin.Authority, StringComparison.OrdinalIgnoreCase))
++            {
++                await LoginPage.WriteAsync(context, $"Invalid {definition.DisplayName} login request",
++                    "Open the login action from DigitalBrain.", 400).ConfigureAwait(false);
++                return;
++            }
++
++            try
++            {
++                if (login)
++                {
++                    var request = context.Request.Query["request"];
++                    if (context.Request.Query.Count != 1 || request.Count != 1 || !logins.TryBegin(request[0], out var scope))
++                    {
++                        await LoginPage.WriteAsync(context, "This login link expired or was already opened",
++                            $"Return to DigitalBrain and request {definition.DisplayName} access again.", 410).ConfigureAwait(false);
++                        return;
++                    }
++
++                    var properties = new AuthenticationProperties();
++                    properties.Items[RequestKey] = request[0];
++                    if (scope is not null)
++                    {
++                        properties.Items[ScopeKey] = scope;
++                    }
++
++                    await context.ChallengeAsync(definition.Scheme, properties).ConfigureAwait(false);
++                    return;
++                }
++
++                await next(context).ConfigureAwait(false);
++            }
++            catch (Exception)
++            {
++                await LoginPage.WriteAsync(context, $"{definition.DisplayName} authorization is unavailable",
++                    "Check the private OAuth configuration and try a new request.", 503).ConfigureAwait(false);
++            }
++            finally
++            {
++                Redact(context);
++            }
++        });
++    }
++
++    // Callback query strings carry authorization codes; traces keep only the path.
++    private static void Redact(HttpContext context)
++    {
++        var activity = Activity.Current;
++        activity?.SetTag("url.query", null);
++        activity?.SetTag("http.target", context.Request.Path.Value);
++        activity?.SetTag("url.full", $"{context.Request.Scheme}://{context.Request.Host}{context.Request.Path}");
++    }
++}
+diff --git a/src/Kernel/DigitalBrain.Sdk/OAuth/BrowserLoginWorker.cs b/src/Kernel/DigitalBrain.Sdk/OAuth/BrowserLoginWorker.cs
+new file mode 100644
+index 00000000..1881e31e
+--- /dev/null
++++ b/src/Kernel/DigitalBrain.Sdk/OAuth/BrowserLoginWorker.cs
+@@ -0,0 +1,31 @@
++using Microsoft.Extensions.Hosting;
++using Microsoft.Extensions.Logging;
++
++namespace DigitalBrain.Sdk;
++
++// Login completion belongs to the kernel, not to the browser connection's lifetime: the durable
++// turn resumes even when the user closes the tab before the callback response finishes.
++public sealed class BrowserLoginWorker<TLogins>(TLogins logins, ILogger<BrowserLoginWorker<TLogins>> logger) : BackgroundService
++    where TLogins : BrowserLogins
++{
++    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
++    {
++        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
++        while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
++        {
++            try
++            {
++                await logins.DeliverAsync(stoppingToken).ConfigureAwait(false);
++            }
++            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
++            {
++                return;
++            }
++            catch (Exception)
++            {
++                // Do not attach the exception: remote exception payloads can contain credentials.
++                logger.LogWarning("A {Provider} login completion could not be delivered; the kernel will retry it.", logins.Definition.DisplayName);
++            }
++        }
++    }
++}
+diff --git a/src/Kernel/DigitalBrain.Sdk/OAuth/BrowserLogins.cs b/src/Kernel/DigitalBrain.Sdk/OAuth/BrowserLogins.cs
+new file mode 100644
+index 00000000..33de84d2
+--- /dev/null
++++ b/src/Kernel/DigitalBrain.Sdk/OAuth/BrowserLogins.cs
+@@ -0,0 +1,245 @@
++using System.Security.Cryptography;
++using DigitalBrain.Abstractions.Identity;
++using DigitalBrain.Abstractions.Interactions;
++using DigitalBrain.Core;
++using Microsoft.Extensions.DependencyInjection;
++
++namespace DigitalBrain.Sdk;
++
++// One pending-login registry per provider. A login request is a one-use capability minted for
++// the current agent turn: the browser opens it once, the OAuth callback claims it once, the
++// provider publishes credentials only while it is still active, and the durable turn is resumed
++// exactly once by the delivery worker. Credentials never enter this class; it holds control data.
++public abstract class BrowserLogins : IUserActionSource
++{
++    private readonly Dictionary<string, Pending> _pending = new(StringComparer.Ordinal);
++    private readonly IServiceProvider _services;
++
++    protected BrowserLogins(BrowserLoginDefinition definition, IServiceProvider services)
++    {
++        ArgumentNullException.ThrowIfNull(definition);
++        ArgumentNullException.ThrowIfNull(services);
++        Definition = definition;
++        _services = services;
++    }
++
++    public BrowserLoginDefinition Definition { get; }
++
++    // Null until the operator has supplied the provider's OAuth client; no login can start before.
++    protected abstract Uri? PublicOrigin { get; }
++
++    internal Uri? ConfiguredOrigin => PublicOrigin;
++
++    // Failures surface as MCP operation errors because a login only ever gates an MCP tool call.
++    public UserActionRequest Require(string[] resumeToolNames, string? scope, CancellationToken cancellationToken)
++    {
++        ArgumentNullException.ThrowIfNull(resumeToolNames);
++        cancellationToken.ThrowIfCancellationRequested();
++        var origin = PublicOrigin
++            ?? throw new McpOperationException($"{Definition.DisplayName} setup is incomplete. Configure its OAuth client privately in Aspire.");
++        var context = AgentTurnContext.Current
++            ?? throw new McpOperationException($"Request {Definition.DisplayName} access from an authenticated chat.");
++        if (VerifiedActor.Current != context.Actor)
++        {
++            throw new McpOperationException("An authenticated chat actor is required.");
++        }
++
++        if (context.AllowedToolNames is not null)
++        {
++            throw new McpOperationException(
++                $"{Definition.DisplayName} authorization did not complete this read. Send a new request after checking access; automatic login will not repeat.");
++        }
++
++        lock (_pending)
++        {
++            foreach (var key in _pending.Where(p => p.Value.Done && p.Value.Action.ExpiresAt <= DateTimeOffset.UtcNow).Select(p => p.Key).ToArray())
++            {
++                _pending.Remove(key);
++            }
++
++            var existing = _pending.Values.FirstOrDefault(p => SameTurn(p.Context, context));
++            if (existing is not null)
++            {
++                if (existing.Done)
++                {
++                    throw new McpOperationException($"This {Definition.DisplayName} login request is already settled. Send a new request.");
++                }
++
++                existing.Scope ??= scope;
++                if (resumeToolNames.Length == 0)
++                {
++                    existing.Action = existing.Action with { ResumeToolNames = [] };
++                }
++
++                return existing.Action;
++            }
++
++            if (_pending.Count >= Definition.Capacity)
++            {
++                throw new McpOperationException($"Too many pending {Definition.DisplayName} logins. Wait for an existing request to expire.");
++            }
++
++            var id = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
++            var action = new UserActionRequest(
++                Guid.NewGuid().ToString("N"),
++                Definition.Provider,
++                Definition.DisplayName,
++                Definition.Message,
++                new Uri(origin, $"{Definition.LoginPath}?request={id}").AbsoluteUri,
++                DateTimeOffset.UtcNow.Add(Definition.Lifetime),
++                [.. resumeToolNames]);
++            var pending = new Pending(context, action, scope);
++            _pending.Add(id, pending);
++            pending.Cancellation = cancellationToken.Register(() => Cancel(context));
++            cancellationToken.ThrowIfCancellationRequested();
++            return action;
++        }
++    }
++
++    public UserActionRequest? Find(OwnerId owner, CommandId commandId)
++    {
++        var context = AgentTurnContext.Current;
++        lock (_pending)
++        {
++            return _pending.Values.FirstOrDefault(p => !p.Done && p.Context.Chat.Owner == owner
++                && p.Context.CommandId == commandId && context?.Chat == p.Context.Chat && context.Actor == p.Context.Actor)?.Action;
++        }
++    }
++
++    public void Cancel(AgentTurnContext context)
++    {
++        ArgumentNullException.ThrowIfNull(context);
++        lock (_pending)
++        {
++            foreach (var p in _pending.Values.Where(p => SameTurn(p.Context, context)))
++            {
++                p.Done = true;
++                p.Outcome = false;
++                p.Cancellation.Unregister();
++            }
++        }
++    }
++
++    internal bool TryBegin(string? request, out string? scope)
++    {
++        lock (_pending)
++        {
++            scope = null;
++            if (request is null || !_pending.TryGetValue(request, out var p) || !Active(p) || p.State != 0)
++            {
++                return false;
++            }
++
++            p.State = 1;
++            scope = p.Scope;
++            return true;
++        }
++    }
++
++    internal bool TryClaim(string? request)
++    {
++        lock (_pending)
++        {
++            if (request is null || !_pending.TryGetValue(request, out var p) || !Active(p) || p.State != 1)
++            {
++                return false;
++            }
++
++            p.State = 2;
++            return true;
++        }
++    }
++
++    // The provider publishes credentials inside commitIfActive: publication and cancellation
++    // share one lock, so nothing can publish after a cancelled or expired request.
++    public async Task AcceptAsync(string request, Func<OwnerId, string?, Action<Action>, Task> accept)
++    {
++        ArgumentNullException.ThrowIfNull(request);
++        ArgumentNullException.ThrowIfNull(accept);
++        Pending p;
++        lock (_pending)
++        {
++            if (!_pending.TryGetValue(request, out p!) || !Active(p) || p.State != 2)
++            {
++                throw new McpOperationException($"This {Definition.DisplayName} login expired or was cancelled.");
++            }
++        }
++
++        await accept(p.Context.Chat.Owner, p.Scope, commit =>
++        {
++            lock (_pending)
++            {
++                if (!Active(p) || p.State != 2)
++                {
++                    throw new McpOperationException($"This {Definition.DisplayName} login expired or was cancelled.");
++                }
++
++                commit();
++                p.Outcome = true;
++            }
++        }).ConfigureAwait(false);
++    }
++
++    public void Reject(string? request)
++    {
++        lock (_pending)
++        {
++            if (request is not null && _pending.TryGetValue(request, out var p) && !p.Done && p.Outcome is null)
++            {
++                p.Outcome = false;
++            }
++        }
++    }
++
++    // Idempotent: a failed delivery leaves the request pending and the worker retries it.
++    public async Task DeliverAsync(CancellationToken cancellationToken)
++    {
++        Pending[] ready;
++        lock (_pending)
++        {
++            foreach (var p in _pending.Values.Where(p => !p.Done && p.Action.ExpiresAt <= DateTimeOffset.UtcNow))
++            {
++                p.Outcome = false;
++            }
++
++            ready = _pending.Values.Where(p => !p.Done && p.Outcome is not null).ToArray();
++        }
++
++        foreach (var p in ready)
++        {
++            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
++            deadline.CancelAfter(TimeSpan.FromSeconds(30));
++            var continuation = _services.GetRequiredService<IUserActionContinuation>();
++            if (p.Action.ExpiresAt > DateTimeOffset.UtcNow
++                && !await continuation.IsWaitingAsync(p.Context, p.Action.Id, deadline.Token).ConfigureAwait(false))
++            {
++                // The callback can finish before the original AI turn publishes its login card.
++                // Wait for that durable state instead of losing the one-shot continuation.
++                continue;
++            }
++
++            await continuation.CompleteAsync(p.Context, p.Action.Id, p.Outcome == true, deadline.Token).ConfigureAwait(false);
++            lock (_pending)
++            {
++                p.Done = true;
++                p.Cancellation.Unregister();
++            }
++        }
++    }
++
++    private static bool Active(Pending p) => !p.Done && p.Outcome is null && p.Action.ExpiresAt > DateTimeOffset.UtcNow;
++
++    private static bool SameTurn(AgentTurnContext a, AgentTurnContext b)
++        => a.Chat == b.Chat && a.Actor == b.Actor && a.CommandId == b.CommandId;
++
++    private sealed class Pending(AgentTurnContext context, UserActionRequest action, string? scope)
++    {
++        internal readonly AgentTurnContext Context = context;
++        internal UserActionRequest Action = action;
++        internal string? Scope = scope;
++        internal int State;
++        internal bool? Outcome;
++        internal bool Done;
++        internal CancellationTokenRegistration Cancellation;
++    }
++}
+diff --git a/src/Kernel/DigitalBrain.Sdk/OAuth/LoginPage.cs b/src/Kernel/DigitalBrain.Sdk/OAuth/LoginPage.cs
+new file mode 100644
+index 00000000..0f261807
+--- /dev/null
++++ b/src/Kernel/DigitalBrain.Sdk/OAuth/LoginPage.cs
+@@ -0,0 +1,26 @@
++using Microsoft.AspNetCore.Http;
++
++namespace DigitalBrain.Sdk;
++
++// Only fixed application strings are rendered. Never reflect an OAuth response or URL.
++public static class LoginPage
++{
++    public static Task WriteAsync(HttpContext context, string title, string message, int status)
++    {
++        ArgumentNullException.ThrowIfNull(context);
++        PrivateHeaders(context);
++        context.Response.StatusCode = status;
++        context.Response.ContentType = "text/html; charset=utf-8";
++        return context.Response.WriteAsync(
++            $"<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>{title}</title><body style=\"font:18px system-ui;max-width:640px;margin:12vh auto;padding:24px\"><h1>{title}</h1><p>{message}</p></body></html>",
++            context.RequestAborted);
++    }
++
++    public static void PrivateHeaders(HttpContext context)
++    {
++        ArgumentNullException.ThrowIfNull(context);
++        context.Response.Headers.CacheControl = "no-store";
++        context.Response.Headers["Referrer-Policy"] = "no-referrer";
++        context.Response.Headers.ContentSecurityPolicy = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'";
++    }
++}
+diff --git a/src/Modules/Google/Google/Gmail/GmailOAuthEndpoints.cs b/src/Modules/Google/Google/Gmail/GmailAuthentication.cs
+similarity index 55%
+rename from src/Modules/Google/Google/Gmail/GmailOAuthEndpoints.cs
+rename to src/Modules/Google/Google/Gmail/GmailAuthentication.cs
+index 650f3c86..50af2103 100644
+--- a/src/Modules/Google/Google/Gmail/GmailOAuthEndpoints.cs
++++ b/src/Modules/Google/Google/Gmail/GmailAuthentication.cs
+@@ -1,8 +1,6 @@
+-using System.Diagnostics;
+ using DigitalBrain.Sdk;
+ using Microsoft.AspNetCore.Authentication;
+ using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+-using Microsoft.AspNetCore.Builder;
+ using Microsoft.AspNetCore.Http;
+ using Microsoft.Extensions.DependencyInjection;
+ using Microsoft.Extensions.Logging;
+@@ -11,15 +9,11 @@ using Microsoft.IdentityModel.Tokens;
+ 
+ namespace DigitalBrain.Google;
+ 
+-internal static class GmailOAuthEndpoints
++internal static class GmailAuthentication
+ {
+-    internal const string LoginPath = "/integrations/gmail/login";
+-    internal const string CallbackPath = "/integrations/gmail/callback";
+-    internal const string RequestKey = "gmail-request";
+-    private const string Scheme = "GmailIntegration";
+     private static readonly object TokensKey = new();
+ 
+-    internal static IServiceCollection AddGmailBrowserAuthorization(this IServiceCollection services, GmailOAuthConfiguration settings)
++    internal static IServiceCollection AddGmailAuthentication(this IServiceCollection services, GmailOAuthConfiguration settings, BrowserLoginDefinition definition)
+     {
+         services.AddLogging(logging =>
+         {
+@@ -28,13 +22,13 @@ internal static class GmailOAuthEndpoints
+             logging.AddFilter("Microsoft.IdentityModel", LogLevel.None);
+             logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.Warning);
+         });
+-        services.AddAuthentication().AddScheme<OpenIdConnectOptions, GmailOAuthHandler>(Scheme, options =>
++        services.AddAuthentication().AddScheme<OpenIdConnectOptions, GmailOAuthHandler>(definition.Scheme, options =>
+         {
+             // Placeholders avoid startup failure; pre-auth guard refuses any challenge until configured.
+             options.ClientId = settings.IsConfigured ? settings.ClientId : "not-configured";
+             options.ClientSecret = settings.IsConfigured ? settings.ClientSecret : "not-configured";
+             options.Authority = "https://accounts.google.com";
+-            options.CallbackPath = CallbackPath;
++            options.CallbackPath = definition.CallbackPath;
+             options.SignInScheme = "GmailNeverSignIn";
+             options.ResponseType = OpenIdConnectResponseType.Code;
+             options.ResponseMode = OpenIdConnectResponseMode.Query;
+@@ -72,11 +66,11 @@ internal static class GmailOAuthEndpoints
+                 OnRedirectToIdentityProvider = context =>
+                 {
+                     settings.RequireConfigured();
+-                    context.ProtocolMessage.RedirectUri = new Uri(settings.PublicOrigin, CallbackPath).AbsoluteUri;
++                    context.ProtocolMessage.RedirectUri = new Uri(settings.PublicOrigin, definition.CallbackPath).AbsoluteUri;
+                     context.ProtocolMessage.SetParameter("include_granted_scopes", "true");
+                     context.ProtocolMessage.SetParameter("access_type", "offline");
+                     context.ProtocolMessage.Prompt = "consent"; // Guarantees refresh consent on reconnect/incremental access.
+-                    if (context.Properties.Items.TryGetValue("gmail-compose", out var compose) && compose == "true")
++                    if (BrowserLoginCorrelation.Scope(context.Properties) == GmailLogins.ComposeScope)
+                     {
+                         context.ProtocolMessage.Scope += " " + GmailOAuthConfiguration.ComposeScope;
+                     }
+@@ -97,7 +91,8 @@ internal static class GmailOAuthEndpoints
+                 OnTicketReceived = async context =>
+                 {
+                     context.HandleResponse(); // Deliberately no sign-in handler or persistent authentication cookie.
+-                    var request = GmailOAuthHandler.VerifiedRequest(context.HttpContext);
++                    var request = BrowserLoginCorrelation.VerifiedRequest(context.HttpContext);
++                    var logins = context.HttpContext.RequestServices.GetRequiredService<GmailLogins>();
+                     try
+                     {
+                         var principal = context.Principal;
+@@ -112,15 +107,18 @@ internal static class GmailOAuthEndpoints
+                         }
+ 
+                         var connections = context.HttpContext.RequestServices.GetRequiredService<GmailConnections>();
+-                        await context.HttpContext.RequestServices.GetRequiredService<GmailPendingActions>().AcceptAsync(request,
+-                            (owner, compose, valid) => connections.AcceptAsync(owner, sub, email, tokens.AccessToken,
+-                                tokens.RefreshToken, tokens.Scope, tokens.ExpiresIn, compose, valid, context.HttpContext.RequestAborted)).ConfigureAwait(false);
+-                        await PageAsync(context.HttpContext, "Gmail connected. You can close this tab and return to DigitalBrain. Login did not create a draft.", 200).ConfigureAwait(false);
++                        await logins.AcceptAsync(request,
++                            (owner, scope, valid) => connections.AcceptAsync(owner, sub, email, tokens.AccessToken,
++                                tokens.RefreshToken, tokens.Scope, tokens.ExpiresIn, scope == GmailLogins.ComposeScope, valid,
++                                context.HttpContext.RequestAborted)).ConfigureAwait(false);
++                        await LoginPage.WriteAsync(context.HttpContext, "Gmail connected",
++                            "You can close this tab and return to DigitalBrain. Login did not create a draft.", 200).ConfigureAwait(false);
+                     }
+                     catch (Exception)
+                     {
+-                        context.HttpContext.RequestServices.GetRequiredService<GmailPendingActions>().Reject(request);
+-                        await PageAsync(context.HttpContext, "Gmail login could not be completed. Check required scopes and Google identity, then ask again in DigitalBrain.", 400).ConfigureAwait(false);
++                        logins.Reject(request);
++                        await LoginPage.WriteAsync(context.HttpContext, "Gmail login could not be completed",
++                            "Check required scopes and Google identity, then ask again in DigitalBrain.", 400).ConfigureAwait(false);
+                     }
+                     finally { context.HttpContext.Items.Remove(TokensKey); }
+                 },
+@@ -128,14 +126,16 @@ internal static class GmailOAuthEndpoints
+                 {
+                     context.HandleResponse();
+                     context.HttpContext.Items.Remove(TokensKey);
+-                    context.HttpContext.RequestServices.GetRequiredService<GmailPendingActions>().Reject(GmailOAuthHandler.VerifiedRequest(context.HttpContext));
+-                    await PageAsync(context.HttpContext, "Gmail login failed or was cancelled. Return to DigitalBrain and check callback registration, account access and required scopes.", 400).ConfigureAwait(false);
++                    context.HttpContext.RequestServices.GetRequiredService<GmailLogins>().Reject(BrowserLoginCorrelation.VerifiedRequest(context.HttpContext));
++                    await LoginPage.WriteAsync(context.HttpContext, "Gmail login failed or was cancelled",
++                        "Return to DigitalBrain and check callback registration, account access and required scopes.", 400).ConfigureAwait(false);
+                 },
+                 OnAccessDenied = async context =>
+                 {
+                     context.HandleResponse();
+-                    context.HttpContext.RequestServices.GetRequiredService<GmailPendingActions>().Reject(GmailOAuthHandler.VerifiedRequest(context.HttpContext));
+-                    await PageAsync(context.HttpContext, "Gmail login was cancelled. No Gmail operation was performed.", 200).ConfigureAwait(false);
++                    context.HttpContext.RequestServices.GetRequiredService<GmailLogins>().Reject(BrowserLoginCorrelation.VerifiedRequest(context.HttpContext));
++                    await LoginPage.WriteAsync(context.HttpContext, "Gmail login was cancelled",
++                        "No Gmail operation was performed.", 200).ConfigureAwait(false);
+                 },
+             };
+         });
+@@ -144,61 +144,6 @@ internal static class GmailOAuthEndpoints
+         return services;
+     }
+ 
+-    internal static void MapGmailBrowserAuthorization(IApplicationBuilder app)
+-    {
+-        app.Use(async (context, next) =>
+-        {
+-            var login = context.Request.Path.Equals(LoginPath, StringComparison.Ordinal);
+-            if (!login && !context.Request.Path.Equals(CallbackPath, StringComparison.Ordinal)) { await next(context).ConfigureAwait(false); return; }
+-            PrivateHeaders(context);
+-            Redact(context);
+-            var settings = context.RequestServices.GetRequiredService<GmailOAuthConfiguration>();
+-            if (!settings.IsConfigured)
+-            { await PageAsync(context, "Gmail setup is incomplete. Configure ClientId, ClientSecret and PublicOrigin privately in Aspire.", 503).ConfigureAwait(false); return; }
+-            if (!HttpMethods.IsGet(context.Request.Method)
+-                || !string.Equals(context.Request.Scheme, settings.PublicOrigin.Scheme, StringComparison.OrdinalIgnoreCase)
+-                || !string.Equals(context.Request.Host.Value, settings.PublicOrigin.Authority, StringComparison.OrdinalIgnoreCase))
+-            { await PageAsync(context, "Invalid Gmail login request. Open the login action from DigitalBrain.", 400).ConfigureAwait(false); return; }
+-            try
+-            {
+-                if (login)
+-                {
+-                    var request = context.Request.Query["request"];
+-                    if (context.Request.Query.Count != 1 || request.Count != 1
+-                        || !context.RequestServices.GetRequiredService<GmailPendingActions>().TryBegin(request[0], out var compose))
+-                    { await PageAsync(context, "This Gmail login link expired or was already opened. Ask again in DigitalBrain.", 410).ConfigureAwait(false); return; }
+-                    var properties = new AuthenticationProperties();
+-                    properties.Items[RequestKey] = request[0];
+-                    properties.Items["gmail-compose"] = compose ? "true" : "false";
+-                    await context.ChallengeAsync(Scheme, properties).ConfigureAwait(false);
+-                }
+-                else
+-                {
+-                    await next(context).ConfigureAwait(false);
+-                }
+-            }
+-            catch (Exception)
+-            { await PageAsync(context, "Gmail authorization is unavailable. Check the private OAuth configuration and try a new request.", 503).ConfigureAwait(false); }
+-            finally { Redact(context); }
+-        });
+-    }
+-    private static void Redact(HttpContext context)
+-    {
+-        Activity.Current?.SetTag("url.query", null);
+-        Activity.Current?.SetTag("http.target", context.Request.Path.Value);
+-        Activity.Current?.SetTag("url.full", $"{context.Request.Scheme}://{context.Request.Host}{context.Request.Path}");
+-    }
+-    private static void PrivateHeaders(HttpContext context)
+-    {
+-        context.Response.Headers.CacheControl = "no-store";
+-        context.Response.Headers["Referrer-Policy"] = "no-referrer";
+-        context.Response.Headers.ContentSecurityPolicy = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'";
+-    }
+-    private static Task PageAsync(HttpContext context, string message, int status)
+-    {
+-        PrivateHeaders(context); context.Response.StatusCode = status; context.Response.ContentType = "text/plain; charset=utf-8";
+-        return context.Response.WriteAsync(message, context.RequestAborted);
+-    }
+     private sealed class Tokens(string accessToken, string? refreshToken, string scope, string? expiresIn)
+     {
+         internal readonly string AccessToken = accessToken;
+@@ -207,8 +152,3 @@ internal static class GmailOAuthEndpoints
+         internal readonly string? ExpiresIn = expiresIn;
+     }
+ }
+-
+-internal sealed class GmailLoginSurface : IHttpSurface
+-{
+-    public void Map(IApplicationBuilder app) => GmailOAuthEndpoints.MapGmailBrowserAuthorization(app);
+-}
+diff --git a/src/Modules/Google/Google/Gmail/GmailDraftPreviews.cs b/src/Modules/Google/Google/Gmail/GmailDraftPreviews.cs
+index bda7635a..d5eaa363 100644
+--- a/src/Modules/Google/Google/Gmail/GmailDraftPreviews.cs
++++ b/src/Modules/Google/Google/Gmail/GmailDraftPreviews.cs
+@@ -8,7 +8,7 @@ using DigitalBrain.Sdk;
+ 
+ namespace DigitalBrain.Google;
+ 
+-internal sealed partial class GmailDraftPreviews(GmailConnections connections, GmailPendingActions actions,
++internal sealed partial class GmailDraftPreviews(GmailConnections connections, GmailLogins logins,
+     GmailMcp gmail, IUntrustedContentScreen screen) : ITrustedUserCommandHandler
+ {
+     private readonly Dictionary<string, Preview> _previews = new(StringComparer.Ordinal);
+@@ -120,12 +120,12 @@ internal sealed partial class GmailDraftPreviews(GmailConnections connections, G
+             }
+             catch (McpAuthenticationRequiredException)
+             {
+-                actions.RequireLogin(compose: true, cancellationToken);
++                logins.RequireLogin(compose: true, cancellationToken);
+                 return "Reconnect Gmail, then request and confirm a fresh preview. Nothing was created.";
+             }
+             if (!preview.Identity.CanCompose)
+             {
+-                actions.RequireLogin(compose: true, cancellationToken);
++                logins.RequireLogin(compose: true, cancellationToken);
+                 return "Gmail compose access is required. Login cannot create a draft; request a fresh preview afterward.";
+             }
+             // At-most-once boundary, BEFORE any network operation. The result remains a tombstone
+diff --git a/src/Modules/Google/Google/Gmail/GmailLogins.cs b/src/Modules/Google/Google/Gmail/GmailLogins.cs
+new file mode 100644
+index 00000000..20c1a1eb
+--- /dev/null
++++ b/src/Modules/Google/Google/Gmail/GmailLogins.cs
+@@ -0,0 +1,25 @@
++using DigitalBrain.Abstractions.Interactions;
++using DigitalBrain.Sdk;
++
++namespace DigitalBrain.Google;
++
++internal sealed class GmailLogins(GmailOAuthConfiguration configuration, IServiceProvider services)
++    : BrowserLogins(LoginDefinition, services)
++{
++    internal const string ComposeScope = "compose";
++    internal static readonly string[] ReadTools = ["gmail_get_current_account", "gmail_search_threads", "gmail_get_thread", "gmail_list_labels"];
++
++    internal static readonly BrowserLoginDefinition LoginDefinition = new(
++        "gmail",
++        "Gmail",
++        "GmailIntegration",
++        "/integrations/gmail/login",
++        "/integrations/gmail/callback",
++        "Sign in with Google to connect Gmail. Credentials stay outside the conversation. Login never creates a draft.");
++
++    protected override Uri? PublicOrigin => configuration.IsConfigured ? configuration.PublicOrigin : null;
++
++    // A compose login escalates the scope and never resumes the interrupted read.
++    internal UserActionRequest RequireLogin(bool compose, CancellationToken cancellationToken = default)
++        => Require(compose ? [] : ReadTools, compose ? ComposeScope : null, cancellationToken);
++}
+diff --git a/src/Modules/Google/Google/Gmail/GmailMaintenanceWorker.cs b/src/Modules/Google/Google/Gmail/GmailMaintenanceWorker.cs
+new file mode 100644
+index 00000000..893c413f
+--- /dev/null
++++ b/src/Modules/Google/Google/Gmail/GmailMaintenanceWorker.cs
+@@ -0,0 +1,16 @@
++using Microsoft.Extensions.Hosting;
++
++namespace DigitalBrain.Google;
++
++internal sealed class GmailMaintenanceWorker(GmailMcp gmail, GmailDraftPreviews previews) : BackgroundService
++{
++    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
++    {
++        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
++        while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
++        {
++            previews.Prune();
++            await gmail.PruneAsync().ConfigureAwait(false);
++        }
++    }
++}
+diff --git a/src/Modules/Google/Google/Gmail/GmailOAuthHandler.cs b/src/Modules/Google/Google/Gmail/GmailOAuthHandler.cs
+index 9526a271..1c639c0e 100644
+--- a/src/Modules/Google/Google/Gmail/GmailOAuthHandler.cs
++++ b/src/Modules/Google/Google/Gmail/GmailOAuthHandler.cs
+@@ -1,7 +1,7 @@
+ using System.Text.Encodings.Web;
++using DigitalBrain.Sdk;
+ using Microsoft.AspNetCore.Authentication;
+ using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+-using Microsoft.AspNetCore.Http;
+ using Microsoft.Extensions.DependencyInjection;
+ using Microsoft.Extensions.Logging;
+ using Microsoft.Extensions.Options;
+@@ -11,19 +11,7 @@ namespace DigitalBrain.Google;
+ internal sealed class GmailOAuthHandler(IOptionsMonitor<OpenIdConnectOptions> options, ILoggerFactory logger, HtmlEncoder htmlEncoder, UrlEncoder encoder)
+     : OpenIdConnectHandler(options, logger, htmlEncoder, encoder)
+ {
+-    private static readonly object VerifiedRequestKey = new();
+     protected override bool ValidateCorrelationId(AuthenticationProperties properties)
+-    {
+-        if (!base.ValidateCorrelationId(properties)
+-            || !properties.Items.TryGetValue(GmailOAuthEndpoints.RequestKey, out var request)
+-            || !Context.RequestServices.GetRequiredService<GmailPendingActions>().TryClaim(request))
+-        {
+-            return false;
+-        }
+-
+-        Context.Items[VerifiedRequestKey] = request;
+-        return true;
+-    }
+-    internal static string? VerifiedRequest(HttpContext context)
+-        => context.Items.TryGetValue(VerifiedRequestKey, out var request) ? request as string : null;
++        => base.ValidateCorrelationId(properties)
++            && BrowserLoginCorrelation.Claim(Context, properties, Context.RequestServices.GetRequiredService<GmailLogins>());
+ }
+diff --git a/src/Modules/Google/Google/Gmail/GmailPendingActions.cs b/src/Modules/Google/Google/Gmail/GmailPendingActions.cs
+deleted file mode 100644
+index d6d61a28..00000000
+--- a/src/Modules/Google/Google/Gmail/GmailPendingActions.cs
++++ /dev/null
+@@ -1,205 +0,0 @@
+-using System.Security.Cryptography;
+-using DigitalBrain.Abstractions.Identity;
+-using DigitalBrain.Abstractions.Interactions;
+-using DigitalBrain.Core;
+-using DigitalBrain.Sdk;
+-using Microsoft.Extensions.DependencyInjection;
+-using Microsoft.Extensions.Hosting;
+-using Microsoft.Extensions.Logging;
+-
+-namespace DigitalBrain.Google;
+-
+-internal sealed class GmailPendingActions(GmailOAuthConfiguration configuration, IServiceProvider services) : IUserActionSource
+-{
+-    internal static readonly string[] ReadTools = ["gmail_get_current_account", "gmail_search_threads", "gmail_get_thread", "gmail_list_labels"];
+-    private readonly Dictionary<string, Pending> _pending = new(StringComparer.Ordinal);
+-
+-    internal UserActionRequest RequireLogin(bool compose, CancellationToken cancellationToken = default)
+-    {
+-        cancellationToken.ThrowIfCancellationRequested();
+-        configuration.RequireConfigured();
+-        var context = AgentTurnContext.Current ?? throw new McpOperationException("Request Gmail access from an authenticated chat.");
+-        if (VerifiedActor.Current != context.Actor)
+-        {
+-            throw new McpOperationException("An authenticated chat actor is required.");
+-        }
+-
+-        if (context.AllowedToolNames is not null)
+-        {
+-            throw new McpOperationException("Gmail authorization did not complete this read. Send a new request after checking access; automatic login will not repeat.");
+-        }
+-
+-        lock (_pending)
+-        {
+-            foreach (var key in _pending.Where(p => p.Value.Done && p.Value.Action.ExpiresAt <= DateTimeOffset.UtcNow).Select(p => p.Key).ToArray())
+-            {
+-                _pending.Remove(key);
+-            }
+-
+-            var existing = _pending.Values.FirstOrDefault(p => p.Context == context);
+-            if (existing is not null)
+-            {
+-                if (existing.Done)
+-                {
+-                    throw new McpOperationException("This Gmail login request is already settled. Send a new request.");
+-                }
+-
+-                if (compose) { existing.Compose = true; existing.Action = existing.Action with { ResumeToolNames = [] }; }
+-                return existing.Action;
+-            }
+-            if (_pending.Count >= 128)
+-            {
+-                throw new McpOperationException("Too many pending Gmail logins. Wait for an existing request to expire.");
+-            }
+-
+-            var id = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+-            var action = new UserActionRequest(Guid.NewGuid().ToString("N"), "gmail", "Gmail",
+-                "Sign in with Google to connect Gmail. Credentials stay outside the conversation. Login never creates a draft.",
+-                new Uri(configuration.PublicOrigin, $"{GmailOAuthEndpoints.LoginPath}?request={id}").AbsoluteUri,
+-                DateTimeOffset.UtcNow.AddMinutes(10), compose ? [] : [.. ReadTools]);
+-            var pending = new Pending(context, action, compose);
+-            _pending.Add(id, pending);
+-            pending.Cancellation = cancellationToken.Register(() => Cancel(context));
+-            cancellationToken.ThrowIfCancellationRequested();
+-            return action;
+-        }
+-    }
+-
+-    public UserActionRequest? Find(OwnerId owner, CommandId commandId)
+-    {
+-        var context = AgentTurnContext.Current;
+-        lock (_pending)
+-        {
+-            return _pending.Values.FirstOrDefault(p => !p.Done && p.Context.Chat.Owner == owner
+-            && p.Context.CommandId == commandId && context?.Chat == p.Context.Chat && context.Actor == p.Context.Actor)?.Action;
+-        }
+-    }
+-    public void Cancel(AgentTurnContext context)
+-    {
+-        lock (_pending)
+-        {
+-            foreach (var p in _pending.Values.Where(p => p.Context.Chat == context.Chat && p.Context.CommandId == context.CommandId && p.Context.Actor == context.Actor))
+-            { p.Done = true; p.Outcome = false; p.Cancellation.Unregister(); }
+-        }
+-    }
+-    internal bool TryBegin(string? request, out bool compose)
+-    {
+-        lock (_pending)
+-        {
+-            compose = false;
+-            if (request is null || !_pending.TryGetValue(request, out var p) || !Active(p) || p.State != 0)
+-            {
+-                return false;
+-            }
+-
+-            p.State = 1; compose = p.Compose; return true;
+-        }
+-    }
+-    internal bool TryClaim(string? request)
+-    {
+-        lock (_pending)
+-        {
+-            if (request is null || !_pending.TryGetValue(request, out var p) || !Active(p) || p.State != 1)
+-            {
+-                return false;
+-            }
+-
+-            p.State = 2; return true;
+-        }
+-    }
+-    internal async Task AcceptAsync(string request, Func<OwnerId, bool, Action<Action>, Task> accept)
+-    {
+-        Pending p;
+-        lock (_pending)
+-        {
+-            if (!_pending.TryGetValue(request, out p!) || !Active(p) || p.State != 2)
+-            {
+-                throw new McpOperationException("This Gmail login expired or was cancelled.");
+-            }
+-        }
+-        await accept(p.Context.Chat.Owner, p.Compose, commit =>
+-        {
+-            lock (_pending)
+-            {
+-                if (!Active(p) || p.State != 2)
+-                {
+-                    throw new McpOperationException("This Gmail login expired or was cancelled.");
+-                }
+-                commit();
+-                p.Outcome = true;
+-            }
+-        }).ConfigureAwait(false);
+-    }
+-    internal void Reject(string? request)
+-    {
+-        lock (_pending)
+-        {
+-            if (request is not null && _pending.TryGetValue(request, out var p) && !p.Done && p.Outcome is null)
+-            {
+-                p.Outcome = false;
+-            }
+-        }
+-    }
+-    internal async Task DeliverAsync(CancellationToken cancellationToken)
+-    {
+-        Pending[] ready;
+-        lock (_pending)
+-        {
+-            foreach (var p in _pending.Values.Where(p => !p.Done && p.Action.ExpiresAt <= DateTimeOffset.UtcNow))
+-            {
+-                p.Outcome = false;
+-            }
+-
+-            ready = _pending.Values.Where(p => !p.Done && p.Outcome is not null).ToArray();
+-        }
+-        foreach (var p in ready)
+-        {
+-            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+-            deadline.CancelAfter(TimeSpan.FromSeconds(30));
+-            var continuation = services.GetRequiredService<IUserActionContinuation>();
+-            if (p.Action.ExpiresAt > DateTimeOffset.UtcNow
+-                && !await continuation.IsWaitingAsync(p.Context, p.Action.Id, deadline.Token).ConfigureAwait(false))
+-            {
+-                // Callback can finish before the original AI turn publishes its login card.
+-                // Wait for that durable state instead of losing the one-shot continuation.
+-                continue;
+-            }
+-            await continuation.CompleteAsync(p.Context, p.Action.Id, p.Outcome == true, deadline.Token).ConfigureAwait(false);
+-            lock (_pending)
+-            {
+-                p.Done = true;
+-                p.Cancellation.Unregister();
+-            }
+-        }
+-    }
+-    private static bool Active(Pending p) => !p.Done && p.Outcome is null && p.Action.ExpiresAt > DateTimeOffset.UtcNow;
+-    private sealed class Pending(AgentTurnContext context, UserActionRequest action, bool compose)
+-    {
+-        internal readonly AgentTurnContext Context = context;
+-        internal UserActionRequest Action = action;
+-        internal bool Compose = compose;
+-        internal int State;
+-        internal bool? Outcome;
+-        internal bool Done;
+-        internal CancellationTokenRegistration Cancellation;
+-    }
+-}
+-
+-internal sealed class GmailCompletionWorker(GmailPendingActions pending, GmailMcp gmail, GmailDraftPreviews previews, ILogger<GmailCompletionWorker> logger) : BackgroundService
+-{
+-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+-    {
+-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+-        while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
+-        {
+-            try
+-            {
+-                previews.Prune();
+-                await gmail.PruneAsync().ConfigureAwait(false);
+-                await pending.DeliverAsync(stoppingToken).ConfigureAwait(false);
+-            }
+-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
+-            catch (Exception) { logger.LogWarning("Gmail login completion delivery failed; the idempotent notification will be retried."); }
+-        }
+-    }
+-}
+diff --git a/src/Modules/Google/Google/Gmail/GmailToolSource.cs b/src/Modules/Google/Google/Gmail/GmailToolSource.cs
+index a545d2dc..bf8971ad 100644
+--- a/src/Modules/Google/Google/Gmail/GmailToolSource.cs
++++ b/src/Modules/Google/Google/Gmail/GmailToolSource.cs
+@@ -9,7 +9,7 @@ using Microsoft.Extensions.AI;
+ namespace DigitalBrain.Google;
+ 
+ internal sealed class GmailToolSource(GmailMcp gmail, GmailConnections connections,
+-    GmailPendingActions actions, GmailDraftPreviews previews, IUntrustedContentScreen screen) : IAgentToolSource
++    GmailLogins logins, GmailDraftPreviews previews, IUntrustedContentScreen screen) : IAgentToolSource
+ {
+     public IReadOnlyList<AIFunction> ToolsFor(OwnerId owner)
+     {
+@@ -61,7 +61,7 @@ internal sealed class GmailToolSource(GmailMcp gmail, GmailConnections connectio
+         {
+             try
+             {
+-                var action = actions.RequireLogin(compose, ct);
++                var action = logins.RequireLogin(compose, ct);
+                 return JsonSerializer.Serialize(new
+                 {
+                     status = "authentication_required",
+diff --git a/src/Modules/Google/Google/Gmail/McpGmail.cs b/src/Modules/Google/Google/Gmail/McpGmail.cs
+index 180559c4..09a212a5 100644
+--- a/src/Modules/Google/Google/Gmail/McpGmail.cs
++++ b/src/Modules/Google/Google/Gmail/McpGmail.cs
+@@ -3,7 +3,7 @@ using DigitalBrain.Sdk;
+ 
+ namespace DigitalBrain.Google;
+ 
+-internal sealed class McpGmail(GmailMcp gmail, GmailPendingActions actions) : IGmail
++internal sealed class McpGmail(GmailMcp gmail, GmailLogins logins) : IGmail
+ {
+     public async Task<string> SearchJsonAsync(
+         OwnerId owner,
+@@ -24,7 +24,7 @@ internal sealed class McpGmail(GmailMcp gmail, GmailPendingActions actions) : IG
+         }
+         catch (McpAuthenticationRequiredException)
+         {
+-            actions.RequireLogin(compose: false, cancellationToken);
++            logins.RequireLogin(compose: false, cancellationToken);
+             throw;
+         }
+     }
+diff --git a/src/Modules/Google/Google/GoogleModule.cs b/src/Modules/Google/Google/GoogleModule.cs
+index 6bc7210b..0e75faae 100644
+--- a/src/Modules/Google/Google/GoogleModule.cs
++++ b/src/Modules/Google/Google/GoogleModule.cs
+@@ -27,15 +27,16 @@ public sealed class GoogleModule : IModule
+         var settings = new GmailOAuthConfiguration(builder.Configuration);
+         services.AddSingleton(settings);
+         services.AddSingleton<GmailConnections>();
+-        services.AddSingleton<GmailPendingActions>();
++        services.AddSingleton<GmailLogins>();
+         services.AddSingleton<GmailMcp>();
+         services.AddSingleton<GmailDraftPreviews>();
+-        services.AddSingleton<IUserActionSource>(static s => s.GetRequiredService<GmailPendingActions>());
++        services.AddSingleton<IUserActionSource>(static s => s.GetRequiredService<GmailLogins>());
++        services.AddSingleton<IHttpSurface>(static s => new BrowserLoginSurface(s.GetRequiredService<GmailLogins>()));
+         services.AddSingleton<ITrustedUserCommandHandler>(static s => s.GetRequiredService<GmailDraftPreviews>());
+         services.AddSingleton<IAgentToolSource, GmailToolSource>();
+         services.AddSingleton<IGmail, McpGmail>();
+-        services.AddHostedService<GmailCompletionWorker>();
+-        services.AddGmailBrowserAuthorization(settings);
+-        services.AddSingleton<IHttpSurface, GmailLoginSurface>();
++        services.AddHostedService<BrowserLoginWorker<GmailLogins>>();
++        services.AddHostedService<GmailMaintenanceWorker>();
++        services.AddGmailAuthentication(settings, GmailLogins.LoginDefinition);
+     }
+ }
+diff --git a/src/Modules/Salesforce/Salesforce/SalesforceAuthentication.cs b/src/Modules/Salesforce/Salesforce/SalesforceAuthentication.cs
+new file mode 100644
+index 00000000..6c2db8ed
+--- /dev/null
++++ b/src/Modules/Salesforce/Salesforce/SalesforceAuthentication.cs
+@@ -0,0 +1,85 @@
++using DigitalBrain.Sdk;
++using Microsoft.AspNetCore.Authentication.OAuth;
++using Microsoft.AspNetCore.Http;
++using Microsoft.Extensions.DependencyInjection;
++using Microsoft.Extensions.Logging;
++
++namespace DigitalBrain.Salesforce;
++
++internal static class SalesforceAuthentication
++{
++    internal static IServiceCollection AddSalesforceAuthentication(
++        this IServiceCollection services, SalesforceOAuthConfiguration settings, BrowserLoginDefinition definition)
++    {
++        // Framework diagnostics can include remote error descriptions and callback query strings.
++        // Keep only our sanitized status messages for this credential boundary.
++        services.AddLogging(logging =>
++        {
++            logging.AddFilter("Microsoft.AspNetCore.Authentication.OAuth.OAuthHandler", LogLevel.None);
++            logging.AddFilter(typeof(SalesforceOAuthHandler).FullName, LogLevel.None);
++            logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.Warning);
++        });
++        services.AddAuthentication()
++            .AddCookie("SalesforceCallback", options => options.Cookie.Name = "db.sf.unused")
++            .AddOAuth<OAuthOptions, SalesforceOAuthHandler>(definition.Scheme, options =>
++            {
++                settings.Configure(options);
++                options.SignInScheme = "SalesforceCallback";
++                options.CallbackPath = definition.CallbackPath;
++                options.UsePkce = true;
++                options.SaveTokens = false;
++                options.Scope.Clear();
++                options.Scope.Add("mcp_api");
++                options.Scope.Add("refresh_token");
++                options.RemoteAuthenticationTimeout = TimeSpan.FromMinutes(10);
++                options.CorrelationCookie.HttpOnly = true;
++                options.CorrelationCookie.SameSite = SameSiteMode.Lax;
++                options.CorrelationCookie.SecurePolicy = settings.PublicOrigin.Scheme == "https"
++                    ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
++                options.BackchannelHttpHandler = new HttpClientHandler { AllowAutoRedirect = false };
++                options.Events = new OAuthEvents
++                {
++                    OnCreatingTicket = async context =>
++                    {
++                        var request = BrowserLoginCorrelation.VerifiedRequest(context.HttpContext)
++                            ?? throw new InvalidOperationException("Salesforce login is missing its original request.");
++                        var issuer = context.Request.Query["iss"].ToString();
++                        if (issuer.Length != 0 && issuer != "https://login.salesforce.com")
++                        {
++                            throw new InvalidOperationException("The Salesforce authorization issuer did not match.");
++                        }
++                        var connections = context.HttpContext.RequestServices.GetRequiredService<SalesforceConnections>();
++                        await context.HttpContext.RequestServices.GetRequiredService<SalesforceLogins>().AcceptAsync(request,
++                            (owner, _, valid) => connections.StoreAsync(owner, context.AccessToken, context.RefreshToken,
++                                context.ExpiresIn, valid, CancellationToken.None)).ConfigureAwait(false);
++                    },
++                    OnTicketReceived = async context =>
++                    {
++                        context.HandleResponse(); // Do not sign in or save tokens to a browser cookie.
++                        // The login worker resumes the durable request even when the user closes
++                        // this tab before the response finishes.
++                        await LoginPage.WriteAsync(context.HttpContext, "Salesforce connected",
++                            "You can close this tab. DigitalBrain is continuing your request.", 200).ConfigureAwait(false);
++                    },
++                    OnRemoteFailure = async context =>
++                    {
++                        context.HandleResponse();
++                        context.HttpContext.RequestServices.GetRequiredService<SalesforceLogins>()
++                            .Reject(BrowserLoginCorrelation.VerifiedRequest(context.HttpContext));
++                        await LoginPage.WriteAsync(context.HttpContext, "Salesforce login was not completed",
++                            "Return to DigitalBrain and ask again. Check the app callback, scopes and Salesforce permissions if this keeps happening.", 400)
++                            .ConfigureAwait(false);
++                    },
++                    OnAccessDenied = async context =>
++                    {
++                        context.HandleResponse();
++                        context.HttpContext.RequestServices.GetRequiredService<SalesforceLogins>()
++                            .Reject(BrowserLoginCorrelation.VerifiedRequest(context.HttpContext));
++                        await LoginPage.WriteAsync(context.HttpContext, "Salesforce login cancelled",
++                            "No Salesforce operation was performed. You can close this tab.", 200).ConfigureAwait(false);
++                    },
++                };
++            });
++        return services;
++    }
++}
+diff --git a/src/Modules/Salesforce/Salesforce/SalesforceCompletionWorker.cs b/src/Modules/Salesforce/Salesforce/SalesforceCompletionWorker.cs
+deleted file mode 100644
+index 740c7da8..00000000
+--- a/src/Modules/Salesforce/Salesforce/SalesforceCompletionWorker.cs
++++ /dev/null
+@@ -1,35 +0,0 @@
+-using Microsoft.Extensions.Hosting;
+-using Microsoft.Extensions.Logging;
+-
+-namespace DigitalBrain.Salesforce;
+-
+-// OAuth completion belongs to the kernel, not the browser connection's lifetime.
+-internal sealed class SalesforceCompletionWorker(
+-    SalesforceConnections connections,
+-    ILogger<SalesforceCompletionWorker> logger) : BackgroundService
+-{
+-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+-    {
+-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+-        while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
+-        {
+-            try
+-            {
+-                var failures = await connections.DeliverPendingCompletionsAsync(stoppingToken).ConfigureAwait(false);
+-                if (failures != 0)
+-                {
+-                    logger.LogWarning("Salesforce login completion is pending for {Count} requests; the kernel will retry them.", failures);
+-                }
+-            }
+-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+-            {
+-                return;
+-            }
+-            catch (Exception)
+-            {
+-                // Do not attach the exception: remote exception payloads can contain credentials.
+-                logger.LogWarning("A Salesforce login completion could not be delivered; the kernel will retry it.");
+-            }
+-        }
+-    }
+-}
+diff --git a/src/Modules/Salesforce/Salesforce/SalesforceConnections.cs b/src/Modules/Salesforce/Salesforce/SalesforceConnections.cs
+index 3115bd0c..a2083b21 100644
+--- a/src/Modules/Salesforce/Salesforce/SalesforceConnections.cs
++++ b/src/Modules/Salesforce/Salesforce/SalesforceConnections.cs
+@@ -1,98 +1,37 @@
+ using System.Collections.Concurrent;
+-using System.Security.Cryptography;
+ using System.Text.Json;
+ using DigitalBrain.Abstractions.Identity;
+ using DigitalBrain.Abstractions.Interactions;
+ using DigitalBrain.Sdk;
+-using Microsoft.Extensions.DependencyInjection;
+ 
+ namespace DigitalBrain.Salesforce;
+ 
+-// The kernel owns one connection per owner. Tokens and OAuth transactions are intentionally
+-// volatile: restarting the kernel disconnects Salesforce, without persisting credentials in Orleans.
+-internal sealed class SalesforceConnections(
+-    SalesforceOAuthConfiguration configuration,
+-    IServiceProvider services) : IMcpCredentials<OwnerId>, IUserActionSource, IDisposable
++// The kernel owns one connection per owner. Tokens are intentionally volatile: restarting the
++// kernel disconnects Salesforce, without persisting credentials in Orleans.
++internal sealed class SalesforceConnections(SalesforceOAuthConfiguration configuration) : IMcpCredentials<OwnerId>, IDisposable
+ {
+     private readonly ConcurrentDictionary<OwnerId, CredentialSlot> _credentials = new();
+-    private readonly ConcurrentDictionary<string, PendingLogin> _pending = new(StringComparer.Ordinal);
+     private readonly HttpClient _oauthHttp = new(new HttpClientHandler { AllowAutoRedirect = false });
+ 
+     internal OwnerId CurrentOwner => AgentTurnContext.Current?.Chat.Owner ?? configuration.Owner;
+ 
+-    public UserActionRequest? Find(OwnerId owner, CommandId commandId)
+-    {
+-        var context = AgentTurnContext.Current;
+-        return context is null ? null : _pending.Values.FirstOrDefault(p => p.Context.Chat.Owner == owner
+-            && p.Context.Chat == context.Chat && p.Context.Actor == context.Actor
+-            && p.Context.CommandId == commandId && p.Status < 3 && p.Action.ExpiresAt > DateTimeOffset.UtcNow)?.Action;
+-    }
+-
+-    internal UserActionRequest RequireLogin(bool readOnly)
+-    {
+-        var context = AgentTurnContext.Current
+-            ?? throw new McpAuthenticationRequiredException();
+-        lock (_pending)
+-        {
+-            foreach (var pair in _pending.Where(p => p.Value.Action.ExpiresAt <= DateTimeOffset.UtcNow).ToArray())
+-            {
+-                _pending.TryRemove(pair.Key, out _);
+-            }
+-            var existing = _pending.Values.FirstOrDefault(p => p.Context.Chat == context.Chat
+-                && p.Context.Actor == context.Actor && p.Context.CommandId == context.CommandId && p.Status < 3);
+-            if (existing is not null)
+-            {
+-                if (!readOnly)
+-                {
+-                    existing.Action = existing.Action with { ResumeToolNames = [] };
+-                }
+-                return existing.Action;
+-            }
+-            if (_pending.Count >= 128)
+-            {
+-                throw new InvalidOperationException("Too many pending Salesforce logins. Cancel an existing request or wait for it to expire.");
+-            }
+-            var request = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+-            var action = new UserActionRequest(
+-                Guid.NewGuid().ToString("N"), "salesforce", "Salesforce",
+-                "Log in to Salesforce to continue this request. Your credentials stay outside the conversation.",
+-                new Uri(configuration.PublicOrigin, $"{SalesforceOAuthEndpoints.LoginPath}?request={request}").AbsoluteUri,
+-                DateTimeOffset.UtcNow.AddMinutes(10),
+-                readOnly ? ["salesforce_get_current_user", "salesforce_soql_query"] : []);
+-            _pending[request] = new PendingLogin(context, action);
+-            return action;
+-        }
+-    }
+-
+-    internal bool TryBegin(string? request)
+-        => request is not null && _pending.TryGetValue(request, out var pending)
+-            && pending.Action.ExpiresAt > DateTimeOffset.UtcNow
+-            && Interlocked.CompareExchange(ref pending.Status, 1, 0) == 0;
+-
+-    internal bool TryClaimCallback(string? request)
+-        => request is not null && _pending.TryGetValue(request, out var pending)
+-            && pending.Action.ExpiresAt > DateTimeOffset.UtcNow
+-            && Interlocked.CompareExchange(ref pending.Status, 2, 1) == 1;
++    public OwnerId Connection(OwnerId owner) => owner;
+ 
+-    internal async Task AcceptTokensAsync(
+-        string request, string? accessToken, string? refreshToken, TimeSpan? expiresIn,
+-        CancellationToken cancellationToken)
++    internal async Task StoreAsync(
++        OwnerId owner, string? accessToken, string? refreshToken, TimeSpan? expiresIn,
++        Action<Action> commitIfActive, CancellationToken cancellationToken)
+     {
+-        if (!_pending.TryGetValue(request, out var pending)
+-            || pending.Action.ExpiresAt <= DateTimeOffset.UtcNow
+-            || pending.Status != 2 || pending.CompletionRequested != 0)
+-        {
+-            throw new InvalidOperationException("The Salesforce login request expired or was already used.");
+-        }
+         ValidateToken(accessToken);
+-        var slot = _credentials.GetOrAdd(pending.Context.Chat.Owner, static _ => new CredentialSlot());
++        var slot = _credentials.GetOrAdd(owner, static _ => new CredentialSlot());
+         await slot.Gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+         try
+         {
+-            slot.AccessToken = accessToken;
+-            slot.RefreshToken = refreshToken;
+-            slot.ExpiresAt = Expiry(expiresIn);
+-            Interlocked.Exchange(ref pending.CompletionRequested, 1);
++            commitIfActive(() =>
++            {
++                slot.AccessToken = accessToken;
++                slot.RefreshToken = refreshToken;
++                slot.ExpiresAt = Expiry(expiresIn);
++            });
+         }
+         finally
+         {
+@@ -100,65 +39,6 @@ internal sealed class SalesforceConnections(
+         }
+     }
+ 
+-    internal void RejectLogin(string? verifiedRequest)
+-    {
+-        if (verifiedRequest is not null && _pending.TryGetValue(verifiedRequest, out var pending)
+-            && pending.Status == 2)
+-        {
+-            // A validated callback outcome is immutable. A duplicate cannot cancel success.
+-            Interlocked.CompareExchange(ref pending.CompletionRequested, 2, 0);
+-        }
+-    }
+-
+-    private async Task FinishAsync(PendingLogin pending, CancellationToken cancellationToken)
+-    {
+-        if (pending.Status >= 3)
+-        {
+-            return;
+-        }
+-        if (Interlocked.Exchange(ref pending.Finishing, 1) != 0)
+-        {
+-            return;
+-        }
+-        try
+-        {
+-            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+-            deadline.CancelAfter(TimeSpan.FromSeconds(30));
+-            await services.GetRequiredService<IUserActionContinuation>()
+-                .CompleteAsync(pending.Context, pending.Action.Id, pending.CompletionRequested == 1, deadline.Token)
+-                .ConfigureAwait(false);
+-            Interlocked.Exchange(ref pending.Status, 3);
+-        }
+-        finally
+-        {
+-            // If delivery fails, the completion worker retries the same idempotent command.
+-            Interlocked.Exchange(ref pending.Finishing, 0);
+-        }
+-    }
+-
+-    internal async Task<int> DeliverPendingCompletionsAsync(CancellationToken cancellationToken)
+-    {
+-        var failures = 0;
+-        foreach (var pair in _pending.Where(p => p.Value.CompletionRequested != 0 && p.Value.Status < 3))
+-        {
+-            try
+-            {
+-                await FinishAsync(pair.Value, cancellationToken).ConfigureAwait(false);
+-            }
+-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+-            {
+-                throw;
+-            }
+-            catch (Exception)
+-            {
+-                failures++;
+-            }
+-        }
+-        return failures;
+-    }
+-
+-    public OwnerId Connection(OwnerId owner) => owner;
+-
+     public async Task<string> AccessTokenAsync(OwnerId owner, OwnerId connection, bool refresh, CancellationToken cancellationToken)
+     {
+         var slot = _credentials.GetOrAdd(owner, static _ => new CredentialSlot());
+@@ -249,7 +129,6 @@ internal sealed class SalesforceConnections(
+             slot.Gate.Dispose();
+         }
+         _credentials.Clear();
+-        _pending.Clear();
+     }
+ 
+     private sealed class CredentialSlot
+@@ -259,13 +138,4 @@ internal sealed class SalesforceConnections(
+         internal string? RefreshToken;
+         internal DateTimeOffset ExpiresAt;
+     }
+-
+-    private sealed class PendingLogin(AgentTurnContext context, UserActionRequest action)
+-    {
+-        internal readonly AgentTurnContext Context = context;
+-        internal UserActionRequest Action = action;
+-        internal int Status;
+-        internal int Finishing;
+-        internal int CompletionRequested;
+-    }
+ }
+diff --git a/src/Modules/Salesforce/Salesforce/SalesforceLogins.cs b/src/Modules/Salesforce/Salesforce/SalesforceLogins.cs
+new file mode 100644
+index 00000000..543e12d7
+--- /dev/null
++++ b/src/Modules/Salesforce/Salesforce/SalesforceLogins.cs
+@@ -0,0 +1,24 @@
++using DigitalBrain.Abstractions.Interactions;
++using DigitalBrain.Sdk;
++
++namespace DigitalBrain.Salesforce;
++
++internal sealed class SalesforceLogins(SalesforceOAuthConfiguration configuration, IServiceProvider services)
++    : BrowserLogins(LoginDefinition, services)
++{
++    internal static readonly string[] ReadTools = ["salesforce_get_current_user", "salesforce_soql_query"];
++
++    internal static readonly BrowserLoginDefinition LoginDefinition = new(
++        "salesforce",
++        "Salesforce",
++        "SalesforceIntegration",
++        "/integrations/salesforce/login",
++        "/integrations/salesforce/callback",
++        "Log in to Salesforce to continue this request. Your credentials stay outside the conversation.");
++
++    protected override Uri? PublicOrigin => configuration.PublicOrigin;
++
++    // A read resumes after login; a write needs a fresh preview and explicit confirmation.
++    internal UserActionRequest RequireLogin(bool readOnly, CancellationToken cancellationToken = default)
++        => Require(readOnly ? ReadTools : [], null, cancellationToken);
++}
+diff --git a/src/Modules/Salesforce/Salesforce/SalesforceModule.cs b/src/Modules/Salesforce/Salesforce/SalesforceModule.cs
+index 445a9e2d..945ea2f0 100644
+--- a/src/Modules/Salesforce/Salesforce/SalesforceModule.cs
++++ b/src/Modules/Salesforce/Salesforce/SalesforceModule.cs
+@@ -36,12 +36,13 @@ public sealed class SalesforceModule : IModule
+         var settings = new SalesforceOAuthConfiguration(builder.Configuration);
+         services.AddSingleton(settings);
+         services.AddSingleton<SalesforceConnections>();
+-        services.AddSingleton<IUserActionSource>(static s => s.GetRequiredService<SalesforceConnections>());
++        services.AddSingleton<SalesforceLogins>();
++        services.AddSingleton<IUserActionSource>(static s => s.GetRequiredService<SalesforceLogins>());
++        services.AddSingleton<IHttpSurface>(static s => new BrowserLoginSurface(s.GetRequiredService<SalesforceLogins>()));
+         services.AddSingleton<IAgentToolSource, SalesforceToolSource>();
+         services.AddSingleton<ISalesforce>(s => new McpSalesforce(endpoint, s.GetRequiredService<SalesforceConnections>()));
+-        services.AddHostedService<SalesforceCompletionWorker>();
+-        services.AddSalesforceBrowserAuthorization(settings);
+-        services.AddSingleton<IHttpSurface, SalesforceLoginSurface>();
++        services.AddHostedService<BrowserLoginWorker<SalesforceLogins>>();
++        services.AddSalesforceAuthentication(settings, SalesforceLogins.LoginDefinition);
+     }
+ 
+     private static McpEndpoint? ReadEndpoint(Microsoft.Extensions.Configuration.IConfiguration configuration)
+diff --git a/src/Modules/Salesforce/Salesforce/SalesforceOAuthEndpoints.cs b/src/Modules/Salesforce/Salesforce/SalesforceOAuthEndpoints.cs
+deleted file mode 100644
+index 53a89c67..00000000
+--- a/src/Modules/Salesforce/Salesforce/SalesforceOAuthEndpoints.cs
++++ /dev/null
+@@ -1,173 +0,0 @@
+-using System.Diagnostics;
+-using DigitalBrain.Sdk;
+-using Microsoft.AspNetCore.Authentication;
+-using Microsoft.AspNetCore.Authentication.OAuth;
+-using Microsoft.AspNetCore.Builder;
+-using Microsoft.AspNetCore.Http;
+-using Microsoft.Extensions.DependencyInjection;
+-using Microsoft.Extensions.Logging;
+-
+-namespace DigitalBrain.Salesforce;
+-
+-internal static class SalesforceOAuthEndpoints
+-{
+-    internal const string LoginPath = "/integrations/salesforce/login";
+-    internal const string CallbackPath = "/integrations/salesforce/callback";
+-    private const string Scheme = "SalesforceIntegration";
+-    internal const string RequestKey = "salesforce-request";
+-
+-    internal static IServiceCollection AddSalesforceBrowserAuthorization(
+-        this IServiceCollection services, SalesforceOAuthConfiguration settings)
+-    {
+-        // Framework diagnostics can include remote error descriptions and callback query strings.
+-        // Keep only our sanitized status messages for this credential boundary.
+-        services.AddLogging(logging =>
+-        {
+-            logging.AddFilter("Microsoft.AspNetCore.Authentication.OAuth.OAuthHandler", LogLevel.None);
+-            logging.AddFilter(typeof(SalesforceOAuthHandler).FullName, LogLevel.None);
+-            logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.Warning);
+-        });
+-        services.AddAuthentication()
+-            .AddCookie("SalesforceCallback", options => options.Cookie.Name = "db.sf.unused")
+-            .AddOAuth<OAuthOptions, SalesforceOAuthHandler>(Scheme, options =>
+-            {
+-                settings.Configure(options);
+-                options.SignInScheme = "SalesforceCallback";
+-                options.CallbackPath = CallbackPath;
+-                options.UsePkce = true;
+-                options.SaveTokens = false;
+-                options.Scope.Clear();
+-                options.Scope.Add("mcp_api");
+-                options.Scope.Add("refresh_token");
+-                options.RemoteAuthenticationTimeout = TimeSpan.FromMinutes(10);
+-                options.CorrelationCookie.HttpOnly = true;
+-                options.CorrelationCookie.SameSite = SameSiteMode.Lax;
+-                options.CorrelationCookie.SecurePolicy = settings.PublicOrigin.Scheme == "https"
+-                    ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
+-                options.BackchannelHttpHandler = new HttpClientHandler { AllowAutoRedirect = false };
+-                options.Events = new OAuthEvents
+-                {
+-                    OnCreatingTicket = async context =>
+-                    {
+-                        var request = GetRequest(context.Properties)
+-                            ?? throw new InvalidOperationException("Salesforce login is missing its original request.");
+-                        var issuer = context.Request.Query["iss"].ToString();
+-                        if (issuer.Length != 0 && issuer != "https://login.salesforce.com")
+-                        {
+-                            throw new InvalidOperationException("The Salesforce authorization issuer did not match.");
+-                        }
+-                        await context.HttpContext.RequestServices.GetRequiredService<SalesforceConnections>()
+-                            .AcceptTokensAsync(request, context.AccessToken, context.RefreshToken,
+-                                context.ExpiresIn, CancellationToken.None).ConfigureAwait(false);
+-                    },
+-                    OnTicketReceived = async context =>
+-                    {
+-                        context.HandleResponse(); // Do not sign in or save tokens to a browser cookie.
+-                        // The background completion worker resumes the durable request even
+-                        // when the user closes this tab before the response finishes.
+-                        await WritePageAsync(context.HttpContext, "Salesforce connected",
+-                            "You can close this tab. DigitalBrain is continuing your request.", 200).ConfigureAwait(false);
+-                    },
+-                    OnRemoteFailure = async context =>
+-                    {
+-                        context.HandleResponse();
+-                        context.HttpContext.RequestServices.GetRequiredService<SalesforceConnections>()
+-                            .RejectLogin(SalesforceOAuthHandler.VerifiedRequest(context.HttpContext));
+-                        await WritePageAsync(context.HttpContext, "Salesforce login was not completed",
+-                            "Return to DigitalBrain and ask again. Check the app callback, scopes and Salesforce permissions if this keeps happening.", 400)
+-                            .ConfigureAwait(false);
+-                    },
+-                    OnAccessDenied = async context =>
+-                    {
+-                        context.HandleResponse();
+-                        context.HttpContext.RequestServices.GetRequiredService<SalesforceConnections>()
+-                            .RejectLogin(SalesforceOAuthHandler.VerifiedRequest(context.HttpContext));
+-                        await WritePageAsync(context.HttpContext, "Salesforce login cancelled",
+-                            "No Salesforce operation was performed. You can close this tab.", 200).ConfigureAwait(false);
+-                    },
+-                };
+-            });
+-        return services;
+-    }
+-
+-    // These two exact paths have their own short-lived request capability / OAuth correlation
+-    // checks. Run before the Basic gate; all other kernel paths retain their existing protection.
+-    internal static void MapSalesforceBrowserAuthorization(IApplicationBuilder app)
+-    {
+-        app.Use(async (context, next) =>
+-        {
+-            var isLogin = context.Request.Path.Equals(LoginPath, StringComparison.Ordinal);
+-            var isCallback = context.Request.Path.Equals(CallbackPath, StringComparison.Ordinal);
+-            if (!isLogin && !isCallback)
+-            {
+-                await next(context).ConfigureAwait(false);
+-                return;
+-            }
+-            SetPrivateResponseHeaders(context);
+-            RedactCallbackActivity(context);
+-            var settings = context.RequestServices.GetRequiredService<SalesforceOAuthConfiguration>();
+-            if (!HttpMethods.IsGet(context.Request.Method)
+-                || !string.Equals(context.Request.Scheme, settings.PublicOrigin.Scheme, StringComparison.OrdinalIgnoreCase)
+-                || !string.Equals(context.Request.Host.Value, settings.PublicOrigin.Authority, StringComparison.OrdinalIgnoreCase))
+-            {
+-                await WritePageAsync(context, "Invalid Salesforce login request",
+-                    "Open the login action from DigitalBrain.", 400).ConfigureAwait(false);
+-                return;
+-            }
+-            try
+-            {
+-                if (isLogin)
+-                {
+-                    var request = context.Request.Query["request"].ToString();
+-                    if (!context.RequestServices.GetRequiredService<SalesforceConnections>().TryBegin(request))
+-                    {
+-                        await WritePageAsync(context, "This login link expired or was already opened",
+-                            "Return to DigitalBrain and request Salesforce access again.", 410).ConfigureAwait(false);
+-                        return;
+-                    }
+-                    var properties = new AuthenticationProperties();
+-                    properties.Items[RequestKey] = request;
+-                    await context.ChallengeAsync(Scheme, properties).ConfigureAwait(false);
+-                    return;
+-                }
+-                await next(context).ConfigureAwait(false);
+-            }
+-            finally
+-            {
+-                RedactCallbackActivity(context);
+-            }
+-        });
+-    }
+-
+-    private static void RedactCallbackActivity(HttpContext context)
+-    {
+-        var activity = Activity.Current;
+-        activity?.SetTag("url.query", null);
+-        activity?.SetTag("http.target", context.Request.Path.Value);
+-        activity?.SetTag("url.full", $"{context.Request.Scheme}://{context.Request.Host}{context.Request.Path}");
+-    }
+-
+-    private static string? GetRequest(AuthenticationProperties? properties)
+-        => properties?.Items.TryGetValue(RequestKey, out var request) == true ? request : null;
+-
+-    private static void SetPrivateResponseHeaders(HttpContext context)
+-    {
+-        context.Response.Headers.CacheControl = "no-store";
+-        context.Response.Headers["Referrer-Policy"] = "no-referrer";
+-        context.Response.Headers.ContentSecurityPolicy = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'";
+-    }
+-
+-    private static Task WritePageAsync(HttpContext context, string title, string message, int status)
+-    {
+-        SetPrivateResponseHeaders(context);
+-        context.Response.StatusCode = status;
+-        context.Response.ContentType = "text/html; charset=utf-8";
+-        // Only fixed application strings are rendered. Never reflect an OAuth response or URL.
+-        return context.Response.WriteAsync($"<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>{title}</title><body style=\"font:18px system-ui;max-width:640px;margin:12vh auto;padding:24px\"><h1>{title}</h1><p>{message}</p></body></html>", context.RequestAborted);
+-    }
+-}
+-
+-internal sealed class SalesforceLoginSurface : IHttpSurface
+-{
+-    public void Map(IApplicationBuilder app) => SalesforceOAuthEndpoints.MapSalesforceBrowserAuthorization(app);
+-}
+diff --git a/src/Modules/Salesforce/Salesforce/SalesforceOAuthHandler.cs b/src/Modules/Salesforce/Salesforce/SalesforceOAuthHandler.cs
+index 3532872c..11cdaca6 100644
+--- a/src/Modules/Salesforce/Salesforce/SalesforceOAuthHandler.cs
++++ b/src/Modules/Salesforce/Salesforce/SalesforceOAuthHandler.cs
+@@ -1,34 +1,18 @@
+ using System.Text.Encodings.Web;
++using DigitalBrain.Sdk;
+ using Microsoft.AspNetCore.Authentication;
+ using Microsoft.AspNetCore.Authentication.OAuth;
+-using Microsoft.AspNetCore.Http;
+ using Microsoft.Extensions.DependencyInjection;
+ using Microsoft.Extensions.Logging;
+ using Microsoft.Extensions.Options;
+ 
+ namespace DigitalBrain.Salesforce;
+ 
+-// Keep the framework's state, browser correlation and PKCE implementation. Add only a
+-// server-side one-use claim after correlation succeeds, before any authorization-code exchange.
+ internal sealed class SalesforceOAuthHandler(
+     IOptionsMonitor<OAuthOptions> options, ILoggerFactory logger, UrlEncoder encoder)
+     : OAuthHandler<OAuthOptions>(options, logger, encoder)
+ {
+-    private static readonly object VerifiedRequestKey = new();
+-
+     protected override bool ValidateCorrelationId(AuthenticationProperties properties)
+-    {
+-        if (!base.ValidateCorrelationId(properties)
+-            || !properties.Items.TryGetValue(SalesforceOAuthEndpoints.RequestKey, out var request)
+-            || !Context.RequestServices.GetRequiredService<SalesforceConnections>().TryClaimCallback(request))
+-        {
+-            return false;
+-        }
+-        Context.Items[VerifiedRequestKey] = request;
+-        return true;
+-    }
+-
+-    // HttpContext survives exceptional framework failure paths where Properties is null.
+-    internal static string? VerifiedRequest(HttpContext context)
+-        => context.Items.TryGetValue(VerifiedRequestKey, out var value) ? value as string : null;
++        => base.ValidateCorrelationId(properties)
++            && BrowserLoginCorrelation.Claim(Context, properties, Context.RequestServices.GetRequiredService<SalesforceLogins>());
+ }
+diff --git a/src/Modules/Salesforce/Salesforce/SalesforceToolSource.cs b/src/Modules/Salesforce/Salesforce/SalesforceToolSource.cs
+index f8435b90..3c367200 100644
+--- a/src/Modules/Salesforce/Salesforce/SalesforceToolSource.cs
++++ b/src/Modules/Salesforce/Salesforce/SalesforceToolSource.cs
+@@ -9,7 +9,7 @@ using Microsoft.Extensions.AI;
+ 
+ namespace DigitalBrain.Salesforce;
+ 
+-internal sealed partial class SalesforceToolSource(ISalesforce salesforce, SalesforceConnections connections) : IAgentToolSource
++internal sealed partial class SalesforceToolSource(ISalesforce salesforce, SalesforceLogins logins) : IAgentToolSource
+ {
+     public IReadOnlyList<AIFunction> ToolsFor(OwnerId owner)
+     {
+@@ -36,14 +36,14 @@ internal sealed partial class SalesforceToolSource(ISalesforce salesforce, Sales
+     }
+ 
+     private Task<string> GetCurrentUserAsync(CancellationToken cancellationToken)
+-        => WithLoginAsync(() => salesforce.GetUserInfoJsonAsync(cancellationToken), readOnly: true);
++        => WithLoginAsync(() => salesforce.GetUserInfoJsonAsync(cancellationToken), readOnly: true, cancellationToken);
+ 
+     private Task<string> QueryAsync(
+         [Description("A single SELECT query with an outer WHERE and a positive LIMIT, for example SELECT Id, Name FROM Account WHERE Name = 'Acme' LIMIT 10.")] string query,
+         CancellationToken cancellationToken)
+     {
+         SalesforceQueryGuard.Validate(query);
+-        return WithLoginAsync(() => salesforce.QueryJsonAsync(query, cancellationToken), readOnly: true);
++        return WithLoginAsync(() => salesforce.QueryJsonAsync(query, cancellationToken), readOnly: true, cancellationToken);
+     }
+ 
+     private async Task<string> CreateOrUpdateAsync(
+@@ -99,12 +99,12 @@ internal sealed partial class SalesforceToolSource(ISalesforce salesforce, Sales
+                 return "Login only authorizes access. Request a new preview and explicit confirmation before writing.";
+             }
+             var payload = JsonSerializer.Serialize(new { id, body, confirmed });
+-            return await WithLoginAsync(() => salesforce.UpsertJsonAsync(objectType, payload, cancellationToken), readOnly: false)
++            return await WithLoginAsync(() => salesforce.UpsertJsonAsync(objectType, payload, cancellationToken), readOnly: false, cancellationToken)
+                 .ConfigureAwait(false);
+         }
+     }
+ 
+-    private async Task<string> WithLoginAsync(Func<Task<string>> operation, bool readOnly)
++    private async Task<string> WithLoginAsync(Func<Task<string>> operation, bool readOnly, CancellationToken cancellationToken)
+     {
+         try
+         {
+@@ -112,7 +112,7 @@ internal sealed partial class SalesforceToolSource(ISalesforce salesforce, Sales
+         }
+         catch (McpAuthenticationRequiredException)
+         {
+-            var action = connections.RequireLogin(readOnly);
++            var action = logins.RequireLogin(readOnly, cancellationToken);
+             // Only a safe status reaches the LLM. The UI/MCP edge obtains the URL separately.
+             return JsonSerializer.Serialize(new
+             {
+diff --git a/tests/DigitalBrain.Simulation.Tests/DigitalBrain.Simulation.Tests.csproj b/tests/DigitalBrain.Simulation.Tests/DigitalBrain.Simulation.Tests.csproj
+index 9e100ad6..ad7efd88 100644
+--- a/tests/DigitalBrain.Simulation.Tests/DigitalBrain.Simulation.Tests.csproj
++++ b/tests/DigitalBrain.Simulation.Tests/DigitalBrain.Simulation.Tests.csproj
+@@ -17,6 +17,7 @@
+   </ItemGroup>
+   <ItemGroup>
+     <ProjectReference Include="../../src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
++    <ProjectReference Include="../../src/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
+     <ProjectReference Include="../../src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
+     <ProjectReference Include="../../src/Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
+     <ProjectReference Include="../../src/Modules/UI/DigitalBrain.Modules.UI/DigitalBrain.Modules.UI.csproj" />
+diff --git a/tests/DigitalBrain.Simulation.Tests/Sdk/BrowserLoginsTests.cs b/tests/DigitalBrain.Simulation.Tests/Sdk/BrowserLoginsTests.cs
+new file mode 100644
+index 00000000..4c2a24e1
+--- /dev/null
++++ b/tests/DigitalBrain.Simulation.Tests/Sdk/BrowserLoginsTests.cs
+@@ -0,0 +1,171 @@
++using DigitalBrain.Abstractions.Identity;
++using DigitalBrain.Abstractions.Interactions;
++using DigitalBrain.Core;
++using DigitalBrain.Sdk;
++using Microsoft.Extensions.DependencyInjection;
++using Xunit;
++
++namespace DigitalBrain.Simulation.Tests.Sdk;
++
++public sealed class BrowserLoginsTests
++{
++    private static readonly OwnerId Owner = new("dev");
++    private static readonly ActorContext Actor = new(new PrincipalId(Guid.NewGuid()), "vlad");
++
++    [Fact]
++    public void Require_mints_one_login_per_turn_and_a_write_drops_the_resume_set()
++    {
++        var (logins, _) = Rail();
++        using var turn = EnterTurn();
++
++        var read = logins.Require(["read_tool"], null, CancellationToken.None);
++        var write = logins.Require([], "compose", CancellationToken.None);
++
++        Assert.Equal("test", read.Provider);
++        Assert.StartsWith("http://localhost:5080/integrations/test/login?request=", read.LoginUrl, StringComparison.Ordinal);
++        Assert.Same(read.Id, write.Id);
++        Assert.Empty(write.ResumeToolNames);
++        Assert.Same(write, logins.Find(Owner, turn.Context.CommandId));
++    }
++
++    [Fact]
++    public void Require_refuses_calls_outside_an_authenticated_turn_or_before_configuration()
++    {
++        var (logins, _) = Rail();
++        Assert.Throws<McpOperationException>(() => logins.Require([], null, CancellationToken.None));
++
++        var (unconfigured, _) = Rail(configured: false);
++        using var turn = EnterTurn();
++        Assert.Throws<McpOperationException>(() => unconfigured.Require([], null, CancellationToken.None));
++    }
++
++    [Fact]
++    public async Task A_login_is_opened_once_claimed_once_committed_once_and_delivered_once()
++    {
++        var (logins, continuation) = Rail();
++        string request;
++        AgentTurnContext context;
++        using (var turn = EnterTurn())
++        {
++            context = turn.Context;
++            request = RequestOf(logins.Require(["read_tool"], "compose", CancellationToken.None));
++        }
++
++        Assert.False(logins.TryClaim(request));
++        Assert.True(logins.TryBegin(request, out var scope));
++        Assert.Equal("compose", scope);
++        Assert.False(logins.TryBegin(request, out _));
++        Assert.True(logins.TryClaim(request));
++        Assert.False(logins.TryClaim(request));
++
++        var committed = false;
++        await logins.AcceptAsync(request, (owner, acceptedScope, commit) =>
++        {
++            Assert.Equal(Owner, owner);
++            Assert.Equal("compose", acceptedScope);
++            commit(() => committed = true);
++            return Task.CompletedTask;
++        });
++        Assert.True(committed);
++        await Assert.ThrowsAsync<McpOperationException>(() => logins.AcceptAsync(request, static (_, _, _) => Task.CompletedTask));
++
++        continuation.Waiting = false;
++        await logins.DeliverAsync(CancellationToken.None);
++        Assert.Empty(continuation.Completed);
++
++        continuation.Waiting = true;
++        await logins.DeliverAsync(CancellationToken.None);
++        await logins.DeliverAsync(CancellationToken.None);
++        var (deliveredContext, accepted) = Assert.Single(continuation.Completed);
++        Assert.Equal(context, deliveredContext);
++        Assert.True(accepted);
++    }
++
++    [Fact]
++    public async Task A_rejected_or_cancelled_login_never_publishes_and_resumes_the_turn_as_denied()
++    {
++        var (logins, continuation) = Rail();
++        string rejected;
++        string cancelled;
++        AgentTurnContext cancelledTurn;
++        using (var turn = EnterTurn())
++        {
++            rejected = RequestOf(logins.Require([], null, CancellationToken.None));
++        }
++
++        using (var turn = EnterTurn())
++        {
++            cancelledTurn = turn.Context;
++            cancelled = RequestOf(logins.Require([], null, CancellationToken.None));
++        }
++
++        Assert.True(logins.TryBegin(rejected, out _));
++        Assert.True(logins.TryClaim(rejected));
++        logins.Reject(rejected);
++        await Assert.ThrowsAsync<McpOperationException>(() => logins.AcceptAsync(rejected, static (_, _, _) => Task.CompletedTask));
++
++        Assert.True(logins.TryBegin(cancelled, out _));
++        Assert.True(logins.TryClaim(cancelled));
++        logins.Cancel(cancelledTurn);
++        var published = false;
++        await Assert.ThrowsAsync<McpOperationException>(() => logins.AcceptAsync(cancelled, (_, _, commit) =>
++        {
++            commit(() => published = true);
++            return Task.CompletedTask;
++        }));
++        Assert.False(published);
++
++        await logins.DeliverAsync(CancellationToken.None);
++        var delivered = Assert.Single(continuation.Completed);
++        Assert.False(delivered.Accepted);
++    }
++
++    private static (TestLogins Logins, FakeContinuation Continuation) Rail(bool configured = true)
++    {
++        var continuation = new FakeContinuation();
++        var services = new ServiceCollection().AddSingleton<IUserActionContinuation>(continuation).BuildServiceProvider();
++        return (new TestLogins(configured, services), continuation);
++    }
++
++    private static string RequestOf(UserActionRequest action)
++        => new Uri(action.LoginUrl).Query["?request=".Length..];
++
++    private static Turn EnterTurn()
++    {
++        var context = new AgentTurnContext(new NeuronId("chat", Owner, "main"), new CommandId(Guid.NewGuid()), Actor);
++        return new Turn(context, AgentTurnContext.Enter(context), VerifiedActor.Enter(Actor));
++    }
++
++    private sealed class Turn(AgentTurnContext context, IDisposable turn, IDisposable actor) : IDisposable
++    {
++        public AgentTurnContext Context { get; } = context;
++
++        public void Dispose()
++        {
++            actor.Dispose();
++            turn.Dispose();
++        }
++    }
++
++    private sealed class TestLogins(bool configured, IServiceProvider services)
++        : BrowserLogins(new BrowserLoginDefinition("test", "Test", "TestScheme", "/integrations/test/login", "/integrations/test/callback", "Log in."), services)
++    {
++        protected override Uri? PublicOrigin => configured ? new Uri("http://localhost:5080") : null;
++    }
++
++    private sealed class FakeContinuation : IUserActionContinuation
++    {
++        public bool Waiting { get; set; } = true;
++
++        public List<(AgentTurnContext Context, bool Accepted)> Completed { get; } = [];
++
++        public Task CompleteAsync(AgentTurnContext context, string actionId, bool accepted, CancellationToken cancellationToken)
++        {
++            Completed.Add((context, accepted));
++            return Task.CompletedTask;
++        }
++
++        public Task<bool> IsWaitingAsync(AgentTurnContext context, string actionId, CancellationToken cancellationToken)
++            => Task.FromResult(Waiting);
++    }
++}
+-- 
+2.43.0
+

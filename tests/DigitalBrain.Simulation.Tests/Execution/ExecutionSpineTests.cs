@@ -3,7 +3,9 @@ using DigitalBrain.Abstractions.Execution;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Core;
 using DigitalBrain.Execution;
-using DigitalBrain.Integrations;
+using DigitalBrain.Google;
+using DigitalBrain.Salesforce;
+using DigitalBrain.SmartPrompt;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -22,15 +24,20 @@ public sealed class ExecutionSimulationFixture : IAsyncLifetime
             Modules = new ModuleManifest(
                 [
                     typeof(ExecutionModule),
-                    typeof(IntegrationsModule),
+                    typeof(GoogleModule),
+                    typeof(SalesforceModule),
                     typeof(DigitalBrain.Time.TimeModule),
                 ]),
             Configuration = new Dictionary<string, string?>
             {
                 [DigitalBrainNames.Mode] = DigitalBrainNames.TestingMode,
             },
-            ConfigureSilo = silo =>
-                silo.Services.AddSingleton<ICapabilityHandler, TestEchoCapabilityHandler>(),
+            // The Smart Prompt module owns the web search capability; the spine only needs the
+            // capability and its fake, not the whole module.
+            ConfigureSilo = silo => silo.Services
+                .AddSingleton<ICapabilityHandler, TestEchoCapabilityHandler>()
+                .AddSingleton<ICapabilityHandler, WebSearchHandler>()
+                .AddSingleton<IWebSearch, FakeWebSearch>(),
         });
 
     public async ValueTask DisposeAsync()

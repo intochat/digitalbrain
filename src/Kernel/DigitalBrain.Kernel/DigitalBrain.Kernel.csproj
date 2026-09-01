@@ -15,11 +15,13 @@
     <ProjectReference Include="../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
     <ProjectReference Include="../../Modules/Memory/Memory/DigitalBrain.Modules.Memory.csproj" />
     <ProjectReference Include="../../Modules/Execution/Execution/DigitalBrain.Modules.Execution.csproj" />
-    <ProjectReference Include="../../Modules/Integrations/DigitalBrain.Modules.Integrations.csproj" />
+    <ProjectReference Include="../../Modules/Google/Google/DigitalBrain.Modules.Google.csproj" />
+    <ProjectReference Include="../../Modules/Salesforce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
     <ProjectReference Include="../../Modules/SmartPrompt/SmartPrompt/DigitalBrain.Modules.SmartPrompt.csproj" />
     <ProjectReference Include="../../Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
     <ProjectReference Include="../DigitalBrain.Core/DigitalBrain.Core.csproj" />
     <ProjectReference Include="../DigitalBrain.Client/DigitalBrain.Client.csproj" />
+    <ProjectReference Include="../DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.E2E.Tests" />

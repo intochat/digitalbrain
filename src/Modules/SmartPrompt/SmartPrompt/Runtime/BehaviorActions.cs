@@ -1,9 +1,9 @@
+using System.Text.Json;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Chat;
-using DigitalBrain.Integrations.Salesforce;
+using DigitalBrain.Salesforce;
 using DigitalBrain.UI;
 using Microsoft.Extensions.AI;
-using System.Text.Json;
 
 namespace DigitalBrain.SmartPrompt;
 
@@ -46,7 +46,7 @@ internal sealed class BehaviorReasoner(IChatClient chatClient) : IBehaviorReason
 internal sealed class BehaviorActionExecutor(
     IGrainFactory grains,
     IBehaviorReasoner reasoner,
-    ISalesforceTransport salesforce)
+    ISalesforce salesforce)
     : IBehaviorActionExecutor
 {
     public async Task Execute(

@@ -49,8 +49,8 @@ When prompted by the dashboard, enter `gmail-client-id` and
 `gmail-client-secret` privately. Aspire can save them to the AppHost's existing
 user-secrets store; do not paste them into chat, source control, or appsettings.
 They are injected only into the kernel as
-`DigitalBrain__Integrations__Gmail__OAuth__ClientId` and
-`DigitalBrain__Integrations__Gmail__OAuth__ClientSecret`. The AppHost also
+`DigitalBrain__Google__Gmail__OAuth__ClientId` and
+`DigitalBrain__Google__Gmail__OAuth__ClientSecret`. The AppHost also
 injects the fixed hosted endpoint, the exact callback's public origin
 `http://localhost:5080`, and no Gmail secrets into the shared DigitalBrain
 module, MCP resource, UI, or trace configuration.

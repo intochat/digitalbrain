@@ -8,6 +8,7 @@
     <Project Path="src/Kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
     <Project Path="src/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
     <Project Path="src/Kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
+    <Project Path="src/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
     <Project Path="src/Kernel/DigitalBrain.Scripting/DigitalBrain.Scripting.csproj" />
   </Folder>
   <Folder Name="/Modules/" />
@@ -34,8 +35,15 @@
     <Project Path="src/Modules/Execution/Contracts/DigitalBrain.Modules.Execution.Contracts.csproj" />
     <Project Path="src/Modules/Execution/Execution/DigitalBrain.Modules.Execution.csproj" />
   </Folder>
-  <Folder Name="/Modules/Integrations/">
-    <Project Path="src/Modules/Integrations/DigitalBrain.Modules.Integrations.csproj" />
+  <Folder Name="/Modules/Google/">
+    <Project Path="src/Modules/Google/Contracts/DigitalBrain.Modules.Google.Contracts.csproj" />
+    <Project Path="src/Modules/Google/Google/DigitalBrain.Modules.Google.csproj" />
+    <Project Path="src/Modules/Google/Aspire.Hosting/DigitalBrain.Modules.Google.Aspire.Hosting.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Salesforce/">
+    <Project Path="src/Modules/Salesforce/Contracts/DigitalBrain.Modules.Salesforce.Contracts.csproj" />
+    <Project Path="src/Modules/Salesforce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
+    <Project Path="src/Modules/Salesforce/Aspire.Hosting/DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" />
   </Folder>
   <Folder Name="/Modules/SmartPrompt/">
     <Project Path="src/Modules/SmartPrompt/Contracts/DigitalBrain.Modules.SmartPrompt.Contracts.csproj" />
@@ -46,7 +54,6 @@
     <File Path="Directory.Packages.props" />
   </Folder>
   <Folder Name="/Testing/">
-    <Project Path="src/Testing/DigitalBrain.Integrations.Fakes/DigitalBrain.Integrations.Fakes.csproj" />
     <Project Path="src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
     <Project Path="src/Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
   </Folder>

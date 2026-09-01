@@ -17,6 +17,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="../../src/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
     <ProjectReference Include="../../src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
     <ProjectReference Include="../../src/Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <ProjectReference Include="../../src/Modules/UI/DigitalBrain.Modules.UI/DigitalBrain.Modules.UI.csproj" />
@@ -27,7 +28,8 @@
     <ProjectReference Include="../../src/Modules/Memory/Contracts/DigitalBrain.Modules.Memory.Contracts.csproj" />
     <ProjectReference Include="../../src/Modules/Execution/Contracts/DigitalBrain.Modules.Execution.Contracts.csproj" />
     <ProjectReference Include="../../src/Modules/Execution/Execution/DigitalBrain.Modules.Execution.csproj" />
-    <ProjectReference Include="../../src/Modules/Integrations/DigitalBrain.Modules.Integrations.csproj" />
+    <ProjectReference Include="../../src/Modules/Google/Google/DigitalBrain.Modules.Google.csproj" />
+    <ProjectReference Include="../../src/Modules/Salesforce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
     <ProjectReference Include="../../src/Modules/SmartPrompt/Contracts/DigitalBrain.Modules.SmartPrompt.Contracts.csproj" />
     <ProjectReference Include="../../src/Modules/SmartPrompt/SmartPrompt/DigitalBrain.Modules.SmartPrompt.csproj" />
   </ItemGroup>
