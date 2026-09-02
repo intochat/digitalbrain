@@ -12,6 +12,12 @@ It also supersedes the generated-script and runtime-agent walkthroughs in
 graph model in those documents remain useful; this document is authoritative when they disagree
 about agents, automations, activities, capabilities, generated code, or recovery.
 
+The focused
+[`2026-09-02-digitalbrain-v2-durable-scripting-design.md`](./2026-09-02-digitalbrain-v2-durable-scripting-design.md)
+brings full-trust user/assistant-authored scripting and a minimal automation path into the first
+durable execution slice. It is authoritative where it refines this document's generated-code,
+security-admission, worker, and implementation-slice sequencing decisions.
+
 ---
 
 ## 1. Goal
@@ -165,8 +171,9 @@ If the user asks to reuse it, the assistant creates an `AgentDefinition` revisio
 that revision.
 
 `EffectWorkerGrain` owns no workflow decisions. Given a recorded `EffectInvocation`, it invokes the
-capability broker, reuses the same `EffectId` across job retries, reconciles ambiguous provider
-outcomes where possible, and reports one idempotent outcome command to the owning run.
+capability broker, durably records that invocation may have started before crossing the provider
+boundary, reuses the same `EffectId` across job retries, reconciles ambiguous provider outcomes
+where possible, and reports one idempotent outcome command to the owning run.
 
 ### 4.4 Activity is a projection
 
@@ -308,7 +315,8 @@ For each effectful step the run:
 1. persists `Planned` and its immutable input;
 2. persists `Started` and the deterministic `EffectId`;
 3. persists a dispatch record and schedules `EffectWorkerGrain` with that same `EffectId`;
-4. yields its turn while the worker invokes the broker and reports a classified outcome;
+4. yields its turn while the worker records `InvocationMayHaveStarted`, invokes the broker, and
+   reports a classified outcome;
 5. persists `Succeeded` and its result, or a classified failure/ambiguity;
 6. atomically advances the run cursor and recovery-critical context; and
 7. schedules the next durable wake-up.
@@ -323,8 +331,8 @@ that transition durable completes.
 |---|---|
 | Before `Planned` is durable | Re-plan the step from persisted inputs. |
 | After `Planned`, before `Started` | Start the recorded step. |
-| After `Started`, before provider acceptance | Invoke with the recorded `EffectId`. |
-| After provider acceptance, before result is durable | Deduplicate or reconcile by `EffectId`; otherwise stop as `Uncertain`. |
+| Before worker `InvocationMayHaveStarted` | Dispatch the recorded invocation again. |
+| After `InvocationMayHaveStarted`, before result is durable | Apply declared recovery semantics: replay, reuse the idempotency key, reconcile, or stop as `Uncertain`. |
 | After `Succeeded` is durable | Replay the stored result and advance; never invoke again. |
 | After terminal state, before notification delivery | Re-deliver the durable outbox signal with the same `SignalId`. |
 
@@ -338,10 +346,17 @@ Jobs provides at-least-once wake-up and retry for non-terminal runs and pending 
 `ExecutionRunGrain` and `EffectWorkerGrain` treat duplicate jobs as harmless checks of durable
 identity and state.
 
-On activation, a non-terminal run ensures that a wake-up exists. A run turn only plans, checkpoints,
-dispatches, or incorporates an outcome; it does not await a slow provider. A long loop therefore
-never monopolizes a serialized run turn, and cancellation or user input can be admitted while an
-effect is in flight.
+Before accepting state which can need future work, a run establishes a recurring durable liveness
+reminder. Immediate Durable Jobs are low-latency wake-ups. The reminder closes the non-atomic gap
+where `DispatchPending` is journaled but the process dies before `ScheduleJobAsync`: it eventually
+reactivates the run and resubmits the recorded dispatch. Duplicate reminders and jobs only re-check
+the ledger. The reminder remains until the run is quiescent: terminal with every dispatch,
+reconciliation, and lifecycle outbox record durably acknowledged and cleared. Unregistration comes
+last, so a crash can leave a harmless extra wake but cannot strand a committed run or notification.
+
+A run turn only plans, checkpoints, dispatches, or incorporates an outcome; it does not await a slow
+provider. A long loop therefore never monopolizes a serialized run turn, and cancellation or user
+input can be admitted while an effect is in flight.
 
 Durable Jobs does not hold the continuation, choose the next step, deduplicate effects, or own run
 status. Those remain responsibilities of `ExecutionRunGrain` and its ledger.
@@ -445,16 +460,15 @@ Generated C# never becomes an Orleans grain class and never defines wire contrac
 types, proxies, serializers, and manifests remain startup-known. `AutomationNeuron`,
 `ExecutionRunGrain`, and `EffectWorkerGrain` remain the graph/runtime citizens.
 
-The initial automation runtime interprets a versioned, typed `AutomationPlan`. Generated C# is a
-later execution adapter. When introduced, it implements a narrow internal program interface in a
-separate worker process and can interact only through deterministic `StepAsync` calls. Restarting
-the program from its entry point is safe because `StepAsync` returns stored results for completed
-step IDs.
+User- and assistant-authored C# is part of the first durable execution vertical. It implements a
+narrow internal program interface in a separate full-trust worker process and uses deterministic
+`StepAsync` calls for operations which require durable recovery. Restarting the program from its
+entry point is safe because `StepAsync` returns stored results for completed step IDs.
 
-A collectible `AssemblyLoadContext` may isolate dependencies and permit unload inside that worker;
-it is not a security boundary. Analyzer/reference restrictions are defense in depth. The worker has
-OS-level resource, filesystem, network, and lifetime restrictions, and it cannot directly call
-Orleans grains or effectors.
+A collectible `AssemblyLoadContext` permits unload inside that worker; it is not a security
+boundary. Hostile-source sandboxing and restricted-OS admission are deferred by explicit product
+decision. The first worker is labelled `FullTrust`. It may run user or assistant source, while
+durability is guaranteed only for effects routed through `StepAsync`.
 
 ---
 
@@ -507,20 +521,21 @@ focused `docs/v2-rebuild-brief.md` as its design input.
 1. **Static neuron substrate.** Execute `docs/v2-rebuild-brief.md`: split command/query contracts,
    add delivery outcomes, inject `NeuronRuntime`, decompose `Neuron`, collapse delivery paths, gate
    potentiation, and remove or relocate dead/misplaced contracts. No run engine, AI, or codegen.
-2. **Durable run core.** Replace the current coarse `ExecutionNeuron` loop with the journaled run
-   state machine, fake replay-safe/idempotent effectors, durable wake-ups, cancellation intent,
-   outbox, activation recovery, and forced-recovery tests. No model or automation authoring.
-3. **Capability protocol.** Add leases, effect recovery classifications, broker enforcement,
-   provider idempotency/reconciliation, and privilege-escalation tests. Migrate existing handlers.
+2. **Durable user-authored scripting.** Execute the focused durable-scripting design: replace the
+   coarse execution loop with the run reducer and ledger; add immutable script revisions, direct
+   Roslyn compilation, a full-trust out-of-process runner, sequential `StepAsync`, durable wake-ups,
+   minimal automation triggers, revision pinning, cancellation, outbox, and crash-recovery tests.
+3. **Capability packs.** Add the complete lease/policy surface and production capability families,
+   including provider idempotency/reconciliation and richer repository/Roslyn operations. The
+   merged slice already establishes the effect protocol and minimum real seams.
 4. **Task-agent delegation.** Add `TaskAgentSpec`, context manifests, model/tool ledgering, child
-   runs, parent cancellation/deadlines, and the four assistant brain operations.
-5. **Automation definitions.** Add immutable revisions, validation/approval/publication, triggers,
-   concurrency policies, revision pinning, and the PR verification automation using a typed plan.
-6. **Generated-program worker.** Add the out-of-process compiler/runner only after the plan runtime
-   proves recovery end to end. Generated code uses existing contracts and `StepAsync`; it never
-   registers an Orleans type.
-7. **Discovery and learning.** Add the dynamic capability catalog, similarity routing, and
+   runs, parent cancellation/deadlines, and durable `agent.spawn`/`agent.await` capabilities.
+5. **Automation expansion.** Add richer trigger adapters, concurrency policies, approval workflows,
+   and the full multi-agent PR verification automation without changing the scripting ABI.
+6. **Discovery and learning.** Add the dynamic capability catalog, similarity routing, and
    correction loop without coupling authorization to routing.
+7. **Isolation and distribution.** Add restricted-OS executors, hostile-source admission,
+   dependency resolution, and multi-host scheduling when the product requires those boundaries.
 
 Each slice leaves the full solution green and deployable. No compatibility shim or parallel `v2`
 namespace is carried forward.
@@ -557,13 +572,16 @@ journal/job storage, and verifies the recovery matrix. The test provider's idemp
 outside the silo process. Separate cases cover a crash before invocation, after provider acceptance,
 after result persistence, and before outbox acknowledgement.
 
-### 14.4 Security and contract tests
+### 14.4 Authority and contract tests
 
 - a child cannot request or use a capability its parent cannot delegate;
 - a synapse or discovered operation cannot widen a lease;
 - generated code cannot define Orleans interfaces or serialized wire types;
 - an effector rejects a missing, expired, wrong-owner, wrong-run, or wrong-revision lease; and
 - manifest validation covers every predeployed run/definition wire type.
+
+The first scripting worker is intentionally full trust. These tests protect domain authority and
+wire compatibility; they do not claim that the process is a sandbox for hostile code.
 
 ---
 
@@ -578,6 +596,9 @@ The durable-run architecture is complete when:
 - every external write either deduplicates/reconciles by `EffectId` or stops as `Uncertain`;
 - every non-terminal run is eventually woken after silo/process restart;
 - cancellation and deadlines prevent new work and reconcile work already in flight;
-- generated code, if enabled, runs behind stable grain types and cannot bypass the capability broker;
+- user- and assistant-authored code runs behind stable grain types, and only brokered `StepAsync`
+  effects receive durability guarantees;
+- the initial executor is identified as full trust without claiming process or ALC isolation is a
+  security boundary;
 - activity and search views can be rebuilt from authoritative run/definition state; and
 - build, unit, simulation, and process-restart suites pass with zero warnings.
