@@ -1,6 +1,10 @@
 # DigitalBrain v2 — rebuild brief
 
-**Read this first, then `docs/superpowers/specs/2026-09-02-digitalbrain-v2-neuron-substrate-design.md` (the binding design) and `docs/digitalbrain-v2-anatomy.html` (the same design, visual, with three step-through walkthroughs).**
+**Authority:** this brief is binding for the immediate static-kernel rebuild. Then read
+`docs/superpowers/specs/2026-09-02-digitalbrain-v2-durable-runs-design.md`, which is binding for
+runtime-created agents, automations, capabilities, activities, and recovery. The older neuron
+substrate spec retains the original rationale, and `docs/digitalbrain-v2-anatomy.html` is an
+illustrative historical walkthrough; the durable-runs design wins wherever those artifacts differ.
 
 ## Goal
 

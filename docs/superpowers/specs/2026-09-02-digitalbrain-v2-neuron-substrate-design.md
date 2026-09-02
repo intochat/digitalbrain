@@ -1,7 +1,13 @@
 # DigitalBrain v2 — The Neuron Substrate
 
-**Status:** Ratified in brainstorm 2026-09-02; written-spec review pending
+**Status:** Ratified for the static graph; dynamic execution sections superseded
 **Date:** 2026-09-02
+**Execution correction:**
+[`2026-09-02-digitalbrain-v2-durable-runs-design.md`](./2026-09-02-digitalbrain-v2-durable-runs-design.md)
+is authoritative for Activity, runtime-created agents, automation definitions/revisions/runs,
+capabilities, generated code, and recovery. In particular, it supersedes D8, D11, D18, §9.3, M4,
+and the old Slice 2/3 execution story below. Generated assemblies do not become Orleans grain types,
+and ordinary `await` is not a durable continuation.
 **Supersedes:**
 - [2026-08-23-smart-prompt-execution-architecture-design.md](./2026-08-23-smart-prompt-execution-architecture-design.md) — entirely. Smart Prompts are retired; the Execution Neuron is narrowed into the Activity Neuron; `DigitalBrain.Scripting`'s "out-of-process, never loaded in Kernel" position is reversed.
 - [2026-08-22-type-safe-behavior-event-architecture-design.md](./2026-08-22-type-safe-behavior-event-architecture-design.md) — the Behavior model.
