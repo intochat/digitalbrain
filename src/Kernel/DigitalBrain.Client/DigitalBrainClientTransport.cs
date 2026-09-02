@@ -25,12 +25,12 @@ internal sealed class DigitalBrainClientTransport
 
     internal OwnerId Owner { get; }
 
-    internal NeuronId Root => ISessionNeuron.ForOwner(Owner);
+    internal NeuronId Root => IBrainNeuron.ForOwner(Owner);
 
     internal Task ActivateAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Session().Activate().WaitAsync(cancellationToken);
+        return Brain().Activate().WaitAsync(cancellationToken);
     }
 
     internal NeuronReference<TNeuron> GetReference<TNeuron>(
@@ -100,7 +100,7 @@ internal sealed class DigitalBrainClientTransport
         RequireOwnedSubject(subject);
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
         cancellationToken.ThrowIfCancellationRequested();
-        return Session()
+        return Brain()
             .ReadNeuronJournal(subject, kind, afterSequence)
             .WaitAsync(cancellationToken);
     }
@@ -111,7 +111,7 @@ internal sealed class DigitalBrainClientTransport
     {
         RequireOwnedSubject(subject);
         cancellationToken.ThrowIfCancellationRequested();
-        return Session().ReadNeuronSynapses(subject).WaitAsync(cancellationToken);
+        return Brain().ReadNeuronSynapses(subject).WaitAsync(cancellationToken);
     }
 
     internal async IAsyncEnumerable<JournalRead> WatchJournalAsync(
@@ -129,7 +129,7 @@ internal sealed class DigitalBrainClientTransport
             var cursor = afterSequence;
             while (!cancellationToken.IsCancellationRequested)
             {
-                var page = await Session()
+                var page = await Brain()
                     .ReadNeuronJournal(subject, kind, cursor)
                     .WaitAsync(cancellationToken)
                     .ConfigureAwait(false);
@@ -145,10 +145,10 @@ internal sealed class DigitalBrainClientTransport
             yield break;
         }
 
-        var session = Session();
+        var brain = Brain();
         try
         {
-            await session
+            await brain
                 .WatchNeuron(subject, kind, afterSequence, reference)
                 .WaitAsync(cancellationToken)
                 .ConfigureAwait(false);
@@ -161,12 +161,12 @@ internal sealed class DigitalBrainClientTransport
         }
         finally
         {
-            await TeardownWatchAsync(session, subject, reference, observer).ConfigureAwait(false);
+            await TeardownWatchAsync(brain, subject, reference, observer).ConfigureAwait(false);
         }
     }
 
-    private ISessionNeuron Session()
-        => _grains.GetGrain<ISessionNeuron>(Root.ToGrainId());
+    private IBrainNeuron Brain()
+        => _grains.GetGrain<IBrainNeuron>(Root.ToGrainId());
 
     private async Task<SignalDeliveryResult> SendResultAsync(
         NeuronId receiver,
@@ -178,7 +178,7 @@ internal sealed class DigitalBrainClientTransport
         cancellationToken.ThrowIfCancellationRequested();
 
         await ActivateAsync(cancellationToken).ConfigureAwait(false);
-        return await Session().Send(receiver, signal)
+        return await Brain().Send(receiver, signal)
             .WaitAsync(cancellationToken)
             .ConfigureAwait(false);
     }
@@ -203,8 +203,8 @@ internal sealed class DigitalBrainClientTransport
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        var session = Session();
-        var cursor = await session
+        var brain = Brain();
+        var cursor = await brain
             .ReadNeuronJournal(Root, JournalKind.Incoming, afterSequence: long.MaxValue)
             .WaitAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -214,7 +214,7 @@ internal sealed class DigitalBrainClientTransport
             var result = await SendResultAsync(receiver, request, cancellationToken).ConfigureAwait(false);
             RequireHandled(receiver, request, result.Outcome);
             return await PollForResponseAsync(
-                session,
+                brain,
                 Root,
                 cursor.ResumeSequence,
                 result.Delivery.CorrelationId,
@@ -224,7 +224,7 @@ internal sealed class DigitalBrainClientTransport
 
         try
         {
-            await session
+            await brain
                 .WatchNeuron(Root, JournalKind.Incoming, cursor.ResumeSequence, reference)
                 .WaitAsync(cancellationToken)
                 .ConfigureAwait(false);
@@ -239,7 +239,7 @@ internal sealed class DigitalBrainClientTransport
         }
         finally
         {
-            await TeardownWatchAsync(session, Root, reference, observer).ConfigureAwait(false);
+            await TeardownWatchAsync(brain, Root, reference, observer).ConfigureAwait(false);
         }
     }
 
@@ -317,7 +317,7 @@ internal sealed class DigitalBrainClientTransport
     }
 
     private static async Task<Signal> PollForResponseAsync(
-        ISessionNeuron session,
+        IBrainNeuron brain,
         NeuronId root,
         long cursor,
         CorrelationId correlation,
@@ -326,7 +326,7 @@ internal sealed class DigitalBrainClientTransport
     {
         while (true)
         {
-            var read = await session
+            var read = await brain
                 .ReadNeuronJournal(root, JournalKind.Incoming, cursor)
                 .WaitAsync(cancellationToken)
                 .ConfigureAwait(false);
@@ -352,14 +352,14 @@ internal sealed class DigitalBrainClientTransport
     }
 
     private async Task TeardownWatchAsync(
-        ISessionNeuron session,
+        IBrainNeuron brain,
         NeuronId subject,
         IJournalObserver reference,
         ChannelJournalObserver observer)
     {
         try
         {
-            await session.UnwatchNeuron(subject, reference).ConfigureAwait(false);
+            await brain.UnwatchNeuron(subject, reference).ConfigureAwait(false);
         }
         catch (Exception)
         {
@@ -381,7 +381,7 @@ internal sealed class DigitalBrainClientTransport
     private static void RequireDomainNeuronContract(Type neuronType)
     {
         if (neuronType == typeof(INeuron)
-            || typeof(ISessionNeuron).IsAssignableFrom(neuronType))
+            || typeof(IBrainNeuron).IsAssignableFrom(neuronType))
         {
             throw new NeuronAuthorizationException(
                 $"'{neuronType.Name}' is not addressable through IDigitalBrain.Get. Activate the brain with ActivateAsync; address domain neuron contracts with Get; send signals through SendAsync; observe the owner root through IDigitalBrain and domain neurons through NeuronReference.");

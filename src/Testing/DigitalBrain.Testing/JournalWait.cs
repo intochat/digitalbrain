@@ -49,7 +49,7 @@ public static class JournalWait
         ArgumentNullException.ThrowIfNull(brain);
 
         return ForAsync(
-            ISessionNeuron.ForOwner(brain.Owner),
+            IBrainNeuron.ForOwner(brain.Owner),
             kind,
             (cursor, token) => brain.ReadJournalAsync(kind, cursor, token),
             match,

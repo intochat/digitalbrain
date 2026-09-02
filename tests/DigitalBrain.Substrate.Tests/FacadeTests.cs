@@ -66,7 +66,7 @@ public sealed class FacadeTests
     {
         await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([]) });
         var owner = new OwnerId(DigitalBrainNames.DefaultOwner);
-        var root = brain.Grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(owner).ToGrainId());
+        var root = brain.Grains.GetGrain<IBrainNeuron>(IBrainNeuron.ForOwner(owner).ToGrainId());
         var foreign = new NeuronId("pingsink", new OwnerId("someone-else"), "private");
 
         await Assert.ThrowsAsync<NeuronAuthorizationException>(

@@ -1,23 +1,24 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Journals;
+using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Signals;
+using DigitalBrain.Abstractions.Synapses;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.BroadcastChannel;
 using Orleans.Journaling;
 
-using DigitalBrain.Abstractions.Neurons;
-using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Messaging;
-using DigitalBrain.Abstractions.Signals;
-using DigitalBrain.Abstractions.Journals;
-using DigitalBrain.Abstractions.Synapses;
 namespace DigitalBrain.Core;
 
-internal sealed class SessionNeuron : Neuron, ISessionNeuron
+[GrainType(IBrainNeuron.GrainTypeName)]
+internal sealed class BrainNeuron : Neuron, IBrainNeuron
 {
     private const string ActivationPublishedName = "activation-published";
 
     private readonly IDurableValue<bool> _activationPublished;
 
-    public SessionNeuron(NeuronRuntime runtime)
+    public BrainNeuron(NeuronRuntime runtime)
         : base(runtime)
     {
         _activationPublished = ServiceProvider.GetRequiredKeyedService<IDurableValue<bool>>(ActivationPublishedName);
@@ -30,8 +31,6 @@ internal sealed class SessionNeuron : Neuron, ISessionNeuron
             return;
         }
 
-        // Journal first: DigitalBrainActivated in this session's OWN Outgoing journal is the
-        // pinned activation footprint, whether or not any surface module subscribes.
         var activated = await RecordOutgoingAsync(new DigitalBrainActivated(Id.Owner))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
@@ -70,12 +69,17 @@ internal sealed class SessionNeuron : Neuron, ISessionNeuron
             : GrainFactory.GetGrain<INeuronQuery>(subject.ToGrainId()).ReadSynapses();
     }
 
-    public Task WatchNeuron(NeuronId subject, JournalKind kind, long afterSequence, IJournalObserver observer)
+    public Task WatchNeuron(
+        NeuronId subject,
+        JournalKind kind,
+        long afterSequence,
+        IJournalObserver observer)
     {
         RequireSameOwner(subject);
         return subject == Id
             ? Watch(kind, afterSequence, observer)
-            : GrainFactory.GetGrain<INeuronQuery>(subject.ToGrainId()).Watch(kind, afterSequence, observer);
+            : GrainFactory.GetGrain<INeuronQuery>(subject.ToGrainId())
+                .Watch(kind, afterSequence, observer);
     }
 
     public Task UnwatchNeuron(NeuronId subject, IJournalObserver observer)

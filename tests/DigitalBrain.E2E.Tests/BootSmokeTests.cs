@@ -23,14 +23,14 @@ public sealed class BootSmokeTests(AppHostFixture fixture)
     }
 
     [Fact]
-    public async Task FacadeFiresAcrossProcessesAndJournals()
+    public async Task FacadeSendsAcrossProcessesAndJournals()
     {
         var brain = fixture.BrainFor($"e2e-{Guid.NewGuid().ToString("N")[..8]}");
         await brain.ActivateAsync(TestContext.Current.CancellationToken);
 
         // Observe the activation's journal footprint using the same subject/kind the simulation
-        // suite's JournalSmokeTests.ActivationLandsInTheSessionJournal pins: DigitalBrainActivated
-        // lands in the owner session's OWN Outgoing journal.
+        // suite's JournalSmokeTests.ActivationLandsInTheBrainJournal pins: DigitalBrainActivated
+        // lands in the owner brain root's own Outgoing journal.
         var delivery = await JournalWait.ForAsync(
             brain,
             JournalKind.Outgoing,

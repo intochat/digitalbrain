@@ -5,6 +5,7 @@ using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Synapses;
 using DigitalBrain.Core;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Serialization;
@@ -14,6 +15,34 @@ namespace DigitalBrain.Substrate.Tests;
 
 public sealed class ContractShapeTests
 {
+    [Fact]
+    public void BrainNeuronRenamesTheOwnerRootWithoutChangingItsDurableAddress()
+    {
+        var owner = new OwnerId("owner");
+
+        Assert.Equal("sessionneuron", IBrainNeuron.GrainTypeName);
+        Assert.Equal("session", IBrainNeuron.InstanceName);
+        Assert.Equal(
+            new NeuronId("sessionneuron", owner, "session"),
+            IBrainNeuron.ForOwner(owner));
+        Assert.Equal(
+            "db.v2.brain-neuron",
+            Assert.Single(typeof(IBrainNeuron).GetCustomAttributes<AliasAttribute>()).Alias);
+        var grainType = Assert.IsType<GrainTypeAttribute>(
+            typeof(BrainNeuron).GetCustomAttribute<GrainTypeAttribute>());
+        using var services = new ServiceCollection().BuildServiceProvider();
+        Assert.Equal(
+            "sessionneuron",
+            grainType.GetGrainType(services, typeof(BrainNeuron)).ToString());
+        var retiredRootTypeName = string.Concat("Session", "Neuron");
+        Assert.DoesNotContain(
+            typeof(INeuron).Assembly.GetTypes(),
+            type => type.Name.Contains(retiredRootTypeName, StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            typeof(Neuron).Assembly.GetTypes(),
+            type => type.Name.Contains(retiredRootTypeName, StringComparison.Ordinal));
+    }
+
     [Fact]
     public void Neuron_RequiresRuntimeCompositionBoundary()
     {

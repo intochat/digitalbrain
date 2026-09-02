@@ -16,21 +16,21 @@ public sealed class JournalSmokeTests(SimulationFixture fixture)
     [Fact]
     public void HistoricalFactJournalAliasesRemainResolvable()
     {
-        // Chat used to journal these signals. They are no longer emitted, but existing
+        // Chat used to journal these signals. They are no longer recorded, but existing
         // retained journals must still be readable after the fact-memory projection is gone.
         Assert.Equal("memory.store-fact", AliasOf<StoreFact>());
         Assert.Equal("memory.fact-stored", AliasOf<FactStored>());
     }
 
     [Fact]
-    public async Task ActivationLandsInTheSessionJournal()
+    public async Task ActivationLandsInTheBrainJournal()
     {
         var brain = fixture.Sim.BrainFor(fixture.Sim.UniqueId("journal-owner"));
         await brain.ActivateAsync(TestContext.Current.CancellationToken);
 
-        // SessionNeuron.Activate() journals DigitalBrainActivated into its OWN Outgoing
+        // BrainNeuron.Activate() journals DigitalBrainActivated into its OWN Outgoing
         // journal BEFORE publishing it on the activation BroadcastChannel -- so the owner
-        // session's own Outgoing journal is where the activation deterministically lands,
+        // brain root's own Outgoing journal is where the activation deterministically lands,
         // independent of whether any surface module subscribes. (Pin moved here in C2 Task 5
         // when the Brain absorbed the standalone DigitalBrainNeuron.)
         var delivery = await JournalWait.ForAsync(

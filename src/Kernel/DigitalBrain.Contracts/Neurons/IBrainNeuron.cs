@@ -1,11 +1,12 @@
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Journals;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Synapses;
+
 namespace DigitalBrain.Abstractions.Neurons;
 
-[Alias("DigitalBrain.Abstractions.ISessionNeuron")]
-public interface ISessionNeuron : INeuron
+[Alias("db.v2.brain-neuron")]
+public interface IBrainNeuron : INeuron, INeuronQuery
 {
     const string GrainTypeName = "sessionneuron";
     const string InstanceName = "session";
@@ -16,8 +17,6 @@ public interface ISessionNeuron : INeuron
     [Alias(nameof(Activate))]
     Task Activate();
 
-    // A send is a direct awaited call spanning the receiver's whole turn, so it carries
-    // the same budget as the receiver's Deliver.
     [Alias(nameof(Send))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
     Task<SignalDeliveryResult> Send(NeuronId receiver, Signal signal);
