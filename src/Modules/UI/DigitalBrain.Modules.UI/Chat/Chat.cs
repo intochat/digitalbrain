@@ -45,7 +45,7 @@ internal sealed class Chat : Neuron, IChat
     private readonly Serializer<TurnQueueState> _queues;
     private readonly Serializer<ChatExecutionFocus> _focusStates;
 
-    // The in-flight worker call, fire-and-tracked: the task settles the turn when the call
+    // The in-flight worker call is detached and tracked: the task settles the turn when the call
     // returns or throws; the token is the turn-scoped cancel; the timer fails a call that
     // outlives its budget. All in-memory — a restarted activation reconciles durably instead.
     private Task? _activeCall;
@@ -139,7 +139,7 @@ internal sealed class Chat : Neuron, IChat
             var queue = LoadQueue();
             queue.PendingTurnIds.Remove(record.TurnId);
             SaveQueue(queue);
-            await EmitAsync(new TurnLifecycle(
+            await RecordOutgoingAsync(new TurnLifecycle(
                 new TurnId(record.TurnId),
                 new CommandId(record.CommandId),
                 Id,
@@ -163,7 +163,7 @@ internal sealed class Chat : Neuron, IChat
         var cancellation = _activeCallCancellation;
         turns[index] = record with { Status = ChatTurnStatus.Cancelling, Revision = record.Revision + 1 };
         SaveTurns(turns);
-        await EmitAsync(new TurnLifecycle(
+        await RecordOutgoingAsync(new TurnLifecycle(
             new TurnId(record.TurnId),
             new CommandId(record.CommandId),
             Id,
@@ -245,7 +245,7 @@ internal sealed class Chat : Neuron, IChat
         }
 
         SaveQueue(queue);
-        await EmitAsync(new TurnLifecycle(new TurnId(record.TurnId), context.CommandId, Id,
+        await RecordOutgoingAsync(new TurnLifecycle(new TurnId(record.TurnId), context.CommandId, Id,
             ChatTurnStatus.Pending, "login-completed"))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         await TryStartNextAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
@@ -314,9 +314,10 @@ internal sealed class Chat : Neuron, IChat
             : await GrainFactory.GetGrain<IChat>(subject.ToGrainId()).Read().WaitAsync(cancellationToken)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
+        cancellationToken.ThrowIfCancellationRequested();
         await ReplyAsync(
-            new TranscriptRead(signal.CommandId, subject, Trimmed(transcript, signal.MaxTurns)),
-            cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            new TranscriptRead(signal.CommandId, subject, Trimmed(transcript, signal.MaxTurns)))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public async Task HandleAsync(Note signal, CancellationToken cancellationToken)
@@ -330,7 +331,7 @@ internal sealed class Chat : Neuron, IChat
         }
 
         Remember(new ChatTurn(FromUser: false, signal.Text));
-        await EmitAsync(new Responded(CommandId.New(), Id, signal.Text, Author: Id.Name))
+        await RecordOutgoingAsync(new Responded(CommandId.New(), Id, signal.Text, Author: Id.Name))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
@@ -346,7 +347,7 @@ internal sealed class Chat : Neuron, IChat
         }
 
         Remember(new ChatTurn(FromUser: false, signal.Caption));
-        await EmitAsync(new Responded(CommandId.New(), Id, signal.Caption, Author: Id.Name, Cards: [signal]))
+        await RecordOutgoingAsync(new Responded(CommandId.New(), Id, signal.Caption, Author: Id.Name, Cards: [signal]))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
@@ -411,7 +412,7 @@ internal sealed class Chat : Neuron, IChat
         queue.PendingTurnIds.Add(turnId);
         SaveQueue(queue);
 
-        await EmitAsync(new TurnLifecycle(
+        await RecordOutgoingAsync(new TurnLifecycle(
             new TurnId(turnId),
             message.CommandId,
             Id,
@@ -464,7 +465,7 @@ internal sealed class Chat : Neuron, IChat
 
         // Running is committed to the journal BEFORE the call starts, so a instantly-settling
         // worker can never put Responded/Completed ahead of Running.
-        await EmitAsync(new TurnLifecycle(
+        await RecordOutgoingAsync(new TurnLifecycle(
             new TurnId(record.TurnId),
             new CommandId(record.CommandId),
             Id,
@@ -555,7 +556,7 @@ internal sealed class Chat : Neuron, IChat
     }
 
     // The single settle point for every turn outcome: worker result, worker failure,
-    // cancellation, budget overrun, restart reconcile. Emits the frozen journal footprint —
+    // cancellation, budget overrun, restart reconcile. Records the frozen journal footprint —
     // Responded (Completed with an answer only) then the terminal TurnLifecycle — and
     // advances the FIFO.
     private async Task SettleTurnAsync(
@@ -607,11 +608,11 @@ internal sealed class Chat : Neuron, IChat
 
         if (status is ChatTurnStatus.Completed or ChatTurnStatus.WaitingForUser)
         {
-            await TryEmitRespondedAsync(record, result)
+            await TryRecordRespondedAsync(record, result)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
 
-        await EmitAsync(new TurnLifecycle(
+        await RecordOutgoingAsync(new TurnLifecycle(
             new TurnId(record.TurnId),
             new CommandId(record.CommandId),
             Id,
@@ -637,14 +638,14 @@ internal sealed class Chat : Neuron, IChat
         await TryStartNextAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    private async Task TryEmitRespondedAsync(DurableTurnRecord record, ChatTurnResult? result)
+    private async Task TryRecordRespondedAsync(DurableTurnRecord record, ChatTurnResult? result)
     {
         if (result is null || string.IsNullOrWhiteSpace(result.Answer))
         {
             return;
         }
 
-        await EmitAsync(new Responded(
+        await RecordOutgoingAsync(new Responded(
             new CommandId(record.CommandId),
             Id,
             result.Answer,
@@ -704,7 +705,7 @@ internal sealed class Chat : Neuron, IChat
     {
         Remember(message.CommandId, message.Text, message.Actor);
         Remember(new ChatTurn(FromUser: true, message.Text));
-        return EmitAsync(new UserMessaged(message.CommandId, Id, message.Text, message.Actor));
+        return RecordOutgoingAsync(new UserMessaged(message.CommandId, Id, message.Text, message.Actor));
     }
 
     private void Remember(CommandId commandId, string text, ActorContext? actor)

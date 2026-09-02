@@ -32,7 +32,7 @@ internal sealed class SessionNeuron : Neuron, ISessionNeuron
 
         // Journal first: DigitalBrainActivated in this session's OWN Outgoing journal is the
         // pinned activation footprint, whether or not any surface module subscribes.
-        var activated = await StageOutgoingAsync(new DigitalBrainActivated(Id.Owner), cause: null)
+        var activated = await RecordOutgoingAsync(new DigitalBrainActivated(Id.Owner))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         var writer = ServiceProvider
@@ -48,41 +48,50 @@ internal sealed class SessionNeuron : Neuron, ISessionNeuron
         await WriteStateAsync().ConfigureAwait(true);
     }
 
-    public Task<SignalDelivery> Fire(NeuronId receiver, Signal signal)
+    public Task<SignalDeliveryResult> Send(NeuronId receiver, Signal signal)
     {
-        if (receiver.Owner != Id.Owner)
-        {
-            throw new NeuronAuthorizationException(
-                $"An owner '{Id.Owner}' session cannot fire at '{receiver}', which belongs to owner '{receiver.Owner}'.");
-        }
-
+        RequireSameOwner(receiver);
         return SendAsync(receiver, signal);
     }
 
-    public Task Emit(Signal signal)
-    {
-        ArgumentNullException.ThrowIfNull(signal);
-
-        return base.EmitAsync(signal);
-    }
-
     public Task<JournalRead> ReadNeuronJournal(NeuronId subject, JournalKind kind, long afterSequence)
-        => subject == Id
+    {
+        RequireSameOwner(subject);
+        return subject == Id
             ? ReadJournal(kind, afterSequence)
             : GrainFactory.GetGrain<INeuronQuery>(subject.ToGrainId()).ReadJournal(kind, afterSequence);
+    }
 
     public Task<IReadOnlyList<Synapse>> ReadNeuronSynapses(NeuronId subject)
-        => subject == Id
+    {
+        RequireSameOwner(subject);
+        return subject == Id
             ? ReadSynapses()
             : GrainFactory.GetGrain<INeuronQuery>(subject.ToGrainId()).ReadSynapses();
+    }
 
     public Task WatchNeuron(NeuronId subject, JournalKind kind, long afterSequence, IJournalObserver observer)
-        => subject == Id
+    {
+        RequireSameOwner(subject);
+        return subject == Id
             ? Watch(kind, afterSequence, observer)
             : GrainFactory.GetGrain<INeuronQuery>(subject.ToGrainId()).Watch(kind, afterSequence, observer);
+    }
 
     public Task UnwatchNeuron(NeuronId subject, IJournalObserver observer)
-        => subject == Id
+    {
+        RequireSameOwner(subject);
+        return subject == Id
             ? Unwatch(observer)
             : GrainFactory.GetGrain<INeuronQuery>(subject.ToGrainId()).Unwatch(observer);
+    }
+
+    private void RequireSameOwner(NeuronId subject)
+    {
+        if (subject.Owner != Id.Owner)
+        {
+            throw new NeuronAuthorizationException(
+                $"Owner root '{Id}' cannot access '{subject}', which belongs to owner '{subject.Owner}'.");
+        }
+    }
 }

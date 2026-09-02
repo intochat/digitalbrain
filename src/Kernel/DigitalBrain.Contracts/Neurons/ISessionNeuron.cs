@@ -16,15 +16,11 @@ public interface ISessionNeuron : INeuron
     [Alias(nameof(Activate))]
     Task Activate();
 
-    // A fire is a direct awaited call spanning the receiver's whole turn, so it carries
+    // A send is a direct awaited call spanning the receiver's whole turn, so it carries
     // the same budget as the receiver's Deliver.
-    [Alias(nameof(Fire))]
+    [Alias(nameof(Send))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
-    Task<SignalDelivery> Fire(NeuronId receiver, Signal signal);
-
-    [Alias(nameof(Emit))]
-    [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
-    Task Emit(Signal signal);
+    Task<SignalDeliveryResult> Send(NeuronId receiver, Signal signal);
 
     [Alias(nameof(ReadNeuronJournal))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]

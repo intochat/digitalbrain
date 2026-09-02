@@ -127,13 +127,13 @@ public sealed class ExecutionNeuron : Neuron, IExecution
             // else ChatTurnWorkload / Agent: providers + related Context only; no blind grant fan-out.
 
             Stage(LoadRecorded()! with { Status = ExecutionStatus.Completed });
-            await EmitAsync(new ExecutionLifecycle(signal.ExecutionId, ExecutionStatus.Completed))
+            await RecordOutgoingAsync(new ExecutionLifecycle(signal.ExecutionId, ExecutionStatus.Completed))
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch (Exception ex) when (ex is not OperationCanceledException && ex is not NeuronAuthorizationException)
         {
             Stage(LoadRecorded()! with { Status = ExecutionStatus.Failed });
-            await EmitAsync(new ExecutionLifecycle(signal.ExecutionId, ExecutionStatus.Failed, ex.Message))
+            await RecordOutgoingAsync(new ExecutionLifecycle(signal.ExecutionId, ExecutionStatus.Failed, ex.Message))
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             throw new NeuronAuthorizationException($"Execution '{Id}' failed: {ex.Message}", ex);
         }
@@ -159,7 +159,7 @@ public sealed class ExecutionNeuron : Neuron, IExecution
         }
 
         Stage(current with { Status = ExecutionStatus.Cancelled });
-        await EmitAsync(new ExecutionLifecycle(signal.ExecutionId, ExecutionStatus.Cancelled))
+        await RecordOutgoingAsync(new ExecutionLifecycle(signal.ExecutionId, ExecutionStatus.Cancelled))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 

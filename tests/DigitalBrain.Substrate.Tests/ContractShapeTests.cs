@@ -68,6 +68,39 @@ public sealed class ContractShapeTests
     }
 
     [Fact]
+    public void SignalDeliveryResultPreservesEnvelopeAndOutcomeOnTheWire()
+    {
+        Assert.NotNull(typeof(SignalDeliveryResult).GetCustomAttribute<GenerateSerializerAttribute>());
+        Assert.Equal(
+            "db.v2.signal-delivery-result",
+            Assert.Single(typeof(SignalDeliveryResult).GetCustomAttributes<AliasAttribute>()).Alias);
+
+        Assert.Equal(0u, FieldId(typeof(SignalDeliveryResult), nameof(SignalDeliveryResult.Delivery)));
+        Assert.Equal(1u, FieldId(typeof(SignalDeliveryResult), nameof(SignalDeliveryResult.Outcome)));
+    }
+
+    [Fact]
+    public void HistoricalUndeliveredFactsRetainTheirCompatibilityCodec()
+    {
+        var legacy = Assert.Single(
+            typeof(Signal).Assembly.GetTypes(),
+            static type => type.GetCustomAttributes<AliasAttribute>()
+                .Any(static alias => alias.Alias == "db.unrouted"));
+
+        Assert.False(legacy.IsPublic);
+        Assert.Equal("LegacyUndeliveredSignal", legacy.Name);
+        Assert.NotNull(legacy.GetCustomAttribute<GenerateSerializerAttribute>());
+        Assert.Equal(typeof(SignalId), legacy.GetProperty("Delivery")!.PropertyType);
+        Assert.Equal(typeof(string), legacy.GetProperty("Alias")!.PropertyType);
+        Assert.Equal(typeof(NeuronId), legacy.GetProperty("Source")!.PropertyType);
+        Assert.Equal(typeof(CorrelationId), legacy.GetProperty("Correlation")!.PropertyType);
+        Assert.Equal(0u, FieldId(legacy, "Delivery"));
+        Assert.Equal(1u, FieldId(legacy, "Alias"));
+        Assert.Equal(2u, FieldId(legacy, "Source"));
+        Assert.Equal(3u, FieldId(legacy, "Correlation"));
+    }
+
+    [Fact]
     public void NeuronPortsUseTheIntentionalV2Aliases()
     {
         Assert.Equal(
@@ -124,6 +157,15 @@ public sealed class ContractShapeTests
         var method = typeof(INeuronQuery).GetMethod(methodName)!;
         Assert.NotNull(method.GetCustomAttribute<ReadOnlyAttribute>());
         Assert.NotNull(method.GetCustomAttribute<AlwaysInterleaveAttribute>());
+    }
+
+    private static uint FieldId(Type declaringType, string propertyName)
+    {
+        var attribute = declaringType
+            .GetProperty(propertyName)!
+            .GetCustomAttributesData()
+            .Single(static candidate => candidate.AttributeType == typeof(IdAttribute));
+        return Convert.ToUInt32(Assert.Single(attribute.ConstructorArguments).Value);
     }
 
     private static void AssertSerialized(string methodName)

@@ -20,7 +20,7 @@ public sealed class SignalRouter(SignalHandlerIndex index)
         // Tier 2 first: a learned edge carries a weight and an ordering that tier 1 cannot.
         var receivers = new List<NeuronId>();
         // Seeded with self: a broadcaster must never receive its own broadcast. Skipping it
-        // here (rather than dispatching in place, the way FireAsync's self-call does) is
+        // here (rather than dispatching in place, the way an awaited self-send does) is
         // deliberate — in-place self-dispatch still lets a handler that re-broadcasts the
         // signal it handles loop forever, where exclusion makes that unreachable by
         // construction. Do not "fix" this back to self-delivery.

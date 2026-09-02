@@ -11,20 +11,20 @@ await using IDigitalBrain brain = await Brain.CreateAsync(args);
 // and printed twice, and the graph grew a spurious chat -> chat edge).
 var chat = brain.Get<IChatNeuron>("default");
 
-// Fire twice: the second fire must potentiate the same synapses, not add new ones.
-await chat.FireAsync(new UserMessageReceived("hello"));
-await chat.FireAsync(new UserMessageReceived("hello again"));
+// Send twice: the second send must potentiate the same synapses, not add new ones.
+await chat.SendAsync(new UserMessageReceived("hello"));
+await chat.SendAsync(new UserMessageReceived("hello again"));
 
 Console.WriteLine();
 Console.WriteLine("-- synapses (anatomy) ------------------------------------------");
-foreach (var synapse in await brain.GetSynapsesAsync(chat.Id))
+foreach (var synapse in await chat.GetSynapsesAsync())
 {
     Console.WriteLine(synapse);
 }
 
 Console.WriteLine();
 Console.WriteLine("-- chat:default outgoing journal (physiology) ------------------");
-var journal = await brain.ReadJournalAsync(chat.Id, JournalKind.Outgoing);
+var journal = await chat.ReadJournalAsync(JournalKind.Outgoing);
 foreach (var delivery in journal.Delta)
 {
     Console.WriteLine(

@@ -15,12 +15,22 @@ public abstract class Neuron :
     INeuronQuery
 {
     private readonly NeuronActivationComponents _components;
+    private readonly SignalSender _sender;
     private SignalDelivery? _handling;
 
     protected Neuron(NeuronRuntime runtime)
     {
         ArgumentNullException.ThrowIfNull(runtime);
         _components = runtime.Bind(ServiceProvider, Id);
+        _sender = new SignalSender(
+            Id,
+            _components.Clock,
+            _components.Router,
+            _components.Journal,
+            _components.Synapses,
+            GrainFactory,
+            DispatchDeliveryAsync,
+            WriteStateAsync);
     }
 
     public NeuronId Id
@@ -75,106 +85,21 @@ public abstract class Neuron :
         return Task.CompletedTask;
     }
 
-    protected async Task<SignalDelivery> SendAsync(NeuronId receiver, Signal signal)
-    {
-        ArgumentNullException.ThrowIfNull(signal);
+    protected Task<SignalDeliveryResult> SendAsync(NeuronId receiver, Signal signal)
+        => _sender.SendAsync(receiver, signal, _handling);
 
-        var delivery = await StageOutgoingAsync(signal, _handling)
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    protected Task<int> BroadcastAsync(Signal signal)
+        => _sender.BroadcastAsync(signal, _handling);
 
-        await DeliverToAsync(receiver, delivery)
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    protected Task ReplyAsync(Signal response)
+        => _sender.ReplyAsync(
+            response,
+            _handling
+                ?? throw new InvalidOperationException(
+                    "ReplyAsync requires an active delivery context. Reply only from a HandleAsync turn."));
 
-        return delivery;
-    }
-
-    // Directed fire: deliver, then record the edge. The synapse is written only after Deliver
-    // returns, so a receiver that threw never strengthens the path to itself.
-    protected async Task<SignalDelivery> FireAsync(NeuronId receiver, Signal signal)
-    {
-        ArgumentNullException.ThrowIfNull(signal);
-
-        var delivery = await SendAsync(receiver, signal)
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-        _components.Synapses.Record(receiver, signal.GetType().Name, SynapseKind.Learned);
-        await WriteStateAsync().ConfigureAwait(true);
-
-        return delivery;
-    }
-
-    // Emit to whoever the graph says listens. The sender names nobody: the receiver set comes
-    // from its own synapses plus the innate handler index. Returns how many were reached.
-    protected async Task<int> BroadcastAsync(Signal signal)
-    {
-        ArgumentNullException.ThrowIfNull(signal);
-
-        var receivers = _components.Router.Resolve(signal, Id, _components.Synapses);
-        if (receivers.Count == 0)
-        {
-            return 0;
-        }
-
-        // One correlation for the whole fan-out: the turn reconstructs from the graph alone.
-        var correlation = ResolveEmissionCorrelation();
-        var signalType = signal.GetType().Name;
-
-        foreach (var receiver in receivers)
-        {
-            var delivery = await StageOutgoingAsync(signal, _handling, correlation)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-            await GrainFactory.GetGrain<INeuron>(receiver.ToGrainId())
-                .Deliver(delivery)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-            _components.Synapses.Record(receiver, signalType, SynapseKind.Learned);
-        }
-
-        await WriteStateAsync().ConfigureAwait(true);
-        return receivers.Count;
-    }
-
-    protected Task EmitAsync(Signal signal)
-    {
-        ArgumentNullException.ThrowIfNull(signal);
-        return EmitAsync(signal, ResolveEmissionCorrelation());
-    }
-
-    protected CorrelationId ResolveEmissionCorrelation()
-        => _handling?.CorrelationId
-            ?? CorrelationId.New();
-
-    protected async Task EmitAsync(Signal signal, CorrelationId correlation)
-    {
-        ArgumentNullException.ThrowIfNull(signal);
-
-        var delivery = await StageOutgoingAsync(signal, _handling, correlation)
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-        _ = delivery;
-    }
-
-    protected async Task ReplyAsync(
-        Signal response,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(response);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var handling = _handling
-            ?? throw new InvalidOperationException(
-                "ReplyAsync requires an active delivery context. Reply only from a "
-                + "HandleAsync turn.");
-
-        var delivery = await StageOutgoingAsync(response, handling, handling.CorrelationId)
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-        // The caller's turn is awaiting this one, so an awaited call back into the caller
-        // would deadlock two serialized grains. The reply rides an unawaited grain call
-        // (queued even when the caller is this neuron); a lost reply is telemetry.
-        _ = DeliverReplyAsync(handling.Caller, delivery);
-    }
+    protected Task<SignalDelivery> RecordOutgoingAsync(Signal signal)
+        => _sender.RecordOutgoingAsync(signal, _handling);
 
     protected new IDisposable RegisterTimer(
         Func<object, Task> callback,
@@ -184,28 +109,6 @@ public abstract class Neuron :
         => throw new InvalidOperationException(
             $"{nameof(RegisterTimer)} creates interleaving callbacks, but neurons require "
             + "serialized turns.");
-
-    internal async Task<SignalDelivery> StageOutgoingAsync(
-        Signal signal,
-        SignalDelivery? cause,
-        CorrelationId? correlation = null)
-    {
-        var delivery = SignalDelivery.Create(
-            signal,
-            Id,
-            _components.Journal.OutgoingNextSequence,
-            TimeProvider,
-            cause,
-            correlation,
-            principal: VerifiedActor.Current?.PrincipalId ?? cause?.Principal);
-
-        _components.Journal.AppendOutgoing(delivery);
-        await WriteStateAsync().ConfigureAwait(true);
-        await _components.Journal.NotifyWatchersAsync()
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-        return delivery;
-    }
 
     private async Task<DeliveryOutcome> DispatchDeliveryAsync(
         SignalDelivery delivery,
@@ -250,26 +153,6 @@ public abstract class Neuron :
         finally
         {
             _handling = previousHandling;
-        }
-    }
-
-    private Task<DeliveryOutcome> DeliverToAsync(NeuronId receiver, SignalDelivery delivery)
-        => receiver == Id
-            // A grain call to self would deadlock the serialized turn; dispatch in place.
-            ? DispatchDeliveryAsync(delivery, CancellationToken.None)
-            : GrainFactory.GetGrain<INeuron>(receiver.ToGrainId()).Deliver(delivery);
-
-    private async Task DeliverReplyAsync(NeuronId receiver, SignalDelivery delivery)
-    {
-        try
-        {
-            await GrainFactory.GetGrain<INeuron>(receiver.ToGrainId())
-                .Deliver(delivery)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        }
-        catch (Exception undelivered)
-        {
-            SignalTelemetry.ReplyDropped(Id, receiver, undelivered);
         }
     }
 

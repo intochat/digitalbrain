@@ -108,7 +108,7 @@ internal static class OwnerCommandsHttpMaps
                         return;
                     }
 
-                    await brain.FireAsync<IUIRenderer>(
+                    await brain.SendAsync<IUIRenderer>(
                         surfaceInstance,
                         new OpenSurface(CommandId.New(), request.SurfaceKey, request.Title),
                         cancellationToken).ConfigureAwait(false);
@@ -165,10 +165,9 @@ internal static class OwnerCommandsHttpMaps
 
         // Budget bounds the observer wait; requestAborted only detaches the observer.
         using var observer = CancellationTokenSource.CreateLinkedTokenSource(requestAborted, budget.Token);
-        var chatId = NeuronId.For<IChat>(brain.Owner, chatInstance);
+        var chat = brain.Get<IChat>(chatInstance);
 
-        await foreach (var page in brain.WatchJournalAsync(
-            chatId,
+        await foreach (var page in chat.WatchJournalAsync(
             JournalKind.Outgoing,
             afterSequence: 0,
             observer.Token).ConfigureAwait(false))

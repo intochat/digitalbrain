@@ -34,11 +34,11 @@ public sealed class ChatTurnTests(SimulationFixture fixture)
         var lifecycle = await ChatTurnDriver.AwaitCompletedTurnAsync(brain, chatName);
 
         var responded = await JournalWait.ForAsync(
-            brain,
-            NeuronId.For<IChat>(brain.Owner, chatName),
+            brain.Get<IChat>(chatName),
             JournalKind.Outgoing,
             delivery => delivery.Signal is Responded reply && reply.CommandId == command,
-            TurnTimeout);
+            TurnTimeout,
+            cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal("Test assistant reply.", ((Responded)responded.Signal).Text);
 
         Assert.Equal(accepted.TurnId, lifecycle.TurnId);
@@ -84,13 +84,12 @@ public sealed class ChatTurnTests(SimulationFixture fixture)
         var transcript = await chat.Read();
         Assert.Contains(transcript.Turns, turn => !turn.FromUser && turn.Text == "Quarterly sales");
 
-        var chatId = NeuronId.For<IChat>(brain.Owner, chatName);
         var responded = await JournalWait.ForAsync(
-            brain,
-            chatId,
+            brain.Get<IChat>(chatName),
             JournalKind.Outgoing,
             delivery => delivery.Signal is Responded reply && reply.Text == "Quarterly sales",
-            TurnTimeout);
+            TurnTimeout,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         var cards = Assert.IsType<Responded>(responded.Signal).Cards;
         Assert.NotNull(cards);

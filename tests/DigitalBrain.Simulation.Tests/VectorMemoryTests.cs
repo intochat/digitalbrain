@@ -15,7 +15,7 @@ public sealed class VectorMemoryTests(SimulationFixture fixture)
         var memoryNamespace = new VectorMemoryNamespace("notes");
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        var stored = await memory.FireAsync(
+        var stored = await memory.SendAsync(
             new StoreVectorMemory(
                 memoryNamespace,
                 "meeting",
@@ -27,7 +27,7 @@ public sealed class VectorMemoryTests(SimulationFixture fixture)
         Assert.True(stored.Stored);
         Assert.Equal(VectorMemoryStoreStatus.Stored, stored.Status);
 
-        var matches = await memory.FireAsync(
+        var matches = await memory.SendAsync(
             new SearchVectorMemory(memoryNamespace, "calendar", Limit: 1, Metadata: null),
             cancellationToken);
 

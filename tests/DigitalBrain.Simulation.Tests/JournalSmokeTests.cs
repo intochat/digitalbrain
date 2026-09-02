@@ -33,12 +33,11 @@ public sealed class JournalSmokeTests(SimulationFixture fixture)
         // session's own Outgoing journal is where the activation deterministically lands,
         // independent of whether any surface module subscribes. (Pin moved here in C2 Task 5
         // when the Brain absorbed the standalone DigitalBrainNeuron.)
-        var subject = ISessionNeuron.ForOwner(brain.Owner);
         var delivery = await JournalWait.ForAsync(
             brain,
-            subject,
             JournalKind.Outgoing,
-            static d => d.Signal is DigitalBrainActivated);
+            static d => d.Signal is DigitalBrainActivated,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.IsType<DigitalBrainActivated>(delivery.Signal);
 
@@ -46,11 +45,13 @@ public sealed class JournalSmokeTests(SimulationFixture fixture)
         // (surface-boot:{owner}/default, keyed by the channel key) journals the published
         // delivery through the regular Deliver path as its own Incoming.
         var surfaceBoot = new NeuronId("surface-boot", brain.Owner, "default");
+        var surfaceBootQuery = fixture.Sim.Grains.GetGrain<INeuronQuery>(surfaceBoot.ToGrainId());
         var received = await JournalWait.ForAsync(
-            brain,
+            surfaceBootQuery,
             surfaceBoot,
             JournalKind.Incoming,
-            static d => d.Signal is DigitalBrainActivated);
+            static d => d.Signal is DigitalBrainActivated,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(delivery.SignalId, received.SignalId);
     }

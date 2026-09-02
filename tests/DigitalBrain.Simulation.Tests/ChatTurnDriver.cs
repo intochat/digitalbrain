@@ -1,4 +1,3 @@
-using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
@@ -17,14 +16,14 @@ internal static class ChatTurnDriver
     public static async Task<TurnLifecycle> AwaitCompletedTurnAsync(IDigitalBrain brain, string chatName)
     {
         var terminal = await JournalWait.ForAsync(
-            brain,
-            NeuronId.For<IChat>(brain.Owner, chatName),
+            brain.Get<IChat>(chatName),
             JournalKind.Outgoing,
             static delivery => delivery.Signal is TurnLifecycle
             {
                 Status: ChatTurnStatus.Completed or ChatTurnStatus.Failed or ChatTurnStatus.Cancelled
             },
-            TurnTimeout);
+            TurnTimeout,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         var lifecycle = Assert.IsType<TurnLifecycle>(terminal.Signal);
         Assert.True(lifecycle.Status == ChatTurnStatus.Completed, lifecycle.Detail);

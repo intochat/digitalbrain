@@ -1,10 +1,8 @@
-using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.Client;
 using DigitalBrain.UI;
 
 using DigitalBrain.Abstractions.Journals;
-using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.Kernel;
 
 internal sealed class OwnerSessionJournal(IDigitalBrain brain)
@@ -17,12 +15,9 @@ internal sealed class OwnerSessionJournal(IDigitalBrain brain)
         ArgumentException.ThrowIfNullOrWhiteSpace(surfaceName);
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
 
-        // SurfaceOpened is emitted by the renderer instance sharing the surface's name.
-        return brain.WatchJournalAsync(
-            NeuronId.For<IUIRenderer>(brain.Owner, surfaceName),
-            JournalKind.Outgoing,
-            afterSequence,
-            cancellationToken);
+        // SurfaceOpened is recorded by the renderer instance sharing the surface's name.
+        return brain.Get<IUIRenderer>(surfaceName)
+            .WatchJournalAsync(JournalKind.Outgoing, afterSequence, cancellationToken);
     }
 
     public IAsyncEnumerable<JournalRead> WatchChatOutgoingAsync(
@@ -33,11 +28,8 @@ internal sealed class OwnerSessionJournal(IDigitalBrain brain)
         ArgumentException.ThrowIfNullOrWhiteSpace(chatName);
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
 
-        return brain.WatchJournalAsync(
-            NeuronId.For<IChat>(brain.Owner, chatName),
-            JournalKind.Outgoing,
-            afterSequence,
-            cancellationToken);
+        return brain.Get<IChat>(chatName)
+            .WatchJournalAsync(JournalKind.Outgoing, afterSequence, cancellationToken);
     }
 
 }

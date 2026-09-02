@@ -18,21 +18,28 @@ public sealed record Ping(string Text) : Signal;
 public interface IPingSource : INeuron
 {
     [Alias(nameof(SendTo))]
-    Task SendTo(NeuronId target, string text);
+    Task<DeliveryOutcome> SendTo(NeuronId target, string text);
 }
 
 [Alias("DigitalBrain.Substrate.Tests.IPingSink")]
 public interface IPingSink : INeuron;
 
+[Alias("DigitalBrain.Substrate.Tests.IPingSilent")]
+public interface IPingSilent : INeuron;
+
 internal sealed class PingSource(NeuronRuntime runtime) : Neuron(runtime), IPingSource
 {
-    public Task SendTo(NeuronId target, string text) => FireAsync(target, new Ping(text));
+    public async Task<DeliveryOutcome> SendTo(NeuronId target, string text)
+        => (await SendAsync(target, new Ping(text))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext)).Outcome;
 }
 
 internal sealed class PingSink(NeuronRuntime runtime) : Neuron(runtime), IPingSink, IHandle<Ping>
 {
     public Task HandleAsync(Ping signal, CancellationToken cancellationToken) => Task.CompletedTask;
 }
+
+internal sealed class PingSilent(NeuronRuntime runtime) : Neuron(runtime), IPingSilent;
 
 public sealed class SynapseSetTests
 {
@@ -91,7 +98,7 @@ public sealed class SynapseSetTests
     }
 
     [Fact]
-    public async Task FirstFire_CreatesALearnedSynapseAtTheInitialWeightThenPotentiatesIt()
+    public async Task DirectedSend_HandledTargetReturnsHandledAndLearns()
     {
         await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([]) });
 
@@ -100,14 +107,40 @@ public sealed class SynapseSetTests
         var sourceQuery = brain.Grains.GetGrain<INeuronQuery>(sourceId.ToGrainId());
         var sinkId = new NeuronId("pingsink", new OwnerId("owner"), "b");
 
-        await source.SendTo(sinkId, "one");
+        var outcome = await source.SendTo(sinkId, "one");
 
+        Assert.Equal(DeliveryOutcome.Handled, outcome);
+        var outgoing = Assert.Single((await sourceQuery.ReadJournal(JournalKind.Outgoing, 0)).Delta);
+        var incoming = Assert.Single((await brain.Grains.GetGrain<INeuronQuery>(sinkId.ToGrainId())
+            .ReadJournal(JournalKind.Incoming, 0)).Delta);
+        Assert.Equal(outgoing.SignalId, incoming.SignalId);
         var synapse = Assert.Single(await sourceQuery.ReadSynapses());
         Assert.Equal(sinkId, synapse.Target);
         Assert.Equal(nameof(Ping), synapse.SignalType);
         Assert.Equal(SynapseKind.Learned, synapse.Kind);
         Assert.Equal(0.65, synapse.Weight, precision: 10);
         Assert.Equal(1, synapse.FireCount);
+    }
+
+    [Fact]
+    public async Task DirectedSend_HandlerlessTargetReturnsUnhandledAndDoesNotLearn()
+    {
+        await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([]) });
+
+        var owner = new OwnerId("owner");
+        var sourceId = new NeuronId("pingsource", owner, "unhandled");
+        var silentId = new NeuronId("pingsilent", owner, "ignored");
+        var source = brain.Grains.GetGrain<IPingSource>(sourceId.ToGrainId());
+        var sourceQuery = brain.Grains.GetGrain<INeuronQuery>(sourceId.ToGrainId());
+        var silentQuery = brain.Grains.GetGrain<INeuronQuery>(silentId.ToGrainId());
+
+        var outcome = await source.SendTo(silentId, "ignored");
+
+        Assert.Equal(DeliveryOutcome.Unhandled, outcome);
+        Assert.Empty(await sourceQuery.ReadSynapses());
+        var outgoing = Assert.Single((await sourceQuery.ReadJournal(JournalKind.Outgoing, 0)).Delta);
+        var incoming = Assert.Single((await silentQuery.ReadJournal(JournalKind.Incoming, 0)).Delta);
+        Assert.Equal(outgoing.SignalId, incoming.SignalId);
     }
 
     [Fact]

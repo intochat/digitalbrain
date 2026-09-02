@@ -41,13 +41,14 @@ public sealed class VectorMemoryNeuron :
 
         if (IsReserved(signal.Namespace))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             await ReplyAsync(
                 new VectorMemoryStored(
                     Stored: false,
                     signal.Namespace,
                     signal.Key,
-                    VectorMemoryStoreStatus.ReservedNamespace),
-                cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+                    VectorMemoryStoreStatus.ReservedNamespace))
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
@@ -68,13 +69,14 @@ public sealed class VectorMemoryNeuron :
                 embedding),
             cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
+        cancellationToken.ThrowIfCancellationRequested();
         await ReplyAsync(
             new VectorMemoryStored(
                 Stored: true,
                 signal.Namespace,
                 signal.Key,
-                VectorMemoryStoreStatus.Stored),
-            cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+                VectorMemoryStoreStatus.Stored))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public async Task HandleAsync(SearchVectorMemory signal, CancellationToken cancellationToken)
@@ -93,7 +95,9 @@ public sealed class VectorMemoryNeuron :
             signal.Metadata,
             cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        await ReplyAsync(new VectorMemoryMatches(signal.Namespace, matches), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        cancellationToken.ThrowIfCancellationRequested();
+        await ReplyAsync(new VectorMemoryMatches(signal.Namespace, matches))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     public async Task HandleAsync(RemoveVectorMemory signal, CancellationToken cancellationToken)
@@ -104,7 +108,9 @@ public sealed class VectorMemoryNeuron :
 
         if (IsReserved(signal.Namespace))
         {
-            await ReplyAsync(new VectorMemoryRemoved(Removed: false, signal.Namespace, signal.Key), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            cancellationToken.ThrowIfCancellationRequested();
+            await ReplyAsync(new VectorMemoryRemoved(Removed: false, signal.Namespace, signal.Key))
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
@@ -113,7 +119,9 @@ public sealed class VectorMemoryNeuron :
             signal.Namespace.Value,
             signal.Key,
             cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        await ReplyAsync(new VectorMemoryRemoved(removed, signal.Namespace, signal.Key), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        cancellationToken.ThrowIfCancellationRequested();
+        await ReplyAsync(new VectorMemoryRemoved(removed, signal.Namespace, signal.Key))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private async Task<float[]> EmbedAsync(string text, CancellationToken cancellationToken)

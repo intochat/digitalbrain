@@ -71,10 +71,8 @@ public sealed class TimerNeuron : Neuron, ITimer, IRemindable
             reminderName));
 
         await RegisterReminderAsync(reminderName, duration).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        cancellationToken.ThrowIfCancellationRequested();
         await ReplyAsync(
-            new TimerScheduled(signal.CommandId, Id, generation, scheduledAt, dueAt, duration, signal.Note),
-            cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        await EmitAsync(
             new TimerScheduled(signal.CommandId, Id, generation, scheduledAt, dueAt, duration, signal.Note))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
@@ -93,10 +91,9 @@ public sealed class TimerNeuron : Neuron, ITimer, IRemindable
 
         Stage(current with { Status = TimerStatus.Cancelled, ActiveReminderName = null });
 
+        cancellationToken.ThrowIfCancellationRequested();
         await ReplyAsync(
-            new TimerCancelled(signal.CommandId, Id, current.Generation),
-            cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        await EmitAsync(new TimerCancelled(signal.CommandId, Id, current.Generation))
+            new TimerCancelled(signal.CommandId, Id, current.Generation))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         await RetireReminderAsync(current.ActiveReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
@@ -140,7 +137,7 @@ public sealed class TimerNeuron : Neuron, ITimer, IRemindable
 
         try
         {
-            await EmitAsync(new TimerElapsed(
+            await RecordOutgoingAsync(new TimerElapsed(
                 Id,
                 generation,
                 data.ScheduledAt,

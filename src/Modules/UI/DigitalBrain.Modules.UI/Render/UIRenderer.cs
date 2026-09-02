@@ -26,7 +26,7 @@ internal sealed class UIRenderer(NeuronRuntime runtime) : Neuron(runtime), IUIRe
             .Open(new SurfaceScene(signal.SurfaceKey, signal.Title), RetainedScenes)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        await EmitAsync(new SurfaceOpened(signal.CommandId, Id, signal.SurfaceKey, signal.Title))
+        await RecordOutgoingAsync(new SurfaceOpened(signal.CommandId, Id, signal.SurfaceKey, signal.Title))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 

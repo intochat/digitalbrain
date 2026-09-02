@@ -1,377 +1,96 @@
 using System.ComponentModel;
-using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
-using DigitalBrain.Abstractions;
-
+using DigitalBrain.Abstractions.Entities;
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
-using DigitalBrain.Abstractions.Entities;
-using DigitalBrain.Abstractions.Brain;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Synapses;
+
 namespace DigitalBrain.Client;
 
 public sealed class DigitalBrainClient : IDigitalBrain
 {
-    private static readonly TimeSpan ResponsePollInterval = TimeSpan.FromMilliseconds(100);
+    private readonly DigitalBrainClientTransport _transport;
 
-    private readonly IGrainFactory _grains;
+    private DigitalBrainClient(DigitalBrainClientTransport transport)
+        => _transport = transport;
 
-    private DigitalBrainClient(IGrainFactory grains, OwnerId owner)
-    {
-        _grains = grains;
-        Owner = owner;
-    }
-
-    public OwnerId Owner { get; }
+    public OwnerId Owner => _transport.Owner;
 
     [EditorBrowsable(EditorBrowsableState.Never)]
     public static DigitalBrainClient Connect(IGrainFactory grains, string owner)
-    {
-        ArgumentNullException.ThrowIfNull(grains);
-        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
-
-        return new DigitalBrainClient(grains, new OwnerId(owner));
-    }
+        => new(new DigitalBrainClientTransport(grains, new OwnerId(owner)));
 
     public Task ActivateAsync(CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        return Session().Activate();
-    }
+        => _transport.ActivateAsync(cancellationToken);
 
     public NeuronReference<TNeuron> Get<TNeuron>(string name = "default")
         where TNeuron : INeuron
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        RequireDomainNeuronContract(typeof(TNeuron));
-        return new NeuronReference<TNeuron>(this, name);
-    }
+        => _transport.GetReference<TNeuron>(this, name);
 
     [EditorBrowsable(EditorBrowsableState.Never)]
     public TNeuron GetGrainProxy<TNeuron>(string name = "default")
         where TNeuron : class, INeuron
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        RequireDomainNeuronContract(typeof(TNeuron));
-
-        return _grains.GetGrain<TNeuron>(NeuronId.For<TNeuron>(Owner, name).ToGrainId());
-    }
+        => _transport.GetGrainProxy<TNeuron>(name);
 
     public TEntity GetEntity<TEntity>(string name = "default")
         where TEntity : class, IEntity
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        RequireDomainEntityContract(typeof(TEntity));
+        => _transport.GetEntity<TEntity>(name);
 
-        return _grains.GetGrain<TEntity>(EntityId.For<TEntity>(Owner, name).ToGrainId());
-    }
-
-    public Task FireAsync<TNeuron>(string name, Signal signal, CancellationToken cancellationToken = default)
+    public Task<DeliveryOutcome> SendAsync<TNeuron>(
+        string name,
+        Signal signal,
+        CancellationToken cancellationToken = default)
         where TNeuron : INeuron
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        RequireDomainNeuronContract(typeof(TNeuron));
-        ArgumentNullException.ThrowIfNull(signal);
-        cancellationToken.ThrowIfCancellationRequested();
-        return Get<TNeuron>(name).FireAsync(signal, cancellationToken);
-    }
+        => _transport.SendAsync<TNeuron>(name, signal, cancellationToken);
 
     public Task<JournalRead> ReadJournalAsync(
-        NeuronId subject,
         JournalKind kind,
         long afterSequence = 0,
         CancellationToken cancellationToken = default)
-    {
-        RequireOwnedSubject(subject);
-        ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
-        cancellationToken.ThrowIfCancellationRequested();
-        return Session().ReadNeuronJournal(subject, kind, afterSequence);
-    }
+        => _transport.ReadJournalAsync(_transport.Root, kind, afterSequence, cancellationToken);
+
+    public IAsyncEnumerable<JournalRead> WatchJournalAsync(
+        JournalKind kind,
+        long afterSequence = 0,
+        CancellationToken cancellationToken = default)
+        => _transport.WatchJournalAsync(_transport.Root, kind, afterSequence, cancellationToken);
 
     public Task<IReadOnlyList<Synapse>> GetSynapsesAsync(
-        NeuronId subject,
         CancellationToken cancellationToken = default)
-    {
-        RequireOwnedSubject(subject);
-        cancellationToken.ThrowIfCancellationRequested();
-        return Session().ReadNeuronSynapses(subject);
-    }
+        => _transport.GetSynapsesAsync(_transport.Root, cancellationToken);
 
-    // The client owns no unmanaged resource and does not own the cluster client it was handed;
-    // IAsyncDisposable exists so `await using IDigitalBrain brain = …` reads naturally in hosts
-    // that DO own one (see Brain.CreateAsync).
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    public async IAsyncEnumerable<JournalRead> WatchJournalAsync(
-        NeuronId subject,
-        JournalKind kind,
-        long afterSequence = 0,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    {
-        RequireOwnedSubject(subject);
-        ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
-        cancellationToken.ThrowIfCancellationRequested();
+    internal Task<DeliveryOutcome> SendAsync(
+        NeuronId receiver,
+        Signal signal,
+        CancellationToken cancellationToken)
+        => _transport.SendAsync(receiver, signal, cancellationToken);
 
-        if (!TryCreateJournalObserver(kind, out var observer, out var reference))
-        {
-
-            var cursor = afterSequence;
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                var page = await Session().ReadNeuronJournal(subject, kind, cursor).ConfigureAwait(false);
-                if (page.Delta.Count > 0 || page.ResetSnapshot is not null)
-                {
-                    yield return page;
-                }
-
-                cursor = page.ResumeSequence;
-                await Task.Delay(ResponsePollInterval, cancellationToken).ConfigureAwait(false);
-            }
-
-            yield break;
-        }
-
-        var session = Session();
-        try
-        {
-            await session.WatchNeuron(subject, kind, afterSequence, reference).ConfigureAwait(false);
-            await foreach (var page in observer.Reads.ReadAllAsync(cancellationToken).ConfigureAwait(false))
-            {
-                yield return page;
-            }
-        }
-        finally
-        {
-            await TeardownWatchAsync(session, subject, reference, observer).ConfigureAwait(false);
-        }
-    }
-
-    internal Task SendToAsync(NeuronId receiver, Signal signal, CancellationToken cancellationToken)
-        => SendValidatedAsync(receiver, signal, cancellationToken);
-
-    internal async Task<TResponse> SendRequestAsync<TResponse>(
+    internal Task<TResponse> SendRequestAsync<TResponse>(
         NeuronId receiver,
         Signal request,
         CancellationToken cancellationToken)
         where TResponse : Signal
-    {
-        var response = await SendRequestAsync(receiver, request, typeof(TResponse), cancellationToken)
-            .ConfigureAwait(false);
-        return (TResponse)response;
-    }
+        => _transport.SendRequestAsync<TResponse>(receiver, request, cancellationToken);
 
-    public async Task<Signal> SendRequestAsync(
-        NeuronId receiver,
-        Signal request,
-        Type responseType,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-        ArgumentNullException.ThrowIfNull(responseType);
-        if (!typeof(Signal).IsAssignableFrom(responseType) || responseType.IsAbstract || responseType.IsInterface)
-        {
-            throw new ArgumentException(
-                $"Response type '{responseType}' must be a concrete Signal.",
-                nameof(responseType));
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var sessionId = ISessionNeuron.ForOwner(Owner);
-        var session = Session();
-        // long.MaxValue: only the resume cursor — do not deserialize the whole journal history
-        // (polymorphic Signal entries can fail client-side if any fact type is missing).
-        var cursor = await session
-            .ReadNeuronJournal(sessionId, JournalKind.Incoming, afterSequence: long.MaxValue)
-            .ConfigureAwait(false);
-
-        if (!TryCreateJournalObserver(JournalKind.Incoming, out var observer, out var reference))
-        {
-            var polled = await SendValidatedAsync(receiver, request, cancellationToken).ConfigureAwait(false);
-            return await PollForResponseAsync(
-                session,
-                sessionId,
-                cursor.ResumeSequence,
-                polled.CorrelationId,
-                responseType,
-                cancellationToken).ConfigureAwait(false);
-        }
-
-        try
-        {
-            await session.WatchNeuron(sessionId, JournalKind.Incoming, cursor.ResumeSequence, reference).ConfigureAwait(false);
-
-            var delivery = await SendValidatedAsync(receiver, request, cancellationToken).ConfigureAwait(false);
-            return await WaitForResponseAsync(
-                observer,
-                delivery.CorrelationId,
-                responseType,
-                cancellationToken).ConfigureAwait(false);
-        }
-        finally
-        {
-            await TeardownWatchAsync(session, sessionId, reference, observer).ConfigureAwait(false);
-        }
-    }
-
-    private ISessionNeuron Session()
-        => _grains.GetGrain<ISessionNeuron>(ISessionNeuron.ForOwner(Owner).ToGrainId());
-
-    private void RequireOwnedSubject(NeuronId subject)
-    {
-        if (subject.Owner != Owner)
-        {
-            throw new NeuronAuthorizationException(
-                $"Client owner '{Owner}' cannot observe journal of neuron '{subject}' owned by '{subject.Owner}'.");
-        }
-    }
-
-    private async Task<SignalDelivery> SendValidatedAsync(
-        NeuronId receiver,
-        Signal signal,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        await ActivateAsync(cancellationToken).ConfigureAwait(false);
-        return await Session().Fire(receiver, signal).ConfigureAwait(false);
-    }
-
-    private bool TryCreateJournalObserver(
-        JournalKind kind,
-        [NotNullWhen(true)] out ChannelJournalObserver? observer,
-        [NotNullWhen(true)] out IJournalObserver? reference)
-    {
-        var candidate = new ChannelJournalObserver(kind);
-        try
-        {
-            reference = _grains.CreateObjectReference<IJournalObserver>(candidate);
-            observer = candidate;
-            return true;
-        }
-        catch (InvalidOperationException ex) when (
-            ex.Message.Contains("object reference", StringComparison.OrdinalIgnoreCase))
-        {
-            candidate.Complete();
-            observer = null;
-            reference = null;
-            return false;
-        }
-    }
-
-    // An unrouted emission never produces the awaited reply, so without this the caller
-    // waits out its own token on a request nothing was connected to receive. (Settled
-    // refusals throw out of Session().Fire directly.)
-    private static void RequireNoRefusal(Signal candidate, CorrelationId correlation)
-    {
-        if (candidate is Unrouted unrouted && unrouted.Correlation == correlation)
-        {
-            throw new NeuronAuthorizationException(
-                $"Nothing is connected to receive '{unrouted.Alias}' from {unrouted.Source}.");
-        }
-    }
-
-    private static async Task<Signal> WaitForResponseAsync(
-        ChannelJournalObserver observer,
-        CorrelationId correlation,
-        Type responseType,
-        CancellationToken cancellationToken)
-    {
-        await foreach (var page in observer.Reads.ReadAllAsync(cancellationToken).ConfigureAwait(false))
-        {
-            foreach (var delivery in page.Delta)
-            {
-                RequireNoRefusal(delivery.Signal, correlation);
-
-                if (delivery.CorrelationId == correlation
-                    && responseType.IsInstanceOfType(delivery.Signal))
-                {
-                    return delivery.Signal;
-                }
-            }
-        }
-
-        throw new InvalidOperationException(
-            $"The session journal watch ended before a '{responseType.Name}' response arrived for correlation '{correlation}'.");
-    }
-
-    private static async Task<Signal> PollForResponseAsync(
-        ISessionNeuron session,
-        NeuronId sessionId,
-        long cursor,
-        CorrelationId correlation,
-        Type responseType,
-        CancellationToken cancellationToken)
-    {
-        while (true)
-        {
-            var read = await session.ReadNeuronJournal(sessionId, JournalKind.Incoming, cursor).ConfigureAwait(false);
-            foreach (var candidate in read.Delta)
-            {
-                RequireNoRefusal(candidate.Signal, correlation);
-
-                if (candidate.CorrelationId == correlation
-                    && responseType.IsInstanceOfType(candidate.Signal))
-                {
-                    return candidate.Signal;
-                }
-            }
-
-            if (read.ResetSnapshot is not null)
-            {
-                throw new InvalidOperationException(
-                    $"The session journal compacted past sequence {cursor} before a "
-                    + $"'{responseType.Name}' response arrived for correlation '{correlation}'.");
-            }
-
-            cursor = read.ResumeSequence;
-            await Task.Delay(ResponsePollInterval, cancellationToken).ConfigureAwait(false);
-        }
-    }
-    private async Task TeardownWatchAsync(
-        ISessionNeuron session,
+    internal Task<JournalRead> ReadJournalAsync(
         NeuronId subject,
-        IJournalObserver reference,
-        ChannelJournalObserver observer)
-    {
-        try
-        {
-            await session.UnwatchNeuron(subject, reference).ConfigureAwait(false);
-        }
-        catch (Exception)
-        {
-        }
+        JournalKind kind,
+        long afterSequence,
+        CancellationToken cancellationToken)
+        => _transport.ReadJournalAsync(subject, kind, afterSequence, cancellationToken);
 
-        try
-        {
-            _grains.DeleteObjectReference<IJournalObserver>(reference);
-        }
-        catch (Exception)
-        {
-        }
-        finally
-        {
-            observer.Complete();
-        }
-    }
+    internal IAsyncEnumerable<JournalRead> WatchJournalAsync(
+        NeuronId subject,
+        JournalKind kind,
+        long afterSequence,
+        CancellationToken cancellationToken)
+        => _transport.WatchJournalAsync(subject, kind, afterSequence, cancellationToken);
 
-    private static void RequireDomainNeuronContract(Type neuronType)
-    {
-        if (neuronType == typeof(INeuron)
-            || typeof(ISessionNeuron).IsAssignableFrom(neuronType))
-        {
-            throw new NeuronAuthorizationException(
-                $"'{neuronType.Name}' is not addressable through IDigitalBrain.Get. Activate the brain with ActivateAsync; address domain neuron contracts with Get; fire signals through FireAsync; observe journals through ReadJournalAsync and WatchJournalAsync.");
-        }
-    }
-
-    private static void RequireDomainEntityContract(Type entityType)
-    {
-        if (entityType == typeof(IEntity))
-        {
-            throw new NeuronAuthorizationException(
-                $"'{entityType.Name}' is not addressable through IDigitalBrain.GetEntity. Address a concrete entity contract with GetEntity.");
-        }
-    }
+    internal Task<IReadOnlyList<Synapse>> GetSynapsesAsync(
+        NeuronId subject,
+        CancellationToken cancellationToken)
+        => _transport.GetSynapsesAsync(subject, cancellationToken);
 }

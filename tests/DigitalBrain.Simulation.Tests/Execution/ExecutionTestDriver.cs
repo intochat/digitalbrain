@@ -36,13 +36,13 @@ internal static class ExecutionTestDriver
     public static async Task<ExecutionLifecycle> AwaitCompletionAsync(IDigitalBrain brain, string executionName)
     {
         var terminal = await JournalWait.ForAsync(
-            brain,
-            NeuronId.For<IExecution>(brain.Owner, executionName),
+            brain.Get<IExecution>(executionName),
             JournalKind.Outgoing,
             static delivery => delivery.Signal is ExecutionLifecycle
             {
                 Status: not (ExecutionStatus.Pending or ExecutionStatus.Running or ExecutionStatus.AwaitingApproval)
-            });
+            },
+            cancellationToken: TestContext.Current.CancellationToken);
 
         var lifecycle = Assert.IsType<ExecutionLifecycle>(terminal.Signal);
         Assert.True(lifecycle.Status == ExecutionStatus.Completed, lifecycle.Detail);

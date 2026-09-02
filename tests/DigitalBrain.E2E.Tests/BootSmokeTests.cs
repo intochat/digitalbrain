@@ -2,7 +2,6 @@ using System.Net;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Messaging;
 using DigitalBrain.Abstractions.Signals;
-using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Testing;
 using Xunit;
 
@@ -32,13 +31,12 @@ public sealed class BootSmokeTests(AppHostFixture fixture)
         // Observe the activation's journal footprint using the same subject/kind the simulation
         // suite's JournalSmokeTests.ActivationLandsInTheSessionJournal pins: DigitalBrainActivated
         // lands in the owner session's OWN Outgoing journal.
-        var subject = ISessionNeuron.ForOwner(brain.Owner);
         var delivery = await JournalWait.ForAsync(
             brain,
-            subject,
             JournalKind.Outgoing,
             static delivery => delivery.Signal is DigitalBrainActivated,
-            TimeSpan.FromSeconds(60));
+            TimeSpan.FromSeconds(60),
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.IsType<DigitalBrainActivated>(delivery.Signal);
     }

@@ -2,7 +2,9 @@ using DigitalBrain.Abstractions;
 
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Signals;
+using DigitalBrain.Abstractions.Synapses;
 namespace DigitalBrain.Client;
 
 public readonly struct NeuronReference<TNeuron> : IEquatable<NeuronReference<TNeuron>>
@@ -19,22 +21,32 @@ public readonly struct NeuronReference<TNeuron> : IEquatable<NeuronReference<TNe
 
     public NeuronId Id => NeuronId.For<TNeuron>(_client.Owner, _name);
 
-    public Task FireAsync(Signal signal, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(signal);
-        cancellationToken.ThrowIfCancellationRequested();
-        return _client.SendToAsync(Id, signal, cancellationToken);
-    }
+    public Task<DeliveryOutcome> SendAsync(
+        Signal signal,
+        CancellationToken cancellationToken = default)
+        => _client.SendAsync(Id, signal, cancellationToken);
 
-    public Task<TResponse> FireAsync<TResponse>(
+    public Task<TResponse> SendAsync<TResponse>(
         Signal<TResponse> request,
         CancellationToken cancellationToken = default)
         where TResponse : Signal
-    {
-        ArgumentNullException.ThrowIfNull(request);
-        cancellationToken.ThrowIfCancellationRequested();
-        return _client.SendRequestAsync<TResponse>(Id, request, cancellationToken);
-    }
+        => _client.SendRequestAsync<TResponse>(Id, request, cancellationToken);
+
+    public Task<JournalRead> ReadJournalAsync(
+        JournalKind kind,
+        long afterSequence = 0,
+        CancellationToken cancellationToken = default)
+        => _client.ReadJournalAsync(Id, kind, afterSequence, cancellationToken);
+
+    public IAsyncEnumerable<JournalRead> WatchJournalAsync(
+        JournalKind kind,
+        long afterSequence = 0,
+        CancellationToken cancellationToken = default)
+        => _client.WatchJournalAsync(Id, kind, afterSequence, cancellationToken);
+
+    public Task<IReadOnlyList<Synapse>> GetSynapsesAsync(
+        CancellationToken cancellationToken = default)
+        => _client.GetSynapsesAsync(Id, cancellationToken);
 
     public bool Equals(NeuronReference<TNeuron> other)
         => ReferenceEquals(_client, other._client)

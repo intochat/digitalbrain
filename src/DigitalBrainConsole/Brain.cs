@@ -65,18 +65,18 @@ public static class Brain
         public TNeuron GetGrainProxy<TNeuron>(string name = "default") where TNeuron : class, INeuron
             => _inner.GetGrainProxy<TNeuron>(name);
 
-        public Task FireAsync<TNeuron>(string name, Signal signal, CancellationToken cancellationToken = default)
+        public Task<DeliveryOutcome> SendAsync<TNeuron>(string name, Signal signal, CancellationToken cancellationToken = default)
             where TNeuron : INeuron
-            => _inner.FireAsync<TNeuron>(name, signal, cancellationToken);
+            => _inner.SendAsync<TNeuron>(name, signal, cancellationToken);
 
-        public Task<IReadOnlyList<Synapse>> GetSynapsesAsync(NeuronId subject, CancellationToken cancellationToken = default)
-            => _inner.GetSynapsesAsync(subject, cancellationToken);
+        public Task<IReadOnlyList<Synapse>> GetSynapsesAsync(CancellationToken cancellationToken = default)
+            => _inner.GetSynapsesAsync(cancellationToken);
 
-        public Task<JournalRead> ReadJournalAsync(NeuronId subject, JournalKind kind, long afterSequence = 0, CancellationToken cancellationToken = default)
-            => _inner.ReadJournalAsync(subject, kind, afterSequence, cancellationToken);
+        public Task<JournalRead> ReadJournalAsync(JournalKind kind, long afterSequence = 0, CancellationToken cancellationToken = default)
+            => _inner.ReadJournalAsync(kind, afterSequence, cancellationToken);
 
-        public IAsyncEnumerable<JournalRead> WatchJournalAsync(NeuronId subject, JournalKind kind, long afterSequence = 0, CancellationToken cancellationToken = default)
-            => _inner.WatchJournalAsync(subject, kind, afterSequence, cancellationToken);
+        public IAsyncEnumerable<JournalRead> WatchJournalAsync(JournalKind kind, long afterSequence = 0, CancellationToken cancellationToken = default)
+            => _inner.WatchJournalAsync(kind, afterSequence, cancellationToken);
 
         public async ValueTask DisposeAsync()
         {

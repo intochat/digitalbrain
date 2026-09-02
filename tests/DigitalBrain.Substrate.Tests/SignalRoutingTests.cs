@@ -71,8 +71,8 @@ internal sealed class EarB(NeuronRuntime runtime) : Neuron(runtime), IEarB, IHan
 }
 
 // Declares IHandle<Rumor> for the very signal it broadcasts — the regression fixture for the
-// self-receiver deadlock: BroadcastAsync's Deliver call has no self-shortcut (unlike
-// FireAsync's DeliverToAsync), so if the emitter's own grain type were left in its own
+// self-receiver deadlock: broadcast excludes self instead of using the directed sender's
+// local-delivery shortcut, so if the emitter's own grain type were left in its own
 // receiver set, a non-reentrant activation would await a Deliver call into itself and hang
 // for the full call timeout.
 internal sealed class Gossip(NeuronRuntime runtime) : Neuron(runtime), IGossip, IHandle<Rumor>

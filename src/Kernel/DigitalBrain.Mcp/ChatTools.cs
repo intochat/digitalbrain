@@ -44,7 +44,6 @@ internal sealed class ChatTools(IDigitalBrain brain)
         }
 
         var chatInstance = PrincipalPartition.InstanceName(Operator, chatName);
-        var chatId = NeuronId.For<IChat>(brain.Owner, chatInstance);
         var command = new CommandId(commandIdentity);
 
         await brain.ActivateAsync(cancellationToken);
@@ -56,7 +55,7 @@ internal sealed class ChatTools(IDigitalBrain brain)
 
         try
         {
-            return await WaitForResponseAsync(chatId, command, server, timeout.Token);
+            return await WaitForResponseAsync(chatInstance, command, server, timeout.Token);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -67,20 +66,20 @@ internal sealed class ChatTools(IDigitalBrain brain)
     }
 
     private async Task<CallToolResult> WaitForResponseAsync(
-        NeuronId chatId,
+        string chatName,
         CommandId commandId,
         McpServer? server,
         CancellationToken cancellationToken)
     {
-        var chat = brain.GetGrainProxy<IChat>(chatId.Name);
+        var chat = brain.GetGrainProxy<IChat>(chatName);
+        var chatReference = brain.Get<IChat>(chatName);
         var snapshot = await ReadTurnAsync(chat, commandId, cancellationToken);
         if (ResultFromSnapshot(snapshot, server) is { } current)
         {
             return current;
         }
 
-        await foreach (var page in brain.WatchJournalAsync(
-            chatId,
+        await foreach (var page in chatReference.WatchJournalAsync(
             JournalKind.Outgoing,
             afterSequence: 0,
             cancellationToken))

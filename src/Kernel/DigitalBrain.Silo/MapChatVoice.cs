@@ -139,10 +139,9 @@ internal static class ChatVoiceHttpMaps
             .ConfigureAwait(false);
 
         using var observer = CancellationTokenSource.CreateLinkedTokenSource(requestAborted, budget.Token);
-        var chatId = NeuronId.For<IChat>(brain.Owner, chatInstance);
+        var chat = brain.Get<IChat>(chatInstance);
 
-        await foreach (var page in brain.WatchJournalAsync(
-            chatId,
+        await foreach (var page in chat.WatchJournalAsync(
             JournalKind.Outgoing,
             afterSequence: 0,
             observer.Token).ConfigureAwait(false))
