@@ -9,6 +9,7 @@ using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Journals;
+using DigitalBrain.Abstractions.Synapses;
 namespace DigitalBrain.Core;
 
 public abstract class Neuron :
@@ -19,6 +20,7 @@ public abstract class Neuron :
 
     private static readonly ConcurrentDictionary<Type, IReadOnlyDictionary<Type, HandlerInvoker>> HandlersByNeuronType = new();
     private readonly NeuronJournal _journal;
+    private readonly SynapseSet _synapses;
     private SignalDelivery? _handling;
 
     protected Neuron()
@@ -28,6 +30,7 @@ public abstract class Neuron :
             ?? System.TimeProvider.System;
 
         _journal = new NeuronJournal(this, ServiceProvider);
+        _synapses = new SynapseSet(ServiceProvider, Id, TimeProvider);
     }
 
     public NeuronId Id
@@ -66,6 +69,8 @@ public abstract class Neuron :
     public Task<JournalRead> ReadJournal(JournalKind kind, long afterSequence)
         => Task.FromResult(_journal.Read(kind, afterSequence));
 
+    public Task<IReadOnlyList<Synapse>> ReadSynapses() => Task.FromResult(_synapses.All());
+
     public async Task Watch(
         JournalKind kind,
         long afterSequence,
@@ -88,6 +93,21 @@ public abstract class Neuron :
 
         await DeliverToAsync(receiver, delivery)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        return delivery;
+    }
+
+    // Directed fire: deliver, then record the edge. The synapse is written only after Deliver
+    // returns, so a receiver that threw never strengthens the path to itself.
+    protected async Task<SignalDelivery> FireAsync(NeuronId receiver, Signal signal)
+    {
+        ArgumentNullException.ThrowIfNull(signal);
+
+        var delivery = await SendAsync(receiver, signal)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        _synapses.Record(receiver, signal.GetType().Name, SynapseKind.Learned);
+        await WriteStateAsync().ConfigureAwait(true);
 
         return delivery;
     }

@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
 
@@ -22,6 +23,7 @@ public static class DigitalBrainRuntime
             DigitalBrainNames.BroadcastChannelProvider,
             options => options.FireAndForgetDelivery = false);
         ModelPayloadSerialization.AddModelPayloadSerialization(builder.Services);
+        builder.Services.TryAddSingleton<SynapseOptions>();
 
         foreach (var hook in ModuleHooksOf(modules))
         {
