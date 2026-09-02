@@ -78,20 +78,20 @@ internal sealed class SessionNeuron : Neuron, ISessionNeuron
     public Task<JournalRead> ReadNeuronJournal(NeuronId subject, JournalKind kind, long afterSequence)
         => subject == Id
             ? ReadJournal(kind, afterSequence)
-            : GrainFactory.GetGrain<INeuron>(subject.ToGrainId()).ReadJournal(kind, afterSequence);
+            : GrainFactory.GetGrain<INeuronQuery>(subject.ToGrainId()).ReadJournal(kind, afterSequence);
 
     public Task<IReadOnlyList<Synapse>> ReadNeuronSynapses(NeuronId subject)
         => subject == Id
             ? ReadSynapses()
-            : GrainFactory.GetGrain<INeuron>(subject.ToGrainId()).ReadSynapses();
+            : GrainFactory.GetGrain<INeuronQuery>(subject.ToGrainId()).ReadSynapses();
 
     public Task WatchNeuron(NeuronId subject, JournalKind kind, long afterSequence, IJournalObserver observer)
         => subject == Id
             ? Watch(kind, afterSequence, observer)
-            : GrainFactory.GetGrain<INeuron>(subject.ToGrainId()).Watch(kind, afterSequence, observer);
+            : GrainFactory.GetGrain<INeuronQuery>(subject.ToGrainId()).Watch(kind, afterSequence, observer);
 
     public Task UnwatchNeuron(NeuronId subject, IJournalObserver observer)
         => subject == Id
             ? Unwatch(observer)
-            : GrainFactory.GetGrain<INeuron>(subject.ToGrainId()).Unwatch(observer);
+            : GrainFactory.GetGrain<INeuronQuery>(subject.ToGrainId()).Unwatch(observer);
 }

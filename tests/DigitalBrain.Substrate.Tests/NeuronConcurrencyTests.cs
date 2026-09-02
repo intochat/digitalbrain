@@ -16,9 +16,11 @@ namespace DigitalBrain.Substrate.Tests;
 // assembly's grain discovery so they cannot interfere with the routing tests in later tasks.
 public sealed class NeuronConcurrencyTests
 {
-    private abstract class NeuronStub : INeuron
+    private abstract class NeuronStub : INeuron, INeuronQuery
     {
-        public Task Deliver(SignalDelivery delivery, CancellationToken cancellationToken = default)
+        public Task<DeliveryOutcome> Deliver(
+            SignalDelivery delivery,
+            CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
         public Task<JournalRead> ReadJournal(JournalKind kind, long afterSequence)
@@ -95,8 +97,8 @@ public sealed class NeuronConcurrencyTests
         Assert.Contains(nameof(StatelessWorkerAttribute), exception.Message, StringComparison.Ordinal);
     }
 
-    // Proves the ReadSynapses/ReadJournal whitelist did not over-widen: a neuron's OWN method
-    // carrying AlwaysInterleave — not one of the two kernel free reads — must still be refused.
+    // Proves the INeuronQuery whitelist did not over-widen: a neuron's OWN method carrying
+    // AlwaysInterleave — not a query-port declaration — must still be refused.
     [Fact]
     public void ANeuronDeclaringItsOwnAlwaysInterleaveMethod_IsRefused()
     {
@@ -106,8 +108,8 @@ public sealed class NeuronConcurrencyTests
         Assert.Contains(nameof(AlwaysInterleaveAttribute), exception.Message, StringComparison.Ordinal);
     }
 
-    // Same proof for ReadOnly: a neuron's own ReadOnly method is not a kernel free read and must
-    // still be refused.
+    // Same proof for ReadOnly: a neuron's own ReadOnly method is not a query-port declaration
+    // and must still be refused.
     [Fact]
     public void ANeuronDeclaringItsOwnReadOnlyMethod_IsRefused()
     {

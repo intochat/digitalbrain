@@ -43,16 +43,14 @@ internal static class NeuronConcurrency
         }
     }
 
-    // ReadJournal and ReadSynapses are the kernel's own free reads: no journal entry, no
-    // correlation, safe to interleave because they only ever read a neuron's own durable state.
+    // Read methods declared by INeuronQuery are the kernel's free observation plane: no journal
+    // entry or correlation, and safe to interleave because they only observe durable state.
+    // Watch and Unwatch carry no interleaving attribute and therefore remain serialized.
     private static bool IsKernelFreeRead(MethodInfo method)
-        => method.DeclaringType == typeof(INeuron)
-        && (string.Equals(method.Name, nameof(INeuron.ReadJournal), StringComparison.Ordinal)
-            || string.Equals(method.Name, nameof(INeuron.ReadSynapses), StringComparison.Ordinal));
+        => method.DeclaringType == typeof(INeuronQuery);
 
     private static void Refuse(Type neuronType, string attribute)
         => throw new InvalidOperationException(
-            $"{neuronType.Name} uses {attribute} outside {nameof(INeuron)}.{nameof(INeuron.ReadJournal)} or "
-            + $"{nameof(INeuron)}.{nameof(INeuron.ReadSynapses)}, but neurons require serialized turns to "
+            $"{neuronType.Name} uses {attribute} outside {nameof(INeuronQuery)}, but neurons require serialized turns to "
             + "preserve journal order and delivery lineage.");
 }

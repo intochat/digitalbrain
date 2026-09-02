@@ -26,7 +26,11 @@ internal sealed class SurfaceBoot :
     public Task OnSubscribed(IBroadcastChannelSubscription subscription)
     {
         ArgumentNullException.ThrowIfNull(subscription);
-        return subscription.Attach<SignalDelivery>(activation => Deliver(activation));
+        return subscription.Attach<SignalDelivery>(async activation =>
+        {
+            _ = await Deliver(activation)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        });
     }
 
     public Task HandleAsync(DigitalBrainActivated signal, CancellationToken cancellationToken)

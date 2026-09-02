@@ -55,11 +55,12 @@ public sealed class SignalDelivery
         Signal signal,
         NeuronId caller,
         long sequence,
+        TimeProvider timeProvider,
         SignalDelivery? cause = null,
-        TimeProvider? timeProvider = null,
         CorrelationId? correlation = null,
         PrincipalId? principal = null)
     {
+        ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(sequence);
 
         return new(
@@ -69,7 +70,7 @@ public sealed class SignalDelivery
             cause?.SignalId,
             caller,
             sequence,
-            (timeProvider ?? TimeProvider.System).GetUtcNow(),
+            timeProvider.GetUtcNow(),
             principal ?? cause?.Principal);
     }
 }

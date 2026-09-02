@@ -40,13 +40,14 @@ public sealed class SynapseSetTests
     {
         await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([]) });
 
-        var source = brain.Grains.GetGrain<IPingSource>(
-            new NeuronId("pingsource", new OwnerId("owner"), "a").ToGrainId());
+        var sourceId = new NeuronId("pingsource", new OwnerId("owner"), "a");
+        var source = brain.Grains.GetGrain<IPingSource>(sourceId.ToGrainId());
+        var sourceQuery = brain.Grains.GetGrain<INeuronQuery>(sourceId.ToGrainId());
         var sinkId = new NeuronId("pingsink", new OwnerId("owner"), "b");
 
         await source.SendTo(sinkId, "one");
 
-        var synapse = Assert.Single(await source.ReadSynapses());
+        var synapse = Assert.Single(await sourceQuery.ReadSynapses());
         Assert.Equal(sinkId, synapse.Target);
         Assert.Equal(nameof(Ping), synapse.SignalType);
         Assert.Equal(SynapseKind.Learned, synapse.Kind);
@@ -59,14 +60,15 @@ public sealed class SynapseSetTests
     {
         await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([]) });
 
-        var source = brain.Grains.GetGrain<IPingSource>(
-            new NeuronId("pingsource", new OwnerId("owner"), "c").ToGrainId());
+        var sourceId = new NeuronId("pingsource", new OwnerId("owner"), "c");
+        var source = brain.Grains.GetGrain<IPingSource>(sourceId.ToGrainId());
+        var sourceQuery = brain.Grains.GetGrain<INeuronQuery>(sourceId.ToGrainId());
         var sinkId = new NeuronId("pingsink", new OwnerId("owner"), "d");
 
         await source.SendTo(sinkId, "one");
         await source.SendTo(sinkId, "two");
 
-        var synapse = Assert.Single(await source.ReadSynapses());
+        var synapse = Assert.Single(await sourceQuery.ReadSynapses());
         Assert.Equal(0.755, synapse.Weight, precision: 10);
         Assert.Equal(2, synapse.FireCount);
     }
@@ -76,12 +78,13 @@ public sealed class SynapseSetTests
     {
         await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([]) });
 
-        var source = brain.Grains.GetGrain<IPingSource>(
-            new NeuronId("pingsource", new OwnerId("owner"), "e").ToGrainId());
+        var sourceId = new NeuronId("pingsource", new OwnerId("owner"), "e");
+        var source = brain.Grains.GetGrain<IPingSource>(sourceId.ToGrainId());
+        var sourceQuery = brain.Grains.GetGrain<INeuronQuery>(sourceId.ToGrainId());
 
         await source.SendTo(new NeuronId("pingsink", new OwnerId("owner"), "f"), "one");
         await source.SendTo(new NeuronId("pingsink", new OwnerId("owner"), "g"), "two");
 
-        Assert.Equal(2, (await source.ReadSynapses()).Count);
+        Assert.Equal(2, (await sourceQuery.ReadSynapses()).Count);
     }
 }

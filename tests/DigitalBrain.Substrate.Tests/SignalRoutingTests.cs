@@ -20,6 +20,10 @@ public sealed record Unheard(string Text) : Signal;
 [Alias("db.test.rumor")]
 public sealed record Rumor(string Text) : Signal;
 
+[GenerateSerializer]
+[Alias("db.test.faulting")]
+public sealed record Faulting(string Message) : Signal;
+
 [Alias("DigitalBrain.Substrate.Tests.IAnnouncer")]
 public interface IAnnouncer : INeuron
 {
@@ -53,9 +57,12 @@ internal sealed class Announcer : Neuron, IAnnouncer
     public Task<int> AnnounceUnheard(string text) => BroadcastAsync(new Unheard(text));
 }
 
-internal sealed class EarA : Neuron, IEarA, IHandle<Announced>
+internal sealed class EarA : Neuron, IEarA, IHandle<Announced>, IHandle<Faulting>
 {
     public Task HandleAsync(Announced signal, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task HandleAsync(Faulting signal, CancellationToken cancellationToken)
+        => Task.FromException(new InvalidOperationException(signal.Message));
 }
 
 internal sealed class EarB : Neuron, IEarB, IHandle<Announced>
@@ -84,7 +91,73 @@ public sealed class SignalRoutingTests
 {
     private static IAnnouncer AnnouncerIn(BrainSimulation brain, string name)
         => brain.Grains.GetGrain<IAnnouncer>(
-            new NeuronId("announcer", new OwnerId("owner"), name).ToGrainId());
+            AnnouncerId(name).ToGrainId());
+
+    private static NeuronId AnnouncerId(string name)
+        => new("announcer", new OwnerId("owner"), name);
+
+    private static INeuronQuery Query(BrainSimulation brain, NeuronId id)
+        => brain.Grains.GetGrain<INeuronQuery>(id.ToGrainId());
+
+    [Fact]
+    public async Task Deliver_WhenHandlerExists_ReturnsHandledAndJournalsIncoming()
+    {
+        await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([]) });
+        var targetId = new NeuronId("eara", new OwnerId("owner"), "handled");
+        var target = brain.Grains.GetGrain<INeuron>(targetId.ToGrainId());
+        var query = Query(brain, targetId);
+        var delivery = SignalDelivery.Create(
+            new Announced("heard"),
+            new NeuronId("caller", new OwnerId("owner"), "source"),
+            sequence: 1,
+            TimeProvider.System);
+
+        var outcome = await target.Deliver(delivery, TestContext.Current.CancellationToken);
+
+        Assert.Equal(DeliveryOutcome.Handled, outcome);
+        var journaled = Assert.Single((await query.ReadJournal(JournalKind.Incoming, 0)).Delta);
+        Assert.Equal(delivery.SignalId, journaled.SignalId);
+    }
+
+    [Fact]
+    public async Task Deliver_WhenHandlerIsMissing_ReturnsUnhandledAndJournalsIncoming()
+    {
+        await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([]) });
+        var targetId = new NeuronId("eara", new OwnerId("owner"), "unhandled");
+        var target = brain.Grains.GetGrain<INeuron>(targetId.ToGrainId());
+        var query = Query(brain, targetId);
+        var delivery = SignalDelivery.Create(
+            new Unheard("ignored"),
+            new NeuronId("caller", new OwnerId("owner"), "source"),
+            sequence: 1,
+            TimeProvider.System);
+
+        var outcome = await target.Deliver(delivery, TestContext.Current.CancellationToken);
+
+        Assert.Equal(DeliveryOutcome.Unhandled, outcome);
+        var journaled = Assert.Single((await query.ReadJournal(JournalKind.Incoming, 0)).Delta);
+        Assert.Equal(delivery.SignalId, journaled.SignalId);
+    }
+
+    [Fact]
+    public async Task Deliver_WhenHandlerThrows_PropagatesAndDoesNotJournalIncoming()
+    {
+        await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([]) });
+        var targetId = new NeuronId("eara", new OwnerId("owner"), "faulted");
+        var target = brain.Grains.GetGrain<INeuron>(targetId.ToGrainId());
+        var query = Query(brain, targetId);
+        var delivery = SignalDelivery.Create(
+            new Faulting("sentinel failure"),
+            new NeuronId("caller", new OwnerId("owner"), "source"),
+            sequence: 1,
+            TimeProvider.System);
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => target.Deliver(delivery, TestContext.Current.CancellationToken));
+
+        Assert.Equal("sentinel failure", failure.Message);
+        Assert.Empty((await query.ReadJournal(JournalKind.Incoming, 0)).Delta);
+    }
 
     // Tier 1 always addresses the "default"-named instance of a grain type (SignalRouter
     // hard-codes it), so the self-receiver hazard only bites when the emitter itself IS the
@@ -107,10 +180,11 @@ public sealed class SignalRoutingTests
     {
         await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([]) });
         var announcer = AnnouncerIn(brain, "b");
+        var query = Query(brain, AnnouncerId("b"));
 
         await announcer.Announce("hello");
 
-        var synapses = await announcer.ReadSynapses();
+        var synapses = await query.ReadSynapses();
         Assert.Equal(2, synapses.Count);
         Assert.All(synapses, synapse => Assert.Equal(nameof(Announced), synapse.SignalType));
     }
@@ -120,11 +194,12 @@ public sealed class SignalRoutingTests
     {
         await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([]) });
         var announcer = AnnouncerIn(brain, "c");
+        var query = Query(brain, AnnouncerId("c"));
 
         await announcer.Announce("one");
         await announcer.Announce("two");
 
-        var synapses = await announcer.ReadSynapses();
+        var synapses = await query.ReadSynapses();
         Assert.Equal(2, synapses.Count);
         Assert.All(synapses, synapse => Assert.Equal(0.755, synapse.Weight, precision: 10));
         Assert.All(synapses, synapse => Assert.Equal(2, synapse.FireCount));
@@ -135,10 +210,11 @@ public sealed class SignalRoutingTests
     {
         await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([]) });
         var announcer = AnnouncerIn(brain, "d");
+        var query = Query(brain, AnnouncerId("d"));
 
         await announcer.Announce("hello");
 
-        var read = await announcer.ReadJournal(JournalKind.Outgoing, 0);
+        var read = await query.ReadJournal(JournalKind.Outgoing, 0);
         Assert.Equal(2, read.Delta.Count);
         Assert.Single(read.Delta.Select(delivery => delivery.CorrelationId).Distinct());
     }
@@ -148,12 +224,13 @@ public sealed class SignalRoutingTests
     {
         await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([]) });
         var announcer = AnnouncerIn(brain, "e");
+        var query = Query(brain, AnnouncerId("e"));
 
         // Unheard has no IHandle<Unheard> declared anywhere in the test assembly, so tier 1
         // finds nothing, tier 2 has no learned edge yet, and tier 3 (similarity discovery)
         // is a later slice: the miss must return an empty set, not a guess.
         Assert.Equal(0, await announcer.AnnounceUnheard("hello"));
-        Assert.Empty(await announcer.ReadSynapses());
+        Assert.Empty(await query.ReadSynapses());
     }
 
     [Fact]
@@ -161,6 +238,8 @@ public sealed class SignalRoutingTests
     {
         await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([]) });
         var gossip = GossipDefault(brain);
+        var gossipId = new NeuronId("gossip", new OwnerId("owner"), "default");
+        var query = Query(brain, gossipId);
 
         // Gossip declares IHandle<Rumor> and broadcasts Rumor. Pre-fix, tier 1 would include
         // gossip's own grain type among the receivers of its own broadcast — and because
@@ -173,7 +252,7 @@ public sealed class SignalRoutingTests
         // Only EarC hears it: the count and the recorded synapse both exclude gossip itself.
         Assert.Equal(1, reached);
 
-        var synapses = await gossip.ReadSynapses();
+        var synapses = await query.ReadSynapses();
         var synapse = Assert.Single(synapses);
         Assert.Equal(new NeuronId("earc", new OwnerId("owner"), "default"), synapse.Target);
     }

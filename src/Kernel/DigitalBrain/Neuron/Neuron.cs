@@ -14,7 +14,8 @@ namespace DigitalBrain.Core;
 
 public abstract class Neuron :
     DurableGrain,
-    INeuron
+    INeuron,
+    INeuronQuery
 {
     private delegate Task HandlerInvoker(object neuron, Signal signal, CancellationToken cancellationToken);
 
@@ -58,14 +59,14 @@ public abstract class Neuron :
     protected virtual Task OnNeuronActivatedAsync(CancellationToken cancellationToken)
         => Task.CompletedTask;
 
-    public async Task Deliver(
+    public async Task<DeliveryOutcome> Deliver(
         SignalDelivery delivery,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(delivery);
         cancellationToken.ThrowIfCancellationRequested();
 
-        await DispatchDeliveryAsync(delivery, cancellationToken)
+        return await DispatchDeliveryAsync(delivery, cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
@@ -215,8 +216,8 @@ public abstract class Neuron :
             signal,
             Id,
             _journal.OutgoingNextSequence,
-            cause,
             TimeProvider,
+            cause,
             correlation,
             principal: VerifiedActor.Current?.PrincipalId ?? cause?.Principal);
 
@@ -228,7 +229,7 @@ public abstract class Neuron :
         return delivery;
     }
 
-    private async Task DispatchDeliveryAsync(
+    private async Task<DeliveryOutcome> DispatchDeliveryAsync(
         SignalDelivery delivery,
         CancellationToken cancellationToken)
     {
@@ -250,13 +251,15 @@ public abstract class Neuron :
 
         try
         {
-            await DispatchSignalAsync(delivery.Signal, cancellationToken)
+            var outcome = await DispatchSignalAsync(delivery.Signal, cancellationToken)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             _journal.AppendIncoming(delivery);
             await WriteStateAsync(cancellationToken).ConfigureAwait(true);
             await _journal.NotifyWatchersAsync()
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+            return outcome;
         }
         catch (Exception failure)
         {
@@ -269,7 +272,7 @@ public abstract class Neuron :
         }
     }
 
-    private Task DeliverToAsync(NeuronId receiver, SignalDelivery delivery)
+    private Task<DeliveryOutcome> DeliverToAsync(NeuronId receiver, SignalDelivery delivery)
         => receiver == Id
             // A grain call to self would deadlock the serialized turn; dispatch in place.
             ? DispatchDeliveryAsync(delivery, CancellationToken.None)
@@ -289,10 +292,21 @@ public abstract class Neuron :
         }
     }
 
-    private Task DispatchSignalAsync(Signal signal, CancellationToken cancellationToken)
-        => HandlersFor(GetType()).TryGetValue(signal.GetType(), out var handler)
-            ? handler(this, signal, cancellationToken)
-            : OnUnboundSignalAsync(signal, cancellationToken);
+    private async Task<DeliveryOutcome> DispatchSignalAsync(
+        Signal signal,
+        CancellationToken cancellationToken)
+    {
+        if (!HandlersFor(GetType()).TryGetValue(signal.GetType(), out var handler))
+        {
+            await OnUnboundSignalAsync(signal, cancellationToken)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            return DeliveryOutcome.Unhandled;
+        }
+
+        await handler(this, signal, cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        return DeliveryOutcome.Handled;
+    }
 
     private static IReadOnlyDictionary<Type, HandlerInvoker> HandlersFor(Type neuronType)
         => HandlersByNeuronType.GetOrAdd(neuronType, static type => BuildHandlers(type));
