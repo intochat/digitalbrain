@@ -21,6 +21,7 @@ public abstract class Neuron :
     private static readonly ConcurrentDictionary<Type, IReadOnlyDictionary<Type, HandlerInvoker>> HandlersByNeuronType = new();
     private readonly NeuronJournal _journal;
     private readonly SynapseSet _synapses;
+    private readonly SignalRouter _router;
     private SignalDelivery? _handling;
 
     protected Neuron()
@@ -31,6 +32,8 @@ public abstract class Neuron :
 
         _journal = new NeuronJournal(this, ServiceProvider);
         _synapses = new SynapseSet(ServiceProvider, Id, TimeProvider);
+        _router = ServiceProvider.GetService<SignalRouter>()
+            ?? new SignalRouter(new SignalHandlerIndex());
     }
 
     public NeuronId Id
@@ -110,6 +113,38 @@ public abstract class Neuron :
         await WriteStateAsync().ConfigureAwait(true);
 
         return delivery;
+    }
+
+    // Emit to whoever the graph says listens. The sender names nobody: the receiver set comes
+    // from its own synapses plus the innate handler index. Returns how many were reached.
+    protected async Task<int> BroadcastAsync(Signal signal)
+    {
+        ArgumentNullException.ThrowIfNull(signal);
+
+        var receivers = _router.Resolve(signal, Id.Owner, _synapses);
+        if (receivers.Count == 0)
+        {
+            return 0;
+        }
+
+        // One correlation for the whole fan-out: the turn reconstructs from the graph alone.
+        var correlation = ResolveEmissionCorrelation();
+        var signalType = signal.GetType().Name;
+
+        foreach (var receiver in receivers)
+        {
+            var delivery = await StageOutgoingAsync(signal, _handling, correlation)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+            await GrainFactory.GetGrain<INeuron>(receiver.ToGrainId())
+                .Deliver(delivery)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+            _synapses.Record(receiver, signalType, SynapseKind.Learned);
+        }
+
+        await WriteStateAsync().ConfigureAwait(true);
+        return receivers.Count;
     }
 
     protected Task EmitAsync(Signal signal)

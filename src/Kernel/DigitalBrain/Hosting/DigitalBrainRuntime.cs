@@ -24,6 +24,8 @@ public static class DigitalBrainRuntime
             options => options.FireAndForgetDelivery = false);
         ModelPayloadSerialization.AddModelPayloadSerialization(builder.Services);
         builder.Services.TryAddSingleton<SynapseOptions>();
+        builder.Services.TryAddSingleton<SignalHandlerIndex>();
+        builder.Services.TryAddSingleton<SignalRouter>();
 
         foreach (var hook in ModuleHooksOf(modules))
         {
