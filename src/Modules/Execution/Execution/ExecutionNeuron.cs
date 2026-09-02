@@ -115,7 +115,7 @@ public sealed class ExecutionNeuron : Neuron, IExecution
                 await RunTeamPhasesAsync(session, synapse.Workload, grants, requestJson, cancellationToken)
                     .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             }
-            else if (synapse.Workload is SmartPromptWorkload)
+            else if (synapse.Workload is AutomationWorkload)
             {
                 // Automations without an interactive tool loop still execute declared grants once.
                 // Chat/Agent turns seed only — capabilities run via ExecutionSession.CallAsync from tools.

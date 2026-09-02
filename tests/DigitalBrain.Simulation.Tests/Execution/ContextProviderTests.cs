@@ -50,7 +50,7 @@ public sealed class ContextProviderTests(ExecutionSimulationFixture fixture)
         await ExecutionTestDriver.StartAndCompleteAsync(
             brain,
             executionId,
-            new SmartPromptWorkload(Guid.NewGuid(), Guid.NewGuid(), "why?"),
+            new AutomationWorkload(Guid.NewGuid(), Guid.NewGuid(), "why?"),
             ExecutionDriverKind.Agent,
             [CapabilityId.Parse("explain.why")],
             cancellationToken: TestContext.Current.CancellationToken);
@@ -60,7 +60,7 @@ public sealed class ContextProviderTests(ExecutionSimulationFixture fixture)
         Assert.NotNull(entry);
         Assert.Equal("explain.trace.v1", entry!.SchemaHash);
         Assert.Contains(executionId.ToString(), entry.PayloadJson, StringComparison.Ordinal);
-        Assert.Contains("SmartPromptWorkload", entry.PayloadJson, StringComparison.Ordinal);
+        Assert.Contains("AutomationWorkload", entry.PayloadJson, StringComparison.Ordinal);
         Assert.Contains("preferences.rules", entry.PayloadJson, StringComparison.Ordinal);
         Assert.Contains("Never share personal emails.", entry.PayloadJson, StringComparison.Ordinal);
         Assert.Contains("Based on active execution context and preferences.", entry.PayloadJson, StringComparison.Ordinal);
@@ -76,7 +76,7 @@ public sealed class ContextProviderTests(ExecutionSimulationFixture fixture)
         var execution = await ExecutionTestDriver.StartAndCompleteAsync(
             brain,
             executionId,
-            new SmartPromptWorkload(Guid.NewGuid(), Guid.NewGuid(), "follow up"),
+            new AutomationWorkload(Guid.NewGuid(), Guid.NewGuid(), "follow up"),
             ExecutionDriverKind.Script,
             grants: [],
             relatedExecutions: [relatedId],

@@ -11,7 +11,6 @@ using DigitalBrain.Memory;
 using DigitalBrain.Memory.Aspire.Hosting;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Salesforce.Aspire.Hosting;
-using DigitalBrain.SmartPrompt;
 using DigitalBrain.Time;
 using DigitalBrain.UI;
 using DigitalBrain.UI.Aspire.Hosting;
@@ -68,7 +67,6 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
     .AddModule<ExecutionModule>()
     .AddModule<GoogleModule>(google => google.WithGmail())
     .AddModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
-    .AddModule<SmartPromptModule>()
     .AddModule<UIModule>(ui =>
     {
         ui.WithWindowHost();

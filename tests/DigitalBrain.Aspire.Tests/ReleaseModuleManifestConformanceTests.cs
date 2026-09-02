@@ -21,7 +21,6 @@ public sealed class ReleaseModuleManifestConformanceTests
         "DigitalBrain.Execution.ExecutionModule, DigitalBrain.Modules.Execution",
         "DigitalBrain.Google.GoogleModule, DigitalBrain.Modules.Google",
         "DigitalBrain.Salesforce.SalesforceModule, DigitalBrain.Modules.Salesforce",
-        "DigitalBrain.SmartPrompt.SmartPromptModule, DigitalBrain.Modules.SmartPrompt",
         "DigitalBrain.UI.UIModule, DigitalBrain.Modules.UI",
     ];
 

@@ -14,9 +14,9 @@ public sealed record ChatTurnWorkload(
     [property: Id(2)] string UserText) : WorkloadDescriptor;
 
 [GenerateSerializer]
-[Alias("db.workload.smart-prompt.v1")]
-public sealed record SmartPromptWorkload(
-    [property: Id(0)] Guid SmartPromptId,
+[Alias("db.workload.automation.v1")]
+public sealed record AutomationWorkload(
+    [property: Id(0)] Guid AutomationId,
     [property: Id(1)] Guid RevisionId,
     [property: Id(2)] string GoalText) : WorkloadDescriptor;
 

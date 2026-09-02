@@ -28,7 +28,6 @@ app.MapOwnerCommands();
 app.MapChatVoice();
 app.MapChatStreams();
 app.MapKitEntities();
-app.MapBehaviors();
 app.MapSurfaceStreams();
 app.MapOrleansDashboard("/orleans");
 app.Run();

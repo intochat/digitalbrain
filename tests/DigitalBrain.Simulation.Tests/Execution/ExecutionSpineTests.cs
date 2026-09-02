@@ -5,7 +5,6 @@ using DigitalBrain.Core;
 using DigitalBrain.Execution;
 using DigitalBrain.Google;
 using DigitalBrain.Salesforce;
-using DigitalBrain.SmartPrompt;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -32,12 +31,8 @@ public sealed class ExecutionSimulationFixture : IAsyncLifetime
             {
                 [DigitalBrainNames.Mode] = DigitalBrainNames.TestingMode,
             },
-            // The Smart Prompt module owns the web search capability; the spine only needs the
-            // capability and its fake, not the whole module.
             ConfigureSilo = silo => silo.Services
-                .AddSingleton<ICapabilityHandler, TestEchoCapabilityHandler>()
-                .AddSingleton<ICapabilityHandler, WebSearchHandler>()
-                .AddSingleton<IWebSearch, FakeWebSearch>(),
+                .AddSingleton<ICapabilityHandler, TestEchoCapabilityHandler>(),
         });
 
     public async ValueTask DisposeAsync()
@@ -75,7 +70,7 @@ public sealed class ExecutionSpineTests(ExecutionSimulationFixture fixture)
         var execution = await ExecutionTestDriver.StartAndCompleteAsync(
             brain,
             executionId,
-            new SmartPromptWorkload(Guid.NewGuid(), Guid.NewGuid(), "hi"),
+            new AutomationWorkload(Guid.NewGuid(), Guid.NewGuid(), "hi"),
             driver,
             [CapabilityId.Parse(capability)],
             cancellationToken: TestContext.Current.CancellationToken);
@@ -91,7 +86,7 @@ public sealed class ExecutionSpineTests(ExecutionSimulationFixture fixture)
         Assert.Equal(ExecutionStatus.Completed, projection.Status);
         Assert.Equal(executionId, projection.ExecutionId);
         Assert.Equal(driver, projection.Driver);
-        Assert.IsType<SmartPromptWorkload>(projection.Workload);
+        Assert.IsType<AutomationWorkload>(projection.Workload);
     }
 
     [Fact]
@@ -104,7 +99,7 @@ public sealed class ExecutionSpineTests(ExecutionSimulationFixture fixture)
         await ExecutionTestDriver.StartAndCompleteAsync(
             brain,
             firstId,
-            new SmartPromptWorkload(Guid.NewGuid(), Guid.NewGuid(), "search"),
+            new AutomationWorkload(Guid.NewGuid(), Guid.NewGuid(), "search"),
             ExecutionDriverKind.Agent,
             [CapabilityId.Parse("gmail.search")],
             cancellationToken: cancellationToken);
@@ -142,21 +137,17 @@ public sealed class ExecutionSpineTests(ExecutionSimulationFixture fixture)
             ExecutionDriverKind.Team,
             [
                 CapabilityId.Parse("gmail.search"),
-                CapabilityId.Parse("websearch.company"),
                 CapabilityId.Parse("salesforce.upsert"),
             ],
             cancellationToken: TestContext.Current.CancellationToken);
 
         var executionContext = brain.GetEntity<IExecutionContext>(executionId.ToString());
         var gmail = await executionContext.Query(new ContextQuery(new ContextPath("gmail.search")));
-        var websearch = await executionContext.Query(new ContextQuery(new ContextPath("websearch.company")));
         var salesforce = await executionContext.Query(new ContextQuery(new ContextPath("salesforce.upsert")));
         var teamTrace = await executionContext.Query(new ContextQuery(new ContextPath("team.trace")));
 
         Assert.NotNull(gmail);
         Assert.Equal("gmail.search.v1", gmail!.SchemaHash);
-        Assert.NotNull(websearch);
-        Assert.Equal("websearch.company.v1", websearch!.SchemaHash);
         Assert.NotNull(salesforce);
         Assert.Equal("salesforce.upsert.v1", salesforce!.SchemaHash);
         Assert.NotNull(teamTrace);
@@ -164,7 +155,6 @@ public sealed class ExecutionSpineTests(ExecutionSimulationFixture fixture)
         Assert.Contains("researcher", teamTrace.PayloadJson, StringComparison.Ordinal);
         Assert.Contains("closer", teamTrace.PayloadJson, StringComparison.Ordinal);
         Assert.Contains("gmail.search", teamTrace.PayloadJson, StringComparison.Ordinal);
-        Assert.Contains("websearch.company", teamTrace.PayloadJson, StringComparison.Ordinal);
         Assert.Contains("salesforce.upsert", teamTrace.PayloadJson, StringComparison.Ordinal);
 
         var projection = await execution.Read();

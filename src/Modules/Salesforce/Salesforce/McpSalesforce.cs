@@ -30,7 +30,7 @@ internal sealed class McpSalesforce : ISalesforce, IAsyncDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
         var result = await CallAsync("soqlQuery", new Dictionary<string, object?> { ["query"] = query }, cancellationToken).ConfigureAwait(false);
-        // Keep the records envelope used by SmartPrompt when hosted MCP returns an array.
+        // Keep the records envelope callers expect when hosted MCP returns an array.
         if (result.ValueKind == JsonValueKind.Array)
         {
             return JsonSerializer.Serialize(new { totalSize = result.GetArrayLength(), records = result });

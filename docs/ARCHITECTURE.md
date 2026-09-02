@@ -62,20 +62,11 @@ KitGalleryScreen) is the starting point for the widget side.
 - **Voice**: Whisper STT (Foundry Local) stays dev-only. PersonaPlex is deleted
   (see Trash record); future voice = provider realtime APIs.
 
-## Smart Prompts
+## Automations
 
-Canonical design: [docs/superpowers/specs/2026-08-23-smart-prompt-execution-architecture-design.md](superpowers/specs/2026-08-23-smart-prompt-execution-architecture-design.md).
-
-Product surface: English + binding chips (logos), not generated C#. Under the hood each
-fire is `StartExecution(SmartPromptWorkload)` on the shared Execution Neuron with an
-`ExecutionContext` Entity. Façade modules (Gmail/Salesforce/Search) return `ContextDelta`
-via Fake transports today; real MCP swaps behind `I*Transport` later.
-
-- Chips bind Capability grants + Account EntityRefs (deterministic).
-- Chat turns also start Executions; `ActiveExecutionId` + related Context lineage
-  support follow-ups.
-- Triggers v1: manual Run now + schedule reminder; event-driven later.
-- Preferences / context providers / explainability seed Executions (IAW-inspired).
+Retired in favour of generated C#. See
+[2026-09-02-digitalbrain-v2-neuron-substrate-design.md](superpowers/specs/2026-09-02-digitalbrain-v2-neuron-substrate-design.md)
+§9.3 — an automation is a neuron, authored by the system and compiled against module contracts.
 
 ## Integration modules
 

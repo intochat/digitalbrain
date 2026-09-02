@@ -22,7 +22,6 @@ public sealed class SimulationFixture : IAsyncLifetime
                     typeof(DigitalBrain.Execution.ExecutionModule),
                     typeof(DigitalBrain.Google.GoogleModule),
                     typeof(DigitalBrain.Salesforce.SalesforceModule),
-                    typeof(DigitalBrain.SmartPrompt.SmartPromptModule),
                 ]),
             Configuration = new Dictionary<string, string?>
             {
