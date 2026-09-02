@@ -15,4 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Substrate.Tests" />
+  </ItemGroup>
 </Project>
