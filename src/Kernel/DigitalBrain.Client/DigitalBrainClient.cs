@@ -9,6 +9,7 @@ using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Entities;
 using DigitalBrain.Abstractions.Brain;
+using DigitalBrain.Abstractions.Synapses;
 namespace DigitalBrain.Client;
 
 public sealed class DigitalBrainClient : IDigitalBrain
@@ -88,6 +89,20 @@ public sealed class DigitalBrainClient : IDigitalBrain
         cancellationToken.ThrowIfCancellationRequested();
         return Session().ReadNeuronJournal(subject, kind, afterSequence);
     }
+
+    public Task<IReadOnlyList<Synapse>> GetSynapsesAsync(
+        NeuronId subject,
+        CancellationToken cancellationToken = default)
+    {
+        RequireOwnedSubject(subject);
+        cancellationToken.ThrowIfCancellationRequested();
+        return Session().ReadNeuronSynapses(subject);
+    }
+
+    // The client owns no unmanaged resource and does not own the cluster client it was handed;
+    // IAsyncDisposable exists so `await using IDigitalBrain brain = …` reads naturally in hosts
+    // that DO own one (see Brain.CreateAsync).
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     public async IAsyncEnumerable<JournalRead> WatchJournalAsync(
         NeuronId subject,

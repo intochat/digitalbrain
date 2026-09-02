@@ -1,6 +1,7 @@
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Journals;
+using DigitalBrain.Abstractions.Synapses;
 namespace DigitalBrain.Abstractions.Neurons;
 
 [Alias("DigitalBrain.Abstractions.ISessionNeuron")]
@@ -28,6 +29,10 @@ public interface ISessionNeuron : INeuron
     [Alias(nameof(ReadNeuronJournal))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
     Task<JournalRead> ReadNeuronJournal(NeuronId subject, JournalKind kind, long afterSequence);
+
+    [Alias(nameof(ReadNeuronSynapses))]
+    [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
+    Task<IReadOnlyList<Synapse>> ReadNeuronSynapses(NeuronId subject);
 
     [Alias(nameof(WatchNeuron))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]

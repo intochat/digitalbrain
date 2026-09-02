@@ -8,6 +8,7 @@ using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Messaging;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Journals;
+using DigitalBrain.Abstractions.Synapses;
 namespace DigitalBrain.Core;
 
 internal sealed class SessionNeuron : Neuron, ISessionNeuron
@@ -78,6 +79,11 @@ internal sealed class SessionNeuron : Neuron, ISessionNeuron
         => subject == Id
             ? ReadJournal(kind, afterSequence)
             : GrainFactory.GetGrain<INeuron>(subject.ToGrainId()).ReadJournal(kind, afterSequence);
+
+    public Task<IReadOnlyList<Synapse>> ReadNeuronSynapses(NeuronId subject)
+        => subject == Id
+            ? ReadSynapses()
+            : GrainFactory.GetGrain<INeuron>(subject.ToGrainId()).ReadSynapses();
 
     public Task WatchNeuron(NeuronId subject, JournalKind kind, long afterSequence, IJournalObserver observer)
         => subject == Id

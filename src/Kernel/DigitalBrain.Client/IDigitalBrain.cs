@@ -6,9 +6,10 @@ using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Entities;
+using DigitalBrain.Abstractions.Synapses;
 namespace DigitalBrain.Client;
 
-public interface IDigitalBrain
+public interface IDigitalBrain : IAsyncDisposable
 {
     OwnerId Owner { get; }
 
@@ -37,5 +38,9 @@ public interface IDigitalBrain
         NeuronId subject,
         JournalKind kind,
         long afterSequence = 0,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Synapse>> GetSynapsesAsync(
+        NeuronId subject,
         CancellationToken cancellationToken = default);
 }
