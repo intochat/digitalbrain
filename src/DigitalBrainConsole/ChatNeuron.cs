@@ -6,13 +6,15 @@ namespace DigitalBrainConsole;
 [Alias("DigitalBrainConsole.IChatNeuron")]
 public interface IChatNeuron : INeuron;
 
-// Handles the incoming message, then broadcasts it onward as UserMessageReceived. It names no
-// receiver: who hears this is a property of the graph, not of this code.
-internal sealed class ChatNeuron : Neuron, IChatNeuron, IHandle<UserMessage>
+// Handles the message, then broadcasts it onward. It names no receiver: who hears this is a
+// property of the graph, not of this code. ChatNeuron itself declares IHandle<UserMessageReceived>
+// and broadcasts that same signal — SignalRouter.Resolve excludes the emitter from its own
+// receiver set, so this does not route back to chat:main.
+internal sealed class ChatNeuron : Neuron, IChatNeuron, IHandle<UserMessageReceived>
 {
-    public async Task HandleAsync(UserMessage signal, CancellationToken cancellationToken)
+    public async Task HandleAsync(UserMessageReceived signal, CancellationToken cancellationToken)
     {
-        var reached = await BroadcastAsync(new UserMessageReceived(signal.Text)).ConfigureAwait(true);
+        var reached = await BroadcastAsync(signal).ConfigureAwait(true);
         Console.WriteLine($"[chat]    broadcast {signal.Text.Length} chars -> {reached} receivers");
     }
 }

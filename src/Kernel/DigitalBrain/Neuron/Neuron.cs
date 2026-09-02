@@ -121,7 +121,7 @@ public abstract class Neuron :
     {
         ArgumentNullException.ThrowIfNull(signal);
 
-        var receivers = _router.Resolve(signal, Id.Owner, _synapses);
+        var receivers = _router.Resolve(signal, Id, _synapses);
         if (receivers.Count == 0)
         {
             return 0;

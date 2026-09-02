@@ -16,6 +16,10 @@ public sealed record Announced(string Text) : Signal;
 [Alias("db.test.unheard")]
 public sealed record Unheard(string Text) : Signal;
 
+[GenerateSerializer]
+[Alias("db.test.rumor")]
+public sealed record Rumor(string Text) : Signal;
+
 [Alias("DigitalBrain.Substrate.Tests.IAnnouncer")]
 public interface IAnnouncer : INeuron
 {
@@ -31,6 +35,16 @@ public interface IEarA : INeuron;
 
 [Alias("DigitalBrain.Substrate.Tests.IEarB")]
 public interface IEarB : INeuron;
+
+[Alias("DigitalBrain.Substrate.Tests.IGossip")]
+public interface IGossip : INeuron
+{
+    [Alias(nameof(Spread))]
+    Task<int> Spread(string text);
+}
+
+[Alias("DigitalBrain.Substrate.Tests.IEarC")]
+public interface IEarC : INeuron;
 
 internal sealed class Announcer : Neuron, IAnnouncer
 {
@@ -49,11 +63,36 @@ internal sealed class EarB : Neuron, IEarB, IHandle<Announced>
     public Task HandleAsync(Announced signal, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
+// Declares IHandle<Rumor> for the very signal it broadcasts — the regression fixture for the
+// self-receiver deadlock: BroadcastAsync's Deliver call has no self-shortcut (unlike
+// FireAsync's DeliverToAsync), so if the emitter's own grain type were left in its own
+// receiver set, a non-reentrant activation would await a Deliver call into itself and hang
+// for the full call timeout.
+internal sealed class Gossip : Neuron, IGossip, IHandle<Rumor>
+{
+    public Task<int> Spread(string text) => BroadcastAsync(new Rumor(text));
+
+    public Task HandleAsync(Rumor signal, CancellationToken cancellationToken) => Task.CompletedTask;
+}
+
+internal sealed class EarC : Neuron, IEarC, IHandle<Rumor>
+{
+    public Task HandleAsync(Rumor signal, CancellationToken cancellationToken) => Task.CompletedTask;
+}
+
 public sealed class SignalRoutingTests
 {
     private static IAnnouncer AnnouncerIn(BrainSimulation brain, string name)
         => brain.Grains.GetGrain<IAnnouncer>(
             new NeuronId("announcer", new OwnerId("owner"), name).ToGrainId());
+
+    // Tier 1 always addresses the "default"-named instance of a grain type (SignalRouter
+    // hard-codes it), so the self-receiver hazard only bites when the emitter itself IS the
+    // "default" instance: that is the one case where tier 1's own candidate resolves back to
+    // the emitter's own NeuronId rather than a sibling activation.
+    private static IGossip GossipDefault(BrainSimulation brain)
+        => brain.Grains.GetGrain<IGossip>(
+            new NeuronId("gossip", new OwnerId("owner"), "default").ToGrainId());
 
     [Fact]
     public async Task Broadcast_ReachesEveryNeuronTypeThatDeclaresIHandle()
@@ -115,5 +154,27 @@ public sealed class SignalRoutingTests
         // is a later slice: the miss must return an empty set, not a guess.
         Assert.Equal(0, await announcer.AnnounceUnheard("hello"));
         Assert.Empty(await announcer.ReadSynapses());
+    }
+
+    [Fact]
+    public async Task Broadcast_ExcludesTheEmitterEvenWhenTheEmitterDeclaresIHandleForTheSameSignal()
+    {
+        await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([]) });
+        var gossip = GossipDefault(brain);
+
+        // Gossip declares IHandle<Rumor> and broadcasts Rumor. Pre-fix, tier 1 would include
+        // gossip's own grain type among the receivers of its own broadcast — and because
+        // gossip is itself the "default" instance, that candidate resolves to gossip's own
+        // NeuronId, so BroadcastAsync's unconditional Deliver call would have the activation
+        // await a call into itself and hang for the whole call budget. If this test times out
+        // or never completes, the exclusion in SignalRouter.Resolve has regressed.
+        var reached = await gossip.Spread("hello");
+
+        // Only EarC hears it: the count and the recorded synapse both exclude gossip itself.
+        Assert.Equal(1, reached);
+
+        var synapses = await gossip.ReadSynapses();
+        var synapse = Assert.Single(synapses);
+        Assert.Equal(new NeuronId("earc", new OwnerId("owner"), "default"), synapse.Target);
     }
 }

@@ -4,11 +4,16 @@ using DigitalBrainConsole;
 
 await using IDigitalBrain brain = await Brain.CreateAsync(args);
 
-var chat = brain.Get<IChatNeuron>("main");
+// "default": tier 1 always addresses the "default" instance of a handler's grain type, so a
+// neuron that both handles and broadcasts the same signal type must itself BE that instance —
+// otherwise its own "default" sibling activation would also be a tier-1 receiver of this
+// broadcast (a real, verified defect: named "main" instead, greeter and logger each received
+// and printed twice, and the graph grew a spurious chat -> chat edge).
+var chat = brain.Get<IChatNeuron>("default");
 
 // Fire twice: the second fire must potentiate the same synapses, not add new ones.
-await chat.FireAsync(new UserMessage("hello"));
-await chat.FireAsync(new UserMessage("hello again"));
+await chat.FireAsync(new UserMessageReceived("hello"));
+await chat.FireAsync(new UserMessageReceived("hello again"));
 
 Console.WriteLine();
 Console.WriteLine("-- synapses (anatomy) ------------------------------------------");
@@ -18,7 +23,7 @@ foreach (var synapse in await brain.GetSynapsesAsync(chat.Id))
 }
 
 Console.WriteLine();
-Console.WriteLine("-- chat:main outgoing journal (physiology) ---------------------");
+Console.WriteLine("-- chat:default outgoing journal (physiology) ------------------");
 var journal = await brain.ReadJournalAsync(chat.Id, JournalKind.Outgoing);
 foreach (var delivery in journal.Delta)
 {

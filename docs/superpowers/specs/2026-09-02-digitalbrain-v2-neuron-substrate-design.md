@@ -441,7 +441,7 @@ collectible-ALC host, in-silo. Its prior "never loaded in Kernel" charter is voi
 
 ### Slice 1 — the graph is real *(no compilation, no AI, no modules)*
 
-`DigitalBrainConsole` references `DigitalBrain` + `DigitalBrain.Silo` and nothing else. Handlers are
+`DigitalBrainConsole` references `DigitalBrain` + `DigitalBrain.Client` and nothing else. Handlers are
 `Console.WriteLine`, in the spirit of `D:\ModernCQRS`.
 
 ```
