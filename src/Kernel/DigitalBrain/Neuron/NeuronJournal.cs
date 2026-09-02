@@ -1,24 +1,25 @@
 using DigitalBrain.Abstractions;
 
+using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Signals;
 namespace DigitalBrain.Core;
 
 internal sealed class NeuronJournal
 {
-    private const string IncomingName = "incoming";
-    private const string OutgoingName = "outgoing";
-
-    private readonly Neuron _neuron;
+    private readonly NeuronId _neuronId;
     private readonly NeuronFeed _incoming;
     private readonly NeuronFeed _outgoing;
     private readonly List<Watcher> _watchers = [];
 
-    internal NeuronJournal(Neuron neuron, IServiceProvider services)
+    internal NeuronJournal(NeuronId neuronId, NeuronFeed incoming, NeuronFeed outgoing)
     {
-        _neuron = neuron;
-        _incoming = new NeuronFeed(services, IncomingName);
-        _outgoing = new NeuronFeed(services, OutgoingName);
+        ArgumentNullException.ThrowIfNull(incoming);
+        ArgumentNullException.ThrowIfNull(outgoing);
+
+        _neuronId = neuronId;
+        _incoming = incoming;
+        _outgoing = outgoing;
     }
 
     internal long OutgoingNextSequence => _outgoing.NextSequence;
@@ -75,7 +76,7 @@ internal sealed class NeuronJournal
             catch (Exception unreachable)
             {
                 _watchers.Remove(watcher);
-                SignalTelemetry.WatcherDropped(_neuron.Id, unreachable);
+                SignalTelemetry.WatcherDropped(_neuronId, unreachable);
             }
         }
     }

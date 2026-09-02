@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using DigitalBrain.Abstractions;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 
 using DigitalBrain.Abstractions.Neurons;
@@ -20,21 +19,13 @@ public abstract class Neuron :
     private delegate Task HandlerInvoker(object neuron, Signal signal, CancellationToken cancellationToken);
 
     private static readonly ConcurrentDictionary<Type, IReadOnlyDictionary<Type, HandlerInvoker>> HandlersByNeuronType = new();
-    private readonly NeuronJournal _journal;
-    private readonly SynapseSet _synapses;
-    private readonly SignalRouter _router;
+    private readonly NeuronActivationComponents _components;
     private SignalDelivery? _handling;
 
-    protected Neuron()
+    protected Neuron(NeuronRuntime runtime)
     {
-        TimeProvider =
-            ServiceProvider.GetKeyedService<TimeProvider>(NeuronTime.ServiceKey)
-            ?? System.TimeProvider.System;
-
-        _journal = new NeuronJournal(this, ServiceProvider);
-        _synapses = new SynapseSet(ServiceProvider, Id, TimeProvider);
-        _router = ServiceProvider.GetService<SignalRouter>()
-            ?? new SignalRouter(new SignalHandlerIndex());
+        ArgumentNullException.ThrowIfNull(runtime);
+        _components = runtime.Bind(ServiceProvider, Id);
     }
 
     public NeuronId Id
@@ -42,7 +33,7 @@ public abstract class Neuron :
             this.GetGrainId().Type.ToString()!,
             this.GetPrimaryKeyString());
 
-    protected TimeProvider TimeProvider { get; }
+    protected TimeProvider TimeProvider => _components.Clock;
 
     public sealed override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
@@ -71,20 +62,21 @@ public abstract class Neuron :
     }
 
     public Task<JournalRead> ReadJournal(JournalKind kind, long afterSequence)
-        => Task.FromResult(_journal.Read(kind, afterSequence));
+        => Task.FromResult(_components.Journal.Read(kind, afterSequence));
 
-    public Task<IReadOnlyList<Synapse>> ReadSynapses() => Task.FromResult(_synapses.All());
+    public Task<IReadOnlyList<Synapse>> ReadSynapses()
+        => Task.FromResult(_components.Synapses.All());
 
     public async Task Watch(
         JournalKind kind,
         long afterSequence,
         IJournalObserver observer)
-        => await _journal.WatchAsync(kind, afterSequence, observer)
+        => await _components.Journal.WatchAsync(kind, afterSequence, observer)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
     public Task Unwatch(IJournalObserver observer)
     {
-        _journal.Unwatch(observer);
+        _components.Journal.Unwatch(observer);
         return Task.CompletedTask;
     }
 
@@ -110,7 +102,7 @@ public abstract class Neuron :
         var delivery = await SendAsync(receiver, signal)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        _synapses.Record(receiver, signal.GetType().Name, SynapseKind.Learned);
+        _components.Synapses.Record(receiver, signal.GetType().Name, SynapseKind.Learned);
         await WriteStateAsync().ConfigureAwait(true);
 
         return delivery;
@@ -122,7 +114,7 @@ public abstract class Neuron :
     {
         ArgumentNullException.ThrowIfNull(signal);
 
-        var receivers = _router.Resolve(signal, Id, _synapses);
+        var receivers = _components.Router.Resolve(signal, Id, _components.Synapses);
         if (receivers.Count == 0)
         {
             return 0;
@@ -141,7 +133,7 @@ public abstract class Neuron :
                 .Deliver(delivery)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-            _synapses.Record(receiver, signalType, SynapseKind.Learned);
+            _components.Synapses.Record(receiver, signalType, SynapseKind.Learned);
         }
 
         await WriteStateAsync().ConfigureAwait(true);
@@ -215,15 +207,15 @@ public abstract class Neuron :
         var delivery = SignalDelivery.Create(
             signal,
             Id,
-            _journal.OutgoingNextSequence,
+            _components.Journal.OutgoingNextSequence,
             TimeProvider,
             cause,
             correlation,
             principal: VerifiedActor.Current?.PrincipalId ?? cause?.Principal);
 
-        _journal.AppendOutgoing(delivery);
+        _components.Journal.AppendOutgoing(delivery);
         await WriteStateAsync().ConfigureAwait(true);
-        await _journal.NotifyWatchersAsync()
+        await _components.Journal.NotifyWatchersAsync()
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         return delivery;
@@ -254,9 +246,9 @@ public abstract class Neuron :
             var outcome = await DispatchSignalAsync(delivery.Signal, cancellationToken)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-            _journal.AppendIncoming(delivery);
+            _components.Journal.AppendIncoming(delivery);
             await WriteStateAsync(cancellationToken).ConfigureAwait(true);
-            await _journal.NotifyWatchersAsync()
+            await _components.Journal.NotifyWatchersAsync()
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             return outcome;

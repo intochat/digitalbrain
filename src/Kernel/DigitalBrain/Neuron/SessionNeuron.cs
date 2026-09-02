@@ -17,7 +17,8 @@ internal sealed class SessionNeuron : Neuron, ISessionNeuron
 
     private readonly IDurableValue<bool> _activationPublished;
 
-    public SessionNeuron()
+    public SessionNeuron(NeuronRuntime runtime)
+        : base(runtime)
     {
         _activationPublished = ServiceProvider.GetRequiredKeyedService<IDurableValue<bool>>(ActivationPublishedName);
     }

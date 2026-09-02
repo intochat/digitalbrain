@@ -5,7 +5,7 @@ using DigitalBrain.Core;
 namespace DigitalBrain.UI;
 
 [GrainType("uirenderer")]
-internal sealed class UIRenderer : Neuron, IUIRenderer
+internal sealed class UIRenderer(NeuronRuntime runtime) : Neuron(runtime), IUIRenderer
 {
     private const int RetainedScenes = 64;
 

@@ -13,8 +13,8 @@ namespace DigitalBrain.UI;
 // delivery runs through the regular Deliver path so it journals and dispatches like any send.
 [GrainType("surface-boot")]
 [ImplicitChannelSubscription(DigitalBrainNames.ActivationChannelNamespace)]
-internal sealed class SurfaceBoot :
-    Neuron,
+internal sealed class SurfaceBoot(NeuronRuntime runtime) :
+    Neuron(runtime),
     IHandle<DigitalBrainActivated>,
     IOnBroadcastChannelSubscribed
 {

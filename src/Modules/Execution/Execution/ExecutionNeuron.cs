@@ -21,7 +21,8 @@ public sealed class ExecutionNeuron : Neuron, IExecution
     private readonly IScriptDriver _scriptDriver;
     private readonly IExecutionContextProvider[] _providers;
 
-    public ExecutionNeuron()
+    public ExecutionNeuron(NeuronRuntime runtime)
+        : base(runtime)
     {
         _state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName);
         _states = ServiceProvider.GetRequiredService<Serializer<ExecutionState>>();

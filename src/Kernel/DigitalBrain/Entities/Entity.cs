@@ -1,6 +1,5 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Entities;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Core;
@@ -17,15 +16,9 @@ public abstract class Entity<TState> : Grain, IEntity<TState>
         [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<TState> state)
     {
         _state = state;
-
-        TimeProvider =
-            ServiceProvider.GetKeyedService<TimeProvider>(NeuronTime.ServiceKey)
-            ?? System.TimeProvider.System;
     }
 
     protected TState? State => _state.RecordExists ? _state.State : null;
-
-    protected TimeProvider TimeProvider { get; }
 
     public Task<TState?> Read() => Task.FromResult(State);
 

@@ -11,7 +11,8 @@ public abstract class Agent : Neuron, IAgent
 {
     private readonly IChatClient _chatClient;
 
-    protected Agent(IChatClient chatClient)
+    protected Agent(NeuronRuntime runtime, IChatClient chatClient)
+        : base(runtime)
     {
         ArgumentNullException.ThrowIfNull(chatClient);
 

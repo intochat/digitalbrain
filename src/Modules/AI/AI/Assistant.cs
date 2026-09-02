@@ -1,10 +1,13 @@
 using DigitalBrain.AI;
+using DigitalBrain.Core;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Assistant;
 
-internal sealed class Assistant(IChatClient chatClient) : Agent(chatClient), IAssistant
+internal sealed class Assistant(NeuronRuntime runtime, IChatClient chatClient) :
+    Agent(runtime, chatClient),
+    IAssistant
 {
     protected override string Instructions =>
         """

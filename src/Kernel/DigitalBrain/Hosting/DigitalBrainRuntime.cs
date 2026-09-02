@@ -23,9 +23,11 @@ public static class DigitalBrainRuntime
             DigitalBrainNames.BroadcastChannelProvider,
             options => options.FireAndForgetDelivery = false);
         ModelPayloadSerialization.AddModelPayloadSerialization(builder.Services);
+        builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         builder.Services.TryAddSingleton<SynapseOptions>();
         builder.Services.TryAddSingleton<SignalHandlerIndex>();
         builder.Services.TryAddSingleton<SignalRouter>();
+        builder.Services.TryAddSingleton<NeuronRuntime>();
 
         foreach (var hook in ModuleHooksOf(modules))
         {

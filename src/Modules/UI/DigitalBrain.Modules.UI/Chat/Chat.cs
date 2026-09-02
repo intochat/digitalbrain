@@ -54,7 +54,8 @@ internal sealed class Chat : Neuron, IChat
     private DateTimeOffset? _activeCallStartedAt;
     private IGrainTimer? _turnDeadlineTimer;
 
-    public Chat()
+    public Chat(NeuronRuntime runtime)
+        : base(runtime)
     {
         _commandLog = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(CommandLogName);
         _transcript = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>(TranscriptName);

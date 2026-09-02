@@ -6,7 +6,10 @@ namespace DigitalBrainConsole;
 [Alias("DigitalBrainConsole.IGreeterNeuron")]
 public interface IGreeterNeuron : INeuron;
 
-internal sealed class GreeterNeuron : Neuron, IGreeterNeuron, IHandle<UserMessageReceived>
+internal sealed class GreeterNeuron(NeuronRuntime runtime) :
+    Neuron(runtime),
+    IGreeterNeuron,
+    IHandle<UserMessageReceived>
 {
     public Task HandleAsync(UserMessageReceived signal, CancellationToken cancellationToken)
     {

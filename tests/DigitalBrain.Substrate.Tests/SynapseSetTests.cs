@@ -5,6 +5,7 @@ using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Synapses;
 using DigitalBrain.Core;
 using DigitalBrain.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace DigitalBrain.Substrate.Tests;
@@ -23,18 +24,72 @@ public interface IPingSource : INeuron
 [Alias("DigitalBrain.Substrate.Tests.IPingSink")]
 public interface IPingSink : INeuron;
 
-internal sealed class PingSource : Neuron, IPingSource
+internal sealed class PingSource(NeuronRuntime runtime) : Neuron(runtime), IPingSource
 {
     public Task SendTo(NeuronId target, string text) => FireAsync(target, new Ping(text));
 }
 
-internal sealed class PingSink : Neuron, IPingSink, IHandle<Ping>
+internal sealed class PingSink(NeuronRuntime runtime) : Neuron(runtime), IPingSink, IHandle<Ping>
 {
     public Task HandleAsync(Ping signal, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
 public sealed class SynapseSetTests
 {
+    [Fact]
+    public async Task ConfiguredClock_StampsOutgoingDelivery()
+    {
+        var clock = new ManualTimeProvider(
+            new DateTimeOffset(2026, 9, 2, 12, 0, 0, TimeSpan.Zero));
+        await using var brain = await BrainSimulation.StartAsync(new()
+        {
+            Modules = new([]),
+            ConfigureSilo = silo => silo.Services.AddSingleton<TimeProvider>(clock),
+        });
+
+        var sourceId = new NeuronId("pingsource", new OwnerId("owner"), "clock");
+        var sinkId = new NeuronId("pingsink", new OwnerId("owner"), "clock");
+        var source = brain.Grains.GetGrain<IPingSource>(sourceId.ToGrainId());
+        var query = brain.Grains.GetGrain<INeuronQuery>(sourceId.ToGrainId());
+
+        await source.SendTo(sinkId, "timestamp");
+
+        var delivery = Assert.Single((await query.ReadJournal(JournalKind.Outgoing, 0)).Delta);
+        Assert.Equal(clock.GetUtcNow(), delivery.Timestamp);
+    }
+
+    [Fact]
+    public async Task DistinctNeuronActivations_DoNotShareRuntimeBoundState()
+    {
+        await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([]) });
+        var owner = new OwnerId("owner");
+        var firstId = new NeuronId("pingsource", owner, "isolated-a");
+        var secondId = new NeuronId("pingsource", owner, "isolated-b");
+        var firstTarget = new NeuronId("pingsink", owner, "isolated-a");
+        var secondTarget = new NeuronId("pingsink", owner, "isolated-b");
+
+        await brain.Grains.GetGrain<IPingSource>(firstId.ToGrainId())
+            .SendTo(firstTarget, "first");
+        await brain.Grains.GetGrain<IPingSource>(secondId.ToGrainId())
+            .SendTo(secondTarget, "second");
+
+        var first = brain.Grains.GetGrain<INeuronQuery>(firstId.ToGrainId());
+        var second = brain.Grains.GetGrain<INeuronQuery>(secondId.ToGrainId());
+        var firstSnapshot = Assert.IsType<JournalSnapshot>(
+            (await first.ReadJournal(JournalKind.Outgoing, long.MaxValue)).ResetSnapshot);
+        var secondSnapshot = Assert.IsType<JournalSnapshot>(
+            (await second.ReadJournal(JournalKind.Outgoing, long.MaxValue)).ResetSnapshot);
+
+        Assert.Equal(
+            (1L, 1L, 1),
+            (firstSnapshot.TotalRecorded, firstSnapshot.LastSequence, firstSnapshot.RetainedCount));
+        Assert.Equal(
+            (1L, 1L, 1),
+            (secondSnapshot.TotalRecorded, secondSnapshot.LastSequence, secondSnapshot.RetainedCount));
+        Assert.Equal(firstTarget, Assert.Single(await first.ReadSynapses()).Target);
+        Assert.Equal(secondTarget, Assert.Single(await second.ReadSynapses()).Target);
+    }
+
     [Fact]
     public async Task FirstFire_CreatesALearnedSynapseAtTheInitialWeightThenPotentiatesIt()
     {

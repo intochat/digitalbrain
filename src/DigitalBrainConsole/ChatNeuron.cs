@@ -10,7 +10,10 @@ public interface IChatNeuron : INeuron;
 // property of the graph, not of this code. ChatNeuron itself declares IHandle<UserMessageReceived>
 // and broadcasts that same signal — SignalRouter.Resolve excludes the emitter from its own
 // receiver set, so this does not route back to chat:main.
-internal sealed class ChatNeuron : Neuron, IChatNeuron, IHandle<UserMessageReceived>
+internal sealed class ChatNeuron(NeuronRuntime runtime) :
+    Neuron(runtime),
+    IChatNeuron,
+    IHandle<UserMessageReceived>
 {
     public async Task HandleAsync(UserMessageReceived signal, CancellationToken cancellationToken)
     {

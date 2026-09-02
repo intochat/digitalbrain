@@ -1,6 +1,5 @@
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Synapses;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 
 namespace DigitalBrain.Core;
@@ -9,17 +8,23 @@ namespace DigitalBrain.Core;
 // type so the same pair of neurons can carry two differently-typed synapses.
 internal sealed class SynapseSet
 {
-    private const string StateName = "synapses";
-
     private readonly IDurableDictionary<string, Synapse> _synapses;
     private readonly SynapseOptions _options;
     private readonly TimeProvider _time;
     private readonly NeuronId _owner;
 
-    internal SynapseSet(IServiceProvider services, NeuronId owner, TimeProvider time)
+    internal SynapseSet(
+        IDurableDictionary<string, Synapse> synapses,
+        SynapseOptions options,
+        NeuronId owner,
+        TimeProvider time)
     {
-        _synapses = services.GetRequiredKeyedService<IDurableDictionary<string, Synapse>>(StateName);
-        _options = services.GetService<SynapseOptions>() ?? new SynapseOptions();
+        ArgumentNullException.ThrowIfNull(synapses);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(time);
+
+        _synapses = synapses;
+        _options = options;
         _owner = owner;
         _time = time;
     }

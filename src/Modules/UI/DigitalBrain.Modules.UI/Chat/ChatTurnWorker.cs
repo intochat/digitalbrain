@@ -16,7 +16,7 @@ namespace DigitalBrain.UI;
 // durable turn off the chat's own activation, so Chat stays free to serve reads and card
 // deliveries while the call is in flight and without the HTTP observer's cancellation token.
 [GrainType(GrainTypeName)]
-internal sealed class ChatTurnWorker : Neuron, IChatTurnWorker
+internal sealed class ChatTurnWorker(NeuronRuntime runtime) : Neuron(runtime), IChatTurnWorker
 {
     internal const string GrainTypeName = "chat-turn-worker";
 

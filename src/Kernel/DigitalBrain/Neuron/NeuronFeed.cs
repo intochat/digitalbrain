@@ -1,5 +1,4 @@
 using DigitalBrain.Abstractions;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;
 
@@ -17,12 +16,21 @@ internal sealed class NeuronFeed
     private readonly IDurableValue<long> _lastSequence;
     private readonly Serializer<JournalEntry> _entries;
 
-    internal NeuronFeed(IServiceProvider services, string name)
+    internal NeuronFeed(
+        IDurableList<byte[]> retained,
+        IDurableDictionary<string, long> tallies,
+        IDurableValue<long> lastSequence,
+        Serializer<JournalEntry> entries)
     {
-        _retained = services.GetRequiredKeyedService<IDurableList<byte[]>>(name);
-        _tallies = services.GetRequiredKeyedService<IDurableDictionary<string, long>>($"{name}.tally");
-        _lastSequence = services.GetRequiredKeyedService<IDurableValue<long>>($"{name}.sequence");
-        _entries = services.GetRequiredService<Serializer<JournalEntry>>();
+        ArgumentNullException.ThrowIfNull(retained);
+        ArgumentNullException.ThrowIfNull(tallies);
+        ArgumentNullException.ThrowIfNull(lastSequence);
+        ArgumentNullException.ThrowIfNull(entries);
+
+        _retained = retained;
+        _tallies = tallies;
+        _lastSequence = lastSequence;
+        _entries = entries;
     }
 
     internal JournalRead Read(long afterSequence)

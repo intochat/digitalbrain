@@ -17,7 +17,8 @@ public sealed class VectorMemoryNeuron :
     private readonly IEmbeddingGenerator<string, Embedding<float>>? _embeddings;
     private readonly IVectorMemoryStore _store;
 
-    public VectorMemoryNeuron()
+    public VectorMemoryNeuron(NeuronRuntime runtime)
+        : base(runtime)
     {
         _embeddings = ServiceProvider.GetService<IEmbeddingGenerator<string, Embedding<float>>>();
         _store = ServiceProvider.GetRequiredService<IVectorMemoryStore>();

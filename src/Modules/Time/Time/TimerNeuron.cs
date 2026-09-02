@@ -19,7 +19,8 @@ public sealed class TimerNeuron : Neuron, ITimer, IRemindable
     private readonly IDurableValue<byte[]> _state;
     private readonly Serializer<TimerState> _states;
 
-    public TimerNeuron()
+    public TimerNeuron(NeuronRuntime runtime)
+        : base(runtime)
     {
         _state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName);
         _states = ServiceProvider.GetRequiredService<Serializer<TimerState>>();

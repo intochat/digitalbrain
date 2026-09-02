@@ -4,6 +4,7 @@ using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Synapses;
+using DigitalBrain.Core;
 using Orleans;
 using Orleans.Concurrency;
 using Orleans.Serialization;
@@ -13,6 +14,28 @@ namespace DigitalBrain.Substrate.Tests;
 
 public sealed class ContractShapeTests
 {
+    [Fact]
+    public void Neuron_RequiresRuntimeCompositionBoundary()
+    {
+        _ = Assert.Single(
+            typeof(Neuron).GetMembers(
+                BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly),
+            static candidate => candidate is { MemberType: MemberTypes.Constructor, Name: ".ctor" });
+        var constructor = typeof(Neuron).GetConstructor(
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+            binder: null,
+            [typeof(NeuronRuntime)],
+            modifiers: null);
+
+        Assert.NotNull(constructor);
+        Assert.True(constructor.IsFamily);
+        Assert.Null(typeof(Neuron).GetConstructor(
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+            binder: null,
+            Type.EmptyTypes,
+            modifiers: null));
+    }
+
     [Fact]
     public void NeuronContractsSeparateDeliveryFromObservation()
     {

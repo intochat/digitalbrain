@@ -50,14 +50,14 @@ public interface IGossip : INeuron
 [Alias("DigitalBrain.Substrate.Tests.IEarC")]
 public interface IEarC : INeuron;
 
-internal sealed class Announcer : Neuron, IAnnouncer
+internal sealed class Announcer(NeuronRuntime runtime) : Neuron(runtime), IAnnouncer
 {
     public Task<int> Announce(string text) => BroadcastAsync(new Announced(text));
 
     public Task<int> AnnounceUnheard(string text) => BroadcastAsync(new Unheard(text));
 }
 
-internal sealed class EarA : Neuron, IEarA, IHandle<Announced>, IHandle<Faulting>
+internal sealed class EarA(NeuronRuntime runtime) : Neuron(runtime), IEarA, IHandle<Announced>, IHandle<Faulting>
 {
     public Task HandleAsync(Announced signal, CancellationToken cancellationToken) => Task.CompletedTask;
 
@@ -65,7 +65,7 @@ internal sealed class EarA : Neuron, IEarA, IHandle<Announced>, IHandle<Faulting
         => Task.FromException(new InvalidOperationException(signal.Message));
 }
 
-internal sealed class EarB : Neuron, IEarB, IHandle<Announced>
+internal sealed class EarB(NeuronRuntime runtime) : Neuron(runtime), IEarB, IHandle<Announced>
 {
     public Task HandleAsync(Announced signal, CancellationToken cancellationToken) => Task.CompletedTask;
 }
@@ -75,14 +75,14 @@ internal sealed class EarB : Neuron, IEarB, IHandle<Announced>
 // FireAsync's DeliverToAsync), so if the emitter's own grain type were left in its own
 // receiver set, a non-reentrant activation would await a Deliver call into itself and hang
 // for the full call timeout.
-internal sealed class Gossip : Neuron, IGossip, IHandle<Rumor>
+internal sealed class Gossip(NeuronRuntime runtime) : Neuron(runtime), IGossip, IHandle<Rumor>
 {
     public Task<int> Spread(string text) => BroadcastAsync(new Rumor(text));
 
     public Task HandleAsync(Rumor signal, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
-internal sealed class EarC : Neuron, IEarC, IHandle<Rumor>
+internal sealed class EarC(NeuronRuntime runtime) : Neuron(runtime), IEarC, IHandle<Rumor>
 {
     public Task HandleAsync(Rumor signal, CancellationToken cancellationToken) => Task.CompletedTask;
 }
