@@ -6,6 +6,7 @@ using Orleans.Journaling;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Journals;
 namespace DigitalBrain.Core;
 
@@ -35,7 +36,7 @@ internal sealed class SessionNeuron : Neuron, ISessionNeuron
         var writer = ServiceProvider
             .GetRequiredService<IClusterClient>()
             .GetBroadcastChannelProvider(DigitalBrainNames.BroadcastChannelProvider)
-            .GetChannelWriter<SynapseDelivery>(ChannelId.Create(
+            .GetChannelWriter<SignalDelivery>(ChannelId.Create(
                 DigitalBrainNames.ActivationChannelNamespace,
                 $"{Id.Owner.Value}/{DigitalBrainNames.ActivationSubscriberName}"));
         await writer.Publish(activated)
@@ -45,7 +46,7 @@ internal sealed class SessionNeuron : Neuron, ISessionNeuron
         await WriteStateAsync().ConfigureAwait(true);
     }
 
-    public Task<SynapseDelivery> Fire(NeuronId receiver, Synapse synapse)
+    public Task<SignalDelivery> Fire(NeuronId receiver, Signal signal)
     {
         if (receiver.Owner != Id.Owner)
         {
@@ -53,22 +54,22 @@ internal sealed class SessionNeuron : Neuron, ISessionNeuron
                 $"An owner '{Id.Owner}' session cannot fire at '{receiver}', which belongs to owner '{receiver.Owner}'.");
         }
 
-        return SendAsync(receiver, synapse);
+        return SendAsync(receiver, signal);
     }
 
-    public Task Emit(Synapse synapse)
+    public Task Emit(Signal signal)
     {
-        ArgumentNullException.ThrowIfNull(synapse);
+        ArgumentNullException.ThrowIfNull(signal);
 
-        return base.EmitAsync(synapse);
+        return base.EmitAsync(signal);
     }
 
     // The session is the reply sink for every client request: ReplyAsync addresses the caller,
     // and the caller of a client fire is always this cell. It declares no IHandle<T> for those
     // replies, so it must accept whatever arrives — being journaled IS the delivery's purpose.
-    protected override Task OnUnboundSynapseAsync(Synapse synapse, CancellationToken cancellationToken)
+    protected override Task OnUnboundSignalAsync(Signal signal, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(synapse);
+        ArgumentNullException.ThrowIfNull(signal);
         cancellationToken.ThrowIfCancellationRequested();
         return Task.CompletedTask;
     }

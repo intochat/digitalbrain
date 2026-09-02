@@ -39,12 +39,12 @@ internal static class ExecutionTestDriver
             brain,
             NeuronId.For<IExecution>(brain.Owner, executionName),
             JournalKind.Outgoing,
-            static delivery => delivery.Synapse is ExecutionLifecycle
+            static delivery => delivery.Signal is ExecutionLifecycle
             {
                 Status: not (ExecutionStatus.Pending or ExecutionStatus.Running or ExecutionStatus.AwaitingApproval)
             });
 
-        var lifecycle = Assert.IsType<ExecutionLifecycle>(terminal.Synapse);
+        var lifecycle = Assert.IsType<ExecutionLifecycle>(terminal.Signal);
         Assert.True(lifecycle.Status == ExecutionStatus.Completed, lifecycle.Detail);
         return lifecycle;
     }

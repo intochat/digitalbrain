@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Entities;
@@ -67,14 +67,14 @@ public sealed class DigitalBrainClient : IDigitalBrain
         return _grains.GetGrain<TEntity>(EntityId.For<TEntity>(Owner, name).ToGrainId());
     }
 
-    public Task FireAsync<TNeuron>(string name, Synapse synapse, CancellationToken cancellationToken = default)
+    public Task FireAsync<TNeuron>(string name, Signal signal, CancellationToken cancellationToken = default)
         where TNeuron : INeuron
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         RequireDomainNeuronContract(typeof(TNeuron));
-        ArgumentNullException.ThrowIfNull(synapse);
+        ArgumentNullException.ThrowIfNull(signal);
         cancellationToken.ThrowIfCancellationRequested();
-        return Get<TNeuron>(name).FireAsync(synapse, cancellationToken);
+        return Get<TNeuron>(name).FireAsync(signal, cancellationToken);
     }
 
     public Task<JournalRead> ReadJournalAsync(
@@ -133,32 +133,32 @@ public sealed class DigitalBrainClient : IDigitalBrain
         }
     }
 
-    internal Task SendToAsync(NeuronId receiver, Synapse synapse, CancellationToken cancellationToken)
-        => SendValidatedAsync(receiver, synapse, cancellationToken);
+    internal Task SendToAsync(NeuronId receiver, Signal signal, CancellationToken cancellationToken)
+        => SendValidatedAsync(receiver, signal, cancellationToken);
 
     internal async Task<TResponse> SendRequestAsync<TResponse>(
         NeuronId receiver,
-        Synapse request,
+        Signal request,
         CancellationToken cancellationToken)
-        where TResponse : Synapse
+        where TResponse : Signal
     {
         var response = await SendRequestAsync(receiver, request, typeof(TResponse), cancellationToken)
             .ConfigureAwait(false);
         return (TResponse)response;
     }
 
-    public async Task<Synapse> SendRequestAsync(
+    public async Task<Signal> SendRequestAsync(
         NeuronId receiver,
-        Synapse request,
+        Signal request,
         Type responseType,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(responseType);
-        if (!typeof(Synapse).IsAssignableFrom(responseType) || responseType.IsAbstract || responseType.IsInterface)
+        if (!typeof(Signal).IsAssignableFrom(responseType) || responseType.IsAbstract || responseType.IsInterface)
         {
             throw new ArgumentException(
-                $"Response type '{responseType}' must be a concrete Synapse.",
+                $"Response type '{responseType}' must be a concrete Signal.",
                 nameof(responseType));
         }
 
@@ -167,7 +167,7 @@ public sealed class DigitalBrainClient : IDigitalBrain
         var sessionId = ISessionNeuron.ForOwner(Owner);
         var session = Session();
         // long.MaxValue: only the resume cursor — do not deserialize the whole journal history
-        // (polymorphic Synapse entries can fail client-side if any fact type is missing).
+        // (polymorphic Signal entries can fail client-side if any fact type is missing).
         var cursor = await session
             .ReadNeuronJournal(sessionId, JournalKind.Incoming, afterSequence: long.MaxValue)
             .ConfigureAwait(false);
@@ -213,14 +213,14 @@ public sealed class DigitalBrainClient : IDigitalBrain
         }
     }
 
-    private async Task<SynapseDelivery> SendValidatedAsync(
+    private async Task<SignalDelivery> SendValidatedAsync(
         NeuronId receiver,
-        Synapse synapse,
+        Signal signal,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         await ActivateAsync(cancellationToken).ConfigureAwait(false);
-        return await Session().Fire(receiver, synapse).ConfigureAwait(false);
+        return await Session().Fire(receiver, signal).ConfigureAwait(false);
     }
 
     private bool TryCreateJournalObserver(
@@ -248,7 +248,7 @@ public sealed class DigitalBrainClient : IDigitalBrain
     // An unrouted emission never produces the awaited reply, so without this the caller
     // waits out its own token on a request nothing was connected to receive. (Settled
     // refusals throw out of Session().Fire directly.)
-    private static void RequireNoRefusal(Synapse candidate, CorrelationId correlation)
+    private static void RequireNoRefusal(Signal candidate, CorrelationId correlation)
     {
         if (candidate is Unrouted unrouted && unrouted.Correlation == correlation)
         {
@@ -257,7 +257,7 @@ public sealed class DigitalBrainClient : IDigitalBrain
         }
     }
 
-    private static async Task<Synapse> WaitForResponseAsync(
+    private static async Task<Signal> WaitForResponseAsync(
         ChannelJournalObserver observer,
         CorrelationId correlation,
         Type responseType,
@@ -267,12 +267,12 @@ public sealed class DigitalBrainClient : IDigitalBrain
         {
             foreach (var delivery in page.Delta)
             {
-                RequireNoRefusal(delivery.Synapse, correlation);
+                RequireNoRefusal(delivery.Signal, correlation);
 
                 if (delivery.CorrelationId == correlation
-                    && responseType.IsInstanceOfType(delivery.Synapse))
+                    && responseType.IsInstanceOfType(delivery.Signal))
                 {
-                    return delivery.Synapse;
+                    return delivery.Signal;
                 }
             }
         }
@@ -281,7 +281,7 @@ public sealed class DigitalBrainClient : IDigitalBrain
             $"The session journal watch ended before a '{responseType.Name}' response arrived for correlation '{correlation}'.");
     }
 
-    private static async Task<Synapse> PollForResponseAsync(
+    private static async Task<Signal> PollForResponseAsync(
         ISessionNeuron session,
         NeuronId sessionId,
         long cursor,
@@ -294,12 +294,12 @@ public sealed class DigitalBrainClient : IDigitalBrain
             var read = await session.ReadNeuronJournal(sessionId, JournalKind.Incoming, cursor).ConfigureAwait(false);
             foreach (var candidate in read.Delta)
             {
-                RequireNoRefusal(candidate.Synapse, correlation);
+                RequireNoRefusal(candidate.Signal, correlation);
 
                 if (candidate.CorrelationId == correlation
-                    && responseType.IsInstanceOfType(candidate.Synapse))
+                    && responseType.IsInstanceOfType(candidate.Signal))
                 {
-                    return candidate.Synapse;
+                    return candidate.Signal;
                 }
             }
 
@@ -347,7 +347,7 @@ public sealed class DigitalBrainClient : IDigitalBrain
             || typeof(ISessionNeuron).IsAssignableFrom(neuronType))
         {
             throw new NeuronAuthorizationException(
-                $"'{neuronType.Name}' is not addressable through IDigitalBrain.Get. Activate the brain with ActivateAsync; address domain neuron contracts with Get; fire synapses through FireAsync; observe journals through ReadJournalAsync and WatchJournalAsync.");
+                $"'{neuronType.Name}' is not addressable through IDigitalBrain.Get. Activate the brain with ActivateAsync; address domain neuron contracts with Get; fire signals through FireAsync; observe journals through ReadJournalAsync and WatchJournalAsync.");
         }
     }
 

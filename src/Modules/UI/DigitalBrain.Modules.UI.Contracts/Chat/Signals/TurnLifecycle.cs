@@ -1,6 +1,6 @@
 using DigitalBrain.Abstractions;
 
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.Chat;
 
@@ -11,4 +11,4 @@ public sealed record TurnLifecycle(
     [property: Id(1)] CommandId CommandId,
     [property: Id(2)] NeuronId Chat,
     [property: Id(3)] ChatTurnStatus Status,
-    [property: Id(4)] string? Detail = null) : Synapse;
+    [property: Id(4)] string? Detail = null) : Signal;

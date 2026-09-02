@@ -7,7 +7,7 @@ using Orleans.Journaling;
 
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Journals;
 namespace DigitalBrain.Core;
 
@@ -15,11 +15,11 @@ public abstract class Neuron :
     DurableGrain,
     INeuron
 {
-    private delegate Task HandlerInvoker(object neuron, Synapse synapse, CancellationToken cancellationToken);
+    private delegate Task HandlerInvoker(object neuron, Signal signal, CancellationToken cancellationToken);
 
     private static readonly ConcurrentDictionary<Type, IReadOnlyDictionary<Type, HandlerInvoker>> HandlersByNeuronType = new();
     private readonly NeuronJournal _journal;
-    private SynapseDelivery? _handling;
+    private SignalDelivery? _handling;
 
     protected Neuron()
     {
@@ -53,7 +53,7 @@ public abstract class Neuron :
         => Task.CompletedTask;
 
     public async Task Deliver(
-        SynapseDelivery delivery,
+        SignalDelivery delivery,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(delivery);
@@ -79,11 +79,11 @@ public abstract class Neuron :
         return Task.CompletedTask;
     }
 
-    protected async Task<SynapseDelivery> SendAsync(NeuronId receiver, Synapse synapse)
+    protected async Task<SignalDelivery> SendAsync(NeuronId receiver, Signal signal)
     {
-        ArgumentNullException.ThrowIfNull(synapse);
+        ArgumentNullException.ThrowIfNull(signal);
 
-        var delivery = await StageOutgoingAsync(synapse, _handling)
+        var delivery = await StageOutgoingAsync(signal, _handling)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         await DeliverToAsync(receiver, delivery)
@@ -92,28 +92,28 @@ public abstract class Neuron :
         return delivery;
     }
 
-    protected Task EmitAsync(Synapse synapse)
+    protected Task EmitAsync(Signal signal)
     {
-        ArgumentNullException.ThrowIfNull(synapse);
-        return EmitAsync(synapse, ResolveEmissionCorrelation());
+        ArgumentNullException.ThrowIfNull(signal);
+        return EmitAsync(signal, ResolveEmissionCorrelation());
     }
 
     protected CorrelationId ResolveEmissionCorrelation()
         => _handling?.CorrelationId
             ?? CorrelationId.New();
 
-    protected async Task EmitAsync(Synapse synapse, CorrelationId correlation)
+    protected async Task EmitAsync(Signal signal, CorrelationId correlation)
     {
-        ArgumentNullException.ThrowIfNull(synapse);
+        ArgumentNullException.ThrowIfNull(signal);
 
-        var delivery = await StageOutgoingAsync(synapse, _handling, correlation)
+        var delivery = await StageOutgoingAsync(signal, _handling, correlation)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         _ = delivery;
     }
 
     protected async Task ReplyAsync(
-        Synapse response,
+        Signal response,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(response);
@@ -133,12 +133,12 @@ public abstract class Neuron :
         _ = DeliverReplyAsync(handling.Caller, delivery);
     }
 
-    // Refusing an unhandled synapse here is correct in principle but is NOT this slice's work:
+    // Refusing an unhandled signal here is correct in principle but is NOT this slice's work:
     // ReplyAsync addresses the caller, and callers routinely have no IHandle for the reply
     // type, so refusing breaks every request/reply in the product. It belongs to the turn and
     // delivery hardening, with an explicit accept-list for reply sinks.
-    protected virtual Task OnUnboundSynapseAsync(
-        Synapse synapse,
+    protected virtual Task OnUnboundSignalAsync(
+        Signal signal,
         CancellationToken cancellationToken)
         => Task.CompletedTask;
 
@@ -151,13 +151,13 @@ public abstract class Neuron :
             $"{nameof(RegisterTimer)} creates interleaving callbacks, but neurons require "
             + "serialized turns.");
 
-    internal async Task<SynapseDelivery> StageOutgoingAsync(
-        Synapse synapse,
-        SynapseDelivery? cause,
+    internal async Task<SignalDelivery> StageOutgoingAsync(
+        Signal signal,
+        SignalDelivery? cause,
         CorrelationId? correlation = null)
     {
-        var delivery = SynapseDelivery.Create(
-            synapse,
+        var delivery = SignalDelivery.Create(
+            signal,
             Id,
             _journal.OutgoingNextSequence,
             cause,
@@ -174,14 +174,14 @@ public abstract class Neuron :
     }
 
     private async Task DispatchDeliveryAsync(
-        SynapseDelivery delivery,
+        SignalDelivery delivery,
         CancellationToken cancellationToken)
     {
-        using var handling = SynapseTelemetry.Source.StartActivity("handle");
+        using var handling = SignalTelemetry.Source.StartActivity("handle");
 
-        handling?.SetTag(SynapseTelemetry.ReceiverTag, Id.ToString());
-        handling?.SetTag(SynapseTelemetry.SynapseTag, delivery.Synapse.GetType().Name);
-        handling?.SetTag(SynapseTelemetry.CorrelationTag, delivery.CorrelationId.ToString());
+        handling?.SetTag(SignalTelemetry.ReceiverTag, Id.ToString());
+        handling?.SetTag(SignalTelemetry.SignalTag, delivery.Signal.GetType().Name);
+        handling?.SetTag(SignalTelemetry.CorrelationTag, delivery.CorrelationId.ToString());
 
         var previousHandling = _handling;
         _handling = delivery;
@@ -195,7 +195,7 @@ public abstract class Neuron :
 
         try
         {
-            await DispatchSynapseAsync(delivery.Synapse, cancellationToken)
+            await DispatchSignalAsync(delivery.Signal, cancellationToken)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             _journal.AppendIncoming(delivery);
@@ -214,13 +214,13 @@ public abstract class Neuron :
         }
     }
 
-    private Task DeliverToAsync(NeuronId receiver, SynapseDelivery delivery)
+    private Task DeliverToAsync(NeuronId receiver, SignalDelivery delivery)
         => receiver == Id
             // A grain call to self would deadlock the serialized turn; dispatch in place.
             ? DispatchDeliveryAsync(delivery, CancellationToken.None)
             : GrainFactory.GetGrain<INeuron>(receiver.ToGrainId()).Deliver(delivery);
 
-    private async Task DeliverReplyAsync(NeuronId receiver, SynapseDelivery delivery)
+    private async Task DeliverReplyAsync(NeuronId receiver, SignalDelivery delivery)
     {
         try
         {
@@ -230,14 +230,14 @@ public abstract class Neuron :
         }
         catch (Exception undelivered)
         {
-            SynapseTelemetry.ReplyDropped(Id, receiver, undelivered);
+            SignalTelemetry.ReplyDropped(Id, receiver, undelivered);
         }
     }
 
-    private Task DispatchSynapseAsync(Synapse synapse, CancellationToken cancellationToken)
-        => HandlersFor(GetType()).TryGetValue(synapse.GetType(), out var handler)
-            ? handler(this, synapse, cancellationToken)
-            : OnUnboundSynapseAsync(synapse, cancellationToken);
+    private Task DispatchSignalAsync(Signal signal, CancellationToken cancellationToken)
+        => HandlersFor(GetType()).TryGetValue(signal.GetType(), out var handler)
+            ? handler(this, signal, cancellationToken)
+            : OnUnboundSignalAsync(signal, cancellationToken);
 
     private static IReadOnlyDictionary<Type, HandlerInvoker> HandlersFor(Type neuronType)
         => HandlersByNeuronType.GetOrAdd(neuronType, static type => BuildHandlers(type));
@@ -249,15 +249,15 @@ public abstract class Neuron :
         foreach (var handled in neuronType.GetInterfaces()
             .Where(candidate => candidate.IsGenericType && candidate.GetGenericTypeDefinition() == typeof(IHandle<>)))
         {
-            var synapseType = handled.GetGenericArguments()[0];
+            var signalType = handled.GetGenericArguments()[0];
             var handleMethod = handled.GetMethod(nameof(IHandle<>.HandleAsync))
                 ?? throw new MissingMethodException(handled.FullName, nameof(IHandle<>.HandleAsync));
 
-            handlers[synapseType] = (neuron, synapse, cancellationToken) => (Task)handleMethod.Invoke(
+            handlers[signalType] = (neuron, signal, cancellationToken) => (Task)handleMethod.Invoke(
                 neuron,
                 BindingFlags.DoNotWrapExceptions,
                 binder: null,
-                [synapse, cancellationToken],
+                [signal, cancellationToken],
                 culture: null)!;
         }
 

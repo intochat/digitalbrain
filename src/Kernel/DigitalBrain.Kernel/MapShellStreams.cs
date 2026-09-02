@@ -3,7 +3,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.UI;
 
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 namespace DigitalBrain.Kernel;
 
 internal static class SurfaceStreamsHttpMaps
@@ -75,8 +75,8 @@ internal static class SurfaceStreamsHttpMaps
             ProjectSurfaceOpened,
             cancellationToken);
 
-    private static SurfaceOpenedEvent? ProjectSurfaceOpened(SynapseDelivery delivery)
-        => delivery.Synapse is not SurfaceOpened opened
+    private static SurfaceOpenedEvent? ProjectSurfaceOpened(SignalDelivery delivery)
+        => delivery.Signal is not SurfaceOpened opened
             ? null
             : new SurfaceOpenedEvent(
                 delivery.Sequence,

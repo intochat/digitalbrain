@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>UI module contracts: the conversation neuron, the UI renderer, and the chart and surface entities plus their synapses.</Description>
+    <Description>UI module contracts: the conversation neuron, the UI renderer, and the chart and surface entities plus their signals.</Description>
     <RootNamespace>DigitalBrain.UI</RootNamespace>
   </PropertyGroup>
   <ItemGroup>

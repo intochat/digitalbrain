@@ -1,14 +1,14 @@
 namespace DigitalBrain.Abstractions.Identity;
 
 [GenerateSerializer]
-[Alias("db.synapse-id")]
-public readonly record struct SynapseId
+[Alias("db.signal-id")]
+public readonly record struct SignalId
 {
-    public SynapseId(Guid value)
+    public SignalId(Guid value)
     {
         if (value == Guid.Empty)
         {
-            throw new ArgumentException("A synapse id cannot be empty.", nameof(value));
+            throw new ArgumentException("A signal id cannot be empty.", nameof(value));
         }
 
         Value = value;
@@ -17,7 +17,7 @@ public readonly record struct SynapseId
     [Id(0)]
     public Guid Value { get; }
 
-    public static SynapseId New() => new(Guid.NewGuid());
+    public static SignalId New() => new(Guid.NewGuid());
 
     public override string ToString() => Value.ToString("n");
 }

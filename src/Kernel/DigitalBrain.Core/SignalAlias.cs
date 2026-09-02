@@ -4,14 +4,14 @@ using Orleans;
 
 namespace DigitalBrain.Core;
 
-public static class SynapseAlias
+public static class SignalAlias
 {
     private static readonly ConcurrentDictionary<Type, string?> Resolved = new();
 
-    public static string? Of(Type synapseType)
+    public static string? Of(Type signalType)
     {
-        ArgumentNullException.ThrowIfNull(synapseType);
-        return Resolved.GetOrAdd(synapseType, static type =>
+        ArgumentNullException.ThrowIfNull(signalType);
+        return Resolved.GetOrAdd(signalType, static type =>
         {
             string? single = null;
 

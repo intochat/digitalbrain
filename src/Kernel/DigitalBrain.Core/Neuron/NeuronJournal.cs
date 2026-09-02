@@ -1,7 +1,7 @@
 using DigitalBrain.Abstractions;
 
 using DigitalBrain.Abstractions.Journals;
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 namespace DigitalBrain.Core;
 
 internal sealed class NeuronJournal
@@ -55,9 +55,9 @@ internal sealed class NeuronJournal
 
     internal NeuronFeedCheckpoint OutgoingCheckpoint() => _outgoing.Checkpoint();
 
-    internal void AppendIncoming(SynapseDelivery delivery) => _incoming.Append(delivery);
+    internal void AppendIncoming(SignalDelivery delivery) => _incoming.Append(delivery);
 
-    internal void AppendOutgoing(SynapseDelivery delivery) => _outgoing.Append(delivery);
+    internal void AppendOutgoing(SignalDelivery delivery) => _outgoing.Append(delivery);
 
     internal void RestoreIncoming(NeuronFeedCheckpoint checkpoint) => _incoming.Restore(checkpoint);
 
@@ -75,7 +75,7 @@ internal sealed class NeuronJournal
             catch (Exception unreachable)
             {
                 _watchers.Remove(watcher);
-                SynapseTelemetry.WatcherDropped(_neuron.Id, unreachable);
+                SignalTelemetry.WatcherDropped(_neuron.Id, unreachable);
             }
         }
     }

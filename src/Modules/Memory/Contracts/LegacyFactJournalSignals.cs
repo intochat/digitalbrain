@@ -1,5 +1,5 @@
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 
 namespace DigitalBrain.Memory;
 
@@ -13,10 +13,10 @@ public sealed record StoreFact(
     [property: Id(1)] string Kind,
     [property: Id(2)] string Text,
     [property: Id(3)] string? Correlation = null,
-    [property: Id(4)] DateTimeOffset? At = null) : RequestSynapse<FactStored>;
+    [property: Id(4)] DateTimeOffset? At = null) : Signal<FactStored>;
 
 [GenerateSerializer]
 [Alias("memory.fact-stored")]
 public sealed record FactStored(
     [property: Id(0)] CommandId CommandId,
-    [property: Id(1)] long Sequence) : Synapse;
+    [property: Id(1)] long Sequence) : Signal;

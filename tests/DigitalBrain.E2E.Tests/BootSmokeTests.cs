@@ -1,6 +1,7 @@
 using System.Net;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Testing;
 using Xunit;
@@ -36,9 +37,9 @@ public sealed class BootSmokeTests(AppHostFixture fixture)
             brain,
             subject,
             JournalKind.Outgoing,
-            static delivery => delivery.Synapse is DigitalBrainActivated,
+            static delivery => delivery.Signal is DigitalBrainActivated,
             TimeSpan.FromSeconds(60));
 
-        Assert.IsType<DigitalBrainActivated>(delivery.Synapse);
+        Assert.IsType<DigitalBrainActivated>(delivery.Signal);
     }
 }

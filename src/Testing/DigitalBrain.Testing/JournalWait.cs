@@ -1,6 +1,6 @@
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Client;
 
 namespace DigitalBrain.Testing;
@@ -20,11 +20,11 @@ public static class JournalWait
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(200);
 
-    public static async Task<SynapseDelivery> ForAsync(
+    public static async Task<SignalDelivery> ForAsync(
         IDigitalBrain brain,
         NeuronId subject,
         JournalKind kind,
-        Func<SynapseDelivery, bool> match,
+        Func<SignalDelivery, bool> match,
         TimeSpan? timeout = null,
         long afterSequence = 0)
     {
@@ -74,7 +74,7 @@ public static class JournalWait
             {
                 foreach (var delivery in page.Delta)
                 {
-                    var typeName = delivery.Synapse.GetType().Name;
+                    var typeName = delivery.Signal.GetType().Name;
                     if (!seenTypes.Contains(typeName, StringComparer.Ordinal))
                     {
                         seenTypes.Add(typeName);

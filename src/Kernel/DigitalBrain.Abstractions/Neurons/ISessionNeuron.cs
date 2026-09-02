@@ -1,5 +1,5 @@
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Journals;
 namespace DigitalBrain.Abstractions.Neurons;
 
@@ -19,11 +19,11 @@ public interface ISessionNeuron : INeuron
     // the same budget as the receiver's Deliver.
     [Alias(nameof(Fire))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
-    Task<SynapseDelivery> Fire(NeuronId receiver, Synapse synapse);
+    Task<SignalDelivery> Fire(NeuronId receiver, Signal signal);
 
     [Alias(nameof(Emit))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
-    Task Emit(Synapse synapse);
+    Task Emit(Signal signal);
 
     [Alias(nameof(ReadNeuronJournal))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>The DigitalBrain neuron runtime: journaled neurons, the durable synapse fabric, on Orleans.</Description>
+    <Description>The DigitalBrain neuron runtime: journaled neurons, the durable signal fabric, on Orleans.</Description>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>

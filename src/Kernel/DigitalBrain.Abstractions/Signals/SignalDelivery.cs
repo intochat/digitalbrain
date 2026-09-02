@@ -1,22 +1,22 @@
 using DigitalBrain.Abstractions.Identity;
-namespace DigitalBrain.Abstractions.Messaging;
+namespace DigitalBrain.Abstractions.Signals;
 
 [GenerateSerializer]
-[Alias("db.synapse-delivery")]
-public sealed class SynapseDelivery
+[Alias("db.signal-delivery")]
+public sealed class SignalDelivery
 {
-    internal SynapseDelivery(
-        Synapse synapse,
-        SynapseId synapseId,
+    internal SignalDelivery(
+        Signal signal,
+        SignalId signalId,
         CorrelationId correlationId,
-        SynapseId? causationId,
+        SignalId? causationId,
         NeuronId caller,
         long sequence,
         DateTimeOffset timestamp,
         PrincipalId? principal = null)
     {
-        Synapse = synapse;
-        SynapseId = synapseId;
+        Signal = signal;
+        SignalId = signalId;
         CorrelationId = correlationId;
         CausationId = causationId;
         Caller = caller;
@@ -26,16 +26,16 @@ public sealed class SynapseDelivery
     }
 
     [Id(0)]
-    public Synapse Synapse { get; }
+    public Signal Signal { get; }
 
     [Id(1)]
-    public SynapseId SynapseId { get; }
+    public SignalId SignalId { get; }
 
     [Id(2)]
     public CorrelationId CorrelationId { get; }
 
     [Id(3)]
-    public SynapseId? CausationId { get; }
+    public SignalId? CausationId { get; }
 
     [Id(4)]
     public NeuronId Caller { get; }
@@ -51,11 +51,11 @@ public sealed class SynapseDelivery
     [Id(7)]
     public PrincipalId? Principal { get; }
 
-    public static SynapseDelivery Create(
-        Synapse synapse,
+    public static SignalDelivery Create(
+        Signal signal,
         NeuronId caller,
         long sequence,
-        SynapseDelivery? cause = null,
+        SignalDelivery? cause = null,
         TimeProvider? timeProvider = null,
         CorrelationId? correlation = null,
         PrincipalId? principal = null)
@@ -63,10 +63,10 @@ public sealed class SynapseDelivery
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(sequence);
 
         return new(
-            synapse,
-            SynapseId.New(),
+            signal,
+            SignalId.New(),
             correlation ?? cause?.CorrelationId ?? CorrelationId.New(),
-            cause?.SynapseId,
+            cause?.SignalId,
             caller,
             sequence,
             (timeProvider ?? TimeProvider.System).GetUtcNow(),

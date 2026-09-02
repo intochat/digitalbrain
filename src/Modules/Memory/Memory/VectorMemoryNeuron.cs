@@ -32,87 +32,87 @@ public sealed class VectorMemoryNeuron :
                 + "IEmbeddingGenerator (an Ollama embedding model in the AppHost) "
                 + "and try again.");
 
-    public async Task HandleAsync(StoreVectorMemory synapse, CancellationToken cancellationToken)
+    public async Task HandleAsync(StoreVectorMemory signal, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(synapse);
+        ArgumentNullException.ThrowIfNull(signal);
         cancellationToken.ThrowIfCancellationRequested();
-        ValidateStore(synapse);
+        ValidateStore(signal);
 
-        if (IsReserved(synapse.Namespace))
+        if (IsReserved(signal.Namespace))
         {
             await ReplyAsync(
                 new VectorMemoryStored(
                     Stored: false,
-                    synapse.Namespace,
-                    synapse.Key,
+                    signal.Namespace,
+                    signal.Key,
                     VectorMemoryStoreStatus.ReservedNamespace),
                 cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
-        var embedding = await EmbedAsync(synapse.Text, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        var embedding = await EmbedAsync(signal.Text, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         cancellationToken.ThrowIfCancellationRequested();
-        var metadata = synapse.Metadata is null
+        var metadata = signal.Metadata is null
             ? new Dictionary<string, string>(StringComparer.Ordinal)
-            : new Dictionary<string, string>(synapse.Metadata, StringComparer.Ordinal);
+            : new Dictionary<string, string>(signal.Metadata, StringComparer.Ordinal);
 
         await _store.UpsertAsync(
             new VectorMemoryEntry(
                 Id.Owner.Value,
-                synapse.Namespace.Value,
-                synapse.Key,
-                synapse.Text,
+                signal.Namespace.Value,
+                signal.Key,
+                signal.Text,
                 metadata,
-                synapse.Payload,
+                signal.Payload,
                 embedding),
             cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         await ReplyAsync(
             new VectorMemoryStored(
                 Stored: true,
-                synapse.Namespace,
-                synapse.Key,
+                signal.Namespace,
+                signal.Key,
                 VectorMemoryStoreStatus.Stored),
             cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    public async Task HandleAsync(SearchVectorMemory synapse, CancellationToken cancellationToken)
+    public async Task HandleAsync(SearchVectorMemory signal, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(synapse);
+        ArgumentNullException.ThrowIfNull(signal);
         cancellationToken.ThrowIfCancellationRequested();
-        ValidateSearch(synapse);
+        ValidateSearch(signal);
 
-        var queryEmbedding = await EmbedAsync(synapse.Query, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        var queryEmbedding = await EmbedAsync(signal.Query, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         cancellationToken.ThrowIfCancellationRequested();
         var matches = await _store.SearchAsync(
             Id.Owner.Value,
-            synapse.Namespace.Value,
+            signal.Namespace.Value,
             queryEmbedding,
-            synapse.Limit,
-            synapse.Metadata,
+            signal.Limit,
+            signal.Metadata,
             cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        await ReplyAsync(new VectorMemoryMatches(synapse.Namespace, matches), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await ReplyAsync(new VectorMemoryMatches(signal.Namespace, matches), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    public async Task HandleAsync(RemoveVectorMemory synapse, CancellationToken cancellationToken)
+    public async Task HandleAsync(RemoveVectorMemory signal, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(synapse);
+        ArgumentNullException.ThrowIfNull(signal);
         cancellationToken.ThrowIfCancellationRequested();
-        ValidateRemove(synapse);
+        ValidateRemove(signal);
 
-        if (IsReserved(synapse.Namespace))
+        if (IsReserved(signal.Namespace))
         {
-            await ReplyAsync(new VectorMemoryRemoved(Removed: false, synapse.Namespace, synapse.Key), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await ReplyAsync(new VectorMemoryRemoved(Removed: false, signal.Namespace, signal.Key), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             return;
         }
 
         var removed = await _store.RemoveAsync(
             Id.Owner.Value,
-            synapse.Namespace.Value,
-            synapse.Key,
+            signal.Namespace.Value,
+            signal.Key,
             cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        await ReplyAsync(new VectorMemoryRemoved(removed, synapse.Namespace, synapse.Key), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await ReplyAsync(new VectorMemoryRemoved(removed, signal.Namespace, signal.Key), cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private async Task<float[]> EmbedAsync(string text, CancellationToken cancellationToken)

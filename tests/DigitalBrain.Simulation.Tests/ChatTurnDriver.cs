@@ -20,13 +20,13 @@ internal static class ChatTurnDriver
             brain,
             NeuronId.For<IChat>(brain.Owner, chatName),
             JournalKind.Outgoing,
-            static delivery => delivery.Synapse is TurnLifecycle
+            static delivery => delivery.Signal is TurnLifecycle
             {
                 Status: ChatTurnStatus.Completed or ChatTurnStatus.Failed or ChatTurnStatus.Cancelled
             },
             TurnTimeout);
 
-        var lifecycle = Assert.IsType<TurnLifecycle>(terminal.Synapse);
+        var lifecycle = Assert.IsType<TurnLifecycle>(terminal.Signal);
         Assert.True(lifecycle.Status == ChatTurnStatus.Completed, lifecycle.Detail);
         return lifecycle;
     }

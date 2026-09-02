@@ -2,11 +2,11 @@ using System.Diagnostics;
 
 namespace DigitalBrain.Core;
 
-internal static class SynapseTelemetry
+internal static class SignalTelemetry
 {
     internal const string ReceiverTag = "db.receiver";
 
-    internal const string SynapseTag = "db.synapse";
+    internal const string SignalTag = "db.signal";
 
     internal const string CorrelationTag = "db.correlation";
 

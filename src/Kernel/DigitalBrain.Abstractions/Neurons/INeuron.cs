@@ -1,6 +1,6 @@
 using Orleans.Concurrency;
 
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Journals;
 namespace DigitalBrain.Abstractions.Neurons;
 
@@ -9,7 +9,7 @@ public interface INeuron : IGrainWithStringKey
 {
     [Alias(nameof(Deliver))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
-    Task Deliver(SynapseDelivery delivery, CancellationToken cancellationToken = default);
+    Task Deliver(SignalDelivery delivery, CancellationToken cancellationToken = default);
 
     [ReadOnly]
     [AlwaysInterleave]

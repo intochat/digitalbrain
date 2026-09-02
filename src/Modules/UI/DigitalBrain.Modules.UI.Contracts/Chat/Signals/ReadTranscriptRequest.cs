@@ -2,12 +2,12 @@ using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions;
 
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 namespace DigitalBrain.Chat;
 
 [GenerateSerializer]
 [Alias("chat.read-transcript-request")]
-public sealed record ReadTranscriptRequest : RequestSynapse<TranscriptRead>
+public sealed record ReadTranscriptRequest : Signal<TranscriptRead>
 {
     public const int MinimumMaxTurns = 1;
     public const int MaximumMaxTurns = 64;

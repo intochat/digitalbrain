@@ -37,9 +37,9 @@ public sealed class ChatTurnTests(SimulationFixture fixture)
             brain,
             NeuronId.For<IChat>(brain.Owner, chatName),
             JournalKind.Outgoing,
-            delivery => delivery.Synapse is Responded reply && reply.CommandId == command,
+            delivery => delivery.Signal is Responded reply && reply.CommandId == command,
             TurnTimeout);
-        Assert.Equal("Test assistant reply.", ((Responded)responded.Synapse).Text);
+        Assert.Equal("Test assistant reply.", ((Responded)responded.Signal).Text);
 
         Assert.Equal(accepted.TurnId, lifecycle.TurnId);
 
@@ -89,10 +89,10 @@ public sealed class ChatTurnTests(SimulationFixture fixture)
             brain,
             chatId,
             JournalKind.Outgoing,
-            delivery => delivery.Synapse is Responded reply && reply.Text == "Quarterly sales",
+            delivery => delivery.Signal is Responded reply && reply.Text == "Quarterly sales",
             TurnTimeout);
 
-        var cards = Assert.IsType<Responded>(responded.Synapse).Cards;
+        var cards = Assert.IsType<Responded>(responded.Signal).Cards;
         Assert.NotNull(cards);
         var card = Assert.Single(cards);
         Assert.Equal(KitCardKinds.Chart, card.Kind);

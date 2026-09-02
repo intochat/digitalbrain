@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Core;
@@ -25,15 +26,15 @@ internal sealed class SurfaceBoot :
     public Task OnSubscribed(IBroadcastChannelSubscription subscription)
     {
         ArgumentNullException.ThrowIfNull(subscription);
-        return subscription.Attach<SynapseDelivery>(activation => Deliver(activation));
+        return subscription.Attach<SignalDelivery>(activation => Deliver(activation));
     }
 
-    public Task HandleAsync(DigitalBrainActivated synapse, CancellationToken cancellationToken)
+    public Task HandleAsync(DigitalBrainActivated signal, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(synapse);
+        ArgumentNullException.ThrowIfNull(signal);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (synapse.Owner != Id.Owner)
+        if (signal.Owner != Id.Owner)
         {
             return Task.CompletedTask;
         }

@@ -98,7 +98,7 @@ internal sealed class ChatTools(IDigitalBrain brain)
                 // Compatibility for retained turns completed before answers were
                 // included in snapshots. Never replay a pending-action response.
                 if (snapshot.Status == ChatTurnStatus.Completed
-                    && delivery.Synapse is Responded { UserAction: null } response
+                    && delivery.Signal is Responded { UserAction: null } response
                     && response.CommandId == commandId)
                 {
                     return TextResult(response.Text);

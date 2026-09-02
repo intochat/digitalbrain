@@ -4,7 +4,7 @@ using Orleans.Journaling;
 using Orleans.Serialization;
 
 using DigitalBrain.Abstractions.Journals;
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 namespace DigitalBrain.Core;
 
 internal sealed class NeuronFeed
@@ -52,14 +52,14 @@ internal sealed class NeuronFeed
         _tallies.ToDictionary(entry => entry.Key, entry => entry.Value),
         _lastSequence.Value);
 
-    internal void Append(SynapseDelivery delivery)
+    internal void Append(SignalDelivery delivery)
     {
         var sequence = _lastSequence.Value + 1;
-        var synapseType = delivery.Synapse.GetType().FullName!;
+        var signalType = delivery.Signal.GetType().FullName!;
 
         _lastSequence.Value = sequence;
         _retained.Add(_entries.SerializeToArray(new JournalEntry(sequence, delivery)));
-        _tallies[synapseType] = RecordedOf(synapseType) + 1;
+        _tallies[signalType] = RecordedOf(signalType) + 1;
 
         Compact();
     }
@@ -99,8 +99,8 @@ internal sealed class NeuronFeed
     private long EarliestRetainedSequence()
         => _retained.Count == 0 ? _lastSequence.Value + 1 : _lastSequence.Value - _retained.Count + 1;
 
-    private long RecordedOf(string synapseType)
-        => _tallies.TryGetValue(synapseType, out var recorded) ? recorded : 0;
+    private long RecordedOf(string signalType)
+        => _tallies.TryGetValue(signalType, out var recorded) ? recorded : 0;
 
     private void Compact()
     {

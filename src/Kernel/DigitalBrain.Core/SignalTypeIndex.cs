@@ -5,21 +5,21 @@ using System.Text.Json.Nodes;
 using DigitalBrain.Abstractions;
 using Orleans;
 
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 namespace DigitalBrain.Core;
 
-public static class SynapseTypeIndex
+public static class SignalTypeIndex
 {
     private static readonly ConcurrentDictionary<string, Type?> Resolved = new(StringComparer.Ordinal);
 
-    public static Type? FindByAlias(string synapseAlias)
+    public static Type? FindByAlias(string signalAlias)
     {
-        if (string.IsNullOrWhiteSpace(synapseAlias))
+        if (string.IsNullOrWhiteSpace(signalAlias))
         {
             return null;
         }
 
-        return Resolved.GetOrAdd(synapseAlias, static alias =>
+        return Resolved.GetOrAdd(signalAlias, static alias =>
         {
             Type? found = null;
 
@@ -35,8 +35,8 @@ public static class SynapseTypeIndex
                 foreach (var type in SafeTypes(assembly))
                 {
                     if (type is not { IsClass: true, IsAbstract: false }
-                        || !typeof(Synapse).IsAssignableFrom(type)
-                        || !string.Equals(SynapseAlias.Of(type), alias, StringComparison.Ordinal))
+                        || !typeof(Signal).IsAssignableFrom(type)
+                        || !string.Equals(SignalAlias.Of(type), alias, StringComparison.Ordinal))
                     {
                         continue;
                     }

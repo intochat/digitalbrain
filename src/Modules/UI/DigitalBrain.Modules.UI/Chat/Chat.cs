@@ -303,49 +303,49 @@ internal sealed class Chat : Neuron, IChat
         return Task.CompletedTask;
     }
 
-    public async Task HandleAsync(ReadTranscriptRequest synapse, CancellationToken cancellationToken)
+    public async Task HandleAsync(ReadTranscriptRequest signal, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(synapse);
+        ArgumentNullException.ThrowIfNull(signal);
 
-        var subject = NeuronId.For<IChat>(Id.Owner, synapse.ChatName);
+        var subject = NeuronId.For<IChat>(Id.Owner, signal.ChatName);
         var transcript = subject == Id
             ? new ChatTranscript(Turns())
             : await GrainFactory.GetGrain<IChat>(subject.ToGrainId()).Read().WaitAsync(cancellationToken)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         await ReplyAsync(
-            new TranscriptRead(synapse.CommandId, subject, Trimmed(transcript, synapse.MaxTurns)),
+            new TranscriptRead(signal.CommandId, subject, Trimmed(transcript, signal.MaxTurns)),
             cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    public async Task HandleAsync(Note synapse, CancellationToken cancellationToken)
+    public async Task HandleAsync(Note signal, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(synapse);
+        ArgumentNullException.ThrowIfNull(signal);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (string.IsNullOrWhiteSpace(synapse.Text))
+        if (string.IsNullOrWhiteSpace(signal.Text))
         {
             throw new NeuronAuthorizationException($"Chat '{Id}' refuses an empty note.");
         }
 
-        Remember(new ChatTurn(FromUser: false, synapse.Text));
-        await EmitAsync(new Responded(CommandId.New(), Id, synapse.Text, Author: Id.Name))
+        Remember(new ChatTurn(FromUser: false, signal.Text));
+        await EmitAsync(new Responded(CommandId.New(), Id, signal.Text, Author: Id.Name))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    public async Task HandleAsync(KitCardOffer synapse, CancellationToken cancellationToken)
+    public async Task HandleAsync(KitCardOffer signal, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(synapse);
+        ArgumentNullException.ThrowIfNull(signal);
         cancellationToken.ThrowIfCancellationRequested();
-        if (string.IsNullOrWhiteSpace(synapse.Kind)
-            || string.IsNullOrWhiteSpace(synapse.Name)
-            || string.IsNullOrWhiteSpace(synapse.Caption))
+        if (string.IsNullOrWhiteSpace(signal.Kind)
+            || string.IsNullOrWhiteSpace(signal.Name)
+            || string.IsNullOrWhiteSpace(signal.Caption))
         {
             throw new NeuronAuthorizationException($"Chat '{Id}' refuses an incomplete kit card.");
         }
 
-        Remember(new ChatTurn(FromUser: false, synapse.Caption));
-        await EmitAsync(new Responded(CommandId.New(), Id, synapse.Caption, Author: Id.Name, Cards: [synapse]))
+        Remember(new ChatTurn(FromUser: false, signal.Caption));
+        await EmitAsync(new Responded(CommandId.New(), Id, signal.Caption, Author: Id.Name, Cards: [signal]))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 

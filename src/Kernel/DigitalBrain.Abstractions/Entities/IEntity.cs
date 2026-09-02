@@ -1,6 +1,6 @@
 namespace DigitalBrain.Abstractions.Entities;
 
-// An entity is a plain stateful grain: direct-call read/write, no journals, no synapse
+// An entity is a plain stateful grain: direct-call read/write, no journals, no signal
 // membrane, never a graph endpoint. Neurons drive entity writes and journal the effect.
 [Alias("db.entity")]
 public interface IEntity : IGrainWithStringKey

@@ -1,6 +1,6 @@
 using DigitalBrain.Abstractions;
 
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.Time;
 
@@ -13,5 +13,5 @@ public sealed record TimerScheduled(
     [property: Id(3)] DateTimeOffset ScheduledAt,
     [property: Id(4)] DateTimeOffset DueAt,
     [property: Id(5)] TimeSpan Duration,
-    [property: Id(6)] string Note) : Synapse;
+    [property: Id(6)] string Note) : Signal;
 

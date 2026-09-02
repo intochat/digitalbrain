@@ -2,7 +2,7 @@ using DigitalBrain.Abstractions;
 
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 namespace DigitalBrain.Client;
 
 public readonly struct NeuronReference<TNeuron> : IEquatable<NeuronReference<TNeuron>>
@@ -19,17 +19,17 @@ public readonly struct NeuronReference<TNeuron> : IEquatable<NeuronReference<TNe
 
     public NeuronId Id => NeuronId.For<TNeuron>(_client.Owner, _name);
 
-    public Task FireAsync(Synapse synapse, CancellationToken cancellationToken = default)
+    public Task FireAsync(Signal signal, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(synapse);
+        ArgumentNullException.ThrowIfNull(signal);
         cancellationToken.ThrowIfCancellationRequested();
-        return _client.SendToAsync(Id, synapse, cancellationToken);
+        return _client.SendToAsync(Id, signal, cancellationToken);
     }
 
     public Task<TResponse> FireAsync<TResponse>(
-        RequestSynapse<TResponse> request,
+        Signal<TResponse> request,
         CancellationToken cancellationToken = default)
-        where TResponse : Synapse
+        where TResponse : Signal
     {
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();

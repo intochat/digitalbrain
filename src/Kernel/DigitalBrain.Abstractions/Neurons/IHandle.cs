@@ -1,8 +1,8 @@
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 namespace DigitalBrain.Abstractions.Neurons;
 
-public interface IHandle<in TSynapse>
-    where TSynapse : Synapse
+public interface IHandle<in TSignal>
+    where TSignal : Signal
 {
-    Task HandleAsync(TSynapse synapse, CancellationToken cancellationToken);
+    Task HandleAsync(TSignal signal, CancellationToken cancellationToken);
 }

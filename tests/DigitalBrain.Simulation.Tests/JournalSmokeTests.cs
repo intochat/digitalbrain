@@ -1,6 +1,7 @@
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Memory;
 using DigitalBrain.Testing;
@@ -15,7 +16,7 @@ public sealed class JournalSmokeTests(SimulationFixture fixture)
     [Fact]
     public void HistoricalFactJournalAliasesRemainResolvable()
     {
-        // Chat used to journal these synapses. They are no longer emitted, but existing
+        // Chat used to journal these signals. They are no longer emitted, but existing
         // retained journals must still be readable after the fact-memory projection is gone.
         Assert.Equal("memory.store-fact", AliasOf<StoreFact>());
         Assert.Equal("memory.fact-stored", AliasOf<FactStored>());
@@ -37,9 +38,9 @@ public sealed class JournalSmokeTests(SimulationFixture fixture)
             brain,
             subject,
             JournalKind.Outgoing,
-            static d => d.Synapse is DigitalBrainActivated);
+            static d => d.Signal is DigitalBrainActivated);
 
-        Assert.IsType<DigitalBrainActivated>(delivery.Synapse);
+        Assert.IsType<DigitalBrainActivated>(delivery.Signal);
 
         // The BroadcastChannel fan-out: the implicit channel subscriber
         // (surface-boot:{owner}/default, keyed by the channel key) journals the published
@@ -49,9 +50,9 @@ public sealed class JournalSmokeTests(SimulationFixture fixture)
             brain,
             surfaceBoot,
             JournalKind.Incoming,
-            static d => d.Synapse is DigitalBrainActivated);
+            static d => d.Signal is DigitalBrainActivated);
 
-        Assert.Equal(delivery.SynapseId, received.SynapseId);
+        Assert.Equal(delivery.SignalId, received.SignalId);
     }
 
     private static string AliasOf<T>()

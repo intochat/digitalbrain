@@ -1,4 +1,4 @@
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.Abstractions.Brain;
 
@@ -7,7 +7,7 @@ namespace DigitalBrain.Abstractions.Brain;
 [GenerateSerializer]
 [Alias("db.unrouted")]
 public sealed record Unrouted(
-    [property: Id(0)] SynapseId Delivery,
+    [property: Id(0)] SignalId Delivery,
     [property: Id(1)] string Alias,
     [property: Id(2)] NeuronId Source,
-    [property: Id(3)] CorrelationId Correlation) : Synapse;
+    [property: Id(3)] CorrelationId Correlation) : Signal;

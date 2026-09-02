@@ -149,7 +149,7 @@ internal static class ChatVoiceHttpMaps
         {
             foreach (var delivery in page.Delta)
             {
-                if (delivery.Synapse is Responded responded && responded.CommandId == command)
+                if (delivery.Signal is Responded responded && responded.CommandId == command)
                 {
                     yield return new SseItem<ChatResponseUpdate>(
                         new ChatResponseUpdate(ChatRole.Assistant, responded.Text),
@@ -157,7 +157,7 @@ internal static class ChatVoiceHttpMaps
                     yield break;
                 }
 
-                if (delivery.Synapse is TurnLifecycle life
+                if (delivery.Signal is TurnLifecycle life
                     && life.TurnId == accepted.TurnId
                     && life.Status is ChatTurnStatus.Failed or ChatTurnStatus.Cancelled)
                 {

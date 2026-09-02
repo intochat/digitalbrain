@@ -1,12 +1,12 @@
 using DigitalBrain.Abstractions;
 
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.UI;
 
 [GenerateSerializer]
 [Alias("ui.open-surface")]
-public sealed record OpenSurface : Synapse
+public sealed record OpenSurface : Signal
 {
     // Overrides IUIRenderer's own default ("default"): an untargeted fire must still reach the
     // "desk" surface SurfaceBoot opens and the shell watches, even though the renderer serves

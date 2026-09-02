@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 
 using DigitalBrain.Abstractions.Journals;
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 namespace DigitalBrain.Kernel;
 
 internal static class JournalProjection
@@ -12,7 +12,7 @@ internal static class JournalProjection
     public static async IAsyncEnumerable<SseItem<TEvent>> WatchAsync<TEvent>(
         Func<CancellationToken, IAsyncEnumerable<JournalRead>> openOutgoing,
         string eventName,
-        Func<SynapseDelivery, TEvent?> project,
+        Func<SignalDelivery, TEvent?> project,
         [EnumeratorCancellation] CancellationToken cancellationToken)
         where TEvent : class
     {

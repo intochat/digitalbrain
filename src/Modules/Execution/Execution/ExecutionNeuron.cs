@@ -43,12 +43,12 @@ public sealed class ExecutionNeuron : Neuron, IExecution
                 data.PromptBlocks));
     }
 
-    public async Task HandleAsync(StartExecution synapse, CancellationToken cancellationToken)
+    public async Task HandleAsync(StartExecution signal, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(synapse);
+        ArgumentNullException.ThrowIfNull(signal);
         cancellationToken.ThrowIfCancellationRequested();
-        RequireCommand(synapse.CommandId);
-        RequireMatchingExecution(synapse.ExecutionId);
+        RequireCommand(signal.CommandId);
+        RequireMatchingExecution(signal.ExecutionId);
 
         var current = LoadRecorded();
         if (current is { Status: ExecutionStatus.Running or ExecutionStatus.AwaitingApproval })
@@ -57,31 +57,31 @@ public sealed class ExecutionNeuron : Neuron, IExecution
                 $"Execution '{Id}' is already active with status '{current.Status}'.");
         }
 
-        var grants = synapse.Grants is null ? Array.Empty<CapabilityId>() : synapse.Grants.ToArray();
+        var grants = signal.Grants is null ? Array.Empty<CapabilityId>() : signal.Grants.ToArray();
         Stage(new ExecutionState(
-            synapse.ExecutionId,
+            signal.ExecutionId,
             ExecutionStatus.Running,
-            synapse.Driver,
-            synapse.Workload,
+            signal.Driver,
+            signal.Workload,
             grants));
 
-        var session = new ExecutionSession(synapse.ExecutionId, Id.Owner, GrainFactory, _broker, grants);
+        var session = new ExecutionSession(signal.ExecutionId, Id.Owner, GrainFactory, _broker, grants);
         var context = GrainFactory.GetGrain<IExecutionContext>(
-            EntityId.For<IExecutionContext>(Id.Owner, synapse.ExecutionId.ToString()).ToGrainId());
+            EntityId.For<IExecutionContext>(Id.Owner, signal.ExecutionId.ToString()).ToGrainId());
 
         try
         {
-            await context.Ensure(synapse.ExecutionId)
+            await context.Ensure(signal.ExecutionId)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-            await AdmitRelatedContextAsync(context, synapse.RelatedExecutions, cancellationToken)
+            await AdmitRelatedContextAsync(context, signal.RelatedExecutions, cancellationToken)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             var seed = new ExecutionSeedBuilder(
-                synapse.ExecutionId,
+                signal.ExecutionId,
                 Id.Owner,
-                synapse.Workload,
-                synapse.RelatedExecutions ?? []);
+                signal.Workload,
+                signal.RelatedExecutions ?? []);
             for (var providerIndex = 0; providerIndex < _providers.Length; providerIndex++)
             {
                 await _providers[providerIndex]
@@ -103,47 +103,47 @@ public sealed class ExecutionNeuron : Neuron, IExecution
             // Script never runs the in-neuron agent/team loop — IScriptDriver owns that path.
             // Production AppHost will start DigitalBrain.Scripting (out of process); Testing/Fakes
             // use InProcessAllowListedScriptDriver to prove the seam without loading generated C#.
-            if (synapse.Driver == ExecutionDriverKind.Script)
+            if (signal.Driver == ExecutionDriverKind.Script)
             {
-                await _scriptDriver.RunAsync(session, synapse.Workload, grants, cancellationToken)
+                await _scriptDriver.RunAsync(session, signal.Workload, grants, cancellationToken)
                     .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             }
-            else if (synapse.Driver == ExecutionDriverKind.Team || synapse.Workload is TeamWorkload)
+            else if (signal.Driver == ExecutionDriverKind.Team || signal.Workload is TeamWorkload)
             {
                 // MAF Workflows can wrap this later; sequential phases keep one shared ExecutionSession.
-                var requestJson = $$"""{"workload":"{{synapse.Workload.GetType().Name}}"}""";
-                await RunTeamPhasesAsync(session, synapse.Workload, grants, requestJson, cancellationToken)
+                var requestJson = $$"""{"workload":"{{signal.Workload.GetType().Name}}"}""";
+                await RunTeamPhasesAsync(session, signal.Workload, grants, requestJson, cancellationToken)
                     .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             }
-            else if (synapse.Workload is AutomationWorkload)
+            else if (signal.Workload is AutomationWorkload)
             {
                 // Automations without an interactive tool loop still execute declared grants once.
                 // Chat/Agent turns seed only — capabilities run via ExecutionSession.CallAsync from tools.
-                var requestJson = $$"""{"workload":"{{synapse.Workload.GetType().Name}}"}""";
+                var requestJson = $$"""{"workload":"{{signal.Workload.GetType().Name}}"}""";
                 await RunGrantedCapabilitiesAsync(session, grants, requestJson, cancellationToken)
                     .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             }
             // else ChatTurnWorkload / Agent: providers + related Context only; no blind grant fan-out.
 
             Stage(LoadRecorded()! with { Status = ExecutionStatus.Completed });
-            await EmitAsync(new ExecutionLifecycle(synapse.ExecutionId, ExecutionStatus.Completed))
+            await EmitAsync(new ExecutionLifecycle(signal.ExecutionId, ExecutionStatus.Completed))
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         }
         catch (Exception ex) when (ex is not OperationCanceledException && ex is not NeuronAuthorizationException)
         {
             Stage(LoadRecorded()! with { Status = ExecutionStatus.Failed });
-            await EmitAsync(new ExecutionLifecycle(synapse.ExecutionId, ExecutionStatus.Failed, ex.Message))
+            await EmitAsync(new ExecutionLifecycle(signal.ExecutionId, ExecutionStatus.Failed, ex.Message))
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             throw new NeuronAuthorizationException($"Execution '{Id}' failed: {ex.Message}", ex);
         }
     }
 
-    public async Task HandleAsync(CancelExecution synapse, CancellationToken cancellationToken)
+    public async Task HandleAsync(CancelExecution signal, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(synapse);
+        ArgumentNullException.ThrowIfNull(signal);
         cancellationToken.ThrowIfCancellationRequested();
-        RequireCommand(synapse.CommandId);
-        RequireMatchingExecution(synapse.ExecutionId);
+        RequireCommand(signal.CommandId);
+        RequireMatchingExecution(signal.ExecutionId);
 
         var current = LoadRecorded();
         if (current is null)
@@ -158,7 +158,7 @@ public sealed class ExecutionNeuron : Neuron, IExecution
         }
 
         Stage(current with { Status = ExecutionStatus.Cancelled });
-        await EmitAsync(new ExecutionLifecycle(synapse.ExecutionId, ExecutionStatus.Cancelled))
+        await EmitAsync(new ExecutionLifecycle(signal.ExecutionId, ExecutionStatus.Cancelled))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 

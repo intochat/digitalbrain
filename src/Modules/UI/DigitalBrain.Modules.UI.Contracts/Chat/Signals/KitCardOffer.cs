@@ -1,6 +1,6 @@
 using DigitalBrain.Abstractions;
 
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 namespace DigitalBrain.Chat;
 
 public static class KitCardKinds
@@ -15,4 +15,4 @@ public static class KitCardKinds
 public sealed record KitCardOffer(
     [property: Id(0)] string Kind,
     [property: Id(1)] string Name,
-    [property: Id(2)] string Caption) : Synapse;
+    [property: Id(2)] string Caption) : Signal;

@@ -2,7 +2,7 @@ using System.ComponentModel;
 using DigitalBrain.Abstractions;
 
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Entities;
@@ -24,7 +24,7 @@ public interface IDigitalBrain
     TNeuron GetGrainProxy<TNeuron>(string name = "default")
         where TNeuron : class, INeuron;
 
-    Task FireAsync<TNeuron>(string name, Synapse synapse, CancellationToken cancellationToken = default)
+    Task FireAsync<TNeuron>(string name, Signal signal, CancellationToken cancellationToken = default)
         where TNeuron : INeuron;
 
     Task<JournalRead> ReadJournalAsync(

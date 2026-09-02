@@ -1,7 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Testing;
 using Xunit;
 using TimerModule = DigitalBrain.Time;
@@ -27,11 +27,11 @@ public sealed class TimerReminderTests(SimulationFixture fixture)
             brain,
             timer.Id,
             JournalKind.Outgoing,
-            delivery => delivery.Synapse is TimerModule.TimerElapsed timerElapsed
+            delivery => delivery.Signal is TimerModule.TimerElapsed timerElapsed
                 && timerElapsed.Generation == armed.Generation,
             timeout: TimeSpan.FromSeconds(20));
 
-        var timerElapsed = Assert.IsType<TimerModule.TimerElapsed>(elapsed.Synapse);
+        var timerElapsed = Assert.IsType<TimerModule.TimerElapsed>(elapsed.Signal);
         Assert.Equal(TimerModule.TimerResolution.OnTime, timerElapsed.Resolution);
         Assert.Equal(TimerModule.TimerStatus.Elapsed, (await brain.GetGrainProxy<TimerModule.ITimer>(timerName).Read()).Status);
     }

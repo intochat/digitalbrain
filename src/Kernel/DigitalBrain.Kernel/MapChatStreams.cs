@@ -4,7 +4,7 @@ using DigitalBrain.Abstractions.Interactions;
 using DigitalBrain.Chat;
 
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 namespace DigitalBrain.Kernel;
 
 internal static class ChatStreamsHttpMaps
@@ -76,13 +76,13 @@ internal static class ChatStreamsHttpMaps
             ProjectTurn,
             cancellationToken);
 
-    private static ChatTurnEvent? ProjectTurn(SynapseDelivery delivery)
+    private static ChatTurnEvent? ProjectTurn(SignalDelivery delivery)
     {
         ChatTurnEvent Turn(
             bool fromUser,
             string text,
             CommandId command,
-            string synapseName,
+            string signalName,
             NeuronId chat,
             string? turnId = null,
             string? status = null,
@@ -93,7 +93,7 @@ internal static class ChatStreamsHttpMaps
                 fromUser,
                 text,
                 command.ToString(),
-                synapseName,
+                signalName,
                 chat.ToString(),
                 delivery.Caller.ToString(),
                 delivery.CorrelationId.ToString(),
@@ -103,7 +103,7 @@ internal static class ChatStreamsHttpMaps
                 cards,
                 userAction);
 
-        return delivery.Synapse switch
+        return delivery.Signal switch
         {
             UserMessaged messaged =>
                 Turn(true, messaged.Text, messaged.CommandId, nameof(UserMessaged), messaged.Chat),

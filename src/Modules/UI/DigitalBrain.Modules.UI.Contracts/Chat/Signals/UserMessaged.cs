@@ -1,12 +1,13 @@
 using DigitalBrain.Abstractions;
 
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.Chat;
 
 [GenerateSerializer]
-[Alias("chat.transcript-read")]
-public sealed record TranscriptRead(
+[Alias("chat.user-messaged")]
+public sealed record UserMessaged(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] NeuronId Chat,
-    [property: Id(2)] ChatTranscript Transcript) : Synapse;
+    [property: Id(2)] string Text,
+    [property: Id(3)] ActorContext? Actor = null) : Signal;

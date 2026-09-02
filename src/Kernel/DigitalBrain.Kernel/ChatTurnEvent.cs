@@ -8,7 +8,7 @@ internal sealed record ChatTurnEvent(
     bool FromUser,
     string Text,
     string CommandId,
-    string Synapse,
+    string Signal,
     string NeuronId,
     string Caller,
     string CorrelationId,

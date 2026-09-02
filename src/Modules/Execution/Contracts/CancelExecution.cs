@@ -1,6 +1,6 @@
 using DigitalBrain.Abstractions.Execution;
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Messaging;
+using DigitalBrain.Abstractions.Signals;
 
 namespace DigitalBrain.Execution;
 
@@ -8,4 +8,4 @@ namespace DigitalBrain.Execution;
 [Alias("db.execution.cancel.v1")]
 public sealed record CancelExecution(
     [property: Id(0)] CommandId CommandId,
-    [property: Id(1)] ExecutionId ExecutionId) : Synapse;
+    [property: Id(1)] ExecutionId ExecutionId) : Signal;
