@@ -1,3 +1,4 @@
+using DigitalBrain.Product.Identity;
 using System.Net.ServerSentEvents;
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI;

@@ -1,4 +1,4 @@
-namespace DigitalBrain.Abstractions.Interactions;
+namespace DigitalBrain.Product.Interactions;
 
 public interface IUserActionContinuation
 {

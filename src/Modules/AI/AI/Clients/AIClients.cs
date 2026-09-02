@@ -1,4 +1,4 @@
-using DigitalBrain.Abstractions.Interactions;
+using DigitalBrain.Product.Interactions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

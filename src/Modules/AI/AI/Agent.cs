@@ -1,5 +1,5 @@
 using System.Runtime.CompilerServices;
-using DigitalBrain.Abstractions.Interactions;
+using DigitalBrain.Product.Interactions;
 using DigitalBrain.Core;
 using Microsoft.Extensions.AI;
 

@@ -2,7 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Interactions;
+using DigitalBrain.Product.Interactions;
 using DigitalBrain.AI;
 using DigitalBrain.Sdk;
 using Microsoft.Extensions.AI;

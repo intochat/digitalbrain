@@ -1,7 +1,8 @@
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Product.Identity;
 using Orleans.Runtime;
 
-namespace DigitalBrain.Abstractions.Interactions;
+namespace DigitalBrain.Product.Interactions;
 
 [GenerateSerializer]
 [Alias("db.agent-turn-context")]

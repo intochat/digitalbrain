@@ -6,6 +6,7 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../../Product/DigitalBrain.Product.Contracts/DigitalBrain.Product.Contracts.csproj" />
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Execution.Contracts.csproj" />
     <ProjectReference Include="../../UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain/DigitalBrain.csproj" />

@@ -1,8 +1,9 @@
+using DigitalBrain.Product.Identity;
 using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Execution;
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Interactions;
+using DigitalBrain.Product.Interactions;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Chat;
 using DigitalBrain.Core;

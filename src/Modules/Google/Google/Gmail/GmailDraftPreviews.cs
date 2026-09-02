@@ -1,8 +1,9 @@
+using DigitalBrain.Product.Identity;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Interactions;
+using DigitalBrain.Product.Interactions;
 using DigitalBrain.Core;
 using DigitalBrain.Sdk;
 

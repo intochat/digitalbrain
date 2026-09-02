@@ -16,6 +16,7 @@
     <PackageReference Include="Microsoft.AI.Foundry.Local" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../../src/Product/DigitalBrain.Product.Contracts/DigitalBrain.Product.Contracts.csproj" />
     <ProjectReference Include="../../src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
     <ProjectReference Include="../../src/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
     <ProjectReference Include="../../src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />

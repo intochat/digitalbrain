@@ -1,4 +1,4 @@
-using DigitalBrain.Abstractions.Interactions;
+using DigitalBrain.Product.Interactions;
 using DigitalBrain.AI;
 using DigitalBrain.Core;
 using DigitalBrain.Execution;

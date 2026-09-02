@@ -1,6 +1,7 @@
+using DigitalBrain.Product.Identity;
 using System.Net.ServerSentEvents;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Abstractions.Interactions;
+using DigitalBrain.Product.Interactions;
 using DigitalBrain.Chat;
 
 using DigitalBrain.Abstractions.Identity;

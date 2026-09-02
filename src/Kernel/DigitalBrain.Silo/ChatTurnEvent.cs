@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 using DigitalBrain.Chat;
-using DigitalBrain.Abstractions.Interactions;
+using DigitalBrain.Product.Interactions;
 namespace DigitalBrain.Kernel;
 
 internal sealed record ChatTurnEvent(

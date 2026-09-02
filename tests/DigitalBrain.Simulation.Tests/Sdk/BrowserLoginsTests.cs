@@ -1,5 +1,6 @@
+using DigitalBrain.Product.Identity;
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Interactions;
+using DigitalBrain.Product.Interactions;
 using DigitalBrain.Core;
 using DigitalBrain.Sdk;
 using Microsoft.Extensions.DependencyInjection;

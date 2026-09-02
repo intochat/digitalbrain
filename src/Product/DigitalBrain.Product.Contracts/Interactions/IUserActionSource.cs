@@ -1,6 +1,7 @@
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Product.Identity;
 
-namespace DigitalBrain.Abstractions.Interactions;
+namespace DigitalBrain.Product.Interactions;
 
 public interface IUserActionSource
 {

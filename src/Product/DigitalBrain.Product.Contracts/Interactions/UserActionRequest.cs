@@ -1,4 +1,4 @@
-namespace DigitalBrain.Abstractions.Interactions;
+namespace DigitalBrain.Product.Interactions;
 
 // Public control data only. Provider credentials and OAuth state never belong here.
 [GenerateSerializer]

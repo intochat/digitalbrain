@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace DigitalBrain.Abstractions.Identity;
+namespace DigitalBrain.Product.Identity;
 
 [GenerateSerializer]
 [Alias("db.command-id")]

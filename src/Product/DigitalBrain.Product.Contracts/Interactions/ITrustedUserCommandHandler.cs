@@ -1,4 +1,4 @@
-namespace DigitalBrain.Abstractions.Interactions;
+namespace DigitalBrain.Product.Interactions;
 
 // Invoked only by the authenticated chat edge, never exposed as an agent tool.
 public interface ITrustedUserCommandHandler

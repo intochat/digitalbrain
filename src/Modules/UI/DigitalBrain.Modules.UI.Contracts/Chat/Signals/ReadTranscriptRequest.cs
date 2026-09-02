@@ -1,3 +1,4 @@
+using DigitalBrain.Product.Identity;
 using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions;
 

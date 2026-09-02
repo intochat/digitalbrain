@@ -1,6 +1,7 @@
+using DigitalBrain.Product.Identity;
 using System.Security.Cryptography;
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Interactions;
+using DigitalBrain.Product.Interactions;
 using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 
