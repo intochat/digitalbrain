@@ -1,5 +1,7 @@
+using DigitalBrain.Execution;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Memory;
 using DigitalBrain.Product.Identity;
 using DigitalBrain.Product.Interactions;
 using Xunit;
@@ -8,6 +10,45 @@ namespace DigitalBrain.Simulation.Tests;
 
 public sealed class ContractOwnershipTests
 {
+    [Fact]
+    public void ModuleValueTypesLiveWithTheirPublicModuleContracts()
+    {
+        Assert.Same(typeof(IExecution).Assembly, typeof(ExecutionId).Assembly);
+        Assert.Same(typeof(IExecution).Assembly, typeof(ContextPath).Assembly);
+        Assert.Same(typeof(IExecution).Assembly, typeof(ContextDigest).Assembly);
+        Assert.Same(typeof(IVectorMemory).Assembly, typeof(ProtectedPayloadReference).Assembly);
+        Assert.Equal("DigitalBrain.Execution", typeof(ExecutionId).Namespace);
+        Assert.Equal("DigitalBrain.Execution", typeof(ContextPath).Namespace);
+        Assert.Equal("DigitalBrain.Execution", typeof(ContextDigest).Namespace);
+        Assert.Equal("DigitalBrain.Memory", typeof(ProtectedPayloadReference).Namespace);
+    }
+
+    [Fact]
+    public void ModuleValueTypeWireIdentityRemainsStable()
+    {
+        AssertAlias<ExecutionId>("db.execution-id");
+        AssertAlias<ContextPath>("db.context-path");
+        AssertAlias<ContextDigest>("db.context-digest");
+        AssertAlias<ProtectedPayloadReference>("db.protected-payload-reference");
+
+        AssertField<ExecutionId>(nameof(ExecutionId.Value), 0, typeof(Guid));
+        AssertField<ContextPath>(nameof(ContextPath.Value), 0, typeof(string));
+        AssertField<ContextDigest>(nameof(ContextDigest.Sha256Hex), 0, typeof(string));
+        AssertField<ProtectedPayloadReference>(nameof(ProtectedPayloadReference.Id), 0, typeof(Guid));
+        AssertField<ProtectedPayloadReference>(
+            nameof(ProtectedPayloadReference.ExpiresAt),
+            1,
+            typeof(DateTimeOffset?));
+
+        var kernelContracts = typeof(INeuron).Assembly;
+        var retiredExecutionNamespace = string.Concat("DigitalBrain.Abstractions.", "Execution");
+        var retiredSecurityNamespace = string.Concat("DigitalBrain.Abstractions.", "Security");
+        Assert.Null(kernelContracts.GetType($"{retiredExecutionNamespace}.ExecutionId"));
+        Assert.Null(kernelContracts.GetType($"{retiredExecutionNamespace}.ContextPath"));
+        Assert.Null(kernelContracts.GetType($"{retiredExecutionNamespace}.ContextDigest"));
+        Assert.Null(kernelContracts.GetType($"{retiredSecurityNamespace}.ProtectedPayloadReference"));
+    }
+
     [Fact]
     public void ProductInteractionTypesDoNotBelongToKernelContracts()
     {

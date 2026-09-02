@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace DigitalBrain.Abstractions.Execution;
+namespace DigitalBrain.Execution;
 
 [GenerateSerializer]
 [Alias("db.execution-id")]

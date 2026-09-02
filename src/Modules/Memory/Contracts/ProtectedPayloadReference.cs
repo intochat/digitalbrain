@@ -1,4 +1,4 @@
-namespace DigitalBrain.Abstractions.Security;
+namespace DigitalBrain.Memory;
 
 [GenerateSerializer]
 [Alias("db.protected-payload-reference")]

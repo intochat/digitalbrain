@@ -1,4 +1,4 @@
-using DigitalBrain.Abstractions.Execution;
+using DigitalBrain.Execution;
 using Xunit;
 
 namespace DigitalBrain.Simulation.Tests.Execution;
