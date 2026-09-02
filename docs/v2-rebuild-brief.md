@@ -5,6 +5,8 @@
 runtime-created agents, automations, capabilities, activities, and recovery. The older neuron
 substrate spec retains the original rationale, and `docs/digitalbrain-v2-anatomy.html` is an
 illustrative historical walkthrough; the durable-runs design wins wherever those artifacts differ.
+The later self-knowledge, catalog, semantic-search, and intent-resolution slice is governed by
+`docs/superpowers/specs/2026-09-02-digitalbrain-v2-self-knowledge-and-ranked-discovery-design.md`.
 
 ## Goal
 
@@ -195,7 +197,7 @@ Do these one at a time, full suite green between each.
 
 ## What not to do
 
-- Do not add tier-3 similarity routing, the membrane filter, sensors/effectors, or Roslyn/ALC compilation. Later slices own those.
+- Do not add tier-3 similarity routing, the membrane filter, sensors/effectors, or Roslyn/ALC compilation **to this completed static slice**. Later focused designs own those; side-effect-free ranked catalog discovery is specified separately and still does not auto-route a signal.
 - Do not weaken `NeuronConcurrency`.
 - Do not put authorization in a contract signature.
 - Do not keep a type "because it might be useful" — the whole point of this pass is that everything serves a purpose.

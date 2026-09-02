@@ -18,6 +18,11 @@ brings full-trust user/assistant-authored scripting and a minimal automation pat
 durable execution slice. It is authoritative where it refines this document's generated-code,
 security-admission, worker, and implementation-slice sequencing decisions.
 
+The focused
+[`2026-09-02-digitalbrain-v2-self-knowledge-and-ranked-discovery-design.md`](./2026-09-02-digitalbrain-v2-self-knowledge-and-ranked-discovery-design.md)
+is authoritative for canonical descriptors, catalog ownership, semantic/lexical projections,
+compatible-candidate ranking, exact inspection, and any future similarity-assisted routing.
+
 ---
 
 ## 1. Goal
@@ -201,6 +206,12 @@ The assistant has four stable conceptual tools:
 | `inspect` | Read safe projections, schemas, synapses, activity, and journals. |
 | `invoke` | Execute one schema-validated application operation using an explicit operation ID. |
 | `observe` | Follow a run, activity, journal cursor, or entity revision. |
+
+`discover` is side-effect-free and returns structurally compatible ranked candidates with exact
+revisioned handles and rank evidence. It never invokes its top vector result. `inspect` resolves the
+selected handle against canonical source state and refuses stale or fabricated revisions. A durable
+caller persists the selected operation reference before `invoke`; recovery does not repeat semantic
+search and silently choose another operation.
 
 `delegate_task`, `create_automation`, `publish_revision`, `connect_synapse`, and domain capabilities
 are discoverable operations behind `invoke`; they are not permanent top-level LLM tools. Tool
@@ -421,10 +432,12 @@ Creating an automation produces a draft `AutomationRevision`. Validation checks:
 - compiler, analyzer, contract-set, and source hashes are complete when generated code is used; and
 - non-recoverable effects and privilege changes require explicit approval.
 
-Publication atomically selects one validated, approved revision and publishes its trigger
-declarations to the dynamic capability catalog. Handler declarations are capabilities, not
-synapses. Explicit subscriptions are durable `Innate` synapses; successful routed deliveries may
-create or strengthen `Learned` or `Discovered` synapses.
+Publication atomically selects one validated, approved revision and records outbox mutations for
+two separate projections: the exact `TriggerRegistry` and the semantic self-knowledge catalog.
+Projection delivery is idempotent and at least once; neither projection is part of the aggregate
+commit. Handler declarations are capabilities, not synapses. Explicit subscriptions are durable
+`Innate` synapses; successful selected deliveries may create or strengthen `Learned` or
+`Discovered` synapses only after `DeliveryOutcome.Handled`.
 
 ### 10.2 Triggering
 
@@ -521,20 +534,25 @@ focused `docs/v2-rebuild-brief.md` as its design input.
 1. **Static neuron substrate.** Execute `docs/v2-rebuild-brief.md`: split command/query contracts,
    add delivery outcomes, inject `NeuronRuntime`, decompose `Neuron`, collapse delivery paths, gate
    potentiation, and remove or relocate dead/misplaced contracts. No run engine, AI, or codegen.
-2. **Durable user-authored scripting.** Execute the focused durable-scripting design: replace the
+2. **Self-knowledge and ranked discovery.** Establish canonical module/neuron/signal/operation
+   descriptors, exact and lexical lookup, a rebuildable versioned semantic index, compatible
+   candidate ranking, and side-effect-free `discover`/exact catalog `inspect`. Automatic semantic
+   signal routing remains deferred.
+3. **Durable user-authored scripting.** Execute the focused durable-scripting design: replace the
    coarse execution loop with the run reducer and ledger; add immutable script revisions, direct
    Roslyn compilation, a full-trust out-of-process runner, sequential `StepAsync`, durable wake-ups,
    minimal automation triggers, revision pinning, cancellation, outbox, and crash-recovery tests.
-3. **Capability packs.** Add the complete lease/policy surface and production capability families,
+4. **Capability packs.** Add the complete lease/policy surface and production capability families,
    including provider idempotency/reconciliation and richer repository/Roslyn operations. The
    merged slice already establishes the effect protocol and minimum real seams.
-4. **Task-agent delegation.** Add `TaskAgentSpec`, context manifests, model/tool ledgering, child
+5. **Task-agent delegation.** Add `TaskAgentSpec`, context manifests, model/tool ledgering, child
    runs, parent cancellation/deadlines, and durable `agent.spawn`/`agent.await` capabilities.
-5. **Automation expansion.** Add richer trigger adapters, concurrency policies, approval workflows,
+6. **Automation expansion.** Add richer trigger adapters, concurrency policies, approval workflows,
    and the full multi-agent PR verification automation without changing the scripting ABI.
-6. **Discovery and learning.** Add the dynamic capability catalog, similarity routing, and
-   correction loop without coupling authorization to routing.
-7. **Isolation and distribution.** Add restricted-OS executors, hostile-source admission,
+7. **Dynamic discovery and routing learning.** Add owner-directory catalog projection for every
+   definition kind, similarity-assisted signal routing, and the correction loop without coupling
+   authorization to routing.
+8. **Isolation and distribution.** Add restricted-OS executors, hostile-source admission,
    dependency resolution, and multi-host scheduling when the product requires those boundaries.
 
 Each slice leaves the full solution green and deployable. No compatibility shim or parallel `v2`

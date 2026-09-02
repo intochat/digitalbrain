@@ -11,6 +11,11 @@ security-admission, and implementation-slice decisions in
 [`2026-09-02-digitalbrain-v2-durable-runs-design.md`](./2026-09-02-digitalbrain-v2-durable-runs-design.md).
 The durable-run invariants in that umbrella design remain authoritative.
 
+The catalog prerequisite in
+[`2026-09-02-digitalbrain-v2-self-knowledge-and-ranked-discovery-design.md`](./2026-09-02-digitalbrain-v2-self-knowledge-and-ranked-discovery-design.md)
+is authoritative for descriptors, operation manifests, semantic/lexical indexes, ranked discovery,
+and exact inspection. Typed wrappers compile from exact canonical manifests, never search results.
+
 ---
 
 ## 1. Outcome
@@ -697,7 +702,10 @@ clean choice is deliberate retirement rather than a permanent compatibility laye
 
 ## 16. First merged implementation boundary
 
-The first implementation plan covers one complete sequential vertical:
+The self-knowledge and ranked-discovery plan is an independently testable prerequisite. It supplies
+canonical operation/schema manifests plus `discover`/catalog `inspect`; automatic similarity signal
+routing remains outside this scripting slice. After that prerequisite, the scripting implementation
+plan covers one complete sequential vertical:
 
 1. pure run reducer, command receipts, step/effect ledger, cancellation, and outbox;
 2. `ExecutionRunGrain` plus at-least-once wake-up integration;

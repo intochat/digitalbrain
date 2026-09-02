@@ -8,8 +8,10 @@ records intent the code cannot show yet. Supersedes all PersonaPlex-era plans.
 Multiuser chat product. One kernel image, one Flutter codebase, entities all the
 way down. Core differentiator: **the neuron substrate itself** — a durable, weighted
 graph of neurons connected by synapses, routing signals by learned strength rather
-than by name. User-authored automations are generated C# neurons (see
-[Automations](#automations) below), not a second, English-language runtime.
+than by name. User-authored scripts and automations are immutable definitions and
+published program revisions executed by stable predeployed run/automation grain types (see
+[Automations](#automations) below), not runtime-generated Orleans types or a second,
+English-language runtime.
 
 ## Core loop (chat + dynamic UI)
 
@@ -57,7 +59,9 @@ KitGalleryScreen) is the starting point for the widget side.
   before local).
 - **Local dev**: Ollama `IGemma4` + `IEmbeddingGemma` stay so dev and CI run
   offline. Production embeddings come from a cloud provider; embedding
-  dimensions are config-driven because Qdrant index dims lock to them.
+  dimensions are config-driven because Qdrant index dims lock to them. Every semantic
+  index generation also pins provider/model identity, dimensions, preprocessing, and
+  document-format version; migrations build and validate a new generation before cutover.
 - **Agent layer**: `Agent` neurons over MEAI clients today; MAF orchestration
   (Team/GroupChat/MafParticipantAdapter) restores from master's git history as
   a later build-order step.
@@ -66,9 +70,13 @@ KitGalleryScreen) is the starting point for the widget side.
 
 ## Automations
 
-Retired in favour of generated C#. See
-[2026-09-02-digitalbrain-v2-neuron-substrate-design.md](superpowers/specs/2026-09-02-digitalbrain-v2-neuron-substrate-design.md)
-§9.3 — an automation is a neuron, authored by the system and compiled against module contracts.
+Automations are journaled definitions with immutable revisions executed through the durable run
+engine; user/assistant-authored C# runs in the full-trust scripting worker and calls durable
+capability steps. See the
+[durable-runs](superpowers/specs/2026-09-02-digitalbrain-v2-durable-runs-design.md),
+[durable-scripting](superpowers/specs/2026-09-02-digitalbrain-v2-durable-scripting-design.md), and
+[self-knowledge](superpowers/specs/2026-09-02-digitalbrain-v2-self-knowledge-and-ranked-discovery-design.md)
+designs.
 
 ## Integration modules
 
@@ -91,8 +99,10 @@ declares none.
 - v1 surface: Gmail search/read/draft/send*, Calendar list/create*, Salesforce
   SOQL/read/create*. `*` = a confirmation Button card in chat must be activated
   before the mutation executes.
-- Both modules publish tool descriptions as module contracts that generated
-  automation neurons compile against — no separate capability catalog.
+- Modules publish canonical operation/capability descriptors and exact schema hashes. The
+  self-knowledge semantic index is a rebuildable projection of those descriptors; run-scoped
+  capability leases remain the independent authorization boundary. Scripts compile typed wrappers
+  from exact manifests, never from vector-search results.
 
 ## Multiuser
 
@@ -138,7 +148,9 @@ declares none.
 1. AI providers (IAW port, no tiers) — shipped 2026-08-22.
 2. Auth (UserAccountEntity, cookie + token) — multiuser boundary.
 3. UI kit, all 13 components on the template. (template + Chart + Image shipped 2026-08-23)
-4. Automations (generated C# neurons: compile chain, sensors/effectors, discovery).
-5. Google + Salesforce modules.
-6. MAF orchestration restore.
-7. Image → Docker Hub, ACA + Key Vault deploy.
+4. Self-knowledge catalog and ranked `discover`/exact `inspect` foundation.
+5. Durable scripting and automation definitions/runs (stable grain types, Roslyn worker,
+   sensors/effectors, recovery).
+6. Google + Salesforce capability migration behind catalog-backed `invoke`.
+7. Task-agent orchestration over the same run/capability model.
+8. Image → Docker Hub, ACA + Key Vault deploy.

@@ -2,6 +2,11 @@
 
 **Status:** Ratified for the static graph; dynamic execution sections superseded
 **Date:** 2026-09-02
+**Discovery correction:**
+[`2026-09-02-digitalbrain-v2-self-knowledge-and-ranked-discovery-design.md`](./2026-09-02-digitalbrain-v2-self-knowledge-and-ranked-discovery-design.md)
+is authoritative for descriptors, catalogs, vector/lexical projections, intent resolution, and any
+future similarity-assisted routing. In particular, semantic search returns compatible ranked
+candidates and never directly delivers to its top hit or creates a synapse.
 **Execution correction:**
 [`2026-09-02-digitalbrain-v2-durable-runs-design.md`](./2026-09-02-digitalbrain-v2-durable-runs-design.md)
 is authoritative for Activity, runtime-created agents, automation definitions/revisions/runs,
