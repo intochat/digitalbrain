@@ -711,11 +711,12 @@ plan covers one complete sequential vertical:
 2. `ExecutionRunGrain` plus at-least-once wake-up integration;
 3. content-addressed artifact abstraction with persistent and in-memory implementations;
 4. script definition, immutable source/compilation/program records, durable compile dispatch,
-   publish, and run operations;
+   publish, catalog upsert/tombstone outbox, and run operations;
 5. scripting ABI, direct Roslyn compiler, and structured diagnostics;
 6. supervisor, disposable runner, versioned protocol, and attempt fencing;
 7. brokered sequential `StepAsync` and effect-worker outcomes;
 8. minimum automation definition with manual and scheduled/signal triggering;
+   automation catalog publication and exact trigger-registry projection are part of this item;
 9. minimum run-scoped grants, typed capability fixtures, one real read-only
    Roslyn/repository-analysis seam, and one
    preconditioned mutation seam;

@@ -208,10 +208,15 @@ The assistant has four stable conceptual tools:
 | `observe` | Follow a run, activity, journal cursor, or entity revision. |
 
 `discover` is side-effect-free and returns structurally compatible ranked candidates with exact
-revisioned handles and rank evidence. It never invokes its top vector result. `inspect` resolves the
-selected handle against canonical source state and refuses stale or fabricated revisions. A durable
-caller persists the selected operation reference before `invoke`; recovery does not repeat semantic
-search and silently choose another operation.
+revisioned handles and rank evidence. It never invokes its top vector result. `inspect` resolves one
+or more provisional candidate handles against canonical source state and refuses stale or fabricated
+revisions. A durable caller then persists a `SelectionDecision` with the final exact handle, query
+fingerprint, structural evidence, policy version, and decision time before `invoke`; semantic rank
+alone cannot select automatically.
+Admission pins the immutable operation-manifest artifact/fingerprint and binding revision into the
+run. Recovery reuses that decision and binding, never repeats semantic search or silently selects a
+newer operation. If the pinned binding is unavailable after deployment, recovery returns
+`IncompatibleDeployment` deterministically.
 
 `delegate_task`, `create_automation`, `publish_revision`, `connect_synapse`, and domain capabilities
 are discoverable operations behind `invoke`; they are not permanent top-level LLM tools. Tool
@@ -433,7 +438,7 @@ Creating an automation produces a draft `AutomationRevision`. Validation checks:
 - non-recoverable effects and privilege changes require explicit approval.
 
 Publication atomically selects one validated, approved revision and records outbox mutations for
-two separate projections: the exact `TriggerRegistry` and the semantic self-knowledge catalog.
+two separate projections: the exact `TriggerRegistry` and the self-knowledge catalog projection.
 Projection delivery is idempotent and at least once; neither projection is part of the aggregate
 commit. Handler declarations are capabilities, not synapses. Explicit subscriptions are durable
 `Innate` synapses; successful selected deliveries may create or strengthen `Learned` or
@@ -549,9 +554,10 @@ focused `docs/v2-rebuild-brief.md` as its design input.
    runs, parent cancellation/deadlines, and durable `agent.spawn`/`agent.await` capabilities.
 6. **Automation expansion.** Add richer trigger adapters, concurrency policies, approval workflows,
    and the full multi-agent PR verification automation without changing the scripting ABI.
-7. **Dynamic discovery and routing learning.** Add owner-directory catalog projection for every
-   definition kind, similarity-assisted signal routing, and the correction loop without coupling
-   authorization to routing.
+7. **Remaining dynamic discovery and routing learning.** Add owner-directory catalog projection for
+   remaining definition/entity kinds, similarity-assisted signal routing, and the correction loop
+   without coupling authorization to routing. Script and automation publication already ships with
+   the durable-scripting slice.
 8. **Isolation and distribution.** Add restricted-OS executors, hostile-source admission,
    dependency resolution, and multi-host scheduling when the product requires those boundaries.
 

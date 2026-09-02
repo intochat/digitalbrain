@@ -1,8 +1,8 @@
 # DigitalBrain v2 — Self-Knowledge and Ranked Discovery
 
-**Status:** Ratified in conversation; implementation plan follows  
-**Date:** 2026-09-02  
-**Branch:** `native`  
+**Status:** Ratified; implementation plan prepared
+**Date:** 2026-09-02
+**Branch:** `native`
 **Scope:** The catalog and intent-resolution foundation which precedes durable scripting.
 
 This specification defines how DigitalBrain knows what it contains and what it can do. It refines
@@ -17,8 +17,8 @@ and [`docs/digitalbrain-v2-anatomy.html`](../../digitalbrain-v2-anatomy.html).
 The user-approved selection rule is:
 
 > Semantic intent matching returns compatible ranked candidates. It never directly executes the
-> top vector result. The assistant or routing policy selects an exact typed reference, and a
-> durable caller persists that selection before execution.
+> top vector result. The assistant or routing policy inspects one or more exact typed references,
+> then a durable caller persists the final selection before execution.
 
 ---
 
@@ -35,8 +35,9 @@ The normal assistant path is:
 user intent
     -> discover(text + typed constraints)
     -> compatible ranked candidates with evidence
-    -> assistant/policy selects an exact revisioned handle
-    -> inspect(handle) resolves authoritative current state and schema
+    -> inspect(one or more exact revisioned handles)
+    -> assistant/policy chooses from inspected authoritative state and schemas
+    -> durable caller persists the final SelectionDecision
     -> invoke(operation handle + operation id) authorizes and executes
     -> observe(reference + cursor) follows durable progress
 ```
@@ -48,9 +49,9 @@ implement automatic invocation, semantic signal delivery, or a second workflow e
 
 ## 2. Decisions and invariants
 
-1. **The catalog is authoritative; the vector index is not.** Canonical descriptors come from
-   configured module manifests and durable definition aggregates. Exact and semantic indexes are
-   disposable projections.
+1. **The catalog is authoritative; its indexes are not.** Canonical descriptors come from
+   configured module manifests and durable definition aggregates. Exact, lexical, and semantic
+   indexes are disposable projections.
 2. **Discovery returns candidates, never actions.** No search result invokes an operation, sends a
    signal, grants a lease, or creates a synapse.
 3. **Compatibility precedes ranking.** Owner visibility, lifecycle, kind, exact contract version,
@@ -60,7 +61,7 @@ implement automatic invocation, semantic signal delivery, or a second workflow e
 5. **Lexical and dense scores are not added together.** Candidate lists are fused by rank using
    Reciprocal Rank Fusion, followed by deterministic structural ordering.
 6. **Every result is revisioned and explainable.** A candidate carries its exact descriptor handle,
-   rank components, matched fields, availability summary, and projection watermark.
+   rank components, matched fields, availability summary, and projection version evidence.
 7. **`inspect` re-resolves authority.** A stale, retired, missing, or tampered handle fails
    explicitly. It never silently follows an active pointer to a different revision.
 8. **Authorization stays separate.** Availability and lease eligibility may be described, but only
@@ -69,8 +70,8 @@ implement automatic invocation, semantic signal delivery, or a second workflow e
    not the self-knowledge catalog and cannot write its index.
 10. **Embeddings never enter aggregate state.** Neurons, definitions, scripts, automations, and
     entities store source data and exact references, not model-specific vectors.
-11. **Model identity is part of index identity.** Provider/model ID, dimensions, preprocessing, and
-    discovery-document format determine the index generation.
+11. **Model identity is part of index identity.** Provider/model ID, operator-pinned model revision,
+    dimensions, preprocessing, and discovery-document format determine the index generation.
 12. **Failure degrades discovery, not the brain.** If embeddings or Qdrant are unavailable, exact
     and lexical discovery continue and the response reports semantic degradation.
 13. **Automatic similarity-assisted signal routing is deferred.** When added, it may choose only
@@ -86,10 +87,11 @@ implement automatic invocation, semantic signal delivery, or a second workflow e
 | **Canonical descriptor** | Safe metadata produced by the owner of a module or durable definition. | Live provider state, credentials, or an executable delegate. |
 | **Semantic index** | Rebuildable dense-vector projection of safe discovery documents. | Source of identity, schemas, lifecycle, or authority. |
 | **Lexical index** | Rebuildable exact/token projection used both alone and beside dense search. | A magic substring score mixed with cosine. |
-| **Discovery handle** | Stable descriptor identity plus exact source revision and fingerprint. | An Orleans proxy or mutable active pointer. |
+| **Discovery handle** | Stable scope/source/descriptor identity plus exact source revision and fingerprint. | An Orleans proxy or mutable active pointer. |
 | **Operation manifest** | Canonical operation/version, schemas, recovery semantics, and binding reference. | A run-scoped lease or search result. |
+| **Capability definition** | Discoverable stable capability/version grouping for related operations. | A grant, token, or runtime authority. |
 | **Capability lease** | Exact authority held by a run/caller. | A tag, synapse, prompt, similarity score, or provider connection. |
-| **Trigger registry** | Exact signal-alias/schema routing for published automations. | The semantic catalog. |
+| **Trigger registry** | Exact signal-alias/schema routing for published automations. | The self-knowledge catalog. |
 | **Synapse set** | Durable graph edges learned from handled traffic. | A document index or permission list. |
 | **User vector memory** | Owner-authored remembered content. | System self-description. |
 
@@ -132,7 +134,7 @@ Every descriptor has a common header:
 ```text
 DescriptorId        stable kind-qualified identity
 Scope               Platform | Owner(OwnerId)
-Kind                Module | NeuronType | NeuronInstance | SignalContract |
+Kind                Module | Capability | NeuronType | NeuronInstance | SignalContract |
                     Operation | Script | Automation | AgentDefinition |
                     Entity | Activity
 Source               source kind + stable source ID
@@ -146,9 +148,21 @@ Aliases              exact alternative names
 Keywords             lexical retrieval terms
 Tags                 typed/faceted classification
 RoutingExamples      short examples of when to use the item
-Availability         declared/configured/connected/healthy summary
+ConfigurationState  canonical declared/configured/disabled state
 TypedReference       kind-specific opaque application reference
 ```
+
+`TypedReference` is a validated discriminated value, not a free-form string: platform definitions
+use a stable platform ID, neuron instances use `NeuronId`, entities use `EntityId`, and
+script/automation/agent/activity entries use an owner-local durable resource reference. Exactly one
+payload is populated and its kind must match the descriptor; `NeuronId`/`EntityId` ownership must
+match the descriptor scope. Durable references omit an owner because scope already supplies the
+trusted owner boundary.
+
+A signal-contract descriptor contains its stable alias and exact canonical schema reference/hash.
+A neuron descriptor contains its stable contract alias, grain type, and the sorted alias/schema-hash
+set of signals it handles. This is authoritative descriptive topology; it does not activate a grain,
+deliver a signal, or assert that a particular neuron instance is currently reachable.
 
 An operation descriptor additionally contains:
 
@@ -157,14 +171,42 @@ OperationId and semantic Version
 CapabilityId and capability Version
 InputSchemaId + InputSchemaHash
 OutputSchemaId + OutputSchemaHash
+Canonical input/output JSON schema documents (or immutable artifact references)
 RecoverySemantics    ReplaySafe | Idempotent | Reconcileable | NonRecoverable
-BindingReference     stable executor/application binding ID
+BindingReference     stable executor/application binding ID + exact binding revision
 RequiredScopes       declarative requirements, not a lease
 ```
 
-The descriptor fingerprint excludes projection data: vectors, vector scores, token positions,
-provider health samples, index generation, and projection checkpoints. Collection records include
-the descriptor fingerprint so every hit can be checked against authoritative metadata.
+A `Capability` descriptor names and explains the stable capability/version grouping referenced by
+one or more operations. It is searchable self-knowledge only. Runtime authority is represented
+solely by a `CapabilityLease`, never by the descriptor or its search rank. A caller uses the
+capability/version as a structural constraint to discover operations; the capability descriptor
+itself is not invocable.
+
+Operation input/output contracts are application DTOs, not transport signals. Fields such as
+`CommandId`, run ID, owner, correlation, causation, and lease come from trusted invocation context
+and are adapted into signals only at the exact binding. Static operations without that binding are
+catalogued as `Declared`, not falsely reported as invocable.
+
+`Visibility` is either `Discoverable` or `InspectOnly`. The authoritative current-descriptor view
+retains both so an owner-visible exact handle may inspect either, but the exact-discovery view,
+lexical index, semantic documents, semantic coverage, and their candidate pools contain only
+`Discoverable` descriptors. `InspectOnly` is therefore absent before every retrieval lane rather
+than fetched and discarded after it consumes a bounded lane position. Resources which cannot be
+safely inspected are not catalogued at all.
+
+The descriptor fingerprint covers every authoritative descriptor field except its own fingerprint
+slot, avoiding a circular hash. It excludes projection data: vectors, vector scores, token positions,
+live connectivity/health samples, index generation, and projection checkpoints. Observed provider
+availability is a timestamped non-authoritative overlay resolved during discovery/inspection; it
+does not stale a canonical handle. Collection records include the descriptor fingerprint so every
+hit can be checked against authoritative metadata.
+
+Canonical schema and descriptor bytes are version-prefixed (`catalog-schema-v1` and
+`catalog-descriptor-v1`). A static descriptor first derives `SourceRevision` as `static-v1:<sha256>`
+over its authoritative payload excluding source revision and fingerprint, then derives the final
+fingerprint over the complete descriptor excluding only the fingerprint slot. Golden canonical JSON
+fixtures and mutation tests lock this algorithm; a format change requires a new prefix version.
 
 Use one discovery document per discoverable resource or operation. Do not embed one large module
 document containing unrelated operations. Discovery text is built only from the safe fields
@@ -178,15 +220,20 @@ script source, provider responses, journals, or external documents.
 
 ## 6. Contribution and resolution interfaces
 
-Static modules register immutable contributions during `IModule.Configure`. Because only module
-types in `ModuleManifest` are configured, loaded-but-unconfigured modules cannot enter the catalog.
-The contribution seam is separate from `IModule`, preserving its single configuration
-responsibility.
+Static module hooks implement a separate `ICatalogContributor` interface. `DigitalBrainRuntime`
+instantiates only the hooks selected by `ModuleManifest` and registers that neutral immutable set as
+`ConfiguredModuleHooks`; it does not reference Catalog. `CatalogModule` collects contributions from
+that exact set, so loaded-but-unconfigured modules cannot enter the catalog. The contribution seam
+remains separate from `IModule`, preserving its single configuration responsibility.
 
 Dynamic aggregates publish descriptor mutations after their canonical revision commits. The common
 source contract supports:
 
-- enumeration for full rebuild;
+- enumeration of stable source partitions for a full rebuild;
+- a repeatable, paged snapshot per partition with an opaque snapshot token and captured high
+  watermark;
+- ordered, gap-free mutation replay after that snapshot through an explicitly captured later
+  watermark;
 - exact resolution by source ID and revision;
 - current-lifecycle resolution without following a stale handle; and
 - idempotent mutation notification.
@@ -194,6 +241,25 @@ source contract supports:
 `ICatalogSource` implementations own domain translation. The catalog application layer owns
 validation, fingerprinting, metadata projection, semantic documents, ranking, and hydration. A
 source never receives a query embedding or Qdrant client.
+
+A `CatalogSourcePartition` identifies one source kind, opaque partition ID, and exact platform or
+owner scope. A snapshot item carries its descriptor and source position. All pages bearing one
+snapshot token and high watermark describe the same point-in-time partition, and the terminal page is the only proof
+that enumeration completed; an incomplete or failed page sequence never authorizes pruning. After
+the snapshot, the coordinator captures the source's current position and replays mutations from the
+snapshot watermark through that inclusive barrier before publishing readiness. Mutation replay is
+strictly ordered and gap-free; compaction or a gap returns `SnapshotRequired` and restarts that
+partition from a new snapshot rather than guessing. `CatalogMutation` carries the partition key so
+checkpointing and pruning never infer partition membership from a descriptor payload.
+
+The configured static source exposes one immutable platform partition. A future durable owner
+directory enumerates every registered owner partition through the same internal rebuild contract;
+normal owner-scoped discovery still reads only the projection and cannot request another owner's
+partition. This makes all-owner rebuild possible without assembly scans or grain activation scans.
+`CatalogSourcePosition.Origin = (0, 0)` means pre-history and cannot identify a mutation. The first
+mutation is `(0, 1)`; successors advance sequence by one or advance epoch by one and restart at
+sequence one. Therefore an empty snapshot captured at `Origin` cannot skip a concurrently published
+first mutation when catch-up uses an exclusive lower bound.
 
 ---
 
@@ -214,17 +280,25 @@ text. A query searches platform descriptors plus that owner's overlay and no oth
 
 Each `DiscoveryCandidate` contains:
 
-- exact `DiscoveryHandle` (`DescriptorId`, `SourceRevision`, `Fingerprint`);
-- kind, name, summary, typed reference, lifecycle, and availability;
+- exact `CatalogReference` (`Scope`, `Source`, `DescriptorId`, `SourceRevision`, `Fingerprint`);
+- kind, name, summary, typed reference, lifecycle, canonical configuration state, and a timestamped
+  observed-availability overlay;
 - compatibility evidence and matched exact fields;
 - exact, lexical, and semantic rank positions where present;
-- final `RankScore`, explicitly not called confidence;
-- deterministic rank-reason strings; and
-- projection watermark and semantic-degradation status.
+- one-based `FinalRank` plus diagnostic `RrfScore`, explicitly not called confidence;
+- deterministic rank-reason evidence.
 
-Empty results and ambiguous top candidates are normal. The assistant may choose automatically when
-its policy has enough grounded evidence, or ask the user for clarification. Either way, it selects
-an exact returned handle; discovery does not select or execute on its behalf.
+The enclosing `DiscoveryResult.Diagnostics`, not every candidate, carries the metadata/availability
+watermarks and snapshot tokens, active semantic generation, nullable semantic snapshot token,
+candidate-pool truncation, and semantic-degradation status/reason. One result therefore describes
+one coherent retrieval snapshot without duplicating global evidence into each candidate.
+
+Empty results and ambiguous top candidates are normal. Discovery never chooses; it yields only a
+provisional shortlist. A later selection policy may choose automatically only after one or more
+successful authoritative inspections and only when exact unique structural evidence or an explicit
+owner policy permits it; semantic rank alone is never sufficient. Otherwise it abstains or asks for
+clarification. Any later execution persists a `SelectionDecision` containing the final inspected
+handle, query fingerprint, structural evidence, policy version, and decision time before invoking.
 
 ---
 
@@ -236,19 +310,57 @@ The application service performs the following stages in order:
    satisfy visibility and lifecycle policy.
 2. **Structural compatibility filter.** Apply requested kind, operation/capability version,
    signal/schema, input/output schema, tag, and invocability constraints.
-3. **Exact lane.** Match canonical IDs, operation IDs, names, and declared aliases. Exact candidates
+3. **Exact lane.** Match canonical IDs, operation/capability IDs, names, and declared aliases. Exact candidates
    form a dominant rank group.
 4. **Lexical lane.** Search a deterministic normalized-token inverted index and record matched
    fields/rank.
-5. **Semantic lane.** Embed the query once, retrieve a bounded dense candidate set, and retain the
-   vector rank and raw provider score for diagnostics.
-6. **Hydration gate.** Resolve every candidate against the canonical source and require an exact
-   revision/fingerprint match. Drop stale or missing hits.
-7. **Rank fusion.** Fuse lexical and semantic *rank positions* using Reciprocal Rank Fusion with
+5. **Semantic lane.** Verify the alias generation matches the selected embedding profile, embed the
+   query once, retrieve a bounded dense candidate set, and retain the vector rank and raw provider
+   score for diagnostics.
+6. **Hydration gate.** Resolve each candidate's current canonical pointer first and require an exact
+   revision/fingerprint match before loading revision details. Drop stale or missing hits even when
+   a source retains the old immutable revision.
+7. **Availability gate.** Resolve one timestamped availability batch and apply an explicit
+   availability requirement when present.
+8. **Lane rerank.** Preserve lexical order; normalize semantic hits by descending similarity then
+   canonical scope key and descriptor ID for exact-score ties; assign new contiguous one-based
+   ranks. Removed hits never consume rank and provider-specific tie order never affects a cursor.
+9. **Rank fusion.** Fuse lexical and semantic *rank positions* using Reciprocal Rank Fusion with
    `k = 60`. Raw lexical and cosine scores are never added.
-8. **Deterministic rerank.** Exact group first, then structural specificity, active/available state,
-   fused rank, and ordinal `DescriptorId` as the final tie-break.
-9. **Bound and explain.** Return the requested page with evidence, watermark, and degradation state.
+10. **Deterministic rerank.** Exact group first, then structural specificity, active/available state,
+   fused rank, and ordinal canonical scope key plus `DescriptorId` as the final tie-break.
+11. **Bound and explain.** Return the requested page with evidence, watermark, and degradation state.
+
+Each lexical/semantic lane uses `min(512, max(64, requestedLimit * 8))` candidates after validating
+`1 <= requestedLimit <= 50`. Filling the bound is reported as truncation; discovery is deliberately
+bounded and does not claim exhaustive nearest-neighbor enumeration.
+
+The total order uses these preferences: exact descriptor ID, exact operation/capability ID, exact
+name/alias, no exact match; descending count of explicitly matched compatibility facets; lifecycle
+`Active`, `Draft`, `Suspended`, `Retired`; configuration `Configured`, `Declared`, `Disabled`;
+availability `Available`, `Degraded`, `Unknown`, `Unavailable`; descending RRF; then scope sort key
+`0:platform` or `1:owner:<owner-id>` and descriptor ID ordinal. Same-ID platform and owner entries
+coexist and remain visibly ambiguous; neither silently shadows the other.
+
+A discovery cursor is base64url canonical JSON bound to the trusted owner, normalized query fields,
+metadata snapshot token, availability snapshot token, active semantic generation, semantic snapshot
+token, the last candidate's global `FinalRank`, and complete final sort tuple. The availability token covers a fresh registry incarnation
+plus its effective ordered observations, so a process restart cannot reuse an old numeric watermark
+for different availability ordering. The semantic token covers generation, deployment epoch and
+manifest fingerprint, active collection incarnation, projected metadata watermark, and exact
+metadata-snapshot fingerprint, so same-generation catch-up,
+static-content replacement, or delete/recovery invalidates old cursors. Query defaults are applied
+before fingerprinting, and the recorded tuple must still exist at that recorded global rank after
+deterministic recomputation. Any mismatch or fabricated tuple
+returns `StaleCursor` with no candidates. A semantically degraded response emits no resumable
+cursor, and a cursor presented while semantic readiness is degraded is stale. A cursor never
+silently resumes against a different owner, catalog snapshot, availability ordering, semantic
+contents, or embedding generation.
+
+Before semantic evidence or a cursor can be returned, the ready semantic snapshot's projected
+metadata watermark and metadata-snapshot fingerprint must equal the exact immutable metadata
+snapshot used for the exact/lexical lanes. A mismatch discards semantic hits, reports semantic
+degradation, wakes reconciliation, and suppresses the cursor; a supplied cursor is stale.
 
 The initial implementation performs RRF in application code. It uses a small deterministic lexical
 index and dense Qdrant search. It does not adopt a provider-specific sparse encoder or pretend the
@@ -262,29 +374,64 @@ strict bound. They can never introduce a candidate removed by stages 1–2 or ou
 
 ## 9. Inspect, select, invoke, and replay
 
-`inspect(handle)` performs no vector search. It asks the source resolver for the exact source
-revision and fingerprint and returns one of:
+The assistant-facing `inspect` request uses one stable discriminated `InspectionReference`
+envelope rather than one tool per resource type. Its variants are `CatalogDescriptor`
+(`CatalogReference`), `Neuron` (`NeuronId`), `Synapse` (source/target `NeuronId` plus signal type),
+`Entity` (`EntityId`), and `DurableResource` (resource kind, stable ID, and optional exact revision).
+Construction requires exactly the payload matching the discriminant. The trusted owner context is
+not supplied by the model and every provider verifies that an embedded owner matches it.
+
+An inspection router dispatches that envelope by composite provider key: ordinary variants use
+`(InspectionReferenceKind, null)`, while durable variants use
+`(DurableResource, normalized ResourceKind)`. It rejects duplicate exact keys, so independent
+script, automation, agent, run, and activity modules can coexist instead of competing for one
+catch-all durable slot. This slice ships only the catalog-descriptor provider; unsupported routes
+return `UnsupportedReference` instead of invented data. Later neuron, synapse, entity, and durable
+providers extend the router without adding assistant tools or changing existing reference fields.
+The result is a versioned discriminated envelope so kind-specific payloads can be appended using new
+serializer field IDs without renumbering the established catalog payload.
+
+Catalog `inspect(handle)` performs no vector search. The handle's source reference routes directly
+to the source resolver. It first resolves the current item for the same source/scope/descriptor ID
+and compares every handle field. Only an exact current-pointer match may load immutable details by
+revision. Thus a durable source may retain historical revision N for replay without allowing N to
+inspect as current after the pointer advances to N+1. It returns one of:
 
 - exact descriptor details;
 - `StaleDescriptor` when the source exists at another revision;
-- `Retired` or `Unavailable` when the exact revision cannot be used; or
+- `Retired` when the exact canonical revision is retired; or
 - `NotFound` when the source is gone or the handle was fabricated.
 
-The assistant or routing policy chooses from the compatible ranked candidates. A durable command
-which will execute work persists the chosen exact handle, operation reference, input, operation ID,
-and relevant projection watermark before dispatch. Recovery reuses that selection; it does not run
-semantic search again and silently choose a different operation.
+A different current revision is `StaleDescriptor`; the same revision with a different fingerprint
+is tampering and returns `NotFound` without disclosing a replacement handle.
+
+Live `Unavailable` or `Unknown` is observation data accompanying an otherwise `Found` inspection;
+it does not turn an exact canonical descriptor into a missing one. `invoke` later rechecks whether
+the selected operation is usable.
+
+Discovery candidates are provisional. The assistant or routing policy inspects one or more exact
+handles, then chooses under the automatic-selection gate in §7 using the inspected authoritative
+state. A durable command which will execute work persists a `SelectionDecision`, the chosen exact
+handle, operation reference, input, operation ID, and relevant projection watermark before
+dispatch. Recovery reuses that selection; it does not run semantic search again and silently choose
+a different operation.
 
 `invoke` is intentionally outside this slice. Its later implementation accepts only an exact
 operation handle and caller-supplied idempotent operation ID, resolves the canonical operation
 manifest, validates input schema, admits a run or command, derives/checks the run-scoped capability
 lease, and rechecks authority at the effect/provider boundary.
 
+An admitted run also pins the immutable operation-manifest artifact/fingerprint and binding
+revision. A deployment must retain a compatible binding for that pinned revision or recovery stops
+with a deterministic `IncompatibleDeployment` result; it must not resolve a newer manifest and
+continue silently.
+
 ---
 
 ## 10. Projection, recovery, and model migration
 
-Canonical state changes produce idempotent catalog mutations:
+Dynamic canonical state changes produce idempotent catalog mutations; configured static authority
+uses complete snapshot replacement:
 
 ```text
 MutationId
@@ -292,6 +439,8 @@ Scope
 DescriptorId
 Source
 SourceRevision
+SourceEpoch
+SourceSequence
 Fingerprint
 Upsert | Tombstone
 DescriptorArtifactReference or immutable descriptor payload
@@ -300,8 +449,9 @@ DescriptorArtifactReference or immutable descriptor payload
 Publication commits canonical state and an outbox item. Projection is asynchronous and at least
 once. The projector:
 
-1. rejects an older revision than the materialized descriptor;
-2. treats duplicate mutation IDs and identical revisions as success;
+1. compares `(SourceEpoch, SourceSequence)` lexicographically and rejects an older source position;
+2. treats a duplicate mutation ID as success only when its canonical bytes and position match,
+   treats an identical payload at the same position as success, and faults any reuse conflict;
 3. applies metadata/lexical upsert or tombstone;
 4. builds and embeds the safe discovery document outside the definition aggregate turn;
 5. writes the semantic record idempotently;
@@ -311,7 +461,9 @@ once. The projector:
 
 Metadata is the visibility gate. A tombstone immediately removes an entry from exact/lexical
 results; a lagging stale vector point is rejected during hydration. Qdrant point identity is
-deterministic from scope, descriptor ID, source revision, fingerprint, and index generation.
+deterministic from index generation, canonical scope key, and descriptor ID. Revision, fingerprint,
+and source position live in payload, so a new revision overwrites the old point and a tombstone
+deletes it instead of accumulating stale high-score records.
 
 An embedding profile contains:
 
@@ -319,20 +471,76 @@ An embedding profile contains:
 GenerationId
 ProviderId
 ModelId
+ModelRevision
 Dimensions
 PreprocessingVersion
 DiscoveryDocumentFormatVersion
 ```
 
 The collection name includes `GenerationId`; a stable alias identifies the active generation.
-Any model, dimension, preprocessing, or document-format change creates a new generation. Rebuild
+Every semantic read verifies that the alias control record's generation equals the caller's selected
+embedding profile before creating or submitting a query embedding. An old but otherwise `Ready`
+alias is a typed generation mismatch: discovery degrades, emits no cursor, and wakes reconciliation;
+it is never queried with the new profile, including when both models happen to use the same vector
+width. Any provider, model ID, operator-pinned model revision, dimension, preprocessing, or
+document-format change creates a new generation. Rebuild
 enumerates configured platform contributions and every owner directory, catches up to the source
 watermark, validates counts and dimensions, then atomically switches the active alias. The old
 generation remains during a rollback grace period.
 
-If the semantic index is lost, full enumeration rebuilds it. If embedding generation fails, exact
-and lexical discovery remain available. Direct inspection and exact invocation do not depend on
+Qdrant build and alias mutation are serialized by one Orleans coordinator keyed by a canonical hash
+of connection name plus active alias—not by generation, because old and new generations share that
+alias. `DigitalBrain:Catalog:DeploymentEpoch` is a positive, monotonically increasing operator value
+(development/testing default `1`, required explicitly in production) which every silo in one rollout must share. Increase it whenever
+the selected embedding profile or configured static contribution manifest changes; an intentional
+rollback also uses a new higher epoch. The ready control record persists the epoch and deployment
+manifest fingerprint, so restart never relies on volatile coordinator memory. A lower epoch is
+`Superseded`; the same epoch with another generation/profile or static manifest is a configuration
+conflict; only a higher epoch may replace it after full validation.
+
+Each reconciliation intent pins that epoch, the complete embedding profile, configured-manifest
+fingerprint, discoverable-metadata watermark/fingerprint, and ordered partition snapshot
+token/high-watermark set. Before any Qdrant mutation, the coordinator captures its local immutable
+discovery metadata snapshot and profile and requires exact equality with the intent. A grain activated on an old rolling-upgrade
+silo therefore returns `IncompatibleCoordinator`, requests deactivation, and writes nothing; the
+caller retries with bounded backoff until a compatible silo services it. This first production slice
+has only the immutable platform partition. When durable owner partitions ship, the activation state
+adds their checkpoint vector and accepts same-epoch catch-up only when every source position is
+equal or advances; regression/incomparability requires a new unified snapshot.
+
+If the semantic index is lost, full enumeration rebuilds it. The initializer keeps a low-frequency,
+cancellation-aware reconciliation loop after startup, and a missing-collection/alias result from a
+semantic query wakes that loop immediately. During recovery, exact and lexical discovery remain
+available with semantic degradation; the connection/alias-keyed deployment coordinator recreates the
+physical collection, a new collection-incarnation marker, payload indexes, points, and alias from
+canonical descriptors. The semantic snapshot token combines deployment epoch/manifest identity and
+that incarnation with the projected metadata watermark and metadata-snapshot fingerprint; it changes after same-generation catch-up,
+static replacement, and loss/recovery. Direct inspection and exact invocation do not depend on
 Qdrant.
+
+A full source-partition enumeration computes the exact desired stable-point set for its
+`Discoverable` descriptors, then prunes descriptor points absent from that set before the semantic
+control record becomes ready. `InspectOnly` descriptors remain in the authoritative current view
+but never contribute semantic points or coverage. A failed or partial enumeration never authorizes
+pruning that partition. The provider-neutral semantic port
+therefore exposes update-scoped partition record enumeration and requires expected per-partition
+count/content fingerprints at commit; Qdrant scrolling is an adapter detail, and no provider may
+publish `Ready` without rechecking coverage. If an owned physical collection
+exists without a valid control record—for example, after a crash between collection creation and
+the marker upsert—the coordinator removes that exact incomplete collection/alias edge, recreates it
+with a fresh incarnation, and rebuilds from authority rather than adopting unknown points.
+
+Epoch and sequence are non-negative integers. A dynamic source owns them durably; `(0, 0)` is the
+pre-history origin, mutations start at sequence one, and an epoch increment restarts at sequence
+one. A scoped descriptor ID is bound to one source; another source
+claiming it is a projection integrity fault. Static platform contributions are rebuilt as a complete
+validated immutable snapshot and swapped atomically, so removal is reconstructed from current
+authority after restart rather than depending on an in-memory epoch/tombstone inventory. The
+metadata projection retains a complete current-entry view for inspection and publishes a separate
+immutable `Discoverable` snapshot for all retrieval lanes. That discovery snapshot has a
+deterministic fingerprint over its ordered exact descriptor references, so semantic state can
+distinguish different searchable canonical contents even when a numeric watermark repeats after
+restart.
 
 The first implementation slice has only static platform sources in production and therefore
 rebuilds them idempotently on startup. It implements the mutation/source contracts and tests owner
@@ -360,7 +568,7 @@ a second registry.
 Assistant intent and signal routing share descriptor/index infrastructure but not policy:
 
 ```text
-assistant intent: discover -> inspect -> choose -> invoke
+assistant intent: discover -> inspect one or more -> choose -> persist selection -> invoke
 signal routing: exact signal contract -> compatible target candidates -> policy chooses -> deliver
 ```
 
@@ -432,7 +640,8 @@ hydration, but not for every search.
 
 Modules and durable aggregates own canonical descriptors. A unified owner-aware exact, lexical, and
 dense projection provides fast ranked retrieval. Every result is hydrated back through the source
-resolver before it can be inspected or selected.
+resolver before it is returned as a provisional candidate; `inspect` then re-resolves the exact
+handle before final selection.
 
 ---
 
@@ -441,13 +650,23 @@ resolver before it can be inspected or selected.
 | Project | Responsibility | Dependency rule |
 |---|---|---|
 | `DigitalBrain.Modules.Catalog.Contracts` | Wire-safe descriptors, handles, queries, candidates, inspection results, and source/contribution abstractions. | References kernel contracts only; no Qdrant, MEAI, executors, or provider code. |
-| `DigitalBrain.Modules.Catalog` | Validation, canonical hashing, source registry, metadata/lexical projection, ranking, discovery grain/service, projection coordination. | Depends on contracts and abstractions; Qdrant is behind an internal interface. |
+| `DigitalBrain.Modules.Catalog.Sdk` | Strongly typed descriptor builders and canonical schema/fingerprint helpers. | Depends on Catalog.Contracts and kernel contracts; kernel projects never depend on it. |
+| `DigitalBrain.Modules.Catalog.Client` | Optional owner-bound `discover`/catalog-`inspect` facade. | Depends on Catalog.Contracts; does not widen kernel `IDigitalBrain`. |
+| `DigitalBrain.Modules.Catalog` | Validation, its own typed contribution, source registry, metadata/lexical projection, ranking, discovery grain/service, projection coordination. | Depends on Catalog.Contracts/SDK, kernel runtime hooks, and AI.Contracts for its adapter/model profile; Qdrant is behind an internal interface. |
 | `DigitalBrain.Modules.Catalog.Aspire.Hosting` | Qdrant resource/config projection for the catalog collection. | Contains no catalog/ranking logic. |
 | `DigitalBrain.Modules.AI.Contracts` / `AI` | Selected embedding model descriptor and `IEmbeddingGenerator`. | Does not own catalog records or ranking. |
 | Configured product modules | Explicit safe descriptor contributions and later executor bindings. | Do not call Qdrant or store embeddings. |
 | Durable definition modules | Owner-scoped source resolution and outbox mutations. | Aggregate commits do not wait on embeddings or Qdrant. |
 | Memory module | User vector memory only. | Cannot write or query the self-knowledge collection through its public API. |
 | Execution module | Exact operation resolution, leases, runs, and effects. | Never treats a candidate or score as authority. |
+
+Catalog wire contracts remain in their own module package. `IBrainNeuron` is not widened; neither
+kernel contracts nor the kernel runtime depend on Catalog. The kernel runtime exposes only its
+neutral `ConfiguredModuleHooks` set. `DigitalBrain.Modules.Catalog.Client` forwards to the separate
+owner-keyed `ICatalogDirectory` grain, while kernel `IDigitalBrain` remains unchanged so Catalog is
+genuinely optional. Catalog runtime references AI.Contracts only for the temporary
+`IAgentToolSource` adapter and selected embedding-profile identity; ranking remains independent of
+the assistant implementation.
 
 The initial provider uses the already-pinned `Microsoft.Extensions.AI` 10.9.0 and `Qdrant.Client`
 1.19.0. It does not add `Microsoft.Extensions.VectorData.Abstractions`: dense search, payload filters,
@@ -460,14 +679,16 @@ ranking is deliberately provider-neutral application code.
 
 The focused implementation plan delivers:
 
-1. wire-safe descriptor, handle, query, candidate, evidence, status, and inspection contracts;
+1. wire-safe descriptor, handle, query, candidate, evidence, status, catalog inspection, and stable
+   multi-kind inspection-envelope contracts;
 2. explicit static module contributions and validation for configured modules only;
 3. deterministic descriptor canonicalization and SHA-256 fingerprints;
 4. an authoritative static source resolver plus owner-overlay source interface;
 5. exact and deterministic lexical retrieval;
 6. explicit selected-embedding profile registration and dimension validation;
 7. an internal semantic-index port with in-memory fake and Qdrant implementation;
-8. idempotent static projection/rebuild and a versioned catalog collection;
+8. idempotent static projection/rebuild, atomic startup readiness, and a versioned catalog
+   collection;
 9. compatibility filtering, stale-hit hydration, RRF ranking, deterministic tie-breaking, and rank
    evidence;
 10. owner-scoped `discover` and exact catalog `inspect` through the client/application surface;
@@ -494,6 +715,7 @@ Deferred to the dependent durable scripting plan:
 - every wire type has stable Orleans serializer metadata;
 - descriptor IDs, source revisions, and fingerprints are non-empty and deterministic;
 - duplicate IDs or conflicting revisions fail startup validation;
+- capability definitions are discoverable but cannot be used as capability leases;
 - only configured modules contribute descriptors;
 - static source enumeration and exact resolution agree;
 - owner A sees platform plus owner A entries and never owner B entries;
@@ -504,28 +726,46 @@ Deferred to the dependent durable scripting plan:
 - structural incompatibility removes a candidate before ranking;
 - an exact stable ID/name/alias wins over a semantically similar description;
 - lexical and semantic ranks use RRF with `k = 60` rather than raw-score addition;
-- ties end in ordinal descriptor-ID order;
+- ties end in ordinal canonical-scope-key plus descriptor-ID order;
 - every candidate exposes matched fields and rank components;
 - no result causes invocation, signal delivery, lease creation, or synapse mutation;
 - embedding failure returns exact/lexical results with degraded status;
 - a stale semantic hit is removed by authoritative hydration;
 - empty and ambiguous results remain explicit.
+- cursor reuse across owners, metadata/availability watermarks, or semantic generations returns
+  `StaleCursor` rather than silently repaging a changed result set.
+- metadata/semantic snapshot equality is required before semantic evidence or a cursor is returned;
+- availability snapshot tokens include a per-registry incarnation, so an equal numeric watermark
+  after process restart does not validate an old cursor;
+- same-generation semantic catch-up and collection loss/recovery change the semantic snapshot token;
+  degraded results have no next cursor and every pre-transition cursor becomes stale.
 
 ### Projection/provider tests
 
 - duplicate upsert is idempotent;
+- lower source positions are ignored, identical same-position mutations are idempotent, and
+  conflicting same-position payloads fault;
+- observed availability can change without changing a descriptor fingerprint or semantic record;
 - stale/tombstoned metadata prevents a lingering vector point from appearing;
-- deterministic point identity includes scope, descriptor revision/fingerprint, and generation;
+- deterministic point identity includes scope, descriptor ID, and generation but deliberately not
+  revision/fingerprint, so revision replacement overwrites one point;
 - owner/global payload filters preserve owner isolation;
 - emitted vector width must match the profile;
 - changing model ID, dimensions, preprocessing, or document format changes generation;
-- loss of the catalog collection is recoverable by static source enumeration;
+- discovery before the first atomic snapshot returns `Initializing`, never a partial result;
+- loss of the catalog collection is automatically recoverable by static source enumeration after a
+  periodic reconciliation or a missing-collection/alias signal;
+- every physical semantic collection has an incarnation marker excluded from descriptor searches;
 - active-generation switch occurs only after the rebuild watermark is complete.
 
 ### End-to-end tests
 
-- the assistant can discover a module, a neuron type, a signal contract, and an operation by intent;
-- `inspect` returns the exact selected descriptor revision;
+- the assistant can discover every configured module's explicitly declared public neuron types and
+  handled signal contracts, plus a capability definition and operation by intent;
+- the assistant may inspect multiple provisional candidates without this slice selecting or
+  executing one; the dependent invoke slice persists the final selection;
+- catalog `inspect` returns the exact requested descriptor revision and unsupported future reference
+  kinds fail explicitly without changing the tool schema;
 - a fabricated or stale handle is refused;
 - a wrong semantic top hit remains only a candidate and performs no action;
 - build and all tests remain green with zero warnings.
