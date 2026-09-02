@@ -1,6 +1,6 @@
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Signals;
-namespace DigitalBrain.Abstractions.Messaging;
+
+namespace DigitalBrain.Abstractions.Signals;
 
 [GenerateSerializer]
 [Alias("db.digitalbrain-activated")]

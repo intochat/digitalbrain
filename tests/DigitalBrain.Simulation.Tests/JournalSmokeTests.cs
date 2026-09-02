@@ -1,6 +1,5 @@
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
-using DigitalBrain.Abstractions.Messaging;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Memory;
@@ -40,6 +39,16 @@ public sealed class JournalSmokeTests(SimulationFixture fixture)
             cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.IsType<DigitalBrainActivated>(delivery.Signal);
+
+        var reset = await brain.ReadJournalAsync(
+            JournalKind.Outgoing,
+            long.MaxValue,
+            TestContext.Current.CancellationToken);
+        var snapshot = Assert.IsType<JournalSnapshot>(reset.ResetSnapshot);
+        var activationTally = Assert.Single(snapshot.Tallies);
+        Assert.Equal(
+            string.Concat("DigitalBrain.Abstractions.", "Messaging.DigitalBrainActivated"),
+            activationTally.SignalType);
 
         // The BroadcastChannel fan-out: the implicit channel subscriber
         // (surface-boot:{owner}/default, keyed by the channel key) journals the published

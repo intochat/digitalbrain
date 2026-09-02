@@ -10,6 +10,8 @@ internal sealed class NeuronFeed
 {
     private const int MaxRetainedEntries = 512;
     private const int MaxRetainedBytes = 512 * 1024;
+    private static readonly string DigitalBrainActivatedTallyKey =
+        string.Concat("DigitalBrain.Abstractions.", "Messaging.DigitalBrainActivated");
 
     private readonly IDurableList<byte[]> _retained;
     private readonly IDurableDictionary<string, long> _tallies;
@@ -63,7 +65,7 @@ internal sealed class NeuronFeed
     internal void Append(SignalDelivery delivery)
     {
         var sequence = _lastSequence.Value + 1;
-        var signalType = delivery.Signal.GetType().FullName!;
+        var signalType = TallyKeyFor(delivery.Signal);
 
         _lastSequence.Value = sequence;
         _retained.Add(_entries.SerializeToArray(new JournalEntry(sequence, delivery)));
@@ -109,6 +111,13 @@ internal sealed class NeuronFeed
 
     private long RecordedOf(string signalType)
         => _tallies.TryGetValue(signalType, out var recorded) ? recorded : 0;
+
+    // Journal tally keys are persisted protocol data. Keep the historical activation key so
+    // moving the CLR type into Signals does not split one brain's counter across two names.
+    private static string TallyKeyFor(Signal signal)
+        => signal is DigitalBrainActivated
+            ? DigitalBrainActivatedTallyKey
+            : signal.GetType().FullName!;
 
     private void Compact()
     {

@@ -1,6 +1,5 @@
 using DigitalBrain.Product.Identity;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Abstractions.Messaging;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Identity;

@@ -1,6 +1,5 @@
 using System.Net;
 using DigitalBrain.Abstractions.Journals;
-using DigitalBrain.Abstractions.Messaging;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Testing;
 using Xunit;

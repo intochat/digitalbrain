@@ -1,15 +1,57 @@
 using DigitalBrain.Execution;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Signals;
+using DigitalBrain.Chat;
 using DigitalBrain.Memory;
 using DigitalBrain.Product.Identity;
 using DigitalBrain.Product.Interactions;
+using System.Reflection;
 using Xunit;
 
 namespace DigitalBrain.Simulation.Tests;
 
 public sealed class ContractOwnershipTests
 {
+    [Fact]
+    public void KernelVocabularyHasNoLegacyDomainBuckets()
+    {
+        Assert.Equal("DigitalBrain.Abstractions.Signals", typeof(DigitalBrainActivated).Namespace);
+        Assert.Equal("DigitalBrain.Abstractions.Signals", typeof(JournalProjectionAttribute).Namespace);
+        AssertAlias<DigitalBrainActivated>("db.digitalbrain-activated");
+        AssertField<DigitalBrainActivated>(
+            nameof(DigitalBrainActivated.Owner),
+            0,
+            typeof(OwnerId));
+
+        var projectionUsage = typeof(JournalProjectionAttribute)
+            .GetCustomAttribute<AttributeUsageAttribute>();
+        Assert.NotNull(projectionUsage);
+        Assert.Equal(AttributeTargets.Class, projectionUsage.ValidOn);
+        Assert.False(projectionUsage.Inherited);
+        Assert.False(projectionUsage.AllowMultiple);
+        Assert.Contains(
+            typeof(Responded).GetCustomAttributesData(),
+            attribute => attribute.AttributeType == typeof(JournalProjectionAttribute));
+
+        var retiredNamespaces = new HashSet<string>(StringComparer.Ordinal)
+        {
+            string.Concat("DigitalBrain.Abstractions.", "Messaging"),
+            string.Concat("DigitalBrain.Abstractions.", "Interactions"),
+            string.Concat("DigitalBrain.Abstractions.", "Execution"),
+            string.Concat("DigitalBrain.Abstractions.", "Security"),
+        };
+        var retiredTypeNames = new HashSet<string>(StringComparer.Ordinal)
+        {
+            string.Concat("Module", "Id"),
+            string.Concat("Un", "routed"),
+        };
+        var types = typeof(INeuron).Assembly.GetTypes();
+
+        Assert.DoesNotContain(types, type => retiredNamespaces.Contains(type.Namespace ?? string.Empty));
+        Assert.DoesNotContain(types, type => retiredTypeNames.Contains(type.Name));
+    }
+
     [Fact]
     public void ModuleValueTypesLiveWithTheirPublicModuleContracts()
     {
@@ -100,9 +142,11 @@ public sealed class ContractOwnershipTests
         AssertField<UserActionRequest>(nameof(UserActionRequest.ResumeToolNames), 6, typeof(string[]));
 
         var kernelContracts = typeof(INeuron).Assembly;
-        Assert.Null(kernelContracts.GetType("DigitalBrain.Abstractions.Identity.CommandId"));
-        Assert.Null(kernelContracts.GetType("DigitalBrain.Abstractions.Interactions.AgentTurnContext"));
-        Assert.Null(kernelContracts.GetType("DigitalBrain.Abstractions.Interactions.UserActionRequest"));
+        var retiredIdentityNamespace = string.Concat("DigitalBrain.Abstractions.", "Identity");
+        var retiredInteractionsNamespace = string.Concat("DigitalBrain.Abstractions.", "Interactions");
+        Assert.Null(kernelContracts.GetType($"{retiredIdentityNamespace}.CommandId"));
+        Assert.Null(kernelContracts.GetType($"{retiredInteractionsNamespace}.AgentTurnContext"));
+        Assert.Null(kernelContracts.GetType($"{retiredInteractionsNamespace}.UserActionRequest"));
     }
 
     [Fact]

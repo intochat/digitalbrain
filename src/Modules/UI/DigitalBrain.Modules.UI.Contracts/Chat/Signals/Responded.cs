@@ -3,7 +3,6 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Product.Interactions;
 using DigitalBrain.UI;
 
-using DigitalBrain.Abstractions.Messaging;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.Chat;
