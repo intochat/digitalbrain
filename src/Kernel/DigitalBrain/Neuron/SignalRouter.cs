@@ -4,8 +4,8 @@ using DigitalBrain.Abstractions.Signals;
 namespace DigitalBrain.Core;
 
 // Assembles the receiver set from tier 1 (innate) and tier 2 (learned). Tier 3 — similarity
-// search — is slice 4 and deliberately absent: a miss here returns an empty set rather than
-// guessing, which keeps every test in this slice deterministic.
+// search — belongs to the later discovery-and-learning slice and is deliberately absent: a miss
+// here returns an empty set rather than guessing, which keeps this substrate deterministic.
 public sealed class SignalRouter(SignalHandlerIndex index)
 {
     private readonly SignalHandlerIndex _index = index;

@@ -1,5 +1,4 @@
-// Stub host so AppHost can reference DigitalBrain.Scripting later. This project is repurposed in
-// slice two as the Roslyn + collectible-ALC compile chain, loaded IN-SILO (D18) -- the prior
-// "never loaded in Kernel" charter is reversed. This standalone exe entry point is not that chain.
-Console.WriteLine("DigitalBrain Scripting host — wire IPC later");
+// Placeholder for the future generated-program worker. Compilation and loading stay in this
+// out-of-process boundary; generated code never becomes a grain or a wire-contract assembly.
+Console.WriteLine("DigitalBrain generated-program worker — protocol not implemented");
 return 0;

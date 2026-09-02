@@ -2,6 +2,6 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <RootNamespace>DigitalBrain.Scripting</RootNamespace>
-    <Description>Stub host, charter reversed by spec decision D18: this becomes the Roslyn + collectible-ALC compile chain for generated automation neurons, loaded IN-SILO, not out-of-process. The prior "Kernel must never reference or load this assembly" position is void.</Description>
+    <Description>Placeholder for the future out-of-process generated-program worker; generated code never defines grains or wire contracts.</Description>
   </PropertyGroup>
 </Project>
