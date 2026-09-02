@@ -2,6 +2,6 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <RootNamespace>DigitalBrain.Scripting</RootNamespace>
-    <Description>Out-of-process Scripting host stub. Kernel must never reference or load this assembly.</Description>
+    <Description>Stub host, charter reversed by spec decision D18: this becomes the Roslyn + collectible-ALC compile chain for generated automation neurons, loaded IN-SILO, not out-of-process. The prior "Kernel must never reference or load this assembly" position is void.</Description>
   </PropertyGroup>
 </Project>

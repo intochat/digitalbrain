@@ -229,6 +229,14 @@ produce the same *set*, which keeps every test deterministic and every incident 
 Rejected: a reminder per edge. One reminder per synapse does not survive the first thousand neurons,
 and buys nothing that read-time arithmetic doesn't.
 
+> **Known gaps between this section and slice 1's code — see §16 items 4-6 for the full
+> writeup.** `SynapseSet.Potentiate` compounds the *stored* `Weight`, not `WeightAt` the decayed
+> value, so a sparse edge climbs toward 1.0 regardless of how long it sat idle (§16.4,
+> **unresolved**). The per-neuron prune reminder described above has no implementation or caller —
+> `SynapseSet.Prune()` exists but nothing calls it, and `All()` does not apply the prune filter that
+> `For()` does (§16.5). And "handled" above is aspirational: `Record` is called after `Deliver`
+> returns, not after a handler ran, because `INeuron.Deliver` reports nothing back (§16.6).
+
 ---
 
 ## 7. Traffic planes
@@ -445,22 +453,39 @@ collectible-ALC host, in-silo. Its prior "never loaded in Kernel" charter is voi
 `Console.WriteLine`, in the spirit of `D:\ModernCQRS`.
 
 ```
-[greeter] handled UserMessageReceived("hello")       -> "Hello!"
+[greeter] handled UserMessageReceived("hello") -> "Hello!"
+[logger]  recorded "hello"
+[chat]    broadcast 5 chars -> 2 receivers
+[logger]  recorded "hello again"
 [greeter] handled UserMessageReceived("hello again") -> "Hello!"
+[chat]    broadcast 11 chars -> 2 receivers
 
 -- synapses (anatomy) ------------------------------------------
-chat:main --UserMessageReceived--> greeter:default   w=0.76  fired=2  learned
-chat:main --UserMessageReceived--> logger:default    w=1.00  fired=2  innate
+chatneuron:dev/default --UserMessageReceived--> greeterneuron:dev/default  w=0.76  fired=2  learned
+chatneuron:dev/default --UserMessageReceived--> loggerneuron:dev/default  w=0.76  fired=2  learned
 
--- chat:main outgoing journal (physiology) ---------------------
-#1  UserMessageReceived  corr=a41f…  cause=—      -> 2 receivers
-#2  UserMessageReceived  corr=b903…  cause=—      -> 2 receivers
+-- chat:default outgoing journal (physiology) ------------------
+#1  UserMessageReceived  corr=e162fd4e06e84a1999b7d16b876ff979
+#2  UserMessageReceived  corr=e162fd4e06e84a1999b7d16b876ff979
+#3  UserMessageReceived  corr=dd1cc40d89b94313a6a2f305454d2243
+#4  UserMessageReceived  corr=dd1cc40d89b94313a6a2f305454d2243
 ```
 
-Four falsifiable claims: neurons dispatch by type without the sender naming the receiver; synapses
-are durable and print with source/target/type/weight; `w=0.76` after two fires proves potentiation
-— durable state changed under repeated firing within the run; anatomy and physiology are two lists
-with two retention policies.
+(Grain type names come from `GrainTypeNames.Of`, e.g. `IChatNeuron`/`ChatNeuron` → `chatneuron`;
+`dev` is the silo's cluster id in the console's single-node dev host. `chat` is addressed as
+`"default"`, not an illustrative `"main"` — `Program.cs` carries a comment explaining why: tier 1
+always resolves a broadcaster's own handler type to its `"default"` instance, so a neuron that
+both handles and broadcasts the same signal type must itself be that instance, or its `"default"`
+sibling activation would also receive its own broadcast.)
+
+Four falsifiable claims, all checked against the real output above: neurons dispatch by type
+without the sender naming the receiver (greeter and logger both fire though `ChatNeuron` names
+neither); synapses are durable and print with source/target/type/weight — both rows print
+`learned`, never `innate`, because no code path anywhere constructs `SynapseKind.Innate`; `w=0.76`
+after two fires proves potentiation — durable state changed under repeated firing within the run;
+anatomy and physiology are two lists with two retention policies and two shapes — 2 synapse rows
+(one edge per receiver) against 4 journal entries (one outgoing journal line per receiver per
+fire, with no receiver-count column), not a 1:1 correspondence.
 
 ### Slice 2 — the compile chain
 
@@ -515,3 +540,32 @@ the ALC work in and a routing bug is indistinguishable from a load-context bug f
 2. **Does `Modules/Execution` get narrowed (M4) or rewritten?** The spec assumes narrowed.
 3. **Traffic journal cap** stays at 512 entries / 512 KB, or rises now that signals carry routing
    fan-out metadata?
+4. **Potentiation compounds the stored weight, not the decayed one — unresolved.**
+   `Synapse.Potentiate` (`src/Kernel/DigitalBrain.Contracts/Synapses/Synapse.cs`) computes
+   `Weight + (rate * (1.0 - Weight))` from the record's stored `Weight`, then stamps a fresh
+   `LastFiredAt`. It never calls `WeightAt` first, so the half-life decay described in §6 only ever
+   applies to an edge nobody touches between fires. An edge with *any* heartbeat — however sparse —
+   climbs toward 1.0 exactly as fast as one that fires constantly, because every `Potentiate` call
+   starts from the last stored value, not from how much it decayed since. This is flagged as
+   **unresolved**, not intended: either `Potentiate` should compound `WeightAt(now, halfLife)`
+   instead of `Weight`, or §6's "half-life only ever weakens edges nobody touches" framing needs to
+   be corrected to acknowledge that a touched edge's decay is effectively erased on every fire.
+5. **The "one reminder per neuron" prune sweep in §6 does not exist.** `SynapseSet.Prune()`
+   (`src/Kernel/DigitalBrain/Neuron/SynapseSet.cs`) is written and unit-testable, but has no caller
+   anywhere in the codebase and no test exercises it — no Orleans reminder registers it, per-neuron
+   or otherwise. Pruning currently happens only as a read-time filter inside `SynapseSet.For()`
+   (`Where(synapse => !synapse.IsPrunedAt(...))`); `SynapseSet.All()` applies no such filter. The
+   practical effect: a graph query or UI view built on `All()` can show edges that `For()` — and
+   therefore routing — will never use, and storage is never reclaimed. Needs either the reminder
+   this section promises, or the section rewritten to describe read-time filtering as the only
+   pruning mechanism.
+6. **Potentiation fires on successful delivery, not on "handled," despite §6 and
+   `SynapseSet.Record`'s own comment both saying "handled."** `INeuron.Deliver`
+   (`src/Kernel/DigitalBrain.Contracts/Neurons/INeuron.cs`) returns `Task` with no result — a
+   handler has no way to report back whether it ran, threw internally and was swallowed, or found
+   no matching `IHandle<T>` at all. `Neuron.FireAsync` and `BroadcastAsync`
+   (`src/Kernel/DigitalBrain/Neuron/Neuron.cs`) call `_synapses.Record` immediately after `Deliver`
+   returns, which is "delivery succeeded," not "a handler ran." Consequence: a directed `FireAsync`
+   at a neuron with no `IHandle<T>` for that signal type still mints a `0.65`-weight `Learned`
+   synapse after the first fire (Deliver completes as a no-op and returns normally), and that
+   synapse then feeds tier-2 routing exactly as if a handler had responded.

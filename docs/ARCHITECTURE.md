@@ -6,8 +6,10 @@ records intent the code cannot show yet. Supersedes all PersonaPlex-era plans.
 ## Product
 
 Multiuser chat product. One kernel image, one Flutter codebase, entities all the
-way down. Core differentiator: **Smart Prompts** — user-authored plain-English
-automations with `@Module` bindings.
+way down. Core differentiator: **the neuron substrate itself** — a durable, weighted
+graph of neurons connected by synapses, routing signals by learned strength rather
+than by name. User-authored automations are generated C# neurons (see
+[Automations](#automations) below), not a second, English-language runtime.
 
 ## Core loop (chat + dynamic UI)
 
@@ -21,7 +23,7 @@ automations with `@Module` bindings.
 4. SSE pushes the card; Flutter mounts the matching kit widget, which reads the
    entity via its `[ClientEntryPoint]` contract. The same entity renders
    full-size on a Surface — one live state, two mounts.
-5. Interactive components (Button, Form, Todo) fire their command synapse back
+5. Interactive components (Button, Form, Todo) fire their command signal back
    through the same path a user message takes.
 6. Every component state record lands in `flutter-wire-contracts.golden.json`;
    a conformance test fails on C#↔Dart drift.
@@ -89,8 +91,8 @@ declares none.
 - v1 surface: Gmail search/read/draft/send*, Calendar list/create*, Salesforce
   SOQL/read/create*. `*` = a confirmation Button card in chat must be activated
   before the mutation executes.
-- Both modules publish tool descriptions into the Smart Prompts capability
-  catalog.
+- Both modules publish tool descriptions as module contracts that generated
+  automation neurons compile against — no separate capability catalog.
 
 ## Multiuser
 
@@ -105,7 +107,7 @@ declares none.
 ## Deployment
 
 - **Product = one Docker image** (kernel, built from
-  `src/Kernel/DigitalBrain.Kernel/Dockerfile`) published to Docker Hub. The
+  `src/Kernel/DigitalBrain.Silo/Dockerfile`) published to Docker Hub. The
   built Flutter web app is baked into this image and served by the kernel —
   same-origin cookies and SSE by construction.
 - **Runtime**: Azure Container Apps pulls the image. Scale = silo replicas.
@@ -136,7 +138,7 @@ declares none.
 1. AI providers (IAW port, no tiers) — shipped 2026-08-22.
 2. Auth (UserAccountEntity, cookie + token) — multiuser boundary.
 3. UI kit, all 13 components on the template. (template + Chart + Image shipped 2026-08-23)
-4. Smart Prompts (entity, catalog, runner, triggers).
+4. Automations (generated C# neurons: compile chain, sensors/effectors, discovery).
 5. Google + Salesforce modules.
 6. MAF orchestration restore.
 7. Image → Docker Hub, ACA + Key Vault deploy.

@@ -1,20 +1,24 @@
 # DigitalBrain
 
-DigitalBrain is a personal assistant whose durable actors, user-authored behaviors, and typed capabilities cooperate on behalf of an identified owner.
+DigitalBrain is a personal assistant whose durable actors, user-authored automations, and typed capabilities cooperate on behalf of an identified owner.
 
 ## Runtime language
 
 **Neuron**:
-A durable participant that receives and emits typed Synapses while preserving its own state and observable traffic.
+A durable participant that receives and emits typed Signals along Synapses while preserving its own state and observable traffic.
 _Avoid_: Agent, service, grain
 
+**Signal**:
+A typed message exchanged between Neurons with preserved identity, causation, correlation, and ownership. Crosses a Synapse.
+_Avoid_: Event payload, bus message, Synapse (the message sense is retired — see Synapse below)
+
 **Synapse**:
-A typed message exchanged between Neurons with preserved identity, causation, correlation, and ownership.
-_Avoid_: Event payload, bus message
+A durable, typed, weighted edge between two Neurons — anatomy, not traffic. Lives in the source Neuron's own state, strengthens on a successful fire, decays by read-time half-life, and is not a journal entry.
+_Avoid_: Message, event, a grain of its own
 
 **Traffic Journal**:
-A bounded observation window over a Neuron's incoming or outgoing Synapses.
-_Avoid_: Event store, audit log, execution history
+A bounded observation window over a Neuron's incoming or outgoing Signals.
+_Avoid_: Event store, audit log, execution history, a record of Synapses (the edges are anatomy, not journaled traffic)
 
 **Entity**:
 A live addressable resource holding one persisted current typed state snapshot, without transition history or Synapse participation.
@@ -24,22 +28,18 @@ _Avoid_: Neuron, event stream, Run history
 A typed owner-scoped identity for an Entity. It identifies current state but is not a snapshot, write endpoint, or authority; governed use requires admitted lineage or a typed grant rule.
 _Avoid_: Entity value, capability, mutable handle
 
-## Behavior and execution language
+## Automation and execution language
 
-**Smart Prompt**:
-The product name for a user-authored automation: almost plain English plus binding chips (Gmail, Salesforce, Chart, schedule). Users do not see generated C# by default.
-_Avoid_: Behavior (internal synonym only), recipe, raw script
+**Automation**:
+A user-authored automation: a generated C# neuron, compiled against module contracts and admitted to the Execution runtime. There is no plain-English interpreter and no separate runtime — English is how the user asks; a compiled neuron is what they get. Smart Prompts and the internal "Behavior" synonym are retired; see the design spec §9.3, §11, §12.
+_Avoid_: Smart Prompt, Behavior, Behavior Revision (all retired product/internal names), recipe, raw script
 
-**Behavior**:
-Internal/engineering synonym for Smart Prompt when discussing grants, revisions, and Execution workloads.
-_Avoid_: Prefer Smart Prompt in UI and product docs
-
-**Smart Prompt / Behavior Revision**:
-An immutable, content-addressed version of a Smart Prompt, including optional script artifact, contract lock, and requested Input and Capability grants.
-_Avoid_: Script version, current code
+**Automation Revision**:
+An immutable, content-addressed compiled version of an automation neuron's source, including its script artifact, contract lock, and requested Input and Capability grants.
+_Avoid_: Smart Prompt / Behavior Revision (retired name), script version, current code
 
 **Execution**:
-The durable Run aggregate (Neuron) that realizes chat turns and Smart Prompt fires on one spine.
+The durable Run aggregate (Neuron) that realizes chat turns and automation fires on one spine.
 _Avoid_: Task, job, session
 
 **ExecutionContext**:
@@ -55,11 +55,11 @@ A typed merge into ExecutionContext: path, schema hash, payload/ref — MCP-shap
 _Avoid_: CompanyResearch DTO, Dictionary bag without schema
 
 **Workload Revision**:
-An immutable executable definition admitted to the generic Execution runtime; a Smart Prompt revision is its primary product form.
+An immutable executable definition admitted to the generic Execution runtime; an Automation Revision is its primary product form.
 _Avoid_: Mutable job definition, latest code
 
 **Trigger**:
-A typed fact admitted by a Behavior subscription that can request Input admission and then start at most one Run per selected revision-scoped subscription.
+A typed fact admitted by an automation's subscription that can request Input admission and then start at most one Run per selected revision-scoped subscription.
 _Avoid_: Prompt, callback, event name
 
 **Input Grant**:
@@ -71,7 +71,7 @@ A durable policy-fenced decision over one frozen redacted Trigger view and one e
 _Avoid_: Trigger match, activation, implicit read
 
 **Run**:
-One durable execution of exactly one immutable Workload Revision for exactly one admitted typed input; a Behavior Run is the primary product case.
+One durable execution of exactly one immutable Workload Revision for exactly one admitted typed input; an automation Run is the primary product case.
 _Avoid_: Task, job, session
 
 **Run Event**:
@@ -99,7 +99,7 @@ A rebuildable read model derived from authoritative domain facts for clients and
 _Avoid_: State of record, event snapshot
 
 **Learning Evidence**:
-A recorded correction, preference, validation result, or Run outcome used to propose a new Behavior Revision.
+A recorded correction, preference, validation result, or Run outcome used to propose a new Automation Revision.
 _Avoid_: Self-modification, model training
 
 **Outcome Uncertain**:

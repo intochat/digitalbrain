@@ -4,7 +4,8 @@ Three concepts share the word "journal" in this codebase's ancestry. This is the
 
 | Concept | Owner | What it is | Retention |
 |---|---|---|---|
-| Traffic journal | Every **neuron** (only neurons) | Incoming/Outgoing `SynapseDelivery` feeds: sequence-numbered observation windows with per-synapse-type tallies | Bounded: 512 entries / 512 KB per feed; reads past retention return a `ResetSnapshot` |
+| Traffic journal | Every **neuron** (only neurons) | Incoming/Outgoing `SignalDelivery` feeds: sequence-numbered observation windows with per-signal-type tallies | Bounded: 512 entries / 512 KB per feed; reads past retention return a `ResetSnapshot` |
+| Synapse | The **source neuron** (durable state, not a grain of its own) | A directed, typed, weighted edge to another neuron — durable anatomy, not traffic. Strengthens (potentiates) on a successful fire and decays by read-time half-life; not a journal entry and not sequence-numbered | Not bounded by the 512-entry/512 KB traffic cap; read-time decay and pruning (below a weight floor) manage its size instead |
 | Durable state | Every durable grain (neurons AND entities) | Orleans.Journaling persistence (`IDurableValue`/`IDurableList` over the `journal` blob connection) — infrastructure, not a domain concept; hosted via `DurableStateHosting.AddDigitalBrainDurableState` | Managed by Orleans.Journaling (append + compaction) |
 | Memory facts | The **owner** (or principal) | Watermarked, resumable story facts (`IFactMemory`) — long-term history, part of the Memory module alongside vector memory | Bounded: 4096 facts, oldest dropped first |
 
@@ -17,10 +18,10 @@ Three concepts share the word "journal" in this codebase's ancestry. This is the
 2. **The session neuron is the owner's journal hub.** Owner-level views watch the session
    neuron's Outgoing journal (`OwnerSessionJournal`, the kernel SSE maps) and proxy-read
    subject neurons via `ISessionNeuron.ReadNeuronJournal`.
-3. **Writes journal, reads don't.** Entity mutations are driven by neurons: a synapse fires,
-   the handling neuron mutates the entity, and that neuron's Outgoing journal records the
-   effect. Clients and UI read entities directly (`IDigitalBrain.GetEntity<TEntity>()`) —
-   free and unjournaled.
+3. **Writes journal, reads don't.** Entity mutations are driven by neurons: a neuron fires a
+   signal along a synapse, the handling neuron mutates the entity, and that neuron's Outgoing
+   journal records the effect. Clients and UI read entities directly
+   (`IDigitalBrain.GetEntity<TEntity>()`) — free and unjournaled.
 4. **The word "journal" in domain code always means the traffic journal.** The persistence
    infrastructure uses durable-state language (`DurableStateHosting`, `DurableStateJson`,
    `DigitalBrainBuilder.DurableStateStore`). The blob resource/connection is still literally

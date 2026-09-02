@@ -27,8 +27,10 @@ internal sealed class SynapseSet
     internal static string KeyFor(NeuronId target, string signalType)
         => $"{target} {signalType}";
 
-    // Ordered strongest-first, with decay applied. Callers see the CURRENT strength, not the
-    // stored one — which is what makes read-time decay work without any background job.
+    // Ordered strongest-first by decayed strength (WeightAt), but each returned record still
+    // carries its STORED Weight, not the decayed one — All() does not rewrite Weight, it only
+    // orders by what it would currently be. Callers that print or compare Weight directly are
+    // seeing the last-recorded value, not what WeightAt would compute for "now".
     internal IReadOnlyList<Synapse> All()
     {
         var now = _time.GetUtcNow();
