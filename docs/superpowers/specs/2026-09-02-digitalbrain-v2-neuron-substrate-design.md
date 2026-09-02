@@ -449,7 +449,7 @@ collectible-ALC host, in-silo. Its prior "never loaded in Kernel" charter is voi
 [greeter] handled UserMessageReceived("hello again") -> "Hello!"
 
 -- synapses (anatomy) ------------------------------------------
-chat:main --UserMessageReceived--> greeter:default   w=0.72  fired=2  learned
+chat:main --UserMessageReceived--> greeter:default   w=0.76  fired=2  learned
 chat:main --UserMessageReceived--> logger:default    w=1.00  fired=2  innate
 
 -- chat:main outgoing journal (physiology) ---------------------
@@ -458,8 +458,9 @@ chat:main --UserMessageReceived--> logger:default    w=1.00  fired=2  innate
 ```
 
 Four falsifiable claims: neurons dispatch by type without the sender naming the receiver; synapses
-are durable and print with source/target/type/weight; `w=0.72` after two fires proves potentiation
-and survives restart; anatomy and physiology are two lists with two retention policies.
+are durable and print with source/target/type/weight; `w=0.76` after two fires proves potentiation
+— durable state changed under repeated firing within the run; anatomy and physiology are two lists
+with two retention policies.
 
 ### Slice 2 — the compile chain
 

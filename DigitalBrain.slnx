@@ -60,6 +60,7 @@
     <Project Path="tests/DigitalBrain.Substrate.Tests/DigitalBrain.Substrate.Tests.csproj" />
   </Folder>
   <Project Path="src/Aspire/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
+  <Project Path="src/DigitalBrainConsole/DigitalBrainConsole.csproj" />
   <Project Path="src/Kernel/DigitalBrain.Silo/DigitalBrain.Silo.csproj" />
   <Project Path="src/Kernel/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
 </Solution>
