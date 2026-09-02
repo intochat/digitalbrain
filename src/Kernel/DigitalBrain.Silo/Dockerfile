@@ -5,7 +5,7 @@
 # (same pattern as v0.1.18): separate digitalbrain-kernel and digitalbrain-mcp images.
 #
 # Build (repo root):
-#   docker build -f src/Kernel/DigitalBrain.Kernel/Dockerfile -t vhorbachov/digitalbrain-kernel:local .
+#   docker build -f src/Kernel/DigitalBrain.Silo/Dockerfile -t vhorbachov/digitalbrain-kernel:local .
 #
 # No secrets are baked into this image. Inject at run/deploy (Azure Key Vault → env):
 #
@@ -37,7 +37,7 @@ WORKDIR /src
 COPY nuget.config Directory.Build.props Directory.Packages.props DigitalBrain.slnx global.json ./
 COPY src/ ./src/
 
-RUN dotnet publish src/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj \
+RUN dotnet publish src/Kernel/DigitalBrain.Silo/DigitalBrain.Silo.csproj \
       -c Release \
       -r linux-x64 \
       --self-contained false \
@@ -55,7 +55,7 @@ WORKDIR /app
 
 COPY --from=build /out/silo /app/silo
 COPY --from=build /out/mcp /app/mcp
-COPY --chmod=755 src/Kernel/DigitalBrain.Kernel/docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY --chmod=755 src/Kernel/DigitalBrain.Silo/docker-entrypoint.sh /app/docker-entrypoint.sh
 
 # Production module set matching AppHost AddModule declarations.
 ENV ASPNETCORE_ENVIRONMENT=Production \

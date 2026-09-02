@@ -8,6 +8,6 @@
   <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <ProjectReference Include="../../Memory/Contracts/DigitalBrain.Modules.Memory.Contracts.csproj" />
-    <ProjectReference Include="../../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
+    <ProjectReference Include="../../../Kernel/DigitalBrain/DigitalBrain.csproj" />
   </ItemGroup>
 </Project>

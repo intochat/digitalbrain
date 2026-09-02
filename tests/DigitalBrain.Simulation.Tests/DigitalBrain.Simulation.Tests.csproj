@@ -11,7 +11,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="xunit.v3.mtp-v2" />
-    <!-- Host pin mirroring DigitalBrain.Kernel. Windows-only: native Foundry assets crash the
+    <!-- Host pin mirroring DigitalBrain.Silo. Windows-only: native Foundry assets crash the
          MTP test host handshake on Linux CI (exit code 5). -->
     <PackageReference Include="Microsoft.AI.Foundry.Local" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
   </ItemGroup>

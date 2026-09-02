@@ -24,7 +24,7 @@ public sealed class KitToolTests(SimulationFixture fixture)
     // new owner guard.
     private static readonly OwnerId Owner = new(DigitalBrainNames.DefaultOwner);
 
-    // PrincipalScoped.InstanceName (src/Kernel/DigitalBrain.Kernel/Auth/Surfaces/PrincipalScoped.cs)
+    // PrincipalScoped.InstanceName (src/Kernel/DigitalBrain.Silo/Auth/Surfaces/PrincipalScoped.cs)
     // is an internal Kernel-side alias not reachable from this module test project; it
     // forwards straight to PrincipalPartition.InstanceName, so asserting against the
     // latter pins the exact same "{principal:N}.{local}" separator rule.

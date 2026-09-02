@@ -12,7 +12,7 @@
     <InternalsVisibleTo Include="DigitalBrain.Simulation.Tests" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
-    <ProjectReference Include="../DigitalBrain.Core/DigitalBrain.Core.csproj" />
+    <ProjectReference Include="../DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
+    <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />
   </ItemGroup>
 </Project>

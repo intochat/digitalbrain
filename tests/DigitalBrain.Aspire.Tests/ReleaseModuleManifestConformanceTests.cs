@@ -10,8 +10,8 @@ namespace DigitalBrain.Aspire.Tests;
 public sealed class ReleaseModuleManifestConformanceTests
 {
     private const string ModuleKeyPrefix = "DigitalBrain__Modules__";
-    private const string DockerfilePath = "src/Kernel/DigitalBrain.Kernel/Dockerfile";
-    private const string PublishProfilePath = "src/Kernel/DigitalBrain.Kernel/Properties/PublishProfiles/Container.pubxml";
+    private const string DockerfilePath = "src/Kernel/DigitalBrain.Silo/Dockerfile";
+    private const string PublishProfilePath = "src/Kernel/DigitalBrain.Silo/Properties/PublishProfiles/Container.pubxml";
 
     private static readonly string[] ExpectedModules =
     [

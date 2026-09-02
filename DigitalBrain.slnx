@@ -5,8 +5,8 @@
     <Project Path="src/Aspire/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/Kernel/">
-    <Project Path="src/Kernel/DigitalBrain.Abstractions/DigitalBrain.Abstractions.csproj" />
-    <Project Path="src/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
+    <Project Path="src/Kernel/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
+    <Project Path="src/Kernel/DigitalBrain/DigitalBrain.csproj" />
     <Project Path="src/Kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
     <Project Path="src/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
     <Project Path="src/Kernel/DigitalBrain.Scripting/DigitalBrain.Scripting.csproj" />
@@ -59,6 +59,6 @@
     <Project Path="tests/DigitalBrain.Simulation.Tests/DigitalBrain.Simulation.Tests.csproj" />
   </Folder>
   <Project Path="src/Aspire/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj" />
-  <Project Path="src/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
+  <Project Path="src/Kernel/DigitalBrain.Silo/DigitalBrain.Silo.csproj" />
   <Project Path="src/Kernel/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
 </Solution>

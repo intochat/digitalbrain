@@ -31,7 +31,7 @@ terminate() {
 trap terminate INT TERM
 
 ASPNETCORE_URLS="$SILO_URLS" \
-  dotnet "$SILO_DIR/DigitalBrain.Kernel.dll" &
+  dotnet "$SILO_DIR/DigitalBrain.Silo.dll" &
 silo_pid=$!
 
 # Northbound MCP is a client of the silo — start after silo process is up.
