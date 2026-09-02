@@ -1,6 +1,4 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Reflection;
 using DigitalBrain.Abstractions;
 using Orleans.Journaling;
 
@@ -16,9 +14,6 @@ public abstract class Neuron :
     INeuron,
     INeuronQuery
 {
-    private delegate Task HandlerInvoker(object neuron, Signal signal, CancellationToken cancellationToken);
-
-    private static readonly ConcurrentDictionary<Type, IReadOnlyDictionary<Type, HandlerInvoker>> HandlersByNeuronType = new();
     private readonly NeuronActivationComponents _components;
     private SignalDelivery? _handling;
 
@@ -181,15 +176,6 @@ public abstract class Neuron :
         _ = DeliverReplyAsync(handling.Caller, delivery);
     }
 
-    // Refusing an unhandled signal here is correct in principle but is NOT this slice's work:
-    // ReplyAsync addresses the caller, and callers routinely have no IHandle for the reply
-    // type, so refusing breaks every request/reply in the product. It belongs to the turn and
-    // delivery hardening, with an explicit accept-list for reply sinks.
-    protected virtual Task OnUnboundSignalAsync(
-        Signal signal,
-        CancellationToken cancellationToken)
-        => Task.CompletedTask;
-
     protected new IDisposable RegisterTimer(
         Func<object, Task> callback,
         object state,
@@ -243,7 +229,10 @@ public abstract class Neuron :
 
         try
         {
-            var outcome = await DispatchSignalAsync(delivery.Signal, cancellationToken)
+            var outcome = await _components.Dispatcher.DispatchAsync(
+                    this,
+                    delivery.Signal,
+                    cancellationToken)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             _components.Journal.AppendIncoming(delivery);
@@ -282,47 +271,6 @@ public abstract class Neuron :
         {
             SignalTelemetry.ReplyDropped(Id, receiver, undelivered);
         }
-    }
-
-    private async Task<DeliveryOutcome> DispatchSignalAsync(
-        Signal signal,
-        CancellationToken cancellationToken)
-    {
-        if (!HandlersFor(GetType()).TryGetValue(signal.GetType(), out var handler))
-        {
-            await OnUnboundSignalAsync(signal, cancellationToken)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            return DeliveryOutcome.Unhandled;
-        }
-
-        await handler(this, signal, cancellationToken)
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        return DeliveryOutcome.Handled;
-    }
-
-    private static IReadOnlyDictionary<Type, HandlerInvoker> HandlersFor(Type neuronType)
-        => HandlersByNeuronType.GetOrAdd(neuronType, static type => BuildHandlers(type));
-
-    private static Dictionary<Type, HandlerInvoker> BuildHandlers(Type neuronType)
-    {
-        var handlers = new Dictionary<Type, HandlerInvoker>();
-
-        foreach (var handled in neuronType.GetInterfaces()
-            .Where(candidate => candidate.IsGenericType && candidate.GetGenericTypeDefinition() == typeof(IHandle<>)))
-        {
-            var signalType = handled.GetGenericArguments()[0];
-            var handleMethod = handled.GetMethod(nameof(IHandle<>.HandleAsync))
-                ?? throw new MissingMethodException(handled.FullName, nameof(IHandle<>.HandleAsync));
-
-            handlers[signalType] = (neuron, signal, cancellationToken) => (Task)handleMethod.Invoke(
-                neuron,
-                BindingFlags.DoNotWrapExceptions,
-                binder: null,
-                [signal, cancellationToken],
-                culture: null)!;
-        }
-
-        return handlers;
     }
 
 }

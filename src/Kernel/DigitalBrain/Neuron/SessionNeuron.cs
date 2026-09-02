@@ -66,16 +66,6 @@ internal sealed class SessionNeuron : Neuron, ISessionNeuron
         return base.EmitAsync(signal);
     }
 
-    // The session is the reply sink for every client request: ReplyAsync addresses the caller,
-    // and the caller of a client fire is always this cell. It declares no IHandle<T> for those
-    // replies, so it must accept whatever arrives — being journaled IS the delivery's purpose.
-    protected override Task OnUnboundSignalAsync(Signal signal, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(signal);
-        cancellationToken.ThrowIfCancellationRequested();
-        return Task.CompletedTask;
-    }
-
     public Task<JournalRead> ReadNeuronJournal(NeuronId subject, JournalKind kind, long afterSequence)
         => subject == Id
             ? ReadJournal(kind, afterSequence)

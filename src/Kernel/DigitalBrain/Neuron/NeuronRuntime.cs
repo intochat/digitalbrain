@@ -25,6 +25,8 @@ public sealed class NeuronRuntime
 
     internal SynapseOptions Options { get; }
 
+    internal SignalDispatcher Dispatcher { get; } = new();
+
     internal NeuronActivationComponents Bind(
         IServiceProvider activationServices,
         NeuronId neuronId)
@@ -41,7 +43,7 @@ public sealed class NeuronRuntime
             neuronId,
             Clock);
 
-        return new(Clock, Router, journal, synapses);
+        return new(Clock, Router, journal, synapses, Dispatcher);
 
         NeuronFeed Feed(string name) => new(
             activationServices.GetRequiredKeyedService<IDurableList<byte[]>>(name),
@@ -55,4 +57,5 @@ internal sealed record NeuronActivationComponents(
     TimeProvider Clock,
     SignalRouter Router,
     NeuronJournal Journal,
-    SynapseSet Synapses);
+    SynapseSet Synapses,
+    SignalDispatcher Dispatcher);
