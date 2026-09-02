@@ -7,6 +7,7 @@ namespace DigitalBrain.Substrate.Tests;
 public sealed class SynapseTests
 {
     private static readonly DateTimeOffset T0 = new(2026, 9, 2, 12, 0, 0, TimeSpan.Zero);
+    private static readonly TimeSpan HalfLife = TimeSpan.FromDays(14);
     private static readonly NeuronId Chat = new("chat", new OwnerId("owner"), "main");
     private static readonly NeuronId Greeter = new("greeter", new OwnerId("owner"), "default");
 
@@ -16,7 +17,7 @@ public sealed class SynapseTests
     [Fact]
     public void Potentiate_MovesWeightTowardOneByTheRate()
     {
-        var potentiated = Learned().Potentiate(T0, rate: 0.30);
+        var potentiated = Learned().Potentiate(T0, HalfLife, rate: 0.30);
 
         Assert.Equal(0.65, potentiated.Weight, precision: 10);
         Assert.Equal(1, potentiated.FireCount);
@@ -25,7 +26,9 @@ public sealed class SynapseTests
     [Fact]
     public void Potentiate_TwiceMatchesTheConsoleProof()
     {
-        var twice = Learned().Potentiate(T0, 0.30).Potentiate(T0, 0.30);
+        var twice = Learned()
+            .Potentiate(T0, HalfLife, 0.30)
+            .Potentiate(T0, HalfLife, 0.30);
 
         Assert.Equal(0.755, twice.Weight, precision: 10);
         Assert.Equal(2, twice.FireCount);
@@ -38,7 +41,7 @@ public sealed class SynapseTests
 
         for (var i = 0; i < 200; i++)
         {
-            synapse = synapse.Potentiate(T0, 0.30);
+            synapse = synapse.Potentiate(T0, HalfLife, 0.30);
         }
 
         Assert.True(synapse.Weight <= 1.0);
@@ -49,7 +52,29 @@ public sealed class SynapseTests
     {
         var later = T0.AddDays(3);
 
-        Assert.Equal(later, Learned().Potentiate(later, 0.30).LastFiredAt);
+        Assert.Equal(later, Learned().Potentiate(later, HalfLife, 0.30).LastFiredAt);
+    }
+
+    [Fact]
+    public void Potentiate_InnateSynapseDoesNotDecayAndRecordsTheFiring()
+    {
+        var later = T0.AddDays(3650);
+        var innate = new Synapse(
+            Chat,
+            Greeter,
+            "UserMessageReceived",
+            0.50,
+            T0,
+            SynapseKind.Innate,
+            fireCount: 4,
+            isBlocking: true);
+
+        var potentiated = innate.Potentiate(later, HalfLife, 0.30);
+
+        Assert.Equal(0.65, potentiated.Weight, precision: 10);
+        Assert.Equal(later, potentiated.LastFiredAt);
+        Assert.Equal(5, potentiated.FireCount);
+        Assert.True(potentiated.IsBlocking);
     }
 
     [Fact]

@@ -4,6 +4,7 @@ using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Core;
 using DigitalBrain.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace DigitalBrain.Substrate.Tests;
@@ -192,7 +193,13 @@ public sealed class SignalRoutingTests
     [Fact]
     public async Task Broadcast_PotentiatesRatherThanDuplicatingOnTheSecondRun()
     {
-        await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([]) });
+        var clock = new ManualTimeProvider(
+            new DateTimeOffset(2026, 9, 2, 12, 0, 0, TimeSpan.Zero));
+        await using var brain = await BrainSimulation.StartAsync(new()
+        {
+            Modules = new([]),
+            ConfigureSilo = silo => silo.Services.AddSingleton<TimeProvider>(clock),
+        });
         var announcer = AnnouncerIn(brain, "c");
         var query = Query(brain, AnnouncerId("c"));
 

@@ -32,17 +32,23 @@ internal sealed class SynapseSet
     internal static string KeyFor(NeuronId target, string signalType)
         => $"{target} {signalType}";
 
-    // Ordered strongest-first by decayed strength (WeightAt), but each returned record still
-    // carries its STORED Weight, not the decayed one — All() does not rewrite Weight, it only
-    // orders by what it would currently be. Callers that print or compare Weight directly are
-    // seeing the last-recorded value, not what WeightAt would compute for "now".
+    // Slice 1 pruning is read/routing exclusion. Physical reclamation belongs to a later
+    // storage-maintenance decision. Returned records retain stored Weight and are ordered by
+    // effective decayed strength; callers can use WeightAt when they need the current value.
     internal IReadOnlyList<Synapse> All()
     {
         var now = _time.GetUtcNow();
 
-        return [.. _synapses.Values.OrderByDescending(synapse => synapse.WeightAt(now, _options.HalfLife))];
+        return
+        [
+            .. _synapses.Values
+                .Where(synapse => !synapse.IsPrunedAt(now, _options.HalfLife, _options.PruneFloor))
+                .OrderByDescending(synapse => synapse.WeightAt(now, _options.HalfLife))
+        ];
     }
 
+    // Slice 1 pruning is read/routing exclusion. Physical reclamation belongs to a later
+    // storage-maintenance decision.
     internal IReadOnlyList<Synapse> For(string signalType)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(signalType);
@@ -78,29 +84,9 @@ internal sealed class SynapseSet
                 kind,
                 isBlocking: false);
 
-        var potentiated = current.Kind == SynapseKind.Innate
-            ? current with { }
-            : current.Potentiate(now, _options.PotentiationRate);
+        var potentiated = current.Potentiate(now, _options.HalfLife, _options.PotentiationRate);
 
         _synapses[key] = potentiated;
         return potentiated;
-    }
-
-    // Storage reclamation only. Driven by ONE reminder per neuron, never one per synapse.
-    internal int Prune()
-    {
-        var now = _time.GetUtcNow();
-
-        var dead = _synapses
-            .Where(entry => entry.Value.IsPrunedAt(now, _options.HalfLife, _options.PruneFloor))
-            .Select(entry => entry.Key)
-            .ToArray();
-
-        foreach (var key in dead)
-        {
-            _synapses.Remove(key);
-        }
-
-        return dead.Length;
     }
 }

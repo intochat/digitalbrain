@@ -72,16 +72,18 @@ public readonly record struct Synapse
 
     // Hebbian: a firing the receiver HANDLED raises the weight asymptotically toward 1 and
     // stamps the instant. An unhandled signal must not call this.
-    public Synapse Potentiate(DateTimeOffset now, double rate)
+    public Synapse Potentiate(DateTimeOffset now, TimeSpan halfLife, double rate)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(rate);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(rate, 1.0);
+
+        var effectiveWeight = WeightAt(now, halfLife);
 
         return new Synapse(
             Source,
             Target,
             SignalType,
-            Weight + (rate * (1.0 - Weight)),
+            effectiveWeight + (rate * (1.0 - effectiveWeight)),
             now,
             Kind,
             FireCount + 1,

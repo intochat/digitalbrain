@@ -6,6 +6,7 @@ using DigitalBrain.Abstractions.Synapses;
 using DigitalBrain.Core;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Journaling;
 using Xunit;
 
 namespace DigitalBrain.Substrate.Tests;
@@ -43,6 +44,8 @@ internal sealed class PingSilent(NeuronRuntime runtime) : Neuron(runtime), IPing
 
 public sealed class SynapseSetTests
 {
+    private static readonly DateTimeOffset T0 = new(2026, 9, 2, 12, 0, 0, TimeSpan.Zero);
+
     [Fact]
     public async Task ConfiguredClock_StampsOutgoingDelivery()
     {
@@ -146,7 +149,12 @@ public sealed class SynapseSetTests
     [Fact]
     public async Task SecondFire_PotentiatesTheSameSynapseRatherThanAddingOne()
     {
-        await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([]) });
+        var clock = new ManualTimeProvider(T0);
+        await using var brain = await BrainSimulation.StartAsync(new()
+        {
+            Modules = new([]),
+            ConfigureSilo = silo => silo.Services.AddSingleton<TimeProvider>(clock),
+        });
 
         var sourceId = new NeuronId("pingsource", new OwnerId("owner"), "c");
         var source = brain.Grains.GetGrain<IPingSource>(sourceId.ToGrainId());
@@ -159,6 +167,99 @@ public sealed class SynapseSetTests
         var synapse = Assert.Single(await sourceQuery.ReadSynapses());
         Assert.Equal(0.755, synapse.Weight, precision: 10);
         Assert.Equal(2, synapse.FireCount);
+    }
+
+    [Fact]
+    public async Task Record_AfterHalfLifePotentiatesDecayedWeight()
+    {
+        var clock = new ManualTimeProvider(T0);
+        await using var brain = await BrainSimulation.StartAsync(new()
+        {
+            Modules = new([]),
+            ConfigureSilo = silo =>
+            {
+                silo.Services.AddSingleton<TimeProvider>(clock);
+                silo.Services.AddSingleton(new SynapseOptions
+                {
+                    HalfLife = TimeSpan.FromHours(1),
+                });
+            },
+        });
+
+        var owner = new OwnerId("owner");
+        var sourceId = new NeuronId("pingsource", owner, "decay-source");
+        var sinkId = new NeuronId("pingsink", owner, "decay-sink");
+        var source = brain.Grains.GetGrain<IPingSource>(sourceId.ToGrainId());
+        var sourceQuery = brain.Grains.GetGrain<INeuronQuery>(sourceId.ToGrainId());
+
+        await source.SendTo(sinkId, "first");
+        clock.Advance(TimeSpan.FromHours(1));
+        await source.SendTo(sinkId, "second");
+
+        var synapse = Assert.Single(await sourceQuery.ReadSynapses());
+        Assert.Equal(0.5275, synapse.Weight, precision: 10);
+        Assert.Equal(2, synapse.FireCount);
+    }
+
+    [Fact]
+    public async Task ReadSynapses_ExcludesPrunedSynapse()
+    {
+        var clock = new ManualTimeProvider(T0);
+        await using var brain = await BrainSimulation.StartAsync(new()
+        {
+            Modules = new([]),
+            ConfigureSilo = silo =>
+            {
+                silo.Services.AddSingleton<TimeProvider>(clock);
+                silo.Services.AddSingleton(new SynapseOptions
+                {
+                    HalfLife = TimeSpan.FromHours(1),
+                });
+            },
+        });
+
+        var owner = new OwnerId("owner");
+        var sourceId = new NeuronId("pingsource", owner, "pruned-source");
+        var sinkId = new NeuronId("pingsink", owner, "pruned-sink");
+        var source = brain.Grains.GetGrain<IPingSource>(sourceId.ToGrainId());
+        var sourceQuery = brain.Grains.GetGrain<INeuronQuery>(sourceId.ToGrainId());
+
+        await source.SendTo(sinkId, "learn");
+        clock.Advance(TimeSpan.FromHours(4));
+
+        Assert.Empty(await sourceQuery.ReadSynapses());
+    }
+
+    [Fact]
+    public void ReadApis_ExcludePrunedSynapse()
+    {
+        var owner = new OwnerId("owner");
+        var source = new NeuronId("pingsource", owner, "direct-source");
+        var target = new NeuronId("pingsink", owner, "direct-target");
+        var routes = new TestDurableDictionary<string, Synapse>
+        {
+            [SynapseSet.KeyFor(target, nameof(Ping))] = new(
+                source,
+                target,
+                nameof(Ping),
+                weight: 0.10,
+                lastFiredAt: T0,
+                SynapseKind.Learned),
+        };
+        var clock = new ManualTimeProvider(T0.AddHours(2));
+        var synapses = new SynapseSet(
+            routes,
+            new SynapseOptions
+            {
+                HalfLife = TimeSpan.FromHours(1),
+                PruneFloor = 0.05,
+            },
+            source,
+            clock);
+
+        Assert.Empty(synapses.All());
+        Assert.Empty(synapses.For(nameof(Ping)));
+        Assert.Single(routes);
     }
 
     [Fact]
@@ -175,4 +276,8 @@ public sealed class SynapseSetTests
 
         Assert.Equal(2, (await sourceQuery.ReadSynapses()).Count);
     }
+
+    private sealed class TestDurableDictionary<TKey, TValue>
+        : Dictionary<TKey, TValue>, IDurableDictionary<TKey, TValue>
+        where TKey : notnull;
 }
