@@ -38,6 +38,10 @@ void main() {
         'ui.chart-state',
         'ui.chart-point',
         'ui.image-state',
+        'ui.graph',
+        'ui.graph-state',
+        'ui.graph-node',
+        'ui.graph-edge',
         'excel.workbook-state',
         'excel.row',
       ]),
@@ -70,6 +74,23 @@ void main() {
       propertyNamesOf('ui.chart-point'),
       {'Label', 'Value'},
       reason: 'ui.chart-point must mirror ChartPoint(Label, Value)',
+    );
+    expect(
+      propertyNamesOf('ui.graph-state'),
+      {'Title', 'Nodes', 'Edges'},
+      reason: 'ui.graph-state must mirror GraphState(Title, Nodes, Edges)',
+    );
+    expect(
+      propertyNamesOf('ui.graph-node'),
+      {'Id', 'Label', 'Kind', 'Cluster'},
+      reason:
+          'ui.graph-node must mirror GraphNodeState(Id, Label, Kind, Cluster)',
+    );
+    expect(
+      propertyNamesOf('ui.graph-edge'),
+      {'Id', 'SourceId', 'TargetId', 'Dotted'},
+      reason:
+          'ui.graph-edge must mirror GraphEdgeState(Id, SourceId, TargetId, Dotted)',
     );
     expect(
       propertyNamesOf('ui.image-state'),
