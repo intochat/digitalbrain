@@ -23,6 +23,7 @@ final class GraphHomeScreen extends StatelessWidget {
     this.onReadChart,
     this.onReadImageBytes,
     this.onReadSpreadsheet,
+    this.onReadGraph,
   });
 
   final String chatName;
@@ -38,6 +39,7 @@ final class GraphHomeScreen extends StatelessWidget {
   final ReadChart? onReadChart;
   final ReadImageBytes? onReadImageBytes;
   final ReadSpreadsheet? onReadSpreadsheet;
+  final ReadGraph? onReadGraph;
 
   @override
   Widget build(BuildContext context) {
@@ -88,6 +90,7 @@ final class GraphHomeScreen extends StatelessWidget {
               onReadChart: onReadChart,
               onReadImageBytes: onReadImageBytes,
               onReadSpreadsheet: onReadSpreadsheet,
+              onReadGraph: onReadGraph,
             ),
           ),
         ],

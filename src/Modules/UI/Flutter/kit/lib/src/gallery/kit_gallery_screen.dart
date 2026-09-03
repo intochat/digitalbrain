@@ -5,6 +5,9 @@ import '../components/card/kit_card.dart';
 import '../components/chart/kit_chart.dart';
 import '../components/graph/graph_models.dart';
 import '../components/graph/kit_graph.dart';
+import '../components/graph/kit_graph_controller.dart';
+import '../components/graph/kit_graph_navigator.dart';
+import '../components/graph/kit_graph_view.dart';
 import '../components/sheet/kit_sheet.dart';
 import '../components/view/kit_view.dart';
 import '../models/kit_part.dart';
@@ -96,6 +99,10 @@ final class KitGalleryScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 28),
+              const Text('Graph (3D)', style: KitType.title),
+              const SizedBox(height: 12),
+              const _Graph3DSection(),
+              const SizedBox(height: 28),
               const Text('Sheet', style: KitType.title),
               const SizedBox(height: 12),
               const KitSheet(
@@ -122,6 +129,65 @@ final class KitGalleryScreen extends StatelessWidget {
                   ],
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Live 3D graph for the gallery. Stateful so the controller -- and with it the
+/// camera and navigation history -- survives rebuilds.
+final class _Graph3DSection extends StatefulWidget {
+  const _Graph3DSection();
+
+  @override
+  State<_Graph3DSection> createState() => _Graph3DSectionState();
+}
+
+final class _Graph3DSectionState extends State<_Graph3DSection> {
+  late final KitGraphController _controller = KitGraphController(
+    nodes: const [
+      GraphNode(id: 'brain', label: 'BRAIN', kind: GraphNodeKind.hub),
+      GraphNode(id: 'chat', label: 'CHAT', cluster: 'core'),
+      GraphNode(id: 'excel', label: 'EXCEL', cluster: 'modules'),
+      GraphNode(id: 'ui', label: 'UI', cluster: 'core'),
+      GraphNode(id: 'budget', label: 'budget.xlsx', cluster: 'entities'),
+      GraphNode(id: 'revenue', label: 'revenue-chart', cluster: 'entities'),
+    ],
+    edges: const [
+      GraphEdge(id: 'brain-chat', sourceId: 'brain', targetId: 'chat'),
+      GraphEdge(id: 'brain-excel', sourceId: 'brain', targetId: 'excel'),
+      GraphEdge(id: 'brain-ui', sourceId: 'brain', targetId: 'ui'),
+      GraphEdge(id: 'excel-budget', sourceId: 'excel', targetId: 'budget'),
+      GraphEdge(id: 'ui-revenue', sourceId: 'ui', targetId: 'revenue'),
+      GraphEdge(id: 'chat-excel', sourceId: 'chat', targetId: 'excel', dotted: true),
+    ],
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 380,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: KitPalette.surfaceSunken,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: KitPalette.line),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Column(
+            children: [
+              Expanded(child: KitGraphView(controller: _controller)),
+              KitGraphNavigator(controller: _controller),
             ],
           ),
         ),

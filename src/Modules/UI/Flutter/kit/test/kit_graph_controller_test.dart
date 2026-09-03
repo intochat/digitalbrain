@@ -1,5 +1,4 @@
 import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
-import 'package:flutter/widgets.dart' show Offset;
 import 'package:flutter_test/flutter_test.dart';
 
 const _nodes = [

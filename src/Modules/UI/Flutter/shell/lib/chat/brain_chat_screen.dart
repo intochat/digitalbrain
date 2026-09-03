@@ -39,6 +39,7 @@ final class BrainChatScreen extends StatefulWidget {
     this.onReadChart,
     this.onReadImageBytes,
     this.onReadSpreadsheet,
+    this.onReadGraph,
   });
 
   final String chatName;
@@ -54,6 +55,7 @@ final class BrainChatScreen extends StatefulWidget {
   final ReadChart? onReadChart;
   final ReadImageBytes? onReadImageBytes;
   final ReadSpreadsheet? onReadSpreadsheet;
+  final ReadGraph? onReadGraph;
 
   @override
   State<BrainChatScreen> createState() => _BrainChatScreenState();
@@ -549,6 +551,7 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
                             onReadChart: widget.onReadChart,
                             onReadImageBytes: widget.onReadImageBytes,
                             onReadSpreadsheet: widget.onReadSpreadsheet,
+                            onReadGraph: widget.onReadGraph,
                           );
                         },
                   ),

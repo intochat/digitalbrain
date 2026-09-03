@@ -7,6 +7,11 @@ import 'package:flutter_chat_core/flutter_chat_core.dart';
 import '../components/button/kit_button.dart';
 import '../components/card/kit_card.dart';
 import '../components/chart/kit_chart.dart';
+import '../components/graph/graph_models.dart';
+import '../components/graph/graph_scene.dart';
+import '../components/graph/kit_graph_controller.dart';
+import '../components/graph/kit_graph_navigator.dart';
+import '../components/graph/kit_graph_view.dart';
 import '../components/clock/kit_clock.dart';
 import '../components/image/kit_image.dart';
 import '../components/sheet/kit_sheet.dart';
@@ -17,6 +22,7 @@ typedef KitButtonPressed = void Function(KitButtonPart part);
 typedef KitChartRefReader = Future<ChatChartOffer?> Function(String name);
 typedef KitImageRefReader = Future<Uint8List?> Function(String name);
 typedef KitSheetRefReader = Future<ChatSpreadsheetOffer?> Function(String name);
+typedef KitGraphRefReader = Future<ChatGraphOffer?> Function(String name);
 
 /// Flyer Chat [Builders] helpers for DigitalBrain kit components.
 ///
@@ -34,6 +40,8 @@ abstract final class KitChatBuilders {
     KitChartRefReader? onReadChart,
     KitImageRefReader? onReadImageBytes,
     KitSheetRefReader? onReadSpreadsheet,
+    KitGraphRefReader? onReadGraph,
+    GraphSceneFactory? graphSceneFactory,
   }) {
     final part = KitPart.tryParse(
       message.metadata == null
@@ -80,6 +88,12 @@ abstract final class KitChatBuilders {
           caption: caption,
           reader: onReadSpreadsheet,
         ),
+        KitGraphRefPart(:final name, :final caption) => _KitGraphRefLoader(
+          name: name,
+          caption: caption,
+          reader: onReadGraph,
+          sceneFactory: graphSceneFactory,
+        ),
       },
     );
   }
@@ -90,6 +104,7 @@ abstract final class KitChatBuilders {
     KitChartRefReader? onReadChart,
     KitImageRefReader? onReadImageBytes,
     KitSheetRefReader? onReadSpreadsheet,
+    KitGraphRefReader? onReadGraph,
   }) {
     return Builders(
       customMessageBuilder:
@@ -109,6 +124,7 @@ abstract final class KitChatBuilders {
             onReadChart: onReadChart,
             onReadImageBytes: onReadImageBytes,
             onReadSpreadsheet: onReadSpreadsheet,
+            onReadGraph: onReadGraph,
           ),
     );
   }
@@ -313,6 +329,124 @@ final class _KitSheetRefLoaderState extends State<_KitSheetRefLoader> {
             sheetName: offer.sheetName,
             columns: offer.columns,
             rows: offer.rows,
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Fetches a named graph entity, then renders it as a navigable 3D graph.
+///
+/// The controller is created once and disposed with the widget so the camera
+/// and navigation history survive rebuilds.
+final class _KitGraphRefLoader extends StatefulWidget {
+  const _KitGraphRefLoader({
+    required this.name,
+    required this.caption,
+    required this.reader,
+    this.sceneFactory,
+  });
+
+  final String name;
+  final String caption;
+  final KitGraphRefReader? reader;
+  final GraphSceneFactory? sceneFactory;
+
+  @override
+  State<_KitGraphRefLoader> createState() => _KitGraphRefLoaderState();
+}
+
+final class _KitGraphRefLoaderState extends State<_KitGraphRefLoader> {
+  Future<ChatGraphOffer?>? _fetch;
+  KitGraphController? _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    final reader = widget.reader;
+    if (reader != null) {
+      _fetch = reader(widget.name);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  KitGraphController _controllerFor(ChatGraphOffer offer) {
+    final nodes = [
+      for (final node in offer.nodes)
+        GraphNode(
+          id: node.id,
+          label: node.label,
+          kind: node.kind == 'hub' ? GraphNodeKind.hub : GraphNodeKind.leaf,
+          cluster: node.cluster,
+        ),
+    ];
+    final edges = [
+      for (final edge in offer.edges)
+        GraphEdge(
+          id: edge.id,
+          sourceId: edge.sourceId,
+          targetId: edge.targetId,
+          dotted: edge.dotted,
+        ),
+    ];
+
+    final existing = _controller;
+    if (existing != null) {
+      existing.setGraph(nodes: nodes, edges: edges);
+      return existing;
+    }
+    return _controller = KitGraphController(nodes: nodes, edges: edges);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.reader == null) {
+      return Text(
+        widget.caption,
+        key: Key('kit_graph_ref_offline_${widget.name}'),
+        style: KitType.bodyMuted,
+      );
+    }
+
+    return FutureBuilder<ChatGraphOffer?>(
+      future: _fetch,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Padding(
+            key: Key('kit_graph_ref_loading'),
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          );
+        }
+
+        final offer = snapshot.data;
+        if (offer == null) {
+          return Text(
+            widget.caption,
+            key: Key('kit_graph_ref_missing_${widget.name}'),
+            style: KitType.bodyMuted,
+          );
+        }
+
+        final controller = _controllerFor(offer);
+        return SizedBox(
+          height: 360,
+          child: Column(
+            children: [
+              Expanded(
+                child: KitGraphView(
+                  controller: controller,
+                  sceneFactory: widget.sceneFactory,
+                ),
+              ),
+              KitGraphNavigator(controller: controller),
+            ],
           ),
         );
       },

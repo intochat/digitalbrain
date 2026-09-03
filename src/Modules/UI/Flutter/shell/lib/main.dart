@@ -63,6 +63,7 @@ Widget buildShell({
     onReadChart: edge?.readChart,
     onReadImageBytes: edge?.readImageBytes,
     onReadSpreadsheet: edge?.readSpreadsheet,
+    onReadGraph: edge?.readGraph,
     onLoadBehaviors: edge?.listBehaviors,
     onLoadBehaviorSteps: edge?.listBehaviorSteps,
     onSaveBehavior: edge?.saveBehavior,

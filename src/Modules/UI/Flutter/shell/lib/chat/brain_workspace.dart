@@ -30,6 +30,7 @@ final class BrainWorkspace extends StatefulWidget {
     this.onReadChart,
     this.onReadImageBytes,
     this.onReadSpreadsheet,
+    this.onReadGraph,
     this.onLoadBehaviors,
     this.onLoadBehaviorSteps,
     this.onSaveBehavior,
@@ -54,6 +55,7 @@ final class BrainWorkspace extends StatefulWidget {
   final ReadChart? onReadChart;
   final ReadImageBytes? onReadImageBytes;
   final ReadSpreadsheet? onReadSpreadsheet;
+  final ReadGraph? onReadGraph;
   final LoadBehaviors? onLoadBehaviors;
   final LoadBehaviorSteps? onLoadBehaviorSteps;
   final SaveBehavior? onSaveBehavior;
@@ -131,6 +133,7 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
         onReadChart: widget.onReadChart,
         onReadImageBytes: widget.onReadImageBytes,
         onReadSpreadsheet: widget.onReadSpreadsheet,
+        onReadGraph: widget.onReadGraph,
       );
     }
     if (_destination == 0
@@ -158,6 +161,7 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
             onReadChart: widget.onReadChart,
             onReadImageBytes: widget.onReadImageBytes,
             onReadSpreadsheet: widget.onReadSpreadsheet,
+            onReadGraph: widget.onReadGraph,
           ),
           ActivityScreen(
             turns: _session.projectedTurns,

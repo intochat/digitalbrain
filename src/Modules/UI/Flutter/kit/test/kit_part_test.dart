@@ -92,6 +92,15 @@ void main() {
     expect(ref.caption, 'Sunset over bay');
   });
 
+  test('KitGraphRefPart round-trips name and caption', () {
+    const part = KitGraphRefPart(name: 'graph-abc', caption: 'Module deps');
+    final parsed = KitPart.tryParse(part.toMetadata());
+    expect(parsed, isA<KitGraphRefPart>());
+    final ref = parsed! as KitGraphRefPart;
+    expect(ref.name, 'graph-abc');
+    expect(ref.caption, 'Module deps');
+  });
+
   test('KitTimerPart round-trips its due instant', () {
     final part = KitTimerPart(
       label: 'tea in five',

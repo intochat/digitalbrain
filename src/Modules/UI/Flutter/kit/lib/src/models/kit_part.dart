@@ -21,6 +21,7 @@ sealed class KitPart {
       KitImageRefPart.kindName => KitImageRefPart.fromMetadata(metadata),
       KitSheetPart.kindName => KitSheetPart.fromMetadata(metadata),
       KitSheetRefPart.kindName => KitSheetRefPart.fromMetadata(metadata),
+      KitGraphRefPart.kindName => KitGraphRefPart.fromMetadata(metadata),
       _ => null,
     };
   }
@@ -320,6 +321,32 @@ final class KitSheetRefPart extends KitPart {
 
   factory KitSheetRefPart.fromMetadata(Map<String, dynamic> metadata) {
     return KitSheetRefPart(
+      name: metadata['name'] as String? ?? '',
+      caption: metadata['caption'] as String? ?? '',
+    );
+  }
+
+  @override
+  Map<String, Object?> toMetadata() => {
+    'kind': kindName,
+    'name': name,
+    'caption': caption,
+  };
+}
+
+final class KitGraphRefPart extends KitPart {
+  const KitGraphRefPart({required this.name, required this.caption});
+
+  static const kindName = 'graph-ref';
+
+  final String name;
+  final String caption;
+
+  @override
+  String get kind => kindName;
+
+  factory KitGraphRefPart.fromMetadata(Map<String, dynamic> metadata) {
+    return KitGraphRefPart(
       name: metadata['name'] as String? ?? '',
       caption: metadata['caption'] as String? ?? '',
     );

@@ -19,6 +19,7 @@ typedef ActivateChatButton =
 typedef ReadChart = Future<ChatChartOffer?> Function(String name);
 typedef ReadImageBytes = Future<Uint8List?> Function(String name);
 typedef ReadSpreadsheet = Future<ChatSpreadsheetOffer?> Function(String name);
+typedef ReadGraph = Future<ChatGraphOffer?> Function(String name);
 
 const ownerUserId = 'owner';
 const assistantUserId = 'assistant';
@@ -54,6 +55,7 @@ extension ChatTurnKitParts on ChatTurnEvent {
         'spreadsheet' => [
           KitSheetRefPart(name: card.name, caption: card.caption),
         ],
+        'graph' => [KitGraphRefPart(name: card.name, caption: card.caption)],
         _ => const <KitPart>[],
       },
   ];
