@@ -338,6 +338,11 @@ final class DigitalBrainUiClient {
     return body == null ? null : ChatChartOffer.fromJson(body);
   }
 
+  Future<ChatGraphOffer?> readGraph(String graphName) async {
+    final body = await _getKitEntity('/kit/graphs/$graphName', 'kit graph');
+    return body == null ? null : ChatGraphOffer.fromJson(body);
+  }
+
   Future<ChatSpreadsheetOffer?> readSpreadsheet(String spreadsheetName) async {
     final body = await _getKitEntity(
       '/kit/spreadsheets/$spreadsheetName',

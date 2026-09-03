@@ -135,6 +135,81 @@ final class ChatSpreadsheetOffer {
   }
 }
 
+final class ChatGraphNode {
+  const ChatGraphNode({
+    required this.id,
+    required this.label,
+    this.kind = 'leaf',
+    this.cluster,
+  });
+
+  final String id;
+  final String label;
+  final String kind;
+  final String? cluster;
+
+  factory ChatGraphNode.fromJson(Map<String, Object?> json) => ChatGraphNode(
+    id: json['id'] as String? ?? '',
+    label: json['label'] as String? ?? '',
+    kind: json['kind'] as String? ?? 'leaf',
+    cluster: json['cluster'] as String?,
+  );
+}
+
+final class ChatGraphEdge {
+  const ChatGraphEdge({
+    required this.id,
+    required this.sourceId,
+    required this.targetId,
+    this.dotted = false,
+  });
+
+  final String id;
+  final String sourceId;
+  final String targetId;
+  final bool dotted;
+
+  factory ChatGraphEdge.fromJson(Map<String, Object?> json) => ChatGraphEdge(
+    id: json['id'] as String? ?? '',
+    sourceId: json['sourceId'] as String? ?? '',
+    targetId: json['targetId'] as String? ?? '',
+    dotted: json['dotted'] as bool? ?? false,
+  );
+}
+
+/// State of a named graph kit entity, read from /kit/graphs/{name}.
+final class ChatGraphOffer {
+  const ChatGraphOffer({
+    required this.title,
+    required this.nodes,
+    required this.edges,
+  });
+
+  final String title;
+  final List<ChatGraphNode> nodes;
+  final List<ChatGraphEdge> edges;
+
+  factory ChatGraphOffer.fromJson(Map<String, Object?> json) {
+    final rawNodes = json['nodes'];
+    final rawEdges = json['edges'];
+    return ChatGraphOffer(
+      title: json['title'] as String? ?? '',
+      nodes: rawNodes is List
+          ? rawNodes
+                .whereType<Map>()
+                .map((e) => ChatGraphNode.fromJson(Map<String, Object?>.from(e)))
+                .toList(growable: false)
+          : const <ChatGraphNode>[],
+      edges: rawEdges is List
+          ? rawEdges
+                .whereType<Map>()
+                .map((e) => ChatGraphEdge.fromJson(Map<String, Object?>.from(e)))
+                .toList(growable: false)
+          : const <ChatGraphEdge>[],
+    );
+  }
+}
+
 final class ChatChartOffer {
   const ChatChartOffer({
     required this.title,

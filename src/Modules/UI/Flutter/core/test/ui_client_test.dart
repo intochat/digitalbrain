@@ -276,6 +276,62 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
     },
   );
 
+  test('readGraph GETs /kit/graphs/{name} and parses the graph', () async {
+    http.BaseRequest? seen;
+    final client = DigitalBrainUiClient(
+      baseUri: Uri.parse('http://ui.example:5080'),
+      httpClient: MockClient((request) async {
+        seen = request;
+        return http.Response(
+          jsonEncode({
+            'title': 'Module deps',
+            'nodes': [
+              {'id': 'brain', 'label': 'BRAIN', 'kind': 'hub'},
+              {
+                'id': 'excel',
+                'label': 'EXCEL',
+                'kind': 'leaf',
+                'cluster': 'modules',
+              },
+            ],
+            'edges': [
+              {
+                'id': 'brain-excel',
+                'sourceId': 'brain',
+                'targetId': 'excel',
+                'dotted': true,
+              },
+            ],
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      }),
+    );
+
+    final graph = await client.readGraph('graph-abc');
+
+    expect(seen, isNotNull);
+    expect(seen!.method, 'GET');
+    expect(seen!.url.toString(), 'http://ui.example:5080/kit/graphs/graph-abc');
+    expect(graph, isNotNull);
+    expect(graph!.title, 'Module deps');
+    expect(graph.nodes.map((n) => n.id), ['brain', 'excel']);
+    expect(graph.nodes.first.kind, 'hub');
+    expect(graph.nodes.last.cluster, 'modules');
+    expect(graph.edges.single.sourceId, 'brain');
+    expect(graph.edges.single.dotted, isTrue);
+  });
+
+  test('readGraph returns null on 404', () async {
+    final client = DigitalBrainUiClient(
+      baseUri: Uri.parse('http://ui.example:5080'),
+      httpClient: MockClient((request) async => http.Response('', 404)),
+    );
+
+    expect(await client.readGraph('missing'), isNull);
+  });
+
   test('readChart returns null on 404', () async {
     final client = DigitalBrainUiClient(
       baseUri: Uri.parse('http://ui.example:5080'),
