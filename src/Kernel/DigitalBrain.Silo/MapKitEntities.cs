@@ -92,6 +92,23 @@ internal static class KitEntitiesHttpMaps
                 return state is null ? Results.NotFound() : Results.Ok(state);
             });
 
+        endpoints.MapGet(
+            HttpSurfacePaths.KitGraphPath,
+            static async Task<IResult> (string graphName, IDigitalBrain brain, CancellationToken cancellationToken) =>
+            {
+                ArgumentNullException.ThrowIfNull(brain);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (string.IsNullOrWhiteSpace(graphName)
+                    || !TryPrincipalResource(HttpActor.Current.PrincipalId, graphName, out var instance))
+                {
+                    return Results.BadRequest();
+                }
+
+                var state = await brain.GetEntity<IGraph>(instance).Read().ConfigureAwait(false);
+                return state is null ? Results.NotFound() : Results.Ok(state);
+            });
+
         return endpoints;
     }
 

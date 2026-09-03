@@ -63,11 +63,38 @@ public sealed class KitSurfaceTests(AppHostFixture fixture)
         Assert.Equal("Shoes", payload.Rows[0].Cells[0]);
     }
 
+    [Fact]
+    public async Task GraphStateIsReadableOverHttp()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var brain = fixture.BrainFor(DigitalBrainNames.DefaultOwner);
+        var instance = PrincipalScoped.InstanceName(HttpActor.Current.PrincipalId, "graph-e2e");
+        await brain.GetEntity<IGraph>(instance).Render(new GraphState(
+            "Deps",
+            [
+                new GraphNodeState("brain", "BRAIN", GraphNodeKinds.Hub),
+                new GraphNodeState("excel", "EXCEL", GraphNodeKinds.Leaf, "modules"),
+            ],
+            [new GraphEdgeState("brain-excel", "brain", "excel")]));
+
+        using var http = fixture.CreateHttpClient("kernel");
+        var response = await http.GetAsync("/kit/graphs/graph-e2e", cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<GraphState>(WireJson, cancellationToken);
+        Assert.NotNull(payload);
+        Assert.Equal("Deps", payload!.Title);
+        Assert.Equal(GraphNodeKinds.Hub, payload.Nodes[0].Kind);
+        Assert.Equal("modules", payload.Nodes[1].Cluster);
+        Assert.Equal("brain", payload.Edges[0].SourceId);
+    }
+
     [Theory]
     [InlineData("/kit/charts/no-such-chart")]
     [InlineData("/kit/images/no-such-image")]
     [InlineData("/kit/images/no-such-image/content")]
     [InlineData("/kit/spreadsheets/no-such-sheet")]
+    [InlineData("/kit/graphs/no-such-graph")]
     public async Task UnknownKitEntityNameReturnsNotFound(string route)
     {
         using var http = fixture.CreateHttpClient("kernel");
