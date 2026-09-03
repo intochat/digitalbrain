@@ -7,7 +7,7 @@ import 'support/shell_test_support.dart';
 
 void main() {
   testWidgets(
-    'the workspace exposes Chat, Activity, Behaviors, Kit, and Windowing destinations',
+    'the workspace exposes Chat, Graph, Activity, Behaviors, Kit, and Windowing destinations',
     (tester) async {
       await prepareShellSurface(tester);
 
@@ -16,10 +16,16 @@ void main() {
       await drainShellTimers(tester);
 
       expect(find.byKey(const Key('destination_chat')), findsOneWidget);
+      expect(find.byKey(const Key('destination_graph')), findsOneWidget);
       expect(find.byKey(const Key('destination_activity')), findsOneWidget);
       expect(find.byKey(const Key('destination_behaviors')), findsOneWidget);
       expect(find.byKey(const Key('destination_kit')), findsOneWidget);
       expect(find.byKey(const Key('destination_windowing')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('destination_graph')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('graph_home_screen')), findsOneWidget);
+      expect(find.byKey(const Key('kit_graph')), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('destination_activity')));
       await tester.pumpAndSettle();

@@ -19,6 +19,8 @@ sealed class KitPart {
       KitTimerPart.kindName => KitTimerPart.fromMetadata(metadata),
       KitChartRefPart.kindName => KitChartRefPart.fromMetadata(metadata),
       KitImageRefPart.kindName => KitImageRefPart.fromMetadata(metadata),
+      KitSheetPart.kindName => KitSheetPart.fromMetadata(metadata),
+      KitSheetRefPart.kindName => KitSheetRefPart.fromMetadata(metadata),
       _ => null,
     };
   }
@@ -232,6 +234,92 @@ final class KitImageRefPart extends KitPart {
 
   factory KitImageRefPart.fromMetadata(Map<String, dynamic> metadata) {
     return KitImageRefPart(
+      name: metadata['name'] as String? ?? '',
+      caption: metadata['caption'] as String? ?? '',
+    );
+  }
+
+  @override
+  Map<String, Object?> toMetadata() => {
+    'kind': kindName,
+    'name': name,
+    'caption': caption,
+  };
+}
+
+final class KitSheetPart extends KitPart {
+  const KitSheetPart({
+    required this.title,
+    required this.columns,
+    required this.rows,
+    this.sheetName = 'Sheet1',
+  });
+
+  static const kindName = 'spreadsheet';
+
+  final String title;
+  final String sheetName;
+  final List<String> columns;
+  final List<List<String>> rows;
+
+  @override
+  String get kind => kindName;
+
+  factory KitSheetPart.fromMetadata(Map<String, dynamic> metadata) {
+    final rawColumns = metadata['columns'];
+    final columns = rawColumns is List
+        ? rawColumns.map((e) => e.toString()).toList(growable: false)
+        : const <String>[];
+    final rawRows = metadata['rows'];
+    final rows = rawRows is List
+        ? rawRows
+              .map((row) {
+                if (row is List) {
+                  return row.map((cell) => cell.toString()).toList();
+                }
+                if (row is Map) {
+                  final cells = row['cells'];
+                  if (cells is List) {
+                    return cells.map((cell) => cell.toString()).toList();
+                  }
+                }
+                return const <String>[];
+              })
+              .toList(growable: false)
+        : const <List<String>>[];
+    return KitSheetPart(
+      title: metadata['title'] as String? ?? 'Sheet',
+      sheetName: metadata['sheetName'] as String? ?? 'Sheet1',
+      columns: columns,
+      rows: rows,
+    );
+  }
+
+  @override
+  Map<String, Object?> toMetadata() => {
+    'kind': kindName,
+    'title': title,
+    'sheetName': sheetName,
+    'columns': columns,
+    'rows': [
+      for (final row in rows) {'cells': row},
+    ],
+  };
+}
+
+final class KitSheetRefPart extends KitPart {
+  const KitSheetRefPart({required this.name, required this.caption});
+
+  static const kindName = 'spreadsheet-ref';
+
+  final String name;
+  final String caption;
+
+  @override
+  String get kind => kindName;
+
+  factory KitSheetRefPart.fromMetadata(Map<String, dynamic> metadata) {
+    return KitSheetRefPart(
       name: metadata['name'] as String? ?? '',
       caption: metadata['caption'] as String? ?? '',
     );

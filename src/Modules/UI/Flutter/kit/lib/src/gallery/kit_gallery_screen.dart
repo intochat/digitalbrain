@@ -5,6 +5,7 @@ import '../components/card/kit_card.dart';
 import '../components/chart/kit_chart.dart';
 import '../components/graph/graph_models.dart';
 import '../components/graph/kit_graph.dart';
+import '../components/sheet/kit_sheet.dart';
 import '../components/view/kit_view.dart';
 import '../models/kit_part.dart';
 import '../theme/kit_theme.dart';
@@ -91,6 +92,20 @@ final class KitGalleryScreen extends StatelessWidget {
                       targetId: 'chart',
                       decorated: true,
                     ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+              const Text('Sheet', style: KitType.title),
+              const SizedBox(height: 12),
+              const KitSheet(
+                part: KitSheetPart(
+                  title: 'Yesterday',
+                  sheetName: 'Sheet1',
+                  columns: ['Item', 'Qty'],
+                  rows: [
+                    ['Shoes', '2'],
+                    ['Laces', '1'],
                   ],
                 ),
               ),

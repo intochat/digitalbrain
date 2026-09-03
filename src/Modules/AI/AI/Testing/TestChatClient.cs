@@ -14,6 +14,7 @@ internal sealed partial class TestChatClient : IChatClient
     private const string RenderedReply = "Rendered.";
     private const string GeneratedReply = "Generated.";
     private const string RenderChartToolName = "render_chart";
+    private const string ShowSpreadsheetToolName = "show_spreadsheet";
     private const string GenerateImageToolName = "generate_image";
     private const string GenerateBehaviorToolName = "generate_behavior_feature";
     private const string RunBehaviorToolName = "run_behavior_example";
@@ -130,7 +131,27 @@ internal sealed partial class TestChatClient : IChatClient
             yield break;
         }
 
-        // Precedence: "chart" beats "image" when a message somehow mentions both.
+        var showSpreadsheet = tools.FirstOrDefault(static tool => tool.Name == ShowSpreadsheetToolName);
+        if (showSpreadsheet is not null
+            && (lastUser.Contains("spreadsheet", StringComparison.OrdinalIgnoreCase)
+                || lastUser.Contains("excel", StringComparison.OrdinalIgnoreCase)))
+        {
+            yield return new ChatResponseUpdate(ChatRole.Assistant,
+            [
+                new FunctionCallContent("call-1", ShowSpreadsheetToolName, new Dictionary<string, object?>
+                {
+                    ["chatName"] = ChatNameFromContext(conversation),
+                    ["title"] = "Yesterday",
+                    ["sheetName"] = "Sheet1",
+                    ["headers"] = "Item,Qty",
+                    ["rows"] = "Shoes,2",
+                }),
+            ])
+            { FinishReason = ChatFinishReason.ToolCalls };
+            yield break;
+        }
+
+        // Precedence: spreadsheet/excel first, then "chart" beats "image".
         var renderChart = tools.FirstOrDefault(static tool => tool.Name == RenderChartToolName);
         if (renderChart is not null && lastUser.Contains("chart", StringComparison.OrdinalIgnoreCase))
         {

@@ -38,6 +38,8 @@ void main() {
         'ui.chart-state',
         'ui.chart-point',
         'ui.image-state',
+        'excel.workbook-state',
+        'excel.row',
       ]),
     );
 
@@ -74,6 +76,17 @@ void main() {
       {'Prompt', 'Model', 'MediaType', 'BlobName'},
       reason:
           'ui.image-state must mirror ImageState(Prompt, Model, MediaType, BlobName)',
+    );
+    expect(
+      propertyNamesOf('excel.workbook-state'),
+      {'Title', 'SheetName', 'Columns', 'Rows'},
+      reason:
+          'excel.workbook-state must mirror ExcelState(Title, SheetName, Columns, Rows)',
+    );
+    expect(
+      propertyNamesOf('excel.row'),
+      {'Cells'},
+      reason: 'excel.row must mirror ExcelRow(Cells)',
     );
   });
 }

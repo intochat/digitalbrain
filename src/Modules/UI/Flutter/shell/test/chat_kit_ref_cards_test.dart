@@ -64,6 +64,53 @@ void main() {
     await drainShellTimers(tester);
   });
 
+  testWidgets('a spreadsheet-ref card fetches its sheet and renders KitSheet', (
+    tester,
+  ) async {
+    await prepareShellSurface(tester);
+    final turns = StreamController<ChatTurnEvent>();
+    addTearDown(turns.close);
+    final requestedNames = <String>[];
+
+    await tester.pumpWidget(
+      BrainChatApp(
+        chatName: 'main',
+        turns: turns.stream,
+        onSend: (_) async {},
+        onReadSpreadsheet: (name) async {
+          requestedNames.add(name);
+          return const ChatSpreadsheetOffer(
+            title: 'Yesterday',
+            columns: ['Item', 'Qty'],
+            rows: [
+              ['Shoes', '2'],
+            ],
+          );
+        },
+      ),
+    );
+
+    turns.add(
+      shellTurn(
+        1,
+        false,
+        'here is your sheet',
+        cards: const [
+          KitCardRef(
+            kind: 'spreadsheet',
+            name: 'sheet-abc',
+            caption: 'Yesterday',
+          ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('kit_sheet_Yesterday')), findsOneWidget);
+    expect(requestedNames, ['sheet-abc']);
+    await drainShellTimers(tester);
+  });
+
   testWidgets('an image-ref card fetches its bytes and renders KitImage', (
     tester,
   ) async {

@@ -23,4 +23,5 @@ internal static class HttpSurfacePaths
     public const string KitChartPath = "/kit/charts/{chartName}";
     public const string KitImagePath = "/kit/images/{imageName}";
     public const string KitImageContentPath = "/kit/images/{imageName}/content";
+    public const string KitSpreadsheetPath = "/kit/spreadsheets/{spreadsheetName}";
 }

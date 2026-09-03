@@ -11,6 +11,7 @@ using DigitalBrain.Memory;
 using DigitalBrain.Memory.Aspire.Hosting;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Salesforce.Aspire.Hosting;
+using DigitalBrain.Excel;
 using DigitalBrain.Time;
 using DigitalBrain.UI;
 using DigitalBrain.UI.Aspire.Hosting;
@@ -64,6 +65,7 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
     })
     .AddModule<MemoryModule>(memory => memory.WithQdrant())
     .AddModule<TimeModule>()
+    .AddModule<ExcelModule>()
     .AddModule<ExecutionModule>()
     .AddModule<GoogleModule>(google => google.WithGmail())
     .AddModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())

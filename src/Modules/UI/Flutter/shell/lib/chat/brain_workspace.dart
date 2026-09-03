@@ -10,6 +10,7 @@ import '../user_actions/user_action_card.dart';
 import '../windowing/windowing_screen.dart';
 import 'brain_chat_screen.dart';
 import 'chat_contracts.dart';
+import 'graph_home_screen.dart';
 import 'workspace_chrome.dart';
 import 'workspace_session.dart';
 
@@ -28,6 +29,7 @@ final class BrainWorkspace extends StatefulWidget {
     this.onActivateButton,
     this.onReadChart,
     this.onReadImageBytes,
+    this.onReadSpreadsheet,
     this.onLoadBehaviors,
     this.onLoadBehaviorSteps,
     this.onSaveBehavior,
@@ -51,6 +53,7 @@ final class BrainWorkspace extends StatefulWidget {
   final ActivateChatButton? onActivateButton;
   final ReadChart? onReadChart;
   final ReadImageBytes? onReadImageBytes;
+  final ReadSpreadsheet? onReadSpreadsheet;
   final LoadBehaviors? onLoadBehaviors;
   final LoadBehaviorSteps? onLoadBehaviorSteps;
   final SaveBehavior? onSaveBehavior;
@@ -111,11 +114,35 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
 
   Widget _destinationPage() {
     // Product tabs stay in an IndexedStack so chat state survives
-    // switches. Kit/Windowing mount only while selected (offline demos with
-    // periodic clocks would otherwise block widget tests via IndexedStack).
-    if (_destination <= behaviorsDestinationIndex) {
+    // switches. Graph/Kit/Windowing mount only while selected (graph pulse
+    // and offline demo clocks would otherwise run offstage).
+    if (_destination == graphDestinationIndex) {
+      return GraphHomeScreen(
+        chatName: widget.chatName,
+        turns: _session.projectedTurns,
+        onSend: widget.onSend,
+        onStream: widget.onStream,
+        onStreamVoice: widget.onStreamVoice,
+        onAttachmentTap: widget.onAttachmentTap,
+        onOpenSignIn: widget.onOpenSignIn,
+        kernelBaseUri: widget.kernelBaseUri,
+        onCancelTurn: widget.onCancelTurn,
+        onActivateButton: widget.onActivateButton,
+        onReadChart: widget.onReadChart,
+        onReadImageBytes: widget.onReadImageBytes,
+        onReadSpreadsheet: widget.onReadSpreadsheet,
+      );
+    }
+    if (_destination == 0
+        || _destination == activityDestinationIndex
+        || _destination == behaviorsDestinationIndex) {
+      final stackIndex = switch (_destination) {
+        0 => 0,
+        activityDestinationIndex => 1,
+        _ => 2,
+      };
       return IndexedStack(
-        index: _destination,
+        index: stackIndex,
         children: [
           BrainChatScreen(
             chatName: widget.chatName,
@@ -130,6 +157,7 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
             onActivateButton: widget.onActivateButton,
             onReadChart: widget.onReadChart,
             onReadImageBytes: widget.onReadImageBytes,
+            onReadSpreadsheet: widget.onReadSpreadsheet,
           ),
           ActivityScreen(
             turns: _session.projectedTurns,

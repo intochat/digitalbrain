@@ -60,6 +60,29 @@ void main() {
     expect(ref.caption, 'Daily sales');
   });
 
+  test('KitSheetPart round-trips cells', () {
+    const part = KitSheetPart(
+      title: 'Yesterday',
+      sheetName: 'Sheet1',
+      columns: ['Item', 'Qty'],
+      rows: [
+        ['Shoes', '2'],
+      ],
+    );
+    final parsed = KitPart.tryParse(part.toMetadata()) as KitSheetPart;
+    expect(parsed.title, 'Yesterday');
+    expect(parsed.rows.first, ['Shoes', '2']);
+  });
+
+  test('KitSheetRefPart round-trips name and caption', () {
+    const part = KitSheetRefPart(name: 'sheet-abc', caption: 'Yesterday');
+    final parsed = KitPart.tryParse(part.toMetadata());
+    expect(parsed, isA<KitSheetRefPart>());
+    final ref = parsed! as KitSheetRefPart;
+    expect(ref.name, 'sheet-abc');
+    expect(ref.caption, 'Yesterday');
+  });
+
   test('KitImageRefPart round-trips name and caption', () {
     const part = KitImageRefPart(name: 'sunset', caption: 'Sunset over bay');
     final parsed = KitPart.tryParse(part.toMetadata());

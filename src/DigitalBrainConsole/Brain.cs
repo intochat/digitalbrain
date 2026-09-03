@@ -15,11 +15,6 @@ using Orleans.Journaling;
 
 namespace DigitalBrainConsole;
 
-// Host composition for the console proof: a local single-node silo with in-memory persistence,
-// so `dotnet run` needs no external dependency. Named Brain, not DigitalBrain: this lives in
-// DigitalBrainConsole and composes types from the DigitalBrain.Core namespace (Neuron,
-// DigitalBrainRuntime, ModuleManifest) unqualified — a type here named DigitalBrain would read
-// as if it belonged to that namespace instead of naming the module.
 public static class Brain
 {
     public static async Task<IDigitalBrain> CreateAsync(
@@ -28,6 +23,17 @@ public static class Brain
     {
         ArgumentNullException.ThrowIfNull(args);
 
+        var context = new ActivationContext(args);
+        await ActivationService.Default.ActivateAsync(context, cancellationToken)
+            .ConfigureAwait(false);
+        return context.Brain
+            ?? throw new InvalidOperationException("Activation finished without a brain.");
+    }
+
+    internal static async Task<HostedBrain> StartLocalSiloAsync(
+        string[] args,
+        CancellationToken cancellationToken)
+    {
         var builder = Host.CreateApplicationBuilder(args);
         builder.Logging.SetMinimumLevel(LogLevel.Warning);
 
@@ -42,14 +48,15 @@ public static class Brain
 
         var host = builder.Build();
         await host.StartAsync(cancellationToken).ConfigureAwait(false);
-
         return new HostedBrain(host);
     }
 
-    private sealed class HostedBrain(IHost host) : IDigitalBrain
+    internal sealed class HostedBrain(IHost host) : IDigitalBrain
     {
         private readonly IDigitalBrain _inner =
             DigitalBrainClient.Connect(host.Services.GetRequiredService<IGrainFactory>(), DigitalBrainNames.DefaultOwner);
+
+        public IHost Host => host;
 
         public OwnerId Owner => _inner.Owner;
 

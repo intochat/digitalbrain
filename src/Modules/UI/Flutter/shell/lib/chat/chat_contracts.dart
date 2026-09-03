@@ -18,11 +18,14 @@ typedef ActivateChatButton =
     });
 typedef ReadChart = Future<ChatChartOffer?> Function(String name);
 typedef ReadImageBytes = Future<Uint8List?> Function(String name);
+typedef ReadSpreadsheet = Future<ChatSpreadsheetOffer?> Function(String name);
 
 const ownerUserId = 'owner';
 const assistantUserId = 'assistant';
-const behaviorsDestinationIndex = 2;
-const kitDestinationIndex = 3;
+const graphDestinationIndex = 1;
+const activityDestinationIndex = 2;
+const behaviorsDestinationIndex = 3;
+const kitDestinationIndex = 4;
 
 extension ChatTurnKitParts on ChatTurnEvent {
   List<KitPart> get kitParts => [
@@ -48,6 +51,9 @@ extension ChatTurnKitParts on ChatTurnEvent {
       ...switch (card.kind) {
         'chart' => [KitChartRefPart(name: card.name, caption: card.caption)],
         'image' => [KitImageRefPart(name: card.name, caption: card.caption)],
+        'spreadsheet' => [
+          KitSheetRefPart(name: card.name, caption: card.caption),
+        ],
         _ => const <KitPart>[],
       },
   ];

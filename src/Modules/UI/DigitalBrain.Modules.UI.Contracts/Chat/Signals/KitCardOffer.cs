@@ -7,6 +7,7 @@ public static class KitCardKinds
 {
     public const string Chart = "chart";
     public const string Image = "image";
+    public const string Spreadsheet = "spreadsheet";
 }
 
 // A reference card: state lives in the named kit entity, never in the message.

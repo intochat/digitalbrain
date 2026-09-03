@@ -91,6 +91,50 @@ final class ChatChartPoint {
   }
 }
 
+final class ChatSpreadsheetOffer {
+  const ChatSpreadsheetOffer({
+    required this.title,
+    required this.columns,
+    required this.rows,
+    this.sheetName = 'Sheet1',
+  });
+
+  final String title;
+  final String sheetName;
+  final List<String> columns;
+  final List<List<String>> rows;
+
+  factory ChatSpreadsheetOffer.fromJson(Map<String, Object?> json) {
+    final rawColumns = json['columns'];
+    final columns = rawColumns is List
+        ? rawColumns.map((e) => e.toString()).toList(growable: false)
+        : const <String>[];
+    final rawRows = json['rows'];
+    final rows = rawRows is List
+        ? rawRows
+              .map((row) {
+                if (row is List) {
+                  return row.map((cell) => cell.toString()).toList();
+                }
+                if (row is Map) {
+                  final cells = row['cells'];
+                  if (cells is List) {
+                    return cells.map((cell) => cell.toString()).toList();
+                  }
+                }
+                return const <String>[];
+              })
+              .toList(growable: false)
+        : const <List<String>>[];
+    return ChatSpreadsheetOffer(
+      title: json['title'] as String? ?? 'Sheet',
+      sheetName: json['sheetName'] as String? ?? 'Sheet1',
+      columns: columns,
+      rows: rows,
+    );
+  }
+}
+
 final class ChatChartOffer {
   const ChatChartOffer({
     required this.title,

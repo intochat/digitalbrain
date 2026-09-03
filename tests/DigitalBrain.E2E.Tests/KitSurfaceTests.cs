@@ -4,6 +4,7 @@ using System.Net.ServerSentEvents;
 using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
+using DigitalBrain.Excel;
 using DigitalBrain.Kernel;
 using DigitalBrain.Testing.E2E;
 using DigitalBrain.UI;
@@ -40,10 +41,33 @@ public sealed class KitSurfaceTests(AppHostFixture fixture)
         Assert.Contains(payload.Points, point => point.Label == "Q1");
     }
 
+    [Fact]
+    public async Task SpreadsheetStateIsReadableOverHttp()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var brain = fixture.BrainFor(DigitalBrainNames.DefaultOwner);
+        var instance = PrincipalScoped.InstanceName(HttpActor.Current.PrincipalId, "sheet-e2e");
+        await brain.GetEntity<IExcel>(instance).Load(new ExcelState(
+            "Yesterday",
+            "Sheet1",
+            ["Item", "Qty"],
+            [new ExcelRow(["Shoes", "2"])]));
+
+        using var http = fixture.CreateHttpClient("kernel");
+        var response = await http.GetAsync("/kit/spreadsheets/sheet-e2e", cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ExcelState>(WireJson, cancellationToken);
+        Assert.NotNull(payload);
+        Assert.Equal("Yesterday", payload!.Title);
+        Assert.Equal("Shoes", payload.Rows[0].Cells[0]);
+    }
+
     [Theory]
     [InlineData("/kit/charts/no-such-chart")]
     [InlineData("/kit/images/no-such-image")]
     [InlineData("/kit/images/no-such-image/content")]
+    [InlineData("/kit/spreadsheets/no-such-sheet")]
     public async Task UnknownKitEntityNameReturnsNotFound(string route)
     {
         using var http = fixture.CreateHttpClient("kernel");
@@ -150,6 +174,31 @@ public sealed class KitSurfaceTests(AppHostFixture fixture)
         Assert.Equal("image/png", content.Content.Headers.ContentType?.MediaType);
         var bytes = await content.Content.ReadAsByteArrayAsync(cancellationToken);
         Assert.NotEmpty(bytes);
+    }
+
+    [Fact]
+    public async Task AskingForASpreadsheetProducesACardOnTheTurnStream()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var http = fixture.CreateHttpClient("kernel");
+        const string ChatName = "sheet-turn-e2e";
+
+        var send = await http.PostAsJsonAsync(
+            HttpSurfacePaths.OwnerCommandsPath,
+            new { kind = "chat.send", chatName = ChatName, text = "show me yesterday's excel file" },
+            cancellationToken);
+        Assert.Equal(HttpStatusCode.OK, send.StatusCode);
+
+        using var turnStreamBudget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        turnStreamBudget.CancelAfter(TimeSpan.FromSeconds(30));
+        var cardName = await ReadCardNameFromTurnStreamAsync(
+            http, ChatName, KitCardKinds.Spreadsheet, turnStreamBudget.Token);
+
+        var sheet = await http.GetAsync($"/kit/spreadsheets/{cardName}", cancellationToken);
+        Assert.Equal(HttpStatusCode.OK, sheet.StatusCode);
+        var payload = await sheet.Content.ReadFromJsonAsync<ExcelState>(WireJson, cancellationToken);
+        Assert.Equal("Yesterday", payload?.Title);
+        Assert.Equal("Shoes", payload?.Rows[0].Cells[0]);
     }
 
     // Reads /chats/{chatName}/events (MapChatStreams) exactly like the Flutter shell's

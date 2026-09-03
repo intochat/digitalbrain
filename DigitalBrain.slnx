@@ -15,6 +15,9 @@
     <Project Path="src/Product/DigitalBrain.Product.Contracts/DigitalBrain.Product.Contracts.csproj" />
   </Folder>
   <Folder Name="/Modules/" />
+  <Folder Name="/Modules/Catalog/">
+    <Project Path="src/Modules/Catalog/Contracts/DigitalBrain.Modules.Catalog.Contracts.csproj" />
+  </Folder>
   <Folder Name="/Modules/AI/">
     <Project Path="src/Modules/AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <Project Path="src/Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
@@ -33,6 +36,10 @@
   <Folder Name="/Modules/Time/">
     <Project Path="src/Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <Project Path="src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Excel/">
+    <Project Path="src/Modules/Excel/Contracts/DigitalBrain.Modules.Excel.Contracts.csproj" />
+    <Project Path="src/Modules/Excel/Excel/DigitalBrain.Modules.Excel.csproj" />
   </Folder>
   <Folder Name="/Modules/Execution/">
     <Project Path="src/Modules/Execution/Contracts/DigitalBrain.Modules.Execution.Contracts.csproj" />
@@ -58,6 +65,7 @@
   </Folder>
   <Folder Name="/Tests/">
     <Project Path="tests/DigitalBrain.Aspire.Tests/DigitalBrain.Aspire.Tests.csproj" />
+    <Project Path="tests/DigitalBrain.Catalog.Tests/DigitalBrain.Catalog.Tests.csproj" />
     <Project Path="tests/DigitalBrain.E2E.Tests/DigitalBrain.E2E.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Simulation.Tests/DigitalBrain.Simulation.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Substrate.Tests/DigitalBrain.Substrate.Tests.csproj" />

@@ -97,6 +97,27 @@
         { "name": "BlobName", "type": "String" }
       ],
       "methods": []
+    },
+    {
+      "name": "ExcelState",
+      "kind": "record",
+      "alias": "excel.workbook-state",
+      "properties": [
+        { "name": "Title", "type": "String" },
+        { "name": "SheetName", "type": "String" },
+        { "name": "Columns", "type": "IReadOnlyList<String>" },
+        { "name": "Rows", "type": "IReadOnlyList<ExcelRow>" }
+      ],
+      "methods": []
+    },
+    {
+      "name": "ExcelRow",
+      "kind": "record",
+      "alias": "excel.row",
+      "properties": [
+        { "name": "Cells", "type": "IReadOnlyList<String>" }
+      ],
+      "methods": []
     }
   ]
 }

@@ -237,6 +237,45 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
     },
   );
 
+  test(
+    'readSpreadsheet GETs /kit/spreadsheets/{name} and parses the sheet',
+    () async {
+      http.BaseRequest? seen;
+      final client = DigitalBrainUiClient(
+        baseUri: Uri.parse('http://ui.example:5080'),
+        httpClient: MockClient((request) async {
+          seen = request;
+          return http.Response(
+            jsonEncode({
+              'title': 'Yesterday',
+              'sheetName': 'Sheet1',
+              'columns': ['Item', 'Qty'],
+              'rows': [
+                {
+                  'cells': ['Shoes', '2'],
+                },
+              ],
+            }),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        }),
+      );
+
+      final sheet = await client.readSpreadsheet('sheet-abc');
+
+      expect(seen, isNotNull);
+      expect(seen!.method, 'GET');
+      expect(
+        seen!.url.toString(),
+        'http://ui.example:5080/kit/spreadsheets/sheet-abc',
+      );
+      expect(sheet, isNotNull);
+      expect(sheet!.title, 'Yesterday');
+      expect(sheet.rows.first, ['Shoes', '2']);
+    },
+  );
+
   test('readChart returns null on 404', () async {
     final client = DigitalBrainUiClient(
       baseUri: Uri.parse('http://ui.example:5080'),

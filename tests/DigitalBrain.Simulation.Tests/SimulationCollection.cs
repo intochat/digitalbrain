@@ -16,6 +16,7 @@ public sealed class SimulationFixture : IAsyncLifetime
             Modules = new ModuleManifest(
                 [
                     typeof(DigitalBrain.Time.TimeModule),
+                    typeof(DigitalBrain.Excel.ExcelModule),
                     typeof(DigitalBrain.UI.UIModule),
                     typeof(DigitalBrain.AI.AIModule),
                     typeof(DigitalBrain.Memory.MemoryModule),
