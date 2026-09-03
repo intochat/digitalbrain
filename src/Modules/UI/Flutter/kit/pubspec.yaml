@@ -18,6 +18,7 @@ dependencies:
     path: ../core
   flutter_chat_core: ^2.9.0
   graphic: ^2.7.0
+  three_js: ^0.3.0
 
 dev_dependencies:
   flutter_test:
