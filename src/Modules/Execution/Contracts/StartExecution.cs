@@ -9,5 +9,5 @@ namespace DigitalBrain.Execution;
 public sealed record StartExecution(
     [property: Id(0)] CommandId CommandId,
     [property: Id(1)] ExecutionId ExecutionId,
-    [property: Id(2)] WorkloadDescriptor Workload,
+    [property: Id(2)] ChatTurnWorkload Workload,
     [property: Id(3)] IReadOnlyList<ExecutionId>? RelatedExecutions = null) : Signal;

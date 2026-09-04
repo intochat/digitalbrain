@@ -67,14 +67,12 @@ public sealed class ExecutionSpineTests(ExecutionSimulationFixture fixture)
         var brain = fixture.Sim.Brain;
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        var preferences = brain.GetEntity<IPreferenceStore>(IPreferenceStore.DefaultInstanceName);
-        await preferences.AddRule("tone", "Be concise.");
-
         var firstId = ExecutionId.New();
+        var firstTurn = Guid.NewGuid();
         await ExecutionTestDriver.StartAndCompleteAsync(
             brain,
             firstId,
-            new ChatTurnWorkload(new NeuronId("chat", brain.Owner, "main"), Guid.NewGuid(), "first"),
+            new ChatTurnWorkload(new NeuronId("chat", brain.Owner, "main"), firstTurn, "first"),
             cancellationToken: cancellationToken);
 
         var secondId = ExecutionId.New();
@@ -86,10 +84,10 @@ public sealed class ExecutionSpineTests(ExecutionSimulationFixture fixture)
             cancellationToken: cancellationToken);
 
         var secondContext = brain.GetEntity<IExecutionContext>(secondId.ToString());
-        var entry = await secondContext.Query(new ContextQuery(new ContextPath("preferences.rules")));
+        var entry = await secondContext.Query(new ContextQuery(new ContextPath($"chat.turn.{firstTurn:N}")));
 
         Assert.NotNull(entry);
-        Assert.Equal("preferences.rules.v1", entry!.SchemaHash);
-        Assert.Contains("Be concise.", entry.PayloadJson, StringComparison.Ordinal);
+        Assert.Equal("chat.turn.v1", entry!.SchemaHash);
+        Assert.Contains("first", entry.PayloadJson, StringComparison.Ordinal);
     }
 }

@@ -13,7 +13,7 @@ internal static class ExecutionTestDriver
     public static async Task<NeuronReference<IExecution>> StartAndCompleteAsync(
         IDigitalBrain brain,
         ExecutionId executionId,
-        WorkloadDescriptor workload,
+        ChatTurnWorkload workload,
         IReadOnlyList<ExecutionId>? relatedExecutions = null,
         CancellationToken cancellationToken = default)
     {

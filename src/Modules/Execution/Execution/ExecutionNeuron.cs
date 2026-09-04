@@ -1,7 +1,9 @@
+using System.Text.Json;
 using DigitalBrain.Product.Identity;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Chat;
 using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
@@ -16,14 +18,12 @@ public sealed class ExecutionNeuron : Neuron, IExecution, IExecutionKernel
 
     private readonly IDurableValue<byte[]> _state;
     private readonly Serializer<ExecutionState> _states;
-    private readonly IExecutionContextProvider[] _providers;
 
     public ExecutionNeuron(NeuronRuntime runtime)
         : base(runtime)
     {
         _state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName);
         _states = ServiceProvider.GetRequiredService<Serializer<ExecutionState>>();
-        _providers = [.. ServiceProvider.GetServices<IExecutionContextProvider>()];
     }
 
     public Task<ExecutionProjection> LoadProjection()
@@ -77,27 +77,15 @@ public sealed class ExecutionNeuron : Neuron, IExecution, IExecutionKernel
             await AdmitRelatedContextAsync(context, signal.RelatedExecutions, cancellationToken)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-            var seed = new ExecutionSeedBuilder(
-                signal.ExecutionId,
-                Id.Owner,
-                signal.Workload,
-                signal.RelatedExecutions ?? []);
-            for (var providerIndex = 0; providerIndex < _providers.Length; providerIndex++)
-            {
-                await _providers[providerIndex]
-                    .ContributeAsync(seed, cancellationToken)
-                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            }
+            var promptBlocks = await CollectPromptBlocksAsync(signal.Workload, cancellationToken)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            await context.ApplyDelta(new ContextDelta(
+                    new ContextPath($"chat.turn.{signal.Workload.TurnId:N}"),
+                    SchemaHash: "chat.turn.v1",
+                    PayloadJson: JsonSerializer.Serialize(signal.Workload.UserText),
+                    BlobRef: null))
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-            for (var deltaIndex = 0; deltaIndex < seed.SeedDeltas.Count; deltaIndex++)
-            {
-                await context.ApplyDelta(seed.SeedDeltas[deltaIndex])
-                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            }
-
-            var promptBlocks = seed.PromptBlocks.Count == 0
-                ? null
-                : (IReadOnlyList<string>)seed.PromptBlocks.ToArray();
             Stage(LoadRecorded()! with { PromptBlocks = promptBlocks });
 
             Stage(LoadRecorded()! with { Status = ExecutionStatus.Completed });
@@ -154,6 +142,37 @@ public sealed class ExecutionNeuron : Neuron, IExecution, IExecutionKernel
                     .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             }
         }
+    }
+
+    private async Task<IReadOnlyList<string>?> CollectPromptBlocksAsync(
+        ChatTurnWorkload workload,
+        CancellationToken cancellationToken)
+    {
+        var blocks = new List<string> { $"Current user turn: {workload.UserText}" };
+        try
+        {
+            var turns = await GrainFactory.GetGrain<IChatKernel>(workload.ChatId.ToGrainId())
+                .LoadTurnSnapshots()
+                .WaitAsync(cancellationToken)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            if (turns.Count > 0)
+            {
+                var start = Math.Max(0, turns.Count - 8);
+                var lines = new List<string>(turns.Count - start);
+                for (var i = start; i < turns.Count; i++)
+                {
+                    lines.Add($"- {turns[i].Status}: {turns[i].Text}");
+                }
+
+                blocks.Add("Recent chat turns:\n" + string.Join('\n', lines));
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Chat neuron may be absent when UI module is not loaded.
+        }
+
+        return blocks;
     }
 
     private void RequireMatchingExecution(ExecutionId executionId)
