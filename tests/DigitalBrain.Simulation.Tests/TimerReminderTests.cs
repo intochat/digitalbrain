@@ -41,7 +41,7 @@ public sealed class TimerReminderTests(SimulationFixture fixture)
         var timer = brain.Get<TimerModule.ITimer>(timerName);
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        var armed = await timer.SendAsync(
+        var armed = await timer.RequestAsync(
             new TimerModule.StartTimer(CommandId.New(), DurationSeconds: 1, Note: "reminder check"),
             cancellationToken);
 

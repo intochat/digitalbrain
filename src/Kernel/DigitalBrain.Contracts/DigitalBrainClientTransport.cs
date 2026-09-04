@@ -60,17 +60,6 @@ internal sealed class DigitalBrainClientTransport
         return _grains.GetGrain<TEntity>(EntityId.For<TEntity>(Owner, name).ToGrainId());
     }
 
-    internal Task<DeliveryOutcome> SendAsync<TNeuron>(
-        string name,
-        Signal signal,
-        CancellationToken cancellationToken)
-        where TNeuron : INeuron
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        RequireDomainNeuronContract(typeof(TNeuron));
-        return SendAsync(NeuronId.For<TNeuron>(Owner, name), signal, cancellationToken);
-    }
-
     internal async Task<DeliveryOutcome> SendAsync(
         NeuronId receiver,
         Signal signal,

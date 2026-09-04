@@ -10,6 +10,7 @@ builder.Services.Configure<StartupScriptOptions>(
     builder.Configuration.GetSection(StartupScriptOptions.SectionName));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IStartupActivationSource, DigitalBrainActivationSource>();
+builder.Services.AddSingleton<IBehaviorAdmissionSource, DigitalBrainBehaviorAdmissionSource>();
 builder.Services.AddSingleton<IStartupScriptRunner, CSharpStartupScriptRunner>();
 builder.Services.AddSingleton<IStartupExecutionLedger>(services =>
 {
@@ -17,4 +18,5 @@ builder.Services.AddSingleton<IStartupExecutionLedger>(services =>
     return new FileStartupExecutionLedger(options.StateDirectory);
 });
 builder.Services.AddHostedService<StartupScriptWorker>();
+builder.Services.AddHostedService<BehaviorScriptWorker>();
 await builder.Build().RunAsync();

@@ -3,7 +3,6 @@ using DigitalBrain.Abstractions.Entities;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
-using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Synapses;
 
 using DigitalBrain.Core;
@@ -71,10 +70,6 @@ public static class Brain
 
         public TNeuron GetGrainProxy<TNeuron>(string name = "default") where TNeuron : class, INeuron
             => _inner.GetGrainProxy<TNeuron>(name);
-
-        public Task<DeliveryOutcome> SendAsync<TNeuron>(string name, Signal signal, CancellationToken cancellationToken = default)
-            where TNeuron : INeuron
-            => _inner.SendAsync<TNeuron>(name, signal, cancellationToken);
 
         public Task<IReadOnlyList<Synapse>> GetSynapsesAsync(CancellationToken cancellationToken = default)
             => _inner.GetSynapsesAsync(cancellationToken);

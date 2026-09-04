@@ -18,7 +18,7 @@ public sealed class VectorMemoryTests(SimulationFixture fixture)
             new DateTimeOffset(2026, 9, 3, 12, 0, 0, TimeSpan.Zero));
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        var stored = await memory.SendAsync(
+        var stored = await memory.RequestAsync(
             new StoreVectorMemory(
                 memoryNamespace,
                 "meeting",
@@ -30,7 +30,7 @@ public sealed class VectorMemoryTests(SimulationFixture fixture)
         Assert.True(stored.Stored);
         Assert.Equal(VectorMemoryStoreStatus.Stored, stored.Status);
 
-        var matches = await memory.SendAsync(
+        var matches = await memory.RequestAsync(
             new SearchVectorMemory(memoryNamespace, "calendar", Limit: 1, Metadata: null),
             cancellationToken);
 

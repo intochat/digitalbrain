@@ -1,4 +1,5 @@
 using System.Reflection;
+using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
@@ -63,6 +64,25 @@ public sealed class ContractShapeTests
             binder: null,
             Type.EmptyTypes,
             modifiers: null));
+    }
+
+    [Fact]
+    public void TypedSendIsTheOnlyPublicFireOnANeuronReference()
+    {
+        var fires = typeof(NeuronReference<>)
+            .GetMethods(BindingFlags.Instance | BindingFlags.Public)
+            .Where(method => method.Name is "SendAsync" or "DeliverAsync")
+            .ToArray();
+        Assert.Empty(fires);
+
+        var send = typeof(NeuronReferenceExtensions).GetMethod(
+            nameof(NeuronReferenceExtensions.SendAsync),
+            BindingFlags.Public | BindingFlags.Static);
+        Assert.NotNull(send);
+        Assert.Contains(
+            send.GetGenericArguments()[0].GetGenericParameterConstraints(),
+            constraint => constraint.IsGenericType
+                && constraint.GetGenericTypeDefinition() == typeof(IHandle<>));
     }
 
     [Fact]

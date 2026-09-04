@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.UI;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 
@@ -7,12 +8,20 @@ namespace DigitalBrain.Scripting.Startup;
 internal sealed class CSharpStartupScriptRunner : IStartupScriptRunner
 {
     private static readonly ScriptOptions Options = ScriptOptions.Default
-        .WithReferences(typeof(object).Assembly, typeof(IDigitalBrain).Assembly)
+        .WithReferences(
+            typeof(object).Assembly,
+            typeof(IDigitalBrain).Assembly,
+            typeof(IChart).Assembly)
         .WithImports(
             "System",
             "System.Threading",
             "System.Threading.Tasks",
-            "DigitalBrain.Abstractions");
+            "DigitalBrain.Abstractions",
+            "DigitalBrain.Abstractions.Identity",
+            "DigitalBrain.Abstractions.Journals",
+            "DigitalBrain.Abstractions.Neurons",
+            "DigitalBrain.Abstractions.Signals",
+            "DigitalBrain.UI");
 
     public async Task<StartupScriptRunResult> RunAsync(
         StartupScript script,

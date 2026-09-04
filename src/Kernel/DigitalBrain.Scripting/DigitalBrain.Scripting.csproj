@@ -11,9 +11,11 @@
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
     <ProjectReference Include="../../Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
+    <ProjectReference Include="../../Modules/UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Scripting.Tests" />
+    <InternalsVisibleTo Include="DigitalBrain.Simulation.Tests" />
   </ItemGroup>
   <ItemGroup>
     <Compile Remove="scripts/start.cs" />

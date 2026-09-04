@@ -3,7 +3,6 @@ using DigitalBrain.Abstractions.Entities;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
-using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Synapses;
 
 namespace DigitalBrain.Scripting.Tests;
@@ -47,12 +46,6 @@ internal sealed class FakeDigitalBrain(string owner) : IDigitalBrain
 
     public TNeuron GetGrainProxy<TNeuron>(string name = "default")
         where TNeuron : class, INeuron => throw new NotSupportedException();
-
-    public Task<DeliveryOutcome> SendAsync<TNeuron>(
-        string name,
-        Signal signal,
-        CancellationToken cancellationToken = default)
-        where TNeuron : INeuron => throw new NotSupportedException();
 
     public Task<JournalRead> ReadJournalAsync(
         JournalKind kind,

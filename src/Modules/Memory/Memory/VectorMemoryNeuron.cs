@@ -9,10 +9,7 @@ namespace DigitalBrain.Memory;
 [GrainType("vectormemory")]
 public sealed class VectorMemoryNeuron :
     Neuron,
-    IVectorMemory,
-    IHandle<StoreVectorMemory>,
-    IHandle<SearchVectorMemory>,
-    IHandle<RemoveVectorMemory>
+    IVectorMemory
 {
     private readonly IEmbeddingGenerator<string, Embedding<float>>? _embeddings;
     private readonly IVectorMemoryStore _store;

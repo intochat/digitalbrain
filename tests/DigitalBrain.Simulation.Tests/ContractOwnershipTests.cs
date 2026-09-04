@@ -19,6 +19,12 @@ public sealed class ContractOwnershipTests
         Assert.Equal("DigitalBrain.Abstractions.Signals", typeof(DigitalBrainActivated).Namespace);
         Assert.Equal("DigitalBrain.Abstractions.Signals", typeof(JournalProjectionAttribute).Namespace);
         AssertAlias<DigitalBrainActivated>("db.digitalbrain-activated");
+        AssertAlias<AdmitBehavior>("db.admit-behavior");
+        AssertAlias<BehaviorAdmitted>("db.behavior-admitted");
+        AssertAlias<PublishPost>("db.publish-post");
+        AssertAlias<NewPost>("db.new-post");
+        Assert.Equal("db.behaviors", AliasOf(typeof(IBehaviors)));
+        Assert.Equal("db.x-account", AliasOf(typeof(IXAccount)));
         AssertField<DigitalBrainActivated>(
             nameof(DigitalBrainActivated.Owner),
             0,
@@ -181,12 +187,15 @@ public sealed class ContractOwnershipTests
     }
 
     private static void AssertAlias<T>(string expected)
+        => Assert.Equal(expected, AliasOf(typeof(T)));
+
+    private static string AliasOf(Type type)
     {
         var alias = Assert.Single(
-            typeof(T).GetCustomAttributesData(),
+            type.GetCustomAttributesData(),
             static attribute => attribute.AttributeType.Name == "AliasAttribute");
 
-        Assert.Equal(expected, Assert.Single(alias.ConstructorArguments).Value);
+        return Assert.IsType<string>(Assert.Single(alias.ConstructorArguments).Value);
     }
 
     private static void AssertField<T>(string propertyName, int expectedId, Type expectedType)

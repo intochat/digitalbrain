@@ -11,11 +11,13 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="xunit.v3.mtp-v2" />
+    <PackageReference Include="Reqnroll.xunit.v3" />
     <!-- Host pin mirroring DigitalBrain.Silo. Windows-only: native Foundry assets crash the
          MTP test host handshake on Linux CI (exit code 5). -->
     <PackageReference Include="Microsoft.AI.Foundry.Local" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../../src/Kernel/DigitalBrain.Scripting/DigitalBrain.Scripting.csproj" />
     <ProjectReference Include="../../src/Product/DigitalBrain.Product.Contracts/DigitalBrain.Product.Contracts.csproj" />
     <ProjectReference Include="../../src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
     <ProjectReference Include="../../src/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />

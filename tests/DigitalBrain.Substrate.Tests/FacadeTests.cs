@@ -54,7 +54,7 @@ public sealed class FacadeTests
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => silent.SendAsync<SilentResponse>(new SilentRequest("ignored"), cancellation.Token));
+            () => silent.RequestAsync<SilentResponse>(new SilentRequest("ignored"), cancellation.Token));
 
         Assert.False(cancellation.IsCancellationRequested);
         Assert.Contains(nameof(SilentRequest), failure.Message, StringComparison.Ordinal);

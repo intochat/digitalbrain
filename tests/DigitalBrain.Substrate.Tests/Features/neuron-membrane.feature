@@ -1,7 +1,7 @@
 Feature: Neuron membrane — fire, handle, journal
   The outside language is IDigitalBrain. A script, MCP tool, or console fires a Signal
   at a named neuron. There is no IOrleans and no FireSignal on the grain contract:
-  IDigitalBrain.SendAsync / NeuronReference.SendAsync is the fire.
+  NeuronReference.SendAsync is the fire, and it only compiles when the target IHandle<T>s T.
   IHandle<T> is the innate capability to receive T. A successful handle learns a
   synapse on the SOURCE neuron (Hebbian). The traffic journal records the
   interaction envelope (SignalDelivery), not a growing domain snapshot.

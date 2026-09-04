@@ -37,13 +37,6 @@ public sealed class DigitalBrainClient : IDigitalBrain
         where TEntity : class, IEntity
         => _transport.GetEntity<TEntity>(name);
 
-    public Task<DeliveryOutcome> SendAsync<TNeuron>(
-        string name,
-        Signal signal,
-        CancellationToken cancellationToken = default)
-        where TNeuron : INeuron
-        => _transport.SendAsync<TNeuron>(name, signal, cancellationToken);
-
     public Task<JournalRead> ReadJournalAsync(
         JournalKind kind,
         long afterSequence = 0,

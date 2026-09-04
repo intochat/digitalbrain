@@ -108,10 +108,11 @@ internal static class OwnerCommandsHttpMaps
                         return;
                     }
 
-                    await brain.SendAsync<IUIRenderer>(
-                        surfaceInstance,
-                        new OpenSurface(CommandId.New(), request.SurfaceKey, request.Title),
-                        cancellationToken).ConfigureAwait(false);
+                    await brain.Get<IUIRenderer>(surfaceInstance)
+                        .SendAsync(
+                            new OpenSurface(CommandId.New(), request.SurfaceKey, request.Title),
+                            cancellationToken)
+                        .ConfigureAwait(false);
                     http.Response.StatusCode = StatusCodes.Status202Accepted;
                     return;
                 }

@@ -20,16 +20,16 @@ public readonly struct NeuronReference<TNeuron> : IEquatable<NeuronReference<TNe
 
     public NeuronId Id => NeuronId.For<TNeuron>(_client.Owner, _name);
 
-    public Task<DeliveryOutcome> SendAsync(
-        Signal signal,
-        CancellationToken cancellationToken = default)
-        => _client.SendAsync(Id, signal, cancellationToken);
-
-    public Task<TResponse> SendAsync<TResponse>(
+    public Task<TResponse> RequestAsync<TResponse>(
         Signal<TResponse> request,
         CancellationToken cancellationToken = default)
         where TResponse : Signal
         => _client.SendRequestAsync<TResponse>(Id, request, cancellationToken);
+
+    internal Task<DeliveryOutcome> DeliverAsync(
+        Signal signal,
+        CancellationToken cancellationToken)
+        => _client.SendAsync(Id, signal, cancellationToken);
 
     public Task<JournalRead> ReadJournalAsync(
         JournalKind kind,
