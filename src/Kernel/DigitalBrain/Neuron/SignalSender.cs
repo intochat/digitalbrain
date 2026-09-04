@@ -139,6 +139,9 @@ internal sealed class SignalSender
         NeuronId receiver,
         SignalDelivery delivery,
         DeliveryMode mode)
+        // Same-activation Deliver is in-process: a serialized neuron cannot await its own
+        // grain proxy. Incoming/outgoing call filters therefore do not see this path;
+        // journal and synapse population stay here, not in a filter.
         => mode == DeliveryMode.Awaited && receiver == _source
             ? _deliverLocally(delivery, CancellationToken.None)
             : _grains.GetGrain<INeuronGrain>(receiver.ToGrainId()).Deliver(delivery);

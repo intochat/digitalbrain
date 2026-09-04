@@ -27,6 +27,10 @@ Three concepts share the word "journal" in this codebase's ancestry. This is the
    `DigitalBrainBuilder.DurableStateStore`). The blob resource/connection is still literally
    named `journal` (`DigitalBrainNames.Journal` / `JournalConnection`) — a deployed-name
    compatibility constraint, not vocabulary.
+5. **Orleans grain call filters are not a journal and not a synapse writer.** Incoming/outgoing
+   filters may wrap the membrane (auth, principal, trace). They must not append feeds or
+   `Record`/`Bind` synapses: self-send never hits a grain proxy, Subscribe is explicit
+   `BindOutgoing`, and query methods interleave. `SignalSender` is the only population path.
 
 ## Semantics pinned by tests (phase 2)
 
