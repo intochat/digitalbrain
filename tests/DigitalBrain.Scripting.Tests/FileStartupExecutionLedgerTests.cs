@@ -52,4 +52,30 @@ public sealed class FileStartupExecutionLedgerTests
             directory.Delete(recursive: true);
         }
     }
+
+    [Fact]
+    public async Task Failed_append_does_not_retain_an_unpersisted_execution()
+    {
+        var directory = Directory.CreateTempSubdirectory("digitalbrain-scripting-");
+        try
+        {
+            var stateDirectory = Directory.CreateDirectory(Path.Combine(directory.FullName, "state"));
+            Directory.CreateDirectory(Path.Combine(stateDirectory.FullName, "startup-executions.jsonl"));
+            var key = new StartupExecutionKey("owner", "signal", "sha256");
+            var execution = StartupExecution.Succeeded(key, "started", DateTimeOffset.UnixEpoch);
+            var ledger = new FileStartupExecutionLedger(stateDirectory.FullName);
+
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => ledger.RecordAsync(
+                execution,
+                TestContext.Current.CancellationToken));
+
+            var restored = await ledger.FindAsync(key, TestContext.Current.CancellationToken);
+
+            Assert.Null(restored);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
 }

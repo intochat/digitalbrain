@@ -40,7 +40,7 @@ internal sealed class FileStartupExecutionLedger : IStartupExecutionLedger
         try
         {
             await LoadAsync(cancellationToken);
-            if (!executions.TryAdd(execution.Key, execution))
+            if (executions.ContainsKey(execution.Key))
             {
                 return;
             }
@@ -56,6 +56,7 @@ internal sealed class FileStartupExecutionLedger : IStartupExecutionLedger
             await using var writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
             await writer.WriteLineAsync(JsonSerializer.Serialize(execution, SerializerOptions));
             await writer.FlushAsync(cancellationToken);
+            executions.Add(execution.Key, execution);
         }
         finally
         {
