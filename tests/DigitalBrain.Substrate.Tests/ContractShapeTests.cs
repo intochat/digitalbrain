@@ -88,12 +88,17 @@ public sealed class ContractShapeTests
     [Fact]
     public void NeuronContractsSeparateDeliveryFromObservation()
     {
-        Assert.Equal(
-            [nameof(INeuron.Deliver)],
-            typeof(INeuron).GetMethods().Select(static method => method.Name).Order().ToArray());
+        Assert.DoesNotContain(
+            typeof(INeuron).GetMethods(),
+            static method => method.Name is nameof(INeuronGrain.Deliver)
+                or nameof(INeuronGrain.BindOutgoing)
+                or nameof(INeuronGrain.UnbindOutgoing));
+        Assert.Contains(
+            typeof(INeuronGrain).GetMethods(),
+            static method => method.Name == nameof(INeuronGrain.Deliver));
         Assert.Equal(
             typeof(Task<DeliveryOutcome>),
-            typeof(INeuron).GetMethod(nameof(INeuron.Deliver))!.ReturnType);
+            typeof(INeuronGrain).GetMethod(nameof(INeuronGrain.Deliver))!.ReturnType);
         Assert.Equal(
             [
                 nameof(INeuronQuery.ReadJournal),
@@ -155,6 +160,9 @@ public sealed class ContractShapeTests
         Assert.Equal(
             "db.v2.neuron",
             Assert.Single(typeof(INeuron).GetCustomAttributes<AliasAttribute>()).Alias);
+        Assert.Equal(
+            "db.v2.neuron-grain",
+            Assert.Single(typeof(INeuronGrain).GetCustomAttributes<AliasAttribute>()).Alias);
         Assert.Equal(
             "db.v2.neuron-query",
             Assert.Single(typeof(INeuronQuery).GetCustomAttributes<AliasAttribute>()).Alias);

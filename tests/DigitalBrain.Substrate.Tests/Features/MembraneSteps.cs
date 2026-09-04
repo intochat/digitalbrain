@@ -31,6 +31,11 @@ public sealed class MembraneSteps
     public async Task GivenProfileExists(string name)
         => _ = await Profile(name).Read();
 
+    [Given(@"timeline ""(.*)"" subscribes to account ""(.*)"" for NewPost")]
+    public Task GivenTimelineSubscribesToAccount(string timeline, string account)
+        => Brain.Grains.GetGrain<ITimeline>(TimelineId(timeline).ToGrainId())
+            .HandleAsync(new Subscribe(AccountId(account), nameof(NewPost)), CancellationToken.None);
+
     [Given(@"account ""(.*)"" has introduced NewPost to timeline ""(.*)""")]
     public async Task GivenAccountIntroducedNewPost(string account, string timeline)
     {
@@ -116,7 +121,19 @@ public sealed class MembraneSteps
 
     [Then(@"account ""(.*)"" has a learned NewPost synapse to timeline ""(.*)""")]
     public async Task ThenHasLearnedSynapseToTimeline(string account, string timeline)
-        => Assert.NotNull(await NewPostSynapse(AccountId(account), TimelineId(timeline)));
+    {
+        var synapse = await NewPostSynapse(AccountId(account), TimelineId(timeline));
+        Assert.NotNull(synapse);
+        Assert.Equal(SynapseKind.Learned, synapse.Value.Kind);
+    }
+
+    [Then(@"account ""(.*)"" has a bound NewPost synapse to timeline ""(.*)""")]
+    public async Task ThenHasBoundSynapseToTimeline(string account, string timeline)
+    {
+        var synapse = await NewPostSynapse(AccountId(account), TimelineId(timeline));
+        Assert.NotNull(synapse);
+        Assert.Equal(SynapseKind.Bound, synapse.Value.Kind);
+    }
 
     [Then(@"account ""(.*)"" has no NewPost synapse to timeline ""(.*)""")]
     public async Task ThenHasNoSynapseToTimeline(string source, string timeline)

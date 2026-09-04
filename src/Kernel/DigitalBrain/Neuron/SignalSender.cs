@@ -141,7 +141,7 @@ internal sealed class SignalSender
         DeliveryMode mode)
         => mode == DeliveryMode.Awaited && receiver == _source
             ? _deliverLocally(delivery, CancellationToken.None)
-            : _grains.GetGrain<INeuron>(receiver.ToGrainId()).Deliver(delivery);
+            : _grains.GetGrain<INeuronGrain>(receiver.ToGrainId()).Deliver(delivery);
 
     private async Task ObserveDetachedAsync(NeuronId receiver, SignalDelivery delivery)
     {

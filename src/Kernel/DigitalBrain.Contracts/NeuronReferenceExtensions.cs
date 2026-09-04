@@ -1,3 +1,4 @@
+using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
 
@@ -35,5 +36,51 @@ public static class NeuronReferenceExtensions
         }
 
         return neuron.RequestCoreAsync(request, cancellationToken);
+    }
+
+    public static Task<DeliveryOutcome> PublishAsync<TNeuron, TSignal>(
+        this NeuronReference<TNeuron> neuron,
+        TSignal signal,
+        CancellationToken cancellationToken = default)
+        where TNeuron : INeuron, IHandle<TSignal>
+        where TSignal : Signal
+        => neuron.SendAsync(signal, cancellationToken);
+
+    public static Task SubscribeToAsync<TSelf, TSource, TSignal>(
+        this NeuronReference<TSelf> subscriber,
+        NeuronId source,
+        CancellationToken cancellationToken = default)
+        where TSelf : INeuron, IHandle<TSignal>
+        where TSource : INeuron
+        where TSignal : Signal
+    {
+        var expected = NeuronId.For<TSource>(source.Owner, source.Name);
+        if (source != expected)
+        {
+            throw new ArgumentException(
+                $"Neuron '{source}' is not a '{expected.Type}' instance.",
+                nameof(source));
+        }
+
+        return subscriber.SendAsync(new Subscribe(source, typeof(TSignal).Name), cancellationToken);
+    }
+
+    public static Task UnsubscribeFromAsync<TSelf, TSource, TSignal>(
+        this NeuronReference<TSelf> subscriber,
+        NeuronId source,
+        CancellationToken cancellationToken = default)
+        where TSelf : INeuron, IHandle<TSignal>
+        where TSource : INeuron
+        where TSignal : Signal
+    {
+        var expected = NeuronId.For<TSource>(source.Owner, source.Name);
+        if (source != expected)
+        {
+            throw new ArgumentException(
+                $"Neuron '{source}' is not a '{expected.Type}' instance.",
+                nameof(source));
+        }
+
+        return subscriber.SendAsync(new Unsubscribe(source, typeof(TSignal).Name), cancellationToken);
     }
 }

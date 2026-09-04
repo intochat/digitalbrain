@@ -89,4 +89,44 @@ internal sealed class SynapseSet
         _synapses[key] = potentiated;
         return potentiated;
     }
+
+    internal Synapse Bind(NeuronId target, string signalType)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(signalType);
+
+        var now = _time.GetUtcNow();
+        var key = KeyFor(target, signalType);
+        if (_synapses.TryGetValue(key, out var existing))
+        {
+            _synapses[key] = new Synapse(
+                existing.Source,
+                existing.Target,
+                existing.SignalType,
+                existing.Kind is SynapseKind.Bound or SynapseKind.Innate
+                    ? existing.Weight
+                    : _options.InnateWeight,
+                existing.LastFiredAt,
+                SynapseKind.Bound,
+                existing.FireCount,
+                isBlocking: false);
+            return _synapses[key];
+        }
+
+        var bound = new Synapse(
+            _owner,
+            target,
+            signalType,
+            _options.InnateWeight,
+            now,
+            SynapseKind.Bound,
+            isBlocking: false);
+        _synapses[key] = bound;
+        return bound;
+    }
+
+    internal void Unbind(NeuronId target, string signalType)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(signalType);
+        _synapses.Remove(KeyFor(target, signalType));
+    }
 }

@@ -23,6 +23,7 @@ public sealed class SynapseOptions
     public double InitialWeightFor(SynapseKind kind) => kind switch
     {
         SynapseKind.Innate => InnateWeight,
+        SynapseKind.Bound => InnateWeight,
         SynapseKind.Learned => InitialLearnedWeight,
         SynapseKind.Discovered => InitialDiscoveredWeight,
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),

@@ -3,6 +3,7 @@ using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
+using DigitalBrain.Abstractions.Synapses;
 using DigitalBrain.Testing;
 using Xunit;
 
@@ -40,10 +41,31 @@ public sealed class FacadeTests
         var synapses = await announcerReference.GetSynapsesAsync(cancellationToken);
 
         Assert.Contains(rootJournal.Delta, delivery => delivery.Signal is DigitalBrainActivated);
-        Assert.Equal(2, announcerJournal.Delta.Count);
-        Assert.Equal(2, synapses.Count);
-        Assert.All(synapses, synapse => Assert.Equal(announcerId, synapse.Source));
+        Assert.Empty(announcerJournal.Delta);
+        Assert.Empty(synapses);
         Assert.Empty(await brain.Brain.GetSynapsesAsync(cancellationToken));
+    }
+
+    [Fact]
+    public async Task SubscribeTo_FromNeuronReference_WritesBoundSynapseOnSource()
+    {
+        await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([]) });
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await brain.Brain.ActivateAsync(cancellationToken);
+
+        var announcer = brain.Brain.Get<IAnnouncer>("facade");
+        var ear = brain.Brain.Get<IEarA>("listener");
+
+        await ear.SubscribeToAsync<IEarA, IAnnouncer, Announced>(announcer.Id, cancellationToken);
+
+        var synapse = Assert.Single(await announcer.GetSynapsesAsync(cancellationToken));
+        Assert.Equal(SynapseKind.Bound, synapse.Kind);
+        Assert.Equal(announcer.Id, synapse.Source);
+        Assert.Equal(ear.Id, synapse.Target);
+        Assert.Equal(nameof(Announced), synapse.SignalType);
+        Assert.Equal(
+            1,
+            await brain.Grains.GetGrain<IAnnouncer>(announcer.Id.ToGrainId()).Announce("hello"));
     }
 
     [Fact]

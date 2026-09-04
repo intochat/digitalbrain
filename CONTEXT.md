@@ -15,7 +15,7 @@ A typed, immutable message. Identity, causation, correlation, and ownership ride
 _Avoid_: event, bus message, “synapse” as a message
 
 **Synapse**
-A directed, typed, weighted edge between two Neurons. Lives on the source. Strengthens when the receiver **handles** the signal; decays when unused. Anatomy, not traffic.
+A directed, typed, weighted edge between two Neurons. Lives on the source. `SubscribeTo` writes a Bound edge (does not decay). A handled Send writes a Learned edge (decays). Anatomy, not traffic.
 _Avoid_: message, subscription grain, journal entry
 
 **Journal**
@@ -37,7 +37,9 @@ User- or assistant-authored C#, compiled against module contracts, executed outs
 **Behavior**
 An admitted script that keeps running. It watches journals and sends typed Signals / writes Entities.
 
-Trigger is type-safe: you may `Send` `TSignal` only to a neuron that `IHandle<TSignal>`s it.
+Trigger is type-safe: you may `Send`/`Publish` `TSignal` only to a neuron that `IHandle<TSignal>`s it.
+`IHandle<T>` is the capability to receive T. A **synapse** is who actually receives T from **this** source.
+`SubscribeTo<TSource, TSignal>(sourceId)` writes that synapse (durable, does not decay). Broadcast fires only along those synapses — not to every neuron type that `IHandle`s T.
 
 ```csharp
 await Brain.Get<IBehaviors>().SendAsync(new AdmitBehavior("elon-chart", source));

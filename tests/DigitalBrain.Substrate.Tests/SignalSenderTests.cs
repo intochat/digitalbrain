@@ -123,17 +123,17 @@ public sealed class SignalSenderTests
         var silentId = new NeuronId("mixedpingsilent", owner, "default");
         var source = brain.Grains.GetGrain<IMixedBroadcaster>(sourceId.ToGrainId());
         var sourceQuery = brain.Grains.GetGrain<INeuronQuery>(sourceId.ToGrainId());
+        var sinkId = new NeuronId("mixedpingsink", owner, "default");
+        await brain.Grains.GetGrain<IMixedPingSink>(sinkId.ToGrainId())
+            .HandleAsync(new Subscribe(sourceId, nameof(MixedPing)), TestContext.Current.CancellationToken);
 
         var reached = await source.Broadcast(silentId, "mixed");
 
         Assert.Equal(2, reached);
         var routes = await sourceQuery.ReadSynapses();
-        var handled = Assert.Single(routes, route =>
-            route.Target == new NeuronId("mixedpingsink", owner, "default"));
+        var handled = Assert.Single(routes, route => route.Target == sinkId);
         var silent = Assert.Single(routes, route => route.Target == silentId);
-        Assert.Equal(
-            handled,
-            Assert.Single(routes, route => route.Kind == SynapseKind.Learned));
+        Assert.Equal(SynapseKind.Bound, handled.Kind);
         Assert.Equal(SynapseKind.Discovered, silent.Kind);
         Assert.Equal(1, handled.FireCount);
         Assert.Equal(3, silent.FireCount);

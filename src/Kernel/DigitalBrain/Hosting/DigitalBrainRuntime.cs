@@ -25,7 +25,6 @@ public static class DigitalBrainRuntime
         ModelPayloadSerialization.AddModelPayloadSerialization(builder.Services);
         builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         builder.Services.TryAddSingleton<SynapseOptions>();
-        builder.Services.TryAddSingleton<SignalHandlerIndex>();
         builder.Services.TryAddSingleton<SignalRouter>();
         builder.Services.TryAddSingleton<NeuronRuntime>();
 

@@ -24,6 +24,7 @@ public readonly record struct NeuronId
     [Id(2)]
     public string Name { get; }
 
+    // Hosting key (Orleans). Scripts address neurons with For<TNeuron>, not grain ids.
     public string GrainKey => $"{Owner.Value}{IdentityPart.OwnerNameSeparator}{Name}";
 
     public GrainId ToGrainId() => GrainId.Create(Type, GrainKey);
@@ -31,9 +32,6 @@ public readonly record struct NeuronId
     public static NeuronId For<TNeuron>(OwnerId owner, string name)
         where TNeuron : INeuron
         => new(GrainTypeNameOf(typeof(TNeuron)), owner, name);
-
-    public static NeuronId BroadcastReceiver(string type, OwnerId owner, CorrelationId correlation)
-        => new(type, owner, correlation.Value.ToString("D"));
 
     public static string GrainTypeNameOf(Type neuronType) => GrainTypeNames.Of(neuronType);
 

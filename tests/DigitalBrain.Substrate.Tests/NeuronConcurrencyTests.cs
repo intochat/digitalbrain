@@ -18,9 +18,10 @@ public sealed class NeuronConcurrencyTests
 {
     private abstract class NeuronStub : INeuron, INeuronQuery
     {
-        public Task<DeliveryOutcome> Deliver(
-            SignalDelivery delivery,
-            CancellationToken cancellationToken = default)
+        public Task HandleAsync(Subscribe signal, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public Task HandleAsync(Unsubscribe signal, CancellationToken cancellationToken)
             => throw new NotSupportedException();
 
         public Task<JournalRead> ReadJournal(JournalKind kind, long afterSequence)

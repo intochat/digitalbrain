@@ -1,16 +1,8 @@
-using Orleans.Concurrency;
-
 using DigitalBrain.Abstractions.Signals;
 
 namespace DigitalBrain.Abstractions.Neurons;
 
-// Graph endpoint: accepts a Signal delivery and reports whether a handler ran.
+// A neuron is an addressable graph endpoint. IGrainWithStringKey is Orleans hosting;
+// product verbs (publish, broadcast, subscribe) live on Neuron and NeuronReference.
 [Alias("db.v2.neuron")]
-public interface INeuron : IGrainWithStringKey
-{
-    [Alias(nameof(Deliver))]
-    [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
-    Task<DeliveryOutcome> Deliver(
-        SignalDelivery delivery,
-        CancellationToken cancellationToken = default);
-}
+public interface INeuron : IGrainWithStringKey, IHandle<Subscribe>, IHandle<Unsubscribe>;

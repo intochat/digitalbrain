@@ -57,7 +57,7 @@ public readonly record struct Synapse
     // nobody uses is already weak the next time anyone looks at it.
     public double WeightAt(DateTimeOffset now, TimeSpan halfLife)
     {
-        if (Kind == SynapseKind.Innate)
+        if (Kind is SynapseKind.Innate or SynapseKind.Bound)
         {
             return Weight;
         }
@@ -91,7 +91,8 @@ public readonly record struct Synapse
     }
 
     public bool IsPrunedAt(DateTimeOffset now, TimeSpan halfLife, double floor)
-        => Kind != SynapseKind.Innate && WeightAt(now, halfLife) < floor;
+        => Kind is not (SynapseKind.Innate or SynapseKind.Bound)
+            && WeightAt(now, halfLife) < floor;
 
     public override string ToString()
         => $"{Source} --{SignalType}--> {Target}  w={Weight:F2}  fired={FireCount}  {Kind.ToString().ToLowerInvariant()}";

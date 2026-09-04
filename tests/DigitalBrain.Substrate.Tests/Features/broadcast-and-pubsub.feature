@@ -1,24 +1,15 @@
 Feature: Broadcast versus named-instance pub/sub
-  IAW had three channels (IReceiver, streams, observers). DigitalBrain collapses
-  neuron-to-neuron traffic to two verbs on the membrane: Send (directed fire) and
-  Broadcast (fan-out from THIS neuron). Orleans streams, BroadcastChannel, and
-  Azure queues are hosting adapters, not script vocabulary.
+  Broadcast fires only along synapses on the source. IHandle<T> is the capability
+  to receive T; it does not subscribe every instance of a type. SubscribeTo writes
+  a Bound synapse (does not decay). A handled directed Send writes a Learned synapse.
 
-  Broadcast receiver set (today):
-    1. Learned synapses on the source for that signal type (instance pub/sub)
-    2. The "default" instance of every grain type that declares IHandle<T>
-       (innate, type-level — NOT every named instance)
-    3. Never the emitter itself
+  Broadcast receiver set:
+    1. Synapses on the source for that signal type
+    2. Never the emitter itself
+    3. Never "all default IHandle types" in the silo
 
-  Named accounts therefore do not share an audience. Account "elon" and account
-  "vlad" are two instances of the same neuron type. Subscribing to elon means a
-  NewPost synapse stored ON elon, targeting the subscriber. Vlad's posts follow
-  vlad's synapses. IHandle<NewPost> on Timeline is the capability to receive;
-  it does not subscribe alice to every account.
-
-  Azure Service Bus / Orleans persistent streams are for offline or huge fan-out
-  that must not live in elon's synapse dictionary. They are not how alice
-  subscribes to elon.
+  Named accounts do not share an audience. Account "elon" and account "vlad"
+  are two instances. Subscribing to elon means a NewPost synapse stored ON elon.
 
   Rule: Who may broadcast
 
@@ -28,12 +19,21 @@ Feature: Broadcast versus named-instance pub/sub
       Then the broadcast reaches 0 receivers
       And account "elon" has no synapses
 
-    Scenario: Broadcast reaches every grain type that declares IHandle, at the default instance
+    Scenario: Broadcast without a synapse reaches nobody even when a type IHandle<T>
       Given a running brain
       And timeline "default" can handle NewPost
       When account "elon" broadcasts NewPost "to all defaults"
-      Then the broadcast reaches at least 1 receiver
-      And timeline "default" incoming journal contains NewPost "to all defaults"
+      Then the broadcast reaches 0 receivers
+      And timeline "default" incoming journal does not contain NewPost "to all defaults"
+
+    Scenario: Subscribe then broadcast reaches only that instance
+      Given a running brain
+      And timeline "alice" can handle NewPost
+      And timeline "alice" subscribes to account "elon" for NewPost
+      When account "elon" broadcasts NewPost "starship"
+      Then the broadcast reaches 1 receivers
+      And timeline "alice" incoming journal contains NewPost "starship"
+      And account "elon" has a bound NewPost synapse to timeline "alice"
 
     Scenario: The emitter is never a receiver of its own broadcast
       Given a running brain

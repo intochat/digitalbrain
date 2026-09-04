@@ -34,7 +34,7 @@ public interface IAccount : INeuron
 }
 
 [Alias("DigitalBrain.Substrate.Tests.ITimeline")]
-public interface ITimeline : INeuron;
+public interface ITimeline : INeuron, IHandle<NewPost>;
 
 [Alias("DigitalBrain.Substrate.Tests.IProfile")]
 public interface IProfile : IEntity<ProfileState>
