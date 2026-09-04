@@ -36,6 +36,7 @@ public sealed class TopologyConformanceTests(ModelFixture fixture)
     [Theory]
     [InlineData(ProductSurfaceResourceNames.Kernel)]
     [InlineData(ProductSurfaceResourceNames.Mcp)]
+    [InlineData(ProductSurfaceResourceNames.Scripting)]
     public void ProductSurfaceResourceExists(string resourceName)
     {
         var resource = fixture.Model.Resource(resourceName);
@@ -50,6 +51,15 @@ public sealed class TopologyConformanceTests(ModelFixture fixture)
         var kernel = fixture.Model.Resource(ProductSurfaceResourceNames.Kernel);
 
         Assert.Contains(kernel, mcp.Annotations.OfType<WaitAnnotation>().Select(static wait => wait.Resource));
+    }
+
+    [Fact]
+    public void ScriptingWaitsForKernel()
+    {
+        var scripting = fixture.Model.Resource(ProductSurfaceResourceNames.Scripting);
+        var kernel = fixture.Model.Resource(ProductSurfaceResourceNames.Kernel);
+
+        Assert.Contains(kernel, scripting.Annotations.OfType<WaitAnnotation>().Select(static wait => wait.Resource));
     }
 
     [Fact]

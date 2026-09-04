@@ -2,7 +2,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <RootNamespace>DigitalBrain.Scripting</RootNamespace>
-    <Description>Placeholder for the future out-of-process generated-program worker; generated code never defines grains or wire contracts.</Description>
+    <Description>Out-of-process startup scripting worker for DigitalBrain.</Description>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" />
@@ -16,6 +16,7 @@
     <InternalsVisibleTo Include="DigitalBrain.Scripting.Tests" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="scripts/start.cs" CopyToOutputDirectory="PreserveNewest" Condition="Exists('scripts/start.cs')" />
+    <Compile Remove="scripts/start.cs" />
+    <Content Include="scripts/start.cs" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

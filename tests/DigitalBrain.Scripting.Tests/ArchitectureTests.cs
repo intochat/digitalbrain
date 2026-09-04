@@ -1,0 +1,32 @@
+using DigitalBrain.Scripting.Startup;
+using Xunit;
+
+namespace DigitalBrain.Scripting.Tests;
+
+public sealed class ArchitectureTests
+{
+    [Fact]
+    public void Kernel_does_not_reference_scripting()
+    {
+        var references = typeof(DigitalBrain.Core.Neuron).Assembly.GetReferencedAssemblies();
+
+        Assert.DoesNotContain(references, reference => reference.Name == "DigitalBrain.Scripting");
+    }
+
+    [Fact]
+    public async Task Copied_start_script_reports_the_owner_without_activating_the_brain()
+    {
+        var scriptPath = Path.Combine(AppContext.BaseDirectory, "scripts", "start.cs");
+        var script = await StartupScript.ReadAsync(scriptPath, TestContext.Current.CancellationToken);
+        var brain = new FakeDigitalBrain("alice");
+
+        var result = await new CSharpStartupScriptRunner().RunAsync(
+            script,
+            brain,
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("DigitalBrain owner 'alice' startup behavior completed.", result.Summary);
+        Assert.Equal(0, brain.ActivateCallCount);
+    }
+}

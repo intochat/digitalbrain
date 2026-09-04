@@ -19,6 +19,8 @@ internal sealed class FakeDigitalBrain(string owner) : IDigitalBrain
 
     public bool WasWatchJournalCalled { get; private set; }
 
+    public int ActivateCallCount { get; private set; }
+
     public long? WatchJournalAfterSequence { get; private set; }
 
     public JournalKind? ReadJournalKind { get; private set; }
@@ -31,7 +33,11 @@ internal sealed class FakeDigitalBrain(string owner) : IDigitalBrain
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    public Task ActivateAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task ActivateAsync(CancellationToken cancellationToken = default)
+    {
+        ActivateCallCount++;
+        return Task.CompletedTask;
+    }
 
     public NeuronReference<TNeuron> Get<TNeuron>(string name = "default")
         where TNeuron : INeuron => throw new NotSupportedException();

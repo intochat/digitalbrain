@@ -140,7 +140,18 @@ var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.
     .WithHttpHealthCheck("/health", endpointName: ProductSurfaceResources.McpHttpEndpointName)
     .WaitFor(kernel);
 
-// Later: AddProject<Projects.DigitalBrain_Scripting>(...) as a sibling resource for Script driver IPC.
-// Do not reference DigitalBrain.Scripting from Kernel — generated C# stays out of process.
+var scripting = builder.AddProject<Projects.DigitalBrain_Scripting>(ProductSurfaceResources.Scripting)
+    .WithReference(brain.AsClient())
+    .WithEnvironment(
+        ShellHostingExtensions.OwnerEnvironmentVariable,
+        ShellHostingExtensions.DefaultOwner)
+    .WithEnvironment(context =>
+    {
+        if (developmentClusterId is not null)
+        {
+            context.EnvironmentVariables["Orleans__ClusterId"] = developmentClusterId;
+        }
+    })
+    .WaitFor(kernel);
 
 builder.Build().Run();
