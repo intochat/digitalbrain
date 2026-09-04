@@ -12,6 +12,23 @@ internal sealed class FakeDigitalBrain(string owner) : IDigitalBrain
 {
     public OwnerId Owner { get; } = new(owner);
 
+    public JournalRead InitialJournal { get; set; } = new(0, [], null);
+
+    public Func<JournalKind, long, CancellationToken, IAsyncEnumerable<JournalRead>> WatchJournal { get; set; }
+        = static (_, _, _) => EmptyJournal();
+
+    public bool WasWatchJournalCalled { get; private set; }
+
+    public long? WatchJournalAfterSequence { get; private set; }
+
+    public JournalKind? ReadJournalKind { get; private set; }
+
+    public long? ReadJournalAfterSequence { get; private set; }
+
+    public CancellationToken ReadJournalCancellationToken { get; private set; }
+
+    public CancellationToken WatchJournalCancellationToken { get; private set; }
+
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     public Task ActivateAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -34,13 +51,30 @@ internal sealed class FakeDigitalBrain(string owner) : IDigitalBrain
     public Task<JournalRead> ReadJournalAsync(
         JournalKind kind,
         long afterSequence = 0,
-        CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        CancellationToken cancellationToken = default)
+    {
+        ReadJournalKind = kind;
+        ReadJournalAfterSequence = afterSequence;
+        ReadJournalCancellationToken = cancellationToken;
+        return Task.FromResult(InitialJournal);
+    }
 
     public IAsyncEnumerable<JournalRead> WatchJournalAsync(
         JournalKind kind,
         long afterSequence = 0,
-        CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        CancellationToken cancellationToken = default)
+    {
+        WasWatchJournalCalled = true;
+        WatchJournalAfterSequence = afterSequence;
+        WatchJournalCancellationToken = cancellationToken;
+        return WatchJournal(kind, afterSequence, cancellationToken);
+    }
 
     public Task<IReadOnlyList<Synapse>> GetSynapsesAsync(
         CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+    private static async IAsyncEnumerable<JournalRead> EmptyJournal()
+    {
+        yield break;
+    }
 }
