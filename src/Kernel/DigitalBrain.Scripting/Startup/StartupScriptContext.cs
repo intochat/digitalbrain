@@ -2,9 +2,15 @@ using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Scripting.Startup;
 
-public sealed class StartupScriptContext(IDigitalBrain brain, CancellationToken cancellationToken)
+public sealed class StartupScriptContext
 {
-    public IDigitalBrain Brain { get; } = brain;
+    internal StartupScriptContext(IDigitalBrain brain, CancellationToken cancellationToken)
+    {
+        Brain = brain;
+        CancellationToken = cancellationToken;
+    }
 
-    public CancellationToken CancellationToken { get; } = cancellationToken;
+    public IDigitalBrain Brain { get; }
+
+    public CancellationToken CancellationToken { get; }
 }
