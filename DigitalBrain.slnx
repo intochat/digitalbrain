@@ -6,9 +6,6 @@
   <Folder Name="/Modules/Behaviors/">
     <Project Path="src/Kernel/DigitalBrain.Scripting/DigitalBrain.Scripting.csproj" />
   </Folder>
-  <Folder Name="/Modules/Catalog/">
-    <Project Path="src/Modules/Catalog/Contracts/DigitalBrain.Modules.Catalog.Contracts.csproj" />
-  </Folder>
   <Folder Name="/Modules/AI/">
     <Project Path="src/Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
     <Project Path="src/Modules/AI/Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" />
@@ -64,7 +61,6 @@
   </Folder>
   <Folder Name="/Tests/">
     <Project Path="tests/DigitalBrain.Aspire.Tests/DigitalBrain.Aspire.Tests.csproj" />
-    <Project Path="tests/DigitalBrain.Catalog.Tests/DigitalBrain.Catalog.Tests.csproj" />
     <Project Path="tests/DigitalBrain.E2E.Tests/DigitalBrain.E2E.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Simulation.Tests/DigitalBrain.Simulation.Tests.csproj" />
     <Project Path="tests/DigitalBrain.Scripting.Tests/DigitalBrain.Scripting.Tests.csproj" />
