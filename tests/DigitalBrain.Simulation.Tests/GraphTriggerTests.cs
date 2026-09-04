@@ -2,6 +2,8 @@ using System.Reflection;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
+using DigitalBrain.AI;
+using DigitalBrain.Chat;
 using DigitalBrain.Memory;
 using DigitalBrain.UI;
 using Xunit;
@@ -37,5 +39,8 @@ public sealed class GraphTriggerTests
         Assert.True(typeof(IHandle<OpenSurface>).IsAssignableFrom(typeof(IUIRenderer)));
         Assert.True(typeof(IHandle<StoreVectorMemory>).IsAssignableFrom(typeof(IVectorMemory)));
         Assert.True(typeof(IHandle<SearchVectorMemory>).IsAssignableFrom(typeof(IVectorMemory)));
+        Assert.True(typeof(IHandle<AgentRequest>).IsAssignableFrom(typeof(IAgent)));
+        Assert.True(typeof(IHandle<AgentRequest>).IsAssignableFrom(typeof(IAssistant)));
+        Assert.False(typeof(IHandle<AgentRequest>).IsAssignableFrom(typeof(IChat)));
     }
 }

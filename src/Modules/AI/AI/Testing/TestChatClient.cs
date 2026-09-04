@@ -197,7 +197,7 @@ internal sealed partial class TestChatClient : IChatClient
 
     // ChatTurnWorker's conversation-context line quotes the chat's full grain key right after
     // the word "chat" -- keep this pattern in sync with that literal. Scans every message
-    // rather than trusting "the first system message" to be it: Agent.RespondStreaming
+    // rather than trusting "the first system message" to be it: Agent.AskStreaming
     // prepends the assistant's OWN persona instructions as a system message ahead of
     // ChatTurnWorker's conversation-context one, so index 0 is the wrong message here.
     // Returning "main" when the pattern is absent from all of them is a loud failure

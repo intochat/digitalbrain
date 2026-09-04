@@ -1,13 +1,15 @@
 using System.Runtime.CompilerServices;
-using DigitalBrain.Product.Interactions;
+using System.Text;
+using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Core;
+using DigitalBrain.Product.Interactions;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.AI;
 
-// The setup layer over a raw LLM: an agent owns its initial prompt and its
-// toolset; model/provider concerns live in the injected chat client.
-public abstract class Agent : Neuron, IAgent
+// LLM turn + optional MCP. Agent turns must not call IDigitalBrain: nested
+// BrainNeuron.Send deadlocks. In-silo callers use IAgentKernel on this grain.
+public abstract class Agent : Neuron, IAgent, IAgentKernel
 {
     private readonly IChatClient _chatClient;
 
@@ -23,7 +25,32 @@ public abstract class Agent : Neuron, IAgent
 
     protected virtual IReadOnlyList<AITool> Tools => [];
 
-    public async IAsyncEnumerable<ChatResponseUpdate> RespondStreaming(
+    public async Task HandleAsync(AgentRequest signal, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(signal);
+        cancellationToken.ThrowIfCancellationRequested();
+        var reply = await Ask(signal, cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await ReplyAsync(reply).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
+
+    public async Task<AgentReply> Ask(AgentRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var text = new StringBuilder();
+        await foreach (var chunk in AskStreaming(
+            [new ChatMessage(ChatRole.User, request.Text)],
+            cancellationToken).ConfigureAwait(true))
+        {
+            text.Append(chunk.Text);
+        }
+
+        return new AgentReply(text.ToString());
+    }
+
+    public async IAsyncEnumerable<ChatResponseUpdate> AskStreaming(
         IReadOnlyList<ChatMessage> messages,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -56,10 +83,5 @@ public abstract class Agent : Neuron, IAgent
         }
     }
 
-    public Task<ChatResponse> Respond(IReadOnlyList<ChatMessage> messages)
-    {
-        ArgumentNullException.ThrowIfNull(messages);
-
-        return RespondStreaming(messages).ToChatResponseAsync();
-    }
+    public Task InvalidateMcpTools() => Task.CompletedTask;
 }

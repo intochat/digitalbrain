@@ -20,7 +20,7 @@ public readonly struct NeuronReference<TNeuron> : IEquatable<NeuronReference<TNe
 
     public NeuronId Id => NeuronId.For<TNeuron>(_client.Owner, _name);
 
-    public Task<TResponse> RequestAsync<TResponse>(
+    internal Task<TResponse> RequestCoreAsync<TResponse>(
         Signal<TResponse> request,
         CancellationToken cancellationToken = default)
         where TResponse : Signal

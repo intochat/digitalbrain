@@ -197,7 +197,7 @@ internal sealed class ChatTurnWorker(NeuronRuntime runtime) : Neuron(runtime), I
         using (VerifiedActor.Enter(goal.Actor))
         using (AgentTurnContext.Enter(new AgentTurnContext(goal.Chat, goal.CommandId, goal.Actor, goal.AllowedToolNames)))
         {
-            await foreach (var chunk in responder.RespondStreaming(
+            await foreach (var chunk in responder.AskStreaming(
                 messages,
                 cancellationToken).ConfigureAwait(true))
             {
@@ -208,8 +208,9 @@ internal sealed class ChatTurnWorker(NeuronRuntime runtime) : Neuron(runtime), I
         return (answer.ToString(), "assistant");
     }
 
-    private IAssistant DefaultResponder(OwnerId owner)
-        => GrainFactory.GetGrain<IAssistant>(NeuronId.For<IAssistant>(owner, "assistant").ToGrainId());
+    private IAgentKernel DefaultResponder(OwnerId owner)
+        => GrainFactory.GetGrain<IAgentKernel>(
+            NeuronId.For<IAssistant>(owner, "assistant").ToGrainId());
 
     private static ChatMessage AsChatMessage(ChatTurn turn)
         => new(turn.FromUser ? ChatRole.User : ChatRole.Assistant, turn.Text);

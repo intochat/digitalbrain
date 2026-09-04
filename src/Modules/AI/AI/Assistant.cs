@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Assistant;
 
+[GrainType("assistant")]
 internal sealed class Assistant(NeuronRuntime runtime, IChatClient chatClient) :
     Agent(runtime, chatClient),
     IAssistant

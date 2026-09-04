@@ -5,8 +5,9 @@ namespace DigitalBrain.Abstractions;
 
 public static class NeuronReferenceExtensions
 {
-    // The only public fire: TNeuron must declare IHandle<TSignal>. That is how the assistant
-    // and scripts stay type-safe — PublishPost cannot be sent to IBehaviors.
+    // The only public fire/ask: TNeuron must declare IHandle<TSignal>. That is how the
+    // assistant and scripts stay type-safe — PublishPost cannot be sent to IBehaviors,
+    // and AgentRequest cannot be asked of IChat.
     public static Task<DeliveryOutcome> SendAsync<TNeuron, TSignal>(
         this NeuronReference<TNeuron> neuron,
         TSignal signal,
@@ -14,4 +15,25 @@ public static class NeuronReferenceExtensions
         where TNeuron : INeuron, IHandle<TSignal>
         where TSignal : Signal
         => neuron.DeliverAsync(signal, cancellationToken);
+
+    // TResponse is inferred from Signal<TResponse>. C# cannot also constrain
+    // TNeuron : IHandle<TRequest> on that signature (TRequest would not infer).
+    // SendAsync gates at compile time; RequestAsync checks IHandle at the call.
+    public static Task<TResponse> RequestAsync<TNeuron, TResponse>(
+        this NeuronReference<TNeuron> neuron,
+        Signal<TResponse> request,
+        CancellationToken cancellationToken = default)
+        where TNeuron : INeuron
+        where TResponse : Signal
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var handle = typeof(IHandle<>).MakeGenericType(request.GetType());
+        if (!handle.IsAssignableFrom(typeof(TNeuron)))
+        {
+            throw new InvalidOperationException(
+                $"Neuron '{typeof(TNeuron).Name}' does not IHandle '{request.GetType().Name}'.");
+        }
+
+        return neuron.RequestCoreAsync(request, cancellationToken);
+    }
 }
