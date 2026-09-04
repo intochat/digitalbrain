@@ -6,8 +6,5 @@ namespace DigitalBrain.Execution;
 public partial interface IExecution :
     INeuron,
     IHandle<StartExecution>,
-    IHandle<CancelExecution>
-{
-    [Alias(nameof(Read))]
-    Task<ExecutionProjection> Read();
-}
+    IHandle<CancelExecution>,
+    IHandle<ReadExecution>;

@@ -20,8 +20,8 @@ public sealed class TranscriptContextProvider(IGrainFactory grains) : IExecution
 
         try
         {
-            var chat = grains.GetGrain<IChat>(chatTurn.ChatId.ToGrainId());
-            var turns = await chat.ReadTurns()
+            var chat = grains.GetGrain<IChatKernel>(chatTurn.ChatId.ToGrainId());
+            var turns = await chat.LoadTurnSnapshots()
                 .WaitAsync(cancellationToken)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             if (turns.Count == 0)

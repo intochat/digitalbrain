@@ -24,9 +24,10 @@ public sealed class ChatTurnTests(SimulationFixture fixture)
         var chatName = fixture.Sim.UniqueId("chat");
         var command = CommandId.New();
         var actor = new ActorContext(new PrincipalId(Guid.NewGuid()), "owner");
+        var cancellationToken = TestContext.Current.CancellationToken;
 
-        var accepted = await brain.GetGrainProxy<IChat>(chatName)
-            .Send(new SendMessage(command, "hello", actor));
+        var accepted = await brain.Get<IChat>(chatName)
+            .RequestAsync(new SendMessage(command, "hello", actor), cancellationToken);
 
         Assert.Equal(command, accepted.CommandId);
 
@@ -51,19 +52,20 @@ public sealed class ChatTurnTests(SimulationFixture fixture)
         var chatName = fixture.Sim.UniqueId("active-execution");
         var command = CommandId.New();
         var actor = new ActorContext(new PrincipalId(Guid.NewGuid()), "owner");
-        var chat = brain.GetGrainProxy<IChat>(chatName);
+        var chat = brain.Get<IChat>(chatName);
+        var cancellationToken = TestContext.Current.CancellationToken;
 
-        Assert.Null(await chat.ReadActiveExecution());
+        Assert.Null((await chat.RequestAsync(new ReadActiveExecution(), cancellationToken)).ExecutionId);
 
-        var accepted = await chat.Send(new SendMessage(command, "hello execution", actor));
+        var accepted = await chat.RequestAsync(new SendMessage(command, "hello execution", actor), cancellationToken);
 
         await ChatTurnDriver.AwaitCompletedTurnAsync(brain, chatName);
 
-        var active = await chat.ReadActiveExecution();
+        var active = (await chat.RequestAsync(new ReadActiveExecution(), cancellationToken)).ExecutionId;
         Assert.NotNull(active);
 
-        var execution = brain.GetGrainProxy<IExecution>(active!.Value.ToString());
-        var projection = await execution.Read();
+        var projection = await brain.Get<IExecution>(active!.Value.ToString())
+            .RequestAsync(new ReadExecution(), cancellationToken);
         Assert.Equal(active.Value, projection.ExecutionId);
         Assert.Equal(ExecutionStatus.Completed, projection.Status);
         Assert.Equal(accepted.TurnId.Value, Assert.IsType<ChatTurnWorkload>(projection.Workload).TurnId);
@@ -74,13 +76,14 @@ public sealed class ChatTurnTests(SimulationFixture fixture)
     {
         var brain = fixture.Sim.Brain;
         var chatName = fixture.Sim.UniqueId("chat");
-        var chat = brain.GetGrainProxy<IChat>(chatName);
+        var chat = brain.Get<IChat>(chatName);
+        var cancellationToken = TestContext.Current.CancellationToken;
 
-        await chat.HandleAsync(
+        await chat.SendAsync(
             new KitCardOffer(KitCardKinds.Chart, "chart-abc12345", "Quarterly sales"),
-            CancellationToken.None);
+            cancellationToken);
 
-        var transcript = await chat.Read();
+        var transcript = (await chat.RequestAsync(new ReadTranscriptRequest(chatName), cancellationToken)).Transcript;
         Assert.Contains(transcript.Turns, turn => !turn.FromUser && turn.Text == "Quarterly sales");
 
         var responded = await JournalWait.ForAsync(
@@ -101,10 +104,10 @@ public sealed class ChatTurnTests(SimulationFixture fixture)
     [Fact]
     public async Task ChatRefusesAKitCardWithABlankCaption()
     {
-        var chat = fixture.Sim.Brain.GetGrainProxy<IChat>(fixture.Sim.UniqueId("chat"));
+        var chat = fixture.Sim.Brain.Get<IChat>(fixture.Sim.UniqueId("chat"));
 
-        await Assert.ThrowsAsync<NeuronAuthorizationException>(() => chat.HandleAsync(
+        await Assert.ThrowsAsync<NeuronAuthorizationException>(() => chat.SendAsync(
             new KitCardOffer(KitCardKinds.Chart, "chart-abc12345", "   "),
-            CancellationToken.None));
+            TestContext.Current.CancellationToken));
     }
 }

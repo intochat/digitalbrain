@@ -55,6 +55,10 @@ public sealed class TimerReminderTests(SimulationFixture fixture)
 
         var timerElapsed = Assert.IsType<TimerModule.TimerElapsed>(elapsed.Signal);
         Assert.Equal(TimerModule.TimerResolution.OnTime, timerElapsed.Resolution);
-        Assert.Equal(TimerModule.TimerStatus.Elapsed, (await brain.GetGrainProxy<TimerModule.ITimer>(timerName).Read()).Status);
+        Assert.Equal(
+            TimerModule.TimerStatus.Elapsed,
+            (await brain.Get<TimerModule.ITimer>(timerName).RequestAsync(
+                new TimerModule.ReadTimer(),
+                cancellationToken)).Status);
     }
 }

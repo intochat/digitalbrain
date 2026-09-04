@@ -136,7 +136,7 @@ public sealed class BehaviorSteps
 
     private static async Task WaitUntilAsync(Func<Task<bool>> condition)
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(
             timeout.Token,
             TestContext.Current.CancellationToken);

@@ -44,9 +44,6 @@ internal sealed class FakeDigitalBrain(string owner) : IDigitalBrain
     public TEntity GetEntity<TEntity>(string name = "default")
         where TEntity : class, IEntity => throw new NotSupportedException();
 
-    public TNeuron GetGrainProxy<TNeuron>(string name = "default")
-        where TNeuron : class, INeuron => throw new NotSupportedException();
-
     public Task<JournalRead> ReadJournalAsync(
         JournalKind kind,
         long afterSequence = 0,

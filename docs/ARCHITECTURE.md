@@ -1,5 +1,9 @@
 # DigitalBrain — Ratified Architecture (2026-08-22)
 
+**Authority now:** the neuron/synapse/signal graph plus out-of-process scripts
+(`CONTEXT.md`, typed `SendAsync` / `AdmitBehavior`). The 2026-09-02 durable-runs,
+durable-scripting, and ranked-discovery specs are historical.
+
 Decisions ratified by the owner on 2026-08-22. Code is the source of truth; this
 records intent the code cannot show yet. Supersedes all PersonaPlex-era plans.
 
@@ -8,14 +12,13 @@ records intent the code cannot show yet. Supersedes all PersonaPlex-era plans.
 Multiuser chat product. One kernel image, one Flutter codebase, entities all the
 way down. Core differentiator: **the neuron substrate itself** — a durable, weighted
 graph of neurons connected by synapses, routing signals by learned strength rather
-than by name. User-authored scripts and automations are immutable definitions and
-published program revisions executed by stable predeployed run/automation grain types (see
-[Automations](#automations) below), not runtime-generated Orleans types or a second,
-English-language runtime.
+than by name. User-authored C# scripts run out of process (`AdmitBehavior`); they
+`Send` typed signals and write entities. No runtime-generated Orleans types and no
+second, English-language runtime.
 
 ## Core loop (chat + dynamic UI)
 
-1. Flutter → `IChat.Send` → durable turn → `ChatTurnWorker` (already built).
+1. Flutter → `Get<IChat>().RequestAsync(SendMessage)` → durable turn → `ChatTurnWorker`.
 2. Worker → `IAssistant` → a Microsoft.Extensions.AI `IChatClient` (the
    configured default model or an explicit marker) with an AI toolset.
 3. Every UI-kit component registers an AI tool (`render_chart`,
@@ -68,22 +71,18 @@ KitGalleryScreen) is the starting point for the widget side.
 - **Voice**: Whisper STT (Foundry Local) stays dev-only. PersonaPlex is deleted
   (see Trash record); future voice = provider realtime APIs.
 
-## Automations
+## Scripts and behaviors
 
-Automations are journaled definitions with immutable revisions executed through the durable run
-engine; user/assistant-authored C# runs in the full-trust scripting worker and calls durable
-capability steps. See the
-[durable-runs](superpowers/specs/2026-09-02-digitalbrain-v2-durable-runs-design.md),
-[durable-scripting](superpowers/specs/2026-09-02-digitalbrain-v2-durable-scripting-design.md), and
-[self-knowledge](superpowers/specs/2026-09-02-digitalbrain-v2-self-knowledge-and-ranked-discovery-design.md)
-designs.
+User- and assistant-authored C# runs in `DigitalBrain.Scripting` (outside the silo).
+`AdmitBehavior` admits a script; the script `Send`s typed signals and writes entities.
+Chat turns still use `ExecutionNeuron` as per-turn working memory, not as an automation engine.
 
 ## Integration modules
 
 `Modules/Google` and `Modules/Salesforce`, each the standard triple
 (Contracts / implementation / Aspire.Hosting). Both sit on `Kernel/DigitalBrain.Sdk`:
-`Sdk/Mcp` owns the hosted MCP tool client (per-owner sessions, bearer auth, catalog
-check, result normalization, the single read-only retry), `Sdk/OAuth` the browser
+`Sdk/Mcp` owns the hosted MCP tool client (per-owner sessions, bearer auth,
+result normalization, the single read-only retry), `Sdk/OAuth` the browser
 login rail (`BrowserLogins` one-use request registry, `BrowserLoginSurface` for the
 login/callback paths, correlation claim, completion worker), `Sdk/Http` the
 `IHttpSurface` seam through which a module maps its callbacks without the kernel
@@ -96,13 +95,12 @@ declares none.
 - Per-user OAuth: `AccountEntity` per user per provider holds the refresh
   token; kernel HTTP serves the callback; every neuron call resolves the
   caller's token. No shared credentials.
+- Today those modules are MCP-backed chat tools (`IGmail` / `ISalesforce` as
+  JSON services). Typed neuron contracts (`Send` `SearchGmail`, …) are later
+  product work, not a second capability bus.
 - v1 surface: Gmail search/read/draft/send*, Calendar list/create*, Salesforce
   SOQL/read/create*. `*` = a confirmation Button card in chat must be activated
   before the mutation executes.
-- Modules publish canonical operation/capability descriptors and exact schema hashes. The
-  self-knowledge semantic index is a rebuildable projection of those descriptors; run-scoped
-  capability leases remain the independent authorization boundary. Scripts compile typed wrappers
-  from exact manifests, never from vector-search results.
 
 ## Multiuser
 
@@ -148,9 +146,7 @@ declares none.
 1. AI providers (IAW port, no tiers) — shipped 2026-08-22.
 2. Auth (UserAccountEntity, cookie + token) — multiuser boundary.
 3. UI kit, all 13 components on the template. (template + Chart + Image shipped 2026-08-23)
-4. Self-knowledge catalog and ranked `discover`/exact `inspect` foundation.
-5. Durable scripting and automation definitions/runs (stable grain types, Roslyn worker,
-   sensors/effectors, recovery).
-6. Google + Salesforce capability migration behind catalog-backed `invoke`.
-7. Task-agent orchestration over the same run/capability model.
-8. Image → Docker Hub, ACA + Key Vault deploy.
+4. Self-knowledge catalog — historical; not in the current product path.
+5. Durable scripting: `AdmitBehavior` + out-of-process C# worker.
+6. Google + Salesforce as typed neurons scripts can `Send` (today they are MCP chat tools).
+7. Image → Docker Hub, ACA + Key Vault deploy.

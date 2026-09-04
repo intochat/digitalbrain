@@ -1,5 +1,4 @@
 using DigitalBrain.Product.Identity;
-using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Execution;
 using DigitalBrain.Abstractions.Identity;
@@ -7,7 +6,6 @@ using DigitalBrain.Product.Interactions;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Chat;
 using DigitalBrain.Core;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;
@@ -15,7 +13,7 @@ using Orleans.Serialization;
 namespace DigitalBrain.UI;
 
 [GrainType("chat")]
-internal sealed class Chat : Neuron, IChat
+internal sealed class Chat : Neuron, IChat, IChatKernel
 {
     private const string CommandLogName = "chat.command-log";
     private const string TranscriptName = "chat.transcript";
@@ -77,21 +75,22 @@ internal sealed class Chat : Neuron, IChat
         await FailTurnInterruptedByRestartAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    public async Task<TurnAccepted> Send(SendMessage message)
-        => await EnqueueTurnAsync(message).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-    public async IAsyncEnumerable<ChatResponseUpdate> SendStreaming(
-        SendMessage message,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async Task HandleAsync(SendMessage signal, CancellationToken cancellationToken)
     {
-        // Enqueue + start the turn; the AI run is independent of cancellationToken.
-        // This stream is a pure observer surface — abort detaches without cancelling the turn.
-        _ = await EnqueueTurnAsync(message).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        ArgumentNullException.ThrowIfNull(signal);
         cancellationToken.ThrowIfCancellationRequested();
-        yield break;
+        var accepted = await EnqueueTurnAsync(signal)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await ReplyAsync(accepted).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    public async Task Cancel(CancelTurn command)
+    public Task HandleAsync(CancelTurn signal, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return CancelTurnAsync(signal);
+    }
+
+    private async Task CancelTurnAsync(CancelTurn command)
     {
         ArgumentNullException.ThrowIfNull(command);
         RequireActor(command.Actor, "cancel-turn");
@@ -173,9 +172,9 @@ internal sealed class Chat : Neuron, IChat
         cancellation?.Cancel();
     }
 
-    public Task<ChatTranscript> Read() => Task.FromResult(new ChatTranscript(Turns()));
+    public Task<ChatTranscript> LoadTranscript() => Task.FromResult(new ChatTranscript(Turns()));
 
-    public async Task<IReadOnlyList<ChatTurnSnapshot>> ReadTurns()
+    public async Task<IReadOnlyList<ChatTurnSnapshot>> LoadTurnSnapshots()
     {
         await FailUnavailableUserActionsAsync().ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         return [.. LoadTurns().Select(static turn => new ChatTurnSnapshot(
@@ -186,6 +185,13 @@ internal sealed class Chat : Neuron, IChat
                 turn.UserAction,
                 turn.Answer,
                 turn.Detail))];
+    }
+
+    public Task HandleAsync(CompleteUserAction signal, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(signal);
+        cancellationToken.ThrowIfCancellationRequested();
+        return CompleteUserAction(signal.Context, signal.ActionId, signal.Accepted);
     }
 
     public async Task CompleteUserAction(AgentTurnContext context, string actionId, bool accepted)
@@ -279,10 +285,17 @@ internal sealed class Chat : Neuron, IChat
         return sources.Any(source => source.Find(Id.Owner, command)?.Id == action.Id);
     }
 
-    public Task<ExecutionId?> ReadActiveExecution()
+    public Task HandleAsync(SetActiveExecution signal, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(signal);
+        cancellationToken.ThrowIfCancellationRequested();
+        return SaveActiveExecution(signal.ExecutionId);
+    }
+
+    public Task<ExecutionId?> LoadActiveExecution()
         => Task.FromResult(LoadFocus().ActiveExecutionId);
 
-    public Task SetActiveExecution(ExecutionId? id)
+    public Task SaveActiveExecution(ExecutionId? id)
     {
         var focus = LoadFocus();
         var related = new List<ExecutionId>(focus.RelatedExecutionIds);
@@ -305,19 +318,29 @@ internal sealed class Chat : Neuron, IChat
         return Task.CompletedTask;
     }
 
+    public async Task HandleAsync(ReadTurns signal, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(signal);
+        var turns = await LoadTurnSnapshots().WaitAsync(cancellationToken)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        await ReplyAsync(new TurnsRead(turns)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
+
+    public async Task HandleAsync(ReadActiveExecution signal, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(signal);
+        cancellationToken.ThrowIfCancellationRequested();
+        await ReplyAsync(new ActiveExecution(LoadFocus().ActiveExecutionId))
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
+
     public async Task HandleAsync(ReadTranscriptRequest signal, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(signal);
 
-        var subject = NeuronId.For<IChat>(Id.Owner, signal.ChatName);
-        var transcript = subject == Id
-            ? new ChatTranscript(Turns())
-            : await GrainFactory.GetGrain<IChat>(subject.ToGrainId()).Read().WaitAsync(cancellationToken)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
         cancellationToken.ThrowIfCancellationRequested();
         await ReplyAsync(
-            new TranscriptRead(signal.CommandId, subject, Trimmed(transcript, signal.MaxTurns)))
+            new TranscriptRead(signal.CommandId, Id, Trimmed(new ChatTranscript(Turns()), signal.MaxTurns)))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 

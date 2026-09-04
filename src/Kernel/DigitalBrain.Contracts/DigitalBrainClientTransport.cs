@@ -44,14 +44,6 @@ internal sealed class DigitalBrainClientTransport
         return new NeuronReference<TNeuron>(client, name);
     }
 
-    internal TNeuron GetGrainProxy<TNeuron>(string name)
-        where TNeuron : class, INeuron
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        RequireDomainNeuronContract(typeof(TNeuron));
-        return _grains.GetGrain<TNeuron>(NeuronId.For<TNeuron>(Owner, name).ToGrainId());
-    }
-
     internal TEntity GetEntity<TEntity>(string name)
         where TEntity : class, IEntity
     {
@@ -373,7 +365,7 @@ internal sealed class DigitalBrainClientTransport
             || typeof(IBrainNeuron).IsAssignableFrom(neuronType))
         {
             throw new NeuronAuthorizationException(
-                $"'{neuronType.Name}' is not addressable through IDigitalBrain.Get. Activate the brain with ActivateAsync; address domain neuron contracts with Get; send signals through SendAsync; observe the owner root through IDigitalBrain and domain neurons through NeuronReference.");
+                $"'{neuronType.Name}' is not addressable through IDigitalBrain.Get. Activate the brain with ActivateAsync; address domain neuron contracts with Get; send signals through NeuronReference.SendAsync; observe the owner root through IDigitalBrain and domain neurons through NeuronReference.");
         }
     }
 

@@ -80,8 +80,8 @@ internal static class OwnerCommandsHttpMaps
                         return;
                     }
 
-                    await brain.GetGrainProxy<IChat>(chatInstance)
-                        .Cancel(new CancelTurn(cancelCommandId, new TurnId(turnGuid), actor))
+                    await brain.Get<IChat>(chatInstance)
+                        .SendAsync(new CancelTurn(cancelCommandId, new TurnId(turnGuid), actor), cancellationToken)
                         .ConfigureAwait(false);
                     http.Response.StatusCode = StatusCodes.Status202Accepted;
                     return;
@@ -160,8 +160,8 @@ internal static class OwnerCommandsHttpMaps
     {
         using var budget = new CancellationTokenSource(TurnBudget);
         var command = CommandId.New();
-        var accepted = await brain.GetGrainProxy<IChat>(chatInstance)
-            .Send(new SendMessage(command, text, actor))
+        var accepted = await brain.Get<IChat>(chatInstance)
+            .RequestAsync(new SendMessage(command, text, actor))
             .ConfigureAwait(false);
 
         // Budget bounds the observer wait; requestAborted only detaches the observer.

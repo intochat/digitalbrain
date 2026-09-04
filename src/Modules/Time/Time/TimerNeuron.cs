@@ -27,11 +27,18 @@ public sealed class TimerNeuron : Neuron, ITimer, IRemindable
         _states = ServiceProvider.GetRequiredService<Serializer<TimerState>>();
     }
 
-    public Task<TimerSnapshot> Read()
-        => Task.FromResult(
-            LoadRecorded() is { } data
-                ? new TimerSnapshot(data.Status, data.Generation, data.ScheduledAt, data.DueAt, data.Duration, data.Note)
-                : new TimerSnapshot(TimerStatus.Unscheduled, Generation: 0, null, null, null, null));
+    private TimerSnapshot Snapshot()
+        => LoadRecorded() is { } data
+            ? new TimerSnapshot(data.Status, data.Generation, data.ScheduledAt, data.DueAt, data.Duration, data.Note)
+            : new TimerSnapshot(TimerStatus.Unscheduled, Generation: 0, null, null, null, null);
+
+    public async Task HandleAsync(ReadTimer signal, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(signal);
+        cancellationToken.ThrowIfCancellationRequested();
+        await ReplyAsync(Snapshot())
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
 
     public async Task HandleAsync(StartTimer signal, CancellationToken cancellationToken)
     {

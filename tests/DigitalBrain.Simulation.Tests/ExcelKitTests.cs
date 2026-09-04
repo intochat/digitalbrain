@@ -55,7 +55,7 @@ public sealed class ExcelKitTests(SimulationFixture fixture)
         var replyText = reply!.ToString()!;
         Assert.Contains("Yesterday", replyText);
 
-        var transcript = await fixture.Sim.Grains.GetGrain<IChat>(chatInstance).Read();
+        var transcript = await ChatTranscriptRead.ForGrainKeyAsync(fixture.Sim, chatInstance, TestContext.Current.CancellationToken);
         Assert.Contains(transcript.Turns, turn => turn.Text == "Yesterday");
 
         var cardName = CardNameFrom(replyText);
@@ -83,7 +83,7 @@ public sealed class ExcelKitTests(SimulationFixture fixture)
         }, CancellationToken.None);
 
         Assert.Contains("blank", reply!.ToString(), StringComparison.OrdinalIgnoreCase);
-        var transcript = await fixture.Sim.Grains.GetGrain<IChat>(chatInstance).Read();
+        var transcript = await ChatTranscriptRead.ForGrainKeyAsync(fixture.Sim, chatInstance, TestContext.Current.CancellationToken);
         Assert.Empty(transcript.Turns);
     }
 

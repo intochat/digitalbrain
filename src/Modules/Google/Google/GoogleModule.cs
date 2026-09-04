@@ -1,7 +1,6 @@
 using DigitalBrain.Product.Interactions;
 using DigitalBrain.AI;
 using DigitalBrain.Core;
-using DigitalBrain.Execution;
 using DigitalBrain.Sdk;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -17,7 +16,6 @@ public sealed class GoogleModule : IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
         var services = builder.Services;
-        services.AddSingleton<ICapabilityHandler, GmailSearchHandler>();
         if (DigitalBrainFakes.Enabled(builder.Configuration))
         {
             services.AddSingleton<IGmail, FakeGmail>();

@@ -10,24 +10,24 @@ namespace DigitalBrain.Simulation.Tests.Execution;
 
 internal static class ExecutionTestDriver
 {
-    public static async Task<IExecution> StartAndCompleteAsync(
+    public static async Task<NeuronReference<IExecution>> StartAndCompleteAsync(
         IDigitalBrain brain,
         ExecutionId executionId,
         WorkloadDescriptor workload,
-        ExecutionDriverKind driver,
-        IReadOnlyList<CapabilityId> grants,
         IReadOnlyList<ExecutionId>? relatedExecutions = null,
         CancellationToken cancellationToken = default)
     {
         var name = executionId.ToString();
-        var execution = brain.GetGrainProxy<IExecution>(name);
-
-        await execution.HandleAsync(
-            new StartExecution(CommandId.New(), executionId, workload, driver, grants, relatedExecutions),
+        await brain.Get<IExecution>(name).SendAsync(
+            new StartExecution(
+                CommandId.New(),
+                executionId,
+                workload,
+                relatedExecutions),
             cancellationToken);
         await AwaitCompletionAsync(brain, name);
 
-        return execution;
+        return brain.Get<IExecution>(name);
     }
 
     // Waits for ANY terminal lifecycle, then asserts it Completed — so a Failed or Cancelled
@@ -40,7 +40,7 @@ internal static class ExecutionTestDriver
             JournalKind.Outgoing,
             static delivery => delivery.Signal is ExecutionLifecycle
             {
-                Status: not (ExecutionStatus.Pending or ExecutionStatus.Running or ExecutionStatus.AwaitingApproval)
+                Status: not ExecutionStatus.Running
             },
             cancellationToken: TestContext.Current.CancellationToken);
 

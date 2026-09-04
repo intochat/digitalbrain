@@ -6,7 +6,7 @@ namespace DigitalBrain.Core;
 
 // Ambient verified principal for the current authenticated turn. Uses Orleans
 // RequestContext so it propagates Chat → Agent grain calls (AsyncLocal does not).
-// Chat.SendStreaming enters with SendMessage.Actor and propagates it over grain calls.
+// Chat SendMessage.Actor enters here and propagates over grain calls.
 public static class VerifiedActor
 {
     private const string PrincipalKey = "db.verified-actor.principal";

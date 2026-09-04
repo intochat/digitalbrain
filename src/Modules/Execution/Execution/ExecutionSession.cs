@@ -5,9 +5,7 @@ namespace DigitalBrain.Execution;
 public sealed class ExecutionSession(
     ExecutionId id,
     OwnerId owner,
-    IGrainFactory grains,
-    EffectBroker broker,
-    IReadOnlyList<CapabilityId> grants)
+    IGrainFactory grains)
 {
     public ExecutionId Id => id;
 
@@ -16,12 +14,6 @@ public sealed class ExecutionSession(
 
     public Task ApplyDeltaAsync(ContextDelta delta)
         => Context().ApplyDelta(delta);
-
-    public Task<ContextDelta> CallAsync(
-        CapabilityId capability,
-        string requestJson,
-        CancellationToken cancellationToken)
-        => broker.InvokeAsync(id, owner, capability, requestJson, grants, cancellationToken);
 
     private IExecutionContext Context()
         => grains.GetGrain<IExecutionContext>(

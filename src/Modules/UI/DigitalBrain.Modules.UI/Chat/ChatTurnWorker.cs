@@ -68,8 +68,8 @@ internal sealed class ChatTurnWorker(NeuronRuntime runtime) : Neuron(runtime), I
 
     private async Task<ExecutionId> StartTurnExecutionAsync(ChatTurnGoal goal, CancellationToken cancellationToken)
     {
-        var chat = GrainFactory.GetGrain<IChat>(goal.Chat.ToGrainId());
-        var prior = await chat.ReadActiveExecution()
+        var chat = GrainFactory.GetGrain<IChatKernel>(goal.Chat.ToGrainId());
+        var prior = await chat.LoadActiveExecution()
             .WaitAsync(cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
@@ -79,19 +79,16 @@ internal sealed class ChatTurnWorker(NeuronRuntime runtime) : Neuron(runtime), I
         var execution = GrainFactory.GetGrain<IExecution>(
             NeuronId.For<IExecution>(goal.Chat.Owner, executionId.ToString()).ToGrainId());
 
-        // Empty grants: chat Agent path must not fan-out Capabilities. Tools call ExecutionSession later.
         await execution.HandleAsync(
                 new StartExecution(
                     CommandId.New(),
                     executionId,
                     new ChatTurnWorkload(goal.Chat, goal.TurnId, goal.Text),
-                    ExecutionDriverKind.Agent,
-                    Grants: [],
                     related),
                 cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        await chat.SetActiveExecution(executionId)
+        await chat.SaveActiveExecution(executionId)
             .WaitAsync(cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
@@ -118,14 +115,14 @@ internal sealed class ChatTurnWorker(NeuronRuntime runtime) : Neuron(runtime), I
                 }
             }
         }
-        var chat = GrainFactory.GetGrain<IChat>(goal.Chat.ToGrainId());
-        var transcript = await chat.Read()
+        var chat = GrainFactory.GetGrain<IChatKernel>(goal.Chat.ToGrainId());
+        var transcript = await chat.LoadTranscript()
             .WaitAsync(cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        var execution = GrainFactory.GetGrain<IExecution>(
+        var execution = GrainFactory.GetGrain<IExecutionKernel>(
             NeuronId.For<IExecution>(goal.Chat.Owner, executionId.ToString()).ToGrainId());
-        var projection = await execution.Read()
+        var projection = await execution.LoadProjection()
             .WaitAsync(cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 

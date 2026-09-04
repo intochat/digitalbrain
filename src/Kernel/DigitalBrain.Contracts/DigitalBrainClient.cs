@@ -28,11 +28,6 @@ public sealed class DigitalBrainClient : IDigitalBrain
         where TNeuron : INeuron
         => _transport.GetReference<TNeuron>(this, name);
 
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public TNeuron GetGrainProxy<TNeuron>(string name = "default")
-        where TNeuron : class, INeuron
-        => _transport.GetGrainProxy<TNeuron>(name);
-
     public TEntity GetEntity<TEntity>(string name = "default")
         where TEntity : class, IEntity
         => _transport.GetEntity<TEntity>(name);

@@ -101,7 +101,7 @@ public sealed class KitToolTests(SimulationFixture fixture)
         }, CancellationToken.None);
 
         Assert.Contains("Sales", reply!.ToString());
-        var transcript = await fixture.Sim.Grains.GetGrain<IChat>(chatInstance).Read();
+        var transcript = await ChatTranscriptRead.ForGrainKeyAsync(fixture.Sim, chatInstance, TestContext.Current.CancellationToken);
         Assert.Contains(transcript.Turns, turn => turn.Text == "Sales");
     }
 
@@ -122,7 +122,7 @@ public sealed class KitToolTests(SimulationFixture fixture)
         }, CancellationToken.None);
 
         Assert.Contains("blank", reply!.ToString(), StringComparison.OrdinalIgnoreCase);
-        var transcript = await fixture.Sim.Grains.GetGrain<IChat>(chatInstance).Read();
+        var transcript = await ChatTranscriptRead.ForGrainKeyAsync(fixture.Sim, chatInstance, TestContext.Current.CancellationToken);
         Assert.Empty(transcript.Turns);
     }
 
@@ -153,7 +153,7 @@ public sealed class KitToolTests(SimulationFixture fixture)
         Assert.Equal(
             $"chatName must be a chat key of this owner (starting with '{Owner.Value}/').",
             reply!.ToString());
-        var transcript = await fixture.Sim.Grains.GetGrain<IChat>(otherOwnerChat).Read();
+        var transcript = await ChatTranscriptRead.ForGrainKeyAsync(fixture.Sim, otherOwnerChat, TestContext.Current.CancellationToken);
         Assert.Empty(transcript.Turns);
     }
 
@@ -181,7 +181,7 @@ public sealed class KitToolTests(SimulationFixture fixture)
         var replyText = reply!.ToString()!;
         Assert.Contains("image", replyText, StringComparison.OrdinalIgnoreCase);
 
-        var transcript = await fixture.Sim.Grains.GetGrain<IChat>(chatInstance).Read();
+        var transcript = await ChatTranscriptRead.ForGrainKeyAsync(fixture.Sim, chatInstance, TestContext.Current.CancellationToken);
         Assert.Contains(transcript.Turns, turn => turn.Text == "a red fox");
 
         var cardName = CardNameFrom(replyText);
@@ -211,7 +211,7 @@ public sealed class KitToolTests(SimulationFixture fixture)
 
         Assert.Contains("blank", reply!.ToString(), StringComparison.OrdinalIgnoreCase);
         Assert.Equal(0, generator.CallCount);
-        var transcript = await fixture.Sim.Grains.GetGrain<IChat>(chatInstance).Read();
+        var transcript = await ChatTranscriptRead.ForGrainKeyAsync(fixture.Sim, chatInstance, TestContext.Current.CancellationToken);
         Assert.Empty(transcript.Turns);
     }
 
@@ -237,14 +237,14 @@ public sealed class KitToolTests(SimulationFixture fixture)
             $"chatName must be a chat key of this owner (starting with '{Owner.Value}/').",
             reply!.ToString());
         Assert.Equal(0, generator.CallCount);
-        var transcript = await fixture.Sim.Grains.GetGrain<IChat>(otherOwnerChat).Read();
+        var transcript = await ChatTranscriptRead.ForGrainKeyAsync(fixture.Sim, otherOwnerChat, TestContext.Current.CancellationToken);
         Assert.Empty(transcript.Turns);
     }
 
     // A tool-supplied chatName is the raw grain key the model was told in its context:
     // "{owner}/{principal:N}.{local}" (owner/name form Neuron.Id requires, wrapping a
     // principal-scoped name — mirrors MapOwnerCommands.TryPrincipalResource composed
-    // through DigitalBrainClient.GetGrainProxy). KitInstanceNames.Sibling only replaces the
+    // through DigitalBrainClient.Get). KitInstanceNames.Sibling only replaces the
     // local segment after the principal partition's '.', so tests need that full shape too.
     private string NewChatInstance()
         => $"{fixture.Sim.Brain.Owner.Value}/"

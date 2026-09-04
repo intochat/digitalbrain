@@ -20,11 +20,11 @@ public sealed class ContextProviderTests(ExecutionSimulationFixture fixture)
             brain,
             executionId,
             new ChatTurnWorkload(new NeuronId("chat", brain.Owner, "main"), Guid.NewGuid(), "hi"),
-            ExecutionDriverKind.Agent,
-            grants: [],
             cancellationToken: TestContext.Current.CancellationToken);
 
-        var projection = await execution.Read();
+        var projection = await execution.RequestAsync(
+            new ReadExecution(),
+            TestContext.Current.CancellationToken);
         Assert.NotNull(projection.PromptBlocks);
         Assert.Contains(
             projection.PromptBlocks!,
@@ -38,34 +38,6 @@ public sealed class ContextProviderTests(ExecutionSimulationFixture fixture)
     }
 
     [Fact]
-    public async Task Explain_why_writes_explain_trace_context()
-    {
-        var brain = fixture.Sim.Brain;
-
-        var preferences = brain.GetEntity<IPreferenceStore>(IPreferenceStore.DefaultInstanceName);
-        await preferences.AddRule("privacy", "Never share personal emails.");
-
-        var executionId = ExecutionId.New();
-        await ExecutionTestDriver.StartAndCompleteAsync(
-            brain,
-            executionId,
-            new AutomationWorkload(Guid.NewGuid(), Guid.NewGuid(), "why?"),
-            ExecutionDriverKind.Agent,
-            [CapabilityId.Parse("explain.why")],
-            cancellationToken: TestContext.Current.CancellationToken);
-
-        var executionContext = brain.GetEntity<IExecutionContext>(executionId.ToString());
-        var entry = await executionContext.Query(new ContextQuery(new ContextPath("explain.trace")));
-        Assert.NotNull(entry);
-        Assert.Equal("explain.trace.v1", entry!.SchemaHash);
-        Assert.Contains(executionId.ToString(), entry.PayloadJson, StringComparison.Ordinal);
-        Assert.Contains("AutomationWorkload", entry.PayloadJson, StringComparison.Ordinal);
-        Assert.Contains("preferences.rules", entry.PayloadJson, StringComparison.Ordinal);
-        Assert.Contains("Never share personal emails.", entry.PayloadJson, StringComparison.Ordinal);
-        Assert.Contains("Based on active execution context and preferences.", entry.PayloadJson, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public async Task Related_executions_add_prompt_block()
     {
         var brain = fixture.Sim.Brain;
@@ -75,13 +47,13 @@ public sealed class ContextProviderTests(ExecutionSimulationFixture fixture)
         var execution = await ExecutionTestDriver.StartAndCompleteAsync(
             brain,
             executionId,
-            new AutomationWorkload(Guid.NewGuid(), Guid.NewGuid(), "follow up"),
-            ExecutionDriverKind.Script,
-            grants: [],
+            new ChatTurnWorkload(new NeuronId("chat", brain.Owner, "main"), Guid.NewGuid(), "follow up"),
             relatedExecutions: [relatedId],
             cancellationToken: TestContext.Current.CancellationToken);
 
-        var projection = await execution.Read();
+        var projection = await execution.RequestAsync(
+            new ReadExecution(),
+            TestContext.Current.CancellationToken);
         Assert.NotNull(projection.PromptBlocks);
         Assert.Contains(
             projection.PromptBlocks!,

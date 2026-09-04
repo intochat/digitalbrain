@@ -47,8 +47,9 @@ internal sealed class ChatTools(IDigitalBrain brain)
         var command = new CommandId(commandIdentity);
 
         await brain.ActivateAsync(cancellationToken);
-        await brain.GetGrainProxy<IChat>(chatInstance).Send(
-            new SendMessage(command, text, new ActorContext(Operator, "operator")));
+        await brain.Get<IChat>(chatInstance).RequestAsync(
+            new SendMessage(command, text, new ActorContext(Operator, "operator")),
+            cancellationToken);
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
@@ -71,9 +72,8 @@ internal sealed class ChatTools(IDigitalBrain brain)
         McpServer? server,
         CancellationToken cancellationToken)
     {
-        var chat = brain.GetGrainProxy<IChat>(chatName);
         var chatReference = brain.Get<IChat>(chatName);
-        var snapshot = await ReadTurnAsync(chat, commandId, cancellationToken);
+        var snapshot = await ReadTurnAsync(chatReference, commandId, cancellationToken);
         if (ResultFromSnapshot(snapshot, server) is { } current)
         {
             return current;
@@ -86,7 +86,7 @@ internal sealed class ChatTools(IDigitalBrain brain)
         {
             // Journals contain every attempt, including an older login prompt. The
             // durable current status decides whether any of those events is relevant.
-            snapshot = await ReadTurnAsync(chat, commandId, cancellationToken);
+            snapshot = await ReadTurnAsync(chatReference, commandId, cancellationToken);
             if (ResultFromSnapshot(snapshot, server) is { } result)
             {
                 return result;
@@ -109,9 +109,9 @@ internal sealed class ChatTools(IDigitalBrain brain)
     }
 
     private static async Task<ChatTurnSnapshot> ReadTurnAsync(
-        IChat chat, CommandId commandId, CancellationToken cancellationToken)
+        NeuronReference<IChat> chat, CommandId commandId, CancellationToken cancellationToken)
     {
-        var turns = await chat.ReadTurns().WaitAsync(cancellationToken);
+        var turns = (await chat.RequestAsync(new ReadTurns(), cancellationToken)).Turns;
         return turns.FirstOrDefault(turn => turn.CommandId == commandId)
             ?? throw new InvalidOperationException("The requested chat turn is no longer retained.");
     }

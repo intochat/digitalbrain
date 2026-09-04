@@ -48,7 +48,9 @@ public sealed class AgentToolTests
         var command = CommandId.New();
         var actor = new ActorContext(new PrincipalId(Guid.NewGuid()), "owner");
 
-        await brain.GetGrainProxy<IChat>("main").Send(new SendMessage(command, "hello", actor));
+        await brain.Get<IChat>("main").RequestAsync(
+            new SendMessage(command, "hello", actor),
+            TestContext.Current.CancellationToken);
 
         await ChatTurnDriver.AwaitCompletedTurnAsync(brain, "main");
 

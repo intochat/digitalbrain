@@ -134,8 +134,8 @@ internal static class ChatVoiceHttpMaps
     {
         using var budget = new CancellationTokenSource(OwnerCommandsHttpMaps.TurnBudget);
         var command = CommandId.New();
-        var accepted = await brain.GetGrainProxy<IChat>(chatInstance)
-            .Send(new SendMessage(command, text, actor))
+        var accepted = await brain.Get<IChat>(chatInstance)
+            .RequestAsync(new SendMessage(command, text, actor))
             .ConfigureAwait(false);
 
         using var observer = CancellationTokenSource.CreateLinkedTokenSource(requestAborted, budget.Token);
