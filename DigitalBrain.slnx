@@ -14,9 +14,6 @@
     <Project Path="src/Modules/AI/Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" />
     <Project Path="src/Modules/AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
   </Folder>
-  <Folder Name="/Modules/Kernel/">
-    <Project Path="src/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" Id="cf949819-e1b3-4dbd-9182-e4a009740102" />
-  </Folder>
   <Folder Name="/Modules/Memory/">
     <Project Path="src/Modules/Memory/Aspire.Hosting/DigitalBrain.Modules.Memory.Aspire.Hosting.csproj" />
     <Project Path="src/Modules/Memory/Contracts/DigitalBrain.Modules.Memory.Contracts.csproj" />
@@ -31,7 +28,7 @@
     <Project Path="src/Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <Project Path="src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
   </Folder>
-  <Folder Name="/Modules/DogitalBrain/">
+  <Folder Name="/Modules/DigitalBrain/">
     <Project Path="src/Aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
     <Project Path="src/Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
     <Project Path="src/Aspire/DigitalBrain.ServiceDefaults/DigitalBrain.ServiceDefaults.csproj" />
