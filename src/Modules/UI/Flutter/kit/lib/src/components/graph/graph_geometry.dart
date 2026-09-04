@@ -40,7 +40,7 @@ List<ProjectedGraphNode> projectGraphNodes(
 ) {
   final hubs = nodes.where((node) => node.kind == GraphNodeKind.hub).toList();
   final leaves = nodes
-      .where((node) => node.kind == GraphNodeKind.leaf)
+      .where((node) => node.kind != GraphNodeKind.hub)
       .toList();
 
   final placed = <({GraphNode node, double x, double y, double z})>[

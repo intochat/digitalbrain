@@ -2,7 +2,7 @@ using DigitalBrain.Product.Identity;
 using DigitalBrain.Execution;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
-using DigitalBrain.Client;
+using DigitalBrain.Abstractions;
 using DigitalBrain.Testing;
 using Xunit;
 

@@ -1,11 +1,10 @@
-using DigitalBrain.Abstractions;
-
-using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
+using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Synapses;
-namespace DigitalBrain.Client;
+
+namespace DigitalBrain.Abstractions;
 
 public readonly struct NeuronReference<TNeuron> : IEquatable<NeuronReference<TNeuron>>
     where TNeuron : INeuron

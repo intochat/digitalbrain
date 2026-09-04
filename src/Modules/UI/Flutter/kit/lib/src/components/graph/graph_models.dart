@@ -1,4 +1,4 @@
-enum GraphNodeKind { hub, leaf }
+enum GraphNodeKind { hub, leaf, entity, module }
 
 /// A world-space coordinate on the graph sphere.
 final class GraphPoint {

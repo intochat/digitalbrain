@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../activity_screen.dart';
 import '../behaviors/behavior_workspace.dart';
+import '../onboarding/onboarding_screen.dart';
 import '../user_actions/user_action_card.dart';
 import '../windowing/windowing_screen.dart';
 import 'brain_chat_screen.dart';
@@ -118,6 +119,9 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
     // Product tabs stay in an IndexedStack so chat state survives
     // switches. Graph/Kit/Windowing mount only while selected (graph pulse
     // and offline demo clocks would otherwise run offstage).
+    if (_destination == onboardingDestinationIndex) {
+      return const OnboardingScreen();
+    }
     if (_destination == graphDestinationIndex) {
       return GraphHomeScreen(
         chatName: widget.chatName,

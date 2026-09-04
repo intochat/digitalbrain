@@ -5,7 +5,6 @@ using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Chat;
-using DigitalBrain.Client;
 using DigitalBrain.Testing;
 using Xunit;
 

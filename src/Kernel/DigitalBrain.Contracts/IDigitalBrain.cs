@@ -1,13 +1,12 @@
 using System.ComponentModel;
-using DigitalBrain.Abstractions;
-
+using DigitalBrain.Abstractions.Entities;
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
-using DigitalBrain.Abstractions.Entities;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Synapses;
-namespace DigitalBrain.Client;
+
+namespace DigitalBrain.Abstractions;
 
 public interface IDigitalBrain : IAsyncDisposable
 {

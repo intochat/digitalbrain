@@ -9,6 +9,5 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../Kernel/DigitalBrain/DigitalBrain.csproj" />
-    <ProjectReference Include="../../Kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
   </ItemGroup>
 </Project>

@@ -6,7 +6,7 @@ using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Synapses;
 
-namespace DigitalBrain.Client;
+namespace DigitalBrain.Abstractions;
 
 public sealed class DigitalBrainClient : IDigitalBrain
 {

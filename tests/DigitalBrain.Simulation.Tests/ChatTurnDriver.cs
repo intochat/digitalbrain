@@ -1,6 +1,6 @@
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Chat;
-using DigitalBrain.Client;
+using DigitalBrain.Abstractions;
 using DigitalBrain.Testing;
 using Xunit;
 

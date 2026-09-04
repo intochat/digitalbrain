@@ -5,7 +5,6 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Chat;
-using DigitalBrain.Client;
 using DigitalBrain.UI;
 using ModelContextProtocol;
 using ModelContextProtocol.Protocol;

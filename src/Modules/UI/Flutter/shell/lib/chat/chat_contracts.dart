@@ -23,10 +23,12 @@ typedef ReadGraph = Future<ChatGraphOffer?> Function(String name);
 
 const ownerUserId = 'owner';
 const assistantUserId = 'assistant';
-const graphDestinationIndex = 1;
-const activityDestinationIndex = 2;
-const behaviorsDestinationIndex = 3;
-const kitDestinationIndex = 4;
+const onboardingDestinationIndex = 1;
+const graphDestinationIndex = 2;
+const activityDestinationIndex = 3;
+const behaviorsDestinationIndex = 4;
+const kitDestinationIndex = 5;
+const windowingDestinationIndex = 6;
 
 extension ChatTurnKitParts on ChatTurnEvent {
   List<KitPart> get kitParts => [

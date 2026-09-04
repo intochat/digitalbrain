@@ -1,5 +1,5 @@
 using DigitalBrain.Aspire;
-using DigitalBrain.Client;
+using DigitalBrain.Abstractions;
 using DigitalBrain.Core;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Auth;

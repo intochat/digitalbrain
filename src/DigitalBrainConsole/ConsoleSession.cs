@@ -1,4 +1,4 @@
-using DigitalBrain.Client;
+using DigitalBrain.Abstractions;
 
 namespace DigitalBrainConsole;
 

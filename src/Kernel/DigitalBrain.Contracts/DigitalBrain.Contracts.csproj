@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>The DigitalBrain programming model: signals, synapses, lineage metadata, handle contracts, and neuron identity.</Description>
+    <Description>The DigitalBrain programming model: signals, synapses, neurons, entities, and owner-bound IDigitalBrain access.</Description>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Sdk" />

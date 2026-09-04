@@ -382,7 +382,12 @@ final class _KitGraphRefLoaderState extends State<_KitGraphRefLoader> {
         GraphNode(
           id: node.id,
           label: node.label,
-          kind: node.kind == 'hub' ? GraphNodeKind.hub : GraphNodeKind.leaf,
+          kind: switch (node.kind) {
+            'hub' => GraphNodeKind.hub,
+            'entity' => GraphNodeKind.entity,
+            'module' => GraphNodeKind.module,
+            _ => GraphNodeKind.leaf,
+          },
           cluster: node.cluster,
         ),
     ];

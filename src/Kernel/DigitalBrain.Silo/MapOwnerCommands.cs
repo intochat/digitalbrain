@@ -3,7 +3,6 @@ using System.Net.ServerSentEvents;
 using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
-using DigitalBrain.Client;
 using DigitalBrain.UI;
 using Microsoft.Extensions.AI;
 

@@ -1,5 +1,5 @@
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Client;
+using DigitalBrain.Abstractions;
 using DigitalBrain.Excel;
 using DigitalBrain.UI;
 

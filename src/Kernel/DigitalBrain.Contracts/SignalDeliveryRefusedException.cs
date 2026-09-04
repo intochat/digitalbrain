@@ -1,6 +1,6 @@
 using DigitalBrain.Abstractions.Identity;
 
-namespace DigitalBrain.Client;
+namespace DigitalBrain.Abstractions;
 
 public sealed class SignalDeliveryRefusedException : Exception
 {

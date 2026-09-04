@@ -1,5 +1,5 @@
 using DigitalBrain.Chat;
-using DigitalBrain.Client;
+using DigitalBrain.Abstractions;
 using DigitalBrain.UI;
 
 using DigitalBrain.Abstractions.Journals;

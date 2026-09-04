@@ -2,7 +2,7 @@ using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
-using DigitalBrain.Client;
+using DigitalBrain.Abstractions;
 
 namespace DigitalBrain.Testing;
 
