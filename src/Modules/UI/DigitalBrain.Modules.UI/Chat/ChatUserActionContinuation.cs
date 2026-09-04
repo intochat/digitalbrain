@@ -23,8 +23,7 @@ internal sealed class ChatUserActionContinuation(IGrainFactory grains) : IUserAc
         ArgumentNullException.ThrowIfNull(context);
         ArgumentException.ThrowIfNullOrWhiteSpace(actionId);
         cancellationToken.ThrowIfCancellationRequested();
-        return grains.GetGrain<IChatKernel>(context.Chat.ToGrainId())
-            .CompleteUserAction(context, actionId, accepted)
-            .WaitAsync(cancellationToken);
+        return grains.GetGrain<IChat>(context.Chat.ToGrainId())
+            .HandleAsync(new CompleteUserAction(context, actionId, accepted), cancellationToken);
     }
 }

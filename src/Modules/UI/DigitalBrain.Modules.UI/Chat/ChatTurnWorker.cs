@@ -88,8 +88,8 @@ internal sealed class ChatTurnWorker(NeuronRuntime runtime) : Neuron(runtime), I
                 cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        await chat.SaveActiveExecution(executionId)
-            .WaitAsync(cancellationToken)
+        await GrainFactory.GetGrain<IChat>(goal.Chat.ToGrainId())
+            .HandleAsync(new SetActiveExecution(executionId), cancellationToken)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         return executionId;

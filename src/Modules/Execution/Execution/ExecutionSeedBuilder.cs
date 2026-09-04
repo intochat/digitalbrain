@@ -27,7 +27,4 @@ public sealed class ExecutionSeedBuilder
     public List<string> PromptBlocks { get; } = [];
 
     public List<ContextDelta> SeedDeltas { get; } = [];
-
-    public ExecutionSeed Build()
-        => new(ExecutionId, Workload, PromptBlocks.ToArray(), SeedDeltas.ToArray());
 }

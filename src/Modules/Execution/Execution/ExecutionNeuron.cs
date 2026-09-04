@@ -66,7 +66,6 @@ public sealed class ExecutionNeuron : Neuron, IExecution, IExecutionKernel
             ExecutionStatus.Running,
             signal.Workload));
 
-        var session = new ExecutionSession(signal.ExecutionId, Id.Owner, GrainFactory);
         var context = GrainFactory.GetGrain<IExecutionContext>(
             EntityId.For<IExecutionContext>(Id.Owner, signal.ExecutionId.ToString()).ToGrainId());
 
@@ -92,7 +91,7 @@ public sealed class ExecutionNeuron : Neuron, IExecution, IExecutionKernel
 
             for (var deltaIndex = 0; deltaIndex < seed.SeedDeltas.Count; deltaIndex++)
             {
-                await session.ApplyDeltaAsync(seed.SeedDeltas[deltaIndex])
+                await context.ApplyDelta(seed.SeedDeltas[deltaIndex])
                     .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             }
 
@@ -112,30 +111,6 @@ public sealed class ExecutionNeuron : Neuron, IExecution, IExecutionKernel
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             throw new NeuronAuthorizationException($"Execution '{Id}' failed: {ex.Message}", ex);
         }
-    }
-
-    public async Task HandleAsync(CancelExecution signal, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(signal);
-        cancellationToken.ThrowIfCancellationRequested();
-        RequireCommand(signal.CommandId);
-        RequireMatchingExecution(signal.ExecutionId);
-
-        var current = LoadRecorded();
-        if (current is null)
-        {
-            throw new NeuronAuthorizationException($"Execution '{Id}' has not been started.");
-        }
-
-        if (current.Status is ExecutionStatus.Completed or ExecutionStatus.Failed or ExecutionStatus.Cancelled)
-        {
-            throw new NeuronAuthorizationException(
-                $"Execution '{Id}' cannot be cancelled from status '{current.Status}'.");
-        }
-
-        Stage(current with { Status = ExecutionStatus.Cancelled });
-        await RecordOutgoingAsync(new ExecutionLifecycle(signal.ExecutionId, ExecutionStatus.Cancelled))
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private ExecutionState? LoadRecorded()

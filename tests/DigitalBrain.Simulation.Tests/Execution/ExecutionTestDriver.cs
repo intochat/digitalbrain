@@ -30,7 +30,7 @@ internal static class ExecutionTestDriver
         return brain.Get<IExecution>(name);
     }
 
-    // Waits for ANY terminal lifecycle, then asserts it Completed — so a Failed or Cancelled
+    // Waits for ANY terminal lifecycle, then asserts it Completed — so a Failed
     // execution reports its Detail immediately instead of burning the full journal-wait
     // timeout and dying as an uninformative TimeoutException.
     public static async Task<ExecutionLifecycle> AwaitCompletionAsync(IDigitalBrain brain, string executionName)

@@ -191,10 +191,10 @@ internal sealed class Chat : Neuron, IChat, IChatKernel
     {
         ArgumentNullException.ThrowIfNull(signal);
         cancellationToken.ThrowIfCancellationRequested();
-        return CompleteUserAction(signal.Context, signal.ActionId, signal.Accepted);
+        return CompleteUserActionAsync(signal.Context, signal.ActionId, signal.Accepted);
     }
 
-    public async Task CompleteUserAction(AgentTurnContext context, string actionId, bool accepted)
+    private async Task CompleteUserActionAsync(AgentTurnContext context, string actionId, bool accepted)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentException.ThrowIfNullOrWhiteSpace(actionId);
@@ -289,13 +289,14 @@ internal sealed class Chat : Neuron, IChat, IChatKernel
     {
         ArgumentNullException.ThrowIfNull(signal);
         cancellationToken.ThrowIfCancellationRequested();
-        return SaveActiveExecution(signal.ExecutionId);
+        SaveActiveExecution(signal.ExecutionId);
+        return Task.CompletedTask;
     }
 
     public Task<ExecutionId?> LoadActiveExecution()
         => Task.FromResult(LoadFocus().ActiveExecutionId);
 
-    public Task SaveActiveExecution(ExecutionId? id)
+    private void SaveActiveExecution(ExecutionId? id)
     {
         var focus = LoadFocus();
         var related = new List<ExecutionId>(focus.RelatedExecutionIds);
@@ -315,7 +316,6 @@ internal sealed class Chat : Neuron, IChat, IChatKernel
         }
 
         SaveFocus(new ChatExecutionFocus(id, related));
-        return Task.CompletedTask;
     }
 
     public async Task HandleAsync(ReadTurns signal, CancellationToken cancellationToken)
