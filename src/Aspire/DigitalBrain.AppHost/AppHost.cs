@@ -78,7 +78,8 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
     .AddModule<GoogleModule>(google => google.WithGmail())
     .AddModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
     .AddModule<MicrosoftModule>(microsoft => microsoft.WithAspire(
-        Path.Combine(builder.AppHostDirectory, "DigitalBrain.AppHost.csproj"), ShellHostingExtensions.DefaultOwner))
+        Path.Combine(builder.AppHostDirectory, "DigitalBrain.AppHost.csproj"), ShellHostingExtensions.DefaultOwner)
+        .WithConfiguredGitHubRepositories(builder.Configuration))
     .AddModule<UIModule>(ui =>
     {
         ui.WithWindowHost();

@@ -14,4 +14,5 @@ public partial interface IChat :
     IHandle<SetActiveExecution>,
     IHandle<CompleteUserAction>,
     IHandle<Note>,
+    IHandle<PublishNote>,
     IHandle<KitCardOffer>;

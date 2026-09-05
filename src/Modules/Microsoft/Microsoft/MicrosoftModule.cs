@@ -3,6 +3,7 @@ using DigitalBrain.AI;
 using DigitalBrain.Core;
 using DigitalBrain.Product.Interactions;
 using DigitalBrain.Product.Presentation;
+using DigitalBrain.Microsoft.GitHub;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Microsoft;
@@ -14,6 +15,12 @@ public sealed class MicrosoftModule : IModule
     public void Configure(ISiloBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
+        ConfigureAspire(builder);
+        GitHubModule.Configure(builder);
+    }
+
+    private static void ConfigureAspire(ISiloBuilder builder)
+    {
         builder.Services.AddSingleton(new NeuronPresentation("aspire", "Aspire", "Microsoft", "aspire"));
         var configuration = builder.Configuration.GetSection(AspireConfigurationRoot);
         if (DigitalBrainFakes.Enabled(builder.Configuration) || string.IsNullOrWhiteSpace(configuration["ProjectPath"]))

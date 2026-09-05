@@ -30,6 +30,10 @@
     <InternalsVisibleTo Include="DigitalBrain.Aspire.Tests" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="../../../../docs/examples/github-pr-review.csx" LogicalName="DigitalBrain.Examples.github-pr-review.csx" />
+    <EmbeddedResource Include="../../../../docs/examples/personal-code-review.csx" LogicalName="DigitalBrain.Examples.personal-code-review.csx" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../../../Product/DigitalBrain.Product.Contracts/DigitalBrain.Product.Contracts.csproj" />
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain/DigitalBrain.csproj" />

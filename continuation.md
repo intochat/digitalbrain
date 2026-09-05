@@ -1,5 +1,43 @@
 # Continuation — keep cleaning on subscribe/unsubscribe
 
+## GitHub repository and custom PR review — 2026-09-05
+
+Implemented the approved [GitHub plan](docs/plans/2026-09-05-github-repository-and-pr-review.md).
+The Microsoft module has `GitHub/IRepository : IAgent` and `Repository : Agent` with native
+read-only MCP schemas. SDK `WebhookSurface` provides bounded raw-body transport; Microsoft
+owns signed, principal-bound durable receipts, repository projection/outbox and typed PR facts.
+
+`IPullRequestReview` is the actual Bound subscriber for PR/open/update/close/CI/revocation
+signals. The admitted C# example controls required checks and the architecture/code-quality
+prompts. Admission is short; a separate source-bound worker refreshes live CI, captures immutable
+evidence and runs two real reviewer agents concurrently. Durable ledger generations fence stale
+heads, cancellations, replacement and revocation. Completed sibling results survive retries.
+Host shutdown preserves work; removal or explicit disable removes the inbox's Bound edges.
+
+Ino can load `read_behavior_example("github-pr-review")` and customize the checked-in example.
+The scripting host supplies read-only `Behavior.Name`, GUID `Revision`, and `SourceHash`.
+Chat `PublishNote` retains stable publication tombstones separately from transcript retention.
+Both success and terminal-failure messages use duplicate-safe identities. GitHub writes are
+not implemented or authorized. Kernel Broadcast tries all subscribers before reporting an
+aggregate failure, allowing repository outbox retries without starving healthy recipients.
+
+Verified: full simulation 250; final targeted GitHub/webhook/publication 61 (overlaps the full
+suite and includes later isolation/restart/telemetry cases); scripting 33; Aspire hosting 61;
+substrate 95; Flutter kit 4. Real two-host simulation recovery keeps the architecture result
+and reruns only code quality. W3C receipt context survives delayed dispatch without baggage;
+review traces include PR/head/base/CI/run/generation identifiers. See the
+[verification record](docs/reviews/2026-09-05-github-pr-review-verification.md).
+
+Live activation remains pending: no GitHub metadata/secret parameters exist in the local
+AppHost secret store. The user has not specified owner/repository, exact required CI checks,
+GitHub App/installation or public webhook route (their reply to that input question was "right").
+Do not invent those values or claim a real GitHub delivery/review ran. Follow the
+[setup guide](docs/github-pr-review.md) and [C# source](docs/examples/github-pr-review.csx).
+Current changes were made in place; no commit or external GitHub mutation was performed.
+After the final checks, the local AppHost was rebuilt/restarted. Kernel, scripting, MCP and
+Flutter reported Healthy, and localhost:5080/health returned HTTP 200 Healthy. Resolve current
+resource identities through Aspire CLI rather than reusing the generated resource suffixes.
+
 ## MCP-backed IAspire and GenAI telemetry — 2026-09-05
 
 Implemented the approved Microsoft-module specialist. `IAspire : IAgent` inherits

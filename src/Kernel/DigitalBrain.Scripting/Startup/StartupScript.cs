@@ -5,6 +5,8 @@ namespace DigitalBrain.Scripting.Startup;
 
 internal sealed record StartupScript(string Path, string Source, string Sha256)
 {
+    public ScriptBehavior? Behavior { get; init; }
+
     public static StartupScript FromSource(string path, string source)
     {
         var sourceBytes = Encoding.UTF8.GetBytes(source);

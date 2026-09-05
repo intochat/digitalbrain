@@ -22,6 +22,7 @@ void main() {
         NeuronIconKind.salesforce,
       );
       expect(brainNeuronIcon(neuron(iconKey: 'aspire')), NeuronIconKind.aspire);
+      expect(brainNeuronIcon(neuron(iconKey: 'github')), NeuronIconKind.github);
       expect(brainNeuronIcon(neuron()), NeuronIconKind.generic);
       expect(brainNeuronIcon(neuron(type: 'gmail')), NeuronIconKind.generic);
       expect(
@@ -121,6 +122,7 @@ void main() {
             NeuronIcon(kind: NeuronIconKind.gmail),
             NeuronIcon(kind: NeuronIconKind.salesforce),
             NeuronIcon(kind: NeuronIconKind.aspire),
+            NeuronIcon(kind: NeuronIconKind.github),
           ],
         ),
         reducedMotion: true,

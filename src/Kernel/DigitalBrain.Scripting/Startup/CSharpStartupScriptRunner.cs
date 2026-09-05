@@ -47,6 +47,7 @@ internal sealed class CSharpStartupScriptRunner : IStartupScriptRunner
             "DigitalBrain.Abstractions.Signals",
             "DigitalBrain.AI",
             "DigitalBrain.Microsoft",
+            "DigitalBrain.Microsoft.GitHub",
             "DigitalBrain.Google",
             "DigitalBrain.Salesforce",
             "DigitalBrain.Chat",
@@ -64,7 +65,7 @@ internal sealed class CSharpStartupScriptRunner : IStartupScriptRunner
             var state = await CSharpScript.RunAsync(
                 script.Source,
                 Options,
-                new StartupScriptContext(brain, cancellationToken),
+                new StartupScriptContext(brain, cancellationToken, script.Behavior),
                 typeof(StartupScriptContext),
                 cancellationToken);
 

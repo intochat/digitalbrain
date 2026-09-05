@@ -28,7 +28,9 @@ internal sealed partial class Assistant(NeuronRuntime runtime, IChatClient chatC
         was posted remotely: the repository tool is read-only.
 
         For custom automation, write C# and use admit_behavior to save it. Scripts run in the
-        separate Scripting process with Brain (IDigitalBrain) and CancellationToken as globals.
+        separate Scripting process with Brain (IDigitalBrain), CancellationToken and read-only
+        Behavior (Name, Guid Revision, SourceHash) as globals. Use read_behavior_example for
+        the supported personal-code-review and github-pr-review scripts before customizing them.
         Use list_behaviors for saved names and status, read_behavior for the exact current source
         before editing it, and remove_behavior when asked to remove one. Admission is not evidence
         that compilation or execution succeeded: inspect the reported status and diagnostics.
@@ -43,7 +45,16 @@ internal sealed partial class Assistant(NeuronRuntime runtime, IChatClient chatC
         catalog, a Gherkin compiler, or an English execution runtime.
         Scripts can use System.IO, System.Diagnostics, LINQ, DigitalBrain.AI, DigitalBrain.Microsoft, DigitalBrain.Google, DigitalBrain.Salesforce, DigitalBrain.Chat,
         DigitalBrain.Time and DigitalBrain.UI contracts. Pass CancellationToken to watches, requests,
-        delays and process waits. Clean up any subscriptions the script created in finally.
+        delays and process waits. Clean up transient subscriptions in finally; durable workflow
+        subscriptions belong to their inbox and survive host shutdown until explicitly disabled.
+        For GitHub PR automation, use the github-pr-review example and configured binding identity.
+        Required CI check names and expected App IDs must come from the owner's policy or verified
+        repository configuration. Do not guess that a check is named CI or build. An empty required
+        set never allows a review. Repository updates flow through real Bound inbox subscriptions;
+        the script reconciles durable candidates, then StartPullRequestReview admits background work.
+        The inbox runs architecture and quality reviewers concurrently only after verifying CI.
+        Its publication is idempotent and goes to this chat. Removing the behavior disables the
+        inbox and removes its subscriptions after reconciliation; it leaves the shared webhook intact.
         For a background model task, send SendMessage to a separate named IChat (for example the
         current chat instance plus .code-review), receive TurnAccepted, and watch its outgoing
         journal for Responded with that CommandId or failed/cancelled TurnLifecycle with that TurnId.
@@ -54,8 +65,10 @@ internal sealed partial class Assistant(NeuronRuntime runtime, IChatClient chatC
         personal output to a guessed default chat. Avoid replaying old journal entries unless asked.
 
         Delegate email questions to ask_gmail, CRM questions to ask_salesforce, and application
-        health/log/trace questions to ask_aspire when those tools are present. Each specialist owns
-        its native MCP tools. Pass the user's request and relevant context; base your answer on
+        health/log/trace questions to ask_aspire when those tools are present.
+        Delegate GitHub repository questions to ask_repository (or the
+        specifically named repository tool) when available. Each repository is configured and read-only.
+        Each specialist owns its native MCP tools. Pass the user's request and relevant context; base your answer on
         returned evidence and disclose failures, missing data or truncation. Never infer live
         provider state from earlier messages or cached identity.
         Let the application present login actions and exact write previews. Login permits only

@@ -114,8 +114,9 @@ internal sealed class BehaviorScriptWorker(
         try
         {
             await ReportAsync(BehaviorStatus.Running, "Compiling and running.", []).ConfigureAwait(false);
-            var result = await runner.RunAsync(
-                StartupScript.FromSource(definition.Name, definition.Source), brain, cancellationToken).ConfigureAwait(false);
+            var script = StartupScript.FromSource(definition.Name, definition.Source);
+            script = script with { Behavior = new ScriptBehavior(definition.Name, definition.Revision, script.Sha256) };
+            var result = await runner.RunAsync(script, brain, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             await ReportAsync(
                 result.IsSuccess ? BehaviorStatus.Completed : BehaviorStatus.Failed,

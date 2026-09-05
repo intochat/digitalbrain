@@ -24,6 +24,7 @@ internal sealed class Chat : Neuron, IChat, IChatKernel
     private const int RetainedTurns = 64;
     private const int RetainedTurnRecords = 64;
     private const int MaxRelatedExecutions = 8;
+    private const int MaxPublications = 10000;
 
     // One turn is one awaited worker call; the budget mirrors the kernel SSE edge and the
     // call's own ResponseTimeout. The deadline timer is the belt for a call that never
@@ -43,6 +44,8 @@ internal sealed class Chat : Neuron, IChat, IChatKernel
     private readonly Serializer<DurableTurnRecord> _turnRecords;
     private readonly Serializer<TurnQueueState> _queues;
     private readonly Serializer<ChatExecutionFocus> _focusStates;
+    private readonly IDurableList<byte[]> _publicationLog;
+    private readonly Serializer<ChatPublication> _publications;
 
     // The in-flight worker call is detached and tracked: the task settles the turn when the call
     // returns or throws; the token is the turn-scoped cancel; the timer fails a call that
@@ -66,6 +69,8 @@ internal sealed class Chat : Neuron, IChat, IChatKernel
         _turnRecords = ServiceProvider.GetRequiredService<Serializer<DurableTurnRecord>>();
         _queues = ServiceProvider.GetRequiredService<Serializer<TurnQueueState>>();
         _focusStates = ServiceProvider.GetRequiredService<Serializer<ChatExecutionFocus>>();
+        _publicationLog = ServiceProvider.GetRequiredKeyedService<IDurableList<byte[]>>("chat.publications");
+        _publications = ServiceProvider.GetRequiredService<Serializer<ChatPublication>>();
     }
 
     protected override async Task OnNeuronActivatedAsync(CancellationToken cancellationToken)
@@ -361,6 +366,41 @@ internal sealed class Chat : Neuron, IChat, IChatKernel
         await ReplyAsync(
             new TranscriptRead(signal.CommandId, Id, Trimmed(new ChatTranscript(Turns()), signal.MaxTurns)))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+    }
+
+    public async Task HandleAsync(PublishNote signal, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (signal.PublicationId == Guid.Empty || string.IsNullOrWhiteSpace(signal.Text) || signal.Text.Length > 100_000)
+        {
+            throw new ArgumentException("A publication requires an identity and between 1 and 100000 characters.", nameof(signal));
+        }
+
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(signal.Text)));
+        var existing = _publicationLog.Select(_publications.Deserialize).FirstOrDefault(entry => entry.Id == signal.PublicationId);
+        if (existing is not null)
+        {
+            if (!string.Equals(existing.ContentHash, hash, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("A publication identity cannot be reused for different content.");
+            }
+
+            await ReplyAsync(new NotePublished(signal.PublicationId, Duplicate: true)).ConfigureAwait(true);
+            return;
+        }
+
+        // Keep compact tombstones even after transcript retention. At capacity fail closed;
+        // silently evicting them could duplicate a delayed workflow publication.
+        if (_publicationLog.Count >= MaxPublications)
+        {
+            throw new InvalidOperationException("This conversation has reached its application publication capacity.");
+        }
+
+        Remember(new ChatTurn(FromUser: false, signal.Text));
+        _publicationLog.Add(_publications.SerializeToArray(new ChatPublication(signal.PublicationId, hash)));
+        await RecordOutgoingAsync(new Responded(new CommandId(signal.PublicationId), Id, signal.Text, Author: Id.Name)).ConfigureAwait(true);
+        await WriteStateAsync(cancellationToken).ConfigureAwait(true);
+        await ReplyAsync(new NotePublished(signal.PublicationId, Duplicate: false)).ConfigureAwait(true);
     }
 
     public async Task HandleAsync(Note signal, CancellationToken cancellationToken)

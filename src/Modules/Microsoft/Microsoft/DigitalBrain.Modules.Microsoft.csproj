@@ -7,6 +7,7 @@
   <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Microsoft.Contracts.csproj" />
     <ProjectReference Include="../../AI/AI/DigitalBrain.Modules.AI.csproj" />
+    <ProjectReference Include="../../UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Simulation.Tests" />

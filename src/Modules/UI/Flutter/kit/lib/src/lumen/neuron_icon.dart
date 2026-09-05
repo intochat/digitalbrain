@@ -10,6 +10,10 @@ enum NeuronIconKind {
   gmail,
   salesforce,
   aspire,
+  github,
+  review,
+  architecture,
+  quality,
   document,
   search,
   repository,
@@ -62,6 +66,9 @@ final class NeuronIcon extends StatelessWidget {
         NeuronIconKind.document => Icons.description_outlined,
         NeuronIconKind.search => Icons.search_rounded,
         NeuronIconKind.repository => Icons.code_rounded,
+        NeuronIconKind.review => Icons.fact_check_outlined,
+        NeuronIconKind.architecture => Icons.account_tree_outlined,
+        NeuronIconKind.quality => Icons.rule_folder_outlined,
         NeuronIconKind.memory => Icons.inventory_2_outlined,
         NeuronIconKind.clock => Icons.schedule_rounded,
         _ => Icons.hub_outlined,
@@ -76,5 +83,6 @@ final class NeuronIcon extends StatelessWidget {
     NeuronIconKind.gmail: 'assets/brands/gmail.svg',
     NeuronIconKind.salesforce: 'assets/brands/salesforce.svg',
     NeuronIconKind.aspire: 'assets/brands/aspire-icon-32.svg',
+    NeuronIconKind.github: 'assets/brands/github.svg',
   };
 }

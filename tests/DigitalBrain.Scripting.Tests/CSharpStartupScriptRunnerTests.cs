@@ -8,6 +8,29 @@ public sealed class CSharpStartupScriptRunnerTests
     private readonly CSharpStartupScriptRunner runner = new();
 
     [Fact]
+    public async Task Checked_in_github_review_example_compiles_and_refuses_unconfigured_execution()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "examples", "github-pr-review.csx");
+        var script = await StartupScript.ReadAsync(path, TestContext.Current.CancellationToken);
+        script = script with { Behavior = new ScriptBehavior("review", Guid.NewGuid(), script.Sha256) };
+        var result = await runner.RunAsync(script, new FakeDigitalBrain("alice"), TestContext.Current.CancellationToken);
+        Assert.False(result.IsSuccess);
+        Assert.Empty(result.Diagnostics);
+        Assert.Contains("Choose the configured repository binding", result.Summary);
+    }
+
+    [Fact]
+    public async Task Admitted_script_observes_host_supplied_revision_and_source_hash()
+    {
+        var revision = Guid.NewGuid();
+        var script = StartupScript.FromSource("review", "return Behavior!.Name + \"/\" + Behavior.Revision + \"/\" + Behavior.SourceHash;");
+        script = script with { Behavior = new ScriptBehavior("review", revision, script.Sha256) };
+        var result = await runner.RunAsync(script, new FakeDigitalBrain("alice"), CancellationToken.None);
+        Assert.True(result.IsSuccess, string.Join(Environment.NewLine, result.Diagnostics));
+        Assert.Equal($"review/{revision}/{script.Sha256}", result.Summary);
+    }
+
+    [Fact]
     public async Task Script_can_read_the_connected_brain_owner()
     {
         var script = StartupScript.FromSource("start.cs", "return Brain.Owner.Value;");

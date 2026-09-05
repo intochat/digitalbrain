@@ -1,6 +1,6 @@
 # GitHub repository neuron and personal PR review behavior
 
-**Status: proposed, awaiting approval.** No application changes, GitHub configuration, webhook registration or review publication are part of preparing this plan.
+**Status: implemented and fixture-verified.** Live GitHub setup still needs a selected repository, installation, required CI identities and reachable webhook route. Automatic GitHub review publication remains outside this scope. The original design sketches below are superseded by the [setup guide](../github-pr-review.md), [working C# example](../examples/github-pr-review.csx) and [verification record](../reviews/2026-09-05-github-pr-review-verification.md).
 
 ## Intended experience
 

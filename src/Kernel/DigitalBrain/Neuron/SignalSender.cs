@@ -98,10 +98,25 @@ internal sealed class SignalSender
         }
 
         var correlation = cause?.CorrelationId ?? CorrelationId.New();
+        List<Exception>? failures = null;
         foreach (var receiver in receivers)
         {
-            await SendAsync(receiver, signal, cause, correlation, CancellationToken.None)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            try
+            {
+                await SendAsync(receiver, signal, cause, correlation, CancellationToken.None)
+                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                // A broken subscriber must not prevent delivery to the remaining audience.
+                // The source still sees failure, so a durable outbox retains this fact and
+                // successful recipients must deduplicate its later replay.
+                (failures ??= []).Add(error);
+            }
+        }
+        if (failures is not null)
+        {
+            throw new AggregateException("One or more signal subscribers failed to handle the broadcast.", failures);
         }
 
         return receivers.Length;

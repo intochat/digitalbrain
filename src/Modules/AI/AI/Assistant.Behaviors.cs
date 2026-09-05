@@ -21,6 +21,22 @@ internal sealed partial class Assistant
 
         var principal = turn.Actor.PrincipalId;
 
+        async Task<string> Example(
+            [Description("The example name: github-pr-review or personal-code-review")] string name,
+            CancellationToken cancellationToken)
+        {
+            if (name is not ("github-pr-review" or "personal-code-review"))
+            {
+                return "Available examples: github-pr-review, personal-code-review.";
+            }
+
+            using var stream = typeof(Assistant).Assembly.GetManifestResourceStream($"DigitalBrain.Examples.{name}.csx")
+                ?? throw new InvalidOperationException("The requested behavior example is unavailable.");
+            using var reader = new StreamReader(stream);
+            var source = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(true);
+            return source.Replace("\"__CHAT_INSTANCE__\"", JsonSerializer.Serialize(turn.Chat.Name), StringComparison.Ordinal);
+        }
+
         async Task<string> Admit(
             [Description("A short stable behavior name without spaces, e.g. personal-code-review")] string name,
             [Description("Complete C# script source using Brain and CancellationToken globals")] string source,
@@ -98,6 +114,13 @@ internal sealed partial class Assistant
 
         return
         [
+            AIFunctionFactory.Create(Example, new AIFunctionFactoryOptions
+            {
+                Name = "read_behavior_example",
+                Description = "Read the supported C# source for github-pr-review or personal-code-review with this chat as destination. "
+                    + "Customize the exact source before admission; unresolved placeholders must be supplied from configuration and user requirements. "
+                    + "The GitHub example waits for required green CI, runs architecture and quality agents, and publishes in DigitalBrain chat.",
+            }),
             AIFunctionFactory.Create(Admit, new AIFunctionFactoryOptions
             {
                 Name = "admit_behavior",
