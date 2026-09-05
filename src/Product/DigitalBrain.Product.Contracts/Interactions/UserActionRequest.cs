@@ -10,4 +10,5 @@ public sealed record UserActionRequest(
     [property: Id(3)] string Message,
     [property: Id(4)] string LoginUrl,
     [property: Id(5)] DateTimeOffset ExpiresAt,
-    [property: Id(6)] string[] ResumeToolNames);
+    [property: Id(6)] string[] ResumeToolNames,
+    [property: Id(7)] SpecialistContinuation? SpecialistContinuation = null);

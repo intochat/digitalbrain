@@ -131,7 +131,7 @@ public sealed class KitGraphToolTests(SimulationFixture fixture)
     private AIFunction ShowGraphTool()
     {
         var tools = new KitToolSource(fixture.Sim.Grains, null, new MemoryKitImageStore());
-        return tools.ToolsFor(Owner).Single(tool => tool.Name == "show_graph");
+        return tools.PrepareTestTools(Owner).Single(tool => tool.Name == "show_graph");
     }
 
     private string NewChatInstance()

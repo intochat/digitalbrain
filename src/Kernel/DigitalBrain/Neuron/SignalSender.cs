@@ -44,16 +44,25 @@ internal sealed class SignalSender
         _persist = persist;
     }
 
-    internal async Task<SignalDeliveryResult> SendAsync(
+    internal Task<SignalDeliveryResult> SendAsync(
         NeuronId receiver,
         Signal signal,
         SignalDelivery? cause,
         CancellationToken cancellationToken = default)
+        => SendAsync(receiver, signal, cause, correlation: null, cancellationToken);
+
+    private async Task<SignalDeliveryResult> SendAsync(
+        NeuronId receiver,
+        Signal signal,
+        SignalDelivery? cause,
+        CorrelationId? correlation,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(signal);
         cancellationToken.ThrowIfCancellationRequested();
+        using var path = NeuronRequestPath.Enter(_source, receiver);
 
-        var delivery = await RecordOutgoingAsync(signal, cause)
+        var delivery = await RecordOutgoingAsync(signal, cause, correlation)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         cancellationToken.ThrowIfCancellationRequested();
         // Bound the remote await here, inside the state-owning sender. A timeout around
@@ -89,21 +98,10 @@ internal sealed class SignalSender
         }
 
         var correlation = cause?.CorrelationId ?? CorrelationId.New();
-        var signalType = signal.GetType().Name;
-
         foreach (var receiver in receivers)
         {
-            var delivery = await RecordOutgoingAsync(signal, cause, correlation)
+            await SendAsync(receiver, signal, cause, correlation, CancellationToken.None)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            var outcome = await DeliverAsync(receiver, delivery, DeliveryMode.Awaited)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-            if (outcome == DeliveryOutcome.Handled)
-            {
-                _synapses.Reinforce(receiver, signalType, SynapseKind.Learned);
-                await _persist(CancellationToken.None)
-                    .ConfigureAwait(true);
-            }
         }
 
         return receivers.Length;

@@ -1,6 +1,7 @@
 using DigitalBrain.Product.Identity;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
+using DigitalBrain.Product.Interactions;
 
 using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.UI;
@@ -15,4 +16,5 @@ public sealed record ChatTurnGoal(
     [property: Id(3)] ActorContext Actor,
     [property: Id(4)] NeuronId Chat,
     [property: Id(5)] string[]? AllowedToolNames = null,
-    [property: Id(6)] string? CompletedUserActionId = null);
+    [property: Id(6)] string? CompletedUserActionId = null,
+    [property: Id(7)] SpecialistContinuation? SpecialistContinuation = null);

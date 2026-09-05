@@ -7,6 +7,42 @@ namespace DigitalBrain.Google;
 
 internal static class GmailContent
 {
+    // Native MCP arguments arrive as JSON values. Preserve their names/schema while applying
+    // the same bounds and safe defaults formerly enforced by the hand-written adapter.
+    internal static Dictionary<string, object?> Normalize(string tool, IReadOnlyDictionary<string, object?> arguments)
+    {
+        var result = arguments.ToDictionary(pair => pair.Key, pair => pair.Value is JsonElement json
+            ? json.ValueKind switch
+            {
+                JsonValueKind.String => json.GetString(),
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                JsonValueKind.Number when json.TryGetInt32(out var number) => number,
+                JsonValueKind.Array when json.EnumerateArray().All(item => item.ValueKind == JsonValueKind.String)
+                    => json.EnumerateArray().Select(item => item.GetString()!).ToArray(),
+                JsonValueKind.Null => null,
+                _ => json,
+            } : pair.Value, StringComparer.Ordinal);
+        if (tool == "search_threads")
+        {
+            result.TryAdd("pageSize", 10);
+            result.TryAdd("includeTrash", false);
+            result.TryAdd("view", "THREAD_VIEW_MINIMAL");
+        }
+        if (tool == "get_thread")
+        {
+            result.TryAdd("messageFormat", "MINIMAL");
+        }
+        if (tool == "create_draft")
+        {
+            result.TryAdd("to", System.Array.Empty<string>());
+            result.TryAdd("cc", System.Array.Empty<string>());
+            result.TryAdd("bcc", System.Array.Empty<string>());
+        }
+        ValidateArguments(tool, result);
+        return result;
+    }
+
     internal static void ValidateArguments(string tool, IReadOnlyDictionary<string, object?> args)
     {
         var allowed = tool switch

@@ -7,7 +7,7 @@ using DigitalBrain.Abstractions.Synapses;
 namespace DigitalBrain.Abstractions;
 
 // The owner's typed handle on the graph. Address neurons with Get, entities with GetEntity.
-// Publish with SendAsync/PublishAsync (only compiles when the target IHandle<T>s the signal).
+// Deliver with SendAsync (only compiles when the target IHandle<T>s the signal).
 // SubscribeTo writes a durable Bound synapse on the source.
 public interface IDigitalBrain : IAsyncDisposable
 {

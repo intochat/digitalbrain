@@ -25,33 +25,11 @@ public abstract partial class Agent : Neuron, IAgent, IAgentKernel
 
     protected abstract string Instructions { get; }
 
-    protected virtual IReadOnlyList<AITool> Tools => [];
-
     protected virtual string DisplayName => Id.Type;
 
-    protected virtual IAgentMcpTools? McpTools => null;
-
-    protected virtual async ValueTask<IReadOnlyList<AITool>> PrepareToolsAsync(
+    protected virtual ValueTask<IReadOnlyList<AITool>> PrepareToolsAsync(
         AgentToolContext context, CancellationToken cancellationToken)
-    {
-        if (McpTools is not { } source)
-        {
-            return Tools;
-        }
-
-        if (context.Principal is not { } principal || !PrincipalPartition.OwnsInstance(principal, Id.Name))
-        {
-            throw new NeuronAuthorizationException("The MCP agent belongs to a different user or has no verified user context.");
-        }
-
-        var started = Stopwatch.GetTimestamp();
-        var discovered = await source.GetToolsAsync(Id, cancellationToken).ConfigureAwait(true);
-        await RecordOutgoingAsync(new AgentActivity(Guid.NewGuid(), "tool", "completed", "tools/list",
-            Server: source.Name, DurationMs: Stopwatch.GetElapsedTime(started).TotalMilliseconds,
-            Preview: McpEvidencePreview.Create(string.Join('\n', discovered.Select(tool => $"{tool.Name}: {tool.Description}")))))
-            .ConfigureAwait(true);
-        return [.. Tools, .. discovered];
-    }
+        => ValueTask.FromResult<IReadOnlyList<AITool>>([]);
 
     public async Task HandleAsync(AgentRequest signal, CancellationToken cancellationToken)
     {
@@ -88,11 +66,12 @@ public abstract partial class Agent : Neuron, IAgent, IAgentKernel
         using var activity = AgentTelemetry.Start(Id, DisplayName,
             _chatClient.GetService<OpenTelemetryChatClient>()?.EnableSensitiveData is true);
         using var requests = new TurnRequests(this, cancellationToken);
-        var context = new AgentToolContext(Id.Owner, VerifiedActor.Current?.PrincipalId, requests);
+        using var context = new AgentToolContext(Id, VerifiedActor.Current?.PrincipalId, requests,
+            async observation => { await RecordOutgoingAsync(observation).ConfigureAwait(true); });
         var operation = Guid.NewGuid();
         var started = Stopwatch.GetTimestamp();
         var state = "cancelled";
-        await RecordOutgoingAsync(new AgentActivity(operation, "agent", "started", DisplayName, Server: McpTools?.Name))
+        await RecordOutgoingAsync(new AgentActivity(operation, "agent", "started", DisplayName))
             .ConfigureAwait(true);
         try
         {
@@ -119,7 +98,7 @@ public abstract partial class Agent : Neuron, IAgent, IAgentKernel
                 var turnScheduler = TaskScheduler.Current;
                 options.Tools = [.. tools.Select(tool =>
                 tool is AIFunction capability
-                    ? new TurnBoundFunction(ObserveMcpTool(capability), turnScheduler) : tool)];
+                    ? new TurnBoundFunction(capability, turnScheduler) : tool)];
             }
             IReadOnlyList<ChatMessage> request = string.IsNullOrWhiteSpace(Instructions)
                 ? messages
@@ -161,10 +140,9 @@ public abstract partial class Agent : Neuron, IAgent, IAgentKernel
                 activity?.SetTag("error.type", "agent_error");
             }
             await RecordOutgoingAsync(new AgentActivity(operation, "agent", state, DisplayName,
-                Server: McpTools?.Name, DurationMs: Stopwatch.GetElapsedTime(started).TotalMilliseconds))
+                DurationMs: Stopwatch.GetElapsedTime(started).TotalMilliseconds))
                 .ConfigureAwait(true);
         }
     }
 
-    public Task InvalidateMcpTools() => McpTools?.InvalidateAsync(Id) ?? Task.CompletedTask;
 }

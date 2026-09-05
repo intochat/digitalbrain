@@ -110,9 +110,7 @@ public abstract class Neuron :
             throw new InvalidOperationException("A neuron cannot request a reply from itself.");
         }
 
-        using var requestPath = NeuronRequestPath.Enter(Id, receiver);
-        using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        budget.CancelAfter(TimeSpan.Parse(NeuronCallTimeouts.LongRunning, System.Globalization.CultureInfo.InvariantCulture));
+        using var budget = SignalRequestPolicy.CreateBudget(cancellationToken);
         try
         {
             budget.Token.ThrowIfCancellationRequested();
@@ -122,7 +120,7 @@ public abstract class Neuron :
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             var result = await SendAsync(receiver, request, budget.Token)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            RequireRequestHandled(receiver, request, result.Outcome);
+            SignalRequestPolicy.RequireHandled(receiver, request, result.Outcome);
 
             // ReplyAsync journals before its detached delivery back to the caller.
             // Therefore a completed handler must already have its reply here; waiting
@@ -130,47 +128,19 @@ public abstract class Neuron :
             var replies = await target.ReadJournal(JournalKind.Outgoing, cursor.ResumeSequence)
                 .WaitAsync(NeuronCallTimeouts.LookupBound, budget.Token)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            return NeuronResponse.Read<TResponse>(receiver, result.Delivery, cursor.ResumeSequence, replies);
+            var retained = await SignalRequestPolicy.RecoverRetainedAsync(replies,
+                    after => target.ReadJournal(JournalKind.Outgoing, after)
+                        .WaitAsync(NeuronCallTimeouts.LookupBound, budget.Token))
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            return (TResponse?)SignalRequestPolicy.FindResponse(retained, receiver, result.Delivery, typeof(TResponse))
+                ?? throw SignalRequestPolicy.MissingResponse(
+                    receiver, result.Delivery, typeof(TResponse), replies.ResetSnapshot is not null);
         }
         catch (OperationCanceledException exception) when (
             budget.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
-            throw new TimeoutException(
-                $"Request '{request.GetType().Name}' to neuron '{receiver}' exceeded its deadline; the remote outcome may be unknown.",
-                exception);
+            throw SignalRequestPolicy.TimedOut(receiver, request, exception);
         }
-    }
-
-    private static void RequireRequestHandled(NeuronId receiver, Signal request, DeliveryOutcome outcome)
-    {
-        switch (outcome)
-        {
-            case DeliveryOutcome.Handled:
-                return;
-            case DeliveryOutcome.Refused:
-                throw new SignalDeliveryRefusedException(
-                    $"Neuron '{receiver}' refused request '{request.GetType().Name}'.");
-            case DeliveryOutcome.Unhandled:
-                throw new InvalidOperationException(
-                    $"Neuron '{receiver}' did not handle request '{request.GetType().Name}'.");
-            default:
-                throw new InvalidOperationException($"Neuron '{receiver}' returned unknown delivery outcome '{outcome}'.");
-        }
-    }
-
-    protected Task<SignalDeliveryResult> PublishAsync<TNeuron, TSignal>(NeuronId to, TSignal signal)
-        where TNeuron : INeuron, IHandle<TSignal>
-        where TSignal : Signal
-    {
-        var expected = NeuronId.For<TNeuron>(to.Owner, to.Name);
-        if (to != expected)
-        {
-            throw new ArgumentException(
-                $"Neuron '{to}' is not a '{expected.Type}' instance.",
-                nameof(to));
-        }
-
-        return SendAsync(to, signal);
     }
 
     protected Task<int> BroadcastAsync(Signal signal)
@@ -284,16 +254,24 @@ public abstract class Neuron :
     private async Task BindFromAsync(NeuronId source, string signalType, Type? expectedSourceType)
     {
         RequireSubscription(source, signalType, expectedSourceType);
-        await GrainFactory.GetGrain<INeuronGrain>(source.ToGrainId())
-            .BindOutgoing(Id, signalType)
+        using var path = NeuronRequestPath.Enter(Id, source);
+        var binding = source == Id
+            ? BindOutgoing(Id, signalType)
+            : GrainFactory.GetGrain<INeuronGrain>(source.ToGrainId()).BindOutgoing(Id, signalType)
+                .WaitAsync(NeuronCallTimeouts.LookupBound);
+        await binding
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
     private async Task UnbindFromAsync(NeuronId source, string signalType, Type? expectedSourceType)
     {
         RequireSubscription(source, signalType, expectedSourceType);
-        await GrainFactory.GetGrain<INeuronGrain>(source.ToGrainId())
-            .UnbindOutgoing(Id, signalType)
+        using var path = NeuronRequestPath.Enter(Id, source);
+        var binding = source == Id
+            ? UnbindOutgoing(Id, signalType)
+            : GrainFactory.GetGrain<INeuronGrain>(source.ToGrainId()).UnbindOutgoing(Id, signalType)
+                .WaitAsync(NeuronCallTimeouts.LookupBound);
+        await binding
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 

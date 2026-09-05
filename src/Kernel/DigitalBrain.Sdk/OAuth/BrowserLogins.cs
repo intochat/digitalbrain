@@ -29,6 +29,9 @@ public abstract class BrowserLogins : IUserActionSource
     // Null until the operator has supplied the provider's OAuth client; no login can start before.
     protected abstract Uri? PublicOrigin { get; }
 
+    // Providers resolve this from credentials accepted for this authenticated actor.
+    protected virtual string? GetConnectionRevision(AgentTurnContext context) => null;
+
     internal Uri? ConfiguredOrigin => PublicOrigin;
 
     // Failures surface as MCP operation errors because a login only ever gates an MCP tool call.
@@ -40,7 +43,7 @@ public abstract class BrowserLogins : IUserActionSource
             ?? throw new McpOperationException($"{Definition.DisplayName} setup is incomplete. Configure its OAuth client privately in Aspire.");
         var context = AgentTurnContext.Current
             ?? throw new McpOperationException($"Request {Definition.DisplayName} access from an authenticated chat.");
-        if (VerifiedActor.Current != context.Actor)
+        if (VerifiedActor.Current?.PrincipalId != context.Actor.PrincipalId)
         {
             throw new McpOperationException("An authenticated chat actor is required.");
         }
@@ -69,7 +72,7 @@ public abstract class BrowserLogins : IUserActionSource
                 existing.Scope ??= scope;
                 if (resumeToolNames.Length == 0)
                 {
-                    existing.Action = existing.Action with { ResumeToolNames = [] };
+                    existing.Action = existing.Action with { ResumeToolNames = [], SpecialistContinuation = null };
                 }
 
                 return existing.Action;
@@ -88,7 +91,7 @@ public abstract class BrowserLogins : IUserActionSource
                 Definition.Message,
                 new Uri(origin, $"{Definition.LoginPath}?request={id}").AbsoluteUri,
                 DateTimeOffset.UtcNow.Add(Definition.Lifetime),
-                [.. resumeToolNames]);
+                [.. resumeToolNames], CreateSpecialistContinuation(context, resumeToolNames));
             var pending = new Pending(context, action, scope);
             _pending.Add(id, pending);
             pending.Cancellation = cancellationToken.Register(() => Cancel(context));
@@ -105,6 +108,41 @@ public abstract class BrowserLogins : IUserActionSource
             return _pending.Values.FirstOrDefault(p => !p.Done && p.Context.Chat.Owner == owner
                 && p.Context.CommandId == commandId && context?.Chat == p.Context.Chat && context.Actor == p.Context.Actor)?.Action;
         }
+    }
+
+    public SpecialistContinuation? ResolveSpecialistContinuation(AgentTurnContext context, string actionId)
+    {
+        lock (_pending)
+        {
+            var pending = _pending.Values.FirstOrDefault(p => SameTurn(p.Context, context)
+                && p.Action.Id == actionId && p.Outcome == true && !p.Done
+                && p.Action.ExpiresAt > DateTimeOffset.UtcNow);
+            if (pending?.Action.SpecialistContinuation is not { } continuation)
+            {
+                return null;
+            }
+            using var actor = VerifiedActor.Enter(pending.Context.Actor);
+            if (GetConnectionRevision(pending.Context) is not { Length: > 0 } revision)
+            {
+                return null;
+            }
+            return continuation with { ConnectionRevision = revision };
+        }
+    }
+
+    private static SpecialistContinuation? CreateSpecialistContinuation(AgentTurnContext context, string[] readTools)
+    {
+        if (readTools.Length == 0 || context.SpecialistRequest is not { } request)
+        {
+            return null;
+        }
+        if (request.Target.Owner != context.Chat.Owner
+            || !PrincipalPartition.OwnsInstance(context.Actor.PrincipalId, request.Target.Name)
+            || string.IsNullOrWhiteSpace(request.Text) || request.Text.Length > 16000)
+        {
+            throw new McpOperationException("The specialist continuation does not belong to this authenticated chat.");
+        }
+        return new SpecialistContinuation(request.Target, request.Text, [.. readTools.Distinct(StringComparer.Ordinal)]);
     }
 
     public void Cancel(AgentTurnContext context)
@@ -153,7 +191,13 @@ public abstract class BrowserLogins : IUserActionSource
 
     // The provider publishes credentials inside commitIfActive: publication and cancellation
     // share one lock, so nothing can publish after a cancelled or expired request.
-    public async Task AcceptAsync(string request, Func<OwnerId, string?, Action<Action>, Task> accept)
+    public Task AcceptAsync(string request, Func<OwnerId, string?, Action<Action>, Task> accept)
+    {
+        ArgumentNullException.ThrowIfNull(accept);
+        return AcceptForActorAsync(request, (context, scope, commit) => accept(context.Chat.Owner, scope, commit));
+    }
+
+    public async Task AcceptForActorAsync(string request, Func<AgentTurnContext, string?, Action<Action>, Task> accept)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(accept);
@@ -166,7 +210,7 @@ public abstract class BrowserLogins : IUserActionSource
             }
         }
 
-        await accept(p.Context.Chat.Owner, p.Scope, commit =>
+        await accept(p.Context, p.Scope, commit =>
         {
             lock (_pending)
             {

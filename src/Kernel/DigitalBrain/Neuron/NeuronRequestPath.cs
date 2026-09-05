@@ -3,7 +3,7 @@ using Orleans.Runtime;
 
 namespace DigitalBrain.Core;
 
-// This is a transient wait-chain carried by Orleans, never a graph registry.
+// This is a transient awaited delivery/binding chain carried by Orleans, never a graph registry.
 // Strings and arrays use Orleans' built-in serializers and cannot retain an
 // executable delegate or an activation after the turn ends.
 internal static class NeuronRequestPath
@@ -14,10 +14,16 @@ internal static class NeuronRequestPath
     {
         var previous = RequestContext.Get(ContextKey);
         var path = previous as string[] ?? [];
+        if (source == receiver)
+        {
+            // Self-delivery and binding run locally inside the current activation.
+            return new Restore(previous);
+        }
+
         if (path.Contains(receiver.ToString(), StringComparer.Ordinal))
         {
             throw new InvalidOperationException(
-                $"Request to neuron '{receiver}' would create a cycle in the active request path.");
+                $"Awaited call to neuron '{receiver}' would create a cycle in the active request path.");
         }
 
         RequestContext.Set(ContextKey, path.Append(source.ToString()).ToArray());

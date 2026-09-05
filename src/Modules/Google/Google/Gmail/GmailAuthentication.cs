@@ -107,8 +107,8 @@ internal static class GmailAuthentication
                         }
 
                         var connections = context.HttpContext.RequestServices.GetRequiredService<GmailConnections>();
-                        await logins.AcceptAsync(request,
-                            (owner, scope, valid) => connections.AcceptAsync(owner, sub, email, tokens.AccessToken,
+                        await logins.AcceptForActorAsync(request,
+                            (actor, scope, valid) => connections.AcceptAsync(actor.Chat.Owner, actor.Actor.PrincipalId, sub, email, tokens.AccessToken,
                                 tokens.RefreshToken, tokens.Scope, tokens.ExpiresIn, scope == GmailLogins.ComposeScope, valid,
                                 context.HttpContext.RequestAborted)).ConfigureAwait(false);
                         await LoginPage.WriteAsync(context.HttpContext, "Gmail connected",

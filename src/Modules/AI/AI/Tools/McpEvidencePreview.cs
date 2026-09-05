@@ -5,9 +5,9 @@ using System.Text.RegularExpressions;
 
 namespace DigitalBrain.AI;
 
-internal static partial class McpEvidencePreview
+public static partial class McpEvidencePreview
 {
-    internal static JsonElement Redact(JsonElement content)
+    public static JsonElement Redact(JsonElement content)
     {
         var source = content.GetRawText();
         var tree = JsonNode.Parse(source);
@@ -27,7 +27,7 @@ internal static partial class McpEvidencePreview
         return document.RootElement.Clone();
     }
 
-    internal static string Create(string screenedContent)
+    public static string Create(string screenedContent)
     {
         var redacted = ScrubText(screenedContent);
         return redacted.Length > 1800 ? redacted[..1800] + "… [preview truncated]" : redacted;

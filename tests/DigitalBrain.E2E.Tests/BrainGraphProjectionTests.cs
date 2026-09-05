@@ -11,6 +11,7 @@ using DigitalBrain.Chat;
 using DigitalBrain.Core;
 using DigitalBrain.Kernel;
 using DigitalBrain.Product.Identity;
+using DigitalBrain.Product.Presentation;
 using Xunit;
 
 namespace DigitalBrain.E2E.Tests;
@@ -20,6 +21,67 @@ public sealed class BrainGraphProjectionTests
     private static readonly OwnerId Owner = new("graph-owner");
     private static readonly ActorContext Actor = HttpActor.Current;
     private static readonly NeuronId Chat = ChatNamed("main");
+
+    [Theory]
+    [InlineData("gmail", "Gmail", "Google", "gmail")]
+    [InlineData("salesforce", "Salesforce", "Salesforce", "salesforce")]
+    [InlineData("aspire", "Aspire", "Microsoft", "aspire")]
+    public async Task Module_presentation_describes_observed_targets_without_creating_topology(
+        string neuronType, string label, string module, string iconKey)
+    {
+        var source = new TestSource();
+        var assistant = new NeuronId("assistant", Owner, "assistant");
+        var target = new NeuronId(neuronType, Owner, PrincipalScoped.InstanceName(Actor.PrincipalId, "local"));
+        var metadata = new BrainGraphMetadata([
+            new(neuronType, label, module, iconKey),
+            new("unobserved-specialist", "Unobserved", "Other", "document"),
+        ]);
+        source.Set(assistant, [], outgoing: new(1,
+            [Observed(new AgentActivity(Guid.NewGuid(), "delegation", "started", label, target), assistant)], null));
+
+        var snapshot = await new BrainGraphProjection(source, metadata)
+            .ReadAsync("main", Actor, TestContext.Current.CancellationToken);
+
+        var node = Assert.Single(snapshot.Nodes, node => node.Id == BrainGraphProjection.InstanceId(target));
+        Assert.Equal(label, node.Label);
+        Assert.Equal(module, node.Module);
+        Assert.Equal(iconKey, node.IconKey);
+        Assert.DoesNotContain(snapshot.Nodes, node => node.Type == "unobserved-specialist");
+        Assert.Empty(snapshot.Synapses);
+        var json = JsonSerializer.SerializeToElement(node, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.Equal(iconKey, json.GetProperty("iconKey").GetString());
+    }
+
+    [Fact]
+    public void Unknown_types_have_cached_generic_metadata_without_provider_guessing()
+    {
+        var metadata = new BrainGraphMetadata([new("gmail", "Gmail", "Google", "gmail")]);
+        var unknown = metadata.For("google-drive-future");
+        Assert.Equal("google-drive-future", unknown.Label);
+        Assert.Null(unknown.IconKey);
+        Assert.Empty(unknown.HandledSignals);
+        Assert.Same(unknown, metadata.For("google-drive-future"));
+        Assert.False(BrainGraphMetadata.IsSubscriptionSignal(nameof(AgentActivity)));
+        Assert.True(BrainGraphMetadata.IsSubscriptionSignal(nameof(Note)));
+    }
+
+    [Fact]
+    public async Task Failure_categories_are_projected_without_arbitrary_exception_content()
+    {
+        var source = new TestSource();
+        const string privateDetail = "private connection and credential details";
+        source.Set(Chat, [], outgoing: new(2,
+            [Observed(new AgentActivity(Guid.NewGuid(), "tool", "failed", "search",
+                FailureCode: "authentication_required"), Chat),
+             Observed(new AgentActivity(Guid.NewGuid(), "tool", "failed", "search",
+                FailureCode: privateDetail), Chat)], null));
+
+        var snapshot = await new BrainGraphProjection(source).ReadAsync("main", Actor, TestContext.Current.CancellationToken);
+
+        Assert.Contains(snapshot.Activity, item => item.FailureCode == "authentication_required");
+        Assert.Single(snapshot.Activity, item => item.FailureCode is null);
+        Assert.DoesNotContain(privateDetail, JsonSerializer.Serialize(snapshot));
+    }
 
     [Fact]
     public async Task Snapshot_uses_real_edges_and_never_walks_foreign_principals_or_owners()

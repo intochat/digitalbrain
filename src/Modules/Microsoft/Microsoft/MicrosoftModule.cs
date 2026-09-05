@@ -1,6 +1,8 @@
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.AI;
 using DigitalBrain.Core;
+using DigitalBrain.Product.Interactions;
+using DigitalBrain.Product.Presentation;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Microsoft;
@@ -12,6 +14,7 @@ public sealed class MicrosoftModule : IModule
     public void Configure(ISiloBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
+        builder.Services.AddSingleton(new NeuronPresentation("aspire", "Aspire", "Microsoft", "aspire"));
         var configuration = builder.Configuration.GetSection(AspireConfigurationRoot);
         if (DigitalBrainFakes.Enabled(builder.Configuration) || string.IsNullOrWhiteSpace(configuration["ProjectPath"]))
         {
@@ -33,7 +36,8 @@ public sealed class MicrosoftModule : IModule
         _ = PrincipalPartition.InstanceName(new PrincipalId(Guid.NewGuid()), settings.Alias);
 
         builder.Services.AddSingleton(settings);
-        builder.Services.AddSingleton(static services => new AspireConnection(services.GetRequiredService<AspireConnectionSettings>()));
+        builder.Services.AddSingleton(static services => new AspireConnection(
+            services.GetRequiredService<AspireConnectionSettings>(), services.GetRequiredService<IUntrustedContentScreen>()));
         builder.Services.AddSingleton<IAgentToolSource>(new AgentDelegation<IAspire>(
             "ask_aspire",
             $"Ask the Aspire infrastructure specialist about the live {settings.ApplicationName} application. "

@@ -56,6 +56,7 @@ final class BrainNeuron {
     required this.name,
     required this.label,
     required this.module,
+    this.iconKey,
     this.role = 'observed',
     this.status = 'Idle',
     this.handledSignals = const [],
@@ -64,6 +65,7 @@ final class BrainNeuron {
     this.lastActivityAt,
   });
   final String id, type, name, label, module, role, status;
+  final String? iconKey;
   final List<String> handledSignals;
   final int incomingSequence, outgoingSequence;
   final DateTime? lastActivityAt;
@@ -73,6 +75,7 @@ final class BrainNeuron {
     name: j['name'] as String,
     label: j['label'] as String,
     module: j['module'] as String,
+    iconKey: j['iconKey'] as String?,
     role: j['role'] as String? ?? 'observed',
     status: j['status'] as String? ?? 'Idle',
     handledSignals: (j['handledSignals'] as List? ?? []).cast<String>(),
@@ -134,6 +137,7 @@ final class BrainActivity {
     this.server,
     this.durationMs,
     this.resultPreview,
+    this.failureCode,
     this.isError = false,
     this.truncated = false,
   });
@@ -141,6 +145,7 @@ final class BrainActivity {
   final String? callerId, correlationId;
   final Object? payloadPreview;
   final String? operationId, kind, state, name, targetId, server, resultPreview;
+  final String? failureCode;
   final double? durationMs;
   final bool isError, truncated;
   final int sequence;
@@ -164,6 +169,7 @@ final class BrainActivity {
     server: j['server'] as String?,
     durationMs: (j['durationMs'] as num?)?.toDouble(),
     resultPreview: j['resultPreview'] as String?,
+    failureCode: j['failureCode'] as String?,
     isError: j['isError'] == true,
     truncated: j['truncated'] == true,
   );

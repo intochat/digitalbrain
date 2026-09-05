@@ -83,6 +83,29 @@ public sealed class FacadeTests
     }
 
     [Fact]
+    public async Task CancelledFacadeRequest_DoesNotLearnFromLateRemoteCompletion()
+    {
+        await using var simulation = await BrainSimulation.StartAsync(new() { Modules = new([]) });
+        var target = simulation.Brain.Get<IRequestTarget>("facade-cancel");
+        await simulation.Brain.ActivateAsync(TestContext.Current.CancellationToken);
+        await target.ReadJournalAsync(JournalKind.Outgoing,
+            cancellationToken: TestContext.Current.CancellationToken);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(150));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => target.RequestAsync(
+            new ProbeRequest("late", "ignore-cancellation", 900), cancellation.Token));
+
+        // The next request waits behind the remote handler. A late reply must neither
+        // satisfy this request nor reinforce its cancelled predecessor's root route.
+        var response = await target.RequestAsync(new ProbeRequest("current", "normal"),
+            TestContext.Current.CancellationToken);
+        Assert.Equal("current", response.Text);
+        var route = Assert.Single(await simulation.Brain.GetSynapsesAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(target.Id, route.Target);
+        Assert.Equal(1, route.FireCount);
+    }
+
+    [Fact]
     public async Task OwnerRoot_RefusesForeignQuerySubjects()
     {
         await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([]) });

@@ -22,7 +22,8 @@ internal sealed record BrainGraphNode(
     IReadOnlyList<string> HandledSignals,
     long IncomingSequence,
     long OutgoingSequence,
-    DateTimeOffset? LastActivityAt);
+    DateTimeOffset? LastActivityAt,
+    string? IconKey = null);
 
 internal sealed record BrainGraphSynapse(
     string Id,
@@ -56,7 +57,8 @@ internal sealed record BrainGraphActivity(
     double? DurationMs = null,
     string? ResultPreview = null,
     bool IsError = false,
-    bool Truncated = false);
+    bool Truncated = false,
+    string? FailureCode = null);
 
 internal sealed record BrainGraphSubscriptionRequest(
     string SourceId,

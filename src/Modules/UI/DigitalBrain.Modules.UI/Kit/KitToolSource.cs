@@ -15,7 +15,14 @@ internal sealed class KitToolSource(
     IImageGeneration? imageGeneration,
     IKitImageStore imageStore) : IAgentToolSource
 {
-    public IReadOnlyList<AIFunction> ToolsFor(OwnerId owner)
+    public ValueTask<IReadOnlyList<AITool>> GetToolsAsync(AgentToolContext context, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        context.RequireActive();
+        return ValueTask.FromResult<IReadOnlyList<AITool>>(CreateTools(context.Owner));
+    }
+
+    private IReadOnlyList<AIFunction> CreateTools(OwnerId owner)
     {
         // The model only ever echoes back a chatName it read from its own conversation
         // context, so the two local wrapper functions below close over the trusted `owner`

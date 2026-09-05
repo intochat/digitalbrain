@@ -15,11 +15,19 @@ enum NeuronIconKind {
   repository,
   memory,
   clock,
-  generic,
+  generic;
+
+  /// Only known presentation keys may select a bundled icon. Never interpret a
+  /// server value as an asset path, URL, or a substring of a provider name.
+  static NeuronIconKind fromKey(String? key) {
+    for (final kind in values) {
+      if (kind.name == key) return kind;
+    }
+    return generic;
+  }
 }
 
-/// Curated marks from the approved Lumen study. Generic types use one coherent
-/// icon vocabulary; caller labels identify the actual neuron/account instance.
+/// One allowlisted local icon vocabulary for graph tiles and their inspectors.
 final class NeuronIcon extends StatelessWidget {
   const NeuronIcon({
     super.key,
@@ -36,22 +44,14 @@ final class NeuronIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (kind == NeuronIconKind.aspire) {
+    final asset = _brandAssets[kind];
+    if (asset != null) {
       return SvgPicture.asset(
-        'assets/brands/aspire-icon-32.svg',
+        asset,
         package: 'digitalbrain_ui_kit',
         width: size,
         height: size,
-        semanticsLabel: semanticLabel ?? 'Aspire',
-      );
-    }
-    final brand = _marks[kind];
-    if (brand != null) {
-      return SvgPicture.string(
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 34 34">$brand</svg>',
-        width: size,
-        height: size,
-        semanticsLabel: semanticLabel,
+        semanticsLabel: semanticLabel ?? kind.name,
       );
     }
     return Icon(
@@ -72,17 +72,9 @@ final class NeuronIcon extends StatelessWidget {
     );
   }
 
-  // Local vector interpretations retained from the approved prototype. Keep
-  // branding isolated here for later replacement with audited provider assets.
-  static const _marks = <NeuronIconKind, String>{
-    NeuronIconKind.gmail: '''
-      <path fill="#4285F4" d="M2 7h5v15H2z"/>
-      <path fill="#34A853" d="M25 7h5v15h-5z"/>
-      <path fill="#EA4335" d="M7 6 16 13l9-7v6l-9 7-9-7z"/>
-      <path fill="#C5221F" d="M2 7q0-5 5-2v7L2 8z"/>
-      <path fill="#FBBC04" d="M25 5q5-3 5 2v1l-5 4z"/>''',
-    NeuronIconKind.salesforce: '''
-      <path fill="#14A8E0" d="M7 10a7 7 0 0 1 12-4 8 8 0 0 1 12 7A7 7 0 0 1 29 27H8A9 9 0 0 1 7 10Z"/>
-      <path fill="none" stroke="white" stroke-width="1.2" stroke-linecap="round" d="M9 16h3m-3 0v3h3v3H9m7 0v-8h3m-3 4h2m5-2h3m-3 0v6h3"/>''',
+  static const _brandAssets = <NeuronIconKind, String>{
+    NeuronIconKind.gmail: 'assets/brands/gmail.svg',
+    NeuronIconKind.salesforce: 'assets/brands/salesforce.svg',
+    NeuronIconKind.aspire: 'assets/brands/aspire-icon-32.svg',
   };
 }

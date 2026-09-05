@@ -11,8 +11,9 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Kernel;
 
-internal sealed class BrainGraphProjection(IBrainGraphSource source)
+internal sealed class BrainGraphProjection(IBrainGraphSource source, BrainGraphMetadata? presentationMetadata = null)
 {
+    private readonly BrainGraphMetadata _metadata = presentationMetadata ?? new([]);
     internal const int MaxNodes = 16;
     internal const int MaxActivity = 64;
     internal const string SnapshotScope = "Current conversation, its known runtime participants, and reachable source-owned synapses. Bounded recent activity; direct runtime calls are not invented as synapses.";
@@ -101,7 +102,7 @@ internal sealed class BrainGraphProjection(IBrainGraphSource source)
                 .Concat(ProjectActivity(neuron, read.Outgoing, JournalKind.Outgoing, privateNeuron, actor.PrincipalId))
                 .OrderBy(item => item.Timestamp).ToArray();
             activity.AddRange(neuronActivity);
-            var metadata = BrainGraphMetadata.For(neuron.Type);
+            var metadata = _metadata.For(neuron.Type);
             var localName = PrincipalPartition.TryParse(neuron.Name, out _, out var local) ? local : neuron.Name;
             var lastStatus = Status(read.Outgoing.Delta
                 .Where(delivery => VisibleDelivery(delivery, privateNeuron, actor.PrincipalId)));
@@ -109,7 +110,7 @@ internal sealed class BrainGraphProjection(IBrainGraphSource source)
                 participants.Contains(neuron) ? "participant" : "observed",
                 lastStatus, metadata.HandledSignals,
                 read.Incoming.ResumeSequence, read.Outgoing.ResumeSequence,
-                neuronActivity.LastOrDefault()?.Timestamp));
+                neuronActivity.LastOrDefault()?.Timestamp, metadata.IconKey));
 
             foreach (var edge in read.Synapses)
             {
@@ -257,9 +258,15 @@ internal sealed class BrainGraphProjection(IBrainGraphSource source)
                 visibleTarget, operation?.Server, operation?.DurationMs,
                 operation?.Kind == "tool" ? BoundPreview(operation.Preview) : null,
                 operation?.IsError == true,
-                operation?.Truncated == true || operation?.Kind == "tool" && operation.Preview?.Length > 4096);
+                operation?.Truncated == true || operation?.Kind == "tool" && operation.Preview?.Length > 4096,
+                SafeFailureCode(operation?.FailureCode));
         }
     }
+
+    private static string? SafeFailureCode(string? code) => code is
+        "unavailable" or "catalog_changed" or "connection_changed" or "access_denied"
+        or "content_rejected" or "capacity" or "timeout" or "authentication_required" or "cancelled"
+            ? code : null;
 
     // Explicit allowlist: never serialize arbitrary Signal objects, tool credentials,
     // prompt text, document contents, OAuth URLs, or exception details into the graph.

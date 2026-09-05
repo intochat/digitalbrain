@@ -46,10 +46,10 @@ internal sealed class BrainNeuron : Neuron, IBrainNeuron
         await WriteStateAsync().ConfigureAwait(true);
     }
 
-    public Task<SignalDeliveryResult> Send(NeuronId receiver, Signal signal)
+    public Task<SignalDeliveryResult> Send(NeuronId receiver, Signal signal, CancellationToken cancellationToken = default)
     {
         RequireSameOwner(receiver);
-        return SendAsync(receiver, signal);
+        return SendAsync(receiver, signal, cancellationToken);
     }
 
     public Task<JournalRead> ReadNeuronJournal(NeuronId subject, JournalKind kind, long afterSequence)

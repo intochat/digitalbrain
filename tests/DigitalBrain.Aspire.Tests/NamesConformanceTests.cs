@@ -63,6 +63,7 @@ public sealed class NamesConformanceTests(ModelFixture fixture)
                 "DigitalBrain.Execution.ExecutionModule, DigitalBrain.Modules.Execution",
                 "DigitalBrain.Google.GoogleModule, DigitalBrain.Modules.Google",
                 "DigitalBrain.Salesforce.SalesforceModule, DigitalBrain.Modules.Salesforce",
+                "DigitalBrain.Microsoft.MicrosoftModule, DigitalBrain.Modules.Microsoft",
                 "DigitalBrain.UI.UIModule, DigitalBrain.Modules.UI",
             ],
             modules);

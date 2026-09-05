@@ -1,8 +1,48 @@
+import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'module icon keys are allowlisted without provider substring guessing',
+    () {
+      BrainNeuron neuron({String? iconKey, String type = 'google-drive'}) =>
+          BrainNeuron(
+            id: 'observed',
+            type: type,
+            name: 'local',
+            label: 'Observed',
+            module: 'Google',
+            iconKey: iconKey,
+          );
+      expect(brainNeuronIcon(neuron(iconKey: 'gmail')), NeuronIconKind.gmail);
+      expect(
+        brainNeuronIcon(neuron(iconKey: 'salesforce')),
+        NeuronIconKind.salesforce,
+      );
+      expect(brainNeuronIcon(neuron(iconKey: 'aspire')), NeuronIconKind.aspire);
+      expect(brainNeuronIcon(neuron()), NeuronIconKind.generic);
+      expect(brainNeuronIcon(neuron(type: 'gmail')), NeuronIconKind.generic);
+      expect(
+        brainNeuronIcon(neuron(iconKey: 'https://example.com/gmail.svg')),
+        NeuronIconKind.generic,
+      );
+      expect(
+        brainNeuronIcon(neuron(iconKey: '../assets/gmail.svg')),
+        NeuronIconKind.generic,
+      );
+      expect(
+        brainNeuronIcon(neuron(iconKey: 'future', type: 'assistant')),
+        NeuronIconKind.generic,
+      );
+      expect(
+        brainNeuronIcon(neuron(type: 'assistant')),
+        NeuronIconKind.assistant,
+      );
+    },
+  );
+
   Widget host(Widget child, {bool reducedMotion = false}) => MaterialApp(
     theme: KitTheme.light(),
     home: KitThemeScope(

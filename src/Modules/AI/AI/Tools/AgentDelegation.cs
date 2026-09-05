@@ -13,13 +13,15 @@ public sealed class AgentDelegation<TAgent>(
     OwnerId? allowedOwner = null) : IAgentToolSource
     where TAgent : IAgent
 {
-    public IReadOnlyList<AIFunction> ToolsFor(AgentToolContext context)
+    public ValueTask<IReadOnlyList<AITool>> GetToolsAsync(AgentToolContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
+        cancellationToken.ThrowIfCancellationRequested();
+        context.RequireActive();
         if (context.Principal is not { } principal
             || (allowedOwner is { } owner && owner != context.Owner))
         {
-            return [];
+            return ValueTask.FromResult<IReadOnlyList<AITool>>([]);
         }
 
         var instance = PrincipalPartition.InstanceName(principal, localInstanceName);
@@ -38,6 +40,7 @@ public sealed class AgentDelegation<TAgent>(
             return reply.Text;
         }
 
-        return [AIFunctionFactory.Create(Ask, new AIFunctionFactoryOptions { Name = name, Description = description })];
+        return ValueTask.FromResult<IReadOnlyList<AITool>>(
+            [AIFunctionFactory.Create(Ask, new AIFunctionFactoryOptions { Name = name, Description = description })]);
     }
 }

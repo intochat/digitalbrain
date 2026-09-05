@@ -56,3 +56,18 @@ The assistant can admit, read, list and remove behaviors. Current definitions an
 their status live durably on `BehaviorsNeuron`; its journal announces changes to
 the separate scripting worker. Development chat can read the configured local
 repository diff for a one-off review.
+
+## Specialist modules
+
+Ino delegates to `IAspire`, `IGmail`, and `ISalesforce`. Each inherits `IAgent`
+(`IHandle<AgentRequest>` with `AgentReply`) and owns its native discovered MCP tools.
+An ordinary request uses the initiating neuron's source-owned send path and can
+create a Learned synapse; it does not create a Bound subscription.
+
+Google, Salesforce, and Microsoft own connection policy and static presentation
+metadata. The SDK owns MCP sessions/discovery; the shared AI tool boundary owns
+screened evidence. Provider operation schemas remain MCP-owned.
+
+`AgentActivity` records diagnostic journal evidence, not subscriber delivery.
+Unsubscribe removes the current edge; a later explicit handled send can establish
+a Learned edge that is again eligible for broadcast. Journals remain bounded.

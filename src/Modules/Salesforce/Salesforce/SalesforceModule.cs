@@ -2,6 +2,7 @@ using DigitalBrain.Product.Interactions;
 using DigitalBrain.AI;
 using DigitalBrain.Core;
 using DigitalBrain.Sdk;
+using DigitalBrain.Product.Presentation;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Salesforce;
@@ -18,16 +19,20 @@ public sealed class SalesforceModule : IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
         var services = builder.Services;
+        services.AddSingleton(new NeuronPresentation("salesforce", "Salesforce", "Salesforce", "salesforce"));
+        services.AddSingleton<IAgentToolSource>(new AgentDelegation<ISalesforce>(
+            "ask_salesforce", "Ask the Salesforce specialist to inspect the connected account and records, query Salesforce, or prepare an exact record change preview. Writes require a separate fresh user confirmation of the published preview. No delete.",
+            builder.Configuration["DigitalBrain:Salesforce:Alias"] ?? "salesforce-local"));
         if (DigitalBrainFakes.Enabled(builder.Configuration))
         {
-            services.AddSingleton<ISalesforce, FakeSalesforce>();
+            services.AddSingleton(static services => new SalesforceTools(services.GetRequiredService<IUntrustedContentScreen>(), fake: true));
             return;
         }
 
         var endpoint = ReadEndpoint(builder.Configuration);
         if (endpoint is null)
         {
-            services.AddSingleton<ISalesforce, NotImplementedSalesforce>();
+            services.AddSingleton(static services => new SalesforceTools(services.GetRequiredService<IUntrustedContentScreen>()));
             return;
         }
 
@@ -37,8 +42,11 @@ public sealed class SalesforceModule : IModule
         services.AddSingleton<SalesforceLogins>();
         services.AddSingleton<IUserActionSource>(static s => s.GetRequiredService<SalesforceLogins>());
         services.AddSingleton<IHttpSurface>(static s => new BrowserLoginSurface(s.GetRequiredService<SalesforceLogins>()));
-        services.AddSingleton<IAgentToolSource, SalesforceToolSource>();
-        services.AddSingleton<ISalesforce>(s => new McpSalesforce(endpoint, s.GetRequiredService<SalesforceConnections>()));
+        services.AddSingleton(s => new SalesforceMcp(endpoint, s.GetRequiredService<SalesforceConnections>()));
+        services.AddSingleton(s => new SalesforceWritePreviews(s.GetRequiredService<SalesforceMcp>(), s.GetRequiredService<IUntrustedContentScreen>()));
+        services.AddSingleton<ITrustedUserCommandHandler>(s => s.GetRequiredService<SalesforceWritePreviews>());
+        services.AddSingleton(s => new SalesforceTools(s.GetRequiredService<SalesforceMcp>(), s.GetRequiredService<SalesforceLogins>(),
+            s.GetRequiredService<SalesforceWritePreviews>(), s.GetRequiredService<IUntrustedContentScreen>()));
         services.AddHostedService<BrowserLoginWorker<SalesforceLogins>>();
         services.AddSalesforceAuthentication(settings, SalesforceLogins.LoginDefinition);
     }

@@ -41,7 +41,7 @@ public sealed class ExcelKitTests(SimulationFixture fixture)
     {
         var chatInstance = NewChatInstance();
         var tools = new ExcelToolSource(fixture.Sim.Grains);
-        var show = tools.ToolsFor(Owner).Single(tool => tool.Name == "show_spreadsheet");
+        var show = tools.PrepareTestTools(Owner).Single(tool => tool.Name == "show_spreadsheet");
 
         var reply = await show.InvokeAsync(new AIFunctionArguments
         {
@@ -71,7 +71,7 @@ public sealed class ExcelKitTests(SimulationFixture fixture)
     {
         var chatInstance = NewChatInstance();
         var tools = new ExcelToolSource(fixture.Sim.Grains);
-        var show = tools.ToolsFor(Owner).Single(tool => tool.Name == "show_spreadsheet");
+        var show = tools.PrepareTestTools(Owner).Single(tool => tool.Name == "show_spreadsheet");
 
         var reply = await show.InvokeAsync(new AIFunctionArguments
         {

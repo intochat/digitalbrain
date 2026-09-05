@@ -25,6 +25,8 @@ internal sealed class CSharpStartupScriptRunner : IStartupScriptRunner
             typeof(IDigitalBrain).Assembly,
             typeof(IAssistant).Assembly,
             typeof(DigitalBrain.Microsoft.IAspire).Assembly,
+            typeof(DigitalBrain.Google.IGmail).Assembly,
+            typeof(DigitalBrain.Salesforce.ISalesforce).Assembly,
             typeof(DigitalBrain.Time.ITimer).Assembly,
             typeof(DigitalBrain.Product.Identity.CommandId).Assembly,
             typeof(IChart).Assembly)
@@ -45,6 +47,8 @@ internal sealed class CSharpStartupScriptRunner : IStartupScriptRunner
             "DigitalBrain.Abstractions.Signals",
             "DigitalBrain.AI",
             "DigitalBrain.Microsoft",
+            "DigitalBrain.Google",
+            "DigitalBrain.Salesforce",
             "DigitalBrain.Chat",
             "DigitalBrain.Time",
             "DigitalBrain.Product.Identity",

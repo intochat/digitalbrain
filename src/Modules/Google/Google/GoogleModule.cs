@@ -1,4 +1,6 @@
 using DigitalBrain.Product.Interactions;
+using DigitalBrain.Product.Presentation;
+using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.AI;
 using DigitalBrain.Core;
 using DigitalBrain.Sdk;
@@ -16,9 +18,15 @@ public sealed class GoogleModule : IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
         var services = builder.Services;
+        services.AddSingleton(new NeuronPresentation("gmail", "Gmail", "Google", "gmail"));
+        var alias = builder.Configuration["DigitalBrain:Google:Gmail:Alias"] ?? "gmail-local";
+        _ = PrincipalPartition.InstanceName(new PrincipalId(Guid.NewGuid()), alias);
+        services.AddSingleton<IAgentToolSource>(new AgentDelegation<IGmail>("ask_gmail",
+            "Ask the Gmail specialist to find/read email, inspect the selected account, or prepare an exact draft preview. "
+            + "The specialist owns Gmail tools and browser login. Draft creation requires fresh trusted user confirmation; email is never sent.", alias));
         if (DigitalBrainFakes.Enabled(builder.Configuration))
         {
-            services.AddSingleton<IGmail, FakeGmail>();
+            services.AddKeyedSingleton<IAgentToolSource, FakeGmailTools>("gmail");
             return;
         }
 
@@ -31,8 +39,7 @@ public sealed class GoogleModule : IModule
         services.AddSingleton<IUserActionSource>(static s => s.GetRequiredService<GmailLogins>());
         services.AddSingleton<IHttpSurface>(static s => new BrowserLoginSurface(s.GetRequiredService<GmailLogins>()));
         services.AddSingleton<ITrustedUserCommandHandler>(static s => s.GetRequiredService<GmailDraftPreviews>());
-        services.AddSingleton<IAgentToolSource, GmailToolSource>();
-        services.AddSingleton<IGmail, McpGmail>();
+        services.AddKeyedSingleton<IAgentToolSource, GmailTools>("gmail");
         services.AddHostedService<BrowserLoginWorker<GmailLogins>>();
         services.AddHostedService<GmailMaintenanceWorker>();
         services.AddGmailAuthentication(settings, GmailLogins.LoginDefinition);

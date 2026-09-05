@@ -16,6 +16,7 @@ builder.AddKernelCors();
 builder.Services.TryAddSingleton(static services =>
     new OwnerSessionJournal(services.GetRequiredService<IDigitalBrain>()));
 builder.Services.AddTransient<IBrainGraphSource, BrainGraphSource>();
+builder.Services.AddSingleton<BrainGraphMetadata>();
 builder.Services.AddTransient<BrainGraphProjection>();
 
 var app = builder.Build();

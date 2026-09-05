@@ -694,7 +694,9 @@ final class _GraphHomeScreenState extends State<GraphHomeScreen> {
               style: const TextStyle(fontSize: 11),
             ),
             children: [
-              if (value.isError)
+              if (value.failureCode != null)
+                _detail('Failure category', _failureLabel(value.failureCode!)),
+              if (value.isError && value.failureCode == null)
                 _detail('MCP outcome', 'Tool returned an error'),
               if (value.truncated)
                 _detail('Evidence limit', 'Result truncated'),
@@ -716,6 +718,19 @@ final class _GraphHomeScreenState extends State<GraphHomeScreen> {
             ],
           ),
         );
+
+  String _failureLabel(String code) => switch (code) {
+    'unavailable' => 'Service unavailable',
+    'catalog_changed' => 'Tool catalog changed',
+    'connection_changed' => 'Connection changed',
+    'access_denied' => 'Access denied',
+    'content_rejected' => 'Content rejected',
+    'capacity' => 'Capacity limit reached',
+    'timeout' => 'Request timed out',
+    'authentication_required' => 'Sign-in required',
+    'cancelled' => 'Request cancelled',
+    _ => 'Request failed',
+  };
 
   String _duration(double milliseconds) => milliseconds < 1000
       ? '${milliseconds.round()} ms'

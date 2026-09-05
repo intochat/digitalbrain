@@ -100,6 +100,25 @@ internal sealed class ChatTurnWorker(NeuronRuntime runtime) : Neuron(runtime), I
         ExecutionId executionId,
         CancellationToken cancellationToken)
     {
+        if (goal.SpecialistContinuation is { } specialist)
+        {
+            if (goal.CompletedUserActionId is null || specialist.Target.Owner != goal.Chat.Owner
+                || !PrincipalPartition.OwnsInstance(goal.Actor.PrincipalId, specialist.Target.Name)
+                || string.IsNullOrWhiteSpace(specialist.ConnectionRevision)
+                || string.IsNullOrWhiteSpace(specialist.RequestText) || specialist.RequestText.Length > 16000
+                || goal.AllowedToolNames is null || specialist.AllowedToolNames.Length == 0
+                || !specialist.AllowedToolNames.SequenceEqual(goal.AllowedToolNames, StringComparer.Ordinal))
+            {
+                throw new InvalidOperationException("This specialist continuation is no longer valid. Send a new request.");
+            }
+            using var actor = VerifiedActor.Enter(goal.Actor);
+            using var turn = AgentTurnContext.Enter(new AgentTurnContext(goal.Chat, goal.CommandId, goal.Actor,
+                specialist.AllowedToolNames, new SpecialistRequest(specialist.Target, specialist.RequestText), specialist));
+            var reply = await RequestAsync<AgentReply>(specialist.Target, new AgentRequest(specialist.RequestText), cancellationToken)
+                .ConfigureAwait(true);
+            return (reply.Text, "assistant");
+        }
+
         // Only original authenticated user text: never an auth continuation, model/tool
         // output, external context or transcript text.
         if (goal.AllowedToolNames is null && goal.CompletedUserActionId is null)

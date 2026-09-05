@@ -2,7 +2,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace DigitalBrain.Google;
 
-internal sealed class GmailMaintenanceWorker(GmailMcp gmail, GmailDraftPreviews previews) : BackgroundService
+internal sealed class GmailMaintenanceWorker(GmailDraftPreviews previews) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -10,7 +10,6 @@ internal sealed class GmailMaintenanceWorker(GmailMcp gmail, GmailDraftPreviews 
         while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
         {
             previews.Prune();
-            await gmail.PruneAsync().ConfigureAwait(false);
         }
     }
 }

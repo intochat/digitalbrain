@@ -4,7 +4,8 @@ using Microsoft.Extensions.AI;
 namespace DigitalBrain.AI;
 
 // In-silo return-value surface. Owners and scripts use IAgent + RequestAsync.
-// Nested RequestAsync deadlocks the session neuron — ChatTurnWorker uses this instead.
+// ChatTurnWorker uses streaming for the conversational responder; specialist requests
+// use their initiating neuron's source-bound signal delivery.
 [Alias("agent.runtime")]
 public interface IAgentKernel : IGrainWithStringKey
 {
@@ -18,6 +19,4 @@ public interface IAgentKernel : IGrainWithStringKey
         IReadOnlyList<ChatMessage> messages,
         CancellationToken cancellationToken = default);
 
-    [Alias(nameof(InvalidateMcpTools))]
-    Task InvalidateMcpTools();
 }

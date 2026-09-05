@@ -9,8 +9,9 @@ namespace DigitalBrain.Simulation.Tests;
 // carries a tool from DI registration through to the model call's ChatOptions.Tools.
 internal sealed class ProbeToolSource : IAgentToolSource
 {
-    public IReadOnlyList<AIFunction> ToolsFor(OwnerId owner)
-        => [AIFunctionFactory.Create(ProbeAsync, new AIFunctionFactoryOptions { Name = "probe_tool" })];
+    public ValueTask<IReadOnlyList<AITool>> GetToolsAsync(AgentToolContext context, CancellationToken cancellationToken)
+        => ValueTask.FromResult<IReadOnlyList<AITool>>(
+            [AIFunctionFactory.Create(ProbeAsync, new AIFunctionFactoryOptions { Name = "probe_tool" })]);
 
     private static Task<string> ProbeAsync() => Task.FromResult("probed");
 }

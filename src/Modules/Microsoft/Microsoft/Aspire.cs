@@ -10,7 +10,9 @@ public sealed class Aspire(NeuronRuntime runtime, IChatClient chatClient, Aspire
 {
     protected override string DisplayName => $"Aspire · {connection.ApplicationName}";
 
-    protected override IAgentMcpTools McpTools => connection;
+    protected override ValueTask<IReadOnlyList<AITool>> PrepareToolsAsync(
+        AgentToolContext context, CancellationToken cancellationToken)
+        => connection.GetToolsAsync(context, cancellationToken);
 
     protected override string Instructions => """
         You are Aspire, DigitalBrain's Microsoft-module infrastructure specialist.

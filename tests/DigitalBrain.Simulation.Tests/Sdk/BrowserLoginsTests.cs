@@ -121,6 +121,75 @@ public sealed class BrowserLoginsTests
         Assert.False(delivered.Accepted);
     }
 
+    [Fact]
+    public void Specialist_login_keeps_exact_target_request_and_native_read_scope()
+    {
+        var (logins, _) = Rail();
+        var target = new NeuronId("probe", Owner, PrincipalPartition.InstanceName(Actor.PrincipalId, "application"));
+        using var turn = EnterTurn(new SpecialistRequest(target, "read current evidence"));
+        var action = logins.Require(["native_read", "native_read"], null, CancellationToken.None);
+
+        var resume = Assert.IsType<SpecialistContinuation>(action.SpecialistContinuation);
+        Assert.Equal(target, resume.Target);
+        Assert.Equal("read current evidence", resume.RequestText);
+        Assert.Equal(["native_read"], resume.AllowedToolNames);
+        Assert.Null(resume.ConnectionRevision);
+        Assert.Null(logins.ResolveSpecialistContinuation(turn.Context, action.Id));
+
+        var write = logins.Require([], "compose", CancellationToken.None);
+        Assert.Null(write.SpecialistContinuation);
+        Assert.Empty(write.ResumeToolNames);
+    }
+
+    [Fact]
+    public async Task Only_accepted_login_resolves_the_same_actor_and_current_binding_once()
+    {
+        var (logins, _) = Rail();
+        var target = new NeuronId("probe", Owner, PrincipalPartition.InstanceName(Actor.PrincipalId, "application"));
+        using var turn = EnterTurn(new SpecialistRequest(target, "read evidence"));
+        var action = logins.Require(["native_read"], null, CancellationToken.None);
+        var request = RequestOf(action);
+        Assert.True(logins.TryBegin(request, out _));
+        Assert.True(logins.TryClaim(request));
+        await logins.AcceptForActorAsync(request, (context, _, commit) =>
+        {
+            Assert.Equal(Actor, context.Actor);
+            Assert.Equal(target, context.SpecialistRequest!.Target);
+            commit(() => logins.Revision = "accepted-binding");
+            return Task.CompletedTask;
+        });
+
+        var resume = Assert.IsType<SpecialistContinuation>(logins.ResolveSpecialistContinuation(turn.Context, action.Id));
+        Assert.Equal("accepted-binding", resume.ConnectionRevision);
+        Assert.Null(logins.ResolveSpecialistContinuation(turn.Context with { CommandId = CommandId.New() }, action.Id));
+        Assert.Null(logins.ResolveSpecialistContinuation(turn.Context with
+        {
+            Actor = new ActorContext(new PrincipalId(Guid.NewGuid()), "other"),
+        }, action.Id));
+        await logins.DeliverAsync(CancellationToken.None);
+        Assert.Null(logins.ResolveSpecialistContinuation(turn.Context, action.Id));
+    }
+
+    [Fact]
+    public void Specialist_login_rejects_foreign_targets_and_repeated_authorization()
+    {
+        var (logins, _) = Rail();
+        var foreign = new NeuronId("probe", Owner, PrincipalPartition.InstanceName(new PrincipalId(Guid.NewGuid()), "application"));
+        using (EnterTurn(new SpecialistRequest(foreign, "read")))
+        {
+            Assert.Throws<McpOperationException>(() => logins.Require(["native_read"], null, CancellationToken.None));
+        }
+        var target = new NeuronId("probe", Owner, PrincipalPartition.InstanceName(Actor.PrincipalId, "application"));
+        using (EnterTurn(new SpecialistRequest(target, "read"), ["native_read"]))
+        {
+            Assert.Throws<McpOperationException>(() => logins.Require(["native_read"], null, CancellationToken.None));
+        }
+        using (EnterTurn(new SpecialistRequest(target, new string('x', 16001))))
+        {
+            Assert.Throws<McpOperationException>(() => logins.Require(["native_read"], null, CancellationToken.None));
+        }
+    }
+
     private static (TestLogins Logins, FakeContinuation Continuation) Rail(bool configured = true)
     {
         var continuation = new FakeContinuation();
@@ -131,9 +200,10 @@ public sealed class BrowserLoginsTests
     private static string RequestOf(UserActionRequest action)
         => new Uri(action.LoginUrl).Query["?request=".Length..];
 
-    private static Turn EnterTurn()
+    private static Turn EnterTurn(SpecialistRequest? specialist = null, string[]? allowedTools = null)
     {
-        var context = new AgentTurnContext(new NeuronId("chat", Owner, "main"), new CommandId(Guid.NewGuid()), Actor);
+        var context = new AgentTurnContext(new NeuronId("chat", Owner, "main"), new CommandId(Guid.NewGuid()), Actor,
+            allowedTools, specialist);
         return new Turn(context, AgentTurnContext.Enter(context), VerifiedActor.Enter(Actor));
     }
 
@@ -152,6 +222,8 @@ public sealed class BrowserLoginsTests
         : BrowserLogins(new BrowserLoginDefinition("test", "Test", "TestScheme", "/integrations/test/login", "/integrations/test/callback", "Log in."), services)
     {
         protected override Uri? PublicOrigin => configured ? new Uri("http://localhost:5080") : null;
+        public string? Revision { get; set; }
+        protected override string? GetConnectionRevision(AgentTurnContext context) => Revision;
     }
 
     private sealed class FakeContinuation : IUserActionContinuation

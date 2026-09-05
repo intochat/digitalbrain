@@ -35,6 +35,11 @@ public abstract partial class Agent
             }
 
             var target = NeuronId.For<TAgent>(source.Id.Owner, instanceName);
+            var parentTurn = AgentTurnContext.Current;
+            using var specialistScope = parentTurn is null ? null : AgentTurnContext.Enter(parentTurn with
+            {
+                SpecialistRequest = new SpecialistRequest(target, request.Text),
+            });
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(turnCancellation, cancellationToken);
             deadline.CancelAfter(TimeSpan.FromMinutes(2));
             deadline.Token.ThrowIfCancellationRequested();

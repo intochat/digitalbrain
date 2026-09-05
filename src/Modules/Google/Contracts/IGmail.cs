@@ -1,8 +1,6 @@
-using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.AI;
 
 namespace DigitalBrain.Google;
 
-public interface IGmail
-{
-    Task<string> SearchJsonAsync(OwnerId owner, string account, string topic, CancellationToken cancellationToken);
-}
+[Alias("DigitalBrain.Google.IGmail")]
+public interface IGmail : IAgent;

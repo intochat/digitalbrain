@@ -49,8 +49,8 @@ internal static class SalesforceAuthentication
                             throw new InvalidOperationException("The Salesforce authorization issuer did not match.");
                         }
                         var connections = context.HttpContext.RequestServices.GetRequiredService<SalesforceConnections>();
-                        await context.HttpContext.RequestServices.GetRequiredService<SalesforceLogins>().AcceptAsync(request,
-                            (owner, _, valid) => connections.StoreAsync(owner, context.AccessToken, context.RefreshToken,
+                        await context.HttpContext.RequestServices.GetRequiredService<SalesforceLogins>().AcceptForActorAsync(request,
+                            (turn, _, valid) => connections.StoreAsync(turn.Chat.Owner, turn.Actor.PrincipalId, context.AccessToken, context.RefreshToken,
                                 context.ExpiresIn, valid, CancellationToken.None)).ConfigureAwait(false);
                     },
                     OnTicketReceived = async context =>

@@ -21,10 +21,10 @@ internal sealed class Probe(NeuronRuntime runtime, IChatClient client) : Agent(r
 
     protected override string Instructions => Purpose;
     protected override string DisplayName => "Probe";
-    protected override IReadOnlyList<AITool> Tools =>
-    [
-        AIFunctionFactory.Create(() => "fresh probe evidence", new AIFunctionFactoryOptions { Name = "probe_read" }),
-    ];
+    protected override ValueTask<IReadOnlyList<AITool>> PrepareToolsAsync(
+        AgentToolContext context, CancellationToken cancellationToken)
+        => ValueTask.FromResult<IReadOnlyList<AITool>>(
+            [AIFunctionFactory.Create(() => "fresh probe evidence", new AIFunctionFactoryOptions { Name = "probe_read" })]);
 }
 
 internal sealed class CapturingDelegation : IAgentToolSource
@@ -34,10 +34,10 @@ internal sealed class CapturingDelegation : IAgentToolSource
 
     public ConcurrentQueue<AgentToolContext> Contexts { get; } = new();
 
-    public IReadOnlyList<AIFunction> ToolsFor(AgentToolContext context)
+    public ValueTask<IReadOnlyList<AITool>> GetToolsAsync(AgentToolContext context, CancellationToken cancellationToken)
     {
         Contexts.Enqueue(context);
-        return _delegation.ToolsFor(context);
+        return _delegation.GetToolsAsync(context, cancellationToken);
     }
 }
 

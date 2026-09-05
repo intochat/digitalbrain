@@ -16,7 +16,14 @@ internal sealed class RepositoryDiffToolSource(IConfiguration configuration, int
     private readonly string _owner = configuration["DigitalBrain:Workspace:Owner"]
         ?? configuration[DigitalBrainNames.Owner] ?? DigitalBrainNames.DefaultOwner;
 
-    public IReadOnlyList<AIFunction> ToolsFor(OwnerId owner)
+    public ValueTask<IReadOnlyList<AITool>> GetToolsAsync(AgentToolContext context, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        context.RequireActive();
+        return ValueTask.FromResult<IReadOnlyList<AITool>>(CreateTools(context.Owner));
+    }
+
+    private IReadOnlyList<AIFunction> CreateTools(OwnerId owner)
     {
         if (string.IsNullOrWhiteSpace(_repositoryPath) || !string.Equals(owner.Value, _owner, StringComparison.Ordinal))
         {

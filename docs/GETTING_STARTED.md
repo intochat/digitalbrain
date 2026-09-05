@@ -28,6 +28,9 @@ Choose **Create subscription** on a neuron, then select an eligible subscriber
 and signal. The source owns the resulting Bound synapse. **Unsubscribe** removes
 it entirely; the interface waits for the kernel and a fresh snapshot before
 confirming either change. Learned connections represent handled direct delivery.
+A later direct send can establish a Learned edge again, making that route eligible
+for broadcast. Unsubscribe removes the current edge rather than permanently blocking
+future explicit requests.
 
 The graph refreshes approximately every two seconds after each completed read.
 It shows the current conversation, known runtime participants, reachable stored
@@ -77,6 +80,25 @@ identity. Behaviors admitted from chat retain that principal's execution context
 Microsoft and AI contracts are already referenced by the script compiler. Use
 ordinary C# conditions or existing signals for custom behavior; there is no
 separate Aspire status DTO or per-tool signal.
+
+## Gmail and Salesforce specialists
+
+Ask Ino to find release emails or open Salesforce opportunities. Ino delegates to
+`IGmail` in the Google module or `ISalesforce` in the Salesforce module. Each uses
+its own native MCP tool schemas. The graph shows its provider icon and observed
+tool activity; selecting a failed operation shows its safe failure category.
+
+When access is missing, use the application's login card. A successful login resumes
+the recorded read once at the same specialist in the original conversation. Login
+does not authorize a mutation. Drafts and CRM record changes require a fresh exact
+preview and the user confirmation shown with it. Tokens are private and volatile;
+the providers need reconnecting after a kernel restart.
+
+Scripts can address both contracts using `AgentRequest` and `AgentReply`, just like
+Aspire. Google and Salesforce contracts are included in the script compiler. Use
+the actual principal-prefixed instance shown in the graph; a script's journal watch
+observes activity without creating a subscription. Diagnostic `AgentActivity` entries
+are not subscriber deliveries.
 
 ## Inspect AI conversations in Aspire
 

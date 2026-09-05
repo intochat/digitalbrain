@@ -1,13 +1,14 @@
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.AI;
 using DigitalBrain.Sdk;
+using DigitalBrain.Product.Interactions;
 using ModelContextProtocol.Client;
 
 namespace DigitalBrain.Microsoft;
 
 public sealed class AspireConnection : McpAgentTools
 {
-    internal AspireConnection(AspireConnectionSettings settings)
+    internal AspireConnection(AspireConnectionSettings settings, IUntrustedContentScreen screen)
         : base(new McpStdioConnection
         {
             Name = "aspire",
@@ -17,7 +18,7 @@ public sealed class AspireConnection : McpAgentTools
             AllowedToolNames = ["list_resources", "list_console_logs", "list_structured_logs", "list_traces", "list_trace_structured_logs"],
             OperationTimeout = TimeSpan.FromSeconds(30),
             ResponseBudgetBytes = 128 * 1024,
-        }, (client, agent, cancellationToken) => BindApplicationAsync(client, agent, settings, cancellationToken))
+        }, screen, (client, agent, cancellationToken) => BindApplicationAsync(client, agent, settings, cancellationToken))
         => ApplicationName = settings.ApplicationName;
 
     public string ApplicationName { get; }

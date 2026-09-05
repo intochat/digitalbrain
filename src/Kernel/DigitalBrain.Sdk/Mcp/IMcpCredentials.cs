@@ -3,7 +3,9 @@ using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.Sdk;
 
 // One implementation per provider. TConnection identifies the owner's current connection
-// (an account identity, or just the owner); when it changes, the cached MCP session is dropped.
+// including an account revision; when it changes, cached sessions and prepared tools are stale.
+// This credential store is not an authorization boundary. Specialist clients additionally bind
+// their identity to a verified principal and validate access through ForHttp's authorize callback.
 public interface IMcpCredentials<TConnection>
     where TConnection : notnull
 {

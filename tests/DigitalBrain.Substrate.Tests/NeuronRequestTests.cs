@@ -88,6 +88,30 @@ internal sealed class RequestTarget(NeuronRuntime runtime)
                 .ConfigureAwait(true);
         }
 
+        var source = new NeuronId("requestsource", Id.Owner, signal.Text);
+        if (signal.Mode == "send-cycle")
+        {
+            await SendAsync(source, new NestedRequest(Id), cancellationToken).ConfigureAwait(true);
+        }
+        else if (signal.Mode == "subscribe-cycle")
+        {
+            await SubscribeToAsync<IRequestSource, ProbeNoise>(source).ConfigureAwait(true);
+        }
+        else if (signal.Mode == "unsubscribe-cycle")
+        {
+            await UnsubscribeFromAsync<IRequestSource, ProbeNoise>(source).ConfigureAwait(true);
+        }
+        else if (signal.Mode == "self-subscribe")
+        {
+            await SubscribeToAsync<IRequestTarget, ProbeNoise>(Id).ConfigureAwait(true);
+            await UnsubscribeFromAsync<IRequestTarget, ProbeNoise>(Id).ConfigureAwait(true);
+        }
+        else if (signal.Mode == "compact-before")
+        {
+            await RecordOutgoingAsync(new RecordedFact(new string('x', 300_000))).ConfigureAwait(true);
+            await RecordOutgoingAsync(new RecordedFact(new string('y', 300_000))).ConfigureAwait(true);
+        }
+
         await ReplyAsync(new ProbeResponse(signal.Text)).ConfigureAwait(true);
         if (signal.Mode == "compact")
         {
@@ -103,6 +127,51 @@ internal sealed class RequestTarget(NeuronRuntime runtime)
 
 public sealed class NeuronRequestTests
 {
+    [Fact]
+    public async Task RetainedReply_AfterEarlierActivityCompacts_Succeeds()
+    {
+        await using var simulation = await BrainSimulation.StartAsync(new() { Modules = new([]) });
+        var (sourceId, source, targetId) = Actors(simulation, "retained");
+
+        Assert.Equal("retained", await source.Request(targetId, new ProbeRequest("retained", "compact-before")));
+
+        var page = await Query(simulation, targetId).ReadJournal(JournalKind.Outgoing, 0);
+        var reset = Assert.IsType<JournalSnapshot>(page.ResetSnapshot);
+        Assert.True(reset.EarliestRetainedSequence > 1);
+        Assert.Equal(1, Assert.Single(await Query(simulation, sourceId).ReadSynapses()).FireCount);
+    }
+
+    [Theory]
+    [InlineData("cycle")]
+    [InlineData("send-cycle")]
+    [InlineData("subscribe-cycle")]
+    [InlineData("unsubscribe-cycle")]
+    public async Task MixedAwaitedCycles_FailPromptlyAndRestoreTheNextCall(string mode)
+    {
+        await using var simulation = await BrainSimulation.StartAsync(new() { Modules = new([]) });
+        var (sourceId, source, targetId) = Actors(simulation, mode);
+        await Query(simulation, targetId).ReadSynapses();
+        await Query(simulation, sourceId).ReadSynapses();
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => source.Request(
+            targetId, new ProbeRequest(sourceId.Name, mode)).WaitAsync(TimeSpan.FromSeconds(2),
+            TestContext.Current.CancellationToken));
+
+        Assert.Contains("cycle", failure.Message, StringComparison.Ordinal);
+        Assert.Empty(await Query(simulation, sourceId).ReadSynapses());
+        Assert.Equal("recovered", await source.Request(targetId, new ProbeRequest("recovered", "normal")));
+    }
+
+    [Fact]
+    public async Task LocalBindingAndUnbinding_InsideRequest_DoesNotCreateAnAwaitedCycle()
+    {
+        await using var simulation = await BrainSimulation.StartAsync(new() { Modules = new([]) });
+        var (_, source, targetId) = Actors(simulation, "self-bind");
+
+        Assert.Equal("self", await source.Request(targetId, new ProbeRequest("self", "self-subscribe")));
+        Assert.Empty(await Query(simulation, targetId).ReadSynapses());
+    }
+
     [Fact]
     public async Task NestedRequest_UsesTargetJournalAndExactCausationAcrossRepeatedCalls()
     {

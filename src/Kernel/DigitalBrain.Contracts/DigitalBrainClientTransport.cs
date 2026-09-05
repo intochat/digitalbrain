@@ -159,12 +159,31 @@ internal sealed class DigitalBrainClientTransport
         cancellationToken.ThrowIfCancellationRequested();
 
         await ActivateAsync(cancellationToken).ConfigureAwait(false);
-        return await Brain().Send(receiver, signal)
+        return await Brain().Send(receiver, signal, cancellationToken)
             .WaitAsync(cancellationToken)
             .ConfigureAwait(false);
     }
 
     private async Task<Signal> SendRequestAsync(
+        NeuronId receiver,
+        Signal request,
+        Type responseType,
+        CancellationToken cancellationToken)
+    {
+        using var budget = SignalRequestPolicy.CreateBudget(cancellationToken);
+        try
+        {
+            return await SendRequestCoreAsync(receiver, request, responseType, budget.Token)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException exception) when (
+            budget.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            throw SignalRequestPolicy.TimedOut(receiver, request, exception);
+        }
+    }
+
+    private async Task<Signal> SendRequestCoreAsync(
         NeuronId receiver,
         Signal request,
         Type responseType,
@@ -187,18 +206,19 @@ internal sealed class DigitalBrainClientTransport
         var brain = Brain();
         var cursor = await brain
             .ReadNeuronJournal(Root, JournalKind.Incoming, afterSequence: long.MaxValue)
-            .WaitAsync(cancellationToken)
+            .WaitAsync(NeuronCallTimeouts.LookupBound, cancellationToken)
             .ConfigureAwait(false);
 
         if (!TryCreateJournalObserver(JournalKind.Incoming, out var observer, out var reference))
         {
             var result = await SendResultAsync(receiver, request, cancellationToken).ConfigureAwait(false);
-            RequireHandled(receiver, request, result.Outcome);
+            SignalRequestPolicy.RequireHandled(receiver, request, result.Outcome);
             return await PollForResponseAsync(
                 brain,
                 Root,
                 cursor.ResumeSequence,
-                result.Delivery.CorrelationId,
+                receiver,
+                result.Delivery,
                 responseType,
                 cancellationToken).ConfigureAwait(false);
         }
@@ -207,14 +227,17 @@ internal sealed class DigitalBrainClientTransport
         {
             await brain
                 .WatchNeuron(Root, JournalKind.Incoming, cursor.ResumeSequence, reference)
-                .WaitAsync(cancellationToken)
+                .WaitAsync(NeuronCallTimeouts.LookupBound, cancellationToken)
                 .ConfigureAwait(false);
 
             var result = await SendResultAsync(receiver, request, cancellationToken).ConfigureAwait(false);
-            RequireHandled(receiver, request, result.Outcome);
+            SignalRequestPolicy.RequireHandled(receiver, request, result.Outcome);
             return await WaitForResponseAsync(
                 observer,
-                result.Delivery.CorrelationId,
+                brain,
+                Root,
+                receiver,
+                result.Delivery,
                 responseType,
                 cancellationToken).ConfigureAwait(false);
         }
@@ -255,53 +278,36 @@ internal sealed class DigitalBrainClientTransport
         }
     }
 
-    private static void RequireHandled(
-        NeuronId receiver,
-        Signal request,
-        DeliveryOutcome outcome)
-    {
-        switch (outcome)
-        {
-            case DeliveryOutcome.Handled:
-                return;
-            case DeliveryOutcome.Unhandled:
-                throw new InvalidOperationException(
-                    $"Neuron '{receiver}' did not handle request '{request.GetType().Name}'.");
-            case DeliveryOutcome.Refused:
-                throw new SignalDeliveryRefusedException(receiver, request.GetType());
-            default:
-                throw new InvalidOperationException(
-                    $"Neuron '{receiver}' returned unknown delivery outcome '{outcome}'.");
-        }
-    }
-
     private static async Task<Signal> WaitForResponseAsync(
         ChannelJournalObserver observer,
-        CorrelationId correlation,
+        IBrainNeuron brain,
+        NeuronId root,
+        NeuronId receiver,
+        SignalDelivery request,
         Type responseType,
         CancellationToken cancellationToken)
     {
         await foreach (var page in observer.Reads.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
-            foreach (var delivery in page.Delta)
+            var retained = await SignalRequestPolicy.RecoverRetainedAsync(page,
+                after => brain.ReadNeuronJournal(root, JournalKind.Incoming, after)
+                    .WaitAsync(NeuronCallTimeouts.LookupBound, cancellationToken)).ConfigureAwait(false);
+            if (SignalRequestPolicy.FindResponse(retained, receiver, request, responseType) is { } response)
             {
-                if (delivery.CorrelationId == correlation
-                    && responseType.IsInstanceOfType(delivery.Signal))
-                {
-                    return delivery.Signal;
-                }
+                return response;
             }
         }
 
         throw new InvalidOperationException(
-            $"The root journal watch ended before a '{responseType.Name}' response arrived for correlation '{correlation}'.");
+            $"The root journal watch ended before a '{responseType.Name}' response arrived for request '{request.SignalId}'.");
     }
 
     private static async Task<Signal> PollForResponseAsync(
         IBrainNeuron brain,
         NeuronId root,
         long cursor,
-        CorrelationId correlation,
+        NeuronId receiver,
+        SignalDelivery request,
         Type responseType,
         CancellationToken cancellationToken)
     {
@@ -309,25 +315,17 @@ internal sealed class DigitalBrainClientTransport
         {
             var read = await brain
                 .ReadNeuronJournal(root, JournalKind.Incoming, cursor)
-                .WaitAsync(cancellationToken)
+                .WaitAsync(NeuronCallTimeouts.LookupBound, cancellationToken)
                 .ConfigureAwait(false);
-            foreach (var candidate in read.Delta)
+            var retained = await SignalRequestPolicy.RecoverRetainedAsync(read,
+                after => brain.ReadNeuronJournal(root, JournalKind.Incoming, after)
+                    .WaitAsync(NeuronCallTimeouts.LookupBound, cancellationToken)).ConfigureAwait(false);
+            if (SignalRequestPolicy.FindResponse(retained, receiver, request, responseType) is { } response)
             {
-                if (candidate.CorrelationId == correlation
-                    && responseType.IsInstanceOfType(candidate.Signal))
-                {
-                    return candidate.Signal;
-                }
+                return response;
             }
 
-            if (read.ResetSnapshot is not null)
-            {
-                throw new InvalidOperationException(
-                    $"The root journal compacted past sequence {cursor} before a "
-                    + $"'{responseType.Name}' response arrived for correlation '{correlation}'.");
-            }
-
-            cursor = read.ResumeSequence;
+            cursor = retained.ResumeSequence;
             await Task.Delay(ResponsePollInterval, cancellationToken).ConfigureAwait(false);
         }
     }
@@ -340,7 +338,8 @@ internal sealed class DigitalBrainClientTransport
     {
         try
         {
-            await brain.UnwatchNeuron(subject, reference).ConfigureAwait(false);
+            await brain.UnwatchNeuron(subject, reference)
+                .WaitAsync(NeuronCallTimeouts.LookupBound).ConfigureAwait(false);
         }
         catch (Exception)
         {

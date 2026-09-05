@@ -223,7 +223,8 @@ internal sealed class Chat : Neuron, IChat, IChatKernel
             return;
         }
 
-        if (action.ResumeToolNames.Length == 0)
+        if (action.ResumeToolNames.Length == 0
+            || (action.Provider is "gmail" or "salesforce" && action.SpecialistContinuation is null))
         {
             await SettleTurnAsync(record.TurnId, ChatTurnStatus.Completed,
                 new ChatTurnResult(
@@ -233,7 +234,24 @@ internal sealed class Chat : Neuron, IChat, IChatKernel
             return;
         }
 
-        // Trust only the stored provider allowlist, never callback or user input.
+        SpecialistContinuation? specialist = null;
+        if (action.SpecialistContinuation is { } requested)
+        {
+            specialist = ServiceProvider.GetServices<IUserActionSource>()
+                .Select(source => source.ResolveSpecialistContinuation(context, action.Id))
+                .FirstOrDefault(candidate => candidate is not null && candidate.Target == requested.Target
+                    && candidate.RequestText == requested.RequestText
+                    && candidate.AllowedToolNames.SequenceEqual(requested.AllowedToolNames, StringComparer.Ordinal));
+            if (specialist is null)
+            {
+                await SettleTurnAsync(record.TurnId, ChatTurnStatus.Failed, null,
+                    "Login completed, but its specialist connection is no longer available. Please send the request again.")
+                    .ConfigureAwait(true);
+                return;
+            }
+        }
+
+        // Trust only stored provider control data, never callback or user input.
         turns[index] = record with
         {
             Status = ChatTurnStatus.Pending,
@@ -241,6 +259,7 @@ internal sealed class Chat : Neuron, IChat, IChatKernel
             UserAction = null,
             AllowedToolNames = [.. action.ResumeToolNames],
             CompletedUserActionId = action.Id,
+            SpecialistContinuation = specialist,
             Answer = null,
             Detail = null,
         };
@@ -524,7 +543,8 @@ internal sealed class Chat : Neuron, IChat, IChatKernel
                 record.Actor,
                 Id,
                 record.AllowedToolNames,
-                record.CompletedUserActionId);
+                record.CompletedUserActionId,
+                record.SpecialistContinuation);
             var result = await worker.RunAsync(goal, cancellationToken)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
             await SettleTurnAsync(record.TurnId,

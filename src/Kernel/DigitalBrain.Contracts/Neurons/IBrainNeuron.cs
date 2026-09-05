@@ -19,7 +19,7 @@ public interface IBrainNeuron : INeuron, INeuronQuery
 
     [Alias(nameof(Send))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
-    Task<SignalDeliveryResult> Send(NeuronId receiver, Signal signal);
+    Task<SignalDeliveryResult> Send(NeuronId receiver, Signal signal, CancellationToken cancellationToken = default);
 
     [Alias(nameof(ReadNeuronJournal))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]

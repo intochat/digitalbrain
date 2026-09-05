@@ -8,7 +8,14 @@ namespace DigitalBrain.Excel;
 
 internal sealed class ExcelToolSource(IGrainFactory grains) : IAgentToolSource
 {
-    public IReadOnlyList<AIFunction> ToolsFor(OwnerId owner)
+    public ValueTask<IReadOnlyList<AITool>> GetToolsAsync(AgentToolContext context, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        context.RequireActive();
+        return ValueTask.FromResult<IReadOnlyList<AITool>>(CreateTools(context.Owner));
+    }
+
+    private IReadOnlyList<AIFunction> CreateTools(OwnerId owner)
     {
         Task<string> ShowSpreadsheet(
             [Description("The current chat's name, exactly as stated in the conversation context")] string chatName,

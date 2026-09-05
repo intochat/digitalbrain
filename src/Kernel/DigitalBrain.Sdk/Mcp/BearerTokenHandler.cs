@@ -43,7 +43,7 @@ internal sealed class BearerTokenHandler(McpEndpoint endpoint, Func<Cancellation
         {
             if (Interlocked.Add(ref _bytes, bytes) > limit)
             {
-                throw new McpOperationException($"MCP response exceeded the {limit / 1024} KiB limit. Narrow the request.");
+                throw new McpOperationException($"MCP response exceeded the {limit / 1024} KiB limit. Narrow the request.", McpFailureKind.ContentRejected);
             }
         }
     }

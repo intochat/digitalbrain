@@ -134,6 +134,26 @@ public sealed class CSharpStartupScriptRunnerTests
     }
 
     [Fact]
+    public async Task Provider_specialists_share_the_generic_agent_request_contract_in_scripts()
+    {
+        var script = StartupScript.FromSource("specialists", """
+            var principal = new PrincipalId(Guid.Parse("0000dead-0000-0000-0000-000000000001"));
+            Func<Task> inspect = async () =>
+            {
+                AgentReply mail = await Brain.Get<IGmail>(PrincipalPartition.InstanceName(principal, "default"))
+                    .RequestAsync(new AgentRequest("Find recent release email"), CancellationToken);
+                AgentReply crm = await Brain.Get<ISalesforce>(PrincipalPartition.InstanceName(principal, "default"))
+                    .RequestAsync(new AgentRequest("Find open Acme opportunities"), CancellationToken);
+            };
+            return typeof(IHandle<AgentRequest>).IsAssignableFrom(typeof(IGmail)) + "|"
+                + typeof(IHandle<AgentRequest>).IsAssignableFrom(typeof(ISalesforce));
+            """);
+        var result = await runner.RunAsync(script, new FakeDigitalBrain("alice"), CancellationToken.None);
+        Assert.True(result.IsSuccess, result.Summary + string.Join(Environment.NewLine, result.Diagnostics));
+        Assert.Equal("True|True", result.Summary);
+    }
+
+    [Fact]
     public async Task Runtime_errors_are_returned_without_terminating_the_worker()
     {
         var script = StartupScript.FromSource("start.cs", "throw new InvalidOperationException(\"boom\");");

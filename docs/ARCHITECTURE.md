@@ -65,9 +65,10 @@ KitGalleryScreen) is the starting point for the widget side.
   dimensions are config-driven because Qdrant index dims lock to them. Every semantic
   index generation also pins provider/model identity, dimensions, preprocessing, and
   document-format version; migrations build and validate a new generation before cutover.
-- **Agent layer**: `Agent` neurons over MEAI clients today; MAF orchestration
-  (Team/GroupChat/MafParticipantAdapter) restores from master's git history as
-  a later build-order step.
+- **Agent layer**: `Agent` neurons over MEAI clients. Each turn prepares tools
+  through one asynchronous `IAgentToolSource` contract. Ino delegates to specialist
+  neurons through ordinary source-owned requests; no additional orchestration
+  runtime is required.
 - **Voice**: Whisper STT (Foundry Local) stays dev-only. PersonaPlex is deleted
   (see Trash record); future voice = provider realtime APIs.
 
@@ -83,28 +84,34 @@ See [Getting started](GETTING_STARTED.md) for local repository review and an exe
 
 ## Integration modules
 
-`Modules/Google` and `Modules/Salesforce`, each the standard triple
-(Contracts / implementation / Aspire.Hosting). Both sit on `Kernel/DigitalBrain.Sdk`:
-`Sdk/Mcp` owns the hosted MCP tool client (per-owner sessions, bearer auth,
-result normalization, the single read-only retry), `Sdk/OAuth` the browser
-login rail (`BrowserLogins` one-use request registry, `BrowserLoginSurface` for the
-login/callback paths, correlation claim, completion worker), `Sdk/Http` the
-`IHttpSurface` seam through which a module maps its callbacks without the kernel
-naming it. A module keeps only its provider policy: OAuth scheme and events, the
-credential store behind `IMcpCredentials`, tool definitions and confirmations.
-Each module's `Aspire.Hosting` project declares its own operator parameters
-(`WithGmail()`, `WithHostedMcp()`) and projects them onto the kernel; fakes mode
-declares none.
+Microsoft, Google, and Salesforce use the same Contracts / implementation /
+Aspire.Hosting boundaries. `IAspire`, `IGmail`, and `ISalesforce` inherit `IAgent`:
+one `AgentRequest`/`AgentReply` contract. Ino sees delegation tools; each specialist
+owns its native discovered MCP catalog, instructions, and provider policy.
 
-- Per-user OAuth: `AccountEntity` per user per provider holds the refresh
-  token; kernel HTTP serves the callback; every neuron call resolves the
-  caller's token. No shared credentials.
-- Today those modules are MCP-backed chat tools (`IGmail` / `ISalesforce` as
-  JSON services). Typed neuron contracts (`Send` `SearchGmail`, …) are later
-  product work, not a second capability bus.
-- v1 surface: Gmail search/read/draft/send*, Calendar list/create*, Salesforce
-  SOQL/read/create*. `*` = a confirmation Button card in chat must be activated
-  before the mutation executes.
+`Sdk/Mcp` owns isolated sessions, native catalog snapshots, STDIO/HTTP transports,
+binding revision checks, bounded results, and the single known-read 401 retry.
+It never automatically replays a write or an uncertain operation. The shared AI
+tool boundary handles screened/redacted evidence and safe failure categories.
+Provider modules retain account, query, consent, and confirmation policy without
+handwriting replacement MCP schemas.
+
+`Sdk/OAuth` retains the one-use `BrowserLogins` registry, callback surface and
+completion worker. Tokens are intentionally volatile and private to the connection
+store, bound to the authenticated principal; they are not persisted in entities,
+journals, or telemetry. Restarting the kernel requires reconnecting providers.
+
+Login completion resolves a stored exact specialist request, native read allowlist,
+and current connection revision. The existing chat worker resumes that target once;
+restricted continuation cannot delegate elsewhere or execute writes. Gmail draft
+creation and Salesforce create/update use exact published previews and a fresh
+authenticated user confirmation. Gmail send/delete and Salesforce delete remain
+outside the admitted catalog.
+
+Each module's hosting project retains its operator parameters (`WithGmail()`,
+`WithHostedMcp()`, `WithAspire()`). Static module-owned presentation descriptors
+provide labels and icon keys for observed neurons; they never create graph topology.
+`AgentActivity` is journal evidence, not an automatic broadcast to subscribers.
 
 ## Multiuser
 
@@ -152,5 +159,5 @@ declares none.
 3. UI kit, all 13 components on the template. (template + Chart + Image shipped 2026-08-23)
 4. Self-knowledge catalog — historical; not in the current product path.
 5. Durable scripting: `AdmitBehavior` + out-of-process C# worker.
-6. Google + Salesforce as typed neurons scripts can `Send` (today they are MCP chat tools).
+6. Google + Salesforce specialist neurons through the inherited generic agent request contract.
 7. Image → Docker Hub, ACA + Key Vault deploy.

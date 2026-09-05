@@ -16,4 +16,5 @@ public sealed record AgentActivity(
     [property: Id(6)] double? DurationMs = null,
     [property: Id(7)] string? Preview = null,
     [property: Id(8)] bool IsError = false,
-    [property: Id(9)] bool Truncated = false) : Signal;
+    [property: Id(9)] bool Truncated = false,
+    [property: Id(10)] string? FailureCode = null) : Signal;

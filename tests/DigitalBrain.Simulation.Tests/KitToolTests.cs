@@ -19,7 +19,7 @@ public sealed class KitToolTests(SimulationFixture fixture)
     // Must equal fixture.Sim.Brain.Owner (BrainSimulationOptions defaults to
     // DigitalBrainNames.DefaultOwner and SimulationCollection never overrides it): the
     // chatName instances built by NewChatInstance() are prefixed with the brain's actual
-    // owner, and KitToolSource.ToolsFor(Owner) now refuses any chatName that doesn't start
+    // owner, and KitToolSource.PrepareTestTools(Owner) now refuses any chatName that doesn't start
     // with "{owner.Value}/", so the two must agree or every non-guard test would trip the
     // new owner guard.
     private static readonly OwnerId Owner = new(DigitalBrainNames.DefaultOwner);
@@ -89,7 +89,7 @@ public sealed class KitToolTests(SimulationFixture fixture)
     {
         var chatInstance = NewChatInstance();
         var tools = new KitToolSource(fixture.Sim.Grains, imageGeneration: null, imageStore: new MemoryKitImageStore());
-        var render = tools.ToolsFor(Owner).Single(tool => tool.Name == "render_chart");
+        var render = tools.PrepareTestTools(Owner).Single(tool => tool.Name == "render_chart");
 
         var reply = await render.InvokeAsync(new AIFunctionArguments
         {
@@ -110,7 +110,7 @@ public sealed class KitToolTests(SimulationFixture fixture)
     {
         var chatInstance = NewChatInstance();
         var tools = new KitToolSource(fixture.Sim.Grains, imageGeneration: null, imageStore: new MemoryKitImageStore());
-        var render = tools.ToolsFor(Owner).Single(tool => tool.Name == "render_chart");
+        var render = tools.PrepareTestTools(Owner).Single(tool => tool.Name == "render_chart");
 
         var reply = await render.InvokeAsync(new AIFunctionArguments
         {
@@ -139,7 +139,7 @@ public sealed class KitToolTests(SimulationFixture fixture)
     {
         var otherOwnerChat = OtherOwnerChatInstance();
         var tools = new KitToolSource(fixture.Sim.Grains, imageGeneration: null, imageStore: new MemoryKitImageStore());
-        var render = tools.ToolsFor(Owner).Single(tool => tool.Name == "render_chart");
+        var render = tools.PrepareTestTools(Owner).Single(tool => tool.Name == "render_chart");
 
         var reply = await render.InvokeAsync(new AIFunctionArguments
         {
@@ -161,7 +161,7 @@ public sealed class KitToolTests(SimulationFixture fixture)
     public void GenerateImageToolIsAbsentWithoutAnImageGenerator()
     {
         var tools = new KitToolSource(fixture.Sim.Grains, imageGeneration: null, imageStore: new MemoryKitImageStore());
-        Assert.DoesNotContain(tools.ToolsFor(Owner), tool => tool.Name == "generate_image");
+        Assert.DoesNotContain(tools.PrepareTestTools(Owner), tool => tool.Name == "generate_image");
     }
 
     [Fact]
@@ -170,7 +170,7 @@ public sealed class KitToolTests(SimulationFixture fixture)
         var chatInstance = NewChatInstance();
         var store = new MemoryKitImageStore();
         var tools = new KitToolSource(fixture.Sim.Grains, new TestImageGeneration(), store);
-        var generate = tools.ToolsFor(Owner).Single(tool => tool.Name == "generate_image");
+        var generate = tools.PrepareTestTools(Owner).Single(tool => tool.Name == "generate_image");
 
         var reply = await generate.InvokeAsync(new AIFunctionArguments
         {
@@ -201,7 +201,7 @@ public sealed class KitToolTests(SimulationFixture fixture)
         var chatInstance = NewChatInstance();
         var generator = new CountingImageGeneration();
         var tools = new KitToolSource(fixture.Sim.Grains, generator, new MemoryKitImageStore());
-        var generate = tools.ToolsFor(Owner).Single(tool => tool.Name == "generate_image");
+        var generate = tools.PrepareTestTools(Owner).Single(tool => tool.Name == "generate_image");
 
         var reply = await generate.InvokeAsync(new AIFunctionArguments
         {
@@ -225,7 +225,7 @@ public sealed class KitToolTests(SimulationFixture fixture)
         var otherOwnerChat = OtherOwnerChatInstance();
         var generator = new CountingImageGeneration();
         var tools = new KitToolSource(fixture.Sim.Grains, generator, new MemoryKitImageStore());
-        var generate = tools.ToolsFor(Owner).Single(tool => tool.Name == "generate_image");
+        var generate = tools.PrepareTestTools(Owner).Single(tool => tool.Name == "generate_image");
 
         var reply = await generate.InvokeAsync(new AIFunctionArguments
         {

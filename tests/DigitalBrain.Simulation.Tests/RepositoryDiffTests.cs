@@ -25,16 +25,16 @@ public sealed class RepositoryDiffTests : IAsyncLifetime
     [Fact]
     public void ToolIsOptInAndAvailableOnlyToConfiguredOwner()
     {
-        Assert.Empty(Source(path: "").ToolsFor(Owner));
-        Assert.Empty(Source().ToolsFor(new OwnerId("someone-else")));
-        Assert.Single(Source().ToolsFor(Owner));
+        Assert.Empty(Source(path: "").PrepareTestTools(Owner));
+        Assert.Empty(Source().PrepareTestTools(new OwnerId("someone-else")));
+        Assert.Single(Source().PrepareTestTools(Owner));
         var fallback = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["DigitalBrain:Workspace:RepositoryPath"] = _path,
             ["DigitalBrain:Owner"] = Owner.Value,
         }).Build();
-        Assert.Single(new RepositoryDiffToolSource(fallback).ToolsFor(Owner));
-        Assert.Empty(new RepositoryDiffToolSource(fallback).ToolsFor(new OwnerId("dev")));
+        Assert.Single(new RepositoryDiffToolSource(fallback).PrepareTestTools(Owner));
+        Assert.Empty(new RepositoryDiffToolSource(fallback).PrepareTestTools(new OwnerId("dev")));
     }
 
     [Fact]
@@ -170,7 +170,7 @@ public sealed class RepositoryDiffTests : IAsyncLifetime
             arguments["scope"] = scope;
         }
 
-        var result = await (source ?? Source()).ToolsFor(Owner).Single().InvokeAsync(arguments, TestContext.Current.CancellationToken);
+        var result = await (source ?? Source()).PrepareTestTools(Owner).Single().InvokeAsync(arguments, TestContext.Current.CancellationToken);
         return result!.ToString()!;
     }
 

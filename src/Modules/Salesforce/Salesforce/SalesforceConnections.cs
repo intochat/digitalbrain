@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Core;
 using DigitalBrain.Product.Interactions;
 using DigitalBrain.Sdk;
 
@@ -8,17 +9,51 @@ namespace DigitalBrain.Salesforce;
 
 // The kernel owns one connection per owner. Tokens are intentionally volatile: restarting the
 // kernel disconnects Salesforce, without persisting credentials in Orleans.
-internal sealed class SalesforceConnections(SalesforceOAuthConfiguration configuration) : IMcpCredentials<OwnerId>, IDisposable
+internal sealed class SalesforceConnections(SalesforceOAuthConfiguration configuration) : IMcpCredentials<SalesforceBinding>, IDisposable
 {
     private readonly ConcurrentDictionary<OwnerId, CredentialSlot> _credentials = new();
     private readonly HttpClient _oauthHttp = new(new HttpClientHandler { AllowAutoRedirect = false });
 
-    internal OwnerId CurrentOwner => AgentTurnContext.Current?.Chat.Owner ?? configuration.Owner;
+    public SalesforceBinding Connection(OwnerId owner)
+    {
+        if (!_credentials.TryGetValue(owner, out var slot) || slot.Binding is not { } binding)
+        {
+            throw new McpAuthenticationRequiredException();
+        }
+        RequireActor(binding);
+        return binding;
+    }
 
-    public OwnerId Connection(OwnerId owner) => owner;
+    internal SalesforceBinding Identity(OwnerId owner, PrincipalId principal)
+    {
+        var binding = Connection(owner);
+        if (binding.Principal != principal)
+        {
+            throw new McpAuthenticationRequiredException();
+        }
+        return binding;
+    }
+
+    private static void RequireActor(SalesforceBinding binding)
+    {
+        if (VerifiedActor.Current?.PrincipalId != binding.Principal)
+        {
+            throw new McpAuthenticationRequiredException();
+        }
+    }
+
+    private CredentialSlot RequireBinding(OwnerId owner, SalesforceBinding binding)
+    {
+        RequireActor(binding);
+        if (binding.Owner != owner || !_credentials.TryGetValue(owner, out var slot) || slot.Binding != binding)
+        {
+            throw new McpOperationException("The Salesforce connection changed. Request a fresh operation.", McpFailureKind.ConnectionChanged);
+        }
+        return slot;
+    }
 
     internal async Task StoreAsync(
-        OwnerId owner, string? accessToken, string? refreshToken, TimeSpan? expiresIn,
+        OwnerId owner, PrincipalId principal, string? accessToken, string? refreshToken, TimeSpan? expiresIn,
         Action<Action> commitIfActive, CancellationToken cancellationToken)
     {
         ValidateToken(accessToken);
@@ -31,6 +66,7 @@ internal sealed class SalesforceConnections(SalesforceOAuthConfiguration configu
                 slot.AccessToken = accessToken;
                 slot.RefreshToken = refreshToken;
                 slot.ExpiresAt = Expiry(expiresIn);
+                slot.Binding = new SalesforceBinding(owner, principal, Guid.NewGuid().ToString("N"));
             });
         }
         finally
@@ -39,12 +75,13 @@ internal sealed class SalesforceConnections(SalesforceOAuthConfiguration configu
         }
     }
 
-    public async Task<string> AccessTokenAsync(OwnerId owner, OwnerId connection, bool refresh, CancellationToken cancellationToken)
+    public async Task<string> AccessTokenAsync(OwnerId owner, SalesforceBinding connection, bool refresh, CancellationToken cancellationToken)
     {
-        var slot = _credentials.GetOrAdd(owner, static _ => new CredentialSlot());
+        var slot = RequireBinding(owner, connection);
         await slot.Gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            RequireBinding(owner, connection);
             if (!refresh && slot.AccessToken is not null && slot.ExpiresAt > DateTimeOffset.UtcNow.AddSeconds(30))
             {
                 return slot.AccessToken;
@@ -93,8 +130,13 @@ internal sealed class SalesforceConnections(SalesforceOAuthConfiguration configu
     }
 
     // The access token was refused twice; the refresh token stays so the next call can try again.
-    public async Task RejectAsync(OwnerId owner, OwnerId connection, CancellationToken cancellationToken)
+    public async Task RejectAsync(OwnerId owner, SalesforceBinding connection, CancellationToken cancellationToken)
     {
+        RequireActor(connection);
+        if (connection.Owner != owner)
+        {
+            throw new McpOperationException("The Salesforce connection belongs to another owner.", McpFailureKind.AccessDenied);
+        }
         if (!_credentials.TryGetValue(owner, out var slot))
         {
             return;
@@ -102,7 +144,7 @@ internal sealed class SalesforceConnections(SalesforceOAuthConfiguration configu
         await slot.Gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            slot.AccessToken = null;
+            if (slot.Binding == connection) { slot.AccessToken = null; }
         }
         finally
         {
@@ -137,5 +179,8 @@ internal sealed class SalesforceConnections(SalesforceOAuthConfiguration configu
         internal string? AccessToken;
         internal string? RefreshToken;
         internal DateTimeOffset ExpiresAt;
+        internal SalesforceBinding? Binding;
     }
 }
+
+internal sealed record SalesforceBinding(OwnerId Owner, PrincipalId Principal, string Revision);

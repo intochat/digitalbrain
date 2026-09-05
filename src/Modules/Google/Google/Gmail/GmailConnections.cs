@@ -27,7 +27,17 @@ internal sealed class GmailConnections(GmailOAuthConfiguration configuration) : 
         throw new McpAuthenticationRequiredException();
     }
 
-    internal async Task AcceptAsync(OwnerId owner, string sub, string email, string accessToken,
+    internal GmailIdentity Identity(OwnerId owner, PrincipalId principal)
+    {
+        var identity = Identity(owner);
+        if (identity.Principal != principal)
+        {
+            throw new McpAuthenticationRequiredException();
+        }
+        return identity;
+    }
+
+    internal async Task AcceptAsync(OwnerId owner, PrincipalId principal, string sub, string email, string accessToken,
         string? refreshToken, string scopes, string? expiresIn, bool compose, Action<Action> commitIfActive,
         CancellationToken cancellationToken)
     {
@@ -63,10 +73,10 @@ internal sealed class GmailConnections(GmailOAuthConfiguration configuration) : 
             commitIfActive(() =>
             {
                 var old = slot.Identity;
-                slot.RefreshToken = refreshToken ?? (old?.Subject == sub ? slot.RefreshToken : null);
+                slot.RefreshToken = refreshToken ?? (old?.Subject == sub && old.Principal == principal ? slot.RefreshToken : null);
                 slot.AccessToken = accessToken;
                 slot.ExpiresAt = expiry;
-                slot.Identity = new GmailIdentity(sub, email, Guid.NewGuid(), grants.Contains(GmailOAuthConfiguration.ComposeScope));
+                slot.Identity = new GmailIdentity(sub, email, Guid.NewGuid(), grants.Contains(GmailOAuthConfiguration.ComposeScope), principal);
             });
         }
         finally { slot.Gate.Release(); }
@@ -180,4 +190,4 @@ internal sealed class GmailConnections(GmailOAuthConfiguration configuration) : 
     }
 }
 
-internal sealed record GmailIdentity(string Subject, string Email, Guid Revision, bool CanCompose);
+internal sealed record GmailIdentity(string Subject, string Email, Guid Revision, bool CanCompose, PrincipalId Principal);

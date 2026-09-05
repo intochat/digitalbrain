@@ -233,29 +233,20 @@ final class _LumenBrainGraphState extends State<LumenBrainGraph> {
 }
 
 NeuronIconKind brainNeuronIcon(BrainNeuron node) {
-  final type = '${node.type} ${node.module}'.toLowerCase();
-  if (type.contains('assistant')) return NeuronIconKind.assistant;
-  if (type.contains('worker') || type.contains('execution')) {
-    return NeuronIconKind.execution;
-  }
-  if (type.contains('chat')) return NeuronIconKind.conversation;
-  if (type.contains('session')) return NeuronIconKind.memory;
-  if (type.contains('gmail') || type.contains('google')) {
-    return NeuronIconKind.gmail;
-  }
-  if (type.contains('salesforce')) return NeuronIconKind.salesforce;
-  if (type.contains('aspire')) return NeuronIconKind.aspire;
-  if (type.contains('search')) return NeuronIconKind.search;
-  if (type.contains('repository') || type.contains('behavior')) {
-    return NeuronIconKind.repository;
-  }
-  if (type.contains('timer') || type.contains('time')) {
-    return NeuronIconKind.clock;
-  }
-  if (type.contains('document') || type.contains('context')) {
-    return NeuronIconKind.document;
-  }
-  return NeuronIconKind.generic;
+  // Older snapshots lack presentation keys. Preserve exact built-in identities;
+  // provider icons always come from their module-owned descriptor.
+  final key =
+      node.iconKey ??
+      switch (node.type.toLowerCase()) {
+        'assistant' => 'assistant',
+        'chat' => 'conversation',
+        'chat-turn-worker' || 'execution' => 'execution',
+        'sessionneuron' || 'memory' => 'memory',
+        'behaviors' => 'repository',
+        'timer' => 'clock',
+        _ => null,
+      };
+  return NeuronIconKind.fromKey(key);
 }
 
 final class _NeuronTile extends StatelessWidget {

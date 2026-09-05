@@ -1,76 +1,98 @@
 using System.Text.Json;
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.AI;
+using DigitalBrain.Core;
 using DigitalBrain.Product.Interactions;
 using DigitalBrain.Sdk;
+using Microsoft.Extensions.AI;
 using ModelContextProtocol.Client;
 
 namespace DigitalBrain.Google;
 
-// Gmail policy around the SDK client: argument allow-list, draft identity rules, request and
-// response screening, positive projection. Sessions, bearer auth and the read retry are the SDK's.
+// Only Gmail policy lives here. The SDK owns HTTP authentication, session leases,
+// native schema snapshots, cancellation, response budgets and read-only refresh.
 internal sealed class GmailMcp : IAsyncDisposable
 {
+    internal static readonly string[] NativeTools = ["search_threads", "get_thread", "list_labels", "create_draft"];
     private readonly GmailConnections _connections;
     private readonly IUntrustedContentScreen _screen;
-    private readonly McpToolClient<GmailIdentity> _client;
+    private readonly McpDiscoveredToolClient<GmailAgentIdentity> _client;
 
     public GmailMcp(GmailConnections connections, IUntrustedContentScreen screen)
+        : this(connections, screen, null) { }
+
+    internal GmailMcp(GmailConnections connections, IUntrustedContentScreen screen,
+        McpDiscoveredToolClient<GmailAgentIdentity>? client)
     {
         _connections = connections;
         _screen = screen;
-        _client = new McpToolClient<GmailIdentity>(
-            new McpEndpoint("gmail", GoogleModule.GmailMcpEndpoint),
-            connections,
+        _client = client ?? McpDiscoveredToolClient<GmailAgentIdentity>.ForHttp(
+            new McpEndpoint("gmail", GoogleModule.GmailMcpEndpoint), connections,
+            static identity => identity.Agent.Owner, Authorize, NativeTools,
             new McpToolPolicy(static tool => tool != "create_draft", ValidateCatalog),
-            new McpSessionOptions
-            {
-                Lifetime = TimeSpan.FromMinutes(10),
-                ResponseBudgetBytes = 1048576,
-                Timeout = TimeSpan.FromSeconds(30),
-            });
+            new McpSessionOptions { Lifetime = TimeSpan.FromMinutes(10), ResponseBudgetBytes = 1048576, Timeout = TimeSpan.FromSeconds(30) });
     }
 
-    internal async Task<JsonElement> CallAsync(OwnerId owner, string tool,
-        IReadOnlyDictionary<string, object?> arguments, CancellationToken cancellationToken, GmailIdentity? expectedIdentity = null)
-    {
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        deadline.CancelAfter(TimeSpan.FromSeconds(30));
-        var ct = deadline.Token;
-        ct.ThrowIfCancellationRequested();
-        GmailContent.ValidateArguments(tool, arguments);
-        if (tool == "create_draft" && expectedIdentity is null)
-        {
-            throw new McpOperationException("Draft writes require a consumed trusted user preview.");
-        }
-        var identity = _connections.Identity(owner); // No network until an owner credential exists.
-        if (expectedIdentity is not null && identity != expectedIdentity)
-        {
-            throw new McpOperationException("The Gmail connection changed. Request a fresh preview.");
-        }
+    internal Task<IReadOnlyList<AIFunction>> GetToolsAsync(GmailAgentIdentity identity, CancellationToken cancellationToken)
+        => _client.GetToolsAsync(identity, cancellationToken);
 
-        if (tool == "create_draft" && !identity.CanCompose)
+    internal static void Authorize(GmailAgentIdentity identity, GmailIdentity binding)
+    {
+        if (VerifiedActor.Current?.PrincipalId != identity.Principal
+            || !PrincipalPartition.OwnsInstance(identity.Principal, identity.Agent.Name)
+            || identity.Agent.Type != "gmail" || binding.Principal != identity.Principal)
         {
             throw new McpAuthenticationRequiredException();
         }
+    }
 
-        await _screen.ScreenAsync(JsonSerializer.Serialize(arguments), ct).ConfigureAwait(false);
-        try
+    internal async Task<JsonElement> InvokeAsync(GmailAgentIdentity identity, AIFunction native,
+        IReadOnlyDictionary<string, object?> arguments, CancellationToken cancellationToken, GmailIdentity? draftIdentity = null)
+    {
+        var binding = _connections.Identity(identity.Agent.Owner, identity.Principal);
+        Authorize(identity, binding);
+        GmailContent.ValidateArguments(native.Name, arguments);
+        if (native.Name == "create_draft" && (draftIdentity is null || draftIdentity != binding || !binding.CanCompose))
         {
-            var raw = await _client.CallAsync(owner, tool, arguments, ct).ConfigureAwait(false);
-            var projected = GmailContent.Project(tool, raw, arguments);
-            await _screen.ScreenAsync(projected.GetRawText(), ct).ConfigureAwait(false);
-            if (_connections.Identity(owner) != identity)
-            {
-                throw new McpOperationException("The Gmail connection changed during the request. Start a new request.");
-            }
-            return projected;
+            throw new McpOperationException("Draft writes require a consumed trusted preview for the current account.");
         }
-        catch (McpAuthenticationRequiredException) { throw; }
-        catch (McpOperationException) { throw; }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
-        catch (HttpRequestException error)
-        { throw new McpOperationException(error.StatusCode is { } status ? $"Gmail MCP failed (HTTP {(int)status}). Check account permissions or try again later." : "Gmail MCP could not be reached. Try again later."); }
-        catch (Exception) { throw new McpOperationException("Gmail MCP or content screening failed. Narrow the request and check service access; no unsafe content was returned."); }
+        await _screen.ScreenAsync(JsonSerializer.Serialize(arguments), cancellationToken).ConfigureAwait(false);
+        if (native.Name == "create_draft")
+        {
+            // Confirmation must compare the saved native schema against the current catalog,
+            // even when the server never sends tools/list_changed. The saved function still
+            // carries its original schema and binding; the SDK refuses any mismatch on invoke.
+            await _client.InvalidateAsync(identity, cancellationToken).ConfigureAwait(false);
+        }
+        var raw = await native.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?>(arguments)), cancellationToken).ConfigureAwait(false);
+        if (raw is not JsonElement envelope || McpDiscoveredTool.IsError(envelope) || McpDiscoveredTool.IsTruncated(envelope))
+        {
+            throw new McpOperationException("Gmail did not return complete successful evidence. Narrow the request or check service access.");
+        }
+        var projected = GmailContent.Project(native.Name, ReadContent(envelope), arguments);
+        await _screen.ScreenAsync(projected.GetRawText(), cancellationToken).ConfigureAwait(false);
+        if (_connections.Identity(identity.Agent.Owner, identity.Principal) != binding)
+        {
+            throw new McpOperationException("The Gmail connection changed during the request. Start a new request.", McpFailureKind.ConnectionChanged);
+        }
+        return projected;
+    }
+
+    private static JsonElement ReadContent(JsonElement envelope)
+    {
+        if (envelope.TryGetProperty("structuredContent", out var structured))
+        {
+            return structured;
+        }
+        if (envelope.TryGetProperty("content", out var blocks) && blocks.ValueKind == JsonValueKind.Array)
+        {
+            var text = string.Join('\n', blocks.EnumerateArray()
+                .Where(static block => block.TryGetProperty("type", out var type) && type.GetString() == "text")
+                .Select(static block => block.GetProperty("text").GetString()));
+            try { using var document = JsonDocument.Parse(text); return document.RootElement.Clone(); }
+            catch (JsonException) { }
+        }
+        throw new McpOperationException("Gmail MCP returned an invalid response shape.");
     }
 
     private static void ValidateCatalog(IEnumerable<McpClientTool> tools)
@@ -85,13 +107,12 @@ internal sealed class GmailMcp : IAsyncDisposable
             if (!catalog.TryGetValue(name, out var tool) || !tool.JsonSchema.TryGetProperty("properties", out var properties)
                 || fields.Any(f => !properties.TryGetProperty(f, out _)))
             {
-                throw new McpOperationException("The hosted Gmail MCP catalog is incompatible with the supported schema.");
+                throw new McpOperationException("The hosted Gmail MCP catalog is incompatible with the supported schema.", McpFailureKind.CatalogChanged);
             }
-
             if (enumField is not null && (!properties.GetProperty(enumField).TryGetProperty("enum", out var choices)
                 || values!.Any(v => !choices.EnumerateArray().Any(c => c.GetString() == v))))
             {
-                throw new McpOperationException("The hosted Gmail MCP catalog does not support the required safe content format.");
+                throw new McpOperationException("The hosted Gmail MCP catalog does not support the required safe content format.", McpFailureKind.CatalogChanged);
             }
             foreach (var field in fields)
             {
@@ -99,18 +120,18 @@ internal sealed class GmailMcp : IAsyncDisposable
                 var expectedType = field switch { "pageSize" => "integer", "includeTrash" => "boolean", "to" or "cc" or "bcc" => "array", _ => "string" };
                 if (!schema.TryGetProperty("type", out var type) || type.GetString() != expectedType)
                 {
-                    throw new McpOperationException("The hosted Gmail MCP argument types changed; access is blocked until the mapping is reviewed.");
+                    throw new McpOperationException("The hosted Gmail MCP argument types changed; review the provider policy.", McpFailureKind.CatalogChanged);
                 }
                 if (expectedType == "array" && (!schema.TryGetProperty("items", out var item)
                     || !item.TryGetProperty("type", out var itemType) || itemType.GetString() != "string"))
                 {
-                    throw new McpOperationException("The hosted Gmail MCP recipient schema is incompatible.");
+                    throw new McpOperationException("The hosted Gmail MCP recipient schema is incompatible.", McpFailureKind.CatalogChanged);
                 }
             }
         }
     }
 
-    internal Task PruneAsync() => _client.PruneAsync();
-
     public ValueTask DisposeAsync() => _client.DisposeAsync();
 }
+
+internal sealed record GmailAgentIdentity(NeuronId Agent, PrincipalId Principal);
