@@ -11,6 +11,7 @@ import 'sse_chat_delta_frames.dart';
 import 'sse_chat_frames.dart';
 import 'sse_frames.dart';
 import 'ui_models.dart';
+import 'models/brain_models.dart';
 
 final class DigitalBrainUiClient {
   /// Gated on the kernel; 404 when the kernel runs ungated.
@@ -67,17 +68,67 @@ final class DigitalBrainUiClient {
   final CookieHttpClient _http;
   final bool _ownsClient;
 
+  Future<BrainSnapshot> readBrain({required String chatName}) async {
+    final response = await _request(
+      'GET',
+      '/chats/${Uri.encodeComponent(chatName)}/brain',
+      timeout: const Duration(seconds: 10),
+    );
+    return BrainSnapshot.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  Future<void> setBrainSubscription({
+    required String chatName,
+    required String sourceId,
+    required String targetId,
+    required String signalType,
+    required bool subscribed,
+  }) async {
+    await _request(
+      'POST',
+      '/chats/${Uri.encodeComponent(chatName)}/brain/subscriptions',
+      timeout: const Duration(seconds: 14),
+      body: {
+        'sourceId': sourceId,
+        'targetId': targetId,
+        'signalType': signalType,
+        'subscribed': subscribed,
+      },
+    );
+  }
+
   Future<http.Response> _request(
     String method,
     String path, {
     Map<String, Object?>? body,
+    Duration? timeout,
   }) async {
-    final request = http.Request(method, baseUri.replace(path: path));
+    final abort = timeout == null ? null : Completer<void>();
+    final request = abort == null
+        ? http.Request(method, baseUri.replace(path: path))
+        : http.AbortableRequest(
+            method,
+            baseUri.replace(path: path),
+            abortTrigger: abort.future,
+          );
     if (body != null) {
       request.headers['content-type'] = 'application/json';
       request.body = jsonEncode(body);
     }
-    final response = await http.Response.fromStream(await _http.send(request));
+    final operation = _http.send(request).then(http.Response.fromStream);
+    final response = timeout == null
+        ? await operation
+        : await operation.timeout(
+            timeout,
+            onTimeout: () {
+              // Stop the actual request, so timed-out graph polls cannot accumulate
+              // network work while the store schedules a retry.
+              abort!.complete();
+              throw TimeoutException('$method $path timed out', timeout);
+            },
+          );
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw StateError(
         '$method $path failed: ${response.statusCode} ${response.body}',

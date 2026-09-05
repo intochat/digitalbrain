@@ -34,6 +34,8 @@ final class KitChat extends StatelessWidget {
     builders: builders,
     onMessageSend: onMessageSend,
     onAttachmentTap: onAttachmentTap,
-    theme: KitChatTheme.dark(),
+    theme: Theme.of(context).brightness == Brightness.light
+        ? KitChatTheme.light()
+        : KitChatTheme.dark(),
   );
 }

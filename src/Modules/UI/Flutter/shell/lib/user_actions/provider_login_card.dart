@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../brain_theme.dart';
 import '../chat/chat_contracts.dart';
 import 'chat_login_action.dart';
 import 'user_action_card.dart';
@@ -212,7 +211,12 @@ final class _ProviderLoginCardState extends State<ProviderLoginCard> {
           if (_failure != null && login.waiting)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: Text(_failure!, style: BrainType.bodyMuted),
+              child: Text(
+                _failure!,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
             ),
         ],
       ),

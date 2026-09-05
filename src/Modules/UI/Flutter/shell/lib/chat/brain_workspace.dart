@@ -6,7 +6,7 @@ import '../activity_screen.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../user_actions/user_action_card.dart';
 import '../windowing/windowing_screen.dart';
-import 'brain_chat_screen.dart';
+
 import 'chat_contracts.dart';
 import 'graph_home_screen.dart';
 import 'workspace_chrome.dart';
@@ -28,6 +28,8 @@ final class BrainWorkspace extends StatefulWidget {
     this.onReadImageBytes,
     this.onReadSpreadsheet,
     this.onReadGraph,
+    this.onReadBrain,
+    this.onSetBrainSubscription,
     this.graphSceneFactory,
     this.userActions = const [],
     this.statusMessage,
@@ -46,6 +48,8 @@ final class BrainWorkspace extends StatefulWidget {
   final ReadImageBytes? onReadImageBytes;
   final ReadSpreadsheet? onReadSpreadsheet;
   final ReadGraph? onReadGraph;
+  final ReadBrain? onReadBrain;
+  final SetBrainSubscription? onSetBrainSubscription;
   final GraphSceneFactory? graphSceneFactory;
   final List<UserActionCardModel> userActions;
   final String? statusMessage;
@@ -58,7 +62,7 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
   static const _compactBreakpoint = 720.0;
 
   late final WorkspaceSession _session;
-  int _destination = 0;
+  int _destination = graphDestinationIndex;
 
   @override
   void initState() {
@@ -98,17 +102,13 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
     super.dispose();
   }
 
-  Widget _destinationPage() {
-    // Product tabs stay in an IndexedStack so chat state survives
-    // switches. Graph/Kit/Windowing mount only while selected (graph pulse
-    // and offline demo clocks would otherwise run offstage).
-    if (_destination == onboardingDestinationIndex) {
-      return const OnboardingScreen();
-    }
-    if (_destination == graphDestinationIndex) {
-      return GraphHomeScreen(
+  Widget _destinationPage() => IndexedStack(
+    index: _destination == 0 || _destination == graphDestinationIndex ? 0 : 1,
+    children: [
+      GraphHomeScreen(
         chatName: widget.chatName,
         turns: _session.projectedTurns,
+        conversation: _destination == 0,
         onSend: widget.onSend,
         onStream: widget.onStream,
         onStreamVoice: widget.onStreamVoice,
@@ -120,42 +120,29 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
         onReadImageBytes: widget.onReadImageBytes,
         onReadSpreadsheet: widget.onReadSpreadsheet,
         onReadGraph: widget.onReadGraph,
+        onReadBrain: widget.onReadBrain,
+        onSetBrainSubscription: widget.onSetBrainSubscription,
         sceneFactory: widget.graphSceneFactory,
-      );
-    }
-    if (_destination == 0 || _destination == activityDestinationIndex) {
-      return IndexedStack(
-        index: _destination == 0 ? 0 : 1,
-        children: [
-          BrainChatScreen(
-            chatName: widget.chatName,
-            turns: _session.projectedTurns,
-            onSend: widget.onSend,
-            onStream: widget.onStream,
-            onStreamVoice: widget.onStreamVoice,
-            onAttachmentTap: widget.onAttachmentTap,
-            onOpenSignIn: widget.onOpenSignIn,
-            kernelBaseUri: widget.kernelBaseUri,
-            onCancelTurn: widget.onCancelTurn,
-            onReadChart: widget.onReadChart,
-            onReadImageBytes: widget.onReadImageBytes,
-            onReadSpreadsheet: widget.onReadSpreadsheet,
-            onReadGraph: widget.onReadGraph,
-          ),
-          ActivityScreen(
-            turns: _session.projectedTurns,
-            userActions: widget.userActions,
-            onOpenUserAction: widget.onOpenSignIn,
-          ),
-        ],
-      );
-    }
-    if (_destination == kitDestinationIndex) {
-      return const KitGalleryScreen();
-    }
-    return const WindowingScreen();
-  }
-
+      ),
+      Theme(
+        data: KitTheme.dark(),
+        child: ColoredBox(
+          color: KitPalette.surface,
+          child: switch (_destination) {
+            onboardingDestinationIndex => const OnboardingScreen(),
+            activityDestinationIndex => ActivityScreen(
+              turns: _session.projectedTurns,
+              userActions: widget.userActions,
+              onOpenUserAction: widget.onOpenSignIn,
+            ),
+            kitDestinationIndex => const KitGalleryScreen(),
+            windowingDestinationIndex => const WindowingScreen(),
+            _ => const SizedBox.shrink(),
+          },
+        ),
+      ),
+    ],
+  );
   @override
   Widget build(BuildContext context) {
     final status = _session.statusMessage(widget.statusMessage);
@@ -182,7 +169,7 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
                       selectedIndex: _destination,
                       onSelected: _selectDestination,
                     ),
-                    const VerticalDivider(width: 1, thickness: 1),
+
                     Expanded(child: content),
                   ],
                 ),

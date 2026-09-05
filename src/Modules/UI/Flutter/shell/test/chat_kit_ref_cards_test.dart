@@ -59,6 +59,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(requestedNames, isEmpty);
+    await tester.tap(find.text('Open attachment'));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('kit_chart_Test chart')), findsOneWidget);
     expect(requestedNames, ['daily-sales']);
     await drainShellTimers(tester);
@@ -89,6 +92,8 @@ void main() {
         },
       ),
     );
+    await tester.tap(find.byKey(const Key('destination_chat')));
+    await tester.pump();
 
     turns.add(
       shellTurn(
@@ -130,6 +135,8 @@ void main() {
         },
       ),
     );
+    await tester.tap(find.byKey(const Key('destination_chat')));
+    await tester.pump();
 
     turns.add(
       shellTurn(
@@ -162,6 +169,8 @@ void main() {
           onSend: (_) async {},
         ),
       );
+      await tester.tap(find.byKey(const Key('destination_chat')));
+      await tester.pump();
 
       turns.add(
         shellTurn(

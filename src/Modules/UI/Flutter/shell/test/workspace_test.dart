@@ -1,4 +1,8 @@
+import 'dart:async';
+
+import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_flutter_shell/chat_screen.dart';
+import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -6,59 +10,57 @@ import 'support/shell_test_support.dart';
 import 'support/fake_graph_scene.dart';
 
 void main() {
-  testWidgets(
-    'the workspace exposes Chat, Onboarding, Graph, Activity, Kit, and Windowing destinations',
-    (tester) async {
-      await prepareShellSurface(tester);
+  testWidgets('the workspace starts in My brain and exposes its destinations', (
+    tester,
+  ) async {
+    await prepareShellSurface(tester);
 
-      await tester.pumpWidget(
-        BrainChatApp(chatName: 'main', graphSceneFactory: FakeGraphScene.new),
-      );
-      await tester.pumpAndSettle();
-      await drainShellTimers(tester);
+    await tester.pumpWidget(
+      BrainChatApp(chatName: 'main', graphSceneFactory: FakeGraphScene.new),
+    );
+    await tester.pumpAndSettle();
+    await drainShellTimers(tester);
 
-      expect(find.byKey(const Key('destination_chat')), findsOneWidget);
-      expect(find.byKey(const Key('destination_onboarding')), findsOneWidget);
-      expect(find.byKey(const Key('destination_graph')), findsOneWidget);
-      expect(find.byKey(const Key('destination_activity')), findsOneWidget);
-      expect(find.byKey(const Key('destination_kit')), findsOneWidget);
-      expect(find.byKey(const Key('destination_windowing')), findsOneWidget);
+    expect(find.byKey(const Key('destination_chat')), findsOneWidget);
+    expect(find.byKey(const Key('destination_onboarding')), findsOneWidget);
+    expect(find.byKey(const Key('destination_graph')), findsOneWidget);
+    expect(find.byKey(const Key('destination_activity')), findsOneWidget);
+    expect(find.byKey(const Key('destination_kit')), findsOneWidget);
+    expect(find.byKey(const Key('destination_windowing')), findsOneWidget);
+    expect(find.byKey(const Key('compact_chat_surface')), findsOneWidget);
+    expect(find.text('A little more headspace.'), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('destination_onboarding')));
-      await tester.pump();
-      await drainShellTimers(tester);
-      expect(find.byKey(const Key('onboarding_screen')), findsOneWidget);
-      expect(
-        find.byKey(const Key('onboarding_capability_rail')),
-        findsOneWidget,
-      );
-      expect(find.byKey(const Key('kit_graph')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('destination_onboarding')));
+    await tester.pump();
+    await drainShellTimers(tester);
+    expect(find.byKey(const Key('onboarding_screen')), findsOneWidget);
+    expect(find.byKey(const Key('onboarding_capability_rail')), findsOneWidget);
+    expect(find.byKey(const Key('kit_graph')), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('destination_graph')));
-      await tester.pump();
-      expect(find.byKey(const Key('graph_home_screen')), findsOneWidget);
-      expect(find.byKey(const Key('kit_graph_view')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('destination_graph')));
+    await tester.pump();
+    expect(find.byKey(const Key('graph_home_screen')), findsOneWidget);
+    expect(find.byKey(const Key('graph_brain_panel')), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('destination_activity')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('activity_screen')), findsOneWidget);
-      expect(find.text('No activity yet.'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('destination_activity')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('activity_screen')), findsOneWidget);
+    expect(find.text('No activity yet.'), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('destination_kit')));
-      await tester.pump();
-      await drainShellTimers(tester);
-      expect(find.byKey(const Key('kit_gallery_screen')), findsOneWidget);
-      expect(find.text('UI Kit'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('destination_kit')));
+    await tester.pump();
+    await drainShellTimers(tester);
+    expect(find.byKey(const Key('kit_gallery_screen')), findsOneWidget);
+    expect(find.text('UI Kit'), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('destination_windowing')));
-      await tester.pump();
-      await drainShellTimers(tester);
-      expect(find.byKey(const Key('windowing_screen')), findsOneWidget);
-      expect(find.textContaining('Windowing demo'), findsOneWidget);
-      expect(find.text('BTC / USD'), findsWidgets);
-      expect(find.byKey(const Key('kit_time_chart')), findsOneWidget);
-    },
-  );
+    await tester.tap(find.byKey(const Key('destination_windowing')));
+    await tester.pump();
+    await drainShellTimers(tester);
+    expect(find.byKey(const Key('windowing_screen')), findsOneWidget);
+    expect(find.textContaining('Windowing demo'), findsOneWidget);
+    expect(find.text('BTC / USD'), findsWidgets);
+    expect(find.byKey(const Key('kit_time_chart')), findsOneWidget);
+  });
 
   testWidgets('assistant hint requests local code review through chat', (
     tester,
@@ -91,8 +93,10 @@ void main() {
     await tester.pumpAndSettle();
     await drainShellTimers(tester);
 
-    expect(find.byType(NavigationBar), findsOneWidget);
-    expect(find.byType(NavigationRail), findsNothing);
+    expect(find.byKey(const Key('destination_graph')), findsOneWidget);
+    expect(find.byKey(const Key('destination_chat')), findsOneWidget);
+    expect(find.byTooltip('More destinations'), findsOneWidget);
+    expect(find.byKey(const Key('destination_onboarding')), findsNothing);
     await drainShellTimers(tester);
   });
 
@@ -106,8 +110,80 @@ void main() {
       await tester.pump();
 
       expect(find.text('not connected'), findsOneWidget);
-      expect(find.byKey(const Key('chat_surface')), findsOneWidget);
+      expect(find.byKey(const Key('compact_chat_surface')), findsOneWidget);
       await drainShellTimers(tester);
     },
   );
+
+  testWidgets('My brain and Conversation preserve a pending send and draft', (
+    tester,
+  ) async {
+    await prepareShellSurface(tester);
+    var subscriptions = 0;
+    var cancellations = 0;
+    final replies = StreamController<ChatDelta>(
+      onListen: () => subscriptions++,
+      onCancel: () => cancellations++,
+    );
+    addTearDown(() async {
+      if (subscriptions == 0) await replies.stream.listen(null).cancel();
+      await replies.close();
+    });
+    final turns = StreamController<ChatTurnEvent>();
+    addTearDown(turns.close);
+    final sent = <String>[];
+    await tester.pumpWidget(
+      BrainChatApp(
+        chatName: 'main',
+        turns: turns.stream,
+        onStream: (text) {
+          sent.add(text);
+          return replies.stream;
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(EditableText), 'Review my diff');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pump();
+    replies.add(
+      const ChatDelta.accepted(commandId: 'review', turnId: 't-review'),
+    );
+    await tester.pump();
+    await tester.enterText(find.byType(EditableText), 'A follow-up draft');
+    await tester.tap(find.byKey(const Key('destination_chat')));
+    await tester.pump();
+    expect(find.byKey(const Key('chat_surface')), findsOneWidget);
+    expect(find.text('Review my diff'), findsOneWidget);
+    expect(
+      tester.widget<EditableText>(find.byType(EditableText)).controller.text,
+      'A follow-up draft',
+    );
+    expect(subscriptions, 1);
+    expect(cancellations, 0);
+    await tester.tap(find.byKey(const Key('destination_graph')));
+    await tester.pump();
+    expect(find.byKey(const Key('compact_chat_surface')), findsOneWidget);
+    expect(
+      tester.widget<EditableText>(find.byType(EditableText)).controller.text,
+      'A follow-up draft',
+    );
+    turns.add(shellTurn(1, true, 'Review my diff', commandId: 'review'));
+    turns.add(
+      shellTurn(2, false, 'One actionable finding.', commandId: 'review'),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(
+      tester.widget<KitMarkdown>(find.byType(KitMarkdown)).text,
+      'One actionable finding.',
+    );
+    expect(sent, ['Review my diff']);
+    expect(subscriptions, 1);
+    expect(cancellations, 0);
+    await tester.pumpWidget(const SizedBox());
+    await drainShellTimers(tester);
+    expect(cancellations, 1);
+    expect(tester.takeException(), isNull);
+  }, timeout: const Timeout(Duration(seconds: 60)));
 }

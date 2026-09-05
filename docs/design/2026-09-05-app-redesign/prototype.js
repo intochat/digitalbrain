@@ -45,7 +45,7 @@ const nodes=[
 ];
 const byId=Object.fromEntries(nodes.map(n=>[n.id,n]));
 const desktopPositions=Object.fromEntries(nodes.map(n=>[n.id,[n.x,n.y]]));
-const mobilePositions={gmail:[115,165],docs:[115,365],search:[325,95],ino:[325,294],memory:[325,551],salesforce:[535,165],repository:[535,365],aspire:[535,551]};
+const mobilePositions={gmail:[115,182],docs:[115,365],search:[325,125],ino:[325,294],memory:[325,551],salesforce:[535,182],repository:[535,395],aspire:[535,551]};
 const edges=[
  {id:'mail-request',from:'ino',to:'gmail',signal:'ReadInbox',kind:'Learned',enabled:true,bend:-24},
  {id:'mail-watch',from:'gmail',to:'ino',signal:'MailReceived',kind:'Bound',enabled:true,bend:-30},

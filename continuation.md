@@ -1,5 +1,72 @@
 # Continuation — keep cleaning on subscribe/unsubscribe
 
+## Approved Lumen + Forui implementation — 2026-09-05
+
+The user approved Lumen and Forui. Flutter now opens **My brain**, with warm light
+surfaces, icon neurons in module regions, Ino, a bottom composer/latest reply,
+and the same full conversation reachable through history or navigation. Forui
+0.26 is behind digitalbrain_ui_kit; KitThemeScope bridges its extracted Material
+widgets into the existing MaterialApp. Legacy demos remain secondary surfaces.
+Ino is a programmatic, reduced-motion-aware face; no unaudited old Rive artwork
+was imported.
+
+GET /chats/{chatName}/brain projects actual current-chat participants, reachable
+stored synapses, and bounded recent journal activity. POST the same prefix plus
+/subscriptions dispatches existing Subscribe/Unsubscribe through the kernel.
+Scope and principal validation remain server-side; arbitrary payloads are omitted.
+The client polls after each completed read (~2 seconds), aborts timed-out HTTP
+requests, ignores late disposed results, preserves stale snapshots visibly, and
+only highlights fresh activity. It waits for a fresh snapshot to confirm mutations.
+No alternate graph store/runtime was added to the kernel. The Flutter store is
+only a disposable UI projection. Some direct assistant/tool calls have no journal
+event; this graph does not claim complete internal tool tracing.
+
+The native Windows app was hot-restarted into Lumen and tested using Computer:
+real 'hi' sent from the graph returned 'Hi! What would you like help with?'; the
+saved conversation restored; actual node and Learned-edge inspectors rendered.
+A temporary assistant:assistant -> current main chat Bound Note subscription was
+created in the dialog, observed in the live graph, then removed via Unsubscribe.
+The UI confirmed removal and no Note edge remained. Ordinary Learned control
+routes from sending Subscribe/Unsubscribe remain observable kernel history.
+
+Focused checks so far: 37 unique shell tests, 3 Forui kit tests, 22 core/client
+tests, and 8 backend tests passed (70 total). Backend includes an isolated real
+HTTP/AppHost subscription round trip and foreign-principal rejection. Saved main
+snapshot also returned 200 (6 nodes, initially 2 stored edges, 36 activities;
+167ms warm read). Whole-workspace analysis had no type errors; its import/brace findings were fixed. Final targeted analysis of the six affected files passed with no issues (--fatal-infos).
+
+Implementation plan: docs/plans/2026-09-05-lumen-forui-implementation.md.
+Updated usage: docs/GETTING_STARTED.md. Native app remains managed by the main
+Aspire AppHost. Do not reintroduce the old simulation as the default live graph.
+
+## Graph-first redesign options — 2026-09-05
+
+The user requested a complete visual redesign explored through 3–4 interactive
+HTML options before choosing the Flutter implementation. The design collection is
+`docs/design/2026-09-05-app-redesign/index.html`: Lumen (warm glass), Aurora (dark
+immersive glass), Tactile (light neumorphism), and Atlas (compact technical graph).
+Run `node docs/design/2026-09-05-app-redesign/serve.cjs`; the local gallery uses
+`http://127.0.0.1:8743/`. Each page has a graph as its main surface, icon neurons,
+an Ino persona, a bottom composer/latest reply, expandable history, inspectors,
+and simulated subscribe/unsubscribe behavior. These are illustrative local
+prototypes, not a live backend projection. No Flutter dependencies were changed.
+
+`research.html` contains the sourced six-kit comparison. Leading recommendation:
+Forui behind `digitalbrain_ui_kit`, Rive for the state-driven Ino persona, ordinary
+Flutter animation for node feedback, and a dedicated graph renderer. shadcn_ui
+is the incremental Material-compatible alternative. Glass/depth are our surface
+tokens, not a reason to adopt the old flutter_neumorphic package as a foundation.
+Actual old Ino Rive assets and implementation were found under
+`D:/Projects/ino/clients/ino.flutter/assets/rive` and `lib/persona`; their detailed
+state mapping needs auditing. The HTML personas are authored CSS stand-ins.
+
+Read `design-brief.md` in that design directory for the full behavior/architecture
+and migration boundaries. Preserve current chat acceptance/journal recovery and
+source-owned Bound/Learned semantics. The future live graph needs a current
+topology projection and observed, correlated traffic; do not treat the HTML
+example graph as production state. Desktop/mobile screenshots and browser
+verification JSON are saved beside the concepts. Direction selection is next.
+
 ## Chat recovery and modular Graph — 2026-09-05
 
 The original Flutter `main` failure had two causes: persisted ExecutionContext

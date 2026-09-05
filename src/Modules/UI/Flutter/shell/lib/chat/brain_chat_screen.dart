@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:flyer_chat_text_message/flyer_chat_text_message.dart';
 import 'package:flyer_chat_text_stream_message/flyer_chat_text_stream_message.dart';
@@ -11,7 +12,6 @@ import 'package:provider/provider.dart';
 import 'package:record/record.dart';
 import 'package:uuid/uuid.dart';
 
-import '../brain_theme.dart';
 import '../user_actions/chat_login_action.dart';
 import '../user_actions/gmail_login_card.dart';
 import '../user_actions/salesforce_login_card.dart';
@@ -21,6 +21,11 @@ import 'stream_state_store.dart';
 import 'voice_file_io.dart'
     if (dart.library.html) 'voice_file_web.dart'
     as voice_file;
+
+part 'brain_chat_presentation.dart';
+
+/// Both presentations share the journal, active requests, and composer draft.
+enum BrainChatPresentation { full, compact }
 
 final class _PendingChatSend {
   _PendingChatSend({
@@ -62,6 +67,8 @@ final class BrainChatScreen extends StatefulWidget {
     this.onReadImageBytes,
     this.onReadSpreadsheet,
     this.onReadGraph,
+    this.presentation = BrainChatPresentation.full,
+    this.compactReplyMaxHeight = 180,
   });
 
   final String chatName;
@@ -77,6 +84,8 @@ final class BrainChatScreen extends StatefulWidget {
   final ReadImageBytes? onReadImageBytes;
   final ReadSpreadsheet? onReadSpreadsheet;
   final ReadGraph? onReadGraph;
+  final BrainChatPresentation presentation;
+  final double compactReplyMaxHeight;
 
   @override
   State<BrainChatScreen> createState() => _BrainChatScreenState();
@@ -84,7 +93,7 @@ final class BrainChatScreen extends StatefulWidget {
 
 final class _BrainChatScreenState extends State<BrainChatScreen> {
   static const _owner = User(id: ownerUserId, name: 'you');
-  static const _assistant = User(id: assistantUserId, name: 'brain');
+  static const _assistant = User(id: assistantUserId, name: 'Ino');
   static const _uuid = Uuid();
   static const _voicePlaceholder = '🎤 …';
 
@@ -98,6 +107,8 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
   final _streams = <StreamIterator<ChatDelta>>{};
   String? _failure;
   _PendingChatSend? _failedSend;
+  final _historyPortal = OverlayPortalController();
+  bool _historyOpen = false;
 
   @override
   void initState() {
@@ -108,6 +119,10 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
   @override
   void didUpdateWidget(covariant BrainChatScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.presentation != oldWidget.presentation && _historyOpen) {
+      _historyPortal.hide();
+      _historyOpen = false;
+    }
     if (!_sameJournal(oldWidget.turns, widget.turns)) {
       unawaited(_syncJournal(widget.turns));
     }
@@ -459,167 +474,16 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final canSend = widget.onSend != null || widget.onStream != null;
-    final canVoice = widget.onStreamVoice != null;
+  Widget build(BuildContext context) => _buildPresentation(context);
 
-    return ColoredBox(
-      color: BrainPalette.surface,
-      child: Column(
-        children: [
-          ListenableBuilder(
-            listenable: _voice,
-            builder: (context, _) {
-              if (!_voice.recording && !_voice.busy) {
-                return const SizedBox.shrink();
-              }
-              return Material(
-                color: _voice.recording
-                    ? BrainPalette.signal.withValues(alpha: 0.12)
-                    : BrainPalette.surfaceRaised,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _voice.recording ? Icons.mic : Icons.hourglass_top,
-                        size: 18,
-                        color: _voice.recording
-                            ? BrainPalette.signal
-                            : BrainPalette.textMuted,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _voice.recording
-                              ? 'Recording… tap the mic to stop and send'
-                              : 'Sending voice…',
-                          style: BrainType.meta.copyWith(
-                            color: _voice.recording
-                                ? BrainPalette.signal
-                                : BrainPalette.textMuted,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-          Expanded(
-            child: ChangeNotifierProvider.value(
-              value: _streamStates,
-              child: ChangeNotifierProvider.value(
-                value: _voice,
-                child: KitChat(
-                  key: const Key('chat_surface'),
-                  chatController: _controller,
-                  currentUserId: ownerUserId,
-                  resolveUser: (id) async => switch (id) {
-                    ownerUserId => _owner,
-                    assistantUserId => _assistant,
-                    _ => null,
-                  },
-                  onMessageSend: canSend ? _handleSend : null,
-                  onAttachmentTap: widget.onAttachmentTap,
-                  builders: Builders(
-                    composerBuilder: (context) => BrainChatComposer(
-                      canVoice: canVoice,
-                      onVoiceTap: () => unawaited(_toggleVoice()),
-                    ),
-                    textMessageBuilder:
-                        (
-                          context,
-                          message,
-                          index, {
-                          required bool isSentByMe,
-                          MessageGroupStatus? groupStatus,
-                        }) => FlyerChatTextMessage(
-                          message: message,
-                          index: index,
-                          showTime: false,
-                          showStatus: false,
-                        ),
-                    textStreamMessageBuilder:
-                        (
-                          context,
-                          message,
-                          index, {
-                          required bool isSentByMe,
-                          MessageGroupStatus? groupStatus,
-                        }) {
-                          final streamState = context
-                              .watch<StreamStateStore>()
-                              .stateFor(message.streamId);
-                          return FlyerChatTextStreamMessage(
-                            message: message,
-                            index: index,
-                            streamState: streamState,
-                            showTime: false,
-                            showStatus: false,
-                          );
-                        },
-                    // Flyer Chat: CustomMessage + customMessageBuilder
-                    // https://pub.dev/packages/flutter_chat_ui
-                    customMessageBuilder:
-                        (
-                          context,
-                          message,
-                          index, {
-                          required bool isSentByMe,
-                          MessageGroupStatus? groupStatus,
-                        }) {
-                          if (message.metadata?['kind'] == 'user-action') {
-                            final login =
-                                _loginActions[message.metadata?['actionKey']];
-                            if (login == null) return const SizedBox.shrink();
-                            return switch (login.action.provider) {
-                              'salesforce' => SalesforceLoginCard(
-                                key: ValueKey(login.key),
-                                login: login,
-                                kernelBaseUri: widget.kernelBaseUri,
-                                onOpenSignIn: widget.onOpenSignIn,
-                                onCancelTurn: widget.onCancelTurn,
-                              ),
-                              'gmail' => GmailLoginCard(
-                                key: ValueKey(login.key),
-                                login: login,
-                                kernelBaseUri: widget.kernelBaseUri,
-                                onOpenSignIn: widget.onOpenSignIn,
-                                onCancelTurn: widget.onCancelTurn,
-                              ),
-                              _ => const SizedBox.shrink(),
-                            };
-                          }
-                          return KitChatBuilders.customMessageBuilder(
-                            context,
-                            message,
-                            index,
-                            isSentByMe: isSentByMe,
-                            groupStatus: groupStatus,
-                            onReadChart: widget.onReadChart,
-                            onReadImageBytes: widget.onReadImageBytes,
-                            onReadSpreadsheet: widget.onReadSpreadsheet,
-                            onReadGraph: widget.onReadGraph,
-                          );
-                        },
-                  ),
-                ),
-              ),
-            ),
-          ),
-          if (_failure != null)
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(_failure!, style: BrainType.bodyMuted),
-            ),
-        ],
-      ),
-    );
+  void _openHistory() {
+    setState(() => _historyOpen = true);
+    _historyPortal.show();
+  }
+
+  void _closeHistory() {
+    _historyPortal.hide();
+    setState(() => _historyOpen = false);
   }
 
   bool _sameJournal(List<ChatTurnEvent> a, List<ChatTurnEvent> b) {

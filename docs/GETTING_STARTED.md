@@ -11,18 +11,33 @@ Docker must be running for the local storage services. Configure the AppHost's
 `Parameters:openai-api-key` user secret for its selected model. The current AppHost
 already selects the model; Flutter uses the kernel at `http://localhost:5080`.
 
-## Chat beside the brain
+## Your brain, with Ino
 
-Open **Graph** for a chat pane on the left and the module graph on the right.
-It uses the same UI-kit chat surface and conversation as **Chat**. Use the example
-buttons to play an illustrative chat reply, code review, or subscription sequence.
-Pause or reset the playback to inspect a step; drag the 3D scene to orbit and scroll
-to zoom. The subscription example creates a Bound synapse on the source, broadcasts
-along it, then removes it on unsubscribe.
+Flutter opens **My brain**, the Lumen workspace built on the shared Forui kit.
+Use the composer at the bottom to talk to Ino. The latest answer stays beside the
+composer; **Full conversation** opens the complete history. **Conversation** in
+the navigation uses the same conversation and pending request.
 
-Examples are local simulations. They do not call the model, run a review, or
-change your real subscriptions. Messages sent in the chat pane use the real
-assistant and its configured tools.
+The graph groups actual observed neurons by module. Select an icon to inspect its
+identity, recent signals, and connections. Select an arrow on a synapse to inspect
+its source, subscriber, signal, kind, and recorded delivery count. The directory
+provides a list alternative to the canvas. Pan and zoom to explore; use the reset
+view control to return to the initial framing.
+
+Choose **Create subscription** on a neuron, then select an eligible subscriber
+and signal. The source owns the resulting Bound synapse. **Unsubscribe** removes
+it entirely; the interface waits for the kernel and a fresh snapshot before
+confirming either change. Learned connections represent handled direct delivery.
+
+The graph refreshes approximately every two seconds after each completed read.
+It shows the current conversation, known runtime participants, reachable stored
+synapses, and bounded recent journal activity. The observation time, limited-view
+status, and connection failures are visible. Direct tool calls that do not emit
+journal signals are not represented as complete live traces. Provider icons appear
+when those neurons are actually observed.
+
+**Play an example** opens the labeled 3D simulations with pause/reset controls.
+These demonstrations do not change real subscriptions or submit model requests.
 
 ## Review your code now
 

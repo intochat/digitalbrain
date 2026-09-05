@@ -55,6 +55,21 @@ Widget buildShell({
     onReadImageBytes: edge?.readImageBytes,
     onReadSpreadsheet: edge?.readSpreadsheet,
     onReadGraph: edge?.readGraph,
+    onReadBrain: edge == null ? null : () => edge.readBrain(chatName: chat),
+    onSetBrainSubscription: edge == null
+        ? null
+        : ({
+            required sourceId,
+            required targetId,
+            required signalType,
+            required subscribed,
+          }) => edge.setBrainSubscription(
+            chatName: chat,
+            sourceId: sourceId,
+            targetId: targetId,
+            signalType: signalType,
+            subscribed: subscribed,
+          ),
   );
 }
 

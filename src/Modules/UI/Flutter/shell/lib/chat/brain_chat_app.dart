@@ -2,7 +2,6 @@ import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
 import 'package:flutter/material.dart';
 
-import '../brain_theme.dart';
 import '../user_actions/user_action_card.dart';
 import 'brain_workspace.dart';
 import 'chat_contracts.dart';
@@ -25,6 +24,8 @@ final class BrainChatApp extends StatelessWidget {
     this.onReadImageBytes,
     this.onReadSpreadsheet,
     this.onReadGraph,
+    this.onReadBrain,
+    this.onSetBrainSubscription,
     this.graphSceneFactory,
     this.userActions = const [],
     this.statusMessage,
@@ -43,6 +44,8 @@ final class BrainChatApp extends StatelessWidget {
   final ReadImageBytes? onReadImageBytes;
   final ReadSpreadsheet? onReadSpreadsheet;
   final ReadGraph? onReadGraph;
+  final ReadBrain? onReadBrain;
+  final SetBrainSubscription? onSetBrainSubscription;
   final GraphSceneFactory? graphSceneFactory;
   final List<UserActionCardModel> userActions;
   final String? statusMessage;
@@ -52,7 +55,8 @@ final class BrainChatApp extends StatelessWidget {
     return MaterialApp(
       title: 'DigitalBrain',
       debugShowCheckedModeBanner: false,
-      theme: BrainTheme.dark(),
+      theme: KitTheme.light(),
+      builder: (context, child) => KitThemeScope(child: child!),
       home: BrainWorkspace(
         chatName: chatName,
         turns: turns,
@@ -67,6 +71,8 @@ final class BrainChatApp extends StatelessWidget {
         onReadImageBytes: onReadImageBytes,
         onReadSpreadsheet: onReadSpreadsheet,
         onReadGraph: onReadGraph,
+        onReadBrain: onReadBrain,
+        onSetBrainSubscription: onSetBrainSubscription,
         graphSceneFactory: graphSceneFactory,
         userActions: userActions,
         statusMessage: statusMessage,

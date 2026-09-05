@@ -27,6 +27,7 @@ node_modules/
 
 # Dart / Flutter clients
 **/.dart_tool/
+/src/Modules/UI/Flutter/build/
 **/packages/pubspec_overrides.yaml
 
 # Reqnroll code-behind: generated into obj/, never source

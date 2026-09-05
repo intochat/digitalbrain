@@ -1,0 +1,61 @@
+namespace DigitalBrain.Kernel;
+
+// HTTP projections, not graph state. Every snapshot is rebuilt from the neuron-owned
+// synapses and bounded journals; identifiers are relative to the authenticated owner.
+internal sealed record BrainGraphSnapshot(
+    string RootId,
+    DateTimeOffset ObservedAt,
+    bool Truncated,
+    string Scope,
+    IReadOnlyList<BrainGraphNode> Nodes,
+    IReadOnlyList<BrainGraphSynapse> Synapses,
+    IReadOnlyList<BrainGraphActivity> Activity);
+
+internal sealed record BrainGraphNode(
+    string Id,
+    string Type,
+    string Name,
+    string Label,
+    string Module,
+    string Role,
+    string Status,
+    IReadOnlyList<string> HandledSignals,
+    long IncomingSequence,
+    long OutgoingSequence,
+    DateTimeOffset? LastActivityAt);
+
+internal sealed record BrainGraphSynapse(
+    string Id,
+    string SourceId,
+    string TargetId,
+    string SignalType,
+    string Kind,
+    double Weight,
+    long FireCount,
+    DateTimeOffset LastFiredAt,
+    bool IsBlocking,
+    bool CanUnsubscribe);
+
+internal sealed record BrainGraphActivity(
+    string Id,
+    string NeuronId,
+    string Direction,
+    long Sequence,
+    string SignalType,
+    DateTimeOffset Timestamp,
+    string CallerId,
+    string CorrelationId,
+    string Summary,
+    IReadOnlyDictionary<string, string>? PayloadPreview);
+
+internal sealed record BrainGraphSubscriptionRequest(
+    string SourceId,
+    string TargetId,
+    string SignalType,
+    bool Subscribed);
+
+internal sealed record BrainGraphSubscriptionResult(
+    string SourceId,
+    string TargetId,
+    string SignalType,
+    bool Subscribed);

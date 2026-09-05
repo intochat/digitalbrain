@@ -10,8 +10,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support/shell_test_support.dart';
 
 void main() {
+  Future<void> openConversation(WidgetTester tester) async {
+    await tester.tap(find.byKey(const Key('destination_chat')));
+    await tester.pump();
+  }
+
   Future<void> send(WidgetTester tester, String text) async {
-    await tester.enterText(find.byType(TextField), text);
+    await tester.enterText(find.byType(EditableText), text);
     await tester.testTextInput.receiveAction(TextInputAction.send);
     await tester.pump();
   }
@@ -302,6 +307,7 @@ void main() {
     await tester.pumpWidget(
       BrainChatApp(chatName: 'main', turns: turns.stream, onSend: (_) async {}),
     );
+    await openConversation(tester);
 
     turns.add(shellTurn(1, true, 'how is my account?'));
     turns.add(shellTurn(2, false, 'Your account is up to date.'));
@@ -320,6 +326,7 @@ void main() {
     await tester.pumpWidget(
       BrainChatApp(chatName: 'main', turns: turns.stream, onSend: (_) async {}),
     );
+    await openConversation(tester);
 
     turns.add(shellTurn(7, false, 'only once'));
     turns.add(shellTurn(7, false, 'only once'));
@@ -344,8 +351,9 @@ void main() {
           onSend: (text) async => sent.add(text),
         ),
       );
+      await openConversation(tester);
 
-      await tester.enterText(find.byType(TextField), 'enrich my account');
+      await tester.enterText(find.byType(EditableText), 'enrich my account');
       await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.pumpAndSettle();
 
@@ -375,8 +383,9 @@ void main() {
           onSend: (_) async {},
         ),
       );
+      await openConversation(tester);
 
-      await tester.enterText(find.byType(TextField), 'stay visible');
+      await tester.enterText(find.byType(EditableText), 'stay visible');
       await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.pumpAndSettle();
 
@@ -418,8 +427,9 @@ void main() {
         },
       ),
     );
+    await openConversation(tester);
 
-    await tester.enterText(find.byType(TextField), 'stream me');
+    await tester.enterText(find.byType(EditableText), 'stream me');
     await tester.testTextInput.receiveAction(TextInputAction.send);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 20));
