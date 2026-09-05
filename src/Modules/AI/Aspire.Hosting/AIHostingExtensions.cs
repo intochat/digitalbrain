@@ -145,7 +145,11 @@ public static class AIHostingExtensions
 
             builder.WithEnvironment(
                 EnableSensitiveDataEnvironmentKey,
-                EnableSensitiveData.ToString());
+                EnableSensitiveData ? "true" : "false")
+                // Keep standard SDK instrumentation and the module pipeline on one
+                // explicit host setting; an explicit false overrides ambient opt-ins.
+                .WithEnvironment("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT",
+                    EnableSensitiveData ? "true" : "false");
 
             foreach (var (marker, resource) in _ollamaModels)
             {

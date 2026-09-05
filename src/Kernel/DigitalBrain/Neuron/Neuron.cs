@@ -86,8 +86,77 @@ public abstract class Neuron :
         return Task.CompletedTask;
     }
 
-    protected Task<SignalDeliveryResult> SendAsync(NeuronId receiver, Signal signal)
-        => _sender.SendAsync(receiver, signal, _handling);
+    protected Task<SignalDeliveryResult> SendAsync(
+        NeuronId receiver,
+        Signal signal,
+        CancellationToken cancellationToken = default)
+        => _sender.SendAsync(receiver, signal, _handling, cancellationToken);
+
+    /// <summary>
+    /// Sends from this activation and reads the exact reply from the target's outgoing
+    /// journal. It does not re-enter the owner root or wait for a reply to enter this
+    /// busy serialized activation.
+    /// </summary>
+    protected async Task<TResponse> RequestAsync<TResponse>(
+        NeuronId receiver,
+        Signal<TResponse> request,
+        CancellationToken cancellationToken = default)
+        where TResponse : Signal
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        RequireSameOwner(receiver);
+        if (receiver == Id)
+        {
+            throw new InvalidOperationException("A neuron cannot request a reply from itself.");
+        }
+
+        using var requestPath = NeuronRequestPath.Enter(Id, receiver);
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        budget.CancelAfter(TimeSpan.Parse(NeuronCallTimeouts.LongRunning, System.Globalization.CultureInfo.InvariantCulture));
+        try
+        {
+            budget.Token.ThrowIfCancellationRequested();
+            var target = GrainFactory.GetGrain<INeuronQuery>(receiver.ToGrainId());
+            var cursor = await target.ReadJournal(JournalKind.Outgoing, long.MaxValue)
+                .WaitAsync(NeuronCallTimeouts.LookupBound, budget.Token)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            var result = await SendAsync(receiver, request, budget.Token)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            RequireRequestHandled(receiver, request, result.Outcome);
+
+            // ReplyAsync journals before its detached delivery back to the caller.
+            // Therefore a completed handler must already have its reply here; waiting
+            // on the caller's incoming journal would deadlock its current turn.
+            var replies = await target.ReadJournal(JournalKind.Outgoing, cursor.ResumeSequence)
+                .WaitAsync(NeuronCallTimeouts.LookupBound, budget.Token)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+            return NeuronResponse.Read<TResponse>(receiver, result.Delivery, cursor.ResumeSequence, replies);
+        }
+        catch (OperationCanceledException exception) when (
+            budget.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                $"Request '{request.GetType().Name}' to neuron '{receiver}' exceeded its deadline; the remote outcome may be unknown.",
+                exception);
+        }
+    }
+
+    private static void RequireRequestHandled(NeuronId receiver, Signal request, DeliveryOutcome outcome)
+    {
+        switch (outcome)
+        {
+            case DeliveryOutcome.Handled:
+                return;
+            case DeliveryOutcome.Refused:
+                throw new SignalDeliveryRefusedException(
+                    $"Neuron '{receiver}' refused request '{request.GetType().Name}'.");
+            case DeliveryOutcome.Unhandled:
+                throw new InvalidOperationException(
+                    $"Neuron '{receiver}' did not handle request '{request.GetType().Name}'.");
+            default:
+                throw new InvalidOperationException($"Neuron '{receiver}' returned unknown delivery outcome '{outcome}'.");
+        }
+    }
 
     protected Task<SignalDeliveryResult> PublishAsync<TNeuron, TSignal>(NeuronId to, TSignal signal)
         where TNeuron : INeuron, IHandle<TSignal>

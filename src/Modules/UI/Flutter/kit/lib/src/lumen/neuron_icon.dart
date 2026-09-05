@@ -36,6 +36,15 @@ final class NeuronIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (kind == NeuronIconKind.aspire) {
+      return SvgPicture.asset(
+        'assets/brands/aspire-icon-32.svg',
+        package: 'digitalbrain_ui_kit',
+        width: size,
+        height: size,
+        semanticsLabel: semanticLabel ?? 'Aspire',
+      );
+    }
     final brand = _marks[kind];
     if (brand != null) {
       return SvgPicture.string(
@@ -75,8 +84,5 @@ final class NeuronIcon extends StatelessWidget {
     NeuronIconKind.salesforce: '''
       <path fill="#14A8E0" d="M7 10a7 7 0 0 1 12-4 8 8 0 0 1 12 7A7 7 0 0 1 29 27H8A9 9 0 0 1 7 10Z"/>
       <path fill="none" stroke="white" stroke-width="1.2" stroke-linecap="round" d="M9 16h3m-3 0v3h3v3H9m7 0v-8h3m-3 4h2m5-2h3m-3 0v6h3"/>''',
-    NeuronIconKind.aspire: '''
-      <path fill="#8B6CE8" d="M4 22 14 3h7L11 22Zm11 0L24 6l7 16h-7l-2-5-3 5Z"/>
-      <path fill="#BDACF7" d="m4 26 3-5h23l3 5z"/>''',
   };
 }

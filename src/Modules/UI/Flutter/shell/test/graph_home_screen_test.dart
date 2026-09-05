@@ -49,6 +49,155 @@ Widget host(Widget child) => MaterialApp(
 );
 
 void main() {
+  BrainSnapshot aspireSnapshot({bool completed = false}) => BrainSnapshot(
+    rootId: 'chat:main',
+    observedAt: DateTime.utc(2026, 9, 5, 12),
+    nodes: [
+      const BrainNeuron(
+        id: 'assistant',
+        type: 'assistant',
+        name: 'assistant',
+        label: 'Ino',
+        module: 'AI',
+      ),
+      BrainNeuron(
+        id: 'aspire',
+        type: 'aspire',
+        name: 'digitalbrain-local',
+        label: 'Aspire',
+        module: 'Microsoft',
+        status: completed ? 'Idle' : 'Running',
+      ),
+    ],
+    activity: [
+      BrainActivity(
+        id: 'request-start',
+        neuronId: 'assistant',
+        direction: 'Outgoing',
+        sequence: 1,
+        signalType: 'AgentActivity',
+        timestamp: DateTime.utc(2026, 9, 5, 12),
+        operationId: 'request-1',
+        kind: 'delegation',
+        state: completed ? 'completed' : 'started',
+        name: 'Aspire',
+        targetId: 'aspire',
+      ),
+      if (completed)
+        BrainActivity(
+          id: 'tool-result',
+          neuronId: 'aspire',
+          direction: 'Outgoing',
+          sequence: 2,
+          signalType: 'AgentActivity',
+          timestamp: DateTime.utc(2026, 9, 5, 12),
+          operationId: 'tool-1',
+          kind: 'tool',
+          state: 'completed',
+          name: 'list_resources',
+          server: 'Aspire',
+          durationMs: 1234,
+          resultPreview: '{"content":[{"type":"text","text":"Ready"}]}',
+        ),
+    ],
+  );
+
+  testWidgets(
+    'first delegated request is inspectable before any synapse exists',
+    (tester) async {
+      await prepareShellSurface(tester);
+      await tester.pumpWidget(
+        host(
+          MediaQuery(
+            data: const MediaQueryData(disableAnimations: true),
+            child: GraphHomeScreen(
+              chatName: 'main',
+              turns: const [],
+              onReadBrain: () async => aspireSnapshot(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final graph = tester.widget<LumenBrainGraph>(
+        find.byType(LumenBrainGraph),
+      );
+      expect(graph.snapshot.synapses, isEmpty);
+      expect(find.text('MICROSOFT'), findsOneWidget);
+      expect(
+        tester
+            .widget<CircularProgressIndicator>(
+              find.byType(CircularProgressIndicator),
+            )
+            .value,
+        1,
+      );
+      await tester.tap(find.byKey(const ValueKey('delegation_request-1')));
+      await tester.pumpAndSettle();
+      expect(find.text('Agent request'), findsOneWidget);
+      expect(find.text('delegation · started'), findsOneWidget);
+      expect(find.byKey(const Key('unsubscribe_synapse')), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await drainShellTimers(tester);
+    },
+  );
+
+  testWidgets(
+    'MCP inspector renders generic evidence without provider-specific cards',
+    (tester) async {
+      await prepareShellSurface(tester);
+      await tester.pumpWidget(
+        host(
+          GraphHomeScreen(
+            chatName: 'main',
+            turns: const [],
+            onReadBrain: () async => aspireSnapshot(completed: true),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('neuron_aspire')));
+      await tester.pumpAndSettle();
+      final tool = find.byKey(const ValueKey('activity_tool-result'));
+      await tester.ensureVisible(tool);
+      await tester.tap(tool);
+      await tester.pumpAndSettle();
+      expect(find.text('tool · completed · 1.2 s'), findsOneWidget);
+      expect(
+        find.text('{"content":[{"type":"text","text":"Ready"}]}'),
+        findsOneWidget,
+      );
+      expect(find.text('MCP SERVER'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await drainShellTimers(tester);
+    },
+  );
+
+  testWidgets(
+    'stale graph suppresses working rings and temporary request traces',
+    (tester) async {
+      await prepareShellSurface(tester);
+      await tester.pumpWidget(
+        host(
+          LumenBrainGraph(
+            snapshot: aspireSnapshot(),
+            stale: true,
+            onNeuron: (_) {},
+            onSynapse: (_) {},
+            onActivity: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('delegation_request-1')), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
   testWidgets(
     'parallel, reverse and self synapses have distinct inspect controls',
     (tester) async {

@@ -1,5 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Diagnostics;
+using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Core;
 using DigitalBrain.Product.Interactions;
@@ -7,9 +9,9 @@ using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.AI;
 
-// LLM turn + optional MCP. Agent turns must not call IDigitalBrain: nested
-// BrainNeuron.Send deadlocks. In-silo callers use IAgentKernel on this grain.
-public abstract class Agent : Neuron, IAgent, IAgentKernel
+// LLM turn + optional discovered MCP tools. Delegation uses this neuron's send
+// path; it never re-enters IDigitalBrain's serialized owner root.
+public abstract partial class Agent : Neuron, IAgent, IAgentKernel
 {
     private readonly IChatClient _chatClient;
 
@@ -24,6 +26,32 @@ public abstract class Agent : Neuron, IAgent, IAgentKernel
     protected abstract string Instructions { get; }
 
     protected virtual IReadOnlyList<AITool> Tools => [];
+
+    protected virtual string DisplayName => Id.Type;
+
+    protected virtual IAgentMcpTools? McpTools => null;
+
+    protected virtual async ValueTask<IReadOnlyList<AITool>> PrepareToolsAsync(
+        AgentToolContext context, CancellationToken cancellationToken)
+    {
+        if (McpTools is not { } source)
+        {
+            return Tools;
+        }
+
+        if (context.Principal is not { } principal || !PrincipalPartition.OwnsInstance(principal, Id.Name))
+        {
+            throw new NeuronAuthorizationException("The MCP agent belongs to a different user or has no verified user context.");
+        }
+
+        var started = Stopwatch.GetTimestamp();
+        var discovered = await source.GetToolsAsync(Id, cancellationToken).ConfigureAwait(true);
+        await RecordOutgoingAsync(new AgentActivity(Guid.NewGuid(), "tool", "completed", "tools/list",
+            Server: source.Name, DurationMs: Stopwatch.GetElapsedTime(started).TotalMilliseconds,
+            Preview: McpEvidencePreview.Create(string.Join('\n', discovered.Select(tool => $"{tool.Name}: {tool.Description}")))))
+            .ConfigureAwait(true);
+        return [.. Tools, .. discovered];
+    }
 
     public async Task HandleAsync(AgentRequest signal, CancellationToken cancellationToken)
     {
@@ -57,31 +85,86 @@ public abstract class Agent : Neuron, IAgent, IAgentKernel
         ArgumentNullException.ThrowIfNull(messages);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var tools = Tools;
-        if (AgentTurnContext.Current?.AllowedToolNames is { } allowedToolNames)
+        using var activity = AgentTelemetry.Start(Id, DisplayName,
+            _chatClient.GetService<OpenTelemetryChatClient>()?.EnableSensitiveData is true);
+        using var requests = new TurnRequests(this, cancellationToken);
+        var context = new AgentToolContext(Id.Owner, VerifiedActor.Current?.PrincipalId, requests);
+        var operation = Guid.NewGuid();
+        var started = Stopwatch.GetTimestamp();
+        var state = "cancelled";
+        await RecordOutgoingAsync(new AgentActivity(operation, "agent", "started", DisplayName, Server: McpTools?.Name))
+            .ConfigureAwait(true);
+        try
         {
-            var allowed = new HashSet<string>(allowedToolNames, StringComparer.Ordinal);
-            // Apply the trusted continuation allowlist to every tool type, including
-            // server-side tools. OAuth consent must never enable an automatic write.
-            tools = [.. tools.Where(tool => allowed.Contains(tool.Name))];
-        }
-        var options = new ChatOptions { MaxOutputTokens = 4096 };
-        if (tools.Count > 0)
-        {
-            var turnScheduler = TaskScheduler.Current;
-            options.Tools = [.. tools.Select(tool =>
-                tool is AIFunction capability ? new TurnBoundFunction(capability, turnScheduler) : tool)];
-        }
-        IReadOnlyList<ChatMessage> request = string.IsNullOrWhiteSpace(Instructions)
-            ? messages
-            : [new ChatMessage(ChatRole.System, Instructions), .. messages];
+            IReadOnlyList<AITool> tools;
+            try
+            {
+                tools = await PrepareToolsAsync(context, cancellationToken).ConfigureAwait(true);
+            }
+            catch (Exception error)
+            {
+                state = error is OperationCanceledException ? "cancelled" : "failed";
+                throw;
+            }
+            if (AgentTurnContext.Current?.AllowedToolNames is { } allowedToolNames)
+            {
+                var allowed = new HashSet<string>(allowedToolNames, StringComparer.Ordinal);
+                // Apply the trusted continuation allowlist to every tool type, including
+                // server-side tools. OAuth consent must never enable an automatic write.
+                tools = [.. tools.Where(tool => allowed.Contains(tool.Name))];
+            }
+            var options = new ChatOptions { MaxOutputTokens = 4096 };
+            if (tools.Count > 0)
+            {
+                var turnScheduler = TaskScheduler.Current;
+                options.Tools = [.. tools.Select(tool =>
+                tool is AIFunction capability
+                    ? new TurnBoundFunction(ObserveMcpTool(capability), turnScheduler) : tool)];
+            }
+            IReadOnlyList<ChatMessage> request = string.IsNullOrWhiteSpace(Instructions)
+                ? messages
+                : [new ChatMessage(ChatRole.System, Instructions), .. messages];
 
-        await foreach (var update in _chatClient
-            .GetStreamingResponseAsync(request, options, cancellationToken).ConfigureAwait(true))
+            await using var stream = _chatClient.GetStreamingResponseAsync(request, options, cancellationToken)
+                .GetAsyncEnumerator(cancellationToken);
+            while (true)
+            {
+                bool hasNext;
+                try
+                {
+                    hasNext = await stream.MoveNextAsync().ConfigureAwait(true);
+                }
+                catch (Exception error)
+                {
+                    state = error is OperationCanceledException ? "cancelled" : "failed";
+                    throw;
+                }
+
+                if (!hasNext)
+                {
+                    state = "completed";
+                    break;
+                }
+
+                yield return stream.Current;
+                // An async stream consumer can change the ambient activity between
+                // chunks. Keep subsequent model/tool iterations under this agent.
+                if (activity is not null) { Activity.Current = activity; }
+            }
+        }
+        finally
         {
-            yield return update;
+            activity?.SetTag("db.agent.state", state);
+            if (state == "failed")
+            {
+                activity?.SetStatus(ActivityStatusCode.Error);
+                activity?.SetTag("error.type", "agent_error");
+            }
+            await RecordOutgoingAsync(new AgentActivity(operation, "agent", state, DisplayName,
+                Server: McpTools?.Name, DurationMs: Stopwatch.GetElapsedTime(started).TotalMilliseconds))
+                .ConfigureAwait(true);
         }
     }
 
-    public Task InvalidateMcpTools() => Task.CompletedTask;
+    public Task InvalidateMcpTools() => McpTools?.InvalidateAsync(Id) ?? Task.CompletedTask;
 }

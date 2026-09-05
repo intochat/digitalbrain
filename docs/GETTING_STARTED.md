@@ -39,6 +39,72 @@ when those neurons are actually observed.
 **Play an example** opens the labeled 3D simulations with pause/reset controls.
 These demonstrations do not change real subscriptions or submit model requests.
 
+## Ask Aspire about the running application
+
+Ask Ino from the bottom composer:
+
+> How many Aspire resources are healthy? List their names and distinguish health from process state.
+
+Or investigate a failure:
+
+> Ask Aspire to investigate recent kernel errors using the relevant traces and logs.
+
+Ino delegates an ordinary `AgentRequest` to the Microsoft module's `IAspire` neuron.
+That agent discovers the CLI's MCP tools and uses their published schemas. The
+default local AppHost binds it to this DigitalBrain application under the instance
+`<current-principal>.digitalbrain-local`. Selecting the Aspire icon shows actual
+delegation/tool activity, timings, and bounded screened evidence. A dotted active
+request is temporary; a handled request creates the normal Learned connection.
+No Bound subscription or background monitor is created by asking a question.
+
+The connection supports resources, logs and traces. It discovers running AppHosts
+before selecting the explicitly configured project; MCP sessions are isolated by
+agent identity. Stopping the AppHost makes the connection unavailable; the next
+request reconnects after it is running. Failed operations are not automatically replayed.
+
+An admitted C# behavior can use the same inherited contract:
+
+```csharp
+var aspire = Brain.Get<IAspire>("<current-principal>.digitalbrain-local");
+var reply = await aspire.RequestAsync(
+    new AgentRequest("How many resources are healthy? Use current evidence."),
+    CancellationToken);
+return reply.Text;
+```
+
+Replace the placeholder with the actual principal prefix shown in the neuron's
+identity. Behaviors admitted from chat retain that principal's execution context.
+Microsoft and AI contracts are already referenced by the script compiler. Use
+ordinary C# conditions or existing signals for custom behavior; there is no
+separate Aspire status DTO or per-tool signal.
+
+## Inspect AI conversations in Aspire
+
+The local Development AppHost enables AI content recording through
+`ai.EnableSensitiveData`. The AI client reads the projected configuration key
+`DigitalBrain:AI:Telemetry:EnableSensitiveData`; its default outside that explicit
+opt-in is false. The hosting projection also sets
+`OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT` consistently.
+
+Open **Traces**, select a recent chat request, and open the GenAI view. The trace
+contains `invoke_agent Ino`, delegated `invoke_agent Aspire · DigitalBrain`,
+`chat <model>` calls, and `execute_tool <name>` calls. Agent spans carry
+`gen_ai.conversation.id`, `gen_ai.agent.id`, and `db.command.id`. Model spans carry
+the model, token counts, and—when enabled—input/output content. Tool spans capture
+arguments and screened results under the same opt-in. Per-model metrics use
+`DigitalBrain.AI.<model marker>` instrumentation.
+
+Changing the setting requires restarting the processes; content omitted from an
+older trace cannot be reconstructed by enabling it later. To inspect from the CLI,
+use the actual telemetry service name `DigitalBrain.Silo`, or query across resources:
+
+```powershell
+aspire otel spans --apphost src/Aspire/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj --search ask_aspire --limit 10 --format Json --non-interactive
+```
+
+See [Microsoft Learn's observability configuration](https://learn.microsoft.com/en-us/agent-framework/agents/observability)
+and [Aspire's GenAI content configuration](https://aspire.dev/dashboard/explore/#configure-message-content-recording).
+
 ## Review your code now
 
 In Flutter, ask:

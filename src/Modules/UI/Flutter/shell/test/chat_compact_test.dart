@@ -10,6 +10,122 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support/shell_test_support.dart';
 
 void main() {
+  testWidgets('an older send failure cannot hide a newer durable reply', (
+    tester,
+  ) async {
+    await prepareShellSurface(tester);
+    final streams = <StreamController<ChatDelta>>[];
+    var turns = <ChatTurnEvent>[];
+    ChatTurnEvent observed(
+      int sequence,
+      bool fromUser,
+      String text,
+      String command,
+    ) => ChatTurnEvent.fromJson({
+      'sequence': sequence,
+      'fromUser': fromUser,
+      'text': text,
+      'commandId': command,
+      'signal': fromUser ? 'UserMessaged' : 'Responded',
+      'neuronId': 'chat:main',
+      'caller': 'chat:main',
+      'correlationId': command,
+      'timestamp': DateTime.now().toUtc().toIso8601String(),
+    });
+    Future<void> show() => tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.bottomCenter,
+            child: SizedBox(
+              width: 700,
+              child: BrainChatScreen(
+                chatName: 'main',
+                turns: turns,
+                presentation: BrainChatPresentation.compact,
+                onStream: (_) {
+                  final stream = StreamController<ChatDelta>();
+                  streams.add(stream);
+                  addTearDown(stream.close);
+                  return stream.stream;
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    Future<void> send(String text) async {
+      await tester.enterText(find.byType(EditableText), text);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+    }
+
+    await show();
+    await tester.pumpAndSettle();
+    await send('First request');
+    streams[0].addError(
+      StateError('First connection failed before acceptance'),
+    );
+    await tester.pump();
+    expect(
+      tester.widget<KitMarkdown>(find.byType(KitMarkdown)).text,
+      contains('First connection failed'),
+    );
+
+    await send('How many Aspire resources are healthy?');
+    streams[1].add(
+      const ChatDelta.accepted(commandId: 'status', turnId: 'status-turn'),
+    );
+    await tester.pump();
+    turns = [
+      observed(1, true, 'How many Aspire resources are healthy?', 'status'),
+      observed(2, false, 'Six resources are healthy.', 'status'),
+    ];
+    await show();
+    await tester.pump();
+    expect(
+      tester.widget<KitMarkdown>(find.byType(KitMarkdown)).text,
+      'Six resources are healthy.',
+    );
+
+    await send('Investigate the remaining resource');
+    streams[2].add(
+      const ChatDelta.accepted(
+        commandId: 'investigate',
+        turnId: 'investigate-turn',
+      ),
+    );
+    streams[2].add(
+      ChatDelta.fromJson({
+        'role': 'assistant',
+        'contents': [
+          {r'$type': 'text', 'text': 'Checking the recent logs…'},
+        ],
+      }),
+    );
+    await tester.pump();
+    expect(find.text('Ino is working on it'), findsOneWidget);
+    expect(
+      tester.widget<KitMarkdown>(find.byType(KitMarkdown)).text,
+      'Checking the recent logs…',
+    );
+    turns = [
+      ...turns,
+      observed(3, true, 'Investigate the remaining resource', 'investigate'),
+      observed(4, false, 'The investigation is complete.', 'investigate'),
+    ];
+    await show();
+    await tester.pump();
+    expect(
+      tester.widget<KitMarkdown>(find.byType(KitMarkdown)).text,
+      'The investigation is complete.',
+    );
+    await tester.pumpWidget(const SizedBox());
+    await drainShellTimers(tester);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('compact history overlay shares draft and active request', (
     tester,
   ) async {

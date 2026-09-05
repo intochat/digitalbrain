@@ -101,6 +101,28 @@ public sealed class CSharpStartupScriptRunnerTests
     }
 
     [Fact]
+    public async Task Aspire_script_uses_inherited_agent_request_with_a_principal_scoped_connection()
+    {
+        var script = StartupScript.FromSource("aspire-status", """
+            var principal = new PrincipalId(Guid.Parse("0000dead-0000-0000-0000-000000000001"));
+            var instance = PrincipalPartition.InstanceName(principal, "digitalbrain-local");
+            Func<Task> inspect = async () =>
+            {
+                var aspire = Brain.Get<IAspire>(instance);
+                AgentReply reply = await aspire.RequestAsync(
+                    new AgentRequest("How many Aspire resources are healthy?"), CancellationToken);
+            };
+            return typeof(IAspire).Name + "|"
+                + typeof(IHandle<AgentRequest>).IsAssignableFrom(typeof(IAspire)) + "|" + instance;
+            """);
+
+        var result = await runner.RunAsync(script, new FakeDigitalBrain("alice"), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.Summary + string.Join(Environment.NewLine, result.Diagnostics));
+        Assert.Equal("IAspire|True|0000dead000000000000000000000001.digitalbrain-local", result.Summary);
+    }
+
+    [Fact]
     public async Task Compilation_errors_are_returned_as_diagnostics()
     {
         var script = StartupScript.FromSource("start.cs", "this is not C#;");

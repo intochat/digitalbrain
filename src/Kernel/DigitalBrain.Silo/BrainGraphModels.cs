@@ -46,7 +46,17 @@ internal sealed record BrainGraphActivity(
     string CallerId,
     string CorrelationId,
     string Summary,
-    IReadOnlyDictionary<string, string>? PayloadPreview);
+    IReadOnlyDictionary<string, string>? PayloadPreview,
+    Guid? OperationId = null,
+    string? Kind = null,
+    string? State = null,
+    string? Name = null,
+    string? TargetId = null,
+    string? Server = null,
+    double? DurationMs = null,
+    string? ResultPreview = null,
+    bool IsError = false,
+    bool Truncated = false);
 
 internal sealed record BrainGraphSubscriptionRequest(
     string SourceId,

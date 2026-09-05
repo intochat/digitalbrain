@@ -47,14 +47,24 @@ internal sealed class SignalSender
     internal async Task<SignalDeliveryResult> SendAsync(
         NeuronId receiver,
         Signal signal,
-        SignalDelivery? cause)
+        SignalDelivery? cause,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(signal);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var delivery = await RecordOutgoingAsync(signal, cause)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        var outcome = await DeliverAsync(receiver, delivery, DeliveryMode.Awaited)
+        cancellationToken.ThrowIfCancellationRequested();
+        // Bound the remote await here, inside the state-owning sender. A timeout around
+        // SendAsync itself would leave this continuation alive to reinforce a route
+        // after the caller's serialized turn had already unwound.
+        var handling = DeliverAsync(receiver, delivery, DeliveryMode.Awaited, cancellationToken);
+        // Local self-send shares our mutable activation state, so it must unwind
+        // cooperatively before this turn can end. Only remote work can be detached.
+        var outcome = await (receiver == _source ? handling : handling.WaitAsync(cancellationToken))
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (outcome == DeliveryOutcome.Handled)
         {
@@ -107,7 +117,10 @@ internal sealed class SignalSender
         var delivery = await RecordOutgoingAsync(response, handling, handling.CorrelationId)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        _ = ObserveDetachedAsync(handling.Caller, delivery);
+        using (NeuronRequestPath.Clear())
+        {
+            _ = ObserveDetachedAsync(handling.Caller, delivery);
+        }
     }
 
     internal async Task<SignalDelivery> RecordOutgoingAsync(
@@ -138,13 +151,14 @@ internal sealed class SignalSender
     private Task<DeliveryOutcome> DeliverAsync(
         NeuronId receiver,
         SignalDelivery delivery,
-        DeliveryMode mode)
+        DeliveryMode mode,
+        CancellationToken cancellationToken = default)
         // Same-activation Deliver is in-process: a serialized neuron cannot await its own
         // grain proxy. Incoming/outgoing call filters therefore do not see this path;
         // journal and synapse population stay here, not in a filter.
         => mode == DeliveryMode.Awaited && receiver == _source
-            ? _deliverLocally(delivery, CancellationToken.None)
-            : _grains.GetGrain<INeuronGrain>(receiver.ToGrainId()).Deliver(delivery);
+            ? _deliverLocally(delivery, cancellationToken)
+            : _grains.GetGrain<INeuronGrain>(receiver.ToGrainId()).Deliver(delivery, cancellationToken);
 
     private async Task ObserveDetachedAsync(NeuronId receiver, SignalDelivery delivery)
     {

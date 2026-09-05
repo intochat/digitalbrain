@@ -5,6 +5,7 @@ using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Synapses;
+using DigitalBrain.AI;
 using DigitalBrain.Chat;
 using DigitalBrain.Core;
 
@@ -77,6 +78,17 @@ internal sealed class BrainGraphProjection(IBrainGraphSource source)
                     }
                 }
             }
+
+            // Only the source's own outgoing delegation observation exposes its
+            // participant before handling completes and reinforces a Learned edge.
+            foreach (var delivery in read.Outgoing.Delta)
+            {
+                if (VisibleDelivery(delivery, privateNeuron, actor.PrincipalId)
+                    && delivery.Signal is AgentActivity { Kind: "delegation", Target: { } target })
+                {
+                    Discover(target);
+                }
+            }
         }
 
         var activity = new List<BrainGraphActivity>();
@@ -91,12 +103,11 @@ internal sealed class BrainGraphProjection(IBrainGraphSource source)
             activity.AddRange(neuronActivity);
             var metadata = BrainGraphMetadata.For(neuron.Type);
             var localName = PrincipalPartition.TryParse(neuron.Name, out _, out var local) ? local : neuron.Name;
-            var lastStatus = read.Outgoing.Delta
-                .Where(delivery => VisibleDelivery(delivery, privateNeuron, actor.PrincipalId))
-                .Select(delivery => delivery.Signal).OfType<TurnLifecycle>().LastOrDefault()?.Status.ToString();
+            var lastStatus = Status(read.Outgoing.Delta
+                .Where(delivery => VisibleDelivery(delivery, privateNeuron, actor.PrincipalId)));
             nodes.Add(new(InstanceId(neuron), neuron.Type, localName, metadata.Label, metadata.Module,
                 participants.Contains(neuron) ? "participant" : "observed",
-                lastStatus ?? "Idle", metadata.HandledSignals,
+                lastStatus, metadata.HandledSignals,
                 read.Incoming.ResumeSequence, read.Outgoing.ResumeSequence,
                 neuronActivity.LastOrDefault()?.Timestamp));
 
@@ -114,6 +125,21 @@ internal sealed class BrainGraphProjection(IBrainGraphSource source)
                     edge.Kind == SynapseKind.Bound
                         && PrincipalPartition.OwnsInstance(actor.PrincipalId, edge.Target.Name)
                         && BrainGraphMetadata.IsSubscriptionSignal(edge.SignalType)));
+            }
+        }
+
+        // A target can be observed before its first handler journal entry. This
+        // changes only its observed status, never the authoritative synapse list.
+        var activeTargets = activity.Where(item => item.Kind == "delegation" && item.OperationId is not null)
+            .GroupBy(item => (item.NeuronId, item.OperationId))
+            .Select(group => group.OrderBy(item => item.Timestamp).ThenBy(item => item.Sequence).Last())
+            .Where(item => item.State == "started" && item.TargetId is not null)
+            .Select(item => item.TargetId).ToHashSet(StringComparer.Ordinal);
+        for (var index = 0; index < nodes.Count; index++)
+        {
+            if (nodes[index].Status == "Idle" && activeTargets.Contains(nodes[index].Id))
+            {
+                nodes[index] = nodes[index] with { Status = "Running" };
             }
         }
 
@@ -220,10 +246,18 @@ internal sealed class BrainGraphProjection(IBrainGraphSource source)
             var sequence = journal.ResumeSequence - journal.Delta.Count + index + 1;
             var type = delivery.Signal.GetType().Name;
             var (summary, preview) = Summarize(delivery.Signal);
+            var operation = direction == JournalKind.Outgoing ? delivery.Signal as AgentActivity : null;
+            var visibleTarget = operation?.Target is { } target && CanSee(target, principal)
+                ? InstanceId(target) : null;
             yield return new($"{InstanceId(neuron)}:{direction}:{sequence}", InstanceId(neuron), direction.ToString(),
                 sequence, type, delivery.Timestamp,
                 VisibleCaller(delivery.Caller, principal) ? InstanceId(delivery.Caller) : "",
-                delivery.CorrelationId.ToString(), summary, preview);
+                delivery.CorrelationId.ToString(), summary, preview,
+                operation?.OperationId, operation?.Kind, operation?.State, operation?.Name,
+                visibleTarget, operation?.Server, operation?.DurationMs,
+                operation?.Kind == "tool" ? BoundPreview(operation.Preview) : null,
+                operation?.IsError == true,
+                operation?.Truncated == true || operation?.Kind == "tool" && operation.Preview?.Length > 4096);
         }
     }
 
@@ -232,6 +266,11 @@ internal sealed class BrainGraphProjection(IBrainGraphSource source)
     internal static (string Summary, IReadOnlyDictionary<string, string>? Preview) Summarize(Signal signal)
         => signal switch
         {
+            AgentActivity activity => ($"{activity.Kind}: {activity.Name} · {activity.State}", null),
+            AgentRequest request => ("Agent request received", new Dictionary<string, string>
+                { ["characters"] = request.Text.Length.ToString(CultureInfo.InvariantCulture) }),
+            AgentReply reply => ("Agent reply recorded", new Dictionary<string, string>
+                { ["characters"] = reply.Text.Length.ToString(CultureInfo.InvariantCulture) }),
             TurnLifecycle turn => ($"Turn {turn.Status.ToString().ToLowerInvariant()}",
                 new Dictionary<string, string> { ["status"] = turn.Status.ToString(), ["turnId"] = turn.TurnId.ToString() }),
             UserMessaged message => ("Message received", new Dictionary<string, string>
@@ -244,6 +283,35 @@ internal sealed class BrainGraphProjection(IBrainGraphSource source)
                 { ["signalType"] = subscription.SignalType }),
             _ => ($"{signal.GetType().Name} observed · payload omitted", null),
         };
+
+    private static string Status(IEnumerable<SignalDelivery> deliveries)
+    {
+        var outgoing = deliveries.OrderBy(delivery => delivery.Timestamp).ToArray();
+        var operations = outgoing.Select(delivery => delivery.Signal).OfType<AgentActivity>().ToArray();
+        var agentOperations = operations.Where(operation => operation.Kind == "agent").ToArray();
+        var statusOperations = agentOperations.Length > 0 ? agentOperations : operations;
+        // Nested tools completing must not mark an agent idle while its outer turn
+        // is still running. Every operation has its own start/terminal identity.
+        if (statusOperations.GroupBy(operation => operation.OperationId).Any(group => group.Last().State == "started"))
+        {
+            return "Running";
+        }
+        Signal? lastStatus = agentOperations.LastOrDefault() ??
+            outgoing.LastOrDefault(delivery => delivery.Signal is TurnLifecycle or AgentActivity)?.Signal;
+        return lastStatus switch
+        {
+            TurnLifecycle turn => turn.Status.ToString(),
+            AgentActivity { State: "failed" } => "Failed",
+            AgentActivity { State: "cancelled" } => "Cancelled",
+            _ => "Idle",
+        };
+    }
+
+    // Only the shared MCP boundary supplies this screened result. A second bound
+    // protects graph response size; arbitrary AgentRequest/Reply bodies stay out.
+    private static string? BoundPreview(string? preview)
+        => preview is null or { Length: 0 } ? null
+            : preview.Length <= 4096 ? preview : preview[..4096] + "\n[Graph preview truncated]";
 
     private static string SynapseId(Synapse edge)
         => $"{InstanceId(edge.Source)}|{edge.SignalType}|{InstanceId(edge.Target)}";

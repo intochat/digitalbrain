@@ -6,6 +6,7 @@ using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Synapses;
+using DigitalBrain.AI;
 using DigitalBrain.Chat;
 using DigitalBrain.Core;
 using DigitalBrain.Kernel;
@@ -161,6 +162,97 @@ public sealed class BrainGraphProjectionTests
         Assert.Equal(BrainGraphProjection.MaxNodes, source.Queried.Count);
         Assert.All(snapshot.Synapses, edge => Assert.Contains(snapshot.Nodes, node => node.Id == edge.TargetId));
     }
+
+    [Fact]
+    public async Task In_flight_delegation_discovers_private_target_without_fabricating_synapse()
+    {
+        var source = new TestSource();
+        var assistant = new NeuronId("assistant", Owner, "assistant");
+        var aspire = new NeuronId("aspire", Owner, PrincipalScoped.InstanceName(Actor.PrincipalId, "digitalbrain-local"));
+        var operation = Guid.NewGuid();
+        source.Set(assistant, [], outgoing: new(1,
+            [Observed(new AgentActivity(operation, "delegation", "started", "Aspire", aspire), assistant)], null));
+
+        var snapshot = await new BrainGraphProjection(source).ReadAsync("main", Actor, TestContext.Current.CancellationToken);
+
+        var node = Assert.Single(snapshot.Nodes, node => node.Id == BrainGraphProjection.InstanceId(aspire));
+        Assert.Equal("Running", node.Status);
+        Assert.Empty(snapshot.Synapses);
+        var observed = Assert.Single(snapshot.Activity);
+        Assert.Equal(operation, observed.OperationId);
+        Assert.Equal("started", observed.State);
+        Assert.Equal(node.Id, observed.TargetId);
+    }
+
+    [Fact]
+    public async Task Delegation_observations_cannot_reveal_another_principal_or_owner()
+    {
+        var source = new TestSource();
+        var assistant = new NeuronId("assistant", Owner, "assistant");
+        var foreignPrincipal = new NeuronId("aspire", Owner, PrincipalScoped.InstanceName(PrincipalId.New(), "secret"));
+        var foreignOwner = new NeuronId("aspire", new OwnerId("different"), "private");
+        source.Set(assistant, [], outgoing: new(3,
+            [Observed(new AgentActivity(Guid.NewGuid(), "delegation", "started", "Aspire", foreignPrincipal), assistant),
+             Observed(new AgentActivity(Guid.NewGuid(), "delegation", "started", "Aspire", foreignOwner), assistant),
+             SignalDelivery.Create(new AgentActivity(Guid.NewGuid(), "tool", "completed", "private_tool", Preview: "private output"),
+                assistant, 3, TimeProvider.System, principal: PrincipalId.New())], null));
+
+        var snapshot = await new BrainGraphProjection(source).ReadAsync("main", Actor, TestContext.Current.CancellationToken);
+
+        Assert.DoesNotContain(foreignPrincipal, source.Queried);
+        Assert.DoesNotContain(foreignOwner, source.Queried);
+        Assert.All(snapshot.Activity, item => Assert.Null(item.TargetId));
+        Assert.DoesNotContain("private output", JsonSerializer.Serialize(snapshot));
+    }
+
+    [Fact]
+    public async Task Tool_completion_preserves_running_agent_and_terminal_agent_state_wins()
+    {
+        var source = new TestSource();
+        var agentOperation = Guid.NewGuid();
+        var toolOperation = Guid.NewGuid();
+        var entries = new List<SignalDelivery>
+        {
+            Observed(new AgentActivity(agentOperation, "agent", "started", "Ino"), Chat),
+            Observed(new AgentActivity(toolOperation, "tool", "started", "list_resources"), Chat),
+            Observed(new AgentActivity(toolOperation, "tool", "completed", "list_resources", DurationMs: 40), Chat),
+        };
+        source.Set(Chat, [], outgoing: new(3, entries, null));
+        var projection = new BrainGraphProjection(source);
+        var running = await projection.ReadAsync("main", Actor, TestContext.Current.CancellationToken);
+        Assert.Equal("Running", running.Nodes.Single(node => node.Id == BrainGraphProjection.InstanceId(Chat)).Status);
+
+        entries.Add(Observed(new AgentActivity(Guid.NewGuid(), "tool", "started", "get_logs"), Chat));
+        entries.Add(Observed(new AgentActivity(agentOperation, "agent", "failed", "Ino"), Chat));
+        source.Set(Chat, [], outgoing: new(5, entries, null));
+        var failed = await projection.ReadAsync("main", Actor, TestContext.Current.CancellationToken);
+        Assert.Equal("Failed", failed.Nodes.Single(node => node.Id == BrainGraphProjection.InstanceId(Chat)).Status);
+    }
+
+    [Fact]
+    public async Task Generic_tool_result_is_bounded_and_raw_request_reply_bodies_stay_omitted()
+    {
+        var source = new TestSource();
+        const string secret = "unfiltered private prompt";
+        source.Set(Chat, [], outgoing: new(4,
+            [Observed(new AgentActivity(Guid.NewGuid(), "tool", "completed", "list_resources", Server: "Aspire",
+                DurationMs: 23.5, Preview: new string('a', 5000)), Chat),
+             Observed(new AgentActivity(Guid.NewGuid(), "agent", "completed", "Ino", Preview: secret), Chat),
+             Observed(new AgentRequest(secret), Chat),
+             Observed(new AgentReply(secret), Chat)], null));
+
+        var snapshot = await new BrainGraphProjection(source).ReadAsync("main", Actor, TestContext.Current.CancellationToken);
+
+        var tool = Assert.Single(snapshot.Activity, item => item.Kind == "tool");
+        Assert.Equal("Aspire", tool.Server);
+        Assert.Equal(23.5, tool.DurationMs);
+        Assert.EndsWith("[Graph preview truncated]", tool.ResultPreview);
+        Assert.True(tool.ResultPreview!.Length < 4200);
+        Assert.DoesNotContain(secret, JsonSerializer.Serialize(snapshot));
+    }
+
+    private static SignalDelivery Observed(Signal signal, NeuronId caller)
+        => SignalDelivery.Create(signal, caller, 1, TimeProvider.System, principal: Actor.PrincipalId);
 
     private static NeuronId ChatNamed(string name)
         => NeuronId.For<IChat>(Owner, PrincipalScoped.InstanceName(Actor.PrincipalId, name));

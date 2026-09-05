@@ -1,5 +1,58 @@
 # Continuation — keep cleaning on subscribe/unsubscribe
 
+## MCP-backed IAspire and GenAI telemetry — 2026-09-05
+
+Implemented the approved Microsoft-module specialist. `IAspire : IAgent` inherits
+AgentRequest/AgentReply; `Aspire : Agent` discovers native Aspire MCP functions.
+There are no Aspire status signals, resource DTOs or per-tool method wrappers.
+Ino gets the generic generated `ask_aspire` delegation capability. The source
+neuron sends and reads the target's exact-causation reply without reentering the
+serialized owner root. Principal scope, cancellation, restricted continuations,
+and source-owned Learned/Bound semantics are preserved.
+
+The local connection binds the configured AppHost using `list_apphosts` before
+`select_apphost`; the CLI initializes its discovery lazily, so immediate selection
+was the cause of the initial 2.9-second failure. Sessions and tool catalogs are
+isolated per agent identity. Discovery refresh, transport failure, cancellation,
+native errors and truncation have generic SDK tests. Read-only resources/logs/
+traces are permitted; no background monitor, restart or deploy behavior is added.
+
+Live `list_resources` returned about 64 KB and has no filtering arguments. The
+initial 24 KB budget prevented the user's healthy-resource count. Response and
+whole-result classifier bounds are now 128 KiB. Generic redaction preserves JSON
+embedded after MCP prose and marks modified envelopes. The graph uses bounded,
+screened previews, generic agent/tool lifecycle signals, first-request target
+discovery, clickable transient activity and actual Learned edges. Aspire uses
+the official unchanged SVG in the UI kit.
+
+Also fixed compact chat: an old failed pre-acceptance stream could cover a later
+durable reply. Timestamp selection plus independent active-stream feedback fixes
+this without changing exact-command recovery. The reported question did have a
+persisted 212-character truncation explanation; the display defect was reproduced
+separately in a widget regression.
+
+GenAI content had been hardcoded off in AppHost and AIClients despite the exposed
+setting. AIClients now honors DigitalBrain:AI:Telemetry:EnableSensitiveData, then
+the standard OTEL content flag, default false. Local Development run mode opts in;
+publish defaults off. AgentTelemetry creates `invoke_agent Ino` / `invoke_agent
+Aspire · DigitalBrain` with agent/conversation/command identity. MEAI 10.9 also
+requires non-exported `__EnableSensitiveData__` on its nearest invoke_agent parent
+for tool arguments/results. Model/content capture remains in the MEAI pipeline,
+without duplicate payload logging on agent spans. Live exported traces verified
+both model messages and tool results. Old traces cannot gain omitted content later.
+
+Validation: clean host build; 33 focused Simulation, 19 substrate, 8 scripting,
+2 telemetry hosting, and 13 backend graph/HTTP/chat-stream tests passed. Flutter
+graph/core/kit: 85 tests; compact/surface/workspace: 18 tests; affected analysis
+clean. Run HTTP E2E with the main AppHost stopped (both bind 5080). After an
+overlapping run was cancelled, all 13 checks passed with the fixture alone.
+
+Implementation/design evidence: docs/plans/2026-09-05-microsoft-aspire-neuron.md.
+User instructions and telemetry configuration: docs/GETTING_STARTED.md. The main
+AppHost and native Flutter app are running with the final implementation. No skills
+or plugins were used for this implementation; CLI and Microsoft documentation were
+used for investigation. There are no commits from this work.
+
 ## Approved Lumen + Forui implementation — 2026-09-05
 
 The user approved Lumen and Forui. Flutter now opens **My brain**, with warm light

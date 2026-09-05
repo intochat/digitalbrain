@@ -15,6 +15,23 @@ final class BrainSnapshot {
   final List<BrainNeuron> nodes;
   final List<BrainSynapse> synapses;
   final List<BrainActivity> activity;
+
+  /// Temporary observed requests, independent of persisted subscriptions.
+  List<BrainActivity> get activeDelegations {
+    final latest = <String, BrainActivity>{};
+    for (final event in activity) {
+      if (event.kind != 'delegation' || event.operationId == null) continue;
+      final key = '${event.neuronId}:${event.operationId}';
+      final previous = latest[key];
+      if (previous == null || event.sequence > previous.sequence) {
+        latest[key] = event;
+      }
+    }
+    return latest.values
+        .where((event) => event.state == 'started' && event.targetId != null)
+        .toList(growable: false);
+  }
+
   factory BrainSnapshot.fromJson(Map<String, dynamic> json) => BrainSnapshot(
     rootId: json['rootId'] as String,
     observedAt: DateTime.parse(json['observedAt'] as String),
@@ -109,10 +126,23 @@ final class BrainActivity {
     this.correlationId,
     this.summary = '',
     this.payloadPreview,
+    this.operationId,
+    this.kind,
+    this.state,
+    this.name,
+    this.targetId,
+    this.server,
+    this.durationMs,
+    this.resultPreview,
+    this.isError = false,
+    this.truncated = false,
   });
   final String id, neuronId, direction, signalType, summary;
   final String? callerId, correlationId;
   final Object? payloadPreview;
+  final String? operationId, kind, state, name, targetId, server, resultPreview;
+  final double? durationMs;
+  final bool isError, truncated;
   final int sequence;
   final DateTime timestamp;
   factory BrainActivity.fromJson(Map<String, dynamic> j) => BrainActivity(
@@ -126,6 +156,16 @@ final class BrainActivity {
     correlationId: j['correlationId'] as String?,
     summary: j['summary'] as String? ?? '',
     payloadPreview: j['payloadPreview'],
+    operationId: j['operationId'] as String?,
+    kind: j['kind'] as String?,
+    state: j['state'] as String?,
+    name: j['name'] as String?,
+    targetId: j['targetId'] as String?,
+    server: j['server'] as String?,
+    durationMs: (j['durationMs'] as num?)?.toDouble(),
+    resultPreview: j['resultPreview'] as String?,
+    isError: j['isError'] == true,
+    truncated: j['truncated'] == true,
   );
 }
 

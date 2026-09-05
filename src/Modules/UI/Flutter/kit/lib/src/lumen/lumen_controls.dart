@@ -143,7 +143,7 @@ final class LumenActionButton extends StatelessWidget {
     variant: primary ? FButtonVariant.primary : FButtonVariant.outline,
     mainAxisSize: MainAxisSize.min,
     prefix: icon,
-    child: Text(label),
+    child: Flexible(child: Text(label, textAlign: TextAlign.center)),
   );
 }
 

@@ -10,6 +10,7 @@ final class LumenBrainGraph extends StatefulWidget {
     required this.snapshot,
     required this.onNeuron,
     required this.onSynapse,
+    this.onActivity,
     this.selectedId,
     this.stale = false,
     this.activeNodes = const {},
@@ -18,6 +19,7 @@ final class LumenBrainGraph extends StatefulWidget {
   final BrainSnapshot snapshot;
   final ValueChanged<BrainNeuron> onNeuron;
   final ValueChanged<BrainSynapse> onSynapse;
+  final ValueChanged<BrainActivity>? onActivity;
   final String? selectedId;
   final bool stale;
   final Set<String> activeNodes, activeEdges;
@@ -79,6 +81,15 @@ final class _LumenBrainGraphState extends State<LumenBrainGraph> {
     }
     final size = Size(columns * 296.0 + 34, math.max(260, y));
     final routes = _synapseRoutes(positions, widget.snapshot.synapses);
+    final delegations = widget.stale
+        ? <BrainActivity>[]
+        : widget.snapshot.activeDelegations
+              .where(
+                (event) =>
+                    positions.containsKey(event.neuronId) &&
+                    positions.containsKey(event.targetId),
+              )
+              .toList();
     return LayoutBuilder(
       builder: (context, constraints) => Stack(
         children: [
@@ -132,6 +143,36 @@ final class _LumenBrainGraphState extends State<LumenBrainGraph> {
                             ),
                           ),
                         ),
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: CustomPaint(
+                              painter: _DelegationPainter(
+                                positions,
+                                delegations,
+                              ),
+                            ),
+                          ),
+                        ),
+                        for (final event in delegations)
+                          Positioned(
+                            left:
+                                (positions[event.neuronId]!.dx +
+                                        positions[event.targetId]!.dx) /
+                                    2 -
+                                70,
+                            top:
+                                (positions[event.neuronId]!.dy +
+                                        positions[event.targetId]!.dy) /
+                                    2 -
+                                50,
+                            child: LumenActionButton(
+                              key: ValueKey('delegation_${event.operationId}'),
+                              label: 'Request running',
+                              onPressed: widget.onActivity == null
+                                  ? null
+                                  : () => widget.onActivity!(event),
+                            ),
+                          ),
                         for (final route in routes)
                           Positioned(
                             left: route.controlPosition.dx - 22,
@@ -159,10 +200,12 @@ final class _LumenBrainGraphState extends State<LumenBrainGraph> {
                               node: node,
                               selected: widget.selectedId == node.id,
                               active:
-                                  widget.activeNodes.contains(node.id) ||
-                                  (brainNeuronIcon(node) ==
-                                          NeuronIconKind.assistant &&
-                                      assistantWorking),
+                                  !widget.stale &&
+                                  (node.status == 'Running' ||
+                                      widget.activeNodes.contains(node.id) ||
+                                      (brainNeuronIcon(node) ==
+                                              NeuronIconKind.assistant &&
+                                          assistantWorking)),
                               stale: widget.stale,
                               onTap: () => widget.onNeuron(node),
                             ),
@@ -229,6 +272,7 @@ final class _NeuronTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final assistant = brainNeuronIcon(node) == NeuronIconKind.assistant;
+    final failed = node.status == 'Failed';
     return Semantics(
       button: true,
       label:
@@ -242,7 +286,9 @@ final class _NeuronTile extends StatelessWidget {
           child: Column(
             children: [
               AnimatedContainer(
-                duration: const Duration(milliseconds: 250),
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 250),
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
@@ -250,7 +296,9 @@ final class _NeuronTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(19),
                   border: Border.all(
                     width: selected || active ? 2 : 1,
-                    color: selected || active
+                    color: failed && !stale
+                        ? LumenPalette.error
+                        : selected || active
                         ? const Color(0xff397b63)
                         : const Color(0xffdce3d9),
                   ),
@@ -264,19 +312,36 @@ final class _NeuronTile extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: Center(
-                  child: assistant
-                      ? InoPresence(
-                          size: 58,
-                          state: stale
-                              ? InoPresenceState.disconnected
-                              : active || node.status == 'Running'
-                              ? InoPresenceState.working
-                              : node.status == 'Failed'
-                              ? InoPresenceState.attention
-                              : InoPresenceState.idle,
-                        )
-                      : NeuronIcon(kind: brainNeuronIcon(node), size: 32),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    if (!assistant && node.status == 'Running' && !stale)
+                      Positioned.fill(
+                        child: Padding(
+                          padding: const EdgeInsets.all(3),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.5,
+                            value: MediaQuery.disableAnimationsOf(context)
+                                ? 1
+                                : null,
+                            color: const Color(0xff397b63),
+                            semanticsLabel: '${node.label} working',
+                          ),
+                        ),
+                      ),
+                    assistant
+                        ? InoPresence(
+                            size: 58,
+                            state: stale
+                                ? InoPresenceState.disconnected
+                                : active || node.status == 'Running'
+                                ? InoPresenceState.working
+                                : node.status == 'Failed'
+                                ? InoPresenceState.attention
+                                : InoPresenceState.idle,
+                          )
+                        : NeuronIcon(kind: brainNeuronIcon(node), size: 32),
+                  ],
                 ),
               ),
               const SizedBox(height: 8),
@@ -291,7 +356,13 @@ final class _NeuronTile extends StatelessWidget {
                 ),
               ),
               Text(
-                active ? (assistant ? 'Working' : 'Just active') : node.name,
+                failed && !stale
+                    ? 'Needs attention'
+                    : node.status == 'Running' && !stale
+                    ? 'Working'
+                    : active
+                    ? (assistant ? 'Working' : 'Just active')
+                    : node.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 9, color: Color(0xff75847b)),
@@ -302,6 +373,44 @@ final class _NeuronTile extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A request trace is temporary activity, never a synthetic BrainSynapse.
+final class _DelegationPainter extends CustomPainter {
+  _DelegationPainter(this.positions, this.events);
+  final Map<String, Offset> positions;
+  final List<BrainActivity> events;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xff7455dd)
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+    for (final event in events) {
+      final from = positions[event.neuronId]!;
+      final to = positions[event.targetId]!;
+      final path = Path()..moveTo(from.dx, from.dy);
+      path.quadraticBezierTo(
+        (from.dx + to.dx) / 2,
+        (from.dy + to.dy) / 2 - 60,
+        to.dx,
+        to.dy,
+      );
+      final metrics = path.computeMetrics();
+      for (final metric in metrics) {
+        for (var distance = 0.0; distance < metric.length; distance += 8) {
+          canvas.drawPath(
+            metric.extractPath(distance, math.min(metric.length, distance + 2)),
+            paint,
+          );
+        }
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DelegationPainter oldDelegate) => true;
 }
 
 final class _SynapseRoute {

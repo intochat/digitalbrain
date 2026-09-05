@@ -173,6 +173,10 @@ final class _GraphHomeScreenState extends State<GraphHomeScreen> {
                               _selected = edge.id;
                               _directory = false;
                             }),
+                            onActivity: (event) => setState(() {
+                              _selected = 'operation:${event.operationId}';
+                              _directory = false;
+                            }),
                           ),
                   ),
                   Padding(
@@ -348,11 +352,19 @@ final class _GraphHomeScreenState extends State<GraphHomeScreen> {
   Widget _inspector(BrainSnapshot? snapshot) {
     BrainNeuron? node;
     BrainSynapse? edge;
+    BrainActivity? operation;
     for (final value in snapshot?.nodes ?? <BrainNeuron>[]) {
       if (value.id == _selected) node = value;
     }
     for (final value in snapshot?.synapses ?? <BrainSynapse>[]) {
       if (value.id == _selected) edge = value;
+    }
+    for (final value in snapshot?.activity ?? <BrainActivity>[]) {
+      if (value.operationId != null &&
+          'operation:${value.operationId}' == _selected &&
+          (operation == null || value.sequence > operation.sequence)) {
+        operation = value;
+      }
     }
     return LumenSurface(
       padding: const EdgeInsets.all(22),
@@ -369,6 +381,8 @@ final class _GraphHomeScreenState extends State<GraphHomeScreen> {
                         ? 'Your neurons'
                         : node != null
                         ? 'Neuron'
+                        : operation != null
+                        ? 'Agent request'
                         : 'Synapse',
                     style: const TextStyle(
                       fontSize: 20,
@@ -423,6 +437,13 @@ final class _GraphHomeScreenState extends State<GraphHomeScreen> {
                       ? _nodeDetails(node, snapshot!)
                       : edge != null
                       ? _edgeDetails(edge, snapshot!)
+                      : operation != null
+                      ? [
+                          const Text(
+                            'An observed request between neurons. Its activity is separate from a subscription.',
+                          ),
+                          _activity(operation),
+                        ]
                       : [
                           const Text(
                             'This connection is no longer in the current graph.',
@@ -455,6 +476,12 @@ final class _GraphHomeScreenState extends State<GraphHomeScreen> {
     _detail('Module', node.module),
     _detail('Instance', node.name),
     _detail('Status', node.status),
+    for (final server
+        in snapshot.activity
+            .where((event) => event.neuronId == node.id && event.server != null)
+            .map((event) => event.server!)
+            .toSet())
+      _detail('Observed MCP connection', server),
     _detail('Identity', node.id),
     _detail(
       'Observed signals',
@@ -490,7 +517,9 @@ final class _GraphHomeScreenState extends State<GraphHomeScreen> {
       'Recent activity',
       style: TextStyle(fontWeight: FontWeight.w600),
     ),
-    if (!snapshot.activity.any((e) => e.neuronId == node.id))
+    if (!snapshot.activity.any(
+      (e) => e.neuronId == node.id || e.targetId == node.id,
+    ))
       const Padding(
         padding: EdgeInsets.only(top: 12),
         child: Text(
@@ -499,7 +528,9 @@ final class _GraphHomeScreenState extends State<GraphHomeScreen> {
         ),
       ),
     for (final activity
-        in snapshot.activity.where((e) => e.neuronId == node.id).take(8))
+        in snapshot.activity
+            .where((e) => e.neuronId == node.id || e.targetId == node.id)
+            .take(12))
       _activity(activity),
   ];
 
@@ -555,6 +586,28 @@ final class _GraphHomeScreenState extends State<GraphHomeScreen> {
       ),
     ],
     if (_brain.failure != null) _detail('Could not confirm', _brain.failure!),
+    if (snapshot.activity.any(
+      (event) =>
+          event.kind == 'delegation' &&
+          event.neuronId == edge.sourceId &&
+          event.targetId == edge.targetId,
+    )) ...[
+      const SizedBox(height: 20),
+      const Text(
+        'Agent exchanges',
+        style: TextStyle(fontWeight: FontWeight.w600),
+      ),
+      for (final event
+          in snapshot.activity
+              .where(
+                (event) =>
+                    event.kind == 'delegation' &&
+                    event.neuronId == edge.sourceId &&
+                    event.targetId == edge.targetId,
+              )
+              .take(6))
+        _activity(event),
+    ],
     const SizedBox(height: 20),
     const Text(
       'Recent source signals',
@@ -576,32 +629,97 @@ final class _GraphHomeScreenState extends State<GraphHomeScreen> {
       _activity(activity),
   ];
 
-  Widget _activity(BrainActivity value) => Padding(
-    padding: const EdgeInsets.only(top: 14),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '${value.direction} · ${_short(value.signalType)}',
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-        ),
-        Text(
-          '${_time(value.timestamp)} · #${value.sequence}',
-          style: const TextStyle(fontSize: 10, color: LumenPalette.muted),
-        ),
-        if (value.summary.isNotEmpty)
-          Text(value.summary, style: const TextStyle(fontSize: 12)),
-        if (value.payloadPreview != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: SelectableText(
-              _preview(value.payloadPreview),
-              style: const TextStyle(fontSize: 11, color: LumenPalette.muted),
-            ),
+  Widget _activity(BrainActivity value) => value.operationId == null
+      ? Padding(
+          padding: const EdgeInsets.only(top: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${value.direction} · ${_short(value.signalType)}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                '${_time(value.timestamp)} · #${value.sequence}',
+                style: const TextStyle(fontSize: 10, color: LumenPalette.muted),
+              ),
+              if (value.summary.isNotEmpty)
+                Text(value.summary, style: const TextStyle(fontSize: 12)),
+              if (value.payloadPreview != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: SelectableText(
+                    _preview(value.payloadPreview),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: LumenPalette.muted,
+                    ),
+                  ),
+                ),
+            ],
           ),
-      ],
-    ),
-  );
+        )
+      : Card(
+          elevation: 0,
+          margin: const EdgeInsets.only(top: 12),
+          color: LumenPalette.background,
+          child: ExpansionTile(
+            key: ValueKey('activity_${value.id}'),
+            tilePadding: const EdgeInsets.symmetric(horizontal: 10),
+            childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+            expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+            leading: Icon(
+              value.state == 'failed' || value.isError
+                  ? Icons.error_outline
+                  : value.state == 'cancelled'
+                  ? Icons.stop_circle_outlined
+                  : value.state == 'started'
+                  ? Icons.more_horiz
+                  : Icons.check_circle_outline,
+              size: 18,
+              color: value.state == 'failed' || value.isError
+                  ? Colors.red.shade700
+                  : LumenPalette.accent,
+            ),
+            title: Text(
+              value.name ?? value.summary,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              '${value.kind ?? 'Activity'} · ${value.state ?? 'observed'}'
+              '${value.durationMs == null ? '' : ' · ${_duration(value.durationMs!)}'}',
+              style: const TextStyle(fontSize: 11),
+            ),
+            children: [
+              if (value.isError)
+                _detail('MCP outcome', 'Tool returned an error'),
+              if (value.truncated)
+                _detail('Evidence limit', 'Result truncated'),
+              _detail('Observed', _time(value.timestamp)),
+              if (value.server != null) _detail('MCP server', value.server!),
+              if (value.targetId != null)
+                _detail('Target neuron', value.targetId!),
+              _detail('Operation', value.operationId!),
+              if (value.correlationId != null)
+                _detail('Conversation trace', value.correlationId!),
+              if (value.resultPreview != null) ...[
+                _detail('MCP result preview', value.resultPreview!),
+                const SizedBox(height: 8),
+                const Text(
+                  'Bounded, screened tool content. Read it as returned evidence.',
+                  style: TextStyle(fontSize: 10, color: LumenPalette.muted),
+                ),
+              ],
+            ],
+          ),
+        );
+
+  String _duration(double milliseconds) => milliseconds < 1000
+      ? '${milliseconds.round()} ms'
+      : '${(milliseconds / 1000).toStringAsFixed(1)} s';
   Widget _detail(String label, String text) => Padding(
     padding: const EdgeInsets.only(top: 14),
     child: Column(

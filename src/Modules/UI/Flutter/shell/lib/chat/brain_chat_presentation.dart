@@ -138,7 +138,18 @@ extension _BrainChatPresentation on _BrainChatScreenState {
         final textMessages = assistantMessages.where(
           (message) => message is TextMessage || message is TextStreamMessage,
         );
-        final latest = textMessages.isEmpty ? null : textMessages.last;
+        // Journal recovery appends surviving local requests after durable replies.
+        // Their list position is not chronology: an older failed stream must not
+        // mask a later answer merely because it never received an acceptance ID.
+        Message? latest;
+        for (final message in textMessages) {
+          if (latest == null ||
+              (message.createdAt != null &&
+                  (latest.createdAt == null ||
+                      !message.createdAt!.isBefore(latest.createdAt!)))) {
+            latest = message;
+          }
+        }
         final (text, waiting) = switch (latest) {
           TextMessage(:final text) => (text, false),
           TextStreamMessage(:final streamId) => switch (_streamStates.stateFor(
@@ -163,6 +174,16 @@ extension _BrainChatPresentation on _BrainChatScreenState {
               login.status == LoginActionStatus.resuming ||
               login.status == LoginActionStatus.cancelling,
         );
+        final working =
+            waiting ||
+            _pendingSends.any((pending) {
+              final streamId = pending.streamId;
+              return streamId != null &&
+                  switch (_streamStates.stateFor(streamId)) {
+                    StreamStateLoading() || StreamStateStreaming() => true,
+                    _ => false,
+                  };
+            });
         final latestTextIndex = latest == null
             ? -1
             : _controller.messages.indexOf(latest);
@@ -191,7 +212,7 @@ extension _BrainChatPresentation on _BrainChatScreenState {
                   children: [
                     Row(
                       children: [
-                        if (waiting)
+                        if (working)
                           const SizedBox(
                             width: 12,
                             height: 12,
@@ -209,7 +230,7 @@ extension _BrainChatPresentation on _BrainChatScreenState {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            waiting ? 'Ino is working on it' : 'Ino',
+                            working ? 'Ino is working on it' : 'Ino',
                             style: const TextStyle(
                               color: LumenPalette.muted,
                               fontSize: 12,

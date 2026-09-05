@@ -9,6 +9,8 @@ using DigitalBrain.Google;
 using DigitalBrain.Google.Aspire.Hosting;
 using DigitalBrain.Memory;
 using DigitalBrain.Memory.Aspire.Hosting;
+using DigitalBrain.Microsoft;
+using DigitalBrain.Microsoft.Hosting;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Salesforce.Aspire.Hosting;
 using DigitalBrain.Excel;
@@ -16,6 +18,7 @@ using DigitalBrain.Time;
 using DigitalBrain.UI;
 using DigitalBrain.UI.Aspire.Hosting;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Configuration;
 using AnthropicModels = DigitalBrain.AI.Anthropic;
 using GoogleModels = DigitalBrain.AI.Google;
 using OllamaModels = DigitalBrain.AI.Ollama;
@@ -23,11 +26,16 @@ using OpenAIModels = DigitalBrain.AI.OpenAI;
 using XaiModels = DigitalBrain.AI.XAI;
 
 var builder = DistributedApplication.CreateBuilder(args);
+// Conversation/model/tool evidence is enabled for this local development app.
+// Publishing or a production environment keeps the module's default off unless
+// the host explicitly configures the same opt-in.
+var captureGenAiContent = builder.Configuration.GetValue<bool?>("DigitalBrain:AI:Telemetry:EnableSensitiveData")
+    ?? (builder.Environment.IsDevelopment() && builder.ExecutionContext.IsRunMode);
 
 var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
     .AddModule<AIModule>(ai =>
     {
-        ai.EnableSensitiveData = false;
+        ai.EnableSensitiveData = captureGenAiContent;
 
         // --- OpenAI ---
         //ai.WithLlm<OpenAIModels.IGpt56Sol>();
@@ -69,6 +77,8 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
     .AddModule<ExecutionModule>()
     .AddModule<GoogleModule>(google => google.WithGmail())
     .AddModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
+    .AddModule<MicrosoftModule>(microsoft => microsoft.WithAspire(
+        Path.Combine(builder.AppHostDirectory, "DigitalBrain.AppHost.csproj"), ShellHostingExtensions.DefaultOwner))
     .AddModule<UIModule>(ui =>
     {
         ui.WithWindowHost();
@@ -91,7 +101,6 @@ var developmentClusterId = builder.Environment.IsDevelopment()
 
 var kernel = builder.AddProject<Projects.DigitalBrain_Silo>(ProductSurfaceResources.Kernel)
     .WithReference(brain)
-    .WithEnvironment("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", "false")
     .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION", "false")
     .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_HTTPCLIENT_DISABLE_URL_QUERY_REDACTION", "false")
     .WithHttpEndpoint(
@@ -130,7 +139,6 @@ var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.
     .WithEnvironment(
         ShellHostingExtensions.OwnerEnvironmentVariable,
         ShellHostingExtensions.DefaultOwner)
-    .WithEnvironment("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", "false")
     .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION", "false")
     .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_HTTPCLIENT_DISABLE_URL_QUERY_REDACTION", "false")
     .WithEnvironment(context =>
