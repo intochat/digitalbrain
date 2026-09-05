@@ -66,6 +66,41 @@ public sealed class CSharpStartupScriptRunnerTests
     }
 
     [Fact]
+    public async Task Personal_review_script_can_use_git_ai_chat_and_typed_subscriptions()
+    {
+        var script = StartupScript.FromSource("review", """
+            Func<Task> review = async () =>
+            {
+                using var git = new Process();
+                git.StartInfo = new ProcessStartInfo("git")
+                {
+                    WorkingDirectory = @"D:\digitalbrain",
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                };
+                git.StartInfo.ArgumentList.Add("diff");
+                git.StartInfo.ArgumentList.Add("--no-ext-diff");
+                git.Start();
+                var diff = await git.StandardOutput.ReadToEndAsync(CancellationToken);
+                await git.WaitForExitAsync(CancellationToken);
+                var review = await Brain.Get<IAssistant>().RequestAsync(new AgentRequest(diff), CancellationToken);
+                await Brain.Get<IChat>("alice/review").SendAsync(new Note(review.Text), CancellationToken);
+                var source = Brain.Get<IChat>("alice/source");
+                var chat = Brain.Get<IChat>("alice/review");
+                await chat.SubscribeToAsync<IChat, IChat, Note>(source.Id, CancellationToken);
+                await chat.UnsubscribeFromAsync<IChat, IChat, Note>(source.Id, CancellationToken);
+            };
+            return typeof(DigitalBrain.Time.ITimer).Name + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("diff")));
+            """);
+
+        var result = await runner.RunAsync(script, new FakeDigitalBrain("alice"), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.Summary + string.Join(Environment.NewLine, result.Diagnostics));
+        Assert.StartsWith("ITimer", result.Summary);
+    }
+
+    [Fact]
     public async Task Compilation_errors_are_returned_as_diagnostics()
     {
         var script = StartupScript.FromSource("start.cs", "this is not C#;");

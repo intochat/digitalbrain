@@ -32,3 +32,9 @@ abstract interface class GraphScene {
 }
 
 typedef GraphSceneFactory = GraphScene Function();
+
+/// Optional signal animation supported by a renderer.
+abstract interface class AnimatedGraphScene {
+  void setPulse(GraphPulse? pulse);
+  void advance(double seconds);
+}

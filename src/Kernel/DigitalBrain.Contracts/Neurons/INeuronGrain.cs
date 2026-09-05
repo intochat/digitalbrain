@@ -4,8 +4,9 @@ using DigitalBrain.Abstractions.Signals;
 namespace DigitalBrain.Abstractions.Neurons;
 
 // Orleans delivery and synapse mutation (membrane). Scripts never call this; they Publish /
-// Subscribe through IDigitalBrain. SignalSender uses Deliver and is the only journal/synapse
-// writer — grain call filters must not Record or Bind (self-send is in-process, not a proxy).
+// Subscribe through IDigitalBrain. SignalSender journals outgoing deliveries and reinforces
+// handled paths. Neuron journals incoming deliveries and binds outgoing synapses.
+// Grain call filters must not write journals or synapses; self-send stays in-process.
 // SubscribeTo asks the source to BindOutgoing.
 [Alias("db.v2.neuron-grain")]
 public interface INeuronGrain : INeuron

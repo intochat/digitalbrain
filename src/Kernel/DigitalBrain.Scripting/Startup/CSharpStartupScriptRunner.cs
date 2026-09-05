@@ -1,5 +1,10 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.AI;
+using DigitalBrain.Time;
 using DigitalBrain.UI;
+using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text.Json;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 
@@ -10,10 +15,26 @@ internal sealed class CSharpStartupScriptRunner : IStartupScriptRunner
     private static readonly ScriptOptions Options = ScriptOptions.Default
         .WithReferences(
             typeof(object).Assembly,
+            typeof(Enumerable).Assembly,
+            typeof(List<>).Assembly,
+            typeof(File).Assembly,
+            typeof(Process).Assembly,
+            typeof(SHA256).Assembly,
+            typeof(JsonSerializer).Assembly,
+            typeof(HttpClient).Assembly,
             typeof(IDigitalBrain).Assembly,
+            typeof(IAssistant).Assembly,
+            typeof(DigitalBrain.Time.ITimer).Assembly,
+            typeof(DigitalBrain.Product.Identity.CommandId).Assembly,
             typeof(IChart).Assembly)
         .WithImports(
             "System",
+            "System.Collections.Generic",
+            "System.Diagnostics",
+            "System.IO",
+            "System.Linq",
+            "System.Security.Cryptography",
+            "System.Text",
             "System.Threading",
             "System.Threading.Tasks",
             "DigitalBrain.Abstractions",
@@ -21,6 +42,10 @@ internal sealed class CSharpStartupScriptRunner : IStartupScriptRunner
             "DigitalBrain.Abstractions.Journals",
             "DigitalBrain.Abstractions.Neurons",
             "DigitalBrain.Abstractions.Signals",
+            "DigitalBrain.AI",
+            "DigitalBrain.Chat",
+            "DigitalBrain.Time",
+            "DigitalBrain.Product.Identity",
             "DigitalBrain.UI");
 
     public async Task<StartupScriptRunResult> RunAsync(

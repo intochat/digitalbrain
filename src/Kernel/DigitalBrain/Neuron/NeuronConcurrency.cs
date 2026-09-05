@@ -43,11 +43,13 @@ internal static class NeuronConcurrency
         }
     }
 
-    // Read methods declared by INeuronQuery are the kernel's free observation plane: no journal
-    // entry or correlation, and safe to interleave because they only observe durable state.
+    // Kernel reads do not create traffic and only observe durable state. The behaviors
+    // snapshot is also needed while an assistant turn is awaiting a behavior command.
     // Watch and Unwatch carry no interleaving attribute and therefore remain serialized.
     private static bool IsKernelFreeRead(MethodInfo method)
-        => method.DeclaringType == typeof(INeuronQuery);
+        => method.DeclaringType == typeof(INeuronQuery)
+            || (method.DeclaringType == typeof(IBehaviorsKernel)
+                && method.Name == nameof(IBehaviorsKernel.ReadCurrent));
 
     private static void Refuse(Type neuronType, string attribute)
         => throw new InvalidOperationException(

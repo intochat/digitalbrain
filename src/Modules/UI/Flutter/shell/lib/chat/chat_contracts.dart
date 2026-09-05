@@ -10,12 +10,6 @@ typedef StreamVoice =
 typedef OpenUrl = Future<void> Function(Uri url);
 typedef CancelChatTurn =
     Future<void> Function({required String commandId, required String turnId});
-typedef ActivateChatButton =
-    Future<void> Function({
-      required String offerCommandId,
-      required String buttonId,
-      required String action,
-    });
 typedef ReadChart = Future<ChatChartOffer?> Function(String name);
 typedef ReadImageBytes = Future<Uint8List?> Function(String name);
 typedef ReadSpreadsheet = Future<ChatSpreadsheetOffer?> Function(String name);
@@ -26,9 +20,8 @@ const assistantUserId = 'assistant';
 const onboardingDestinationIndex = 1;
 const graphDestinationIndex = 2;
 const activityDestinationIndex = 3;
-const behaviorsDestinationIndex = 4;
-const kitDestinationIndex = 5;
-const windowingDestinationIndex = 6;
+const kitDestinationIndex = 4;
+const windowingDestinationIndex = 5;
 
 extension ChatTurnKitParts on ChatTurnEvent {
   List<KitPart> get kitParts => [

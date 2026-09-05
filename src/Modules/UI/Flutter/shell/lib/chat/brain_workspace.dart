@@ -1,11 +1,8 @@
-import 'dart:async';
-
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
 import 'package:flutter/material.dart';
 
 import '../activity_screen.dart';
-import '../behaviors/behavior_workspace.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../user_actions/user_action_card.dart';
 import '../windowing/windowing_screen.dart';
@@ -27,18 +24,11 @@ final class BrainWorkspace extends StatefulWidget {
     this.onOpenSignIn,
     this.kernelBaseUri,
     this.onCancelTurn,
-    this.onActivateButton,
     this.onReadChart,
     this.onReadImageBytes,
     this.onReadSpreadsheet,
     this.onReadGraph,
-    this.onLoadBehaviors,
-    this.onLoadBehaviorSteps,
-    this.onSaveBehavior,
-    this.onTestBehavior,
-    this.onActivateBehavior,
-    this.onRunBehaviorFake,
-    this.onGenerateBehavior,
+    this.graphSceneFactory,
     this.userActions = const [],
     this.statusMessage,
   });
@@ -52,18 +42,11 @@ final class BrainWorkspace extends StatefulWidget {
   final OpenUrl? onOpenSignIn;
   final Uri? kernelBaseUri;
   final CancelChatTurn? onCancelTurn;
-  final ActivateChatButton? onActivateButton;
   final ReadChart? onReadChart;
   final ReadImageBytes? onReadImageBytes;
   final ReadSpreadsheet? onReadSpreadsheet;
   final ReadGraph? onReadGraph;
-  final LoadBehaviors? onLoadBehaviors;
-  final LoadBehaviorSteps? onLoadBehaviorSteps;
-  final SaveBehavior? onSaveBehavior;
-  final TestBehavior? onTestBehavior;
-  final ActivateBehavior? onActivateBehavior;
-  final RunBehaviorFake? onRunBehaviorFake;
-  final GenerateBehavior? onGenerateBehavior;
+  final GraphSceneFactory? graphSceneFactory;
   final List<UserActionCardModel> userActions;
   final String? statusMessage;
 
@@ -133,23 +116,16 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
         onOpenSignIn: widget.onOpenSignIn,
         kernelBaseUri: widget.kernelBaseUri,
         onCancelTurn: widget.onCancelTurn,
-        onActivateButton: widget.onActivateButton,
         onReadChart: widget.onReadChart,
         onReadImageBytes: widget.onReadImageBytes,
         onReadSpreadsheet: widget.onReadSpreadsheet,
         onReadGraph: widget.onReadGraph,
+        sceneFactory: widget.graphSceneFactory,
       );
     }
-    if (_destination == 0
-        || _destination == activityDestinationIndex
-        || _destination == behaviorsDestinationIndex) {
-      final stackIndex = switch (_destination) {
-        0 => 0,
-        activityDestinationIndex => 1,
-        _ => 2,
-      };
+    if (_destination == 0 || _destination == activityDestinationIndex) {
       return IndexedStack(
-        index: stackIndex,
+        index: _destination == 0 ? 0 : 1,
         children: [
           BrainChatScreen(
             chatName: widget.chatName,
@@ -161,7 +137,6 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
             onOpenSignIn: widget.onOpenSignIn,
             kernelBaseUri: widget.kernelBaseUri,
             onCancelTurn: widget.onCancelTurn,
-            onActivateButton: widget.onActivateButton,
             onReadChart: widget.onReadChart,
             onReadImageBytes: widget.onReadImageBytes,
             onReadSpreadsheet: widget.onReadSpreadsheet,
@@ -172,36 +147,11 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
             userActions: widget.userActions,
             onOpenUserAction: widget.onOpenSignIn,
           ),
-          BehaviorWorkspace(
-            onLoad: widget.onLoadBehaviors,
-            onLoadSteps: widget.onLoadBehaviorSteps,
-            onSave: widget.onSaveBehavior,
-            onTest: widget.onTestBehavior,
-            onActivate: widget.onActivateBehavior,
-            onRunFake: widget.onRunBehaviorFake,
-            onGenerate: widget.onGenerateBehavior,
-          ),
         ],
       );
     }
     if (_destination == kitDestinationIndex) {
-      return KitGalleryScreen(
-        onButtonPressed: widget.onActivateButton == null
-            ? null
-            : (part) {
-                final offer = part.offerCommandId;
-                if (offer == null) {
-                  return;
-                }
-                unawaited(
-                  widget.onActivateButton!(
-                    offerCommandId: offer,
-                    buttonId: part.buttonId,
-                    action: part.action,
-                  ),
-                );
-              },
-      );
+      return const KitGalleryScreen();
     }
     return const WindowingScreen();
   }

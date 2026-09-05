@@ -10,8 +10,8 @@ internal sealed class SignalSender
     private readonly NeuronId _source;
     private readonly TimeProvider _clock;
     private readonly SignalRouter _router;
-    private readonly NeuronJournal _journal;
-    private readonly SynapseSet _synapses;
+    private readonly NeuronJournals _journals;
+    private readonly NeuronSynapses _synapses;
     private readonly IGrainFactory _grains;
     private readonly Func<SignalDelivery, CancellationToken, Task<DeliveryOutcome>> _deliverLocally;
     private readonly Func<CancellationToken, ValueTask> _persist;
@@ -20,15 +20,15 @@ internal sealed class SignalSender
         NeuronId source,
         TimeProvider clock,
         SignalRouter router,
-        NeuronJournal journal,
-        SynapseSet synapses,
+        NeuronJournals journals,
+        NeuronSynapses synapses,
         IGrainFactory grains,
         Func<SignalDelivery, CancellationToken, Task<DeliveryOutcome>> deliverLocally,
         Func<CancellationToken, ValueTask> persist)
     {
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(router);
-        ArgumentNullException.ThrowIfNull(journal);
+        ArgumentNullException.ThrowIfNull(journals);
         ArgumentNullException.ThrowIfNull(synapses);
         ArgumentNullException.ThrowIfNull(grains);
         ArgumentNullException.ThrowIfNull(deliverLocally);
@@ -37,7 +37,7 @@ internal sealed class SignalSender
         _source = source;
         _clock = clock;
         _router = router;
-        _journal = journal;
+        _journals = journals;
         _synapses = synapses;
         _grains = grains;
         _deliverLocally = deliverLocally;
@@ -58,7 +58,7 @@ internal sealed class SignalSender
 
         if (outcome == DeliveryOutcome.Handled)
         {
-            _synapses.Record(receiver, signal.GetType().Name, SynapseKind.Learned);
+            _synapses.Reinforce(receiver, signal.GetType().Name, SynapseKind.Learned);
             await _persist(CancellationToken.None)
                 .ConfigureAwait(true);
         }
@@ -70,7 +70,7 @@ internal sealed class SignalSender
     {
         ArgumentNullException.ThrowIfNull(signal);
 
-        var receivers = _router.Resolve(signal, _source, _synapses)
+        var receivers = _router.BroadcastRecipientsFor(signal, _source, _synapses)
             .Distinct()
             .ToArray();
         if (receivers.Length == 0)
@@ -90,7 +90,7 @@ internal sealed class SignalSender
 
             if (outcome == DeliveryOutcome.Handled)
             {
-                _synapses.Record(receiver, signalType, SynapseKind.Learned);
+                _synapses.Reinforce(receiver, signalType, SynapseKind.Learned);
                 await _persist(CancellationToken.None)
                     .ConfigureAwait(true);
             }
@@ -120,16 +120,16 @@ internal sealed class SignalSender
         var delivery = SignalDelivery.Create(
             signal,
             _source,
-            _journal.OutgoingNextSequence,
+            _journals.OutgoingNextSequence,
             _clock,
             cause,
             correlation,
             principal: VerifiedActor.Current?.PrincipalId ?? cause?.Principal);
 
-        _journal.AppendOutgoing(delivery);
+        _journals.AppendOutgoing(delivery);
         await _persist(CancellationToken.None)
             .ConfigureAwait(true);
-        await _journal.NotifyWatchersAsync()
+        await _journals.NotifyWatchersAsync()
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         return delivery;

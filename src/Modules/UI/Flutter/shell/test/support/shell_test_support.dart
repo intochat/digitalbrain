@@ -8,19 +8,22 @@ ChatTurnEvent shellTurn(
   int sequence,
   bool fromUser,
   String text, {
-  String? synapse,
+  String? signal,
+  String? commandId,
+  String? status,
   List<KitCardRef> cards = const [],
 }) => ChatTurnEvent(
   sequence: sequence,
   fromUser: fromUser,
   text: text,
-  commandId: 'c$sequence',
-  synapse: synapse ?? (fromUser ? 'UserMessaged' : 'Responded'),
+  commandId: commandId ?? 'c$sequence',
+  signal: signal ?? (fromUser ? 'UserMessaged' : 'Responded'),
   neuronId: 'chat:owner/main',
   caller: 'chat:owner/main',
   correlationId: 'correlation-$sequence',
   timestamp: DateTime.utc(2026, 7, 28, 8, 0, sequence),
   cards: cards,
+  status: status,
 );
 
 Future<void> prepareShellSurface(WidgetTester tester) async {

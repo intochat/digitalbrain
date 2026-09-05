@@ -17,6 +17,7 @@ dependencies:
   digitalbrain_flutter:
     path: ../core
   flutter_chat_core: ^2.9.0
+  flutter_chat_ui: ^2.11.1
   graphic: ^2.7.0
   three_js: ^0.3.0
 

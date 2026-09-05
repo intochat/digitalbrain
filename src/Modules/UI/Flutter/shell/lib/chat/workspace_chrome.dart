@@ -67,17 +67,6 @@ final class WorkspaceNavigationBar extends StatelessWidget {
           label: 'Activity',
         ),
         NavigationDestination(
-          icon: Icon(
-            Icons.account_tree_outlined,
-            key: Key('destination_behaviors'),
-          ),
-          selectedIcon: Icon(
-            Icons.account_tree,
-            key: Key('destination_behaviors'),
-          ),
-          label: 'Behaviors',
-        ),
-        NavigationDestination(
           icon: Icon(Icons.widgets_outlined, key: Key('destination_kit')),
           selectedIcon: Icon(Icons.widgets, key: Key('destination_kit')),
           label: 'Kit',
@@ -118,11 +107,6 @@ const workspaceRailDestinations = <NavigationRailDestination>[
     icon: Icon(Icons.timeline_outlined, key: Key('destination_activity')),
     selectedIcon: Icon(Icons.timeline, key: Key('destination_activity')),
     label: Text('Activity'),
-  ),
-  NavigationRailDestination(
-    icon: Icon(Icons.account_tree_outlined, key: Key('destination_behaviors')),
-    selectedIcon: Icon(Icons.account_tree, key: Key('destination_behaviors')),
-    label: Text('Behaviors'),
   ),
   NavigationRailDestination(
     icon: Icon(Icons.widgets_outlined, key: Key('destination_kit')),
@@ -225,8 +209,7 @@ String workspaceSectionName(int index) => switch (index) {
   1 => 'Onboarding',
   2 => 'Graph',
   3 => 'Activity',
-  4 => 'Behaviors',
-  5 => 'Kit',
-  6 => 'Windowing',
+  4 => 'Kit',
+  5 => 'Windowing',
   _ => 'Chat',
 };

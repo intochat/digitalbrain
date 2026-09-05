@@ -6,6 +6,112 @@ import 'package:http/testing.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('watchChatTurns reads the kernel signal contract', () async {
+    final client = DigitalBrainUiClient(
+      baseUri: Uri.parse('http://ui.example:5080'),
+      httpClient: MockClient(
+        (_) async => http.Response('''
+event: chat-turn
+data: {"sequence":1,"fromUser":true,"text":"hello","commandId":"c1","signal":"UserMessaged","neuronId":"chat:dev/main","caller":"chat:dev/main","correlationId":"r1","timestamp":"2026-09-05T10:00:00Z","cards":null}
+
+event: chat-turn
+data: {"sequence":2,"fromUser":false,"text":"hello back","commandId":"c1","signal":"Responded","neuronId":"chat:dev/main","caller":"chat:dev/main","correlationId":"r2","timestamp":"2026-09-05T10:00:01Z","cards":null}
+
+''', 200),
+      ),
+    );
+    final turns = await client.watchChatTurns(chatName: 'main').toList();
+    expect(turns.map((turn) => turn.text), ['hello', 'hello back']);
+    expect(turns.map((turn) => turn.signal), ['UserMessaged', 'Responded']);
+  });
+
+  test('malformed known journal frame reports a contract failure', () async {
+    final client = DigitalBrainUiClient(
+      baseUri: Uri.parse('http://ui.example:5080'),
+      httpClient: MockClient(
+        (_) async =>
+            http.Response('event: chat-turn\ndata: {"sequence":1}\n\n', 200),
+      ),
+    );
+    await expectLater(
+      client.watchChatTurns(chatName: 'main').toList(),
+      throwsA(isA<TypeError>()),
+    );
+  });
+
+  test('chat-error exposes the backend failure message', () async {
+    final client = DigitalBrainUiClient(
+      baseUri: Uri.parse('http://ui.example:5080'),
+      httpClient: MockClient(
+        (_) async => http.Response(
+          'event: chat-error\ndata: {"message":"Model unavailable","status":"Failed","turnId":"t1","commandId":"c1"}\n\n',
+          200,
+        ),
+      ),
+    );
+    await expectLater(
+      client.streamMessage(chatName: 'main', text: 'hello').toList(),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'Model unavailable',
+        ),
+      ),
+    );
+  });
+
+  test(
+    'acceptance carries exact command identity but is not a completed reply',
+    () async {
+      final client = DigitalBrainUiClient(
+        baseUri: Uri.parse('http://ui.example:5080'),
+        httpClient: MockClient(
+          (_) async => http.Response(
+            'event: chat-accepted\ndata: {"commandId":"c1","turnId":"t1"}\n\n',
+            200,
+          ),
+        ),
+      );
+      final frames = <ChatDelta>[];
+      await expectLater(
+        client.streamMessage(chatName: 'main', text: 'hello').map((frame) {
+          frames.add(frame);
+          return frame;
+        }).toList(),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('without a response'),
+          ),
+        ),
+      );
+      expect(frames.single.isAcceptance, isTrue);
+      expect(frames.single.commandId, 'c1');
+      expect(frames.single.turnId, 't1');
+    },
+  );
+
+  test('a closed connection without a reply is an error', () async {
+    final client = DigitalBrainUiClient(
+      baseUri: Uri.parse('http://ui.example:5080'),
+      httpClient: MockClient(
+        (_) async => http.Response(': connected\n\n', 200),
+      ),
+    );
+    await expectLater(
+      client.streamMessage(chatName: 'main', text: 'hello').toList(),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          contains('without a response'),
+        ),
+      ),
+    );
+  });
+
   test('openScene POSTs the explicit surface command', () async {
     http.Request? seen;
     final client = DigitalBrainUiClient(
@@ -425,81 +531,4 @@ data: {"role":"assistant","contents":[{"\$type":"text","text":"ignore"}]}
 
     expect(await client.readImageBytes('missing'), isNull);
   });
-
-  test(
-    'behavior client lists, saves, tests, runs fake data, and generates',
-    () async {
-      final requests = <String>[];
-      final client = DigitalBrainUiClient(
-        baseUri: Uri.parse('http://ui.example:5080'),
-        httpClient: MockClient((request) async {
-          requests.add('${request.method} ${request.url.path}');
-          if (request.url.path == '/behaviors' && request.method == 'GET') {
-            return http.Response(
-              jsonEncode([
-                {
-                  'name': 'bitcoin-tracker',
-                  'title': 'Bitcoin',
-                  'source': 'Feature: Bitcoin',
-                  'active': true,
-                  'lastTest': {
-                    'allGreen': true,
-                    'scenarios': 1,
-                    'failures': [],
-                  },
-                  'diagnostics': [],
-                },
-              ]),
-              200,
-            );
-          }
-          if (request.url.path.endsWith('/test')) {
-            return http.Response(
-              jsonEncode({'allGreen': true, 'scenarios': 1, 'failures': []}),
-              200,
-            );
-          }
-          if (request.url.path.endsWith('/fake')) {
-            return http.Response(
-              jsonEncode({'eventId': 'fake-1', 'description': 'x.post fake'}),
-              200,
-            );
-          }
-          if (request.url.path == '/behaviors/generate') {
-            return http.Response(
-              jsonEncode({
-                'source': 'Feature: Generated',
-                'model': 'gemma4:e2b',
-                'compilation': {'success': true, 'diagnostics': []},
-              }),
-              200,
-            );
-          }
-          return http.Response('{}', 200);
-        }),
-      );
-
-      final listed = await client.listBehaviors();
-      await client.saveBehavior('bitcoin-tracker', 'Feature: Bitcoin');
-      final report = await client.testBehavior('bitcoin-tracker');
-      final fake = await client.runBehaviorFake('bitcoin-tracker');
-      final generated = await client.generateBehavior('track bitcoin');
-
-      expect(listed.single.active, isTrue);
-      expect(report.allGreen, isTrue);
-      expect(fake, 'x.post fake');
-      expect(generated.model, 'gemma4:e2b');
-      expect(generated.success, isTrue);
-      expect(
-        requests,
-        containsAll([
-          'GET /behaviors',
-          'PUT /behaviors/bitcoin-tracker',
-          'POST /behaviors/bitcoin-tracker/test',
-          'POST /behaviors/bitcoin-tracker/fake',
-          'POST /behaviors/generate',
-        ]),
-      );
-    },
-  );
 }

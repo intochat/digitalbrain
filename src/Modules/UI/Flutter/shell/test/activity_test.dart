@@ -31,9 +31,7 @@ void main() {
     await drainShellTimers(tester);
   });
 
-  testWidgets('activity renders the authoritative synapse name', (
-    tester,
-  ) async {
+  testWidgets('activity renders the authoritative signal name', (tester) async {
     await prepareShellSurface(tester);
     final turns = StreamController<ChatTurnEvent>();
     addTearDown(turns.close);
@@ -42,7 +40,7 @@ void main() {
       BrainChatApp(chatName: 'main', turns: turns.stream, onSend: (_) async {}),
     );
     turns.add(
-      shellTurn(2, true, 'private payload', synapse: 'ObservedCustomSynapse'),
+      shellTurn(2, true, 'private payload', signal: 'ObservedCustomSynapse'),
     );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('destination_activity')));

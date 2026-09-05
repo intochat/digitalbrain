@@ -42,7 +42,7 @@ internal sealed class PingSink(NeuronRuntime runtime) : Neuron(runtime), IPingSi
 
 internal sealed class PingSilent(NeuronRuntime runtime) : Neuron(runtime), IPingSilent;
 
-public sealed class SynapseSetTests
+public sealed class NeuronSynapsesTests
 {
     private static readonly DateTimeOffset T0 = new(2026, 9, 2, 12, 0, 0, TimeSpan.Zero);
 
@@ -170,7 +170,7 @@ public sealed class SynapseSetTests
     }
 
     [Fact]
-    public async Task Record_AfterHalfLifePotentiatesDecayedWeight()
+    public async Task Reinforce_AfterHalfLifePotentiatesDecayedWeight()
     {
         var clock = new ManualTimeProvider(T0);
         await using var brain = await BrainSimulation.StartAsync(new()
@@ -238,7 +238,7 @@ public sealed class SynapseSetTests
         var target = new NeuronId("pingsink", owner, "direct-target");
         var routes = new TestDurableDictionary<string, Synapse>
         {
-            [SynapseSet.KeyFor(target, nameof(Ping))] = new(
+            [NeuronSynapses.KeyFor(target, nameof(Ping))] = new(
                 source,
                 target,
                 nameof(Ping),
@@ -247,7 +247,7 @@ public sealed class SynapseSetTests
                 SynapseKind.Learned),
         };
         var clock = new ManualTimeProvider(T0.AddHours(2));
-        var synapses = new SynapseSet(
+        var synapses = new NeuronSynapses(
             routes,
             new SynapseOptions
             {
@@ -257,8 +257,8 @@ public sealed class SynapseSetTests
             source,
             clock);
 
-        Assert.Empty(synapses.All());
-        Assert.Empty(synapses.For(nameof(Ping)));
+        Assert.Empty(synapses.Active());
+        Assert.Empty(synapses.ForSignal(nameof(Ping)));
         Assert.Single(routes);
     }
 

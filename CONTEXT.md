@@ -29,6 +29,8 @@ _Avoid_: neuron, run history
 **IDigitalBrain**
 The owner’s typed handle: `Get<TNeuron>`, `GetEntity<TEntity>`, journals. The assistant and scripts use this, not Orleans.
 
+In code, a `Neuron` owns its outgoing relationships through `NeuronSynapses` and its incoming/outgoing journal windows (`JournalWindow`) through `NeuronJournals`. Synapses `Bind`, `Unbind`, and `Reinforce`; journals record signal deliveries.
+
 ## Programming
 
 **Script**
@@ -48,3 +50,9 @@ await Brain.GetEntity<IChart>("elon-activity").Append(point, title);
 ```
 
 English is how the owner asks. A compiled script is what they get. There is no second runtime, grant catalog, or JSON capability bus for this path.
+
+Start with [Flutter chat and personal C# review routines](docs/GETTING_STARTED.md).
+The assistant can admit, read, list and remove behaviors. Current definitions and
+their status live durably on `BehaviorsNeuron`; its journal announces changes to
+the separate scripting worker. Development chat can read the configured local
+repository diff for a one-off review.

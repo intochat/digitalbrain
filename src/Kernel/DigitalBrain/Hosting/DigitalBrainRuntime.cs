@@ -27,6 +27,7 @@ public static class DigitalBrainRuntime
         builder.Services.TryAddSingleton<SynapseOptions>();
         builder.Services.TryAddSingleton<SignalRouter>();
         builder.Services.TryAddSingleton<NeuronRuntime>();
+        builder.AddIncomingGrainCallFilter<NeuronMembraneFilter>();
 
         foreach (var hook in ModuleHooksOf(modules))
         {

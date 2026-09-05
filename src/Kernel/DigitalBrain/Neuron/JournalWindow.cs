@@ -6,7 +6,9 @@ using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Signals;
 namespace DigitalBrain.Core;
 
-internal sealed class NeuronFeed
+// One direction of a neuron's traffic journal. Retention bounds recent deliveries;
+// sequence and lifetime tallies survive compaction.
+internal sealed class JournalWindow
 {
     private const int MaxRetainedEntries = 512;
     private const int MaxRetainedBytes = 512 * 1024;
@@ -18,7 +20,7 @@ internal sealed class NeuronFeed
     private readonly IDurableValue<long> _lastSequence;
     private readonly Serializer<JournalEntry> _entries;
 
-    internal NeuronFeed(
+    internal JournalWindow(
         IDurableList<byte[]> retained,
         IDurableDictionary<string, long> tallies,
         IDurableValue<long> lastSequence,
@@ -57,7 +59,7 @@ internal sealed class NeuronFeed
 
     internal long NextSequence => _lastSequence.Value + 1;
 
-    internal NeuronFeedCheckpoint Checkpoint() => new(
+    internal JournalWindowCheckpoint Checkpoint() => new(
         [.. _retained],
         _tallies.ToDictionary(entry => entry.Key, entry => entry.Value),
         _lastSequence.Value);
@@ -81,7 +83,7 @@ internal sealed class NeuronFeed
         RetainedCount: _retained.Count,
         Tallies: [.. _tallies.Select(tally => new JournalTally(tally.Key, tally.Value))]);
 
-    internal void Restore(NeuronFeedCheckpoint checkpoint)
+    internal void Restore(JournalWindowCheckpoint checkpoint)
     {
         while (_retained.Count > 0)
         {

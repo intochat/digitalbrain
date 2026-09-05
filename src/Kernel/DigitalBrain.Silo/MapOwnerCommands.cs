@@ -1,21 +1,13 @@
 using DigitalBrain.Product.Identity;
-using System.Net.ServerSentEvents;
-using System.Runtime.CompilerServices;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
 using DigitalBrain.UI;
-using Microsoft.Extensions.AI;
 
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Journals;
-using DigitalBrain.Abstractions.Neurons;
 namespace DigitalBrain.Kernel;
 
 internal static class OwnerCommandsHttpMaps
 {
-    internal static readonly TimeSpan TurnBudget =
-        TimeSpan.Parse(NeuronCallTimeouts.LongRunning, System.Globalization.CultureInfo.InvariantCulture);
-
     public static IEndpointRouteBuilder MapOwnerCommands(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
@@ -57,7 +49,7 @@ internal static class OwnerCommandsHttpMaps
 
                     await SseResponse.WriteAsync(
                         http.Response,
-                        StreamDeltasAsync(brain, chatInstance, request.Text, actor, cancellationToken),
+                        ChatTurnStream.SendAsync(brain, chatInstance, request.Text, actor, cancellationToken),
                         cancellationToken).ConfigureAwait(false);
                     return;
                 }
@@ -149,47 +141,4 @@ internal static class OwnerCommandsHttpMaps
         return true;
     }
 
-    // Observer-only SSE: durable Send starts the turn; request abort detaches this
-    // watch without cancelling the turn (P0-2).
-    private static async IAsyncEnumerable<SseItem<ChatResponseUpdate>> StreamDeltasAsync(
-        IDigitalBrain brain,
-        string chatInstance,
-        string text,
-        ActorContext actor,
-        [EnumeratorCancellation] CancellationToken requestAborted)
-    {
-        using var budget = new CancellationTokenSource(TurnBudget);
-        var command = CommandId.New();
-        var accepted = await brain.Get<IChat>(chatInstance)
-            .RequestAsync(new SendMessage(command, text, actor))
-            .ConfigureAwait(false);
-
-        // Budget bounds the observer wait; requestAborted only detaches the observer.
-        using var observer = CancellationTokenSource.CreateLinkedTokenSource(requestAborted, budget.Token);
-        var chat = brain.Get<IChat>(chatInstance);
-
-        await foreach (var page in chat.WatchJournalAsync(
-            JournalKind.Outgoing,
-            afterSequence: 0,
-            observer.Token).ConfigureAwait(false))
-        {
-            foreach (var delivery in page.Delta)
-            {
-                if (delivery.Signal is Responded responded && responded.CommandId == command)
-                {
-                    yield return new SseItem<ChatResponseUpdate>(
-                        new ChatResponseUpdate(ChatRole.Assistant, responded.Text),
-                        HttpSurfacePaths.ChatDeltaEvent);
-                    yield break;
-                }
-
-                if (delivery.Signal is TurnLifecycle life
-                    && life.TurnId == accepted.TurnId
-                    && life.Status is ChatTurnStatus.Failed or ChatTurnStatus.Cancelled)
-                {
-                    yield break;
-                }
-            }
-        }
-    }
 }

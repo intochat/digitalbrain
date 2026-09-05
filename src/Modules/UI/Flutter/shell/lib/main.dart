@@ -42,15 +42,6 @@ Widget buildShell({
             audioBytes: audioBytes,
             fileName: fileName,
           ),
-    onActivateButton: edge == null
-        ? null
-        : ({required offerCommandId, required buttonId, required action}) =>
-              edge.activateChatButton(
-                chatName: chat,
-                offerCommandId: offerCommandId,
-                buttonId: buttonId,
-                action: action,
-              ),
     onOpenSignIn: openExternalUrl,
     kernelBaseUri: edge?.baseUri,
     onCancelTurn: edge == null
@@ -64,13 +55,6 @@ Widget buildShell({
     onReadImageBytes: edge?.readImageBytes,
     onReadSpreadsheet: edge?.readSpreadsheet,
     onReadGraph: edge?.readGraph,
-    onLoadBehaviors: edge?.listBehaviors,
-    onLoadBehaviorSteps: edge?.listBehaviorSteps,
-    onSaveBehavior: edge?.saveBehavior,
-    onTestBehavior: edge?.testBehavior,
-    onActivateBehavior: edge?.activateBehavior,
-    onRunBehaviorFake: edge?.runBehaviorFake,
-    onGenerateBehavior: edge?.generateBehavior,
   );
 }
 

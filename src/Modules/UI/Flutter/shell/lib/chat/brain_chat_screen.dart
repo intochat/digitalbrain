@@ -4,7 +4,6 @@ import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_core/flutter_chat_core.dart';
-import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:flyer_chat_text_message/flyer_chat_text_message.dart';
 import 'package:flyer_chat_text_stream_message/flyer_chat_text_stream_message.dart';
 import 'package:path_provider/path_provider.dart';
@@ -23,6 +22,30 @@ import 'voice_file_io.dart'
     if (dart.library.html) 'voice_file_web.dart'
     as voice_file;
 
+final class _PendingChatSend {
+  _PendingChatSend({
+    required this.id,
+    required this.text,
+    required this.afterSequence,
+    required this.expectsAcceptance,
+  }) : createdAt = DateTime.now().toUtc();
+
+  final String id;
+  final String text;
+  final int afterSequence;
+  final bool expectsAcceptance;
+  final DateTime createdAt;
+  String? commandId;
+  String? streamId;
+
+  TextMessage get userMessage => TextMessage(
+    id: id,
+    authorId: ownerUserId,
+    createdAt: createdAt,
+    text: text,
+  );
+}
+
 final class BrainChatScreen extends StatefulWidget {
   const BrainChatScreen({
     super.key,
@@ -35,7 +58,6 @@ final class BrainChatScreen extends StatefulWidget {
     this.onOpenSignIn,
     this.kernelBaseUri,
     this.onCancelTurn,
-    this.onActivateButton,
     this.onReadChart,
     this.onReadImageBytes,
     this.onReadSpreadsheet,
@@ -51,7 +73,6 @@ final class BrainChatScreen extends StatefulWidget {
   final OpenUrl? onOpenSignIn;
   final Uri? kernelBaseUri;
   final CancelChatTurn? onCancelTurn;
-  final ActivateChatButton? onActivateButton;
   final ReadChart? onReadChart;
   final ReadImageBytes? onReadImageBytes;
   final ReadSpreadsheet? onReadSpreadsheet;
@@ -73,10 +94,10 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
   final _appliedSequences = <int>{};
   final _recorder = AudioRecorder();
   Map<String, ChatLoginAction> _loginActions = const {};
-  String? _pendingUserMessageId;
-  String? _pendingUserText;
-  String? _activeStreamId;
+  final _pendingSends = <_PendingChatSend>[];
+  final _streams = <StreamIterator<ChatDelta>>{};
   String? _failure;
+  _PendingChatSend? _failedSend;
 
   @override
   void initState() {
@@ -92,36 +113,53 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
     }
   }
 
-  Future<void> _syncJournal(List<ChatTurnEvent> turns) async {
+  Future<void> _syncJournal(
+    List<ChatTurnEvent> turns, {
+    bool force = false,
+  }) async {
     final sequences = {for (final turn in turns) turn.sequence};
-    if (sequences.length == _appliedSequences.length &&
+    if (!force &&
+        sequences.length == _appliedSequences.length &&
         sequences.every(_appliedSequences.contains)) {
       return;
     }
 
-    if (sequences.isEmpty &&
-        (_pendingUserMessageId != null || _activeStreamId != null)) {
-      return;
-    }
-
-    if (_pendingUserMessageId != null) {
-      final matchedExact = turns.any(
-        (turn) => turn.fromUser && turn.text == _pendingUserText,
-      );
-      // Voice path: server text arrives only after STT; clear on any new user turn.
-      final matchedNewUser = turns.any(
-        (turn) => turn.fromUser && !_appliedSequences.contains(turn.sequence),
-      );
-      if (matchedExact || matchedNewUser) {
-        _pendingUserMessageId = null;
-        _pendingUserText = null;
+    for (final turn in turns) {
+      if (!turn.fromUser || _appliedSequences.contains(turn.sequence)) continue;
+      for (final pending in _pendingSends) {
+        if (!pending.expectsAcceptance &&
+            pending.commandId == null &&
+            turn.sequence > pending.afterSequence &&
+            (turn.text == pending.text || pending.text == _voicePlaceholder)) {
+          pending.commandId = turn.commandId;
+          break;
+        }
       }
     }
-
-    final journalHasAssistant = turns.any((turn) => !turn.fromUser);
-    if (_activeStreamId != null && journalHasAssistant) {
-      _streamStates.forget(_activeStreamId!);
-      _activeStreamId = null;
+    for (final pending in _pendingSends.toList()) {
+      if (pending.commandId == null) continue;
+      final responded = turns.any(
+        (turn) =>
+            turn.commandId == pending.commandId && turn.signal == 'Responded',
+      );
+      final terminal =
+          responded ||
+          turns.any(
+            (turn) =>
+                turn.commandId == pending.commandId &&
+                turn.signal == 'TurnLifecycle' &&
+                (turn.status == 'Failed' || turn.status == 'Cancelled'),
+          );
+      if (terminal) {
+        _pendingSends.remove(pending);
+        if (responded && identical(_failedSend, pending)) {
+          _failure = null;
+          _failedSend = null;
+        }
+        if (pending.streamId case final streamId?) {
+          _streamStates.forget(streamId);
+        }
+      }
     }
 
     _loginActions = ChatLoginAction.project(turns);
@@ -134,12 +172,17 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
     final messages = <Message>[
       for (final turn in turns) ...[
         // The inline action card presents this command's lifecycle state.
-        if (turn.synapse != 'TurnLifecycle' ||
-            !actionCommands.contains(turn.commandId))
+        if (turn.signal != 'TurnLifecycle' ||
+            (!actionCommands.contains(turn.commandId) &&
+                (turn.status == 'Failed' || turn.status == 'Cancelled')))
           ...KitMessageFactory.messagesForTurn(
             sequence: turn.sequence,
             fromUser: turn.fromUser,
-            text: turn.text,
+            text: turn.signal == 'TurnLifecycle'
+                ? (turn.status == 'Cancelled'
+                      ? 'Request cancelled.'
+                      : 'Request failed. See Activity for details.')
+                : turn.text,
             createdAt: turn.timestamp,
             parts: turn.kitParts,
           ),
@@ -158,26 +201,22 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
       ],
     ];
 
-    if (_pendingUserMessageId != null && _pendingUserText != null) {
-      messages.add(
-        TextMessage(
-          id: _pendingUserMessageId!,
-          authorId: ownerUserId,
-          createdAt: DateTime.now().toUtc(),
-          text: _pendingUserText!,
-        ),
-      );
-    }
-
-    if (_activeStreamId != null) {
-      messages.add(
-        TextStreamMessage(
-          id: _activeStreamId!,
-          authorId: assistantUserId,
-          createdAt: DateTime.now().toUtc(),
-          streamId: _activeStreamId!,
-        ),
-      );
+    for (final pending in _pendingSends) {
+      if (!turns.any(
+        (turn) => turn.fromUser && turn.commandId == pending.commandId,
+      )) {
+        messages.add(pending.userMessage);
+      }
+      if (pending.streamId case final streamId?) {
+        messages.add(
+          TextStreamMessage(
+            id: streamId,
+            authorId: assistantUserId,
+            createdAt: pending.createdAt,
+            streamId: streamId,
+          ),
+        );
+      }
     }
 
     _appliedSequences
@@ -196,23 +235,18 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
       return;
     }
 
-    setState(() => _failure = null);
+    _showFailure(null);
 
-    final localId = _uuid.v4();
-    _pendingUserMessageId = localId;
-    _pendingUserText = trimmed;
-    await _controller.insertMessage(
-      TextMessage(
-        id: localId,
-        authorId: ownerUserId,
-        createdAt: DateTime.now().toUtc(),
-        text: trimmed,
-      ),
+    final pending = _newPendingSend(
+      trimmed,
+      expectsAcceptance: widget.onStream != null,
     );
+    await _controller.insertMessage(pending.userMessage);
+    if (!mounted) return;
 
     final stream = widget.onStream;
     if (stream != null) {
-      await _drainStream(stream(trimmed));
+      await _drainStream(pending, stream(trimmed));
       return;
     }
 
@@ -225,14 +259,41 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
       await send(trimmed);
     } on Object catch (error) {
       if (mounted) {
-        setState(() => _failure = '$error');
+        _showFailure('$error', pending: pending);
       }
     }
   }
 
-  Future<void> _drainStream(Stream<ChatDelta> deltas) async {
+  _PendingChatSend _newPendingSend(
+    String text, {
+    required bool expectsAcceptance,
+  }) {
+    final pending = _PendingChatSend(
+      id: _uuid.v4(),
+      text: text,
+      expectsAcceptance: expectsAcceptance,
+      afterSequence: widget.turns.fold(
+        0,
+        (value, turn) => turn.sequence > value ? turn.sequence : value,
+      ),
+    );
+    _pendingSends.add(pending);
+    return pending;
+  }
+
+  void _showFailure(String? message, {_PendingChatSend? pending}) {
+    setState(() {
+      _failure = message;
+      _failedSend = pending;
+    });
+  }
+
+  Future<void> _drainStream(
+    _PendingChatSend pending,
+    Stream<ChatDelta> deltas,
+  ) async {
     final streamId = _uuid.v4();
-    _activeStreamId = streamId;
+    pending.streamId = streamId;
     final streamMessage = TextStreamMessage(
       id: streamId,
       authorId: assistantUserId,
@@ -240,20 +301,40 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
       streamId: streamId,
     );
     await _controller.insertMessage(streamMessage);
+    if (!mounted) return;
     _streamStates.start(streamId);
 
     final buffer = StringBuffer();
+    final iterator = StreamIterator(deltas);
+    _streams.add(iterator);
     try {
-      await for (final delta in deltas) {
-        buffer.write(delta.text);
-        _streamStates.streaming(streamId, buffer.toString());
+      while (await iterator.moveNext()) {
+        if (!mounted) return;
+        if (iterator.current.isAcceptance) {
+          pending.commandId = iterator.current.commandId;
+          await _syncJournal(widget.turns, force: true);
+          continue;
+        }
+        buffer.write(iterator.current.text);
+        if (_pendingSends.contains(pending)) {
+          _streamStates.streaming(streamId, buffer.toString());
+        }
+      }
+      if (!mounted || !_pendingSends.contains(pending)) return;
+      if (buffer.isEmpty) {
+        throw StateError(
+          'The assistant connection ended without a response. Please try again.',
+        );
       }
       _streamStates.complete(streamId, buffer.toString());
     } on Object catch (error) {
-      _streamStates.error(streamId, '$error');
-      if (mounted) {
-        setState(() => _failure = '$error');
+      if (mounted && _pendingSends.contains(pending)) {
+        _streamStates.error(streamId, '$error');
+        _showFailure('$error', pending: pending);
       }
+    } finally {
+      _streams.remove(iterator);
+      await iterator.cancel();
     }
   }
 
@@ -278,7 +359,7 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
       }
       if (!await _recorder.hasPermission()) {
         if (mounted) {
-          setState(() => _failure = 'Microphone permission denied.');
+          _showFailure('Microphone permission denied.');
         }
         return;
       }
@@ -286,9 +367,7 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
       // Whisper expects a container (WAV); raw PCM is refused server-side quality.
       if (!await _recorder.isEncoderSupported(AudioEncoder.wav)) {
         if (mounted) {
-          setState(
-            () => _failure = 'WAV recording is not supported on this device.',
-          );
+          _showFailure('WAV recording is not supported on this device.');
         }
         return;
       }
@@ -310,12 +389,12 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
 
       if (mounted) {
         _voice.update(recording: true);
-        setState(() => _failure = null);
+        _showFailure(null);
       }
     } on Object catch (error) {
-      _voice.update(recording: false, busy: false);
       if (mounted) {
-        setState(() => _failure = 'Record failed: $error');
+        _voice.update(recording: false, busy: false);
+        _showFailure('Record failed: $error');
       }
     }
   }
@@ -323,7 +402,7 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
   Future<void> _stopAndSendVoice(StreamVoice streamVoice) async {
     _voice.update(recording: false, busy: true);
     if (mounted) {
-      setState(() => _failure = null);
+      _showFailure(null);
     }
 
     String? path;
@@ -340,23 +419,19 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
         throw StateError('Recording is empty.');
       }
 
-      final localId = _uuid.v4();
-      _pendingUserMessageId = localId;
-      _pendingUserText = _voicePlaceholder;
-      await _controller.insertMessage(
-        TextMessage(
-          id: localId,
-          authorId: ownerUserId,
-          createdAt: DateTime.now().toUtc(),
-          text: _voicePlaceholder,
-        ),
+      if (!mounted) return;
+      final pending = _newPendingSend(
+        _voicePlaceholder,
+        expectsAcceptance: true,
       );
+      await _controller.insertMessage(pending.userMessage);
+      if (!mounted) return;
 
       _voice.update(busy: false);
-      await _drainStream(streamVoice(bytes, fileName: 'voice.wav'));
+      await _drainStream(pending, streamVoice(bytes, fileName: 'voice.wav'));
     } on Object catch (error) {
       if (mounted) {
-        setState(() => _failure = '$error');
+        _showFailure('$error');
       }
     } finally {
       if (path != null) {
@@ -366,34 +441,16 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
           // best-effort temp cleanup
         }
       }
-      _voice.update(recording: false, busy: false);
-    }
-  }
-
-  Future<void> _onKitButton(KitButtonPart part) async {
-    final activate = widget.onActivateButton;
-    if (activate == null) {
-      return;
-    }
-    final offer = part.offerCommandId;
-    if (offer == null || offer.isEmpty) {
-      return;
-    }
-    try {
-      await activate(
-        offerCommandId: offer,
-        buttonId: part.buttonId,
-        action: part.action,
-      );
-    } on Object catch (error) {
-      if (mounted) {
-        setState(() => _failure = '$error');
-      }
+      if (mounted) _voice.update(recording: false, busy: false);
     }
   }
 
   @override
   void dispose() {
+    for (final stream in _streams.toList()) {
+      unawaited(stream.cancel());
+    }
+    _streams.clear();
     unawaited(_recorder.dispose());
     _controller.dispose();
     _streamStates.dispose();
@@ -458,7 +515,7 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
               value: _streamStates,
               child: ChangeNotifierProvider.value(
                 value: _voice,
-                child: Chat(
+                child: KitChat(
                   key: const Key('chat_surface'),
                   chatController: _controller,
                   currentUserId: ownerUserId,
@@ -467,7 +524,6 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
                     assistantUserId => _assistant,
                     _ => null,
                   },
-                  theme: BrainChatTheme.dark(),
                   onMessageSend: canSend ? _handleSend : null,
                   onAttachmentTap: widget.onAttachmentTap,
                   builders: Builders(
@@ -545,9 +601,6 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
                             index,
                             isSentByMe: isSentByMe,
                             groupStatus: groupStatus,
-                            onButtonPressed: widget.onActivateButton == null
-                                ? null
-                                : _onKitButton,
                             onReadChart: widget.onReadChart,
                             onReadImageBytes: widget.onReadImageBytes,
                             onReadSpreadsheet: widget.onReadSpreadsheet,

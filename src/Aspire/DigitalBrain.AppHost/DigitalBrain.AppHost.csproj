@@ -19,14 +19,4 @@
     <ProjectReference Include="../../Kernel/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
     <ProjectReference Include="../../Kernel/DigitalBrain.Scripting/DigitalBrain.Scripting.csproj" />
   </ItemGroup>
-  <PropertyGroup>
-    <CodeGraphRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..'))</CodeGraphRoot>
-  </PropertyGroup>
-  <Target Name="RefreshCodeGraph" BeforeTargets="Build">
-    <PropertyGroup>
-      <CodeGraphIndexed>$([System.IO.File]::Exists('$(CodeGraphRoot)\.codegraph\codegraph.db'))</CodeGraphIndexed>
-    </PropertyGroup>
-    <Exec Command="npx -y @colbymchenry/codegraph@latest init &quot;$(CodeGraphRoot)&quot;" WorkingDirectory="$(CodeGraphRoot)" Condition="'$(CodeGraphIndexed)' != 'True'" />
-    <Exec Command="npx -y @colbymchenry/codegraph@latest sync &quot;$(CodeGraphRoot)&quot;" WorkingDirectory="$(CodeGraphRoot)" Condition="'$(CodeGraphIndexed)' == 'True'" />
-  </Target>
 </Project>

@@ -40,7 +40,7 @@ final class ChatLoginAction {
       for (final entry in actions.entries.toList(growable: false)) {
         final current = entry.value;
         if (current.offer.commandId != turn.commandId) continue;
-        final status = switch (turn.synapse) {
+        final status = switch (turn.signal) {
           'Responded' when offered == null => LoginActionStatus.completed,
           'Responded' when offered?.id != current.action.id =>
             LoginActionStatus.superseded,
@@ -71,7 +71,7 @@ final class ChatLoginAction {
         );
       }
       if (!turn.fromUser &&
-          turn.synapse == 'Responded' &&
+          turn.signal == 'Responded' &&
           offered != null &&
           _providerLoginPaths.containsKey(offered.provider)) {
         final key = '${turn.commandId}:${offered.id}';

@@ -106,19 +106,21 @@ final class _BrainChatComposerState extends State<BrainChatComposer> {
                   scrollDirection: Axis.horizontal,
                   children: [
                     _AssistantHint(
-                      label: 'Run Bitcoin fake',
-                      prompt: 'Run the bitcoin behavior with fake data',
+                      label: 'Personal code review',
+                      prompt:
+                          'Review my local repository diff. Focus on correctness, concurrency, and durable state. Give actionable findings with file and line references; skip cosmetic comments.',
                       onSend: onSend,
                     ),
                     _AssistantHint(
-                      label: 'Show 8 examples',
-                      prompt: 'Show me the eight available behavior examples',
+                      label: 'My behaviors',
+                      prompt:
+                          'List my admitted C# behaviors and explain what each one does.',
                       onSend: onSend,
                     ),
                     _AssistantHint(
                       label: 'Create a behavior',
                       prompt:
-                          'Create a behavior for me and compile its paired tests',
+                          'Help me turn a routine into a C# behavior. Ask what should trigger it and what it should do.',
                       onSend: onSend,
                     ),
                   ],

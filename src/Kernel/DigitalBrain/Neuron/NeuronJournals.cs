@@ -5,14 +5,14 @@ using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Signals;
 namespace DigitalBrain.Core;
 
-internal sealed class NeuronJournal
+internal sealed class NeuronJournals
 {
     private readonly NeuronId _neuronId;
-    private readonly NeuronFeed _incoming;
-    private readonly NeuronFeed _outgoing;
+    private readonly JournalWindow _incoming;
+    private readonly JournalWindow _outgoing;
     private readonly List<Watcher> _watchers = [];
 
-    internal NeuronJournal(NeuronId neuronId, NeuronFeed incoming, NeuronFeed outgoing)
+    internal NeuronJournals(NeuronId neuronId, JournalWindow incoming, JournalWindow outgoing)
     {
         ArgumentNullException.ThrowIfNull(incoming);
         ArgumentNullException.ThrowIfNull(outgoing);
@@ -25,7 +25,7 @@ internal sealed class NeuronJournal
     internal long OutgoingNextSequence => _outgoing.NextSequence;
 
     internal JournalRead Read(JournalKind kind, long afterSequence)
-        => FeedFor(kind).Read(afterSequence);
+        => WindowFor(kind).Read(afterSequence);
 
     internal async Task WatchAsync(
         JournalKind kind,
@@ -35,7 +35,7 @@ internal sealed class NeuronJournal
         ArgumentNullException.ThrowIfNull(observer);
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
 
-        _ = FeedFor(kind);
+        _ = WindowFor(kind);
         _watchers.RemoveAll(existing =>
             existing.Kind == kind && existing.Observer.Equals(observer));
 
@@ -52,17 +52,17 @@ internal sealed class NeuronJournal
         _watchers.RemoveAll(existing => existing.Observer.Equals(observer));
     }
 
-    internal NeuronFeedCheckpoint IncomingCheckpoint() => _incoming.Checkpoint();
+    internal JournalWindowCheckpoint IncomingCheckpoint() => _incoming.Checkpoint();
 
-    internal NeuronFeedCheckpoint OutgoingCheckpoint() => _outgoing.Checkpoint();
+    internal JournalWindowCheckpoint OutgoingCheckpoint() => _outgoing.Checkpoint();
 
     internal void AppendIncoming(SignalDelivery delivery) => _incoming.Append(delivery);
 
     internal void AppendOutgoing(SignalDelivery delivery) => _outgoing.Append(delivery);
 
-    internal void RestoreIncoming(NeuronFeedCheckpoint checkpoint) => _incoming.Restore(checkpoint);
+    internal void RestoreIncoming(JournalWindowCheckpoint checkpoint) => _incoming.Restore(checkpoint);
 
-    internal void RestoreOutgoing(NeuronFeedCheckpoint checkpoint) => _outgoing.Restore(checkpoint);
+    internal void RestoreOutgoing(JournalWindowCheckpoint checkpoint) => _outgoing.Restore(checkpoint);
 
     internal async Task NotifyWatchersAsync()
     {
@@ -83,7 +83,7 @@ internal sealed class NeuronJournal
 
     private async Task PushAsync(Watcher watcher)
     {
-        var read = FeedFor(watcher.Kind).Read(watcher.Cursor);
+        var read = WindowFor(watcher.Kind).Read(watcher.Cursor);
 
         if (read.Delta.Count == 0 && read.ResetSnapshot is null)
         {
@@ -96,7 +96,7 @@ internal sealed class NeuronJournal
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
 
-    private NeuronFeed FeedFor(JournalKind kind) => kind switch
+    private JournalWindow WindowFor(JournalKind kind) => kind switch
     {
         JournalKind.Incoming => _incoming,
         JournalKind.Outgoing => _outgoing,

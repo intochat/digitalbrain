@@ -11,7 +11,6 @@ import 'sse_chat_delta_frames.dart';
 import 'sse_chat_frames.dart';
 import 'sse_frames.dart';
 import 'ui_models.dart';
-import 'behavior_models.dart';
 
 final class DigitalBrainUiClient {
   /// Gated on the kernel; 404 when the kernel runs ungated.
@@ -68,57 +67,6 @@ final class DigitalBrainUiClient {
   final CookieHttpClient _http;
   final bool _ownsClient;
 
-  Future<List<BehaviorSummary>> listBehaviors() async {
-    final response = await _request('GET', '/behaviors');
-    return (jsonDecode(response.body) as List<Object?>)
-        .cast<Map<String, Object?>>()
-        .map(BehaviorSummary.fromJson)
-        .toList();
-  }
-
-  Future<List<BehaviorStepSuggestion>> listBehaviorSteps() async {
-    final response = await _request('GET', '/behaviors/steps');
-    return (jsonDecode(response.body) as List<Object?>)
-        .cast<Map<String, Object?>>()
-        .map(BehaviorStepSuggestion.fromJson)
-        .toList();
-  }
-
-  Future<void> saveBehavior(String name, String source) async {
-    await _request('PUT', '/behaviors/$name', body: {'source': source});
-  }
-
-  Future<BehaviorTestReport> testBehavior(String name) async {
-    final response = await _request('POST', '/behaviors/$name/test');
-    return BehaviorTestReport.fromJson(
-      jsonDecode(response.body) as Map<String, Object?>,
-    );
-  }
-
-  Future<void> activateBehavior(String name, {required bool active}) async {
-    await _request(
-      'POST',
-      '/behaviors/$name/${active ? 'activate' : 'disable'}',
-    );
-  }
-
-  Future<String> runBehaviorFake(String name) async {
-    final response = await _request('POST', '/behaviors/$name/fake');
-    return (jsonDecode(response.body) as Map<String, Object?>)['description']
-        as String;
-  }
-
-  Future<BehaviorGeneration> generateBehavior(String request) async {
-    final response = await _request(
-      'POST',
-      '/behaviors/generate',
-      body: {'request': request},
-    );
-    return BehaviorGeneration.fromJson(
-      jsonDecode(response.body) as Map<String, Object?>,
-    );
-  }
-
   Future<http.Response> _request(
     String method,
     String path, {
@@ -157,31 +105,6 @@ final class DigitalBrainUiClient {
     if (response.statusCode != 202) {
       throw StateError(
         'surface.open failed: ${response.statusCode} ${response.body}',
-      );
-    }
-  }
-
-  Future<void> activateChatButton({
-    required String chatName,
-    required String offerCommandId,
-    required String buttonId,
-    required String action,
-  }) async {
-    final uri = baseUri.replace(path: '/owner/commands');
-    final request = http.Request('POST', uri)
-      ..headers['content-type'] = 'application/json'
-      ..body = jsonEncode({
-        'kind': 'chat.button',
-        'chatName': chatName,
-        'offerCommandId': offerCommandId,
-        'buttonId': buttonId,
-        'action': action,
-      });
-    final streamed = await _http.send(request);
-    final response = await http.Response.fromStream(streamed);
-    if (response.statusCode != 202) {
-      throw StateError(
-        'chat.button failed: ${response.statusCode} ${response.body}',
       );
     }
   }
@@ -245,7 +168,8 @@ final class DigitalBrainUiClient {
       });
     final response = await _http.send(request);
     if (response.statusCode != 200) {
-      throw StateError('chat.send failed: ${response.statusCode}');
+      final body = await response.stream.bytesToString();
+      throw StateError('chat.send failed: ${response.statusCode} $body');
     }
 
     yield* _parseChatDeltas(response);
@@ -295,13 +219,21 @@ final class DigitalBrainUiClient {
         .transform(const LineSplitter());
 
     final parser = SseChatDeltaParser();
+    var receivedResponse = false;
     await for (final line in lines) {
       for (final delta in parser.addLine(line)) {
+        receivedResponse = receivedResponse || !delta.isAcceptance;
         yield delta;
       }
     }
     for (final delta in parser.flush()) {
+      receivedResponse = receivedResponse || !delta.isAcceptance;
       yield delta;
+    }
+    if (!receivedResponse) {
+      throw StateError(
+        'The assistant connection ended without a response. Please try again.',
+      );
     }
   }
 

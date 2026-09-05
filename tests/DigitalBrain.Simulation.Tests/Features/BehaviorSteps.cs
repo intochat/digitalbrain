@@ -73,7 +73,7 @@ public sealed class BehaviorSteps
         Assert.Contains(admitted.Delta, delivery => delivery.Signal is BehaviorAdmitted);
 
         _worker = new BehaviorScriptWorker(
-            new DigitalBrainBehaviorAdmissionSource(Brain.Brain),
+            new DigitalBrainBehaviorAdmissionSource(Brain.Brain, Brain.Grains),
             new CSharpStartupScriptRunner(),
             Brain.Brain,
             NullLogger<BehaviorScriptWorker>.Instance);

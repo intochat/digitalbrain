@@ -8,7 +8,7 @@ void main() {
       'fromUser': false,
       'text': 'tea in five',
       'commandId': 'c',
-      'synapse': 'Responded',
+      'signal': 'Responded',
       'neuronId': 'n',
       'caller': 'x',
       'correlationId': 'y',
@@ -29,7 +29,7 @@ void main() {
       'fromUser': false,
       'text': 'here is the chart',
       'commandId': 'c',
-      'synapse': 'Responded',
+      'signal': 'Responded',
       'neuronId': 'n',
       'caller': 'x',
       'correlationId': 'y',
@@ -51,7 +51,7 @@ void main() {
       'fromUser': false,
       'text': 'no cards here',
       'commandId': 'c',
-      'synapse': 'Responded',
+      'signal': 'Responded',
       'neuronId': 'n',
       'caller': 'x',
       'correlationId': 'y',
@@ -103,14 +103,14 @@ void main() {
       'fromUser': true,
       'text': 'hello',
       'commandId': 'command-9',
-      'synapse': 'UserMessaged',
+      'signal': 'UserMessaged',
       'neuronId': 'chat:owner/main',
       'caller': 'session:owner/session',
       'correlationId': 'correlation-9',
       'timestamp': '2026-07-28T08:00:00Z',
     });
 
-    expect(event.synapse, 'UserMessaged');
+    expect(event.signal, 'UserMessaged');
     expect(event.neuronId, 'chat:owner/main');
     expect(event.caller, 'session:owner/session');
     expect(event.correlationId, 'correlation-9');

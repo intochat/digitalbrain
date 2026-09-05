@@ -8,17 +8,22 @@ abstract final class OnboardingCatalog {
   static const alice = GraphNode(id: 'alice', label: 'alice');
   static const vlad = GraphNode(id: 'vlad', label: 'vlad');
   static const bob = GraphNode(id: 'bob', label: 'bob');
-  static const timeline = GraphNode(id: 'timeline', label: 'default');
+  static const timeline = GraphNode(
+    id: 'timeline',
+    label: 'unsubscribed',
+    dimmed: true,
+  );
   static const profile = GraphNode(
     id: 'profile',
     label: 'profile',
     kind: GraphNodeKind.entity,
   );
-  static const aspire = GraphNode(
-    id: 'aspire',
-    label: 'IAspire',
+  static const timeModule = GraphNode(
+    id: 'time-module',
+    label: 'Time',
     kind: GraphNodeKind.module,
   );
+  static const timer = GraphNode(id: 'timer', label: 'Timer', cluster: 'Time');
 
   static const elonToAlice = GraphEdge(
     id: 'elon-alice',
@@ -30,16 +35,10 @@ abstract final class OnboardingCatalog {
     sourceId: 'vlad',
     targetId: 'bob',
   );
-  static const elonToTimeline = GraphEdge(
-    id: 'elon-timeline',
-    sourceId: 'elon',
-    targetId: 'timeline',
-    dotted: true,
-  );
-  static const clientToAspire = GraphEdge(
-    id: 'client-aspire',
+  static const clientToTimer = GraphEdge(
+    id: 'client-timer',
     sourceId: 'client',
-    targetId: 'aspire',
+    targetId: 'timer',
   );
 
   static const client = GraphNode(id: 'client', label: 'script');
@@ -127,17 +126,17 @@ abstract final class OnboardingCatalog {
     title: 'Broadcast',
     blurb: 'Fan-out from this neuron’s audience.',
     rule:
-        'Broadcast walks this neuron’s synapses plus the default instance of every IHandle type. The emitter never receives its own broadcast.',
+        'Broadcast follows this source neuron’s existing synapses for the signal type. An unsubscribed handler receives nothing. The emitter never receives its own broadcast.',
     icon: Icons.campaign_outlined,
     frames: [
       OnboardingLessonFrame(
         nodes: [elon, alice, timeline],
-        edges: [elonToAlice, elonToTimeline],
+        edges: [elonToAlice],
         duration: Duration(milliseconds: 500),
       ),
       OnboardingLessonFrame(
         nodes: [elon, alice, timeline],
-        edges: [elonToAlice, elonToTimeline],
+        edges: [elonToAlice],
         pulse: GraphPulse(
           fromId: 'elon',
           toId: 'alice',
@@ -147,12 +146,7 @@ abstract final class OnboardingCatalog {
       ),
       OnboardingLessonFrame(
         nodes: [elon, alice, timeline],
-        edges: [elonToAlice, elonToTimeline],
-        pulse: GraphPulse(
-          fromId: 'elon',
-          toId: 'timeline',
-          signature: 'broadcast-default',
-        ),
+        edges: [elonToAlice],
       ),
     ],
   );
@@ -178,11 +172,7 @@ abstract final class OnboardingCatalog {
           GraphNode(id: 'bob', label: 'bob', dimmed: true),
         ],
         edges: [elonToAlice, vladToBob],
-        pulse: GraphPulse(
-          fromId: 'elon',
-          toId: 'alice',
-          signature: 'sub-elon',
-        ),
+        pulse: GraphPulse(fromId: 'elon', toId: 'alice', signature: 'sub-elon'),
         highlightEdgeId: 'elon-alice',
       ),
     ],
@@ -199,7 +189,11 @@ abstract final class OnboardingCatalog {
       OnboardingLessonFrame(
         nodes: [elon, alice],
         edges: [elonToAlice],
-        pulse: GraphPulse(fromId: 'elon', toId: 'alice', signature: 'journal-1'),
+        pulse: GraphPulse(
+          fromId: 'elon',
+          toId: 'alice',
+          signature: 'journal-1',
+        ),
         highlightEdgeId: 'elon-alice',
       ),
     ],
@@ -238,22 +232,22 @@ abstract final class OnboardingCatalog {
   static const module = OnboardingCapability(
     id: 'module',
     title: 'Module',
-    blurb: 'IAspire is a neuron you fire at.',
+    blurb: 'Modules contain neurons with related responsibilities.',
     rule:
-        'Aspire, Excel, Memory are modules: named neurons and tools. There is no Orleans node on the graph. Scripts talk to IAspire the same way they talk to any neuron.',
+        'Time groups timer neurons; other modules group their own neurons and tools. A script sends StartTimer to a named Timer neuron. The module groups the neurons; it does not receive the signal.',
     icon: Icons.extension_outlined,
     frames: [
       OnboardingLessonFrame(
-        nodes: [client, aspire],
+        nodes: [client, timeModule, timer],
         edges: [],
         duration: Duration(milliseconds: 400),
       ),
       OnboardingLessonFrame(
-        nodes: [client, aspire],
-        edges: [clientToAspire],
+        nodes: [client, timeModule, timer],
+        edges: [clientToTimer],
         pulse: GraphPulse(
           fromId: 'client',
-          toId: 'aspire',
+          toId: 'timer',
           signature: 'module-1',
         ),
       ),

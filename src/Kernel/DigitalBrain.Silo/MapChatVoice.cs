@@ -1,12 +1,9 @@
 using DigitalBrain.Product.Identity;
-using System.Net.ServerSentEvents;
 using DigitalBrain.Abstractions;
 using DigitalBrain.AI;
 using DigitalBrain.Chat;
-using Microsoft.Extensions.AI;
 
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Journals;
 namespace DigitalBrain.Kernel;
 
 // Upload voice → local Whisper → durable chat turn (server-orchestrated).
@@ -104,7 +101,7 @@ internal static class ChatVoiceHttpMaps
                 // Same observer SSE path as typed chat.send.
                 await SseResponse.WriteAsync(
                     http.Response,
-                    StreamDeltasAsync(brain, chatInstance, text.Trim(), actor, cancellationToken),
+                    ChatTurnStream.SendAsync(brain, chatInstance, text.Trim(), actor, cancellationToken),
                     cancellationToken).ConfigureAwait(false);
             });
 
@@ -125,44 +122,4 @@ internal static class ChatVoiceHttpMaps
         }
     }
 
-    private static async IAsyncEnumerable<SseItem<ChatResponseUpdate>> StreamDeltasAsync(
-        IDigitalBrain brain,
-        string chatInstance,
-        string text,
-        ActorContext actor,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken requestAborted)
-    {
-        using var budget = new CancellationTokenSource(OwnerCommandsHttpMaps.TurnBudget);
-        var command = CommandId.New();
-        var accepted = await brain.Get<IChat>(chatInstance)
-            .RequestAsync(new SendMessage(command, text, actor))
-            .ConfigureAwait(false);
-
-        using var observer = CancellationTokenSource.CreateLinkedTokenSource(requestAborted, budget.Token);
-        var chat = brain.Get<IChat>(chatInstance);
-
-        await foreach (var page in chat.WatchJournalAsync(
-            JournalKind.Outgoing,
-            afterSequence: 0,
-            observer.Token).ConfigureAwait(false))
-        {
-            foreach (var delivery in page.Delta)
-            {
-                if (delivery.Signal is Responded responded && responded.CommandId == command)
-                {
-                    yield return new SseItem<ChatResponseUpdate>(
-                        new ChatResponseUpdate(ChatRole.Assistant, responded.Text),
-                        HttpSurfacePaths.ChatDeltaEvent);
-                    yield break;
-                }
-
-                if (delivery.Signal is TurnLifecycle life
-                    && life.TurnId == accepted.TurnId
-                    && life.Status is ChatTurnStatus.Failed or ChatTurnStatus.Cancelled)
-                {
-                    yield break;
-                }
-            }
-        }
-    }
 }

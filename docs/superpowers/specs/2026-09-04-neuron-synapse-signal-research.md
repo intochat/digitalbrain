@@ -19,8 +19,8 @@ DigitalBrain already has a durable, typed graph: neurons are Orleans `DurableGra
 
 The proposed architecture is **three planes: two stores on the grain, plus a grouping key** (and an optional off-grain projection). Episode is **not** a third durable collection on the neuron.
 
-1. **Anatomy** — `SynapseSet` (`IDurableDictionary<string, Synapse>` keyed `"synapses"`). Who *may* fire `T` from A to B. Lives on the source grain.
-2. **Traffic** — `NeuronFeed` incoming/outgoing (`IDurableList<byte[]>` compacted to **512 entries or 512 KB**). What *did* fire, recently. Lives on the same grain, separate collection.
+1. **Anatomy** — `NeuronSynapses` (`IDurableDictionary<string, Synapse>` keyed `"synapses"`). Who *may* fire `T` from A to B. Lives on the source grain.
+2. **Traffic** — `JournalWindow` incoming/outgoing (`IDurableList<byte[]>` compacted to **512 entries or 512 KB**). What *did* fire, recently. Lives on the same grain, separate collection.
 3. **Episode** — `CorrelationId` already on `SignalDelivery` **rows**. Groups a fan-out. Reconstruct edges from **incoming** journals of a **seed set** (`Caller` → journal owner + type); the envelope has **no Target**, so one source’s outgoing feed is not an edge list. Optionally project later to an `IGraph` / timeline Entity. Not a new grain type in v1.
 
 Do **not** treat synapses as events. Do **not** make synapses grains. Do **not** put lifetime traffic on the grain. Visualization and “last time I did this” read anatomy + the traffic window + an optional projection entity.
@@ -51,7 +51,7 @@ Pain points today:
 - `Weight` orders and prunes Learned; it does not decide *who* `BroadcastAsync` reaches.
 - `IsBlocking` is a constructor invariant (`Innate` only) and is never read on the hot path.
 - There is **no owner-wide neuron registry**. `IDigitalBrain.Get<T>(name)` is an address, not a catalog. A brain-wide 3D graph has a discovery problem.
-- `IGraph` / kit 3D graph is a **snapshot entity** the assistant draws; it is not a live projection of `SynapseSet`.
+- `IGraph` / kit 3D graph is a **snapshot entity** the assistant draws; it is not a live projection of `NeuronSynapses`.
 - Nested `IDigitalBrain.RequestAsync` deadlocks `BrainNeuron.Send` (serialized turns on the owner root).
 
 ---
@@ -93,11 +93,11 @@ Each research follows: **Question → Code today → Conclusion → Not decided 
 |---|---|---|---|
 | Neuron | Cell body | Durable actor | `Neuron : DurableGrain, INeuron, INeuronGrain, INeuronQuery` in [`src/Kernel/DigitalBrain/Neuron/Neuron.cs`](../../../src/Kernel/DigitalBrain/Neuron/Neuron.cs) |
 | Membrane | What may enter the cell | `Deliver` | `INeuronGrain.Deliver` — signal **into this** neuron |
-| Synapse | Directed connection | Typed weighted edge on the **source** | `Synapse` value in [`Synapse.cs`](../../../src/Kernel/DigitalBrain.Contracts/Synapses/Synapse.cs); `SynapseSet` |
+| Synapse | Directed connection | Typed weighted edge on the **source** | `Synapse` value in [`Synapse.cs`](../../../src/Kernel/DigitalBrain.Contracts/Synapses/Synapse.cs); `NeuronSynapses` |
 | Signal | Neurotransmitter payload | Typed immutable message | `abstract record Signal` — **no** id/correlation |
 | Firing / AP | This spike at time t | `SignalDelivery` | Envelope: `SignalId`, `CorrelationId`, `CausationId`, `Caller`, `Sequence`, `Timestamp`, `Principal` |
-| Recent spikes | Short-term trace | Journal | `NeuronFeed` of `SignalDelivery` |
-| Anatomy | Connectome | `SynapseSet` | Durable dict, not a log |
+| Recent spikes | Short-term trace | Journal | `JournalWindow` of `SignalDelivery` |
+| Anatomy | Connectome | `NeuronSynapses` | Durable dict, not a log |
 | This thought | One episode | Correlation / chat turn | `CorrelationId` on the **envelope** (grouping key, not a store); reconstruct from incoming journals of a seed set |
 
 The sentence that forbids collapse: **a neuron fires a signal along a synapse.**
@@ -106,21 +106,21 @@ People confuse synapse with event because both are “something happened between
 
 - **Synapse = anatomy.** Who *may* fire `T` from A to B. Survives silence. Bound does not decay. Learned decays. Not sequence-numbered.
 - **Delivery = traffic.** This firing at `t`, with causation and correlation. Sequence-numbered. Compacted away.
-- **Journal records traffic. SynapseSet records anatomy.** The Reqnroll feature [`journal-and-state.feature`](../../../tests/DigitalBrain.Substrate.Tests/Features/journal-and-state.feature) already pins: “Learning a route does not add a synapse record to the traffic journal.”
+- **Journal records traffic. NeuronSynapses records anatomy.** The Reqnroll feature [`journal-and-state.feature`](../../../tests/DigitalBrain.Substrate.Tests/Features/journal-and-state.feature) already pins: “Learning a route does not add a synapse record to the traffic journal.”
 
 **DurableGrain constraint.** One grain hosts **both** stores (`NeuronRuntime.Bind`). That does not make them one concept. Orleans will persist both; the domain must not. `CorrelationId` is a field on traffic rows, not a third collection.
 
-**Conclusion.** Keep five words: neuron, synapse, signal, delivery, journal. Execution/episode is a *grouping key* on deliveries (`CorrelationId`), reconstructed from **incoming** journals of a seed set — not a sixth grain type and not `Record()` keyed by correlation. Membrane (`Deliver`) ≠ edge (`Synapse`) ≠ payload (`Signal`).
+**Conclusion.** Keep five words: neuron, synapse, signal, delivery, journal. Execution/episode is a *grouping key* on deliveries (`CorrelationId`), reconstructed from **incoming** journals of a seed set — not a sixth grain type and not `Reinforce()` keyed by correlation. Membrane (`Deliver`) ≠ edge (`Synapse`) ≠ payload (`Signal`).
 
 **Not decided yet.** Whether UI copy says “connection” vs “synapse”; whether an episode is ever materialized as an Entity.
 
 ```mermaid
 flowchart LR
   subgraph anatomy [Anatomy plane]
-    S["SynapseSet on source"]
+    S["NeuronSynapses on source"]
   end
   subgraph traffic [Traffic plane]
-    J["NeuronFeed window"]
+    J["JournalWindow"]
   end
   subgraph episode [Episode grouping — not a grain store]
     C["CorrelationId on SignalDelivery"]
@@ -161,11 +161,11 @@ Contrast:
 **What would break if synapses were events in the same 512 KB feed.**
 
 1. **Anatomy eviction.** A busy `NewPost` stream would compact away `Subscribe`/`Bind` records. The graph would forget standing wiring.
-2. **You cannot rebuild SynapseSet from the window.** Window is traffic, not binds; even if you logged binds, the window is lossy. Tallies survive (`JournalSnapshot.Tallies`) but they are counts per CLR type name, not edges.
+2. **You cannot rebuild NeuronSynapses from the window.** Window is traffic, not binds; even if you logged binds, the window is lossy. Tallies survive (`JournalSnapshot.Tallies`) but they are counts per CLR type name, not edges.
 3. **Scripts that `WatchJournalAsync` for `NewPost` would see graph-churn events** unless every watcher filtered (R3).
-4. **Hebbian `Record` on every handled send** would write a “synapse event” per fire — the feed would be *mostly* weight updates. v2 substrate **D4’s rationale** (not D4’s decision — that one named four *traffic* planes: Signal, Internal event, Broadcast, Direct call) already warned: “The 512-entry traffic journal would be evicted by its own weight bookkeeping.” Anatomy-on-the-source is **D7** (synapse is not a grain).
+4. **Hebbian `Reinforce` on every handled send** would write a “synapse event” per fire — the feed would be *mostly* weight updates. v2 substrate **D4’s rationale** (not D4’s decision — that one named four *traffic* planes: Signal, Internal event, Broadcast, Direct call) already warned: “The 512-entry traffic journal would be evicted by its own weight bookkeeping.” Anatomy-on-the-source is **D7** (synapse is not a grain).
 
-**Quantify the 512 / 512 KB cap** ([`NeuronFeed`](../../../src/Kernel/DigitalBrain/Neuron/NeuronFeed.cs)):
+**Quantify the 512 / 512 KB cap** ([`JournalWindow`](../../../src/Kernel/DigitalBrain/Neuron/JournalWindow.cs)):
 
 ```csharp
 private const int MaxRetainedEntries = 512;
@@ -179,9 +179,9 @@ private const int MaxRetainedBytes = 512 * 1024; // 524,288 bytes
 - Tallies: `JournalSnapshot.TotalRecorded` and per-type `JournalTally` **outlive** the window. You can know “this neuron has seen 400 `NewPost`s” after the 400th has been compacted.
 - Synapse dict: **not** under 512/512KB. Unbounded except grain storage. A `Synapse` is a small record struct (two `NeuronId`s, `string` signal type, `double`, `DateTimeOffset`, enum, `long`, `bool`) — roughly **0.2–0.5 KB** serialized. **100 Bound edges ≈ 20–50 KB**; **1,000 ≈ 200–500 KB**. That is expertise-graph sized. A Learned edge per HTTP call would be grain bloat (**high severity**, R13).
 
-**Orleans infra vs the owner’s “512 KB journaling limit.”** The owner believes Orleans journaling is ~512 KB; the code already has **both** 512 entries **and** 512 KB — on `NeuronFeed`, as a **product window**, not as Orleans’s documented DurableGrain cap. Production hosting is **Azure Blob** journals (`AzureOrleansJournalHosting.AddAzureBlobJournal` / `AddAzureBlobJournalStorage` on connection `journal`), not Azure Table. Blob journals append and compact as an **op log of collection mutations**; that is infrastructure, and its exact compaction thresholds are a hosting concern, not the product number. DigitalBrain chose 512/512KB so the **domain** list stays small enough that the infra log of `Add` + `RemoveAt(0)` does not become the product. Do not replace “Orleans is 512 KB” with a Table EGT story this host does not use.
+**Orleans infra vs the owner’s “512 KB journaling limit.”** The owner believes Orleans journaling is ~512 KB; the code already has **both** 512 entries **and** 512 KB — on `JournalWindow`, as a **product window**, not as Orleans’s documented DurableGrain cap. Production hosting is **Azure Blob** journals (`AzureOrleansJournalHosting.AddAzureBlobJournal` / `AddAzureBlobJournalStorage` on connection `journal`), not Azure Table. Blob journals append and compact as an **op log of collection mutations**; that is infrastructure, and its exact compaction thresholds are a hosting concern, not the product number. DigitalBrain chose 512/512KB so the **domain** list stays small enough that the infra log of `Add` + `RemoveAt(0)` does not become the product. Do not replace “Orleans is 512 KB” with a Table EGT story this host does not use.
 
-**Conclusion.** Treating synapses as events in the feed is a category error. DurableGrain persists *state collections*. The domain journal is a compacted observation window. Event sourcing would make deliveries (or binds) the source of truth; we deliberately made **current SynapseSet** the source of truth for wiring, and a **lossy window** the source of truth for “what just happened.”
+**Conclusion.** Treating synapses as events in the feed is a category error. DurableGrain persists *state collections*. The domain journal is a compacted observation window. Event sourcing would make deliveries (or binds) the source of truth; we deliberately made **current NeuronSynapses** the source of truth for wiring, and a **lossy window** the source of truth for “what just happened.”
 
 **Not decided yet.** Physical compaction policy of the Orleans op log (hosting). Whether a *separate* long-term traffic projection exists outside the grain (R4).
 
@@ -189,15 +189,15 @@ private const int MaxRetainedBytes = 512 * 1024; // 524,288 bytes
 
 ### R3. Two stores on one neuron: anatomy vs traffic
 
-**Question.** Why must SynapseSet and NeuronFeed stay separate? When should subscribe appear in a journal?
+**Question.** Why must NeuronSynapses and JournalWindow stay separate? When should subscribe appear in a journal?
 
 **Code today.**
 
 Anatomy mutation:
 
-- `SubscribeToAsync` (in-neuron) → `BindFromAsync` → `INeuronGrain.BindOutgoing` on the **source** → `SynapseSet.Bind` → `WriteStateAsync`. **No journal append.**
-- Script path: `NeuronReference.SubscribeToAsync` → `subscriber.SendAsync(new Subscribe(source, typeof(T).Name))` ([`NeuronReferenceExtensions.cs`](../../../src/Kernel/DigitalBrain.Contracts/NeuronReferenceExtensions.cs)). That **is** a `Deliver` to the **subscriber**. `DispatchDeliveryAsync` appends incoming after `DispatchAsync` **returns without throwing** (any `DeliveryOutcome`, including `Unhandled` — not Handled-only). Then `HandleAsync(Subscribe)` calls `BindFromAsync` (silent on the source). `Record(Learned)` is the Handled-only path (`SignalSender`). Outgoing is appended in `RecordOutgoingAsync` **before** deliver, so Unhandled Sends still journal outgoing.
-- `SendAsync` / `BroadcastAsync` that **Handled** → `SynapseSet.Record(..., Learned)` **and** outgoing/incoming journal entries for the payload.
+- `SubscribeToAsync` (in-neuron) → `BindFromAsync` → `INeuronGrain.BindOutgoing` on the **source** → `NeuronSynapses.Bind` → `WriteStateAsync`. **No journal append.**
+- Script path: `NeuronReference.SubscribeToAsync` → `subscriber.SendAsync(new Subscribe(source, typeof(T).Name))` ([`NeuronReferenceExtensions.cs`](../../../src/Kernel/DigitalBrain.Contracts/NeuronReferenceExtensions.cs)). That **is** a `Deliver` to the **subscriber**. `DispatchDeliveryAsync` appends incoming after `DispatchAsync` **returns without throwing** (any `DeliveryOutcome`, including `Unhandled` — not Handled-only). Then `HandleAsync(Subscribe)` calls `BindFromAsync` (silent on the source). `Reinforce(Learned)` is the Handled-only path (`SignalSender`). Outgoing is appended in `RecordOutgoingAsync` **before** deliver, so Unhandled Sends still journal outgoing.
+- `SendAsync` / `BroadcastAsync` that **Handled** → `NeuronSynapses.Reinforce(..., Learned)` **and** outgoing/incoming journal entries for the payload.
 
 Pinned by tests:
 
@@ -208,17 +208,17 @@ Pinned by tests:
 
 | Failure | Why |
 |---|---|
-| (a) Blow the 512 KB window with graph churn | Every `Record` (Hebbian) on every handled send is a write. Busy sources would compact *payload* history to make room for weight stamps. |
+| (a) Blow the 512 KB window with graph churn | Every `Reinforce` (Hebbian) on every handled send is a write. Busy sources would compact *payload* history to make room for weight stamps. |
 | (b) Script noise | Behaviors watch journals (`BehaviorScriptWorker` ← `IBehaviors` outgoing `BehaviorAdmitted`; user scripts `WatchJournalAsync` on `IXAccount` for `NewPost`). Subscribe noise would fire chart scripts unless every watcher filtered by CLR type (they already *can*, but the default “something happened” would lie). |
 | (c) Confuse “I subscribed” with “elon posted” | Same feed, different ontology. CONTEXT.md: Journal is how scripts notice something happened; Synapse is anatomy, not traffic. |
 
 **When SHOULD subscribe appear in a journal?**
 
-| Path | Subscriber incoming | Source outgoing | Source SynapseSet |
+| Path | Subscriber incoming | Source outgoing | Source NeuronSynapses |
 |---|---|---|---|
 | `Neuron.SubscribeToAsync` / `BindOutgoing` | no | no | Bind (Bound) |
 | Script `SubscribeToAsync` → `Send(Subscribe)` to subscriber | **yes, `Subscribe` signal** | no | Bind (Bound) |
-| Handled `Send`/`Broadcast` of `T` | `T` on target incoming | `T` on source outgoing | Record (Learned) |
+| Handled `Send`/`Broadcast` of `T` | `T` on target incoming | `T` on source outgoing | Reinforce (Learned) |
 
 That is already a coherent product:
 
@@ -226,7 +226,7 @@ That is already a coherent product:
 - The source’s expertise shape changes **without** a fake `NewPost`.
 - UI “last connections” for *traffic* still comes from deliveries of `T`, not from bind ops.
 
-**Conclusion.** Keep the two stores. Do not log `Synapse` values into `NeuronFeed`. Optional future: a dedicated **anatomy journal** (not the signal feed) if audit of binds is required — that is a fourth store, not a merge. Default: Bind is silent; Subscribe-as-signal is the script-visible protocol on the subscriber.
+**Conclusion.** Keep the two stores. Do not log `Synapse` values into `JournalWindow`. Optional future: a dedicated **anatomy journal** (not the signal feed) if audit of binds is required — that is a fourth store, not a merge. Default: Bind is silent; Subscribe-as-signal is the script-visible protocol on the subscriber.
 
 **Not decided yet.** Whether the source should also emit a typed `SynapseBound` *signal* (would be traffic *about* anatomy — still not storing `Synapse` in the feed). Owner taste.
 
@@ -241,8 +241,8 @@ That is already a coherent product:
 **Code today.**
 
 - Window: last 512 or 512 KB of `SignalDelivery` per feed; `Timestamp`, `Caller`, `Signal` type/payload, `CorrelationId`.
-- Beyond the window: **tallies** (`JournalTally` by `Type.FullName`, with a frozen key for `DigitalBrainActivated`) and `TotalRecorded` / `LastSequence` / `EarliestRetainedSequence` on `JournalSnapshot`. Reads past retention return `ResetSnapshot` and empty `Delta` ([`NeuronFeed.Read`](../../../src/Kernel/DigitalBrain/Neuron/NeuronFeed.cs)).
-- Anatomy recency: `Synapse.LastFiredAt`, `FireCount` (updated only on **Handled** `Record` / potentiation). Bound edges also keep `LastFiredAt`/`FireCount` when they fire (Bind preserves counts; `Record`/`Potentiate` increments). `All()` orders by decayed `WeightAt`.
+- Beyond the window: **tallies** (`JournalTally` by `Type.FullName`, with a frozen key for `DigitalBrainActivated`) and `TotalRecorded` / `LastSequence` / `EarliestRetainedSequence` on `JournalSnapshot`. Reads past retention return `ResetSnapshot` and empty `Delta` ([`JournalWindow.Read`](../../../src/Kernel/DigitalBrain/Neuron/JournalWindow.cs)).
+- Anatomy recency: `Synapse.LastFiredAt`, `FireCount` (updated only on **Handled** `Reinforce` / potentiation). Bound edges also keep `LastFiredAt`/`FireCount` when they fire (Bind preserves counts; `Reinforce`/`Potentiate` increments). `Active()` orders by decayed `WeightAt`.
 
 **Three options for longer history:**
 
@@ -255,7 +255,7 @@ That is already a coherent product:
 **Recommendation.**
 
 - **Highlight / “what just happened”** → traffic window (option 1). This is the working-set metadata while a neuron is working.
-- **Stable graph shape** → SynapseSet (`Kind`, `SignalType`, `LastFiredAt`, `FireCount`).
+- **Stable graph shape** → NeuronSynapses (`Kind`, `SignalType`, `LastFiredAt`, `FireCount`).
 - **Brain-wide lifetime timeline** → option 2, an Entity projection (kit `IGraph` already exists as a *drawn* snapshot; a *live* brain projection is a new writer, not a kernel journal expansion).
 - **“Last time I did this”** as *agent memory* → query synapses by `LastFiredAt` + scan remaining **incoming** journals of a seed set for matching `CorrelationId` / signal type (`Caller` → this neuron). If that is not enough (compacted), **do not** un-compact the grain; project (option 2) or accept tallies (option 3). `LastFiredAt` is not correlation-scoped.
 
@@ -267,20 +267,20 @@ That is already a coherent product:
 
 ### R5. Execution-scoped working set vs lifetime graph
 
-**Question.** “During an execution there would be a list of synapses between neurons, still limited.” Is that SynapseSet, the journal, or a third thing?
+**Question.** “During an execution there would be a list of synapses between neurons, still limited.” Is that NeuronSynapses, the journal, or a third thing?
 
 **It is a grouping of traffic, not a third store on the grain.**
 
 | Plane | Where it lives | Limited by | Meaning |
 |---|---|---|---|
-| Lifetime graph | Source `SynapseSet` | Grain storage; *should* stay an expertise graph | Bound = program; Learned = scar of a successful send |
-| Traffic window | This neuron’s `NeuronFeed` | Product cap 512 / 512 KB | Recent physiology |
+| Lifetime graph | Source `NeuronSynapses` | Grain storage; *should* stay an expertise graph | Bound = program; Learned = scar of a successful send |
+| Traffic window | This neuron’s `JournalWindow` | Product cap 512 / 512 KB | Recent physiology |
 | Execution trace | `CorrelationId` on traffic **rows**; optional Entity later | Naturally small (one turn’s fan-out) | The path this turn actually took: assistant → behaviors → gmail → chart |
 
 **Code today — correlation groups a fan-out; it does not record an edge list.**
 
 - `SignalDelivery` has `Caller`, not `Target` ([`SignalDelivery.cs`](../../../src/Kernel/DigitalBrain.Contracts/Signals/SignalDelivery.cs)).
-- `SynapseSet.Record` does **not** store `CorrelationId`. `LastFiredAt` is anatomy and is **not** correlation-scoped.
+- `NeuronSynapses.Reinforce` does **not** store `CorrelationId`. `LastFiredAt` is anatomy and is **not** correlation-scoped.
 - `SignalDelivery.Create`: `correlation ?? cause?.CorrelationId ?? CorrelationId.New()`.
 - `SignalSender.BroadcastAsync` uses **one** `CorrelationId` for every receiver ([`SignalSender.cs`](../../../src/Kernel/DigitalBrain/Neuron/SignalSender.cs)); test `Broadcast_JournalsOneOutgoingEntryPerReceiver` asserts a single distinct correlation for two outgoing entries — same caller (self), still **no receiver id** on those outgoing envelopes.
 - `ReplyAsync` stamps `handling.CorrelationId`.
@@ -292,7 +292,7 @@ That is already a coherent product:
 for each neuron N in a seed set (known names, module singletons, BFS from Bound edges — R15):
   for each incoming delivery D on N where D.CorrelationId == thisTurn:
     edge := (source: D.Caller, target: N, T: type of D.Signal)
-    optionally join SynapseSet on Caller for Kind / LastFiredAt / FireCount / heat
+    optionally join NeuronSynapses on Caller for Kind / LastFiredAt / FireCount / heat
 ```
 
 Outgoing journals of a broadcaster tell you *that* a fan-out happened (N copies, one correlation); they do **not** name who received. After compaction, `LastFiredAt` on anatomy is not “this correlation.” Q9’s snapshot is how you **remember targets the envelope never stored**.
@@ -308,7 +308,7 @@ So: an execution is **not** a new kernel concept in v1. It is **one correlation*
 
 That list is bounded by fan-out, not by the lifetime graph. It does **not** need a new grain. If the UI wants it after compaction, project it onto an Entity when the turn completes (R4 option 2 / Q9).
 
-**Conclusion.** Do not add an execution-synapse grain. Do not store the episode on `SynapseSet`. Do not imply `Record()` is correlation-keyed. Reconstruct edges from incoming journals of a seed set; optionally snapshot to `IGraph` / a timeline entity.
+**Conclusion.** Do not add an execution-synapse grain. Do not store the episode on `NeuronSynapses`. Do not imply `Reinforce()` is correlation-keyed. Reconstruct edges from incoming journals of a seed set; optionally snapshot to `IGraph` / a timeline entity.
 
 **Not decided yet.** Whether chat turns write that snapshot automatically, or only when the assistant/user asks to “show what just ran.”
 
@@ -320,7 +320,7 @@ That list is bounded by fan-out, not by the lifetime graph. It does **not** need
 
 **Code today.**
 
-`IHandle<T>` = compile-time **capability** to receive `T` ([`IHandle.cs`](../../../src/Kernel/DigitalBrain.Contracts/Neurons/IHandle.cs)). A Bound synapse = **who actually receives T from this source**. Broadcast is synapse-only ([`SignalRouter.Resolve`](../../../src/Kernel/DigitalBrain/Neuron/SignalRouter.cs)): iterate `SynapseSet.For(signalType)`, never self, never “all default IHandle types.” Proven: `Broadcast_WithoutSynapsesReachesNobodyEvenWhenTypesHandleTheSignal`.
+`IHandle<T>` = compile-time **capability** to receive `T` ([`IHandle.cs`](../../../src/Kernel/DigitalBrain.Contracts/Neurons/IHandle.cs)). A Bound synapse = **who actually receives T from this source**. Broadcast is synapse-only ([`SignalRouter.BroadcastRecipientsFor`](../../../src/Kernel/DigitalBrain/Neuron/SignalRouter.cs)): iterate `NeuronSynapses.ForSignal(signalType)`, never self, never “all default IHandle types.” Proven: `Broadcast_WithoutSynapsesReachesNobodyEvenWhenTypesHandleTheSignal`.
 
 Subscribe:
 
@@ -331,7 +331,7 @@ await Brain.Get<ITimeline>("alice")
 
 Constraints on the extension method: `TSelf : INeuron, IHandle<TSignal>`, `TSource : INeuron`, and `source` must be `NeuronId.For<TSource>(...)`. On the grain: `RequireSameOwner`, `CanHandle(signalType)` via `IHandle<>` interface names ([`Neuron.RequireSubscription`](../../../src/Kernel/DigitalBrain/Neuron/Neuron.cs)).
 
-Unsubscribe removes the dict key (`SynapseSet.Unbind`). Bind and Record share `KeyFor(target, signalType)`, so there is **no leftover Learned scar** after Unsubscribe. Broadcast stops (`Unsubscribe_RemovesBoundSynapseAndBroadcastStops`). Today, Broadcast does **not** reach unsubscribed targets.
+Unsubscribe removes the dict key (`NeuronSynapses.Unbind`). Bind and Reinforce share `KeyFor(target, signalType)`, so there is **no leftover Learned scar** after Unsubscribe. Broadcast stops (`Unsubscribe_RemovesBoundSynapseAndBroadcastStops`). Today, Broadcast does **not** reach unsubscribed targets.
 
 Always-on vs once:
 
@@ -382,16 +382,16 @@ sequenceDiagram
 
 | Kind | Created by | Decays? | Product use |
 |---|---|---|---|
-| Innate | Nowhere in product paths | No | Comment: “IHandle is capability, not an innate edge.” Unused in `SynapseSet.Bind`/`Record`. Tests only. |
+| Innate | Nowhere in product paths | No | Comment: “IHandle is capability, not an innate edge.” Unused in `NeuronSynapses.Bind`/`Reinforce`. Tests only. |
 | Bound | `SubscribeTo` / `Bind` | No | **Product program** |
 | Learned | `SignalSender` after `DeliveryOutcome.Handled` | Yes, half-life 14d, floor 0.05 | Scar of a successful send |
 | Discovered | Nowhere in router | Fastest (initial weight 0.10) | Ranked-discovery spec said similarity must **not** auto-create synapses. Tests seed Discovered; router treats it as “an edge in the dict.” |
 
-`SignalRouter.Resolve`: all non-pruned synapses of that `signalType`, unique targets, never self. **Weight does not include/exclude** (except `IsPrunedAt` for non-Bound/Innate). Order in `For()` is decayed weight descending — relevant if a caller sliced “top K”; **Broadcast sends to all.**
+`SignalRouter.BroadcastRecipientsFor`: all non-pruned synapses of that `signalType`, unique targets, never self. **Weight does not include/exclude** (except `IsPrunedAt` for non-Bound/Innate). Order in `ForSignal()` is decayed weight descending — relevant if a caller sliced “top K”; **Broadcast sends to all.**
 
 `IsBlocking`: constructor throws unless `Kind == Innate` (spec D10). **Never read** by `SignalRouter` or `SignalSender`. Grep hits: `Synapse.cs` + tests.
 
-`WeightAt` / `Potentiate` / `SynapseOptions`: still live. `Record` always potentiates. Bind of an existing Learned **promotes to Bound** and may bump weight to `InnateWeight` (1.0).
+`WeightAt` / `Potentiate` / `SynapseOptions`: still live. `Reinforce` always potentiates. Bind of an existing Learned **promotes to Bound** and may bump weight to `InnateWeight` (1.0).
 
 **Read of this after synapse-only broadcast:**
 
@@ -402,7 +402,7 @@ sequenceDiagram
 
 **Recommendation (this paper).** Keep **Bound vs Learned** as the only *product* kinds. Keep `fireCount` + `lastFiredAt` as recency for viz/agents. Treat `weight` as optional heat until discovery is real. **Do not delete from the wire in this paper’s first PRs** without owner say-so.
 
-**Not decided yet.** Keep Hebbian weight on the wire, or Bound/Learned + lastFiredAt/fireCount only? Physical prune of below-floor Learned (today: read/routing exclusion only; comment in `SynapseSet`).
+**Not decided yet.** Keep Hebbian weight on the wire, or Bound/Learned + lastFiredAt/fireCount only? Physical prune of below-floor Learned (today: read/routing exclusion only; comment in `NeuronSynapses`).
 
 ---
 
@@ -437,7 +437,7 @@ sequenceDiagram
 3. Appearing as `SignalDelivery.Caller` in a journal window.
 4. Implicit module singletons (`IBehaviors`, `IBrainNeuron` session, `IChat`).
 
-Implication: “visualize my whole brain” is **enumerate-from-seeds + BFS on SynapseSet**, or a **new** owner-scoped index (Open Question). Do not scan grain storage from the product API.
+Implication: “visualize my whole brain” is **enumerate-from-seeds + BFS on NeuronSynapses**, or a **new** owner-scoped index (Open Question). Do not scan grain storage from the product API.
 
 **Conclusion.** Viz reads anatomy + traffic window. Kit graph is a valid **projection target** (Entity, off the grain) once a writer exists that pulls `ReadSynapses`. Do not host the whole-brain mesh on a neuron.
 
@@ -481,7 +481,7 @@ Assistant tools that fit the existing grain split: `read_journal` / synapses via
 English
   → IAssistant (tools on the graph)
   → SubscribeTo / AdmitBehavior / Publish
-  → SynapseSet mutates (Bound) and/or a behavior process starts
+  → NeuronSynapses mutates (Bound) and/or a behavior process starts
   → later Publish/Broadcast is heard by new subscribers
   → journals + LastFiredAt show outcomes
   → assistant or a behavior Unbind / AdmitBehavior again
@@ -500,7 +500,7 @@ Hop count 1 is **not** in this list. It is a proposed assistant-turn policy in a
 
 **What “follow synapses” means.** Executions do **not** magically walk all synapses. They `Publish`/`Broadcast`/`Send` as neurons already do; the graph shapes **who hears**. A “last time I did this” lookup is journal/tally/`ReadSynapses`, not a new inference engine in the kernel.
 
-A planner that BFS-walks SynapseSet to invent a multi-hop tool sequence would:
+A planner that BFS-walks NeuronSynapses to invent a multi-hop tool sequence would:
 
 - Re-enter `BrainNeuron.Send` (deadlock) or invent a second runtime.
 - Treat Learned scars as permissions.
@@ -516,7 +516,7 @@ A planner that BFS-walks SynapseSet to invent a multi-hop tool sequence would:
 | Self-programming without type checks (JSON bus) | High | Already rejected |
 | Treating journals as the program | High | Anatomy vs traffic (R3) |
 
-**Conclusion.** The loop is the product. The kernel remains a small deterministic substrate. Reinforcement is `Record` on Handled (heat) and human/assistant `SubscribeTo`/`UnsubscribeFrom` (program). Do not add kernel-side graph walking.
+**Conclusion.** The loop is the product. The kernel remains a small deterministic substrate. Reinforcement is `Reinforce` on Handled (heat) and human/assistant `SubscribeTo`/`UnsubscribeFrom` (program). Do not add kernel-side graph walking.
 
 **Not decided yet.** Confirm-on-mutate; whether Learned should auto-promote to Bound after N fires (almost certainly no — that would turn scars into SOPs without consent).
 
@@ -561,9 +561,9 @@ Renaming the membrane interface to `ISynapse` would teach the next reader that a
 
 ### R13. DurableDictionary growth and physical prune (load-bearing)
 
-**Question.** SynapseSet is unbounded except grain storage. Prune is read-time. What blows the grain if we are careless?
+**Question.** NeuronSynapses is unbounded except grain storage. Prune is read-time. What blows the grain if we are careless?
 
-**Code today.** `SynapseSet.All`/`For`: filter `IsPrunedAt`; **no `Remove`**. Comment: “Slice 1 pruning is read/routing exclusion. Physical reclamation belongs to a later storage-maintenance decision.” Dead Learned keys remain in `IDurableDictionary` forever, still in the Orleans op log / snapshot.
+**Code today.** `NeuronSynapses.Active`/`ForSignal`: filter `IsPrunedAt`; **no `Remove`**. Comment: “Slice 1 pruning is read/routing exclusion. Physical reclamation belongs to a later storage-maintenance decision.” Dead Learned keys remain in `IDurableDictionary` forever, still in the Orleans op log / snapshot.
 
 **Load.**
 
@@ -571,7 +571,7 @@ Renaming the membrane interface to `ISynapse` would teach the next reader that a
 - Scar per handled Send: a chatty helper that `Send`s to many one-off names could grow **without bound**.
 - Compact of the **traffic** list (`RemoveAt(0)` every overflow) writes Orleans ops continuously; that is already bounded in *domain* size but the infra log relies on DurableGrain compaction. Mixing an ever-growing synapse dict **plus** 512-entry lists on one grain is the actual storage risk, not the 512 KB *domain* cap alone.
 
-**Conclusion.** Product rule: SynapseSet is an **expertise graph, not every HTTP call.** Learned must remain prunable **and** (later) physically reclaimed. Do not log Learned into the traffic feed as a substitute for prune (that is worse). First PRs: do not implement reclamation until the owner wants it; document the risk.
+**Conclusion.** Product rule: NeuronSynapses is an **expertise graph, not every HTTP call.** Learned must remain prunable **and** (later) physically reclaimed. Do not log Learned into the traffic feed as a substitute for prune (that is worse). First PRs: do not implement reclamation until the owner wants it; document the risk.
 
 **Not decided yet.** Reminder-driven physical prune vs prune-on-write vs never (rely on Unbind only).
 
@@ -613,7 +613,7 @@ This is the **right kind of place** to put a brain-wide projection (Entity, not 
 
 **Code today.** `ExecutionNeuron` is chat-turn working memory: workload, prompt blocks, status, `IExecutionContext` deltas. ARCHITECTURE.md: “Chat turns still use `ExecutionNeuron` as per-turn working memory, not as an automation engine.” Historical durable-runs / Activity specs are superseded for product language; do not revive “Activity grain = synapse list.”
 
-**Conclusion.** `CorrelationId` on `SignalDelivery` **groups** the episode; it is not a stored edge list (`Caller` only, no `Target`). `ExecutionNeuron` may *reference* an `ExecutionId` that you also stamp into payloads if chat needs it; do not overload it as SynapseSet. If a turn snapshot is needed for the 3D “this request” highlight, write an Entity at the end of `ChatTurnWorker` (optional, later) — that is how you remember **targets the envelope never stored**.
+**Conclusion.** `CorrelationId` on `SignalDelivery` **groups** the episode; it is not a stored edge list (`Caller` only, no `Target`). `ExecutionNeuron` may *reference* an `ExecutionId` that you also stamp into payloads if chat needs it; do not overload it as NeuronSynapses. If a turn snapshot is needed for the 3D “this request” highlight, write an Entity at the end of `ChatTurnWorker` (optional, later) — that is how you remember **targets the envelope never stored**.
 
 **Not decided yet.** Auto-snapshot vs on-demand.
 
@@ -627,12 +627,12 @@ This is the **right kind of place** to put a brain-wide projection (Entity, not 
 
 - Outgoing journal: `SignalSender.RecordOutgoingAsync` **before** `Deliver`.
 - Incoming journal: `Neuron.DispatchDeliveryAsync` after dispatch (any non-throwing outcome).
-- Learned/heat: `SignalSender` after `DeliveryOutcome.Handled`, on the **source** `SynapseSet`.
+- Learned/heat: `SignalSender` after `DeliveryOutcome.Handled`, on the **source** `NeuronSynapses`.
 - Bound: `BindOutgoing` / `UnbindOutgoing` (Subscribe/Unsubscribe).
 
 `DeliverAsync` forks: same-neuron awaited send calls `_deliverLocally` (in-process) so a serialized `DurableGrain` does not `Deliver` itself. Incoming and outgoing filters **do not run** on that path. Filters run on grain **proxy** calls only. Incoming `context.Grain` is the **receiver**; anatomy lives on the **source**. Outgoing filters are silo/client DI, see the **target**, and also run on Orleans system methods. `ReadJournal` / `ReadSynapses` are `[AlwaysInterleave]` — a filter that writes durable state there breaks turns. Subscribe is an explicit `Bind`, not something inferred from `Deliver(Announced)`.
 
-**Conclusion (owner-ratified 2026-09-04).** It is possible to use filters in this architecture. It is **not** possible to move graph population onto them without breaking subscribe, self-send, or serialized turns. Allowed: incoming filter as **membrane** (owner/auth, `VerifiedActor`, tracing) around `Deliver` / `BindOutgoing` / `UnbindOutgoing`, skipping `INeuronQuery`. `SignalSender` remains the only writer of journals and synapses. Local self-delivery keeps sharing `DispatchDeliveryAsync`.
+**Conclusion (owner-ratified 2026-09-04).** It is possible to use filters in this architecture. It is **not** possible to move graph population onto them without breaking subscribe, self-send, or serialized turns. Allowed: incoming filter as **membrane** (owner/auth, `VerifiedActor`, tracing) around `Deliver` / `BindOutgoing` / `UnbindOutgoing`, skipping `INeuronQuery`. `SignalSender` appends outgoing deliveries and reinforces synapses after a handled send; `Neuron` appends incoming deliveries and binds or unbinds outgoing synapses. Local self-delivery keeps sharing `DispatchDeliveryAsync`.
 
 **Not decided yet.** Whether to *implement* that membrane filter (ownership hole on raw grain `ReadSynapses`). The constraint is decided; the PR is optional.
 
@@ -662,8 +662,8 @@ flowchart TB
   S -->|"SubscribeTo Send Watch"| M
 ```
 
-1. **Anatomy (`SynapseSet`)** — who is wired to whom for which `T`. Bound = program. Learned = scar of a successful send. Lives on the source DurableDictionary. Unbounded-ish (grain storage); must stay small in practice (expertise graph, not every HTTP call).
-2. **Traffic (`Journal` / `NeuronFeed`)** — what actually fired, last 512 or 512 KB. Recency, highlight, script triggers, “what just happened.” Tallies survive.
+1. **Anatomy (`NeuronSynapses`)** — who is wired to whom for which `T`. Bound = program. Learned = scar of a successful send. Lives on the source DurableDictionary. Unbounded-ish (grain storage); must stay small in practice (expertise graph, not every HTTP call).
+2. **Traffic (`Journal` / `JournalWindow`)** — what actually fired, last 512 or 512 KB. Recency, highlight, script triggers, “what just happened.” Tallies survive.
 3. **Episode (`CorrelationId` grouping / optional Entity)** — this user request’s path. **Not a third store on the grain.** `CorrelationId` lives on traffic rows. Reconstruct edges from **incoming** journals of a **seed set** (`Caller` → this neuron + type); outgoing copies of a broadcast do not name receivers. After compaction, snapshot to an Entity if the UI still needs the target list. Not a new grain type in v1.
 
 `INeuronGrain` remains membrane. `Synapse` remains a value. `Signal` remains payload.
@@ -681,7 +681,7 @@ This paper’s proposed design is **this naming plus a conservative next step**,
 3. **Observation path for viz/agents** using existing `INeuronQuery` — no new persistence.
 4. **Optional** kit-graph writer that *reads* synapses (after owner answers R8).
 5. **Do not** delete `Weight`/`Innate`/`Discovered`/`IsBlocking` until the owner answers R7.
-6. **Orleans call filters are membrane, not graph writers** (R17, owner-ratified). Do not `Record` / `AppendIncoming` / `Bind` from a filter.
+6. **Orleans call filters are membrane, not graph writers** (R17, owner-ratified). Do not `Reinforce` / `AppendIncoming` / `Bind` from a filter.
 
 No API break is required to think clearly. The grain already has the two stores; the refactor risk is *forgetting* that, or treating `CorrelationId` as a third collection.
 
@@ -736,7 +736,7 @@ SignalDelivery(signal, signalId, correlationId, causationId, caller, sequence, t
 
 **Migration.** Not applicable. If the owner later drops `weight` from the wire, that is an Orleans serializer/`[Id(n)]` compatibility project — **not scheduled**.
 
-**If we ever project episodes:** new `Entity` state (e.g. extend `GraphState` or a timeline record). Entities use `IPersistentState`, not `NeuronFeed`. No journal migration.
+**If we ever project episodes:** new `Entity` state (e.g. extend `GraphState` or a timeline record). Entities use `IPersistentState`, not `JournalWindow`. No journal migration.
 
 ---
 
@@ -744,7 +744,7 @@ SignalDelivery(signal, signalId, correlationId, causationId, caller, sequence, t
 
 ### (A) Synapse-as-event in the journal
 
-Put bind/unbind/potentiate into `NeuronFeed` and fold to rebuild the graph.
+Put bind/unbind/potentiate into `JournalWindow` and fold to rebuild the graph.
 
 - **For:** One “everything that happened” stream; familiar event-sourcing story.
 - **Against:** Window is 512/512KB and **lossy**. Fold would be wrong after compaction. Hebbian events would evict `NewPost`. Scripts would mix anatomy with traffic. DurableGrain is not `JournaledGrain`. Feature tests already forbid this.
@@ -766,12 +766,12 @@ Anatomy dict + traffic window + correlation/optional entity.
 - **Against:** Whole-brain viz needs discovery (R15). “Last time” older than the window needs an Entity or acceptance of `LastFiredAt`/tallies.
 - **Verdict:** **Adopt.**
 
-### (D) Collapse Learned into journal-only; SynapseSet holds only Bound
+### (D) Collapse Learned into journal-only; NeuronSynapses holds only Bound
 
-Send would not `Record` Learned. Recency only from the traffic window.
+Send would not `Reinforce` Learned. Recency only from the traffic window.
 
-- **For:** SynapseSet stays a pure program (standing SOP). No scar bloat (R13). Weight/Learned become unnecessary.
-- **Against:** After compaction, last successful **one-shot Send** (no prior `SubscribeTo`) disappears from anatomy; Broadcast would only follow Bound edges. Today, `SignalSender` `Record`s a Learned scar after `DeliveryOutcome.Handled`, and later Broadcast of the same `T` **does** reach those never-Bound targets until prune. Unsubscribe is **not** this trade-off: `Unbind` removes the dict key; there is no leftover scar. Heat for viz/`LastFiredAt` on non-Bound paths also disappears.
+- **For:** NeuronSynapses stays a pure program (standing SOP). No scar bloat (R13). Weight/Learned become unnecessary.
+- **Against:** After compaction, last successful **one-shot Send** (no prior `SubscribeTo`) disappears from anatomy; Broadcast would only follow Bound edges. Today, `SignalSender` calls `NeuronSynapses.Reinforce` after `DeliveryOutcome.Handled`, and later Broadcast of the same `T` **does** reach those never-Bound targets until prune. Unsubscribe is **not** this trade-off: `Unbind` removes the dict key; there is no leftover scar. Heat for viz/`LastFiredAt` on non-Bound paths also disappears.
 - **Verdict:** **Viable product alternative; owner must choose.** Not adopted silently. If chosen, it is a small `SignalSender` change plus tests — still not a graph rewrite.
 
 ---
@@ -846,7 +846,7 @@ The owner must answer these. This paper does **not** silently pick.
 2. **Is “last time I did this” a journal query, a new Entity projection, or something agents get as tools?** Recommendation: tools over journal + synapses first; Entity if the UI timeline must outlive 512/512KB.
 3. **Brain-wide graph: UI fan-out vs a projection grain vs kit graph entity?** Kit mount exists; live connectome writer does not.
 4. **May the assistant `SubscribeTo` on the owner’s behalf without an extra confirm, or is graph mutation always a behavior the owner admits?**
-5. **Alternative D:** SynapseSet holds only Bound; Learned is journal-only (or omitted). Scar vs pure program. Trade-off is **one-shot Send** (Broadcast would no longer reach never-Bound Learned targets), **not** Unsubscribe leftovers.
+5. **Alternative D:** NeuronSynapses holds only Bound; Learned is journal-only (or omitted). Scar vs pure program. Trade-off is **one-shot Send** (Broadcast would no longer reach never-Bound Learned targets), **not** Unsubscribe leftovers.
 6. **Physical reclamation** of pruned Learned keys (R13) — now, later, never?
 7. **Seed set for whole-brain viz** — module conventions + BFS, or a new name index (R15)?
 8. **Should in-neuron `SubscribeToAsync` journal a `Subscribe` on the subscriber** for uniform observability with the script path (R12)?
@@ -858,7 +858,7 @@ The owner must answer these. This paper does **not** silently pick.
 
 Only what this paper actually decides. Everything else is Open Questions or already shipped.
 
-1. **Three planes, not one store: two stores on the grain + a grouping key.** Anatomy = `SynapseSet`. Traffic = `NeuronFeed` window. Episode = `CorrelationId` on traffic rows (reconstruct edges from **incoming** journals of a **seed set**; optional later Entity). Episode is **not** a third collection on the neuron. Rationale: matches code and tests; forbids synapse-as-event, lifetime traffic on the grain, and treating correlation as stored edges (`SignalDelivery` has no `Target`; `Record` is not correlation-keyed).
+1. **Three planes, not one store: two stores on the grain + a grouping key.** Anatomy = `NeuronSynapses`. Traffic = `JournalWindow`. Episode = `CorrelationId` on traffic rows (reconstruct edges from **incoming** journals of a **seed set**; optional later Entity). Episode is **not** a third collection on the neuron. Rationale: matches code and tests; forbids synapse-as-event, lifetime traffic on the grain, and treating correlation as stored edges (`SignalDelivery` has no `Target`; `Reinforce` is not correlation-keyed).
 2. **`Synapse` is a value on the source, never a grain, never an event.** Rationale: cardinality; million-edge failure; R2/R11.
 3. **`INeuronGrain` is the membrane. Do not rename to `ISynapse`.** Rationale: one neuron, many synapses; Deliver ≠ edge.
 4. **`Signal` is payload; `SignalDelivery` is envelope.** Rationale: R12; identity/causation/correlation/ownership do not belong on module payloads.
@@ -868,7 +868,7 @@ Only what this paper actually decides. Everything else is Open Questions or alre
 8. **Executions do not walk the graph.** They Send/Publish/Broadcast; the graph shapes who hears. “Last time I did this” is query, not a kernel planner. Rationale: no second runtime; nested `IDigitalBrain` / `BrainNeuron.Send` from a still-open Deliver **deadlocks** (serialized turns). Hop count 1 is another spec’s assistant-turn proposal, not this paper’s kernel law.
 9. **Innate / Discovered / `IsBlocking` / weight are not deleted in this paper’s first PRs.** Rationale: wire compatibility; owner must answer Q1.
 10. **Conservative implementation: document, then optional read path, then cleanup after answers.** Rationale: the graph is already powerful; the failure mode is a confused rewrite.
-11. **Grain call filters may exist; they must not populate the graph.** Incoming/outgoing filters are allowed as membrane (auth, principal, trace). They must not write `SynapseSet` or `NeuronFeed`. Rationale: owner-ratified R17 — moving population onto filters breaks subscribe (wiring is `Bind`, not inferred from `Deliver`), self-send (`_deliverLocally` skips the proxy), or serialized turns (writes on `[AlwaysInterleave]` reads; nested `GetGrain` from a filter on Deliver). `SignalSender` stays the only journal/synapse writer.
+11. **Grain call filters may exist; they must not populate the graph.** Incoming/outgoing filters are allowed as membrane (auth, principal, trace). They must not write `NeuronSynapses` or `JournalWindow`. Rationale: owner-ratified R17 — moving population onto filters breaks subscribe (wiring is `Bind`, not inferred from `Deliver`), self-send (`_deliverLocally` skips the proxy), or serialized turns (writes on `[AlwaysInterleave]` reads; nested `GetGrain` from a filter on Deliver). `SignalSender` appends outgoing deliveries and reinforces synapses after a handled send; `Neuron` appends incoming deliveries and binds or unbinds outgoing synapses.
 
 ---
 
@@ -882,7 +882,7 @@ Only what this paper actually decides. Everything else is Open Questions or alre
 - [`2026-09-03-kit-graph-3d-design.md`](./2026-09-03-kit-graph-3d-design.md) — kit 3D graph as **entity snapshot**.
 - [`2026-09-04-mcp-specialist-agents-design.md`](./2026-09-04-mcp-specialist-agents-design.md) — nested `BrainNeuron.Send` deadlock; hop count 1 is **that** spec’s assistant-turn proposal, not substrate code.
 - [`2026-09-04-scripted-behaviors-design.md`](./2026-09-04-scripted-behaviors-design.md) — behaviors as C# outside the silo.
-- Code: `INeuron`, `INeuronGrain`, `IHandle`, `Synapse`, `SynapseKind`, `Signal`, `SignalDelivery`, `Subscribe`, `NeuronReferenceExtensions`, `Neuron`, `SynapseSet`, `SignalRouter`, `SignalSender`, `NeuronFeed`, `NeuronRuntime`, `SynapseOptions`, `BrainNeuron`, `BehaviorsNeuron`, `IDigitalBrain`, `IGraph`, `ExecutionNeuron`, `ChatTurnWorker`.
+- Code: `INeuron`, `INeuronGrain`, `IHandle`, `Synapse`, `SynapseKind`, `Signal`, `SignalDelivery`, `Subscribe`, `NeuronReferenceExtensions`, `Neuron`, `NeuronSynapses`, `SignalRouter`, `SignalSender`, `JournalWindow`, `NeuronRuntime`, `SynapseOptions`, `BrainNeuron`, `BehaviorsNeuron`, `IDigitalBrain`, `IGraph`, `ExecutionNeuron`, `ChatTurnWorker`.
 
 ---
 
@@ -899,8 +899,8 @@ Each PR independently reviewable. **Do not rewrite the graph until researches co
 
 ### PR 2 — Guardrail comments only (optional, tiny)
 
-- **Title:** `docs: membrane vs synapse comments on INeuronGrain and SynapseSet`
-- **Files/components:** `INeuronGrain.cs`, `Synapse.cs`, `NeuronFeed.cs`, `SignalRouter.cs` — short factual comments already mostly present; add “not an event store” / “512 KB is the traffic window, not synapse storage” where a future rename would hurt.
+- **Title:** `docs: membrane vs synapse comments on INeuronGrain and NeuronSynapses`
+- **Files/components:** `INeuronGrain.cs`, `Synapse.cs`, `JournalWindow.cs`, `SignalRouter.cs` — short factual comments already mostly present; add “not an event store” / “512 KB is the traffic window, not synapse storage” where a future rename would hurt.
 - **Dependencies:** PR 1.
 - **Description:** Zero behavior change. Makes R11/R2 locally obvious. Skip if comments are already sufficient.
 
@@ -945,15 +945,15 @@ Each PR independently reviewable. **Do not rewrite the graph until researches co
 ### PR 6 — Kind/weight cleanup (only after Q1 and Q5)
 
 - **Title:** TBD — either `refactor: document Bound/Learned as product kinds` (comments/tests only) **or** a wire change the owner explicitly requested.
-- **Files/components:** `SynapseKind`, `Synapse`, `SynapseSet`, `SignalSender`, tests.
+- **Files/components:** `SynapseKind`, `Synapse`, `NeuronSynapses`, `SignalSender`, tests.
 - **Dependencies:** PR 1; **written owner decision on Open Questions 1 and 5**.
-- **Description:** Default if the owner delays: **no PR**. If they choose “heat only,” stop using weight in any new code but keep `[Id(3)]` on the wire. If they choose alternative D, stop `Record(Learned)` and add tests that Send does not grow SynapseSet. **Do not delete Innate/Discovered/IsBlocking/Weight in this PR unless the owner’s answer is an explicit wire break.**
+- **Description:** Default if the owner delays: **no PR**. If they choose “heat only,” stop using weight in any new code but keep `[Id(3)]` on the wire. If they choose alternative D, stop `Reinforce(Learned)` and add tests that Send does not grow NeuronSynapses. **Do not delete Innate/Discovered/IsBlocking/Weight in this PR unless the owner’s answer is an explicit wire break.**
 
 ### PR 7 — Physical prune of Learned (only after Q6)
 
 - **Title:** `feat: reclaim pruned Learned synapses from the durable dictionary`
-- **Files/components:** `SynapseSet`, tests, maybe a maintenance path on activate (not a timer — neurons forbid `RegisterTimer` interleaving).
+- **Files/components:** `NeuronSynapses`, tests, maybe a maintenance path on activate (not a timer — neurons forbid `RegisterTimer` interleaving).
 - **Dependencies:** PR 1; **owner answer to Q6**.
 - **Description:** Today prune is read-time exclusion. This PR is storage maintenance, not routing. Not scheduled until Q6.
 
-**Out of scope for this train:** synapse grains, synapse event store, `ListNeurons` registry (unless Q7), `INeuronGrain` rename, second runtime, JSON capability bus, **moving `Record` / journal append onto `IIncomingGrainCallFilter` / `IOutgoingGrainCallFilter`**. An optional later PR may add an incoming **membrane** filter (owner/auth/trace only); it is not scheduled until someone wants the raw-grain ownership hole closed.
+**Out of scope for this train:** synapse grains, synapse event store, `ListNeurons` registry (unless Q7), `INeuronGrain` rename, second runtime, JSON capability bus, **moving `Reinforce` / journal append onto `IIncomingGrainCallFilter` / `IOutgoingGrainCallFilter`**. An optional later PR may add an incoming **membrane** filter (owner/auth/trace only); it is not scheduled until someone wants the raw-grain ownership hole closed.

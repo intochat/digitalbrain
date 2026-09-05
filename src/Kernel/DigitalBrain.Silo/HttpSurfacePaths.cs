@@ -11,6 +11,8 @@ internal static class HttpSurfacePaths
     public const string SurfaceOpenedEvent = "surface-opened";
     public const string ChatTurnEvent = "chat-turn";
     public const string ChatDeltaEvent = "chat-delta";
+    public const string ChatErrorEvent = "chat-error";
+    public const string ChatAcceptedEvent = "chat-accepted";
 
     public const string KindChatSend = "chat.send";
     public const string KindChatCancelTurn = "chat.cancel-turn";

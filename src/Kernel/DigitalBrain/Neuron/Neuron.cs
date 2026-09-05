@@ -27,7 +27,7 @@ public abstract class Neuron :
             Id,
             _components.Clock,
             _components.Router,
-            _components.Journal,
+            _components.Journals,
             _components.Synapses,
             GrainFactory,
             DispatchDeliveryAsync,
@@ -68,21 +68,21 @@ public abstract class Neuron :
     }
 
     public Task<JournalRead> ReadJournal(JournalKind kind, long afterSequence)
-        => Task.FromResult(_components.Journal.Read(kind, afterSequence));
+        => Task.FromResult(_components.Journals.Read(kind, afterSequence));
 
     public Task<IReadOnlyList<Synapse>> ReadSynapses()
-        => Task.FromResult(_components.Synapses.All());
+        => Task.FromResult(_components.Synapses.Active());
 
     public async Task Watch(
         JournalKind kind,
         long afterSequence,
         IJournalObserver observer)
-        => await _components.Journal.WatchAsync(kind, afterSequence, observer)
+        => await _components.Journals.WatchAsync(kind, afterSequence, observer)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
     public Task Unwatch(IJournalObserver observer)
     {
-        _components.Journal.Unwatch(observer);
+        _components.Journals.Unwatch(observer);
         return Task.CompletedTask;
     }
 
@@ -164,9 +164,9 @@ public abstract class Neuron :
                     cancellationToken)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-            _components.Journal.AppendIncoming(delivery);
+            _components.Journals.AppendIncoming(delivery);
             await WriteStateAsync(cancellationToken).ConfigureAwait(true);
-            await _components.Journal.NotifyWatchersAsync()
+            await _components.Journals.NotifyWatchersAsync()
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
 
             return outcome;

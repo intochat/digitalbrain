@@ -6,16 +6,25 @@ final class SendMessageRequest {
   Map<String, Object?> toJson() => {'text': text};
 }
 
-/// One [ChatResponseUpdate] frame from POST /chats/{name}/messages/stream.
+/// An acceptance receipt or assistant content from the chat command stream.
 ///
 /// Unknown content `$type` values are retained as [ChatDeltaPart] with raw
 /// fields so older clients do not crash when the edge starts emitting data/uri.
 
 final class ChatDelta {
-  const ChatDelta({required this.role, required this.contents});
+  const ChatDelta({required this.role, required this.contents})
+    : commandId = null,
+      turnId = null;
+
+  const ChatDelta.accepted({required this.commandId, required this.turnId})
+    : role = null,
+      contents = const [];
 
   final String? role;
   final List<ChatDeltaPart> contents;
+  final String? commandId;
+  final String? turnId;
+  bool get isAcceptance => commandId != null;
 
   String get text => contents
       .map((part) => part.text ?? '')
@@ -197,13 +206,17 @@ final class ChatGraphOffer {
       nodes: rawNodes is List
           ? rawNodes
                 .whereType<Map>()
-                .map((e) => ChatGraphNode.fromJson(Map<String, Object?>.from(e)))
+                .map(
+                  (e) => ChatGraphNode.fromJson(Map<String, Object?>.from(e)),
+                )
                 .toList(growable: false)
           : const <ChatGraphNode>[],
       edges: rawEdges is List
           ? rawEdges
                 .whereType<Map>()
-                .map((e) => ChatGraphEdge.fromJson(Map<String, Object?>.from(e)))
+                .map(
+                  (e) => ChatGraphEdge.fromJson(Map<String, Object?>.from(e)),
+                )
                 .toList(growable: false)
           : const <ChatGraphEdge>[],
     );
@@ -316,7 +329,7 @@ final class ChatTurnEvent {
     required this.fromUser,
     required this.text,
     required this.commandId,
-    required this.synapse,
+    required this.signal,
     required this.neuronId,
     required this.caller,
     required this.correlationId,
@@ -334,7 +347,7 @@ final class ChatTurnEvent {
   final bool fromUser;
   final String text;
   final String commandId;
-  final String synapse;
+  final String signal;
   final String neuronId;
   final String caller;
   final String correlationId;
@@ -384,7 +397,7 @@ final class ChatTurnEvent {
       fromUser: json['fromUser'] as bool,
       text: json['text'] as String,
       commandId: json['commandId'] as String,
-      synapse: json['synapse'] as String,
+      signal: json['signal'] as String,
       neuronId: json['neuronId'] as String,
       caller: json['caller'] as String,
       correlationId: json['correlationId'] as String,

@@ -11,8 +11,8 @@ records intent the code cannot show yet. Supersedes all PersonaPlex-era plans.
 
 Multiuser chat product. One kernel image, one Flutter codebase, entities all the
 way down. Core differentiator: **the neuron substrate itself** — a durable, weighted
-graph of neurons connected by synapses, routing signals by learned strength rather
-than by name. User-authored C# scripts run out of process (`AdmitBehavior`); they
+graph of neurons connected by synapses. Broadcast follows the source neuron's
+existing synapses; weight orders connections and prunes Learned ones. C# scripts run out of process (`AdmitBehavior`); they
 `Send` typed signals and write entities. No runtime-generated Orleans types and no
 second, English-language runtime.
 
@@ -76,6 +76,10 @@ KitGalleryScreen) is the starting point for the widget side.
 User- and assistant-authored C# runs in `DigitalBrain.Scripting` (outside the silo).
 `AdmitBehavior` admits a script; the script `Send`s typed signals and writes entities.
 Chat turns still use `ExecutionNeuron` as per-turn working memory, not as an automation engine.
+Current behavior definitions, revisions, and execution diagnostics are durable state
+on `BehaviorsNeuron`. The worker reconciles that state; journal notifications only
+reduce latency. Flutter chat offers admit/read/list/remove tools for C# behaviors.
+See [Getting started](GETTING_STARTED.md) for local repository review and an executable example.
 
 ## Integration modules
 

@@ -8,7 +8,10 @@ import 'graph_layout.dart';
 import 'graph_models.dart';
 
 /// Nodes one edge away from a node, split by direction.
-typedef GraphNeighbours = ({List<GraphNode> incoming, List<GraphNode> outgoing});
+typedef GraphNeighbours = ({
+  List<GraphNode> incoming,
+  List<GraphNode> outgoing,
+});
 
 /// Selection, camera and browser-style navigation over a graph.
 ///
@@ -29,6 +32,7 @@ final class KitGraphController extends ChangeNotifier {
   List<GraphEdge> _edges = const [];
   Map<String, GraphPoint> _layout = const {};
   final Map<String, GraphNode> _byId = {};
+  int _graphRevision = 0;
 
   final List<String> _history = [];
   int _cursor = -1;
@@ -39,6 +43,7 @@ final class KitGraphController extends ChangeNotifier {
   List<GraphNode> get nodes => UnmodifiableListView(_nodes);
   List<GraphEdge> get edges => UnmodifiableListView(_edges);
   Map<String, GraphPoint> get layout => UnmodifiableMapView(_layout);
+  int get graphRevision => _graphRevision;
 
   String? get selected => _cursor < 0 ? null : _history[_cursor];
   bool get canGoBack => _cursor > 0;
@@ -63,6 +68,7 @@ final class KitGraphController extends ChangeNotifier {
       ..clear()
       ..addEntries(nodes.map((n) => MapEntry(n.id, n)));
     _layout = layoutGraph(nodes);
+    _graphRevision++;
   }
 
   GraphNode? nodeById(String id) => _byId[id];

@@ -65,7 +65,7 @@ internal sealed class MixedBroadcaster : Neuron, IMixedBroadcaster
 
     public async Task<int> Broadcast(NeuronId silent, string text)
     {
-        _routes[SynapseSet.KeyFor(silent, nameof(MixedPing))] = new Synapse(
+        _routes[NeuronSynapses.KeyFor(silent, nameof(MixedPing))] = new Synapse(
             Id,
             silent,
             nameof(MixedPing),

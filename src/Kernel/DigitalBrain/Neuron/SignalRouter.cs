@@ -7,15 +7,15 @@ namespace DigitalBrain.Core;
 // capability to receive; it does not subscribe every instance of a type.
 public sealed class SignalRouter
 {
-    internal IReadOnlyList<NeuronId> Resolve(Signal signal, NeuronId self, SynapseSet learned)
+    internal IReadOnlyList<NeuronId> BroadcastRecipientsFor(Signal signal, NeuronId source, NeuronSynapses synapses)
     {
         ArgumentNullException.ThrowIfNull(signal);
-        ArgumentNullException.ThrowIfNull(learned);
+        ArgumentNullException.ThrowIfNull(synapses);
 
         var receivers = new List<NeuronId>();
         // Seeded with self: a broadcaster must never receive its own broadcast.
-        var seen = new HashSet<NeuronId> { self };
-        foreach (var synapse in learned.For(signal.GetType().Name))
+        var seen = new HashSet<NeuronId> { source };
+        foreach (var synapse in synapses.ForSignal(signal.GetType().Name))
         {
             if (seen.Add(synapse.Target))
             {

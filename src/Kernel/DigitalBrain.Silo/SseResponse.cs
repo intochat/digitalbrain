@@ -23,13 +23,12 @@ internal static class SseResponse
         await response.Body.WriteAsync(ConnectedComment, cancellationToken).ConfigureAwait(false);
         await response.Body.FlushAsync(cancellationToken).ConfigureAwait(false);
 
-        var json = typeof(T) == typeof(ChatResponseUpdate) ? AiJson : EventJson;
-
         await SseFormatter.WriteAsync(
             events,
             response.Body,
             (item, writer) =>
             {
+                var json = item.Data is ChatResponseUpdate ? AiJson : EventJson;
                 var payload = JsonSerializer.SerializeToUtf8Bytes(item.Data, json);
                 var span = writer.GetSpan(payload.Length);
                 payload.CopyTo(span);

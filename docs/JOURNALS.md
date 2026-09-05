@@ -15,9 +15,10 @@ Three concepts share the word "journal" in this codebase's ancestry. This is the
    An `Entity<TState>` (`DigitalBrain.Core`) is a plain stateful grain: `Read()`/`SaveAsync()`
    over durable state. It has no journals and no synapse membrane, and it is never a
    synapse-graph endpoint.
-2. **The session neuron is the owner's journal hub.** Owner-level views watch the session
-   neuron's Outgoing journal (`OwnerSessionJournal`, the kernel SSE maps) and proxy-read
-   subject neurons via `ISessionNeuron.ReadNeuronJournal`.
+2. **The brain neuron is the owner's journal hub.** `IBrainNeuron.ReadNeuronJournal` and
+   `WatchNeuron` proxy access to subject neurons. Its persisted address remains
+   `sessionneuron` / `session`. The kernel SSE helper `OwnerSessionJournal` watches the
+   named chat or UI renderer neuron's Outgoing journal through `IDigitalBrain`.
 3. **Writes journal, reads don't.** Entity mutations are driven by neurons: a neuron fires a
    signal along a synapse, the handling neuron mutates the entity, and that neuron's Outgoing
    journal records the effect. Clients and UI read entities directly
@@ -29,8 +30,10 @@ Three concepts share the word "journal" in this codebase's ancestry. This is the
    compatibility constraint, not vocabulary.
 5. **Orleans grain call filters are not a journal and not a synapse writer.** Incoming/outgoing
    filters may wrap the membrane (auth, principal, trace). They must not append feeds or
-   `Record`/`Bind` synapses: self-send never hits a grain proxy, Subscribe is explicit
-   `BindOutgoing`, and query methods interleave. `SignalSender` is the only population path.
+   `Reinforce`/`Bind` synapses: self-send never hits a grain proxy, Subscribe is explicit
+   `BindOutgoing`, and query methods interleave. `SignalSender` appends outgoing deliveries
+   and reinforces synapses after a handled send. `Neuron` appends incoming deliveries and
+   binds or unbinds outgoing synapses.
 
 ## Semantics pinned by tests (phase 2)
 

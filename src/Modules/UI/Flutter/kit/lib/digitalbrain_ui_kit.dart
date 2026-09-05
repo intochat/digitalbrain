@@ -1,5 +1,6 @@
 library;
 
+export 'src/chat/kit_chat.dart';
 export 'src/chat/kit_chat_builders.dart';
 export 'src/chat/kit_message_factory.dart';
 export 'src/components/button/kit_button.dart';

@@ -34,18 +34,18 @@ public sealed class NeuronRuntime
         ArgumentNullException.ThrowIfNull(activationServices);
 
         var entries = activationServices.GetRequiredService<Serializer<JournalEntry>>();
-        var incoming = Feed("incoming");
-        var outgoing = Feed("outgoing");
-        var journal = new NeuronJournal(neuronId, incoming, outgoing);
-        var synapses = new SynapseSet(
+        var incoming = Window("incoming");
+        var outgoing = Window("outgoing");
+        var journals = new NeuronJournals(neuronId, incoming, outgoing);
+        var synapses = new NeuronSynapses(
             activationServices.GetRequiredKeyedService<IDurableDictionary<string, Synapse>>("synapses"),
             Options,
             neuronId,
             Clock);
 
-        return new(Clock, Router, journal, synapses, Dispatcher);
+        return new(Clock, Router, journals, synapses, Dispatcher);
 
-        NeuronFeed Feed(string name) => new(
+        JournalWindow Window(string name) => new(
             activationServices.GetRequiredKeyedService<IDurableList<byte[]>>(name),
             activationServices.GetRequiredKeyedService<IDurableDictionary<string, long>>($"{name}.tally"),
             activationServices.GetRequiredKeyedService<IDurableValue<long>>($"{name}.sequence"),
@@ -56,6 +56,6 @@ public sealed class NeuronRuntime
 internal sealed record NeuronActivationComponents(
     TimeProvider Clock,
     SignalRouter Router,
-    NeuronJournal Journal,
-    SynapseSet Synapses,
+    NeuronJournals Journals,
+    NeuronSynapses Synapses,
     SignalDispatcher Dispatcher);

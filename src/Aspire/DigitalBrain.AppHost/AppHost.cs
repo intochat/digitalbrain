@@ -115,6 +115,12 @@ var kernel = builder.AddProject<Projects.DigitalBrain_Silo>(ProductSurfaceResour
         if (developmentClusterId is not null)
         {
             context.EnvironmentVariables["Orleans__ClusterId"] = developmentClusterId;
+            // Local reviews read this checkout. Production has no host workspace unless
+            // one is explicitly configured for its owner.
+            context.EnvironmentVariables["DigitalBrain__Workspace__RepositoryPath"] =
+                builder.Configuration["DigitalBrain:Workspace:RepositoryPath"]
+                    ?? Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "../../.."));
+            context.EnvironmentVariables["DigitalBrain__Workspace__Owner"] = ShellHostingExtensions.DefaultOwner;
         }
     });
 

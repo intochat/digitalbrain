@@ -4,19 +4,19 @@ using Orleans.Journaling;
 
 namespace DigitalBrain.Core;
 
-// A neuron's outgoing edges, held in its own durable state (spec D7). Keyed by target+signal
-// type so the same pair of neurons can carry two differently-typed synapses.
-internal sealed class SynapseSet
+// A source neuron's synapses: binding, reinforcement, and decay. Each target+signal pair
+// identifies one connection in the neuron's durable state.
+internal sealed class NeuronSynapses
 {
     private readonly IDurableDictionary<string, Synapse> _synapses;
     private readonly SynapseOptions _options;
     private readonly TimeProvider _time;
-    private readonly NeuronId _owner;
+    private readonly NeuronId _source;
 
-    internal SynapseSet(
+    internal NeuronSynapses(
         IDurableDictionary<string, Synapse> synapses,
         SynapseOptions options,
-        NeuronId owner,
+        NeuronId source,
         TimeProvider time)
     {
         ArgumentNullException.ThrowIfNull(synapses);
@@ -25,7 +25,7 @@ internal sealed class SynapseSet
 
         _synapses = synapses;
         _options = options;
-        _owner = owner;
+        _source = source;
         _time = time;
     }
 
@@ -35,7 +35,7 @@ internal sealed class SynapseSet
     // Slice 1 pruning is read/routing exclusion. Physical reclamation belongs to a later
     // storage-maintenance decision. Returned records retain stored Weight and are ordered by
     // effective decayed strength; callers can use WeightAt when they need the current value.
-    internal IReadOnlyList<Synapse> All()
+    internal IReadOnlyList<Synapse> Active()
     {
         var now = _time.GetUtcNow();
 
@@ -49,7 +49,7 @@ internal sealed class SynapseSet
 
     // Slice 1 pruning is read/routing exclusion. Physical reclamation belongs to a later
     // storage-maintenance decision.
-    internal IReadOnlyList<Synapse> For(string signalType)
+    internal IReadOnlyList<Synapse> ForSignal(string signalType)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(signalType);
 
@@ -64,9 +64,9 @@ internal sealed class SynapseSet
         ];
     }
 
-    // Hebbian bookkeeping. Call ONLY after the receiver handled the signal — an unhandled
-    // delivery must not strengthen the path that produced it.
-    internal Synapse Record(NeuronId target, string signalType, SynapseKind kind)
+    // A successful fire creates or strengthens its synapse. Call only after the receiver
+    // handled the signal; an unhandled delivery must not reinforce its path.
+    internal Synapse Reinforce(NeuronId target, string signalType, SynapseKind kind)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(signalType);
 
@@ -76,7 +76,7 @@ internal sealed class SynapseSet
         var current = _synapses.TryGetValue(key, out var existing)
             ? existing
             : new Synapse(
-                _owner,
+                _source,
                 target,
                 signalType,
                 _options.InitialWeightFor(kind),
@@ -113,7 +113,7 @@ internal sealed class SynapseSet
         }
 
         var bound = new Synapse(
-            _owner,
+            _source,
             target,
             signalType,
             _options.InnateWeight,

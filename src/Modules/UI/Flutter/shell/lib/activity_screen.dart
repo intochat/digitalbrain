@@ -142,7 +142,7 @@ final class _ActivityEntry extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  turn.synapse,
+                  turn.signal,
                   style: BrainType.metaStrong.copyWith(color: color),
                 ),
                 const SizedBox(height: 6),

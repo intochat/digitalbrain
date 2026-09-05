@@ -2,10 +2,10 @@ import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('the catalog lists the eight foundational capabilities in rail order', () {
-    expect(
-      OnboardingCatalog.capabilities.map((item) => item.id).toList(),
-      [
+  test(
+    'the catalog lists the eight foundational capabilities in rail order',
+    () {
+      expect(OnboardingCatalog.capabilities.map((item) => item.id).toList(), [
         'fire',
         'handle',
         'synapse',
@@ -14,9 +14,9 @@ void main() {
         'journal',
         'entity',
         'module',
-      ],
-    );
-  });
+      ]);
+    },
+  );
 
   test('a handled fire ends with a solid synapse on the source', () {
     final last = OnboardingCatalog.synapse.frames.last;
@@ -27,12 +27,25 @@ void main() {
     expect(last.highlightEdgeId, 'elon-alice');
   });
 
-  test('broadcast never pulses the emitter', () {
-    for (final frame in OnboardingCatalog.broadcast.frames) {
-      expect(frame.pulse?.toId, isNot('elon'));
-      expect(frame.pulse?.fromId ?? 'elon', 'elon');
-    }
-  });
+  test(
+    'broadcast follows an existing edge and never reaches an unsubscribed handler',
+    () {
+      for (final frame in OnboardingCatalog.broadcast.frames) {
+        expect(frame.pulse?.toId, isNot('elon'));
+        expect(frame.pulse?.toId, isNot('timeline'));
+        expect(frame.pulse?.fromId ?? 'elon', 'elon');
+        if (frame.pulse case final pulse?) {
+          expect(
+            frame.edges.any(
+              (edge) =>
+                  edge.sourceId == pulse.fromId && edge.targetId == pulse.toId,
+            ),
+            isTrue,
+          );
+        }
+      }
+    },
+  );
 
   test('subscribe to elon does not pulse bob', () {
     final last = OnboardingCatalog.subscribe.frames.last;
@@ -51,11 +64,21 @@ void main() {
     }
   });
 
-  test('module lesson fires at IAspire, not an Orleans node', () {
+  test('module lesson fires at a contained neuron', () {
     final last = OnboardingCatalog.module.frames.last;
-    expect(last.pulse?.toId, 'aspire');
-    expect(last.nodes.any((node) => node.id.toLowerCase().contains('orleans')), isFalse);
-    expect(last.nodes.singleWhere((node) => node.id == 'aspire').kind, GraphNodeKind.module);
+    expect(last.pulse?.toId, 'timer');
+    expect(
+      last.nodes.any((node) => node.id.toLowerCase().contains('orleans')),
+      isFalse,
+    );
+    expect(
+      last.nodes.singleWhere((node) => node.id == 'time-module').kind,
+      GraphNodeKind.module,
+    );
+    expect(
+      last.nodes.singleWhere((node) => node.id == 'timer').cluster,
+      'Time',
+    );
   });
 
   test('a player with animations off stays on the completed frame', () {
