@@ -7,15 +7,14 @@ using Orleans.Concurrency;
 namespace DigitalBrain.Abstractions.Neurons;
 
 // The whole surface of a neuron: the two verbs, Deliver (which only another neuron's Fire
-// calls), and the reads. A read is a query — nothing moves, nothing is journaled — so the
-// Read* methods interleave; Deliver interleaves too, because accepting a signal only
-// appends to the journal and never runs the reaction.
+// calls), CancelReaction, and the reads. Everything that interleaves does so because it must
+// reach a neuron whose turn is busy running a reaction, and none of it runs one.
 [Alias("db.v3.neuron")]
 public interface INeuron : IGrainWithStringKey
 {
     // to == null: along every synapse of signal.Type. to != null: along exactly that synapse,
     // creating it first if missing. Returns the envelope it minted and the number of neurons
-    // delivered to.
+    // accepting it or reporting Busy.
     [Alias(nameof(Fire))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
     Task<FireOutcome> Fire(Signal signal, NeuronId? to, CorrelationId? correlation, CancellationToken cancellationToken = default);
@@ -32,12 +31,24 @@ public interface INeuron : IGrainWithStringKey
     [Alias(nameof(Deliver))]
     [AlwaysInterleave]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
-    Task Deliver(SignalDelivery delivery, CancellationToken cancellationToken = default);
+    Task<DeliveryAdmission> Deliver(SignalDelivery delivery, CancellationToken cancellationToken = default);
+
+    [Alias(nameof(CancelReaction))]
+    [AlwaysInterleave]
+    Task CancelReaction(SignalId pending);
 
     [ReadOnly]
     [AlwaysInterleave]
     [Alias(nameof(ReadState))]
     Task<IReadOnlyList<SignalDelivery>> ReadState();
+
+    // Fire reports Busy to its emitter, and that is only actionable if the backlog behind it
+    // is visible. A neuron with a full queue is by definition mid-reaction, so this read has
+    // to interleave to answer at all.
+    [ReadOnly]
+    [AlwaysInterleave]
+    [Alias(nameof(ReadPendingCount))]
+    Task<int> ReadPendingCount();
 
     [ReadOnly]
     [AlwaysInterleave]

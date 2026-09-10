@@ -42,22 +42,6 @@ internal sealed class JournalWindow
 
     internal long NextSequence => _lastSequence.Value + 1;
 
-    internal long LastSequence => _lastSequence.Value;
-
-    // False when the entry was compacted away before anything read it.
-    internal bool TryRead(long sequence, out SignalDelivery delivery)
-    {
-        delivery = null!;
-        var earliest = EarliestRetainedSequence();
-        if (sequence < earliest || sequence > _lastSequence.Value)
-        {
-            return false;
-        }
-
-        delivery = Decode(_retained[(int)(sequence - earliest)]).Delivery;
-        return true;
-    }
-
     internal JournalRead Read(long afterSequence)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);

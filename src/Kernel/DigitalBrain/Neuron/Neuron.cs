@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Journaling;
+using Orleans.Runtime;
 
 namespace DigitalBrain.Core;
 
@@ -20,20 +21,24 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox
 
     private readonly NeuronActivationComponents _components;
 
-    // A reaction's token. It is cancelled when the activation shuts down, which is the only
-    // cancellation a neuron has: there are no timers and no deadlines on a turn.
     private readonly CancellationTokenSource _activation = new();
+    private readonly RetryTimer _retry;
     private SignalDelivery? _handling;
+    private (SignalId Id, CancellationTokenSource Cancellation)? _reacting;
 
     protected Neuron(NeuronRuntime runtime)
     {
         ArgumentNullException.ThrowIfNull(runtime);
         _components = runtime.Bind(ServiceProvider, Id);
+        _retry = new RetryTimer(this, _ => ((INeuronInbox)this).Drain());
     }
 
     public NeuronId Id => NeuronId.FromGrainId(this.GetGrainId());
 
     protected TimeProvider TimeProvider => _components.Clock;
+
+    // A durable write belongs to the activation, so request cancellation cannot interrupt it.
+    protected Task PersistAsync() => WriteStateAsync(_activation.Token).AsTask();
 
     // The delivery this turn is reacting to, or null outside ReceiveAsync.
     protected SignalDelivery? CurrentDelivery => _handling;
@@ -45,16 +50,18 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox
         await OnNeuronActivatedAsync(cancellationToken).ConfigureAwait(true);
 
         // Entries accepted before the last deactivation are still pending: resume the drain.
-        if (_components.Reacted.Value < _components.Journals.IncomingLastSequence)
+        if (_components.Pending.Peek() is not null)
         {
             Wake();
+            _retry.Arm();
         }
     }
 
-    // Shutting down cancels the reaction in flight. It is not a failure: the cursor stays and
+    // Shutting down cancels the reaction in flight. The pending head stays and
     // the next activation retries the entry.
     public sealed override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
     {
+        _retry.Disarm();
         await _activation.CancelAsync().ConfigureAwait(true);
         try
         {
@@ -81,7 +88,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox
         ArgumentException.ThrowIfNullOrWhiteSpace(signalType);
         if (_components.Synapses.Connect(target, signalType))
         {
-            await WriteStateAsync().ConfigureAwait(true);
+            await PersistAsync().ConfigureAwait(true);
         }
     }
 
@@ -90,27 +97,69 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox
         ArgumentException.ThrowIfNullOrWhiteSpace(signalType);
         if (_components.Synapses.Disconnect(target, signalType))
         {
-            await WriteStateAsync().ConfigureAwait(true);
+            await PersistAsync().ConfigureAwait(true);
         }
     }
 
-    public async Task Deliver(SignalDelivery delivery, CancellationToken cancellationToken = default)
+    public async Task<DeliveryAdmission> Deliver(SignalDelivery delivery, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(delivery);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (_components.Latest.Count >= MaxSignalTypesPerNeuron && !_components.Latest.ContainsKey(delivery.Signal.Type))
+        RequireSignalTypeCapacity(delivery.Signal.Type);
+        var admission = _components.Pending.TryAdmit(delivery);
+        if (admission != DeliveryAdmission.Accepted)
+        {
+            return admission;
+        }
+
+        _components.Journals.AppendIncoming(delivery);
+        _components.Latest[delivery.Signal.Type] = delivery;
+        await PersistAsync().ConfigureAwait(true);
+
+        Wake();
+        return DeliveryAdmission.Accepted;
+    }
+
+    protected SignalId Schedule(Signal signal, CorrelationId? correlation = null)
+    {
+        ArgumentNullException.ThrowIfNull(signal);
+        signal = Signal.Create(signal.Type, signal.Body);
+        RequireSignalTypeCapacity(signal.Type);
+        var delivery = SignalDelivery.Create(signal, Id, _components.Journals.IncomingNextSequence, TimeProvider, _handling, correlation);
+        if (_components.Pending.TryAdmit(delivery) != DeliveryAdmission.Accepted)
+        {
+            throw new NeuronBusyException($"Neuron '{Id}' already holds {PendingWork.MaxPending} pending signals. Retry after pending work finishes.");
+        }
+
+        _components.Journals.AppendIncoming(delivery);
+        _components.Latest[signal.Type] = delivery;
+        Wake();
+        return delivery.SignalId;
+    }
+
+    public async Task CancelReaction(SignalId pending)
+    {
+        if (!_components.Pending.Cancel(pending))
+        {
+            return;
+        }
+
+        await PersistAsync().ConfigureAwait(true);
+        if (_reacting is { } reacting && reacting.Id == pending)
+        {
+            await reacting.Cancellation.CancelAsync().ConfigureAwait(true);
+        }
+    }
+
+    private void RequireSignalTypeCapacity(string signalType)
+    {
+        if (_components.Latest.Count >= MaxSignalTypesPerNeuron && !_components.Latest.ContainsKey(signalType))
         {
             throw new SignalRejectedException(
                 $"Neuron '{Id}' already remembers {MaxSignalTypesPerNeuron} signal types. "
                 + "Type names are vocabulary such as 'Note'; put identity in the neuron name.");
         }
-
-        _components.Journals.AppendIncoming(delivery);
-        _components.Latest[delivery.Signal.Type] = delivery;
-        await WriteStateAsync(cancellationToken).ConfigureAwait(true);
-
-        Wake();
     }
 
     // ---- INeuronInbox ----
@@ -119,39 +168,60 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox
     // accepts interleave with reactions and journal order is preserved.
     async Task INeuronInbox.Drain()
     {
-        var next = _components.Reacted.Value + 1;
-        if (next > _components.Journals.IncomingLastSequence)
+        RequestContext.Clear();
+        var delivery = _components.Pending.Peek();
+        if (delivery is null)
         {
+            _retry.Disarm();
             return;
         }
 
-        if (!_components.Journals.TryReadIncoming(next, out var delivery))
+        if (_components.Pending.IsCancelled(delivery.SignalId))
         {
-            // Fell out of the retained window before we reacted: count it as lost and move on.
-            DrainTelemetry.Lost(Logger, Id, next);
-            await AdvanceAsync(next).ConfigureAwait(true);
+            _components.Pending.Complete(delivery.SignalId);
+            await PersistAsync().ConfigureAwait(true);
+            Wake();
             return;
         }
 
         var previous = _handling;
+        var previousReacting = _reacting;
+        using var reaction = CancellationTokenSource.CreateLinkedTokenSource(_activation.Token);
         _handling = delivery;
+        _reacting = (delivery.SignalId, reaction);
         try
         {
-            await ReceiveAsync(delivery, _activation.Token).ConfigureAwait(true);
-        }
-        catch (Exception failure)
-        {
-            // The cursor stays, so the entry is not lost, and nothing else happens: the
-            // journal is the only schedule. The next Deliver or activation retries it.
-            DrainTelemetry.Failed(Logger, Id, next, failure);
-            return;
+            try
+            {
+                await ReceiveAsync(delivery, reaction.Token).ConfigureAwait(true);
+            }
+            catch (Exception failure)
+            {
+                DrainTelemetry.Failed(Logger, Id, delivery.SignalId, failure);
+                if (_components.Pending.IsCancelled(delivery.SignalId))
+                {
+                    _components.Pending.Complete(delivery.SignalId);
+                    await PersistAsync().ConfigureAwait(true);
+                    Wake();
+                }
+                else
+                {
+                    _retry.Arm();
+                }
+
+                return;
+            }
+
+            _components.Pending.Complete(delivery.SignalId);
+            await PersistAsync().ConfigureAwait(true);
+            _retry.Disarm();
+            Wake();
         }
         finally
         {
             _handling = previous;
+            _reacting = previousReacting;
         }
-
-        await AdvanceAsync(next).ConfigureAwait(true);
     }
 
     // ---- INeuron: the reads ----
@@ -159,6 +229,8 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox
     public Task<IReadOnlyList<SignalDelivery>> ReadState()
         => Task.FromResult<IReadOnlyList<SignalDelivery>>(
             [.. _components.Latest.Values.OrderBy(d => d.Signal.Type, StringComparer.Ordinal)]);
+
+    public Task<int> ReadPendingCount() => Task.FromResult(_components.Pending.Count);
 
     public Task<IReadOnlyList<Synapse>> ReadSynapses() => Task.FromResult(_components.Synapses.All());
 
@@ -193,20 +265,30 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox
 
         var delivery = SignalDelivery.Create(signal, Id, _components.Journals.OutgoingNextSequence, TimeProvider, _handling, correlation);
         _components.Journals.AppendOutgoing(delivery);
-        await WriteStateAsync(cancellationToken).ConfigureAwait(true);
+        await PersistAsync().ConfigureAwait(true);
 
         var targets = to is { } one
             ? [one]
             : _components.Synapses.ForType(signal.Type).Select(s => s.Target).Where(t => t != Id).Distinct().ToArray();
 
+        var delivered = 0;
+        var busy = 0;
         List<Exception>? failures = null;
         foreach (var receiver in targets)
         {
             try
             {
-                await GrainFactory.GetGrain<INeuron>(receiver.ToGrainId())
+                var admission = await GrainFactory.GetGrain<INeuron>(receiver.ToGrainId())
                     .Deliver(delivery, cancellationToken)
                     .ConfigureAwait(true);
+                if (admission == DeliveryAdmission.Accepted)
+                {
+                    delivered++;
+                }
+                else if (admission == DeliveryAdmission.Busy)
+                {
+                    busy++;
+                }
             }
             catch (Exception error) when (error is not OperationCanceledException)
             {
@@ -221,7 +303,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox
                 failures);
         }
 
-        return new FireOutcome(delivery.SignalId, delivery.CorrelationId, targets.Length);
+        return new FireOutcome(delivery.SignalId, delivery.CorrelationId, delivered, busy);
     }
 
     // ---- the drain's wake-ups ----
@@ -230,13 +312,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox
 
     // A one-way call to ourselves: it returns immediately and is queued behind the current turn.
     private void Wake() => GrainFactory.GetGrain<INeuronInbox>(this.GetGrainId()).Drain().Ignore();
-
-    private async Task AdvanceAsync(long sequence)
-    {
-        _components.Reacted.Value = sequence;
-        await WriteStateAsync().ConfigureAwait(true);
-        Wake();
-    }
 
     protected new IDisposable RegisterTimer(Func<object, Task> callback, object state, TimeSpan dueTime, TimeSpan period)
         => throw new InvalidOperationException($"{nameof(RegisterTimer)} creates interleaving callbacks, but neurons require serialized turns.");

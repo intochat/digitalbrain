@@ -42,13 +42,12 @@ internal static class NeuronConcurrency
         }
     }
 
-    // The kernel's own interleaving methods, and nothing else: the Read* methods of INeuron,
-    // which only observe durable state, and Deliver, which journals the accept without
-    // running the reaction.
+    // Kernel reads, delivery admission, and cancellation may interleave with a reaction.
     private static bool IsKernelInterleaved(MethodInfo method)
         => method.DeclaringType == typeof(INeuron)
         && (method.Name.StartsWith("Read", StringComparison.Ordinal)
-            || method.Name == nameof(INeuron.Deliver));
+            || method.Name == nameof(INeuron.Deliver)
+            || method.Name == nameof(INeuron.CancelReaction));
 
     private static void Refuse(Type neuronType, string attribute)
         => throw new InvalidOperationException(

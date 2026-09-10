@@ -57,6 +57,12 @@ public static class FixtureSwitches
     public static ConcurrentDictionary<string, int> Reactions { get; } = new(StringComparer.Ordinal);
 
     public static ConcurrentDictionary<string, bool> Asleep { get; } = new(StringComparer.Ordinal);
+
+    public static ConcurrentDictionary<string, int> ThrowingFailuresLeft { get; } = new(StringComparer.Ordinal);
+
+    public static ConcurrentDictionary<string, TaskCompletionSource> Release { get; } = new(StringComparer.Ordinal);
+
+    public static ConcurrentDictionary<string, TaskCompletionSource> Cancelled { get; } = new(StringComparer.Ordinal);
 }
 
 // Throws on the first reaction to each entry while FlakyFailuresLeft[name] > 0, then echoes.
@@ -85,6 +91,39 @@ internal sealed class SleepyNeuron(NeuronRuntime runtime) : Neuron(runtime)
         if (FixtureSwitches.Asleep.TryGetValue(Id.Name, out var asleep) && asleep)
         {
             throw new InvalidOperationException("sleepy: not yet");
+        }
+
+        return FireAsync(Signal.Create("Pong", delivery.Signal.Body), delivery.Source, delivery.CorrelationId, cancellationToken);
+    }
+}
+
+[GrainType("slow")]
+internal sealed class SlowNeuron(NeuronRuntime runtime) : Neuron(runtime)
+{
+    protected override async Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
+    {
+        var release = FixtureSwitches.Release[Id.Name];
+        try
+        {
+            await release.Task.WaitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            FixtureSwitches.Cancelled[Id.Name].TrySetResult();
+            throw;
+        }
+    }
+}
+
+[GrainType("throwing")]
+internal sealed class ThrowingNeuron(NeuronRuntime runtime) : Neuron(runtime)
+{
+    protected override Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
+    {
+        if (FixtureSwitches.ThrowingFailuresLeft[Id.Name] > 0)
+        {
+            FixtureSwitches.ThrowingFailuresLeft[Id.Name]--;
+            throw new InvalidOperationException("throwing: reaction fails");
         }
 
         return FireAsync(Signal.Create("Pong", delivery.Signal.Body), delivery.Source, delivery.CorrelationId, cancellationToken);

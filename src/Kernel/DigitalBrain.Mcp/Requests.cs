@@ -2,7 +2,9 @@ namespace DigitalBrain.Mcp;
 
 public sealed record FireRequest(string Type, string Body, string? To = null, string? Correlation = null);
 
-public sealed record FireResult(string SignalId, string Correlation, int Delivered);
+public sealed record FireResult(string SignalId, string Correlation, int Delivered, int Busy);
+
+public sealed record CancelRequest(string Neuron, string Signal);
 
 public sealed record ConnectRequest(string From, string To, string Type);
 

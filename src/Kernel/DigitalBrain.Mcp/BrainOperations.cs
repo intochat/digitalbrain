@@ -5,7 +5,7 @@ using DigitalBrain.Abstractions.Signals;
 
 namespace DigitalBrain.Mcp;
 
-// The client. Four operations; the MCP tools are thin wrappers over these.
+// The client. Five operations; the MCP tools are thin wrappers over these.
 public sealed class BrainOperations(IGrainFactory grains)
 {
     // A read is a query, not a subscription: a client that wants to wait longer polls again.
@@ -22,7 +22,20 @@ public sealed class BrainOperations(IGrainFactory grains)
         var correlation = ParseCorrelation(request.Correlation);
 
         var outcome = await Neuron(from).Fire(signal, to, correlation, cancellationToken).ConfigureAwait(false);
-        return new(outcome.SignalId.ToString(), outcome.CorrelationId.ToString(), outcome.Delivered);
+        return new(outcome.SignalId.ToString(), outcome.CorrelationId.ToString(), outcome.Delivered, outcome.Busy);
+    }
+
+    public Task CancelAsync(CancelRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+        var neuron = Parse(request.Neuron, nameof(request));
+        if (!Guid.TryParse(request.Signal, out var signal))
+        {
+            throw new ArgumentException($"'{request.Signal}' is not a signal id. Pass the signalId returned by an earlier fire.", nameof(request));
+        }
+
+        return Neuron(neuron).CancelReaction(new SignalId(signal));
     }
 
     public Task ConnectAsync(ConnectRequest request, CancellationToken cancellationToken = default)

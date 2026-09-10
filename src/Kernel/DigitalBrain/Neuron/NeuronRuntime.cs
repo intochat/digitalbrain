@@ -28,13 +28,9 @@ public sealed class NeuronRuntime(TimeProvider clock)
             new NeuronJournals(Window("incoming"), Window("outgoing")),
             new NeuronSynapses(services.GetRequiredKeyedService<IDurableDictionary<string, Synapse>>("synapses"), neuronId, Clock),
             services.GetRequiredKeyedService<IDurableDictionary<string, SignalDelivery>>("latest"),
-            services.GetRequiredKeyedService<IDurableValue<long>>("reacted"));
+            new PendingWork(
+                services.GetRequiredKeyedService<IDurableQueue<SignalDelivery>>("pending"),
+                services.GetRequiredKeyedService<IDurableSet<SignalId>>("pending.cancelled"),
+                services.GetRequiredKeyedService<IDurableList<SignalId>>("reacted")));
     }
 }
-
-internal sealed record NeuronActivationComponents(
-    TimeProvider Clock,
-    NeuronJournals Journals,
-    NeuronSynapses Synapses,
-    IDurableDictionary<string, SignalDelivery> Latest,
-    IDurableValue<long> Reacted);

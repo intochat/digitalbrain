@@ -13,7 +13,7 @@ public sealed class BrainTools(BrainOperations operations, SessionPrincipal sess
         "Fire a signal from your Session neuron. A signal is a `type` (letters only, vocabulary such as Note, Confirmed, Decision) "
         + "and a JSON `body` up to 64 KB. With `to`, it goes to exactly that neuron and creates the synapse if missing; "
         + "without `to`, it follows every synapse of that type you already have. Neurons exist as soon as they are named. "
-        + "Put identity in the neuron name (run-tests-before-commit), never in the type. Returns the signal id, correlation and how many neurons received it.")]
+        + "Put identity in the neuron name (run-tests-before-commit), never in the type. Returns the signal id, correlation and how many neurons accepted it or were busy.")]
     public Task<string> Fire(
         [Description("Signal type: letters only, e.g. Note")] string type,
         [Description("JSON body, e.g. {\"text\":\"run tests before commit\"}. Empty means {}.")] string body,
@@ -22,6 +22,20 @@ public sealed class BrainTools(BrainOperations operations, SessionPrincipal sess
         CancellationToken cancellationToken = default)
         => Guard(async () => JsonSerializer.Serialize(
             await operations.FireAsync(session.Name, new(type, body, to, correlation), cancellationToken).ConfigureAwait(false), Json));
+
+    [McpServerTool(Name = "cancel"), Description(
+        "Cancel a signal on a neuron. Drops pending work that has not been reacted to yet and asks a reaction already running "
+        + "to stop at its next cooperative check. It is a no-op if the signal is neither pending nor running. "
+        + "Pass the signalId returned by an earlier fire.")]
+    public Task<string> Cancel(
+        [Description("Neuron name holding the work")] string neuron,
+        [Description("Signal id (GUID) returned by an earlier fire")] string signal,
+        CancellationToken cancellationToken = default)
+        => Guard(async () =>
+        {
+            await operations.CancelAsync(new(neuron, signal), cancellationToken).ConfigureAwait(false);
+            return $"cancellation requested for {signal} on {neuron}";
+        });
 
     [McpServerTool(Name = "connect"), Description(
         "Create a synapse: from one neuron to another for one signal type. Idempotent. Use it to build structure, "

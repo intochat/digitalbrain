@@ -11,7 +11,6 @@ namespace DigitalBrain.Tests;
 [Binding]
 public sealed class BrainSteps(BrainWorld world)
 {
-    private int _lastCount;
     private Exception? _lastError;
 
     [Given("a running brain")]
@@ -19,6 +18,7 @@ public sealed class BrainSteps(BrainWorld world)
         => world.Simulation = await BrainSimulation.StartAsync(new() { Modules = new([]) });
 
     [Given("a running brain with durable storage")]
+    [Given("a running brain with file-backed storage")]
     public async Task GivenADurableBrain()
         => world.Simulation = await BrainSimulation.StartAsync(new()
         {
@@ -41,13 +41,22 @@ public sealed class BrainSteps(BrainWorld world)
     public Task FireAt(string from, string type, string body, string to) => FireCore(from, type, body, to);
 
     [When("the silo restarts")]
-    public Task Restart() => Brain.RestartSiloAsync();
+    public async Task Restart()
+    {
+        await Brain.RestartSiloAsync();
+        // A restarted silo activates a neuron only when called. A read delivers no signal,
+        // so the entry is still reacted to and retried without new traffic.
+        foreach (var fixture in world.Fixtures.Values)
+        {
+            await Brain.Grains.GetGrain<INeuron>(fixture.ToGrainId()).ReadPendingCount();
+        }
+    }
 
     [Then(@"the fire reached (\d+) neurons")]
     public void ThenReached(int count)
     {
         Assert.Null(_lastError);
-        Assert.Equal(count, _lastCount);
+        Assert.Equal(count, LastFire?.Delivered);
     }
 
     [Then(@"the fire was rejected with a message containing ""(.*)""")]
@@ -107,8 +116,14 @@ public sealed class BrainSteps(BrainWorld world)
     // ---- helpers shared with later features ----
 
     internal BrainSimulation Brain => world.Brain;
+    internal FireOutcome? LastFire { get; private set; }
     internal static NeuronId Id(string name)
         => NeuronId.TryParse(name, out var id) ? id : NeuronId.Plain(name);
+
+    // The "db" prefix keeps deterministic fixture signal IDs non-empty, even for handle "0".
+    internal static SignalId SignalIdFrom(string handle)
+        => new(Guid.ParseExact("db" + handle.PadLeft(30, '0'), "N"));
+
     internal INeuron Neuron(string name) => Brain.Grains.GetGrain<INeuron>(Id(name).ToGrainId());
     internal INeuron Query(string name) => Brain.Grains.GetGrain<INeuron>(Id(name).ToGrainId());
     internal Task<JournalRead> Journal(string name, JournalKind kind) => Query(name).ReadJournal(kind, 0);
@@ -120,9 +135,10 @@ public sealed class BrainSteps(BrainWorld world)
     internal async Task FireCore(string from, string type, string body, NeuronId? to)
     {
         _lastError = null;
+        LastFire = null;
         try
         {
-            _lastCount = (await Neuron(from).Fire(Signal.Create(type, body), to, null)).Delivered;
+            LastFire = await Neuron(from).Fire(Signal.Create(type, body), to, null);
         }
         catch (Exception error)
         {

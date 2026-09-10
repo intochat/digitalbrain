@@ -1,11 +1,11 @@
 Feature: MCP surface
-  Four tools over the same operations. An unfamiliar model must be able to use them from
+  Five tools over the same operations. An unfamiliar model must be able to use them from
   the descriptions alone.
 
   Scenario: The server exposes exactly fire, connect, disconnect and read
     Given a running brain
     And an MCP client for principal "claude"
-    Then the tools are "connect, disconnect, fire, read"
+    Then the tools are "cancel, connect, disconnect, fire, read"
     And every tool has a description longer than 40 characters
 
   Scenario: Store, group, recall through the tools

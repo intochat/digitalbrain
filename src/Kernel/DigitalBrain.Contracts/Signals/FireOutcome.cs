@@ -8,4 +8,5 @@ namespace DigitalBrain.Abstractions.Signals;
 public sealed record FireOutcome(
     [property: Id(0)] SignalId SignalId,
     [property: Id(1)] CorrelationId CorrelationId,
-    [property: Id(2)] int Delivered);
+    [property: Id(2)] int Delivered,
+    [property: Id(3)] int Busy);

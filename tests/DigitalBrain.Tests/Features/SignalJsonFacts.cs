@@ -36,7 +36,7 @@ public sealed class SignalJsonFacts
     [Fact]
     public void FireOutcomeSurvivesJsonRoundTrip()
     {
-        FireOutcome outcome = new(SignalId.New(), CorrelationId.New(), 2);
+        FireOutcome outcome = new(SignalId.New(), CorrelationId.New(), 2, 1);
 
         Assert.Equal(outcome, JsonSerializer.Deserialize<FireOutcome>(JsonSerializer.Serialize(outcome)));
     }
