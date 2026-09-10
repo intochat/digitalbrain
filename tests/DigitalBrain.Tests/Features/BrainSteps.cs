@@ -5,6 +5,7 @@ using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Core;
 using DigitalBrain.Testing;
 using DigitalBrain.Memory;
+using DigitalBrain.Time;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Reqnroll;
@@ -112,11 +113,12 @@ public sealed class BrainSteps(BrainWorld world)
         var counterFixtureState = new CounterFixtureState();
         return BrainSimulation.StartAsync(new()
         {
-            Modules = new([typeof(MemoryModule)]),
+            Modules = new([typeof(MemoryModule), typeof(TimeModule)]),
             PersistenceDirectory = persistenceDirectory,
             JournalFaults = journalFaults,
             ConfigureSilo = silo =>
             {
+                silo.Services.AddSingleton(new TimeOptions { AlarmPeriod = TimeSpan.FromSeconds(2) });
                 silo.Services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>, DeterministicEmbeddingGenerator>();
                 silo.Services.AddSingleton(counterFixtureState);
                 silo.Services.AddSingleton<ICommandCrashPoint, FixtureCommandCrashPoint>();

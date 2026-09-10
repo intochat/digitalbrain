@@ -27,12 +27,10 @@
     <Project Path="src/Modules/UI/DigitalBrain.Modules.UI/DigitalBrain.Modules.UI.csproj" />
   </Folder>
   -->
-  <!-- Phase B: restore from b225d085.
   <Folder Name="/Modules/Time/">
     <Project Path="src/Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <Project Path="src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
   </Folder>
-  -->
   <!-- Phase B: restore from b225d085.
   <Folder Name="/Modules/Excel/">
     <Project Path="src/Modules/Excel/Contracts/DigitalBrain.Modules.Excel.Contracts.csproj" />

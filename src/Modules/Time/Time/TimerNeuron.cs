@@ -1,213 +1,118 @@
-using System.Globalization;
+using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Commands;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Core;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Journaling;
-using Orleans.Serialization;
+using Orleans.Runtime;
 
 namespace DigitalBrain.Time;
 
 [GrainType("timer")]
-public sealed class TimerNeuron : Neuron, ITimer, IRemindable
+internal sealed class TimerNeuron(
+    NeuronRuntime runtime,
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<TimerState> state)
+    : Neuron<TimerState>(runtime, state), ITimer
 {
-    private const string StateName = "time.timer";
-    private const string ReminderPrefix = "time.timer.";
-    private static readonly TimeSpan ReminderPeriod = TimeSpan.FromMinutes(1);
+    private const int RecoveredAfterMinutes = 1;
 
-    private readonly IDurableValue<byte[]> _state;
-    private readonly Serializer<TimerState> _states;
+    public Task<Accepted<TimerGeneration>> Schedule(ScheduleTimer command) => ExecuteCommandAsync(
+        Descriptor("schedule"), command, TimeJson.Default.ScheduleTimer, TimeJson.Default.AcceptedTimerGeneration, arguments =>
+        {
+            if (arguments.DurationSeconds <= 0)
+            {
+                throw new CommandRejectedException(arguments.Id, "duration must be positive", "Provide a duration greater than zero seconds.");
+            }
 
-    public TimerNeuron(NeuronRuntime runtime)
-        : base(runtime)
+            if (string.IsNullOrWhiteSpace(arguments.Note))
+            {
+                throw new CommandRejectedException(arguments.Id, "note is blank", "Provide a non-blank note for the timer.");
+            }
+
+            if (State is { Status: TimerStatus.Scheduled })
+            {
+                throw new CommandRejectedException(arguments.Id, "timer is already scheduled", "Stop the scheduled timer before scheduling another.");
+            }
+
+            var generation = (State?.Generation ?? 0) + 1;
+            var scheduledAt = TimeProvider.GetUtcNow();
+            var dueAt = scheduledAt + TimeSpan.FromSeconds(arguments.DurationSeconds);
+            var body = new SchedulingBody(generation, scheduledAt, dueAt, arguments.DurationSeconds, arguments.Note);
+            var work = Schedule(Signal.Create(TimeSignals.Scheduling, JsonSerializer.Serialize(body, TimeJson.Default.SchedulingBody)));
+            return new Accepted<TimerGeneration>(new TimerGeneration(generation), work);
+        });
+
+    public Task<Accepted<TimerGeneration>> Stop(StopTimer command) => ExecuteCommandAsync(
+        Descriptor("stop"), command, TimeJson.Default.StopTimer, TimeJson.Default.AcceptedTimerGeneration, arguments =>
+        {
+            if (State is not { Status: TimerStatus.Scheduled } current)
+            {
+                throw new CommandRejectedException(arguments.Id, "nothing scheduled to stop", "Schedule a timer before stopping it.");
+            }
+
+            var generation = new TimerGeneration(current.Generation);
+            var work = Schedule(Signal.Create(TimeSignals.Stopping, JsonSerializer.Serialize(generation, TimeJson.Default.TimerGeneration)));
+            return new Accepted<TimerGeneration>(generation, work);
+        });
+
+    public Task<TimerSnapshot> Read() => Task.FromResult(State is { } current
+        ? new TimerSnapshot(current.Status, current.Generation, current.ScheduledAt, current.DueAt, current.DurationSeconds, current.Note)
+        : new TimerSnapshot(TimerStatus.Unscheduled, 0, null, null, null, null));
+
+    protected override async Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
     {
-        _state = ServiceProvider.GetRequiredKeyedService<IDurableValue<byte[]>>(StateName);
-        _states = ServiceProvider.GetRequiredService<Serializer<TimerState>>();
-    }
-
-    private TimerSnapshot Snapshot()
-        => LoadRecorded() is { } data
-            ? new TimerSnapshot(data.Status, data.Generation, data.ScheduledAt, data.DueAt, data.Duration, data.Note)
-            : new TimerSnapshot(TimerStatus.Unscheduled, Generation: 0, null, null, null, null);
-
-    public async Task HandleAsync(ReadTimer signal, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(signal);
-        cancellationToken.ThrowIfCancellationRequested();
-        await ReplyAsync(Snapshot())
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-    }
-
-    public async Task HandleAsync(StartTimer signal, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(signal);
-        cancellationToken.ThrowIfCancellationRequested();
-        RequireCommand(signal.CommandId);
-
-        if (signal.DurationSeconds <= 0)
+        switch (delivery.Signal.Type)
         {
-            throw new NeuronAuthorizationException($"Timer '{Id}' refuses a non-positive duration.");
-        }
+            case TimeSignals.Scheduling:
+                {
+                    var body = Body(delivery, TimeJson.Default.SchedulingBody);
+                    await SaveAsync(new TimerState(TimerStatus.Scheduled, body.Generation, body.ScheduledAt, body.DueAt,
+                        body.DurationSeconds, body.Note), cancellationToken).ConfigureAwait(true);
+                    await Alarm(body.Generation).Arm(body.DueAt - TimeProvider.GetUtcNow()).ConfigureAwait(true);
+                    break;
+                }
+            case TimeSignals.Stopping:
+                {
+                    var generation = Body(delivery, TimeJson.Default.TimerGeneration).Value;
+                    if (State is { Status: TimerStatus.Scheduled } current && current.Generation == generation)
+                    {
+                        await SaveAsync(current with { Status = TimerStatus.Cancelled }, cancellationToken).ConfigureAwait(true);
+                    }
 
-        if (string.IsNullOrWhiteSpace(signal.Note))
-        {
-            throw new NeuronAuthorizationException($"Timer '{Id}' refuses to arm without a note to deliver.");
-        }
+                    await Alarm(generation).Retire().ConfigureAwait(true);
+                    break;
+                }
+            case TimeSignals.Due:
+                {
+                    var generation = Body(delivery, TimeJson.Default.TimerGeneration).Value;
+                    if (State is not { Status: TimerStatus.Scheduled } current || current.Generation != generation)
+                    {
+                        await Alarm(generation).Retire().ConfigureAwait(true);
+                        return;
+                    }
 
-        var current = LoadRecorded();
-        if (current is { Status: TimerStatus.Scheduled })
-        {
-            throw new NeuronAuthorizationException(
-                $"Timer '{Id}' is already scheduled; cancel it or let it elapse before arming again.");
-        }
+                    var observedAt = TimeProvider.GetUtcNow();
+                    if (observedAt < current.DueAt)
+                    {
+                        await Alarm(generation).Arm(current.DueAt - observedAt).ConfigureAwait(true);
+                        return;
+                    }
 
-        var generation = (current?.Generation ?? 0) + 1;
-        var scheduledAt = TimeProvider.GetUtcNow();
-        var duration = TimeSpan.FromSeconds(signal.DurationSeconds);
-        var dueAt = scheduledAt + duration;
-        var reminderName = ReminderName(generation);
-
-        Stage(new TimerState(
-            TimerStatus.Scheduled,
-            generation,
-            scheduledAt,
-            dueAt,
-            duration,
-            signal.Note,
-            reminderName));
-
-        await RegisterReminderAsync(reminderName, duration).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        cancellationToken.ThrowIfCancellationRequested();
-        await ReplyAsync(
-            new TimerScheduled(signal.CommandId, Id, generation, scheduledAt, dueAt, duration, signal.Note))
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-    }
-
-    public async Task HandleAsync(CancelTimer signal, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(signal);
-        cancellationToken.ThrowIfCancellationRequested();
-        RequireCommand(signal.CommandId);
-
-        var current = LoadRecorded();
-        if (current is not { Status: TimerStatus.Scheduled })
-        {
-            throw new NeuronAuthorizationException($"Timer '{Id}' has no scheduled timer to cancel.");
-        }
-
-        Stage(current with { Status = TimerStatus.Cancelled, ActiveReminderName = null });
-
-        cancellationToken.ThrowIfCancellationRequested();
-        await ReplyAsync(
-            new TimerCancelled(signal.CommandId, Id, current.Generation))
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        await RetireReminderAsync(current.ActiveReminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-    }
-
-    async Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
-    {
-        if (!TryParseReminderName(reminderName, out var generation))
-        {
-            throw new InvalidOperationException(
-                $"Timer neuron '{Id}' does not own reminder '{reminderName}'.");
-        }
-
-        await ElapseIfDue(generation, reminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-    }
-
-    private async Task ElapseIfDue(long generation, string reminderName)
-    {
-        var data = LoadRecorded();
-
-        if (data is null
-            || data.Status != TimerStatus.Scheduled
-            || data.Generation != generation
-            || !string.Equals(data.ActiveReminderName, reminderName, StringComparison.Ordinal))
-        {
-            await RetireReminderAsync(reminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            return;
-        }
-
-        var observedAt = TimeProvider.GetUtcNow();
-        if (observedAt < data.DueAt)
-        {
-            await RegisterReminderAsync(reminderName, data.DueAt - observedAt).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            return;
-        }
-
-        var resolution = observedAt > data.DueAt + ReminderPeriod
-            ? TimerResolution.Recovered
-            : TimerResolution.OnTime;
-        var rollbackState = SerializedState();
-        Stage(data with { Status = TimerStatus.Elapsed, ActiveReminderName = null });
-
-        try
-        {
-            await RecordOutgoingAsync(new TimerElapsed(
-                Id,
-                generation,
-                data.ScheduledAt,
-                data.DueAt,
-                observedAt,
-                resolution,
-                data.Note)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        }
-        catch
-        {
-            RestoreState(rollbackState);
-            DeactivateOnIdle();
-            throw;
-        }
-
-        await RetireReminderAsync(reminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-    }
-
-    private TimerState? LoadRecorded()
-        => _state.Value is { Length: > 0 } serialized
-            ? _states.Deserialize(serialized)
-            : null;
-
-    private void Stage(TimerState data) => _state.Value = _states.SerializeToArray(data);
-
-    private byte[] SerializedState()
-        => _state.Value is { } serialized ? serialized.ToArray() : [];
-
-    private void RestoreState(byte[] serialized) => _state.Value = serialized;
-
-    private static void RequireCommand(CommandId commandId)
-    {
-        if (commandId.Value == Guid.Empty)
-        {
-            throw new NeuronAuthorizationException("A timer command requires a command id.");
+                    var resolution = observedAt > current.DueAt.AddMinutes(RecoveredAfterMinutes)
+                        ? TimerResolution.Recovered
+                        : TimerResolution.OnTime;
+                    await SaveAsync(current with { Status = TimerStatus.Elapsed }, cancellationToken).ConfigureAwait(true);
+                    var body = new TimerElapsedBody(Id, generation, current.ScheduledAt, current.DueAt, observedAt, resolution, current.Note);
+                    await FireAsync(Signal.Create(TimeSignals.TimerElapsed, JsonSerializer.Serialize(body, TimeJson.Default.TimerElapsedBody)),
+                        to: null, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
+                    await Alarm(generation).Retire().ConfigureAwait(true);
+                    break;
+                }
         }
     }
 
-    private Task<Orleans.Runtime.IGrainReminder> RegisterReminderAsync(string reminderName, TimeSpan dueTime)
-        => this.RegisterOrUpdateReminder(reminderName, dueTime, ReminderPeriod);
+    private ITimerAlarm Alarm(long generation) => GrainFactory.GetGrain<ITimerAlarm>($"{Id.Name}/{generation}");
 
-    private async Task RetireReminderAsync(string? reminderName)
-    {
-        if (reminderName is not null
-            && await this.GetReminder(reminderName).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext) is { } reminder)
-        {
-            await this.UnregisterReminder(reminder).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        }
-    }
-
-    private static string ReminderName(long generation)
-        => string.Create(CultureInfo.InvariantCulture, $"{ReminderPrefix}{generation}");
-
-    private static bool TryParseReminderName(string reminderName, out long generation)
-    {
-        generation = 0;
-        return reminderName.StartsWith(ReminderPrefix, StringComparison.Ordinal)
-            && long.TryParse(
-                reminderName.AsSpan(ReminderPrefix.Length),
-                NumberStyles.None,
-                CultureInfo.InvariantCulture,
-                out generation)
-            && generation > 0;
-    }
+    private static T Body<T>(SignalDelivery delivery, JsonTypeInfo<T> json)
+        => JsonSerializer.Deserialize(delivery.Signal.Body, json)!;
 }
-
