@@ -109,9 +109,11 @@ snapshot facet.
   `ReactedIds`; `Busy` if `Pending` is full, writing nothing; else append incoming journal,
   set latest, enqueue, persist, wake, `Accepted`. `FireAsync` awaits every target's
   `Deliver` and reports non-acceptance per target.
-- `Schedule(signal)` is the local form used inside commands: same checks, same enqueue, no
-  flush; capacity exceeded throws `NeuronBusyException` before anything is staged. It is the
-  one permitted self-delivery and creates no synapse and no outgoing entry.
+- `Schedule(signal)` is the local form used inside commands: same capacity check, then the
+  delivery is buffered in memory and admitted into `Pending` immediately before the wrapper's
+  terminal persist, so effects and outcome land in one flush; capacity exceeded throws
+  `NeuronBusyException` before anything is staged. It is the one permitted self-delivery and
+  creates no synapse and no outgoing entry.
 - `Drain` (one entry per call): peek head; if in `PendingCancelled` → dequeue, remove, push the
   id to `ReactedIds` (a re-delivery of a cancelled id is `Duplicate`), persist;
   else set `ReactionContext`, clear and rebuild `RequestContext` from the persisted delivery,
@@ -155,7 +157,9 @@ effects without their outcome. Execution failure does not roll back staged effec
 persist together with `Failed`. Recovery discards whatever storage did not commit.
 
 `Unknown` means "attempted, no committed effect", so a retry with the same id re-executes as
-the next incarnation. Generic deduplication is guaranteed for the last 1024 resolved commands
+the next incarnation. A `Completed` command whose result exceeded 64 KiB has no stored
+result; a retry with its id fails with `CommandOutcomeUnknownException` and the caller reads
+state instead. Generic deduplication is guaranteed for the last 1024 resolved commands
 per neuron and nothing beyond; modules needing more carry domain receipts with the same stated
 bound (`ChatState.TurnByCommand`, 1024) or `ExpectedVersion` preconditions.
 
