@@ -253,7 +253,8 @@ Violations of the table fail at silo start naming interface and method.
 
 Edges: MCP `fire, connect, disconnect, read, describe, call, cancel`; HTTP adapters over the
 same; in-silo agents get the seven as `AIFunction`s plus typed functions generated from the
-descriptors of the interfaces they are instructed to use.
+descriptors of the neurons they are instructed to use (`Instruct.tools` names neurons;
+every method of every interface the neuron implements becomes one typed function).
 
 ## 8. Signals vocabulary and payloads
 
