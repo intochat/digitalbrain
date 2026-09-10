@@ -15,7 +15,7 @@ journaled state. A **signal** is a type name plus a JSON body that travels along
 addressed by the graph, accepted into a bounded durable pending queue, and reacted to later
 in the neuron's own turns, at least once or until cancelled. Reactions are where a neuron
 talks to the world: they fire signals, call other neurons, run models and save snapshots.
-Every neuron exposes the same nine kernel operations; an AI agent reads a neuron's
+Every neuron exposes the same ten kernel operations; an AI agent reads a neuron's
 interfaces through a descriptor table and calls typed methods through the same table that
 generates its tools. There is one brain per silo and no identity inside the neuron layer.
 
@@ -39,6 +39,8 @@ public interface INeuron : IGrainWithStringKey
     Task<JournalRead> ReadJournal(JournalKind kind, long afterSequence);
     [ReadOnly, AlwaysInterleave, Alias(nameof(ReadCommands))]
     Task<CommandJournalRead> ReadCommands(long afterSequence);
+    [ReadOnly, AlwaysInterleave, Alias(nameof(ReadPendingCount))]
+    Task<int> ReadPendingCount();
 }
 public enum DeliveryAdmission { Accepted, Duplicate, Busy }
 ```
@@ -48,7 +50,8 @@ Plus the internal one-way `INeuronInbox.Drain`, the only one-way call in the sys
 before its single persist await, and without interleaving two neurons whose reactions
 fire at each other deadlock (A's `Fire` awaits B's `Deliver` while B's reaction awaits A's
 `Deliver`). The kernel uses of `[AlwaysInterleave]` are therefore `Deliver`, `CancelReaction`,
-`ReadJournal` and `ReadCommands`.
+`ReadJournal`, `ReadCommands` and `ReadPendingCount` (the size of the pending queue, so that
+`Busy` is observable while a reaction runs).
 `ReadJournal` and `ReadCommands` interleave and serve the committed view only. `ReadState`
 and `ReadSynapses` are serialized turns.
 
@@ -114,7 +117,9 @@ snapshot facet.
   call `ReceiveAsync` with a token linked to the activation and a per-entry source, then
   dequeue, push id to `ReactedIds`, persist. Throw → log, arm the retry timer (1 s → 60 s
   exponential, `Interleave = false`, `KeepAlive = true`), leave the head. Activation re-arms if
-  a head exists.
+  a head exists. A grain timer needs an activation, so while the head has failed the neuron
+  also holds one Orleans reminder (`retry`, minimum period) that reactivates it after a cold
+  restart; the reminder is unregistered when the head clears.
 - `CancelReaction(id)`: no-op if `id` is neither pending nor reacting; else add to
   `PendingCancelled`, persist, and cancel the reacting entry's token if it is the one running.
   Cancellation is observed at the reaction's next cooperative observation of its token.

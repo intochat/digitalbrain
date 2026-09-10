@@ -145,6 +145,21 @@ Feature: Cancel
 - [ ] **Step 4:** All features green. Existing `react.feature` scenario "Reactions run in journal order" still green.
 - [ ] **Step 5:** Commit: `feat(kernel): durable pending queue with admission, kernel cancellation and retry`.
 
+### Task A2b: Retry liveness across a cold restart
+
+**Files:**
+- Modify: `DigitalBrain/Neuron/Neuron.cs` (implement `IRemindable`; register reminder `retry` when the head of `Pending` first fails, unregister when the head completes or is cancelled; `ReceiveReminder` only re-arms the drain), `DigitalBrain/Neuron/RetryTimer.cs` (owns the reminder handle alongside the timer), `Testing/BrainSimulation.cs` (+ new `Testing/FileReminderTable.cs`: an `IReminderTable` backed by a JSON file so reminders survive `RestartSiloAsync`; volatile mode keeps `UseInMemoryReminderService`), `tests/DigitalBrain.Tests/Features/admit.feature` restart scenario (the restart step must NOT touch the neuron; remove the `ReadPendingCount` workaround from the step), `Aspire/DigitalBrain.Aspire` (reminder service already wired for Azure; nothing to add).
+- Test: the existing restart scenario in `admit.feature`, unchanged text, now proven without traffic.
+
+**Interfaces:**
+- Consumes: A2 `PendingWork`, `RetryTimer`.
+- Produces: nothing new on `INeuron`.
+
+- [ ] **Step 1:** Remove the read-on-restart workaround from the "the silo restarts" step; run the Admit restart scenario; expected: fails (pending count stays 1, no `Pong`).
+- [ ] **Step 2:** Implement the reminder registration/unregistration and the file-backed test reminder table. Reminder period = `TimeSpan.FromMinutes(1)` (Orleans minimum); the timer still handles the fast path while the activation lives.
+- [ ] **Step 3:** Scenario green three runs in a row; whole project green.
+- [ ] **Step 4:** Commit: `feat(kernel): failed pending work survives a cold restart through a reminder`.
+
 ### Task A3: Typed commands — journal, dedup, wrapper
 
 **Files:**
