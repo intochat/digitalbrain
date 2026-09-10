@@ -72,7 +72,6 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
         .WithAspire(Path.Combine(builder.AppHostDirectory, "DigitalBrain.AppHost.csproj"))
         .WithConfiguredGitHubRepositories(builder.Configuration))
     .AddModule<UIModule>(ui => ui.WithWindowHost());
-// Phase B: Execution is deleted in B6; nothing else stands in.
 
 // Isolated Aspire runs reuse the persistent Azurite volume while assigning new random silo
 // ports. A per-run development cluster avoids trying to contact a dead membership row from the
