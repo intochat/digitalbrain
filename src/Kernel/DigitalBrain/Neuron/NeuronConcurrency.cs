@@ -1,5 +1,4 @@
 using System.Reflection;
-using DigitalBrain.Abstractions;
 using Orleans.Concurrency;
 
 using DigitalBrain.Abstractions.Neurons;
@@ -43,14 +42,14 @@ internal static class NeuronConcurrency
         }
     }
 
-    // Kernel reads do not create traffic and only observe durable state. The behaviors
-    // snapshot is also needed while an assistant turn is awaiting a behavior command.
-    // Watch and Unwatch carry no interleaving attribute and therefore remain serialized.
+    // Kernel reads do not create traffic and only observe durable state, so they alone may
+    // interleave: the Read* methods of INeuron, and nothing else.
     private static bool IsKernelFreeRead(MethodInfo method)
-        => method.DeclaringType == typeof(INeuronQuery);
+        => method.DeclaringType == typeof(INeuron)
+        && method.Name.StartsWith("Read", StringComparison.Ordinal);
 
     private static void Refuse(Type neuronType, string attribute)
         => throw new InvalidOperationException(
-            $"{neuronType.Name} uses {attribute} outside {nameof(INeuronQuery)}, but neurons require serialized turns to "
-            + "preserve journal order and delivery lineage.");
+            $"{neuronType.Name} uses {attribute} outside the Read* methods of {nameof(INeuron)}, but neurons require "
+            + "serialized turns to preserve journal order and delivery lineage.");
 }

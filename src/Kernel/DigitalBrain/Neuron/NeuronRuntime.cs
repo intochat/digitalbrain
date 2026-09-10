@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Synapses;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
@@ -7,57 +8,33 @@ using Orleans.Serialization.Session;
 
 namespace DigitalBrain.Core;
 
-public sealed class NeuronRuntime
+public sealed class NeuronRuntime(TimeProvider clock)
 {
-    public NeuronRuntime(TimeProvider clock, SignalRouter router, SynapseOptions options)
+    internal TimeProvider Clock { get; } = clock;
+
+    internal NeuronActivationComponents Bind(IServiceProvider services, NeuronId neuronId)
     {
-        ArgumentNullException.ThrowIfNull(clock);
-        ArgumentNullException.ThrowIfNull(router);
-        ArgumentNullException.ThrowIfNull(options);
-
-        Clock = clock;
-        Router = router;
-        Options = options;
-    }
-
-    internal TimeProvider Clock { get; }
-
-    internal SignalRouter Router { get; }
-
-    internal SynapseOptions Options { get; }
-
-    internal SignalDispatcher Dispatcher { get; } = new();
-
-    internal NeuronActivationComponents Bind(
-        IServiceProvider activationServices,
-        NeuronId neuronId)
-    {
-        ArgumentNullException.ThrowIfNull(activationServices);
-
-        var entries = activationServices.GetRequiredService<Serializer<JournalEntry>>();
-        var incoming = Window("incoming");
-        var outgoing = Window("outgoing");
-        var journals = new NeuronJournals(neuronId, incoming, outgoing);
-        var synapses = new NeuronSynapses(
-            activationServices.GetRequiredKeyedService<IDurableDictionary<string, Synapse>>("synapses"),
-            Options,
-            neuronId,
-            Clock);
-
-        return new(Clock, Router, journals, synapses, Dispatcher);
-
+        var entries = services.GetRequiredService<Serializer<JournalEntry>>();
+        var sessions = services.GetRequiredService<SerializerSessionPool>();
         JournalWindow Window(string name) => new(
-            activationServices.GetRequiredKeyedService<IDurableList<byte[]>>(name),
-            activationServices.GetRequiredKeyedService<IDurableDictionary<string, long>>($"{name}.tally"),
-            activationServices.GetRequiredKeyedService<IDurableValue<long>>($"{name}.sequence"),
+            services.GetRequiredKeyedService<IDurableList<byte[]>>(name),
+            services.GetRequiredKeyedService<IDurableDictionary<string, long>>($"{name}.tally"),
+            services.GetRequiredKeyedService<IDurableValue<long>>($"{name}.sequence"),
             entries,
-            activationServices.GetRequiredService<SerializerSessionPool>());
+            sessions);
+
+        return new(
+            Clock,
+            new NeuronJournals(Window("incoming"), Window("outgoing")),
+            new NeuronSynapses(services.GetRequiredKeyedService<IDurableDictionary<string, Synapse>>("synapses"), neuronId, Clock),
+            services.GetRequiredKeyedService<IDurableDictionary<string, SignalDelivery>>("latest"),
+            services.GetRequiredKeyedService<IDurableValue<long>>("reacted"));
     }
 }
 
 internal sealed record NeuronActivationComponents(
     TimeProvider Clock,
-    SignalRouter Router,
     NeuronJournals Journals,
     NeuronSynapses Synapses,
-    SignalDispatcher Dispatcher);
+    IDurableDictionary<string, SignalDelivery> Latest,
+    IDurableValue<long> Reacted);
