@@ -1,39 +1,27 @@
-using DigitalBrain.Abstractions;
-using DigitalBrain.Core;
-using Orleans.Runtime;
-
 namespace DigitalBrain.Excel;
 
-[GrainType("excel")]
-internal sealed class ExcelEntity(
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ExcelState> state)
-    : Entity<ExcelState>(state), IExcel
+internal static class SheetGrid
 {
     internal const int MaxColumns = 32;
     internal const int MaxRows = 64;
 
-    public async Task Load(ExcelState state)
-    {
-        ArgumentNullException.ThrowIfNull(state);
-        await SaveAsync(Normalize(state));
-    }
+    internal static ExcelState Empty { get; } = Normalize(new ExcelState("Sheet", "Sheet1", [], []));
 
-    public async Task SetCell(int row, int column, string value)
+    internal static ExcelState WithCell(ExcelState current, CellEdit edit)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(row);
-        ArgumentOutOfRangeException.ThrowIfNegative(column);
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(row, MaxRows);
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(column, MaxColumns);
+        ArgumentOutOfRangeException.ThrowIfNegative(edit.Row);
+        ArgumentOutOfRangeException.ThrowIfNegative(edit.Column);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(edit.Row, MaxRows);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(edit.Column, MaxColumns);
 
-        var current = State ?? new ExcelState("Sheet", "Sheet1", [], []);
         var columns = current.Columns.ToList();
-        while (columns.Count <= column)
+        while (columns.Count <= edit.Column)
         {
             columns.Add(ColumnLetter(columns.Count));
         }
 
         var rows = current.Rows.Select(static r => r.Cells.ToList()).ToList();
-        while (rows.Count <= row)
+        while (rows.Count <= edit.Row)
         {
             rows.Add([]);
         }
@@ -46,12 +34,12 @@ internal sealed class ExcelEntity(
             }
         }
 
-        rows[row][column] = value ?? "";
-        await SaveAsync(new ExcelState(
+        rows[edit.Row][edit.Column] = edit.Value ?? "";
+        return new ExcelState(
             current.Title,
             current.SheetName,
             columns,
-            rows.Select(static cells => new ExcelRow(cells)).ToArray()));
+            rows.Select(static cells => new ExcelRow(cells)).ToArray());
     }
 
     internal static ExcelState Normalize(ExcelState state)

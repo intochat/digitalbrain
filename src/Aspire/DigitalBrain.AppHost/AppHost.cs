@@ -1,5 +1,6 @@
 using Aspire.Hosting;
 using DigitalBrain.Aspire.Hosting;
+using DigitalBrain.Excel;
 using DigitalBrain.Memory;
 using DigitalBrain.Memory.Aspire.Hosting;
 using DigitalBrain.Time;
@@ -9,10 +10,10 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
     .AddModule<MemoryModule>(memory => memory.WithQdrant())
-    .AddModule<TimeModule>();
-// Phase B: the module wiring these seven lines stand in for is in AppHost.cs at b225d085.
+    .AddModule<TimeModule>()
+    .AddModule<ExcelModule>();
+// Phase B: the module wiring these six lines stand in for is in AppHost.cs at b225d085.
 // Phase B: .AddModule<AIModule>(ai => ...)
-// Phase B: .AddModule<ExcelModule>()
 // Phase B: .AddModule<ExecutionModule>()
 // Phase B: .AddModule<GoogleModule>(google => google.WithGmail())
 // Phase B: .AddModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())

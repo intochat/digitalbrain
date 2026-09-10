@@ -3,6 +3,7 @@ using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Core;
+using DigitalBrain.Excel;
 using DigitalBrain.Testing;
 using DigitalBrain.Memory;
 using DigitalBrain.Time;
@@ -113,7 +114,7 @@ public sealed class BrainSteps(BrainWorld world)
         var counterFixtureState = new CounterFixtureState();
         return BrainSimulation.StartAsync(new()
         {
-            Modules = new([typeof(MemoryModule), typeof(TimeModule)]),
+            Modules = new([typeof(MemoryModule), typeof(TimeModule), typeof(ExcelModule)]),
             PersistenceDirectory = persistenceDirectory,
             JournalFaults = journalFaults,
             ConfigureSilo = silo =>
