@@ -32,6 +32,11 @@ internal sealed class RepositoryDiffFunction
         string scope = "working_tree",
         CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrWhiteSpace(_repositoryPath))
+        {
+            return "Repository diff unavailable: no repository path is configured.";
+        }
+
         if (scope is not ("working_tree" or "staged"))
         {
             return "Repository diff unavailable: scope must be working_tree or staged.";
@@ -41,7 +46,7 @@ internal sealed class RepositoryDiffFunction
         deadline.CancelAfter(TimeSpan.FromSeconds(10));
         try
         {
-            var path = Path.GetFullPath(_repositoryPath!);
+            var path = Path.GetFullPath(_repositoryPath);
             if (!Directory.Exists(path))
             {
                 return $"Repository diff unavailable: configured directory does not exist: {path}";

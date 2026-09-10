@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.Tests;
@@ -144,8 +146,9 @@ internal sealed class ScriptedChatClient : IChatClient
             return [];
         }
 
-        return System.Text.Json.Nodes.JsonNode.Parse(json) is not System.Text.Json.Nodes.JsonObject node
+        // A real model's tool call carries typed JSON, so keep numbers numbers.
+        return JsonNode.Parse(json) is not JsonObject node
             ? []
-            : node.ToDictionary(static pair => pair.Key, static pair => (object?)pair.Value?.ToString(), StringComparer.Ordinal);
+            : node.ToDictionary(static pair => pair.Key, static pair => (object?)pair.Value?.Deserialize<JsonElement>(), StringComparer.Ordinal);
     }
 }

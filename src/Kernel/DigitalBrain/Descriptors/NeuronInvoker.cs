@@ -10,6 +10,9 @@ internal sealed class NeuronInvoker(IGrainFactory grains, DescriptorTable table)
 
     public MethodDescriptor Describe(string interfaceAlias, string methodAlias) => table.Get(interfaceAlias, methodAlias);
 
+    public ArgumentContract? ArgumentContractOf(string interfaceAlias, string methodAlias)
+        => table.ArgumentContractOf(interfaceAlias, methodAlias);
+
     public async Task<JsonElement?> InvokeAsync(NeuronId neuron, string interfaceAlias, string methodAlias,
         JsonElement arguments, CancellationToken cancellationToken = default)
     {

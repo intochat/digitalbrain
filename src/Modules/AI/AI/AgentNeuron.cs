@@ -26,6 +26,11 @@ internal sealed class AgentNeuron(
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<AgentState> state)
     : Neuron<AgentState>(runtime, state)
 {
+    // Descriptors are fixed for the life of the silo, so the typed functions an Instruct.tools
+    // entry generates are built once per activation. Neuron turns are serialized: no locking.
+    private readonly Dictionary<string, AIFunction[]> _typedFunctions = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _takenFunctionNames = new(StringComparer.Ordinal);
+
     protected override async Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(delivery);
@@ -59,7 +64,8 @@ internal sealed class AgentNeuron(
             var nativeTools = ServiceProvider.GetRequiredService<NativeTools>();
             var operations = new McpOperations(GrainFactory, invoker);
             var tools = new List<AITool>(BrainTools.For(this, operations, invoker)
-                .Concat(TypedNeuronFunctions.For(invoker, instruct.Tools.Where(name => !nativeTools.Contains(name))))
+                .Concat(instruct.Tools.Where(name => !nativeTools.Contains(name)).Distinct(StringComparer.Ordinal)
+                    .SelectMany(name => TypedFunctionsFor(invoker, name)))
                 .Select(function => new TurnBoundFunction(function, turnScheduler)));
             tools.AddRange(nativeTools.Resolve(instruct.Tools));
 
@@ -103,6 +109,22 @@ internal sealed class AgentNeuron(
             ServiceProvider.GetService<ILogger<AgentNeuron>>()?.LogError(failure, "Agent {Neuron} failed to answer.", Id);
             await ReplyAsync(delivery, failure.Message, cancellationToken).ConfigureAwait(true);
         }
+    }
+
+    private AIFunction[] TypedFunctionsFor(INeuronInvoker invoker, string name)
+    {
+        if (_typedFunctions.TryGetValue(name, out var functions))
+        {
+            return functions;
+        }
+
+        // A tools entry that is neither a native tool nor a neuron name contributes nothing,
+        // for the same reason NativeTools skips a name nobody registered.
+        functions = NeuronId.TryParse(name, out var neuron)
+            ? [.. TypedNeuronFunctions.For(invoker, neuron, _takenFunctionNames)]
+            : [];
+        _typedFunctions.Add(name, functions);
+        return functions;
     }
 
     // ---- what the tools call ----

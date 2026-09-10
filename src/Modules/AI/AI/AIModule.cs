@@ -17,22 +17,16 @@ public sealed class AIModule : IModule
         VoiceToTextHosting.Add(builder.Services, builder.Configuration);
         WebSearchHosting.Add(builder.Services, builder.Configuration);
 
-        builder.Services.TryAddSingleton(services =>
+        builder.Services.TryAddSingleton<NativeTools>();
+        if (builder.Configuration.GetValue<bool>(TavilyWebSearch.EnabledConfigurationKey))
         {
-            var configuration = services.GetRequiredService<IConfiguration>();
-            var tools = new NativeTools();
-            if (configuration.GetValue<bool>(TavilyWebSearch.EnabledConfigurationKey))
-            {
-                tools.Add("websearch", WebSearchFunction.Create(services.GetRequiredService<IWebSearch>()));
-            }
+            builder.Services.AddNativeTool("websearch", services => WebSearchFunction.Create(services.GetRequiredService<IWebSearch>()));
+        }
 
-            if (!string.IsNullOrWhiteSpace(configuration["DigitalBrain:Workspace:RepositoryPath"]))
-            {
-                tools.Add("repositorydiff", new RepositoryDiffFunction(configuration).Function);
-            }
-
-            return tools;
-        });
+        if (!string.IsNullOrWhiteSpace(builder.Configuration["DigitalBrain:Workspace:RepositoryPath"]))
+        {
+            builder.Services.AddNativeTool("repositorydiff", services => new RepositoryDiffFunction(services.GetRequiredService<IConfiguration>()).Function);
+        }
 
         if (builder.Configuration[AIClients.DefaultModelKey] is { } defaultModel
             && !string.IsNullOrWhiteSpace(defaultModel))

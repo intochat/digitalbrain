@@ -80,3 +80,15 @@ Feature: agent
     And session "claude" fires "Ask" {"text":"second"} at "agent:a" with the correlation of its last fire
     And "claude" waits up to 10 seconds for 2 incoming "Reply"
     Then the scripted model's last request contained 2 user messages
+
+  Scenario: Instruct names a neuron and its typed methods become tools
+    Given a running brain with AI
+    And the scripted model will call tool "counter_c_add" with {"count":2} then say "added"
+    And the scripted model will call tool "counter_c_add" with {"count":2} then say "added again"
+    When session "claude" fires "Instruct" {"tools":["counter:c"]} at "agent:a"
+    And session "claude" fires "Ask" {"text":"add two"} at "agent:a"
+    And "claude" waits up to 10 seconds for an incoming "Reply"
+    And session "claude" fires "Ask" {"text":"add two again"} at "agent:a"
+    And "claude" waits up to 10 seconds for 2 incoming "Reply"
+    Then "c" commands journal shows 2 distinct commands, each Attempted then Completed
+    And "claude" waits up to 20 seconds until counter "c" total is 4

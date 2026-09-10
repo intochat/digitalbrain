@@ -7,5 +7,6 @@ public interface INeuronInvoker
 {
     IReadOnlyList<MethodDescriptor> Describe(NeuronId neuron);
     MethodDescriptor Describe(string interfaceAlias, string methodAlias);
+    ArgumentContract? ArgumentContractOf(string interfaceAlias, string methodAlias);
     Task<JsonElement?> InvokeAsync(NeuronId neuron, string interfaceAlias, string methodAlias, JsonElement arguments, CancellationToken cancellationToken = default);
 }

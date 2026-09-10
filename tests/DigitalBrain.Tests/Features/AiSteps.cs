@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.AI;
+using DigitalBrain.AI.XAI;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -114,11 +115,13 @@ public sealed class AiSteps(BrainWorld world, BrainSteps brain)
         Assert.Contains(fragment, text, StringComparison.Ordinal);
     }
 
-    // The scripted client is the default provider, so nothing in a scenario names a model.
+    // The marker registration exercises catalogue resolution by default; the raw key exercises provider fallback.
     private static Action<ISiloBuilder> Scripted(BrainWorld world)
         => silo =>
         {
             silo.Services.AddKeyedSingleton<IChatClient>("scripted", (_, _) => world.Scripted);
-            silo.Services.AddSingleton(new AIDefaults("scripted"));
+            silo.Services.AddKeyedSingleton<IChatClient>(typeof(IGrok46), (_, _) => world.Scripted);
+            silo.Services.AddSingleton(new AIDefaults("IGrok46"));
+            silo.Services.AddSingleton(new CounterFixtureState());
         };
 }

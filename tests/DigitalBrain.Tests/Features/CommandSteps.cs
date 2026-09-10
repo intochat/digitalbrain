@@ -108,6 +108,15 @@ public sealed class CommandSteps(BrainSteps brain)
         AssertPhases(read.Delta.Where(record => record.Id == CommandIdFrom(handle)), first, second);
     }
 
+    [Then(@"""(.*)"" commands journal shows (\d+) distinct commands, each (\w+) then (\w+)")]
+    public async Task ThenDistinctCommandPhases(string name, int count, string first, string second)
+    {
+        var read = await Journal(name);
+        var commands = read.Delta.GroupBy(record => record.Id).ToList();
+        Assert.Equal(count, commands.Count);
+        Assert.All(commands, records => AssertPhases(records, first, second));
+    }
+
     [Then(@"""(.*)"" commands journal shows ""(.*)"" incarnation (\d+) as (\w+) then (\w+)")]
     public async Task ThenIncarnationPhases(string name, string handle, int incarnation, string first, string second)
     {

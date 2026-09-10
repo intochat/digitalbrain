@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Descriptors;
+using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
 using Microsoft.Extensions.Options;
 using Orleans.Concurrency;
@@ -97,6 +98,21 @@ public sealed class DescriptorTable
     public IReadOnlyList<MethodDescriptor> For(GrainType grainType) => _descriptors.GetValueOrDefault(grainType) ?? [];
 
     public MethodDescriptor Get(string interfaceAlias, string methodAlias) => Method(interfaceAlias, methodAlias).Descriptor;
+
+    public ArgumentContract? ArgumentContractOf(string interfaceAlias, string methodAlias)
+    {
+        var arguments = Method(interfaceAlias, methodAlias).ArgumentsJson;
+        if (arguments is null)
+        {
+            return null;
+        }
+
+        var commandIdPropertyName = typeof(Command).IsAssignableFrom(arguments.Type)
+            ? arguments.Properties.Single(property => property.PropertyType == typeof(CommandId)
+                && property.AttributeProvider is MemberInfo { Name: nameof(Command.Id) }).Name
+            : null;
+        return new(arguments.Options, commandIdPropertyName);
+    }
 
     public IReadOnlyList<string> InterfaceAliasesOf(GrainType grainType) => _aliases.GetValueOrDefault(grainType) ?? [];
 

@@ -24,7 +24,8 @@ internal static class Providers
         // An explicitly configured provider can accept model ids outside our marker catalogue.
         if (client is null && !string.IsNullOrWhiteSpace(provider))
         {
-            client = ResolveClient(services, provider);
+            name = provider;
+            client = ResolveClient(services, name);
         }
 
         return client ?? throw new SignalRejectedException(

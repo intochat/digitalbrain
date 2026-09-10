@@ -161,6 +161,11 @@ Because the turn never yields between step 2 and step 4, no interleaving request
 effects without their outcome. Execution failure does not roll back staged effects; they
 persist together with `Failed`. Recovery discards whatever storage did not commit.
 
+A command never derives new state from the snapshot: it validates and carries the delta,
+and the reaction merges against the current snapshot and assigns versions or generations
+(deliveries drain serially; commands do not wait for queued reactions). A snapshot-dependent
+precondition in a command is valid only when the DTO carries `ExpectedVersion`.
+
 `Unknown` means "attempted, no committed effect", so a retry with the same id re-executes as
 the next incarnation. A `Completed` command whose result exceeded 64 KiB has no stored
 result; a retry with its id fails with `CommandOutcomeUnknownException` and the caller reads
