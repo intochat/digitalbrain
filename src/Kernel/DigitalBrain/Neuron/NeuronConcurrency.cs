@@ -28,7 +28,7 @@ internal static class NeuronConcurrency
         var methods = neuronType
             .GetMethods()
             .Concat(neuronType.GetInterfaces().SelectMany(contract => contract.GetMethods()))
-            .Where(method => !IsKernelFreeRead(method))
+            .Where(method => !IsKernelInterleaved(method))
             .ToArray();
 
         if (methods.Any(method => method.IsDefined(typeof(AlwaysInterleaveAttribute), inherit: true)))
@@ -42,11 +42,13 @@ internal static class NeuronConcurrency
         }
     }
 
-    // Kernel reads do not create traffic and only observe durable state, so they alone may
-    // interleave: the Read* methods of INeuron, and nothing else.
-    private static bool IsKernelFreeRead(MethodInfo method)
+    // The kernel's own interleaving methods, and nothing else: the Read* methods of INeuron,
+    // which only observe durable state, and Deliver, which journals the accept without
+    // running the reaction.
+    private static bool IsKernelInterleaved(MethodInfo method)
         => method.DeclaringType == typeof(INeuron)
-        && method.Name.StartsWith("Read", StringComparison.Ordinal);
+        && (method.Name.StartsWith("Read", StringComparison.Ordinal)
+            || method.Name == nameof(INeuron.Deliver));
 
     private static void Refuse(Type neuronType, string attribute)
         => throw new InvalidOperationException(

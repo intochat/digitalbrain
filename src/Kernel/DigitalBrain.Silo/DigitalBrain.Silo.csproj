@@ -8,6 +8,6 @@
     <ProjectReference Include="../../Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
     <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />
     <ProjectReference Include="../DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
-    <!-- Phase B: <ProjectReference Include="../../Modules/AI/AI/DigitalBrain.Modules.AI.csproj" /> -->
+    <!-- Phase B: restore from b225d085. <ProjectReference Include="../../Modules/AI/AI/DigitalBrain.Modules.AI.csproj" /> -->
   </ItemGroup>
 </Project>

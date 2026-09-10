@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 var builder = DistributedApplication.CreateBuilder(args);
 
 var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain);
+// Phase B: the module wiring these nine lines stand in for is in AppHost.cs at b225d085.
 // Phase B: .AddModule<AIModule>(ai => ...)
 // Phase B: .AddModule<MemoryModule>(memory => memory.WithQdrant())
 // Phase B: .AddModule<TimeModule>()

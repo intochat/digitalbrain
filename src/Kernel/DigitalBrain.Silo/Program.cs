@@ -9,12 +9,15 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddDigitalBrain();
 builder.AddKernelCors();
+builder.Services.AddAuthentication();
 builder.Services.AddDigitalBrainMcp()
     .WithHttpTransport(options => options.SessionMode = HttpServerSessionMode.Stateless);
 
 var app = builder.Build();
 
 app.UseKernelCors();
+app.UseAuthentication();
+app.UseBasicAuthGate();
 app.MapDefaultEndpoints();
 app.MapOrleansDashboard("/orleans");
 app.MapDigitalBrainMcp("/mcp");
