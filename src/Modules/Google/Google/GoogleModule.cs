@@ -1,6 +1,7 @@
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace DigitalBrain.Google;
 
@@ -14,22 +15,27 @@ public sealed class GoogleModule : IModule
         ArgumentNullException.ThrowIfNull(builder);
         var services = builder.Services;
         var settings = new GmailOAuthConfiguration(builder.Configuration);
+        services.TryAddSingleton<TokenHandoff>();
+        services.AddSingleton<GmailDraftAccess>();
         services.AddSingleton(settings);
         services.AddSingleton<GmailLogins>();
         services.AddSingleton<IHttpSurface>(static services => new BrowserLoginSurface(services.GetRequiredService<GmailLogins>()));
         if (DigitalBrainFakes.Enabled(builder.Configuration))
         {
             services.AddSingleton<IGmailProvider, FakeGmailProvider>();
+            services.AddSingleton<IGmailTokenExchange, FakeGmailTokenExchange>();
         }
         else
         {
             services.AddSingleton<IGmailProvider, GmailMcpProvider>();
+            services.AddSingleton<IGmailTokenExchange, GmailTokenExchange>();
         }
         services.AddSingleton<GmailTokenRefresh>();
         // NativeTools contributor lands after the AI module merge
         services.AddSingleton(static services => new GmailNativeTools(
             services.GetRequiredService<IGrainFactory>().GetGrain<IGmail>(new NeuronId("gmail", "gmail").ToGrainId()),
-            services.GetRequiredService<GmailLogins>()));
+            services.GetRequiredService<GmailLogins>(),
+            services.GetRequiredService<TimeProvider>()));
         services.AddGmailAuthentication(settings, GmailLogins.LoginDefinition);
     }
 }

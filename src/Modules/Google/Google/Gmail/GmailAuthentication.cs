@@ -114,10 +114,11 @@ internal static class GmailAuthentication
                         {
                             throw new GmailUnavailableException("Google did not grant all required Gmail scopes or a valid token lifetime.");
                         }
+                        var nonce = context.HttpContext.RequestServices.GetRequiredService<TokenHandoff>()
+                            .Deposit(new OAuthTokens(tokens.AccessToken, tokens.RefreshToken));
                         var grains = context.HttpContext.RequestServices.GetRequiredService<IGrainFactory>();
                         await grains.GetGrain<IGmail>(new NeuronId("gmail", "gmail").ToGrainId())
-                            .Connect(new ConnectGmailAccount(CommandId.New(), sub, email, tokens.AccessToken,
-                                tokens.RefreshToken, tokens.Scope, expiresIn)).ConfigureAwait(false);
+                            .Connect(new ConnectGmailAccount(CommandId.New(), sub, email, tokens.Scope, expiresIn, nonce)).ConfigureAwait(false);
                         await LoginPage.WriteAsync(context.HttpContext, "Gmail connected",
                             "You can close this tab and return to DigitalBrain. Login did not create a draft.", 200).ConfigureAwait(false);
                     }

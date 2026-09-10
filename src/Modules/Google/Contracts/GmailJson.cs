@@ -8,6 +8,9 @@ using DigitalBrain.Google;
 namespace DigitalBrain.Google;
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(RefreshGmailConnection))]
+[JsonSerializable(typeof(GmailRefreshed))]
+[JsonSerializable(typeof(GmailConnectionRejected))]
 [JsonSerializable(typeof(ConnectGmailAccount))]
 [JsonSerializable(typeof(DisconnectGmail))]
 [JsonSerializable(typeof(PrepareGmailDraft))]

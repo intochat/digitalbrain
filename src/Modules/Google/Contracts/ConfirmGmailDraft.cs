@@ -3,7 +3,6 @@ using DigitalBrain.Abstractions.Identity;
 
 namespace DigitalBrain.Google;
 
-/// <summary>Confirms the stored preview and provider schema.</summary>
 [GenerateSerializer]
 [Alias("db.gmail.confirm-draft")]
 public sealed record ConfirmGmailDraft(

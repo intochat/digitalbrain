@@ -3,7 +3,6 @@ using DigitalBrain.Abstractions.Identity;
 
 namespace DigitalBrain.Google;
 
-/// <summary>Requests an exact draft preview.</summary>
 [GenerateSerializer]
 [Alias("db.gmail.prepare-draft")]
 public sealed record PrepareGmailDraft(

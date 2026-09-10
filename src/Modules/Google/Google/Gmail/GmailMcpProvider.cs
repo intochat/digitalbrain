@@ -13,6 +13,7 @@ internal sealed class GmailMcpProvider : IGmailProvider
     public async Task<JsonElement> InvokeAsync(string tool, IReadOnlyDictionary<string, object?> arguments,
         string accessToken, CancellationToken cancellationToken)
     {
+        GmailTokenRefresh.ValidateToken(accessToken);
         if (!NativeTools.Contains(tool, StringComparer.Ordinal))
         {
             throw new GmailUnavailableException("This Gmail operation is not allowed.");
@@ -53,6 +54,7 @@ internal sealed class GmailMcpProvider : IGmailProvider
     public async Task<string> ReadToolSchemaHashAsync(string tool, string accessToken, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        GmailTokenRefresh.ValidateToken(accessToken);
         if (!NativeTools.Contains(tool, StringComparer.Ordinal))
         {
             throw new GmailUnavailableException("This Gmail operation is not allowed.");
