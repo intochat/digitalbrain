@@ -118,9 +118,11 @@ snapshot facet.
   call `ReceiveAsync` with a token linked to the activation and a per-entry source, then
   dequeue, push id to `ReactedIds`, persist. Throw → log, arm the retry timer (1 s → 60 s
   exponential, `Interleave = false`, `KeepAlive = true`), leave the head. Activation re-arms if
-  a head exists. A grain timer needs an activation, so while the head has failed the neuron
-  also holds one Orleans reminder (`retry`, minimum period) that reactivates it after a cold
-  restart; the reminder is unregistered when the head clears.
+  a head exists. A grain timer needs an activation, so while `Pending` is non-empty the
+  neuron also holds one Orleans reminder (`retry`, period `NeuronOptions.RetryReminderPeriod`,
+  default one minute) that reactivates it after a cold restart; it is registered on the
+  empty→non-empty transition and unregistered when `Pending` becomes empty. A tick only
+  re-arms the drain.
 - `CancelReaction(id)`: no-op if `id` is neither pending nor reacting; else add to
   `PendingCancelled`, persist, and cancel the reacting entry's token if it is the one running.
   Cancellation is observed at the reaction's next cooperative observation of its token.
