@@ -80,10 +80,18 @@ public sealed class DescriptorTable
                     var argumentType = parameters.FirstOrDefault(parameter => parameter.ParameterType != typeof(CancellationToken))?.ParameterType;
                     var resultType = method.ReturnType == typeof(Task) ? null : method.ReturnType.GenericTypeArguments[0];
                     var argumentsJson = TypeInfo(argumentType, json, method);
+                    string? commandIdPropertyName = null;
+                    if (argumentsJson is not null && typeof(Command).IsAssignableFrom(argumentsJson.Type))
+                    {
+                        commandIdPropertyName = argumentsJson.Properties.FirstOrDefault(property => property.PropertyType == typeof(CommandId)
+                            && property.AttributeProvider is MemberInfo { Name: nameof(Command.Id) } && property.Get is not null)?.Name
+                            ?? throw new InvalidOperationException($"Interface '{contract.FullName}', method '{method.Name}' needs a serializable Id property of type CommandId. Put Id in the DTO's source-generated JSON contract.");
+                    }
+
                     var resultJson = TypeInfo(resultType, json, method);
                     var descriptor = new MethodDescriptor(alias, methodAlias, method.IsDefined(typeof(ReadOnlyAttribute)),
                         Schema(argumentsJson), Schema(resultJson), summaries.For(method));
-                    metadata = new(contract, interfaceTypes.GetGrainInterfaceType(contract), argumentsJson, resultJson,
+                    metadata = new(contract, interfaceTypes.GetGrainInterfaceType(contract), argumentsJson, commandIdPropertyName, resultJson,
                         CompileCall(method), CompileResult(method.ReturnType), descriptor);
                     _methods.Add(key, metadata);
                 }
@@ -101,17 +109,14 @@ public sealed class DescriptorTable
 
     public ArgumentContract? ArgumentContractOf(string interfaceAlias, string methodAlias)
     {
-        var arguments = Method(interfaceAlias, methodAlias).ArgumentsJson;
+        var metadata = Method(interfaceAlias, methodAlias);
+        var arguments = metadata.ArgumentsJson;
         if (arguments is null)
         {
             return null;
         }
 
-        var commandIdPropertyName = typeof(Command).IsAssignableFrom(arguments.Type)
-            ? arguments.Properties.Single(property => property.PropertyType == typeof(CommandId)
-                && property.AttributeProvider is MemberInfo { Name: nameof(Command.Id) }).Name
-            : null;
-        return new(arguments.Options, commandIdPropertyName);
+        return new(arguments.Options, metadata.CommandIdPropertyName);
     }
 
     public IReadOnlyList<string> InterfaceAliasesOf(GrainType grainType) => _aliases.GetValueOrDefault(grainType) ?? [];
@@ -208,6 +213,7 @@ internal sealed record InvocationMetadata(
     Type Interface,
     GrainInterfaceType InterfaceType,
     JsonTypeInfo? ArgumentsJson,
+    string? CommandIdPropertyName,
     JsonTypeInfo? ResultJson,
     Func<object, object?, CancellationToken, Task> Invoke,
     Func<Task, object?>? Result,

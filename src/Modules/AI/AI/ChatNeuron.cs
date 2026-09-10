@@ -108,7 +108,7 @@ internal sealed class ChatNeuron(
             [.. participants.Select(static p => p.ToString())],
             instruct.Rounds > 0 ? instruct.Rounds : 1,
             Turn: 0);
-        var run = new ChatRun(delivery.CorrelationId.ToString(), delivery.Source.ToString(), policy.ToJson(), PendingParticipant: null);
+        var run = new ChatRun(delivery.CorrelationId.ToString(), delivery.Source.ToString(), policy.ToJson(), PendingParticipant: null, ReplyFired: false);
         await InviteAsync(run, policy, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
     }
 
@@ -129,7 +129,7 @@ internal sealed class ChatNeuron(
         var policy = RunPolicy.Parse(run.StateJson);
         if (!string.Equals(run.PendingParticipant, delivery.Source.ToString(), StringComparison.Ordinal))
         {
-            if (!policy.Participants.Contains(delivery.Source.ToString(), StringComparer.Ordinal))
+            if (run.ReplyFired || !policy.Participants.Contains(delivery.Source.ToString(), StringComparer.Ordinal))
             {
                 return;
             }
@@ -177,11 +177,11 @@ internal sealed class ChatNeuron(
             ? parsed
             : throw new InvalidOperationException($"'{run.Asker}' is not a neuron name.");
         // Fire before forgetting the run, so a lost activation leaves the retry something to close.
-        // The outgoing journal keeps that retry from answering the same conversation twice.
-        var read = await ReadJournal(JournalKind.Outgoing, 0).ConfigureAwait(true);
-        if (!read.Delta.Any(entry => entry.Signal.Type == AIVocabulary.Reply && entry.CorrelationId == correlation))
+        // The retry reads the marker, not the journal, to avoid answering the same conversation twice.
+        if (!run.ReplyFired)
         {
             await FireAsync(Signal.Create(AIVocabulary.Reply, Bodies.Write(text)), asker, correlation, cancellationToken).ConfigureAwait(true);
+            await SaveRunAsync(run with { ReplyFired = true }, cancellationToken).ConfigureAwait(true);
         }
 
         await SaveRunAsync(run, cancellationToken, remove: true).ConfigureAwait(true);

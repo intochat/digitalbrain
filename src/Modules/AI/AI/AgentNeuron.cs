@@ -39,10 +39,7 @@ internal sealed class AgentNeuron(
             return;
         }
 
-        // Causation identifies this answer; a second Ask on the same correlation is a new question.
-        var answerType = delivery.Signal.Type == AIVocabulary.Ask ? AIVocabulary.Reply : AIVocabulary.Said;
-        var outgoing = await ReadJournal(JournalKind.Outgoing, 0).ConfigureAwait(true);
-        if (outgoing.Delta.Any(entry => entry.Signal.Type == answerType && entry.CausationId == delivery.SignalId))
+        if (State?.Answered.Contains(delivery.SignalId) == true)
         {
             return;
         }
@@ -99,7 +96,6 @@ internal sealed class AgentNeuron(
                 : Bodies.Text(delivery.Signal.Body);
 
             var response = await agent.RunAsync(input, session, options: null, cancellationToken).ConfigureAwait(true);
-            await SaveSessionAsync(agent, correlation, session, cancellationToken).ConfigureAwait(true);
 
             var text = response.Text ?? string.Empty;
             var isTurn = delivery.Signal.Type == AIVocabulary.Turn;
@@ -108,6 +104,8 @@ internal sealed class AgentNeuron(
                 delivery.Source,
                 delivery.CorrelationId,
                 cancellationToken).ConfigureAwait(true);
+            // Write the session with the marker after the answer, so a retry after activation loss re-asks rather than going silent.
+            await SaveAnsweredTurnAsync(agent, correlation, session, delivery.SignalId, cancellationToken).ConfigureAwait(true);
         }
         // A model that times out cancels with a TaskCanceledException that has nothing to do
         // with this turn's token. Letting it escape would leave the cursor in place and the
@@ -246,18 +244,28 @@ internal sealed class AgentNeuron(
         return await agent.CreateSessionAsync(cancellationToken).ConfigureAwait(true);
     }
 
-    private async Task SaveSessionAsync(AIAgent agent, string correlation, AgentSession session, CancellationToken cancellationToken)
+    private async Task SaveAnsweredTurnAsync(AIAgent agent, string correlation, AgentSession session, SignalId answered, CancellationToken cancellationToken)
     {
         var json = (await agent.SerializeSessionAsync(session, cancellationToken: cancellationToken).ConfigureAwait(true)).GetRawText();
-        var sessions = State is { } current ? new List<AgentSessionEntry>(current.Sessions) : [];
+        var current = State;
+        var sessions = current is null ? [] : new List<AgentSessionEntry>(current.Sessions);
         sessions.RemoveAll(s => string.Equals(s.Correlation, correlation, StringComparison.Ordinal));
         sessions.Add(new AgentSessionEntry(correlation, json));
-        if (sessions.Count > AgentState.MaxSessions)
-        {
-            sessions.RemoveRange(0, sessions.Count - AgentState.MaxSessions);
-        }
+        Trim(sessions, AgentState.MaxSessions);
 
-        await SaveAsync(new AgentState(sessions), cancellationToken).ConfigureAwait(true);
+        var answeredTurns = current is null ? [] : new List<SignalId>(current.Answered);
+        answeredTurns.Add(answered);
+        Trim(answeredTurns, AgentState.MaxAnswered);
+
+        await SaveAsync(new AgentState(sessions, answeredTurns), cancellationToken).ConfigureAwait(true);
+    }
+
+    private static void Trim<T>(List<T> entries, int keep)
+    {
+        if (entries.Count > keep)
+        {
+            entries.RemoveRange(0, entries.Count - keep);
+        }
     }
 
     // ---- plumbing ----
