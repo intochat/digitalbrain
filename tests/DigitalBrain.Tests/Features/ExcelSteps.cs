@@ -42,12 +42,12 @@ public sealed class ExcelSteps(BrainWorld world)
         }
     }
 
-    [Then("the spreadsheet command is accepted")]
-    public void CommandAccepted()
+    [Then(@"the spreadsheet command is accepted against version (\d+)")]
+    public void CommandAccepted(long version)
     {
         Assert.Null(_lastError);
         Assert.NotNull(_lastAccepted);
-        Assert.Equal(new SheetVersion(1), _lastAccepted.Receipt);
+        Assert.Equal(new SheetVersion(version), _lastAccepted.Receipt);
         Assert.NotEqual(default, _lastAccepted.Work);
     }
 
@@ -129,6 +129,17 @@ public sealed class ExcelSteps(BrainWorld world)
         _lastAccepted = null;
         RequestContext.Set(NeuronRequestKeys.Caller, NeuronId.Plain(principal).ToString());
         _lastAccepted = await Spreadsheet(name).Apply(command);
+    }
+
+    [When(@"""(.*)"" applies cell edits to sheet ""(.*)"" concurrently, ""(.*)"" at row (\d+) and column (\d+) and ""(.*)"" at row (\d+) and column (\d+)")]
+    public async Task ApplyCellsConcurrently(string principal, string name, string firstValue, int firstRow, int firstColumn,
+        string secondValue, int secondRow, int secondColumn)
+    {
+        RequestContext.Set(NeuronRequestKeys.Caller, NeuronId.Plain(principal).ToString());
+        var sheet = Spreadsheet(name);
+        var first = sheet.Apply(new ApplySheetEdit(CommandId.New(), null, new CellEdit(firstRow, firstColumn, firstValue)));
+        var second = sheet.Apply(new ApplySheetEdit(CommandId.New(), null, new CellEdit(secondRow, secondColumn, secondValue)));
+        await Task.WhenAll(first, second);
     }
 
     private ISpreadsheet Spreadsheet(string name)

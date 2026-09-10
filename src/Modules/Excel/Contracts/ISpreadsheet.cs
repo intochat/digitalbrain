@@ -7,7 +7,7 @@ namespace DigitalBrain.Excel;
 [Alias("sheet")]
 public interface ISpreadsheet : INeuron
 {
-    /// <summary>Applies a replacement grid or cell edit and schedules its storage.</summary>
+    /// <summary>Applies a replacement grid or a cell edit; the receipt is the version it was accepted against, and the reaction assigns the next one.</summary>
     [Alias("apply")]
     Task<Accepted<SheetVersion>> Apply(ApplySheetEdit command);
 

@@ -7,7 +7,7 @@ namespace DigitalBrain.Time;
 [Alias("timer")]
 public interface ITimer : INeuron
 {
-    /// <summary>Schedules a timer to elapse after the requested duration.</summary>
+    /// <summary>Schedules a timer to elapse after the requested duration; the receipt is the generation the command was accepted against.</summary>
     [Alias("schedule")]
     Task<Accepted<TimerGeneration>> Schedule(ScheduleTimer command);
 

@@ -133,5 +133,16 @@ internal sealed class MemoryNeuron : Neuron<MemoryState>, IMemory
     }
 
     private static Dictionary<string, string> ToMetadataFilter(IReadOnlyList<MemoryTag> tags)
-        => tags.ToDictionary(static tag => tag.Name, static tag => tag.Value, StringComparer.Ordinal);
+    {
+        var filter = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var tag in tags)
+        {
+            if (!filter.TryAdd(tag.Name, tag.Value))
+            {
+                throw new ArgumentException($"Duplicate tag name '{tag.Name}'; pass each tag name once.", nameof(tags));
+            }
+        }
+
+        return filter;
+    }
 }

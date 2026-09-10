@@ -9,4 +9,5 @@ namespace DigitalBrain.Time;
 public sealed record ScheduleTimer(
     CommandId Id,
     [property: Id(0)] int DurationSeconds,
-    [property: Id(1)] string Note) : Command(Id);
+    [property: Id(1)] string Note,
+    long? ExpectedVersion = null) : Command(Id, ExpectedVersion);

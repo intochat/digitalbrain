@@ -16,9 +16,18 @@ Feature: Time
     Then "claude" waits up to 5 seconds until timer "t" status is Cancelled
     And "claude" incoming journal is empty
 
-  Scenario: Scheduling a timer that is already scheduled is refused
+  Scenario: Scheduling against a stale generation is refused
     Given a running brain with file-backed storage
     When "claude" schedules timer "t" for 60 seconds with note "Tea is ready"
     Then "claude" waits up to 5 seconds until timer "t" status is Scheduled
-    When "claude" tries to schedule timer "t" for 60 seconds with note "Another tea"
-    Then the timer command fails with "already scheduled"
+    When "claude" tries to schedule timer "t" for 60 seconds with note "Another tea" expecting generation 0
+    Then the timer command fails with "expected generation 0"
+
+  Scenario: Scheduling again while armed changes nothing
+    Given a running brain with file-backed storage
+    When "claude" schedules timer "t" for 60 seconds with note "Tea is ready"
+    Then "claude" waits up to 5 seconds until timer "t" status is Scheduled
+    When "claude" schedules timer "t" for 30 seconds with note "Another tea"
+    And "claude" waits up to 5 seconds until "timer:t" pending count is 0
+    Then timer "t" generation is 1
+    And timer "t" note is "Tea is ready"

@@ -9,11 +9,6 @@ internal static class SheetGrid
 
     internal static ExcelState WithCell(ExcelState current, CellEdit edit)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(edit.Row);
-        ArgumentOutOfRangeException.ThrowIfNegative(edit.Column);
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(edit.Row, MaxRows);
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(edit.Column, MaxColumns);
-
         var columns = current.Columns.ToList();
         while (columns.Count <= edit.Column)
         {

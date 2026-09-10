@@ -29,17 +29,15 @@ internal sealed class TimerNeuron(
                 throw new CommandRejectedException(arguments.Id, "note is blank", "Provide a non-blank note for the timer.");
             }
 
-            if (State is { Status: TimerStatus.Scheduled })
+            if (arguments.ExpectedVersion is { } expected && expected != (State?.Generation ?? 0))
             {
-                throw new CommandRejectedException(arguments.Id, "timer is already scheduled", "Stop the scheduled timer before scheduling another.");
+                throw new CommandRejectedException(arguments.Id, $"expected generation {expected} but the timer is at {State?.Generation ?? 0}",
+                    "Read the timer and retry with the generation it reports, or stop it first.");
             }
 
-            var generation = (State?.Generation ?? 0) + 1;
-            var scheduledAt = TimeProvider.GetUtcNow();
-            var dueAt = scheduledAt + TimeSpan.FromSeconds(arguments.DurationSeconds);
-            var body = new SchedulingBody(generation, scheduledAt, dueAt, arguments.DurationSeconds, arguments.Note);
+            var body = new SchedulingBody(arguments.DurationSeconds, arguments.Note);
             var work = Schedule(Signal.Create(TimeSignals.Scheduling, JsonSerializer.Serialize(body, TimeJson.Default.SchedulingBody)));
-            return new Accepted<TimerGeneration>(new TimerGeneration(generation), work);
+            return new Accepted<TimerGeneration>(new TimerGeneration(State?.Generation ?? 0), work);
         });
 
     public Task<Accepted<TimerGeneration>> Stop(StopTimer command) => ExecuteCommandAsync(
@@ -50,9 +48,8 @@ internal sealed class TimerNeuron(
                 throw new CommandRejectedException(arguments.Id, "nothing scheduled to stop", "Schedule a timer before stopping it.");
             }
 
-            var generation = new TimerGeneration(current.Generation);
-            var work = Schedule(Signal.Create(TimeSignals.Stopping, JsonSerializer.Serialize(generation, TimeJson.Default.TimerGeneration)));
-            return new Accepted<TimerGeneration>(generation, work);
+            var work = Schedule(Signal.Create(TimeSignals.Stopping, "{}"));
+            return new Accepted<TimerGeneration>(new TimerGeneration(current.Generation), work);
         });
 
     public Task<TimerSnapshot> Read() => Task.FromResult(State is { } current
@@ -65,21 +62,30 @@ internal sealed class TimerNeuron(
         {
             case TimeSignals.Scheduling:
                 {
+                    if (State is { Status: TimerStatus.Scheduled })
+                    {
+                        // A racing schedule is a no-op while the timer is already armed.
+                        return;
+                    }
+
                     var body = Body(delivery, TimeJson.Default.SchedulingBody);
-                    await SaveAsync(new TimerState(TimerStatus.Scheduled, body.Generation, body.ScheduledAt, body.DueAt,
+                    var generation = (State?.Generation ?? 0) + 1;
+                    var scheduledAt = TimeProvider.GetUtcNow();
+                    var dueAt = scheduledAt + TimeSpan.FromSeconds(body.DurationSeconds);
+                    await SaveAsync(new TimerState(TimerStatus.Scheduled, generation, scheduledAt, dueAt,
                         body.DurationSeconds, body.Note), cancellationToken).ConfigureAwait(true);
-                    await Alarm(body.Generation).Arm(body.DueAt - TimeProvider.GetUtcNow()).ConfigureAwait(true);
+                    await Alarm(generation).Arm(dueAt - TimeProvider.GetUtcNow()).ConfigureAwait(true);
                     break;
                 }
             case TimeSignals.Stopping:
                 {
-                    var generation = Body(delivery, TimeJson.Default.TimerGeneration).Value;
-                    if (State is { Status: TimerStatus.Scheduled } current && current.Generation == generation)
+                    if (State is not { Status: TimerStatus.Scheduled } current)
                     {
-                        await SaveAsync(current with { Status = TimerStatus.Cancelled }, cancellationToken).ConfigureAwait(true);
+                        return;
                     }
 
-                    await Alarm(generation).Retire().ConfigureAwait(true);
+                    await SaveAsync(current with { Status = TimerStatus.Cancelled }, cancellationToken).ConfigureAwait(true);
+                    await Alarm(current.Generation).Retire().ConfigureAwait(true);
                     break;
                 }
             case TimeSignals.Due:

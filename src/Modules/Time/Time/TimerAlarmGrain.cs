@@ -12,6 +12,8 @@ namespace DigitalBrain.Time;
 internal sealed class TimerAlarmGrain(TimeOptions options, TimeProvider timeProvider) : Grain, ITimerAlarm, IRemindable
 {
     private const string AlarmReminderName = "due";
+    // The receiving neuron stamps its own incoming journal sequence, so this only has to be positive.
+    private const long EdgeDeliverySequence = 1;
 
     public Task Arm(TimeSpan dueIn)
         => this.RegisterOrUpdateReminder(AlarmReminderName, dueIn < TimeSpan.Zero ? TimeSpan.Zero : dueIn, options.AlarmPeriod);
@@ -52,7 +54,7 @@ internal sealed class TimerAlarmGrain(TimeOptions options, TimeProvider timeProv
 
         var signal = Signal.Create(TimeSignals.Due,
             JsonSerializer.Serialize(new TimerGeneration(generation), TimeJson.Default.TimerGeneration));
-        var delivery = SignalDelivery.Create(signal, NeuronId.FromGrainId(this.GetGrainId()), 1, timeProvider);
+        var delivery = SignalDelivery.Create(signal, NeuronId.FromGrainId(this.GetGrainId()), EdgeDeliverySequence, timeProvider);
         return GrainFactory.GetGrain<INeuron>(timer.ToGrainId()).Deliver(delivery);
     }
 }

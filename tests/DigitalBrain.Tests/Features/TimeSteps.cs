@@ -21,13 +21,14 @@ public sealed class TimeSteps(BrainWorld world)
         return Timer(name).Schedule(new ScheduleTimer(CommandId.New(), seconds, note));
     }
 
-    [When(@"""(.*)"" tries to schedule timer ""(.*)"" for (\d+) seconds with note ""(.*)""")]
-    public async Task TrySchedule(string principal, string name, int seconds, string note)
+    [When(@"""(.*)"" tries to schedule timer ""(.*)"" for (\d+) seconds with note ""(.*)"" expecting generation (\d+)")]
+    public async Task TrySchedule(string principal, string name, int seconds, string note, long expectedGeneration)
     {
         _lastError = null;
         try
         {
-            await Schedule(principal, name, seconds, note);
+            RequestContext.Set(NeuronRequestKeys.Caller, NeuronId.Plain(principal).ToString());
+            await Timer(name).Schedule(new ScheduleTimer(CommandId.New(), seconds, note, expectedGeneration));
         }
         catch (Exception error)
         {
@@ -66,6 +67,13 @@ public sealed class TimeSteps(BrainWorld world)
         Assert.Contains(reason, error.Reason, StringComparison.Ordinal);
     }
 
-    private ITimer Timer(string name)
-        => world.Brain.Grains.GetGrain<ITimer>(new NeuronId("timer", name).ToGrainId());
+    [Then(@"timer ""(.*)"" generation is (\d+)")]
+    public async Task GenerationIs(string name, long generation)
+        => Assert.Equal(generation, (await Timer(name).Read()).Generation);
+
+    [Then(@"timer ""(.*)"" note is ""(.*)""")]
+    public async Task NoteIs(string name, string note)
+        => Assert.Equal(note, (await Timer(name).Read()).Note);
+
+    private ITimer Timer(string name) => world.Brain.Grains.GetGrain<ITimer>(new NeuronId("timer", name).ToGrainId());
 }

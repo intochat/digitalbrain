@@ -39,13 +39,11 @@ internal sealed class SpreadsheetNeuron(
                 }
             }
 
-            var grid = arguments.Replace is { } replacement
-                ? SheetGrid.Normalize(replacement)
-                : SheetGrid.Normalize(SheetGrid.WithCell(State?.Grid ?? SheetGrid.Empty, arguments.Cell!));
-            var version = (State?.Version ?? 0) + 1;
-            var body = new ApplyingBody(grid, version);
+            var body = new ApplyingBody(
+                arguments.Replace is { } replacement ? SheetGrid.Normalize(replacement) : null,
+                arguments.Cell);
             var work = Schedule(Signal.Create(ExcelSignals.Applying, JsonSerializer.Serialize(body, ExcelJson.Default.ApplyingBody)));
-            return new Accepted<SheetVersion>(new SheetVersion(version), work);
+            return new Accepted<SheetVersion>(new SheetVersion(State?.Version ?? 0), work);
         });
 
     private ExcelState Grid => State?.Grid ?? SheetGrid.Empty;
@@ -80,8 +78,10 @@ internal sealed class SpreadsheetNeuron(
         }
 
         var body = JsonSerializer.Deserialize(delivery.Signal.Body, ExcelJson.Default.ApplyingBody)!;
-        await SaveAsync(new SheetState(body.Grid, body.Version), cancellationToken).ConfigureAwait(true);
-        var changed = new SheetChangedBody(Id.Name, body.Grid.Title, body.Version);
+        var grid = body.Replace is { } replacement ? replacement : SheetGrid.Normalize(SheetGrid.WithCell(Grid, body.Cell!));
+        var version = (State?.Version ?? 0) + 1;
+        await SaveAsync(new SheetState(grid, version), cancellationToken).ConfigureAwait(true);
+        var changed = new SheetChangedBody(Id.Name, grid.Title, version);
         await FireAsync(Signal.Create(ExcelSignals.SheetChanged, JsonSerializer.Serialize(changed, ExcelJson.Default.SheetChangedBody)),
             to: null, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
     }
