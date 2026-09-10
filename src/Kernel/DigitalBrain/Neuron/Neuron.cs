@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization.Metadata;
+using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
@@ -11,9 +13,9 @@ using Orleans.Runtime;
 
 namespace DigitalBrain.Core;
 
-// A durable actor with one receive slot. Owns its synapses, two bounded journals, and the
+// A durable actor with one receive slot. Owns its synapses, three bounded journals, and the
 // latest signal of each type it received. Fire travels along synapses; nothing else routes.
-public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable
+public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable, ICommandHost
 {
     // Latest-per-type is keyed by type name, so a caller putting identity in the type would
     // grow it without bound. The cap turns that mistake into one sentence of advice.
@@ -23,8 +25,8 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable
 
     private readonly CancellationTokenSource _activation = new();
     private readonly RetryScheduler _retry;
-    private SignalDelivery? _handling;
     private (SignalId Id, CancellationTokenSource Cancellation)? _reacting;
+    private readonly List<SignalDelivery> _commandWork = [];
 
     protected Neuron(NeuronRuntime runtime)
     {
@@ -40,13 +42,50 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable
     // A durable write belongs to the activation, so request cancellation cannot interrupt it.
     protected Task PersistAsync() => WriteStateAsync(_activation.Token).AsTask();
 
-    // The delivery this turn is reacting to, or null outside ReceiveAsync.
-    protected SignalDelivery? CurrentDelivery => _handling;
+    protected ReactionContext? ReactionContext { get; private set; }
+
+    private protected CommandId? ExecutingCommand => (ReactionContext as CommandReaction)?.Command;
+
+    NeuronId ICommandHost.Id => Id;
+
+    ReactionContext? ICommandHost.ReactionContext
+    {
+        get => ReactionContext;
+        set => ReactionContext = value;
+    }
+
+    Task ICommandHost.PersistAsync() => PersistAsync();
+
+    void ICommandHost.AdmitCommandWork()
+    {
+        foreach (var delivery in _commandWork)
+        {
+            AdmitAndStageDelivery(delivery);
+        }
+
+        _commandWork.Clear();
+    }
+
+    Task ICommandHost.WakeCommandWorkAsync()
+    {
+        return _components.Pending.Count == 0 ? Task.CompletedTask : EnsureReminderAndWakeAsync();
+
+        async Task EnsureReminderAndWakeAsync()
+        {
+            await _retry.EnsureReminderAsync().ConfigureAwait(true);
+            Wake();
+        }
+    }
 
     public sealed override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         NeuronConcurrency.RequireSerializedTurns(GetType());
         await base.OnActivateAsync(cancellationToken).ConfigureAwait(true);
+        if (CommandReconciliation.Reconcile(_components.Commands, _components.Dedup, TimeProvider.GetUtcNow()))
+        {
+            await PersistAsync().ConfigureAwait(true);
+        }
+
         await OnNeuronActivatedAsync(cancellationToken).ConfigureAwait(true);
 
         // Entries accepted before the last deactivation are still pending: resume the drain.
@@ -122,21 +161,39 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable
         return DeliveryAdmission.Accepted;
     }
 
-    // Registration rides the queued drain turn; the caller's flush makes the entry durable.
+    // Commands buffer work until their terminal flush; reactions stage it now and register on the queued drain turn.
     protected SignalId Schedule(Signal signal, CorrelationId? correlation = null)
     {
         ArgumentNullException.ThrowIfNull(signal);
         signal = Signal.Create(signal.Type, signal.Body);
         RequireSignalTypeCapacity(signal.Type);
-        var delivery = SignalDelivery.Create(signal, Id, _components.Journals.IncomingNextSequence, TimeProvider, _handling, correlation);
-        if (_components.Pending.TryAdmit(delivery) != DeliveryAdmission.Accepted)
+        var delivery = SignalDelivery.Create(signal, Id, _components.Journals.IncomingNextSequence + _commandWork.Count, TimeProvider, (ReactionContext as DeliveryReaction)?.Delivery, correlation);
+        if (_components.Pending.Count + _commandWork.Count >= PendingWork.MaxPending)
         {
             throw new NeuronBusyException($"Neuron '{Id}' already holds {PendingWork.MaxPending} pending signals. Retry after pending work finishes.");
         }
 
-        StageAdmitted(delivery);
+        if (ReactionContext is CommandReaction commandReaction)
+        {
+            // Command work becomes visible only with its terminal record, never after an uncommitted attempt.
+            _commandWork.Add(delivery);
+            ReactionContext = commandReaction with { Work = delivery.SignalId };
+            return delivery.SignalId;
+        }
+
+        AdmitAndStageDelivery(delivery);
         Wake();
         return delivery.SignalId;
+    }
+
+    private void AdmitAndStageDelivery(SignalDelivery delivery)
+    {
+        if (_components.Pending.TryAdmit(delivery) != DeliveryAdmission.Accepted)
+        {
+            throw new InvalidOperationException($"Scheduled signal '{delivery.SignalId}' could not be admitted.");
+        }
+
+        StageAdmitted(delivery);
     }
 
     private void StageAdmitted(SignalDelivery delivery)
@@ -194,10 +251,10 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable
             return;
         }
 
-        var previous = _handling;
+        var previous = ReactionContext;
         var previousReacting = _reacting;
         using var reaction = CancellationTokenSource.CreateLinkedTokenSource(_activation.Token);
-        _handling = delivery;
+        ReactionContext = new DeliveryReaction(delivery);
         _reacting = (delivery.SignalId, reaction);
         try
         {
@@ -236,7 +293,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable
         }
         finally
         {
-            _handling = previous;
+            ReactionContext = previous;
             _reacting = previousReacting;
         }
     }
@@ -254,13 +311,46 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable
     public Task<JournalRead> ReadJournal(JournalKind kind, long afterSequence)
         => Task.FromResult(_components.Journals.Read(kind, afterSequence));
 
+    public Task<CommandJournalRead> ReadCommands(long afterSequence)
+        => Task.FromResult(_components.Commands.Read(afterSequence));
+
     // ---- for subclasses ----
 
-    protected async Task<FireOutcome> FireAsync(
+    protected async Task<TResult> ExecuteCommandAsync<TArguments, TResult>(
+        CommandDescriptor command, TArguments arguments,
+        JsonTypeInfo<TArguments> argumentsJson, JsonTypeInfo<TResult> resultJson,
+        Func<TArguments, TResult> execute) where TArguments : Command
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentNullException.ThrowIfNull(execute);
+        try
+        {
+            return await _components.Execution.RunAsync(this, command, arguments, argumentsJson, resultJson, execute).ConfigureAwait(true);
+        }
+        finally
+        {
+            _commandWork.Clear();
+        }
+    }
+
+    protected Task<FireOutcome> FireAsync(
         Signal signal,
         NeuronId? to = null,
         CorrelationId? correlation = null,
         CancellationToken cancellationToken = default)
+    {
+        if (ExecutingCommand is { } id)
+        {
+            throw new InvalidOperationException(
+                $"Neuron '{Id}' cannot fire while executing command '{id}': fire from a reaction, not a command. Schedule the work instead.");
+        }
+
+        return FireCoreAsync(signal, to, correlation, cancellationToken);
+    }
+
+    private async Task<FireOutcome> FireCoreAsync(
+        Signal signal, NeuronId? to, CorrelationId? correlation, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(signal);
         cancellationToken.ThrowIfCancellationRequested();
@@ -280,7 +370,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable
             _components.Synapses.Connect(single, signal.Type);
         }
 
-        var delivery = SignalDelivery.Create(signal, Id, _components.Journals.OutgoingNextSequence, TimeProvider, _handling, correlation);
+        var delivery = SignalDelivery.Create(signal, Id, _components.Journals.OutgoingNextSequence, TimeProvider, (ReactionContext as DeliveryReaction)?.Delivery, correlation);
         _components.Journals.AppendOutgoing(delivery);
         await PersistAsync().ConfigureAwait(true);
 

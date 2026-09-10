@@ -2,7 +2,6 @@ using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Signals;
 using Orleans.Journaling;
 using Orleans.Serialization;
-using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
 
 namespace DigitalBrain.Core;
@@ -11,14 +10,9 @@ namespace DigitalBrain.Core;
 // sequence and lifetime tallies survive compaction.
 internal sealed class JournalWindow
 {
-    private const int MaxRetainedEntries = 512;
-    private const int MaxRetainedBytes = 512 * 1024;
-
-    private readonly IDurableList<byte[]> _retained;
+    private readonly BoundedJournal<JournalEntry> _retained;
     private readonly IDurableDictionary<string, long> _tallies;
     private readonly IDurableValue<long> _lastSequence;
-    private readonly Serializer<JournalEntry> _entries;
-    private readonly SerializerSessionPool _sessions;
 
     internal JournalWindow(
         IDurableList<byte[]> retained,
@@ -33,11 +27,9 @@ internal sealed class JournalWindow
         ArgumentNullException.ThrowIfNull(entries);
         ArgumentNullException.ThrowIfNull(sessions);
 
-        _retained = retained;
+        _retained = new(retained, entries, sessions);
         _tallies = tallies;
         _lastSequence = lastSequence;
-        _entries = entries;
-        _sessions = sessions;
     }
 
     internal long NextSequence => _lastSequence.Value + 1;
@@ -47,29 +39,22 @@ internal sealed class JournalWindow
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
 
         var lastSequence = _lastSequence.Value;
+        var earliest = EarliestRetainedSequence();
+        var gap = afterSequence + 1 < earliest;
 
-        if (afterSequence > lastSequence
-            || (afterSequence < lastSequence && afterSequence < EarliestRetainedSequence() - 1))
+        if (afterSequence > lastSequence || gap)
         {
-            return new(lastSequence, [], Snapshot());
+            return new(lastSequence, earliest, gap, [], Snapshot());
         }
 
-        var firstIndex = (int)(afterSequence - EarliestRetainedSequence() + 1);
+        var firstIndex = (int)(afterSequence - earliest + 1);
         List<SignalDelivery> deliveries = [];
         for (var index = firstIndex; index < _retained.Count; index++)
         {
-            deliveries.Add(Decode(_retained[index]).Delivery);
+            deliveries.Add(_retained[index].Delivery);
         }
 
-        return new(lastSequence, deliveries, null);
-    }
-
-    // Orleans 10.3.1 types Serializer<T>.Deserialize as nullable; Append only ever writes a real entry.
-    private JournalEntry Decode(byte[] encoded)
-    {
-        using var session = _sessions.GetSession();
-        var reader = Reader.Create(encoded, session);
-        return _entries.Deserialize(ref reader)!;
+        return new(lastSequence, earliest, gap, deliveries, null);
     }
 
     internal void Append(SignalDelivery delivery)
@@ -78,10 +63,8 @@ internal sealed class JournalWindow
         var signalType = TallyKeyFor(delivery);
 
         _lastSequence.Value = sequence;
-        _retained.Add(_entries.SerializeToArray(new JournalEntry(sequence, delivery)));
+        _retained.Append(new JournalEntry(sequence, delivery));
         _tallies[signalType] = RecordedOf(signalType) + 1;
-
-        Compact();
     }
 
     internal JournalSnapshot Snapshot() => new(
@@ -98,16 +81,4 @@ internal sealed class JournalWindow
         => _tallies.TryGetValue(signalType, out var recorded) ? recorded : 0;
 
     private static string TallyKeyFor(SignalDelivery delivery) => delivery.Signal.Type;
-
-    private void Compact()
-    {
-        var retainedBytes = _retained.Sum(entry => (long)entry.Length);
-
-        while (_retained.Count > MaxRetainedEntries
-            || (retainedBytes > MaxRetainedBytes && _retained.Count > 1))
-        {
-            retainedBytes -= _retained[0].Length;
-            _retained.RemoveAt(0);
-        }
-    }
 }

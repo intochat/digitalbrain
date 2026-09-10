@@ -1,3 +1,4 @@
+using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Signals;
@@ -60,4 +61,9 @@ public interface INeuron : IGrainWithStringKey
     [Alias(nameof(ReadJournal))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
     Task<JournalRead> ReadJournal(JournalKind kind, long afterSequence);
+
+    [ReadOnly]
+    [AlwaysInterleave]
+    [Alias(nameof(ReadCommands))]
+    Task<CommandJournalRead> ReadCommands(long afterSequence);
 }

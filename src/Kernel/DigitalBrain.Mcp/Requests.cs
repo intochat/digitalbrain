@@ -18,4 +18,10 @@ public sealed record JournalEntryView(long Sequence, string Type, string Body, s
 
 public sealed record JournalView(long ResumeSequence, IReadOnlyList<JournalEntryView> Entries, long TotalRecorded);
 
-public sealed record ReadResult(string Neuron, IReadOnlyList<StateEntry>? State, IReadOnlyList<SynapseEntry>? Synapses, JournalView? Incoming, JournalView? Outgoing);
+public sealed record ReadResult(string Neuron, IReadOnlyList<StateEntry>? State, IReadOnlyList<SynapseEntry>? Synapses, JournalView? Incoming, JournalView? Outgoing, CommandsView? Commands);
+
+public sealed record CommandEntryView(long Sequence, string Command, int Incarnation, string Interface,
+    string Method, string Phase, string Caller, string? Error, DateTimeOffset At);
+
+public sealed record CommandsView(long ResumeSequence, long EarliestRetained, bool Gap,
+    IReadOnlyList<CommandEntryView> Entries);

@@ -1,8 +1,13 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.Commands;
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Core;
+using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Tests;
@@ -63,6 +68,8 @@ public static class FixtureSwitches
     public static ConcurrentDictionary<string, TaskCompletionSource> Cancelled { get; } = new(StringComparer.Ordinal);
 
     public static ConcurrentDictionary<string, TaskCompletionSource> Release { get; } = new(StringComparer.Ordinal);
+
+    public static ConcurrentDictionary<string, int> CommandExecutions { get; } = new(StringComparer.Ordinal);
 }
 
 // Throws on the first reaction to each entry while FlakyFailuresLeft[name] > 0, then echoes.
@@ -129,5 +136,90 @@ internal sealed class ThrowingNeuron(NeuronRuntime runtime) : Neuron(runtime)
         }
 
         return FireAsync(Signal.Create("Pong", delivery.Signal.Body), delivery.Source, delivery.CorrelationId, cancellationToken);
+    }
+}
+
+[GenerateSerializer]
+[Alias("db.test.counter-state")]
+public sealed record CounterState([property: Id(0)] int Total);
+
+[GenerateSerializer]
+[Alias("db.test.add-count")]
+public sealed record AddCount(
+    [property: Id(0)] CommandId CommandId,
+    [property: Id(1)] int Amount,
+    [property: Id(2)] string Note = "") : Command(CommandId);
+
+[Alias("test.counter")]
+public interface ICounter : INeuron
+{
+    [Alias("add")]
+    Task<Accepted<int>> Add(AddCount command);
+
+    [Alias("save")]
+    Task<Accepted<int>> AddAndSave(AddCount command);
+
+    [ReadOnly]
+    [Alias("total")]
+    Task<int> ReadTotal();
+}
+
+[JsonSerializable(typeof(AddCount))]
+[JsonSerializable(typeof(Accepted<int>))]
+internal sealed partial class CounterJson : JsonSerializerContext;
+
+[GrainType("counter")]
+internal sealed class CounterNeuron(
+    NeuronRuntime runtime,
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<CounterState> state)
+    : Neuron<CounterState>(runtime, state), ICounter
+{
+    private static readonly CommandDescriptor AddCommand = new("test.counter", "add");
+    private static readonly CommandDescriptor SaveCommand = new("test.counter", "save");
+
+    public Task<Accepted<int>> Add(AddCount command) => ExecuteCommandAsync(
+        AddCommand, command, CounterJson.Default.AddCount, CounterJson.Default.AcceptedInt32, arguments =>
+        {
+            FixtureSwitches.CommandExecutions.AddOrUpdate(Id.Name, 1, (_, count) => count + 1);
+            var work = Schedule(Signal.Create("Counted", "{\"amount\":" + arguments.Amount + "}"));
+            return new Accepted<int>(arguments.Amount, work);
+        });
+
+    public Task<Accepted<int>> AddAndSave(AddCount command) => ExecuteCommandAsync(
+        SaveCommand, command, CounterJson.Default.AddCount, CounterJson.Default.AcceptedInt32, arguments =>
+        {
+            // The fixture deliberately breaks the reaction-only snapshot rule.
+            _ = SaveAsync(new CounterState(arguments.Amount));
+            return new Accepted<int>(arguments.Amount, default);
+        });
+
+    protected override Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
+    {
+        if (delivery.Signal.Type != "Counted")
+        {
+            return Task.CompletedTask;
+        }
+
+        using var body = JsonDocument.Parse(delivery.Signal.Body);
+        var amount = body.RootElement.GetProperty("amount").GetInt32();
+        return SaveAsync(new CounterState((State?.Total ?? 0) + amount), cancellationToken);
+    }
+
+    public Task<int> ReadTotal() => Task.FromResult(State?.Total ?? 0);
+}
+
+// The kernel calls this between staging a command's terminal record and committing it. The test
+// implementation simulates process loss for one command id so the silo restart finds only Attempted.
+internal sealed class FixtureCommandCrashPoint : ICommandCrashPoint
+{
+    internal static ConcurrentDictionary<CommandId, byte> CrashOnce { get; } = new();
+
+    public void BeforeTerminalPersist(CommandId command)
+    {
+        if (CrashOnce.TryRemove(command, out _))
+        {
+            throw new InvalidOperationException(
+                "simulated process loss before the terminal command record was committed");
+        }
     }
 }

@@ -1,3 +1,4 @@
+using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Synapses;
@@ -24,10 +25,20 @@ public sealed class NeuronRuntime(TimeProvider clock, NeuronOptions options)
             entries,
             sessions);
 
+        var commands = new CommandJournal(
+            services.GetRequiredKeyedService<IDurableList<byte[]>>("commands"),
+            services.GetRequiredKeyedService<IDurableValue<long>>("commands.sequence"),
+            services.GetRequiredService<Serializer<CommandRecord>>(),
+            sessions);
+        var dedup = new CommandDedup(services.GetRequiredKeyedService<IDurableDictionary<CommandId, CommandOutcome>>("dedup"));
+
         return new(
             Clock,
             Options,
             new NeuronJournals(Window("incoming"), Window("outgoing")),
+            commands,
+            dedup,
+            new CommandExecution(commands, dedup, Clock, services.GetService<ICommandCrashPoint>()),
             new NeuronSynapses(services.GetRequiredKeyedService<IDurableDictionary<string, Synapse>>("synapses"), neuronId, Clock),
             services.GetRequiredKeyedService<IDurableDictionary<string, SignalDelivery>>("latest"),
             new PendingWork(

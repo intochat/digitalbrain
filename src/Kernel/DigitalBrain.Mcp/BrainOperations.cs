@@ -60,9 +60,9 @@ public sealed class BrainOperations(IGrainFactory grains)
         var id = Parse(request.Neuron, nameof(request));
         var query = Query(id);
         var what = request.What?.Trim().ToLowerInvariant();
-        if (what is not (null or "" or "state" or "synapses" or "incoming" or "outgoing"))
+        if (what is not (null or "" or "state" or "synapses" or "incoming" or "outgoing" or "commands"))
         {
-            throw new ArgumentException($"'{request.What}' is not a view. Use state, synapses, incoming or outgoing, or omit it for all four.", nameof(request));
+            throw new ArgumentException($"'{request.What}' is not a view. Use state, synapses, incoming, outgoing or commands, or omit it for all five.", nameof(request));
         }
 
         // One budget for the whole read: a default read must not wait it out twice.
@@ -72,6 +72,7 @@ public sealed class BrainOperations(IGrainFactory grains)
         IReadOnlyList<SynapseEntry>? synapses = null;
         JournalView? incoming = null;
         JournalView? outgoing = null;
+        CommandsView? commands = null;
 
         if (all || what == "state")
         {
@@ -93,7 +94,16 @@ public sealed class BrainOperations(IGrainFactory grains)
             outgoing = await ReadJournalAsync(query, JournalKind.Outgoing, request.After, deadline, cancellationToken).ConfigureAwait(false);
         }
 
-        return new(Name(id), state, synapses, incoming, outgoing);
+        if (all || what == "commands")
+        {
+            var read = await query.ReadCommands(request.After).ConfigureAwait(false);
+            commands = new(read.ResumeSequence, read.EarliestRetained, read.Gap,
+                [.. read.Delta.Select(record => new CommandEntryView(
+                    record.Sequence, record.Id.ToString(), record.Incarnation, record.Interface,
+                    record.Method, record.Phase.ToString(), Name(record.Caller), record.Error, record.At))]);
+        }
+
+        return new(Name(id), state, synapses, incoming, outgoing, commands);
     }
 
     private static async Task<JournalView> ReadJournalAsync(INeuron query, JournalKind kind, long after, DateTimeOffset deadline, CancellationToken cancellationToken)

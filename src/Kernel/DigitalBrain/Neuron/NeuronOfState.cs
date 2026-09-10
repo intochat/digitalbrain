@@ -17,10 +17,16 @@ public abstract class Neuron<TState> : Neuron where TState : class
 
     protected TState? State => _state.RecordExists ? _state.State : null;
 
-    protected async Task SaveAsync(TState value, CancellationToken cancellationToken = default)
+    protected Task SaveAsync(TState value, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(value);
+        if (ExecutingCommand is { } id)
+        {
+            throw new InvalidOperationException(
+                $"Neuron '{Id}' cannot save a snapshot while executing command '{id}': save state from a reaction, not a command.");
+        }
+
         _state.State = value;
-        await _state.WriteStateAsync(cancellationToken).ConfigureAwait(true);
+        return _state.WriteStateAsync(cancellationToken);
     }
 }

@@ -2,7 +2,9 @@ using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
+using DigitalBrain.Core;
 using DigitalBrain.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using Reqnroll;
 using Xunit;
 
@@ -15,7 +17,11 @@ public sealed class BrainSteps(BrainWorld world)
 
     [Given("a running brain")]
     public async Task GivenARunningBrain()
-        => world.Simulation = await BrainSimulation.StartAsync(new() { Modules = new([]) });
+        => world.Simulation = await BrainSimulation.StartAsync(new()
+        {
+            Modules = new([]),
+            ConfigureSilo = static silo => silo.Services.AddSingleton<ICommandCrashPoint, FixtureCommandCrashPoint>(),
+        });
 
     [Given("a running brain with durable storage")]
     [Given("a running brain with file-backed storage")]
@@ -24,6 +30,7 @@ public sealed class BrainSteps(BrainWorld world)
         {
             Modules = new([]),
             PersistenceDirectory = Path.Combine(Path.GetTempPath(), "digitalbrain-tests", Guid.NewGuid().ToString("N")),
+            ConfigureSilo = static silo => silo.Services.AddSingleton<ICommandCrashPoint, FixtureCommandCrashPoint>(),
         });
 
     [Given(@"""(.*)"" is connected to ""(.*)"" for ""(.*)""")]

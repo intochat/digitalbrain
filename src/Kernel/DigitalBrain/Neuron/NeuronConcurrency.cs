@@ -35,14 +35,9 @@ internal static class NeuronConcurrency
         {
             Refuse(neuronType, nameof(AlwaysInterleaveAttribute));
         }
-
-        if (methods.Any(method => method.IsDefined(typeof(ReadOnlyAttribute), inherit: true)))
-        {
-            Refuse(neuronType, nameof(ReadOnlyAttribute));
-        }
     }
 
-    // Kernel reads, delivery admission, and cancellation may interleave with a reaction.
+    // AlwaysInterleave is kernel-only; module methods may use ReadOnly.
     private static bool IsKernelInterleaved(MethodInfo method)
         => method.DeclaringType == typeof(INeuron)
         && (method.Name.StartsWith("Read", StringComparison.Ordinal)
@@ -51,6 +46,6 @@ internal static class NeuronConcurrency
 
     private static void Refuse(Type neuronType, string attribute)
         => throw new InvalidOperationException(
-            $"{neuronType.Name} uses {attribute} outside the Read* methods of {nameof(INeuron)}, but neurons require "
+            $"{neuronType.Name} uses {attribute}; only kernel methods may use AlwaysInterleave, and neurons require "
             + "serialized turns to preserve journal order and delivery lineage.");
 }
