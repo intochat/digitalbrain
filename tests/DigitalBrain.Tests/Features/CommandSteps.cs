@@ -162,19 +162,15 @@ public sealed class CommandSteps(BrainSteps brain)
     public void ThenFails(string fragment)
     {
         Assert.NotNull(_lastError);
-        var error = Flatten(_lastError);
-        switch (error)
+        var error = BrainSteps.Flatten(_lastError);
+        var commandId = error switch
         {
-            case CommandRejectedException rejected:
-                Assert.Equal(_lastCommandId, rejected.Id);
-                break;
-            case CommandOutcomeUnknownException unknown:
-                Assert.Equal(_lastCommandId, unknown.Id);
-                break;
-            case CommandFailedException failed:
-                Assert.Equal(_lastCommandId, failed.Id);
-                break;
-        }
+            CommandRejectedException rejected => rejected.Id,
+            CommandOutcomeUnknownException unknown => unknown.Id,
+            CommandFailedException failed => failed.Id,
+            _ => _lastCommandId,
+        };
+        Assert.Equal(_lastCommandId, commandId);
 
         Assert.Contains(fragment, error.Message, StringComparison.Ordinal);
     }
@@ -187,8 +183,8 @@ public sealed class CommandSteps(BrainSteps brain)
     {
         Assert.NotNull(_previousError);
         Assert.NotNull(_lastError);
-        var previous = Assert.IsType<CommandRejectedException>(Flatten(_previousError));
-        var current = Assert.IsType<CommandRejectedException>(Flatten(_lastError));
+        var previous = Assert.IsType<CommandRejectedException>(BrainSteps.Flatten(_previousError));
+        var current = Assert.IsType<CommandRejectedException>(BrainSteps.Flatten(_lastError));
         Assert.Equal(previous.Id, current.Id);
         Assert.Equal(previous.Reason, current.Reason);
         Assert.Equal(previous.Message, current.Message);
@@ -233,7 +229,4 @@ public sealed class CommandSteps(BrainSteps brain)
         => Assert.Equal(
             [Enum.Parse<CommandPhase>(first), Enum.Parse<CommandPhase>(second)],
             records.Select(record => record.Phase));
-
-    private static Exception Flatten(Exception error)
-        => error is AggregateException aggregate ? aggregate.Flatten().InnerExceptions[0] : error;
 }

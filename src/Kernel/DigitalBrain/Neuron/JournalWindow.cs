@@ -45,10 +45,12 @@ internal sealed class JournalWindow
         var lastSequence = _retained.CommittedSequence;
         var earliest = _retained.CommittedEarliestRetained;
         var gap = afterSequence + 1 < earliest;
+        EnsureTalliesCached();
+        var totalRecorded = _cachedTotalRecorded;
 
         if (afterSequence >= lastSequence || gap)
         {
-            return new(lastSequence, earliest, gap, [], Snapshot());
+            return new(lastSequence, earliest, gap, [], Snapshot(), totalRecorded);
         }
 
         List<SignalDelivery> deliveries = [];
@@ -57,7 +59,7 @@ internal sealed class JournalWindow
             deliveries.Add(_retained[index].Delivery);
         }
 
-        return new(lastSequence, earliest, gap, deliveries, null);
+        return new(lastSequence, earliest, gap, deliveries, null, totalRecorded);
     }
 
     internal void Append(SignalDelivery delivery)
@@ -73,18 +75,14 @@ internal sealed class JournalWindow
 
     internal JournalSnapshot Snapshot()
     {
-        if (_cachedTallies is null)
-        {
-            _cachedTallies = [.. _committedTallies.Select(tally => new JournalTally(tally.Key, tally.Value))];
-            _cachedTotalRecorded = _cachedTallies.Sum(tally => tally.Recorded);
-        }
+        EnsureTalliesCached();
 
         return new(
             TotalRecorded: _cachedTotalRecorded,
             LastSequence: _retained.CommittedSequence,
             EarliestRetainedSequence: _retained.CommittedEarliestRetained,
             RetainedCount: _retained.CommittedCount,
-            Tallies: _cachedTallies);
+            Tallies: _cachedTallies!);
     }
 
     internal JournalWindowBoundary CaptureCommitBoundary() => new(_retained.CaptureCommitBoundary(), _stagedTallyCount);
@@ -116,6 +114,15 @@ internal sealed class JournalWindow
         }
 
         _cachedTallies = null;
+    }
+
+    private void EnsureTalliesCached()
+    {
+        if (_cachedTallies is null)
+        {
+            _cachedTallies = [.. _committedTallies.Select(tally => new JournalTally(tally.Key, tally.Value))];
+            _cachedTotalRecorded = _cachedTallies.Sum(tally => tally.Recorded);
+        }
     }
 
     private long RecordedOf(string signalType)

@@ -24,12 +24,6 @@ public sealed class OperationSteps(BrainSteps brain)
     public Task SessionFires(string session, string type, string body, string to)
         => Try(() => Ops.FireAsync(session, new(type, body, to)));
 
-    // Continuing a conversation is reusing its correlation, so a scenario needs the one the
-    // previous fire returned.
-    [When(@"session ""(.*)"" fires ""([^""]+)"" (\{.*\}) at ""(.*)"" with the correlation of its last fire")]
-    public Task SessionFiresCorrelated(string session, string type, string body, string to)
-        => Try(() => Ops.FireAsync(session, new(type, body, to, _fire!.Correlation)));
-
     [When(@"session ""(.*)"" fires ""(\w+)"" with a body of (\d+) bytes at ""(.*)""")]
     public Task SessionFiresBig(string session, string type, int bytes, string to)
         => Try(() => Ops.FireAsync(session, new(type, "{\"t\":\"" + new string('x', bytes - 8) + "\"}", to)));
@@ -116,7 +110,7 @@ public sealed class OperationSteps(BrainSteps brain)
     public void ThenFailed(string fragment)
     {
         Assert.NotNull(_error);
-        Assert.Contains(fragment, Flatten(_error).Message, StringComparison.Ordinal);
+        Assert.Contains(fragment, BrainSteps.Flatten(_error).Message, StringComparison.Ordinal);
     }
 
     [Then(@"the fire result reports (\d+) delivered")]
@@ -197,9 +191,6 @@ public sealed class OperationSteps(BrainSteps brain)
         Span<char> letters = ['T', (char)('a' + (index / 676 % 26)), (char)('a' + (index / 26 % 26)), (char)('a' + (index % 26))];
         return new(letters);
     }
-
-    private static Exception Flatten(Exception error)
-        => error is AggregateException aggregate ? aggregate.Flatten().InnerExceptions[0] : error;
 
     private async Task Try(Func<Task<FireResult>> action)
     {

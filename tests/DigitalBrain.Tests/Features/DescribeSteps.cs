@@ -1,7 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using DigitalBrain.Abstractions.Descriptors;
-using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Core;
 using DigitalBrain.Mcp;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,7 +16,6 @@ public sealed class DescribeSteps(BrainSteps brain)
     private IReadOnlyList<MethodDescriptor>? _description;
     private JsonElement? _callResult;
     private Exception? _lastError;
-    private JournalRead? _read;
 
     [When(@"""(.*)"" describes counter ""(.*)""")]
     public async Task Describe(string _, string name)
@@ -73,18 +71,6 @@ public sealed class DescribeSteps(BrainSteps brain)
         var error = Assert.IsType<ArgumentException>(_lastError);
         Assert.Contains("implements no callable interfaces", error.Message, StringComparison.Ordinal);
         Assert.Contains("kernel operations are the fire/connect/disconnect/read/cancel tools", error.Message, StringComparison.Ordinal);
-    }
-
-    [When(@"""(.*)"" reads ""(.*)"" incoming journal after sequence (\d+)")]
-    public async Task ReadIncoming(string _, string name, long after)
-        => _read = await brain.Neuron(name).ReadJournal(JournalKind.Incoming, after);
-
-    [Then(@"the read reports a gap and an earliest retained sequence above (\d+)")]
-    public void ThenGap(long sequence)
-    {
-        Assert.NotNull(_read);
-        Assert.True(_read.Gap);
-        Assert.True(_read.EarliestRetained > sequence);
     }
 
     private BrainOperations Operations()

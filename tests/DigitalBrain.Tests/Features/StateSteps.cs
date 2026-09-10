@@ -10,6 +10,20 @@ namespace DigitalBrain.Tests;
 [Binding]
 public sealed class StateSteps(BrainSteps brain)
 {
+    private JournalRead? _read;
+
+    [When(@"""(.*)"" reads ""(.*)"" incoming journal after sequence (\d+)")]
+    public async Task ReadIncoming(string _, string name, long after)
+        => _read = await brain.Neuron(name).ReadJournal(JournalKind.Incoming, after);
+
+    [Then(@"the read reports a gap and an earliest retained sequence above (\d+)")]
+    public void ThenGap(long sequence)
+    {
+        Assert.NotNull(_read);
+        Assert.True(_read.Gap);
+        Assert.True(_read.EarliestRetained > sequence);
+    }
+
     [When(@"""(.*)"" fires ""(\w+)"" (\{.*\}) at ""(.*)"" (\d+) times")]
     public async Task FireMany(string from, string type, string body, string to, int times)
     {
@@ -35,20 +49,20 @@ public sealed class StateSteps(BrainSteps brain)
     [Then(@"""(.*)"" (incoming|outgoing) tally for ""(\w+)"" is (\d+)")]
     public async Task ThenTally(string name, string kind, string type, long count)
     {
-        var snapshot = await Snapshot(brain.Query(name), BrainSteps.Kind(kind));
+        var snapshot = await Snapshot(brain.Neuron(name), BrainSteps.Kind(kind));
         Assert.Equal(count, snapshot.Tallies.SingleOrDefault(t => t.SignalType == type)?.Recorded ?? 0);
     }
 
     [Then(@"""(.*)"" incoming last sequence is (\d+)")]
     public async Task ThenLastSequence(string name, long sequence)
-        => Assert.Equal(sequence, (await Snapshot(brain.Query(name), JournalKind.Incoming)).LastSequence);
+        => Assert.Equal(sequence, (await Snapshot(brain.Neuron(name), JournalKind.Incoming)).LastSequence);
 
     [Then(@"""(.*)"" latest ""(\w+)"" is (\{.*\})$")]
     public async Task ThenLatest(string name, string type, string body)
-        => Assert.Equal(body, (await brain.Query(name).ReadState()).Single(d => d.Signal.Type == type).Signal.Body);
+        => Assert.Equal(body, (await brain.Neuron(name).ReadState()).Single(d => d.Signal.Type == type).Signal.Body);
 
     [Then(@"""(.*)"" state has (\d+) entries")]
-    public async Task ThenStateCount(string name, int count) => Assert.Equal(count, (await brain.Query(name).ReadState()).Count);
+    public async Task ThenStateCount(string name, int count) => Assert.Equal(count, (await brain.Neuron(name).ReadState()).Count);
 
     [Then(@"profile ""(.*)"" bio is ""(.*)""")]
     public async Task ThenBio(string profile, string bio)

@@ -1,10 +1,7 @@
 namespace DigitalBrain.Kernel;
 
-/// <summary>
-/// Cross-origin access for the deployed shell, which is served from a Static Web App
-/// origin distinct from the kernel's. Inactive unless an origin is configured, so
-/// same-origin and local hosting keep today's behavior.
-/// </summary>
+// The deployed shell is served from a different Static Web App origin. Inactive unless
+// AllowedOriginConfigurationKey is configured, so same-origin and local hosting are unchanged.
 internal static class KernelCors
 {
     public const string AllowedOriginConfigurationKey = "DigitalBrain:Cors:AllowedOrigin";

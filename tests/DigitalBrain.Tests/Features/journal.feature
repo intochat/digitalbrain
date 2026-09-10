@@ -26,3 +26,9 @@ Feature: Journal
     Then "alice" incoming journal has 1 entries
     And "alice" outgoing journal has 0 entries
     And "elon" outgoing journal has 1 entries
+
+  Scenario: A read past the retained window reports a gap
+    Given a running brain
+    When "claude" fires 600 "Tick" signals at plain "p"
+    And "claude" reads "p" incoming journal after sequence 0
+    Then the read reports a gap and an earliest retained sequence above 1

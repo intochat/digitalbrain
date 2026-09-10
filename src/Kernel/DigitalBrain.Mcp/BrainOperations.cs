@@ -4,7 +4,6 @@ using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
-using Orleans.Runtime;
 
 namespace DigitalBrain.Mcp;
 
@@ -36,24 +35,9 @@ public sealed class BrainOperations(IGrainFactory grains, INeuronInvoker invoker
     {
         ArgumentNullException.ThrowIfNull(request);
         var caller = Session(session);
-        var previous = RequestContext.Get(NeuronRequestKeys.Caller);
-        RequestContext.Set(NeuronRequestKeys.Caller, caller.ToString());
-        try
-        {
-            return await invoker.InvokeAsync(Parse(request.Neuron, nameof(request)), request.Interface,
-                request.Method, request.Arguments, cancellationToken).ConfigureAwait(false);
-        }
-        finally
-        {
-            if (previous is null)
-            {
-                RequestContext.Remove(NeuronRequestKeys.Caller);
-            }
-            else
-            {
-                RequestContext.Set(NeuronRequestKeys.Caller, previous);
-            }
-        }
+        using var _ = CallerScope.For(caller);
+        return await invoker.InvokeAsync(Parse(request.Neuron, nameof(request)), request.Interface,
+            request.Method, request.Arguments, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<FireResult> FireAsync(string session, FireRequest request, CancellationToken cancellationToken = default)
@@ -101,53 +85,73 @@ public sealed class BrainOperations(IGrainFactory grains, INeuronInvoker invoker
     {
         ArgumentNullException.ThrowIfNull(request);
         var id = Parse(request.Neuron, nameof(request));
-        var query = Query(id);
-        var what = request.What?.Trim().ToLowerInvariant();
-        if (what is not (null or "" or "state" or "synapses" or "incoming" or "outgoing" or "commands"))
+        var query = Neuron(id);
+        var view = request.What?.Trim().ToLowerInvariant() switch
         {
-            throw new ArgumentException($"'{request.What}' is not a view. Use state, synapses, incoming, outgoing or commands, or omit it for all but commands.", nameof(request));
-        }
+            null or "" => ReadView.AllExceptCommands,
+            "state" => ReadView.State,
+            "synapses" => ReadView.Synapses,
+            "incoming" => ReadView.Incoming,
+            "outgoing" => ReadView.Outgoing,
+            "commands" => ReadView.Commands,
+            _ => throw new ArgumentException($"'{request.What}' is not a view. Use state, synapses, incoming, outgoing or commands, or omit it for all but commands.", nameof(request)),
+        };
 
         // One budget for the whole read: a default read must not wait it out twice.
         var deadline = DateTimeOffset.UtcNow.AddSeconds(Math.Clamp(request.TimeoutSeconds, 0, MaxTimeoutSeconds));
-        var all = string.IsNullOrEmpty(what);
         IReadOnlyList<StateEntry>? state = null;
         IReadOnlyList<SynapseEntry>? synapses = null;
         JournalView? incoming = null;
         JournalView? outgoing = null;
         CommandsView? commands = null;
 
-        if (all || what == "state")
+        switch (view)
         {
-            state = [.. (await query.ReadState().ConfigureAwait(false)).Select(d => new StateEntry(d.Signal.Type, d.Signal.Body, Name(d.Source), d.Timestamp))];
-        }
-
-        if (all || what == "synapses")
-        {
-            synapses = [.. (await query.ReadSynapses().ConfigureAwait(false)).Select(s => new SynapseEntry(Name(s.Source), Name(s.Target), s.SignalType))];
-        }
-
-        if (all || what == "incoming")
-        {
-            incoming = await ReadJournalAsync(query, JournalKind.Incoming, request.After, deadline, cancellationToken).ConfigureAwait(false);
-        }
-
-        if (all || what == "outgoing")
-        {
-            outgoing = await ReadJournalAsync(query, JournalKind.Outgoing, request.After, deadline, cancellationToken).ConfigureAwait(false);
-        }
-
-        if (what == "commands")
-        {
-            var read = await query.ReadCommands(request.After).ConfigureAwait(false);
-            commands = new(read.ResumeSequence, read.EarliestRetained, read.Gap,
-                [.. read.Delta.Select(record => new CommandEntryView(
-                    record.Sequence, record.Id.ToString(), record.Incarnation, record.Interface,
-                    record.Method, record.Phase.ToString(), Name(record.Caller), record.Error, record.At))]);
+            case ReadView.AllExceptCommands:
+                state = await ReadStateAsync(query).ConfigureAwait(false);
+                synapses = await ReadSynapsesAsync(query).ConfigureAwait(false);
+                incoming = await ReadJournalAsync(query, JournalKind.Incoming, request.After, deadline, cancellationToken).ConfigureAwait(false);
+                outgoing = await ReadJournalAsync(query, JournalKind.Outgoing, request.After, deadline, cancellationToken).ConfigureAwait(false);
+                break;
+            case ReadView.State:
+                state = await ReadStateAsync(query).ConfigureAwait(false);
+                break;
+            case ReadView.Synapses:
+                synapses = await ReadSynapsesAsync(query).ConfigureAwait(false);
+                break;
+            case ReadView.Incoming:
+                incoming = await ReadJournalAsync(query, JournalKind.Incoming, request.After, deadline, cancellationToken).ConfigureAwait(false);
+                break;
+            case ReadView.Outgoing:
+                outgoing = await ReadJournalAsync(query, JournalKind.Outgoing, request.After, deadline, cancellationToken).ConfigureAwait(false);
+                break;
+            case ReadView.Commands:
+                var read = await query.ReadCommands(request.After).ConfigureAwait(false);
+                commands = new(read.ResumeSequence, read.EarliestRetained, read.Gap,
+                    [.. read.Delta.Select(record => new CommandEntryView(
+                        record.Sequence, record.Id.ToString(), record.Incarnation, record.Interface,
+                        record.Method, record.Phase.ToString(), Name(record.Caller), record.Error, record.At))]);
+                break;
         }
 
         return new(Name(id), state, synapses, incoming, outgoing, commands);
     }
+
+    private enum ReadView
+    {
+        AllExceptCommands,
+        State,
+        Synapses,
+        Incoming,
+        Outgoing,
+        Commands,
+    }
+
+    private static async Task<IReadOnlyList<StateEntry>> ReadStateAsync(INeuron query)
+        => [.. (await query.ReadState().ConfigureAwait(false)).Select(d => new StateEntry(d.Signal.Type, d.Signal.Body, Name(d.Source), d.Timestamp))];
+
+    private static async Task<IReadOnlyList<SynapseEntry>> ReadSynapsesAsync(INeuron query)
+        => [.. (await query.ReadSynapses().ConfigureAwait(false)).Select(s => new SynapseEntry(Name(s.Source), Name(s.Target), s.SignalType))];
 
     private static async Task<JournalView> ReadJournalAsync(INeuron query, JournalKind kind, long after, DateTimeOffset deadline, CancellationToken cancellationToken)
     {
@@ -157,7 +161,7 @@ public sealed class BrainOperations(IGrainFactory grains, INeuronInvoker invoker
             if (read.Gap || read.Delta.Count > 0 || DateTimeOffset.UtcNow >= deadline)
             {
                 return new(read.ResumeSequence, read.EarliestRetained, read.Gap,
-                    [.. read.Delta.Select((d, index) => Entry(read, d, index))], await TotalAsync(query, kind, read).ConfigureAwait(false));
+                    [.. read.Delta.Select((d, index) => Entry(read, d, index))], read.TotalRecorded);
             }
 
             await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
@@ -175,21 +179,7 @@ public sealed class BrainOperations(IGrainFactory grains, INeuronInvoker invoker
             delivery.CorrelationId.ToString(),
             delivery.Timestamp);
 
-    // A delta-only read carries no snapshot; one read past the tip returns it without a delta.
-    private static async Task<long> TotalAsync(INeuron query, JournalKind kind, JournalRead read)
-    {
-        if (read.ResetSnapshot is { } snapshot)
-        {
-            return snapshot.TotalRecorded;
-        }
-
-        var past = await query.ReadJournal(kind, read.ResumeSequence + 1).ConfigureAwait(false);
-        return past.ResetSnapshot?.TotalRecorded ?? read.Delta.Count;
-    }
-
     private INeuron Neuron(NeuronId id) => grains.GetGrain<INeuron>(id.ToGrainId());
-
-    private INeuron Query(NeuronId id) => grains.GetGrain<INeuron>(id.ToGrainId());
 
     // Plain neurons are named the way callers type them; anything else keeps its "type:name".
     private static string Name(NeuronId id) => id.Type == NeuronId.PlainType ? id.Name : id.ToString();

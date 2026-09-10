@@ -30,7 +30,7 @@ public sealed class CancelSteps(BrainSteps brain, BrainWorld world)
     public async Task ThenTotalRecorded(string name, long count)
     {
         // A read past the tip carries the snapshot and no delta.
-        var read = await brain.Query(name).ReadJournal(JournalKind.Incoming, long.MaxValue);
+        var read = await brain.Neuron(name).ReadJournal(JournalKind.Incoming, long.MaxValue);
         Assert.Equal(count, read.ResetSnapshot!.TotalRecorded);
     }
 }

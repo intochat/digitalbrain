@@ -85,13 +85,13 @@ public sealed class BrainSteps(BrainWorld world)
 
     [Then(@"""(.*)"" has a synapse to ""(.*)"" for ""(.*)""")]
     public async Task ThenHasSynapse(string from, string to, string type)
-        => Assert.Contains(await Query(from).ReadSynapses(), s => s.Target == Id(to) && s.SignalType == type);
+        => Assert.Contains(await Neuron(from).ReadSynapses(), s => s.Target == Id(to) && s.SignalType == type);
 
     [Then(@"""(.*)"" has (\d+) synapses")]
-    public async Task ThenSynapseCount(string name, int count) => Assert.Equal(count, (await Query(name).ReadSynapses()).Count);
+    public async Task ThenSynapseCount(string name, int count) => Assert.Equal(count, (await Neuron(name).ReadSynapses()).Count);
 
     [Then(@"""(.*)"" state is empty")]
-    public async Task ThenStateEmpty(string name) => Assert.Empty(await Query(name).ReadState());
+    public async Task ThenStateEmpty(string name) => Assert.Empty(await Neuron(name).ReadState());
 
     [AfterScenario]
     public async Task AfterScenario()
@@ -135,8 +135,7 @@ public sealed class BrainSteps(BrainWorld world)
         => new(Guid.ParseExact("db" + handle.PadLeft(30, '0'), "N"));
 
     internal INeuron Neuron(string name) => Brain.Grains.GetGrain<INeuron>(Id(name).ToGrainId());
-    internal INeuron Query(string name) => Brain.Grains.GetGrain<INeuron>(Id(name).ToGrainId());
-    internal Task<JournalRead> Journal(string name, JournalKind kind) => Query(name).ReadJournal(kind, 0);
+    internal Task<JournalRead> Journal(string name, JournalKind kind) => Neuron(name).ReadJournal(kind, 0);
     internal static JournalKind Kind(string text) => text == "incoming" ? JournalKind.Incoming : JournalKind.Outgoing;
 
     internal Task FireCore(string from, string type, string body, string? to)
@@ -158,5 +157,5 @@ public sealed class BrainSteps(BrainWorld world)
 
     internal void RecordError(Exception error) => _lastError = error;
 
-    private static Exception Flatten(Exception error) => error is AggregateException aggregate ? aggregate.Flatten().InnerExceptions[0] : error;
+    internal static Exception Flatten(Exception error) => error is AggregateException aggregate ? aggregate.Flatten().InnerExceptions[0] : error;
 }

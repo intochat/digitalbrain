@@ -9,4 +9,5 @@ public sealed record JournalRead(
     [property: Id(1)] long EarliestRetained,
     [property: Id(2)] bool Gap,
     [property: Id(3)] IReadOnlyList<SignalDelivery> Delta,
-    [property: Id(4)] JournalSnapshot? ResetSnapshot);
+    [property: Id(4)] JournalSnapshot? ResetSnapshot,
+    [property: Id(5)] long TotalRecorded);

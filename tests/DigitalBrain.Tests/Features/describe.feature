@@ -20,9 +20,3 @@ Feature: Describe
     Then the call fails naming "test.counter"
     When "claude" calls "test.counter" "add" on plain "p" with {"id":"c3","count":1}
     Then the call fails explaining there are no callable interfaces and naming the kernel tools
-
-  Scenario: A read past the retained window reports a gap
-    Given a running brain
-    When "claude" fires 600 "Tick" signals at plain "p"
-    And "claude" reads "p" incoming journal after sequence 0
-    Then the read reports a gap and an earliest retained sequence above 1

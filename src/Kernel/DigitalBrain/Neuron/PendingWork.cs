@@ -44,14 +44,14 @@ internal sealed class PendingWork
 
     internal void Admit(SignalDelivery delivery) => _queue.Enqueue(delivery);
 
-    internal SignalDelivery? Peek() => _queue.TryPeek(out var delivery) ? delivery : null;
+    internal HeadToken? Peek() => _queue.TryPeek(out var delivery) ? new HeadToken(delivery) : null;
 
-    internal void CompleteHead(SignalId id)
+    internal void CompleteHead(HeadToken token)
     {
+        var id = token.Delivery.SignalId;
         if (!_queue.TryPeek(out var head) || head.SignalId != id)
         {
-            throw new InvalidOperationException(
-                $"Cannot complete signal '{id}' when the head is '{head?.SignalId.ToString() ?? "<empty>"}'; the drain completes only the head it peeked.");
+            throw new InvalidOperationException("The drain completes only the head it peeked.");
         }
 
         _queue.Dequeue();
@@ -76,4 +76,6 @@ internal sealed class PendingWork
     }
 
     internal bool IsCancelled(SignalId id) => _cancelled.Contains(id);
+
+    internal readonly record struct HeadToken(SignalDelivery Delivery);
 }

@@ -91,7 +91,7 @@ public sealed class RecoverySteps(BrainWorld world, BrainSteps brain)
         {
             try
             {
-                var synapses = await brain.Query(name).ReadSynapses();
+                var synapses = await brain.Neuron(name).ReadSynapses();
                 Assert.DoesNotContain(synapses,
                     synapse => synapse.Target == NeuronId.Plain(target) && synapse.SignalType == type);
                 return;
@@ -107,7 +107,7 @@ public sealed class RecoverySteps(BrainWorld world, BrainSteps brain)
 
     [Then(@"""(.*)"" state does not contain ""(.*)""")]
     public async Task StateDoesNotContain(string name, string type)
-        => Assert.DoesNotContain(await brain.Query(name).ReadState(), delivery => delivery.Signal.Type == type);
+        => Assert.DoesNotContain(await brain.Neuron(name).ReadState(), delivery => delivery.Signal.Type == type);
 
     [AfterScenario]
     [Scope(Feature = "Recovery")]

@@ -272,18 +272,18 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     {
         Guard();
         RequestContext.Clear();
-        var delivery = _components.Pending.Peek();
-        if (delivery is null)
+        if (_components.Pending.Peek() is not { } head)
         {
             await _retry.AfterDrainAsync().ConfigureAwait(true);
             return;
         }
 
+        var delivery = head.Delivery;
         await _retry.EnsureReminderAsync().ConfigureAwait(true);
 
         if (_components.Pending.IsCancelled(delivery.SignalId))
         {
-            _components.Pending.CompleteHead(delivery.SignalId);
+            _components.Pending.CompleteHead(head);
             await PersistAsync().ConfigureAwait(true);
             await _retry.AfterDrainAsync().ConfigureAwait(true);
             Wake();
@@ -315,7 +315,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
                 if (_components.Pending.IsCancelled(delivery.SignalId))
                 {
                     DrainTelemetry.Cancelled(Logger, Id, delivery.SignalId);
-                    _components.Pending.CompleteHead(delivery.SignalId);
+                    _components.Pending.CompleteHead(head);
                     await PersistAsync().ConfigureAwait(true);
                     await _retry.AfterDrainAsync().ConfigureAwait(true);
                     Wake();
@@ -330,7 +330,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
                 return;
             }
 
-            _components.Pending.CompleteHead(delivery.SignalId);
+            _components.Pending.CompleteHead(head);
             await PersistAsync().ConfigureAwait(true);
             await _retry.AfterDrainAsync().ConfigureAwait(true);
             Wake();

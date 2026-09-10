@@ -32,57 +32,66 @@ public sealed class DescriptorTable
         var summaries = new XmlDocSummaries();
         foreach (var grainClass in options.Value.Classes.Where(type => type is { IsClass: true, IsAbstract: false } && typeof(INeuron).IsAssignableFrom(type)))
         {
-            DescriptorRules.Validate(grainClass);
-            var grainType = grainTypes.GetGrainType(grainClass);
-            List<string> aliases = [];
-            List<MethodDescriptor> descriptors = [];
-            foreach (var contract in grainClass.GetInterfaces().Where(type => typeof(INeuron).IsAssignableFrom(type)))
+            var (grainType, aliases, descriptors) = BuildGrainType(grainClass, grainTypes, interfaceTypes, interfaces, contexts, summaries);
+            _aliases.Add(grainType, aliases);
+            _descriptors.Add(grainType, descriptors);
+        }
+    }
+
+    private (GrainType GrainType, string[] Aliases, MethodDescriptor[] Descriptors) BuildGrainType(
+        Type grainClass, GrainTypeResolver grainTypes, GrainInterfaceTypeResolver interfaceTypes,
+        Dictionary<string, Type> interfaces, Dictionary<Type, JsonSerializerOptions> contexts,
+        XmlDocSummaries summaries)
+    {
+        DescriptorRules.Validate(grainClass);
+        var grainType = grainTypes.GetGrainType(grainClass);
+        List<string> aliases = [];
+        List<MethodDescriptor> descriptors = [];
+        foreach (var contract in grainClass.GetInterfaces().Where(type => typeof(INeuron).IsAssignableFrom(type)))
+        {
+            var alias = contract.GetCustomAttribute<AliasAttribute>()!.Alias;
+            if (interfaces.TryGetValue(alias, out var existing) && existing != contract)
             {
-                var alias = contract.GetCustomAttribute<AliasAttribute>()!.Alias;
-                if (interfaces.TryGetValue(alias, out var existing) && existing != contract)
-                {
-                    throw new InvalidOperationException($"Interface alias '{alias}' is shared by '{existing.FullName}' and '{contract.FullName}'. Choose unique interface aliases.");
-                }
-
-                interfaces[alias] = contract;
-                if (contract == typeof(INeuron))
-                {
-                    continue;
-                }
-
-                aliases.Add(alias);
-                var json = JsonOptions(contract, contexts);
-                foreach (var method in contract.GetMethods())
-                {
-                    var methodAlias = method.GetCustomAttribute<AliasAttribute>()!.Alias;
-                    if (!_commands.TryAdd((grainType, methodAlias), new(alias, methodAlias)))
-                    {
-                        var previous = _commands[(grainType, methodAlias)];
-                        throw new InvalidOperationException($"Grain type '{grainType}' has ambiguous method alias '{methodAlias}' on interfaces '{interfaces[previous.InterfaceAlias].FullName}' and '{contract.FullName}'. Choose a unique method alias.");
-                    }
-
-                    var key = (alias, methodAlias);
-                    if (!_methods.TryGetValue(key, out var metadata))
-                    {
-                        var parameters = method.GetParameters();
-                        var argumentType = parameters.FirstOrDefault(parameter => parameter.ParameterType != typeof(CancellationToken))?.ParameterType;
-                        var resultType = method.ReturnType == typeof(Task) ? null : method.ReturnType.GenericTypeArguments[0];
-                        var argumentsJson = TypeInfo(argumentType, json, method);
-                        var resultJson = TypeInfo(resultType, json, method);
-                        var descriptor = new MethodDescriptor(alias, methodAlias, method.IsDefined(typeof(ReadOnlyAttribute)),
-                            Schema(argumentsJson), Schema(resultJson), summaries.For(method));
-                        metadata = new(contract, interfaceTypes.GetGrainInterfaceType(contract), argumentsJson, resultJson,
-                            CompileCall(method), CompileResult(method.ReturnType), descriptor);
-                        _methods.Add(key, metadata);
-                    }
-
-                    descriptors.Add(metadata.Descriptor);
-                }
+                throw new InvalidOperationException($"Interface alias '{alias}' is shared by '{existing.FullName}' and '{contract.FullName}'. Choose unique interface aliases.");
             }
 
-            _aliases.Add(grainType, [.. aliases]);
-            _descriptors.Add(grainType, [.. descriptors]);
+            interfaces[alias] = contract;
+            if (contract == typeof(INeuron))
+            {
+                continue;
+            }
+
+            aliases.Add(alias);
+            var json = JsonOptions(contract, contexts);
+            foreach (var method in contract.GetMethods())
+            {
+                var methodAlias = method.GetCustomAttribute<AliasAttribute>()!.Alias;
+                if (!_commands.TryAdd((grainType, methodAlias), new(alias, methodAlias)))
+                {
+                    var previous = _commands[(grainType, methodAlias)];
+                    throw new InvalidOperationException($"Grain type '{grainType}' has ambiguous method alias '{methodAlias}' on interfaces '{interfaces[previous.InterfaceAlias].FullName}' and '{contract.FullName}'. Choose a unique method alias.");
+                }
+
+                var key = (alias, methodAlias);
+                if (!_methods.TryGetValue(key, out var metadata))
+                {
+                    var parameters = method.GetParameters();
+                    var argumentType = parameters.FirstOrDefault(parameter => parameter.ParameterType != typeof(CancellationToken))?.ParameterType;
+                    var resultType = method.ReturnType == typeof(Task) ? null : method.ReturnType.GenericTypeArguments[0];
+                    var argumentsJson = TypeInfo(argumentType, json, method);
+                    var resultJson = TypeInfo(resultType, json, method);
+                    var descriptor = new MethodDescriptor(alias, methodAlias, method.IsDefined(typeof(ReadOnlyAttribute)),
+                        Schema(argumentsJson), Schema(resultJson), summaries.For(method));
+                    metadata = new(contract, interfaceTypes.GetGrainInterfaceType(contract), argumentsJson, resultJson,
+                        CompileCall(method), CompileResult(method.ReturnType), descriptor);
+                    _methods.Add(key, metadata);
+                }
+
+                descriptors.Add(metadata.Descriptor);
+            }
         }
+
+        return (grainType, [.. aliases], [.. descriptors]);
     }
 
     public IReadOnlyList<MethodDescriptor> For(GrainType grainType) => _descriptors.GetValueOrDefault(grainType) ?? [];

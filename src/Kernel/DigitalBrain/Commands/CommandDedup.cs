@@ -28,6 +28,7 @@ internal sealed class CommandDedup(IDurableDictionary<CommandId, CommandOutcome>
         }
     }
 
+    // Unresolved outcomes are never evicted; the 1024 bound prevents unbounded growth when commands stop resolving.
     internal bool IsFullOfUnresolved
         => UnresolvedEntries.Count() >= MaxResolved;
 

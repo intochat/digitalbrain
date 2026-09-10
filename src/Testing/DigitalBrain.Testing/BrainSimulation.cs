@@ -22,17 +22,17 @@ public sealed class BrainSimulationOptions
 
 public sealed class BrainSimulation : IAsyncDisposable
 {
-    private readonly InProcessTestCluster inProcess;
+    private readonly InProcessTestCluster _inProcess;
 
     private BrainSimulation(InProcessTestCluster cluster)
     {
-        inProcess = cluster;
+        _inProcess = cluster;
         Grains = cluster.Client;
     }
 
     public IGrainFactory Grains { get; }
 
-    public IServiceProvider SiloServices => inProcess.GetActiveSilos().Single().ServiceProvider;
+    public IServiceProvider SiloServices => _inProcess.GetActiveSilos().Single().ServiceProvider;
 
     public static async Task<BrainSimulation> StartAsync(BrainSimulationOptions options)
     {
@@ -84,10 +84,10 @@ public sealed class BrainSimulation : IAsyncDisposable
 
     public async Task RestartSiloAsync(CancellationToken cancellationToken = default)
     {
-        var silo = inProcess.GetActiveSilos().Single();
-        await inProcess.RestartSiloAsync(silo).WaitAsync(cancellationToken).ConfigureAwait(false);
-        await inProcess.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+        var silo = _inProcess.GetActiveSilos().Single();
+        await _inProcess.RestartSiloAsync(silo).WaitAsync(cancellationToken).ConfigureAwait(false);
+        await _inProcess.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    public ValueTask DisposeAsync() => inProcess.DisposeAsync();
+    public ValueTask DisposeAsync() => _inProcess.DisposeAsync();
 }

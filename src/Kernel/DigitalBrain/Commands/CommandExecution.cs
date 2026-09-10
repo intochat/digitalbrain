@@ -36,32 +36,13 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
                 $"Command arguments are {(bytes.Length + 1023) / 1024} KB; the limit is 64 KB. Pass a reference instead of the payload.")).ConfigureAwait(true);
         }
 
-        if (existing is not null)
+        var replay = await TryReplay(host, record, existing, hash, resultJson).ConfigureAwait(true);
+        if (replay.Applies)
         {
-            if (existing.MismatchAgainst(caller, command.InterfaceAlias, command.MethodAlias, hash) is { } mismatch)
-            {
-                return await RejectAsync<TResult>(host, record, hash, new CommandRejectedException(
-                    arguments.Id, mismatch,
-                    $"Neuron '{host.Id}' refuses a command id reused with {mismatch}. Mint a new command id.")).ConfigureAwait(true);
-            }
-
-            switch (existing.Phase)
-            {
-                case CommandPhase.Completed:
-                    if (existing.ResultJson is { } storedResult)
-                    {
-                        return JsonSerializer.Deserialize(storedResult, resultJson)!;
-                    }
-
-                    throw new CommandOutcomeUnknownException(arguments.Id, existing.Error ?? $"Command '{arguments.Id}' has no recorded result.");
-                case CommandPhase.Failed:
-                    throw new CommandFailedException(arguments.Id, existing.Error ?? $"Command '{arguments.Id}' failed.");
-                case CommandPhase.Attempted:
-                    throw new CommandOutcomeUnknownException(arguments.Id,
-                        $"Command '{arguments.Id}' on '{host.Id}' is still attempting; its outcome is unknown. Retry with the same id.");
-            }
+            return replay.Result;
         }
-        else if (dedup.IsFullOfUnresolved)
+
+        if (existing is null && dedup.IsFullOfUnresolved)
         {
             // A full unresolved dedup cannot admit an entry to remember this rejection.
             var error = new NeuronBusyException(
@@ -156,6 +137,41 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
         }
 
         return result;
+    }
+
+    private async Task<(bool Applies, TResult Result)> TryReplay<TResult>(
+        ICommandHost host, CommandRecord record, CommandOutcome? existing, string hash, JsonTypeInfo<TResult> resultJson)
+    {
+        if (existing is null)
+        {
+            return (false, default!);
+        }
+
+        if (existing.MismatchAgainst(record.Caller, record.Interface, record.Method, hash) is { } mismatch)
+        {
+            return (true, await RejectAsync<TResult>(host, record, hash, new CommandRejectedException(
+                record.Id, mismatch,
+                $"Neuron '{host.Id}' refuses a command id reused with {mismatch}. Mint a new command id.")).ConfigureAwait(true));
+        }
+
+        switch (existing.Phase)
+        {
+            case CommandPhase.Completed:
+                if (existing.ResultJson is { } storedResult)
+                {
+                    return (true, JsonSerializer.Deserialize(storedResult, resultJson)!);
+                }
+
+                throw new CommandOutcomeUnknownException(record.Id, existing.Error ?? $"Command '{record.Id}' has no recorded result.");
+            case CommandPhase.Failed:
+                throw new CommandFailedException(record.Id, existing.Error ?? $"Command '{record.Id}' failed.");
+            case CommandPhase.Attempted:
+                throw new CommandOutcomeUnknownException(record.Id,
+                    $"Command '{record.Id}' on '{host.Id}' is still attempting; its outcome is unknown. Retry with the same id.");
+        }
+
+        // A stored Rejected or Unknown phase is not a replay: the caller goes on to attempt a fresh incarnation.
+        return (false, default!);
     }
 
     private void AppendTerminalRecord(CommandRecord record, CommandOutcome outcome, Exception? failure,
