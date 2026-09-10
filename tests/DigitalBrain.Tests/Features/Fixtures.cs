@@ -208,13 +208,13 @@ internal sealed class CounterNeuron(
     public Task<int> ReadTotal() => Task.FromResult(State?.Total ?? 0);
 }
 
-// The kernel calls this between staging a command's terminal record and committing it. The test
+// The kernel calls this before staging a command's terminal record. The test
 // implementation simulates process loss for one command id so the silo restart finds only Attempted.
 internal sealed class FixtureCommandCrashPoint : ICommandCrashPoint
 {
     internal static ConcurrentDictionary<CommandId, byte> CrashOnce { get; } = new();
 
-    public void BeforeTerminalPersist(CommandId command)
+    public void BeforeTerminalRecord(CommandId command)
     {
         if (CrashOnce.TryRemove(command, out _))
         {

@@ -8,6 +8,5 @@ public abstract record ReactionContext;
 
 public sealed record DeliveryReaction(SignalDelivery Delivery) : ReactionContext;
 
-// Work starts null because the scheduled work id does not exist until execute calls Schedule,
-// which then replaces the context with `commandReaction with { Work = id }`.
-public sealed record CommandReaction(CommandId Command, SignalId? Work = null) : ReactionContext;
+// ScheduledWork is empty until execute calls Schedule and grows with each Schedule, in that order.
+public sealed record CommandReaction(CommandId Command, IReadOnlyList<SignalId> ScheduledWork) : ReactionContext;

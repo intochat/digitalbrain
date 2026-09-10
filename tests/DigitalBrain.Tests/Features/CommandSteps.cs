@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using DigitalBrain.Abstractions.Commands;
@@ -16,10 +15,11 @@ public sealed class CommandSteps(BrainSteps brain)
 {
     private readonly List<Accepted<int>> _results = [];
     private Exception? _lastError;
+    private CommandId _lastCommandId;
 
     [When(@"""(.*)"" adds (\d+) to counter ""(.*)"" with command id ""(.*)""")]
     public Task Add(string principal, int amount, string name, string handle)
-        => Capture(principal, () => Counter(name).Add(new AddCount(CommandIdFrom(handle), amount)));
+        => Capture(principal, CommandIdFrom(handle), id => Counter(name).Add(new AddCount(id, amount)));
 
     [When(@"""(.*)"" adds (\d+) to counter ""(.*)"" with command id ""(.*)"" and the call fails")]
     public async Task AddAndFail(string principal, int amount, string name, string handle)
@@ -30,11 +30,11 @@ public sealed class CommandSteps(BrainSteps brain)
 
     [When(@"""(.*)"" adds a (\d+)-byte note to counter ""(.*)"" with command id ""(.*)""")]
     public Task AddNote(string principal, int bytes, string name, string handle)
-        => Capture(principal, () => Counter(name).Add(new AddCount(CommandIdFrom(handle), 0, new string('n', bytes))));
+        => Capture(principal, CommandIdFrom(handle), id => Counter(name).Add(new AddCount(id, 0, new string('n', bytes))));
 
     [When(@"""(.*)"" invokes the misbehaving save on counter ""(.*)""")]
     public Task AddAndSave(string principal, string name)
-        => Capture(principal, () => Counter(name).AddAndSave(new AddCount(CommandIdFrom("save"), 3)));
+        => Capture(principal, CommandIdFrom("save"), id => Counter(name).AddAndSave(new AddCount(id, 3)));
 
     // The scenario that uses this step issues only command "x9".
     [Given(@"^counter ""[^""]*"" crashes after recording Attempted$")]
@@ -72,25 +72,23 @@ public sealed class CommandSteps(BrainSteps brain)
         Assert.Null(rejected.ArgsJson);
     }
 
-    [Then(@"""(.*)"" waits up to 5 seconds until counter ""(.*)"" total is (\d+)")]
-    public async Task WaitForTotal(string principal, string name, int expected)
+    [Then(@"""(.*)"" waits up to (\d+) seconds until counter ""(.*)"" total is (\d+)")]
+    public async Task WaitForTotal(string principal, int seconds, string name, int expected)
     {
-        var elapsed = Stopwatch.StartNew();
-        int total;
-        do
+        RequestContext.Set(CallerContext.Key, NeuronId.Plain(principal).ToString());
+        var counter = Counter(name);
+        var deadline = DateTime.UtcNow.AddSeconds(seconds);
+        var observed = await counter.ReadTotal();
+        while (observed != expected && DateTime.UtcNow < deadline)
         {
-            RequestContext.Set(CallerContext.Key, NeuronId.Plain(principal).ToString());
-            total = await Counter(name).ReadTotal();
-            if (total == expected || elapsed.Elapsed >= TimeSpan.FromSeconds(5))
-            {
-                break;
-            }
-
             await Task.Delay(50);
+            observed = await counter.ReadTotal();
         }
-        while (elapsed.Elapsed < TimeSpan.FromSeconds(5));
 
-        Assert.Equal(expected, total);
+        if (observed != expected)
+        {
+            Assert.Fail($"{principal} waited {seconds}s for {name} total to be {expected}, but observed {observed}");
+        }
     }
 
     [Then(@"counter ""(.*)"" executed (\d+) times?")]
@@ -110,7 +108,21 @@ public sealed class CommandSteps(BrainSteps brain)
     public void ThenFails(string fragment)
     {
         Assert.NotNull(_lastError);
-        Assert.Contains(fragment, Flatten(_lastError).Message, StringComparison.Ordinal);
+        var error = Flatten(_lastError);
+        switch (error)
+        {
+            case CommandRejectedException rejected:
+                Assert.Equal(_lastCommandId, rejected.Id);
+                break;
+            case CommandOutcomeUnknownException unknown:
+                Assert.Equal(_lastCommandId, unknown.Id);
+                break;
+            case CommandFailedException failed:
+                Assert.Equal(_lastCommandId, failed.Id);
+                break;
+        }
+
+        Assert.Contains(fragment, error.Message, StringComparison.Ordinal);
     }
 
     [Then("the add fails with the membrane message")]
@@ -125,13 +137,14 @@ public sealed class CommandSteps(BrainSteps brain)
         FixtureCommandCrashPoint.CrashOnce.Clear();
     }
 
-    private async Task Capture(string principal, Func<Task<Accepted<int>>> call)
+    private async Task Capture(string principal, CommandId id, Func<CommandId, Task<Accepted<int>>> call)
     {
         _lastError = null;
+        _lastCommandId = id;
         RequestContext.Set(CallerContext.Key, NeuronId.Plain(principal).ToString());
         try
         {
-            _results.Add(await call());
+            _results.Add(await call(id));
         }
         catch (Exception error)
         {

@@ -177,7 +177,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         {
             // Command work becomes visible only with its terminal record, never after an uncommitted attempt.
             _commandWork.Add(delivery);
-            ReactionContext = commandReaction with { Work = delivery.SignalId };
+            ReactionContext = commandReaction with { ScheduledWork = [.. commandReaction.ScheduledWork, delivery.SignalId] };
             return delivery.SignalId;
         }
 

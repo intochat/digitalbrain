@@ -15,9 +15,23 @@ public sealed record CommandOutcome(
     [property: Id(7)] string? Error,
     [property: Id(8)] long Sequence)
 {
-    public bool Matches(NeuronId caller, string interfaceAlias, string method, string argumentsHash)
-        => Caller == caller
-            && StringComparer.Ordinal.Equals(Interface, interfaceAlias)
-            && StringComparer.Ordinal.Equals(Method, method)
-            && StringComparer.Ordinal.Equals(ArgumentsHash, argumentsHash);
+    public string? MismatchAgainst(NeuronId caller, string interfaceAlias, string method, string argumentsHash)
+    {
+        if (Caller != caller)
+        {
+            return "a different caller";
+        }
+
+        if (!StringComparer.Ordinal.Equals(Interface, interfaceAlias))
+        {
+            return "a different interface";
+        }
+
+        if (!StringComparer.Ordinal.Equals(Method, method))
+        {
+            return "a different method";
+        }
+
+        return StringComparer.Ordinal.Equals(ArgumentsHash, argumentsHash) ? null : "different arguments";
+    }
 }

@@ -27,6 +27,7 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
         if (bytes.Length > CommandLimits.MaxArgumentBytes)
         {
             return await RejectAsync<TResult>(host, record, new CommandRejectedException(
+                arguments.Id, "arguments over the 64 KB limit",
                 $"Command arguments are {(bytes.Length + 1023) / 1024} KB; the limit is 64 KB. Pass a reference instead of the payload.")).ConfigureAwait(true);
         }
 
@@ -35,10 +36,11 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
         if (existing is not null)
         {
             record = record with { Incarnation = existing.Incarnation + 1 };
-            if (!existing.Matches(caller, command.InterfaceAlias, command.MethodAlias, hash))
+            if (existing.MismatchAgainst(caller, command.InterfaceAlias, command.MethodAlias, hash) is { } mismatch)
             {
                 return await RejectAsync<TResult>(host, record, new CommandRejectedException(
-                    $"Neuron '{host.Id}' refuses a command id reused with different arguments ('{arguments.Id}'). Mint a new command id for new arguments.")).ConfigureAwait(true);
+                    arguments.Id, mismatch,
+                    $"Neuron '{host.Id}' refuses a command id reused with {mismatch}. Mint a new command id.")).ConfigureAwait(true);
             }
 
             switch (existing.Phase)
@@ -49,11 +51,11 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
                         return JsonSerializer.Deserialize(storedResult, resultJson)!;
                     }
 
-                    throw new CommandOutcomeUnknownException(existing.Error ?? $"Command '{arguments.Id}' has no recorded result.");
+                    throw new CommandOutcomeUnknownException(arguments.Id, existing.Error ?? $"Command '{arguments.Id}' has no recorded result.");
                 case CommandPhase.Failed:
-                    throw new CommandFailedException(existing.Error ?? $"Command '{arguments.Id}' failed.");
+                    throw new CommandFailedException(arguments.Id, existing.Error ?? $"Command '{arguments.Id}' failed.");
                 case CommandPhase.Attempted:
-                    throw new CommandOutcomeUnknownException(
+                    throw new CommandOutcomeUnknownException(arguments.Id,
                         $"Command '{arguments.Id}' on '{host.Id}' is still attempting; its outcome is unknown. Retry with the same id.");
             }
         }
@@ -71,7 +73,7 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
         await host.PersistAsync().ConfigureAwait(true);
 
         var previous = host.ReactionContext;
-        host.ReactionContext = new CommandReaction(arguments.Id);
+        host.ReactionContext = new CommandReaction(arguments.Id, []);
         TResult result = default!;
         Exception? failure = null;
         try
@@ -119,7 +121,7 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
             Error = errorText,
             At = clock.GetUtcNow(),
         };
-        crashPoint?.BeforeTerminalPersist(arguments.Id);
+        crashPoint?.BeforeTerminalRecord(arguments.Id);
         terminal = journal.Append(terminal);
         dedup.Record(arguments.Id, outcome with
         {

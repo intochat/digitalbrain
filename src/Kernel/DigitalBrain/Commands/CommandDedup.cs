@@ -5,7 +5,7 @@ using Orleans.Journaling;
 namespace DigitalBrain.Core;
 
 // Dedup is exact for the last 1024 resolved commands and nothing beyond; unresolved commands are
-// never dropped so an in-flight id can never be reused silently.
+// never dropped so an in-flight id can never be reused silently. Admission stops at 1024 unresolved commands.
 internal sealed class CommandDedup(IDurableDictionary<CommandId, CommandOutcome> outcomes)
 {
     internal const int MaxResolved = 1024;
@@ -29,8 +29,11 @@ internal sealed class CommandDedup(IDurableDictionary<CommandId, CommandOutcome>
     }
 
     internal bool IsFullOfUnresolved
-        => outcomes.Count >= MaxResolved && outcomes.All(entry => entry.Value.Phase == CommandPhase.Attempted);
+        => UnresolvedEntries.Count() >= MaxResolved;
 
     internal IReadOnlyList<KeyValuePair<CommandId, CommandOutcome>> Unresolved()
-        => [.. outcomes.Where(entry => entry.Value.Phase == CommandPhase.Attempted)];
+        => [.. UnresolvedEntries];
+
+    private IEnumerable<KeyValuePair<CommandId, CommandOutcome>> UnresolvedEntries
+        => outcomes.Where(entry => entry.Value.Phase == CommandPhase.Attempted);
 }
