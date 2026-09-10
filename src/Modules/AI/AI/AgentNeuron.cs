@@ -100,7 +100,9 @@ internal sealed class AgentNeuron(
             var text = response.Text ?? string.Empty;
             var isTurn = delivery.Signal.Type == AIVocabulary.Turn;
             await FireAsync(
-                Signal.Create(isTurn ? AIVocabulary.Said : AIVocabulary.Reply, isTurn ? Bodies.Said(Id.ToString(), text) : Bodies.Write(text)),
+                isTurn
+                    ? Signal.FromJson(AIVocabulary.Said, new SaidBody(Id.ToString(), text), AIJson.Default.SaidBody)
+                    : Signal.FromJson(AIVocabulary.Reply, new TextBody(text), AIJson.Default.TextBody),
                 delivery.Source,
                 delivery.CorrelationId,
                 cancellationToken).ConfigureAwait(true);
@@ -199,7 +201,7 @@ internal sealed class AgentNeuron(
     }
 
     private Task ReplyAsync(SignalDelivery delivery, string text, CancellationToken cancellationToken)
-        => FireAsync(Signal.Create(AIVocabulary.Reply, Bodies.Write(text)), delivery.Source, delivery.CorrelationId, cancellationToken);
+        => FireAsync(Signal.FromJson(AIVocabulary.Reply, new TextBody(text), AIJson.Default.TextBody), delivery.Source, delivery.CorrelationId, cancellationToken);
 
     // A turn carries no transcript: the participant reads the source's incoming journal for
     // its own correlation and speaks next.

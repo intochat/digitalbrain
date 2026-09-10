@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.AI;
 using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -31,7 +32,11 @@ public sealed class GoogleModule : IModule
             services.AddSingleton<IGmailTokenExchange, GmailTokenExchange>();
         }
         services.AddSingleton<GmailTokenRefresh>();
-        // NativeTools contributor lands after the AI module merge
+        services.AddNativeTool("search_gmail_threads", services => services.GetRequiredService<GmailNativeTools>().CreateSearchThreads());
+        services.AddNativeTool("read_gmail_thread", services => services.GetRequiredService<GmailNativeTools>().CreateGetThread());
+        services.AddNativeTool("list_gmail_labels", services => services.GetRequiredService<GmailNativeTools>().CreateListLabels());
+        services.AddNativeTool("gmail_current_account", services => services.GetRequiredService<GmailNativeTools>().CreateGetCurrentAccount());
+        services.AddNativeTool("prepare_gmail_draft", services => services.GetRequiredService<GmailNativeTools>().CreateDraftPreview());
         services.AddSingleton(static services => new GmailNativeTools(
             services.GetRequiredService<IGrainFactory>().GetGrain<IGmail>(new NeuronId("gmail", "gmail").ToGrainId()),
             services.GetRequiredService<GmailLogins>(),

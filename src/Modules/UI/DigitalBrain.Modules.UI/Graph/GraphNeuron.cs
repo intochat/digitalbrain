@@ -19,7 +19,7 @@ internal sealed class GraphNeuron(
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.Title);
             ArgumentNullException.ThrowIfNull(arguments.Nodes);
             ArgumentNullException.ThrowIfNull(arguments.Edges);
-            var work = Schedule(UIBodies.Signal(UIVocabulary.GraphRendering, arguments, UIJson.Default.RenderGraph));
+            var work = Schedule(Signal.FromJson(UIVocabulary.GraphRendering, arguments, UIJson.Default.RenderGraph));
             return new Accepted<string>(Id.Name, work);
         });
 
@@ -33,9 +33,13 @@ internal sealed class GraphNeuron(
             return;
         }
 
-        var command = UIBodies.Read(delivery, UIJson.Default.RenderGraph);
+        if (Body(delivery, UIJson.Default.RenderGraph) is not { } command)
+        {
+            return;
+        }
+
         await SaveAsync(new GraphState(command.Title, command.Nodes, command.Edges), cancellationToken).ConfigureAwait(true);
-        await FireAsync(UIBodies.Card(UIVocabulary.GraphRendered, Id.Name, command.Title),
+        await FireAsync(Signal.FromJson(UIVocabulary.GraphRendered, new KitCard(Id.Name, command.Title), UIJson.Default.KitCard),
             cancellationToken: cancellationToken).ConfigureAwait(true);
     }
 }

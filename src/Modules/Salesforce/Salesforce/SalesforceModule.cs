@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.AI;
 using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -35,7 +36,10 @@ public sealed class SalesforceModule : IModule
             services.AddSingleton<ISalesforceTokenExchange, SalesforceTokenExchange>();
         }
         services.AddSingleton<SalesforceTokenRefresh>();
-        // NativeTools contributor lands after the AI module merge
+        services.AddNativeTool("salesforce_user_info", services => services.GetRequiredService<SalesforceNativeTools>().CreateGetUserInfo());
+        services.AddNativeTool("salesforce_query", services => services.GetRequiredService<SalesforceNativeTools>().CreateSoqlQuery());
+        services.AddNativeTool("prepare_salesforce_record", services => services.GetRequiredService<SalesforceNativeTools>().CreateRecordPreview());
+        services.AddNativeTool("prepare_salesforce_record_update", services => services.GetRequiredService<SalesforceNativeTools>().CreateRecordUpdatePreview());
         services.AddSingleton(static services => new SalesforceNativeTools(
             services.GetRequiredService<IGrainFactory>().GetGrain<ISalesforce>(new NeuronId("salesforce", "salesforce").ToGrainId()),
             services.GetRequiredService<TimeProvider>()));

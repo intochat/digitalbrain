@@ -20,7 +20,7 @@ internal sealed class ImageNeuron(
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.Model);
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.MediaType);
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.BlobName);
-            var work = Schedule(UIBodies.Signal(UIVocabulary.ImageDescribing, arguments, UIJson.Default.DescribeImage));
+            var work = Schedule(Signal.FromJson(UIVocabulary.ImageDescribing, arguments, UIJson.Default.DescribeImage));
             return new Accepted<string>(Id.Name, work);
         });
 
@@ -34,9 +34,13 @@ internal sealed class ImageNeuron(
             return;
         }
 
-        var command = UIBodies.Read(delivery, UIJson.Default.DescribeImage);
+        if (Body(delivery, UIJson.Default.DescribeImage) is not { } command)
+        {
+            return;
+        }
+
         await SaveAsync(new ImageState(command.Prompt, command.Model, command.MediaType, command.BlobName), cancellationToken).ConfigureAwait(true);
-        await FireAsync(UIBodies.Card(UIVocabulary.ImageDescribed, Id.Name, command.Prompt),
+        await FireAsync(Signal.FromJson(UIVocabulary.ImageDescribed, new KitCard(Id.Name, command.Prompt), UIJson.Default.KitCard),
             cancellationToken: cancellationToken).ConfigureAwait(true);
     }
 }

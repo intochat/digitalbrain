@@ -11,6 +11,7 @@
     <PackageReference Include="Octokit.Webhooks" />
     <PackageReference Include="ModelContextProtocol.Core" />
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Microsoft.Contracts.csproj" />
+    <ProjectReference Include="../../AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain/DigitalBrain.csproj" />
     <InternalsVisibleTo Include="DigitalBrain.Tests" />
   </ItemGroup>

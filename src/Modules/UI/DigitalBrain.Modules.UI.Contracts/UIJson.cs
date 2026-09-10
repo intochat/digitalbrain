@@ -24,6 +24,7 @@ namespace DigitalBrain.UI;
 [JsonSerializable(typeof(ChatTurnSnapshot))]
 [JsonSerializable(typeof(ChatTurnStatus))]
 [JsonSerializable(typeof(KitCardOffer))]
+[JsonSerializable(typeof(KitCard))]
 [JsonSerializable(typeof(Responded))]
 [JsonSerializable(typeof(Accepted<SignalId>))]
 [JsonSerializable(typeof(SignalId))]

@@ -1,5 +1,3 @@
-using System.Text.Json;
-using System.Text.Json.Serialization.Metadata;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Signals;
@@ -35,7 +33,7 @@ internal sealed class GmailNeuron(
             }
             var expiry = GmailTokenRefresh.Expiry(arguments.ExpiresInSeconds, TimeProvider);
             var receipt = new GmailConnection(true, arguments.Email, grants.Contains(GmailOAuthConfiguration.ComposeScope), expiry);
-            var work = Schedule(CreateSignal(GmailSignals.GmailConnectionRequested, arguments, GmailJson.Default.ConnectGmailAccount));
+            var work = Schedule(Signal.FromJson(GmailSignals.GmailConnectionRequested, arguments, GmailJson.Default.ConnectGmailAccount));
             return new Accepted<GmailConnection>(receipt, work);
         });
 
@@ -46,14 +44,14 @@ internal sealed class GmailNeuron(
             {
                 throw new GmailNotConnectedException();
             }
-            var work = Schedule(CreateSignal(GmailSignals.GmailRefreshRequested, arguments, GmailJson.Default.RefreshGmailConnection));
+            var work = Schedule(Signal.FromJson(GmailSignals.GmailRefreshRequested, arguments, GmailJson.Default.RefreshGmailConnection));
             return new Accepted<GmailConnection>(Connection(), work);
         });
 
     public Task<Accepted<GmailConnection>> Disconnect(DisconnectGmail command) => ExecuteCommandAsync(
         Descriptor("disconnect"), command, GmailJson.Default.DisconnectGmail, GmailJson.Default.AcceptedGmailConnection, arguments =>
         {
-            var work = Schedule(CreateSignal(GmailSignals.GmailDisconnectionRequested, arguments, GmailJson.Default.DisconnectGmail));
+            var work = Schedule(Signal.FromJson(GmailSignals.GmailDisconnectionRequested, arguments, GmailJson.Default.DisconnectGmail));
             return new Accepted<GmailConnection>(new(false, null, false, null), work);
         });
 
@@ -64,7 +62,7 @@ internal sealed class GmailNeuron(
             GmailContent.ValidateArguments("create_draft", DraftArguments(arguments.To, arguments.Cc, arguments.Bcc, arguments.Subject, arguments.Body));
             var preview = new GmailDraftPreview(arguments.Id.ToString(), "", arguments.To, arguments.Cc, arguments.Bcc,
                 arguments.Subject, arguments.Body, TimeProvider.GetUtcNow().AddMinutes(10));
-            var work = Schedule(CreateSignal(GmailSignals.GmailDraftRequested,
+            var work = Schedule(Signal.FromJson(GmailSignals.GmailDraftRequested,
                 new GmailDraftRequested(preview, connection.Subject!), GmailJson.Default.GmailDraftRequested));
             return new Accepted<GmailDraftPreview>(preview, work);
         });
@@ -78,7 +76,7 @@ internal sealed class GmailNeuron(
             {
                 throw new GmailUnavailableException("The Gmail preview expired or changed. Prepare a fresh preview.");
             }
-            var work = Schedule(CreateSignal(GmailSignals.GmailDraftConfirmed,
+            var work = Schedule(Signal.FromJson(GmailSignals.GmailDraftConfirmed,
                 new GmailDraftConfirmed(preview.PreviewId, preview.ToolSchemaHash), GmailJson.Default.GmailDraftConfirmed));
             return new Accepted<GmailDraftPreview>(preview, work);
         });
@@ -124,7 +122,11 @@ internal sealed class GmailNeuron(
         switch (delivery.Signal.Type)
         {
             case GmailSignals.GmailConnectionRequested:
-                var account = JsonSerializer.Deserialize(delivery.Signal.Body, GmailJson.Default.ConnectGmailAccount)!;
+                if (Body(delivery, GmailJson.Default.ConnectGmailAccount) is not { } account)
+                {
+                    return;
+                }
+
                 if (!handoff.TryRedeem(account.Nonce, out var tokens))
                 {
                     await RejectConnectionAsync(new TokenHandoffExpiredException().Message, cancellationToken).ConfigureAwait(true);
@@ -148,7 +150,7 @@ internal sealed class GmailNeuron(
                     tokens.RefreshToken ?? (State?.Subject == account.Subject ? State.RefreshToken : null),
                     account.GrantedScopes, delivery.Timestamp.AddSeconds(account.ExpiresInSeconds),
                     grants.Contains(GmailOAuthConfiguration.ComposeScope)), cancellationToken).ConfigureAwait(true);
-                await FireAsync(CreateSignal(GmailSignals.GmailConnected, new GmailConnected(Connection()),
+                await FireAsync(Signal.FromJson(GmailSignals.GmailConnected, new GmailConnected(Connection()),
                     GmailJson.Default.GmailConnected), cancellationToken: cancellationToken).ConfigureAwait(true);
                 break;
             case GmailSignals.GmailRefreshRequested:
@@ -169,16 +171,20 @@ internal sealed class GmailNeuron(
                     return;
                 }
                 await SaveAsync(refreshed, cancellationToken).ConfigureAwait(true);
-                await FireAsync(CreateSignal(GmailSignals.GmailRefreshed, new GmailRefreshed(Connection()),
+                await FireAsync(Signal.FromJson(GmailSignals.GmailRefreshed, new GmailRefreshed(Connection()),
                     GmailJson.Default.GmailRefreshed), cancellationToken: cancellationToken).ConfigureAwait(true);
                 break;
             case GmailSignals.GmailDisconnectionRequested:
                 await SaveAsync(new GmailState(), cancellationToken).ConfigureAwait(true);
-                await FireAsync(CreateSignal(GmailSignals.GmailDisconnected, new GmailDisconnected(),
+                await FireAsync(Signal.FromJson(GmailSignals.GmailDisconnected, new GmailDisconnected(),
                     GmailJson.Default.GmailDisconnected), cancellationToken: cancellationToken).ConfigureAwait(true);
                 break;
             case GmailSignals.GmailDraftRequested:
-                var requested = JsonSerializer.Deserialize(delivery.Signal.Body, GmailJson.Default.GmailDraftRequested)!;
+                if (Body(delivery, GmailJson.Default.GmailDraftRequested) is not { } requested)
+                {
+                    return;
+                }
+
                 string hash;
                 try
                 {
@@ -195,11 +201,16 @@ internal sealed class GmailNeuron(
                 }
                 var preview = requested.Preview with { ToolSchemaHash = hash };
                 await SaveAsync(State! with { PendingDraft = preview }, cancellationToken).ConfigureAwait(true);
-                await FireAsync(CreateSignal(GmailSignals.GmailDraftPrepared, new GmailDraftPrepared(preview.PreviewId, preview.ToolSchemaHash),
+                await FireAsync(Signal.FromJson(GmailSignals.GmailDraftPrepared, new GmailDraftPrepared(preview.PreviewId, preview.ToolSchemaHash),
                     GmailJson.Default.GmailDraftPrepared), cancellationToken: cancellationToken).ConfigureAwait(true);
                 break;
             case GmailSignals.GmailDraftConfirmed:
-                await CreateDraftAsync(JsonSerializer.Deserialize(delivery.Signal.Body, GmailJson.Default.GmailDraftConfirmed)!, cancellationToken).ConfigureAwait(true);
+                if (Body(delivery, GmailJson.Default.GmailDraftConfirmed) is not { } confirmed)
+                {
+                    return;
+                }
+
+                await CreateDraftAsync(confirmed, cancellationToken).ConfigureAwait(true);
                 break;
         }
     }
@@ -243,12 +254,12 @@ internal sealed class GmailNeuron(
             await FireUncertainAsync(preview.PreviewId, cancellationToken).ConfigureAwait(true);
             return;
         }
-        await FireAsync(CreateSignal(GmailSignals.GmailDraftCreated, new GmailDraftCreated(preview.PreviewId, draftId),
+        await FireAsync(Signal.FromJson(GmailSignals.GmailDraftCreated, new GmailDraftCreated(preview.PreviewId, draftId),
             GmailJson.Default.GmailDraftCreated), cancellationToken: cancellationToken).ConfigureAwait(true);
     }
 
     private Task FireUncertainAsync(string previewId, CancellationToken cancellationToken)
-        => FireAsync(CreateSignal(GmailSignals.GmailDraftUncertain, new GmailDraftUncertain(previewId),
+        => FireAsync(Signal.FromJson(GmailSignals.GmailDraftUncertain, new GmailDraftUncertain(previewId),
             GmailJson.Default.GmailDraftUncertain), cancellationToken: cancellationToken);
 
     private async Task<string> ReadDraftSchemaAsync(CancellationToken cancellationToken)
@@ -267,11 +278,8 @@ internal sealed class GmailNeuron(
     }
 
     private Task RejectConnectionAsync(string reason, CancellationToken cancellationToken)
-        => FireAsync(CreateSignal(GmailSignals.GmailConnectionRejected, new GmailConnectionRejected(reason),
+        => FireAsync(Signal.FromJson(GmailSignals.GmailConnectionRejected, new GmailConnectionRejected(reason),
             GmailJson.Default.GmailConnectionRejected), cancellationToken: cancellationToken);
-
-    private static Signal CreateSignal<T>(string type, T body, JsonTypeInfo<T> json)
-        => Signal.Create(type, JsonSerializer.Serialize(body, json));
 
     private GmailState RequireConnection(bool compose = false)
     {

@@ -24,7 +24,7 @@ internal sealed class SurfaceNeuron(
             var scene = new SurfaceScene(arguments.SurfaceKey, arguments.Title, arguments.Root);
             // This receipt is advisory: it is what the caller can show immediately.
             var receipt = CreateReceipt(arguments, scene, State);
-            var work = Schedule(UIBodies.Signal(UIVocabulary.Opening, arguments, UIJson.Default.OpenSurface));
+            var work = Schedule(Signal.FromJson(UIVocabulary.SurfaceOpening, arguments, UIJson.Default.OpenSurface));
             return new Accepted<SurfaceOpenReceipt>(receipt, work);
         });
 
@@ -41,7 +41,7 @@ internal sealed class SurfaceNeuron(
                 throw new ArgumentException($"Button '{arguments.ControlId}' is not on surface '{arguments.SurfaceKey}'. Open a surface containing that button, then activate its control id.", nameof(command));
             }
 
-            var work = Schedule(UIBodies.Signal(UIVocabulary.Activating, arguments, UIJson.Default.ActivateControl));
+            var work = Schedule(Signal.FromJson(UIVocabulary.SurfaceActivating, arguments, UIJson.Default.ActivateControl));
             return new Accepted<ControlActivation>(new(arguments.SurfaceKey, arguments.ControlId, arguments.Intent), work);
         });
 
@@ -52,17 +52,26 @@ internal sealed class SurfaceNeuron(
     {
         switch (delivery.Signal.Type)
         {
-            case UIVocabulary.Opening:
+            case UIVocabulary.SurfaceOpening:
                 await OpenAsync(delivery, cancellationToken).ConfigureAwait(true);
                 break;
-            case UIVocabulary.Activating:
-                var command = UIBodies.Read(delivery, UIJson.Default.ActivateControl);
-                await FireAsync(UIBodies.Signal(UIVocabulary.ControlActivated,
+            case UIVocabulary.SurfaceActivating:
+                if (Body(delivery, UIJson.Default.ActivateControl) is not { } command)
+                {
+                    return;
+                }
+
+                await FireAsync(Signal.FromJson(UIVocabulary.ControlActivated,
                     new ControlActivation(command.SurfaceKey, command.ControlId, command.Intent), UIJson.Default.ControlActivation),
                     cancellationToken: cancellationToken).ConfigureAwait(true);
                 break;
             case UIVocabulary.ActivityChanged:
-                var activity = UIBodies.Read(delivery, UIJson.Default.ActivityChanged).Activity;
+                if (Body(delivery, UIJson.Default.ActivityChanged) is not { } activityBody)
+                {
+                    return;
+                }
+
+                var activity = activityBody.Activity;
                 var previous = State?.Activities?.FirstOrDefault(item => item.Id == activity.Id);
                 if (previous is not null && previous.Version >= activity.Version)
                 {
@@ -81,7 +90,11 @@ internal sealed class SurfaceNeuron(
 
     private async Task OpenAsync(SignalDelivery delivery, CancellationToken cancellationToken)
     {
-        var command = UIBodies.Read(delivery, UIJson.Default.OpenSurface);
+        if (Body(delivery, UIJson.Default.OpenSurface) is not { } command)
+        {
+            return;
+        }
+
         var current = State ?? new SurfaceState([]);
         var scene = new SurfaceScene(command.SurfaceKey, command.Title, command.Root);
         var receipt = CreateReceipt(command, scene, current);
@@ -90,7 +103,7 @@ internal sealed class SurfaceNeuron(
             Scenes = BoundedList.Append(current.Scenes.Where(item => item.SurfaceKey != command.SurfaceKey), scene, 64),
             OpenReceipts = BoundedList.Append((current.OpenReceipts ?? []).Where(item => item.CommandId != command.Id), receipt, 64),
         }, cancellationToken).ConfigureAwait(true);
-        await FireAsync(UIBodies.Signal(UIVocabulary.SurfaceOpened,
+        await FireAsync(Signal.FromJson(UIVocabulary.SurfaceOpened,
             new SurfaceOpened(command.Id, Id, command.SurfaceKey, command.Title, receipt), UIJson.Default.SurfaceOpened),
             cancellationToken: cancellationToken).ConfigureAwait(true);
         foreach (var component in receipt.AddedComponents)
@@ -98,7 +111,7 @@ internal sealed class SurfaceNeuron(
             // Identical queued scenes mint the same ids so clients deduplicating by event id cannot double-add.
             var eventId = new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(
                 $"component-added:{Id}:{receipt.Fingerprint}:{command.SurfaceKey}:{component.Key}")).AsSpan(0, 16)).ToString();
-            await FireAsync(UIBodies.Signal(UIVocabulary.ComponentAdded,
+            await FireAsync(Signal.FromJson(UIVocabulary.ComponentAdded,
                 new ComponentAdded(command.Id, Id, command.SurfaceKey, component, eventId), UIJson.Default.ComponentAdded),
                 cancellationToken: cancellationToken).ConfigureAwait(true);
         }

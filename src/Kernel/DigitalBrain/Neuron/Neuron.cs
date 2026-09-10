@@ -163,6 +163,17 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     // Override to react. The default neuron does nothing: the signal is already journaled and remembered.
     protected virtual Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken) => Task.CompletedTask;
 
+    protected T? Body<T>(SignalDelivery delivery, JsonTypeInfo<T> json) where T : class
+    {
+        var body = delivery.Body(json);
+        if (body is null)
+        {
+            DrainTelemetry.BodyUnreadable(_logger, Id, delivery.Signal.Type, delivery.SignalId);
+        }
+
+        return body;
+    }
+
     // Snapshot hooks let the drain finish saved reactions and their announcements.
     private protected virtual bool HasStoredAnnouncements => false;
 

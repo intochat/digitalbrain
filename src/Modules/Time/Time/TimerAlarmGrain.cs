@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text.Json;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
@@ -52,8 +51,8 @@ internal sealed class TimerAlarmGrain(TimeOptions options, TimeProvider timeProv
             throw new InvalidOperationException($"Malformed timer alarm key '{key}'.", error);
         }
 
-        var signal = Signal.Create(TimeSignals.Due,
-            JsonSerializer.Serialize(new TimerGeneration(generation), TimeJson.Default.TimerGeneration));
+        var signal = Signal.FromJson(TimeSignals.TimerDue,
+            new TimerGeneration(generation), TimeJson.Default.TimerGeneration);
         var delivery = SignalDelivery.Create(signal, NeuronId.FromGrainId(this.GetGrainId()), EdgeDeliverySequence, timeProvider);
         return GrainFactory.GetGrain<INeuron>(timer.ToGrainId()).Deliver(delivery);
     }

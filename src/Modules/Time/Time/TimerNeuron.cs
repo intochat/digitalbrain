@@ -1,5 +1,3 @@
-using System.Text.Json;
-using System.Text.Json.Serialization.Metadata;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Signals;
@@ -36,7 +34,7 @@ internal sealed class TimerNeuron(
             }
 
             var body = new SchedulingBody(arguments.DurationSeconds, arguments.Note);
-            var work = Schedule(Signal.Create(TimeSignals.Scheduling, JsonSerializer.Serialize(body, TimeJson.Default.SchedulingBody)));
+            var work = Schedule(Signal.FromJson(TimeSignals.TimerScheduling, body, TimeJson.Default.SchedulingBody));
             return new Accepted<TimerGeneration>(new TimerGeneration(State?.Generation ?? 0), work);
         });
 
@@ -48,7 +46,7 @@ internal sealed class TimerNeuron(
                 throw new CommandRejectedException(arguments.Id, "nothing scheduled to stop", "Schedule a timer before stopping it.");
             }
 
-            var work = Schedule(Signal.Create(TimeSignals.Stopping, "{}"));
+            var work = Schedule(Signal.Create(TimeSignals.TimerStopping, "{}"));
             return new Accepted<TimerGeneration>(new TimerGeneration(current.Generation), work);
         });
 
@@ -60,7 +58,7 @@ internal sealed class TimerNeuron(
     {
         switch (delivery.Signal.Type)
         {
-            case TimeSignals.Scheduling:
+            case TimeSignals.TimerScheduling:
                 {
                     if (State is { Status: TimerStatus.Scheduled })
                     {
@@ -68,7 +66,11 @@ internal sealed class TimerNeuron(
                         return;
                     }
 
-                    var body = Body(delivery, TimeJson.Default.SchedulingBody);
+                    if (Body(delivery, TimeJson.Default.SchedulingBody) is not { } body)
+                    {
+                        return;
+                    }
+
                     var generation = (State?.Generation ?? 0) + 1;
                     var scheduledAt = TimeProvider.GetUtcNow();
                     var dueAt = scheduledAt + TimeSpan.FromSeconds(body.DurationSeconds);
@@ -77,7 +79,7 @@ internal sealed class TimerNeuron(
                     await Alarm(generation).Arm(dueAt - TimeProvider.GetUtcNow()).ConfigureAwait(true);
                     break;
                 }
-            case TimeSignals.Stopping:
+            case TimeSignals.TimerStopping:
                 {
                     if (State is not { Status: TimerStatus.Scheduled } current)
                     {
@@ -88,9 +90,14 @@ internal sealed class TimerNeuron(
                     await Alarm(current.Generation).Retire().ConfigureAwait(true);
                     break;
                 }
-            case TimeSignals.Due:
+            case TimeSignals.TimerDue:
                 {
-                    var generation = Body(delivery, TimeJson.Default.TimerGeneration).Value;
+                    if (Body(delivery, TimeJson.Default.TimerGeneration) is not { } generationBody)
+                    {
+                        return;
+                    }
+
+                    var generation = generationBody.Value;
                     if (State is not { Status: TimerStatus.Scheduled } current || current.Generation != generation)
                     {
                         await Alarm(generation).Retire().ConfigureAwait(true);
@@ -109,7 +116,7 @@ internal sealed class TimerNeuron(
                         : TimerResolution.OnTime;
                     await SaveAsync(current with { Status = TimerStatus.Elapsed }, cancellationToken).ConfigureAwait(true);
                     var body = new TimerElapsedBody(Id, generation, current.ScheduledAt, current.DueAt, observedAt, resolution, current.Note);
-                    await FireAsync(Signal.Create(TimeSignals.TimerElapsed, JsonSerializer.Serialize(body, TimeJson.Default.TimerElapsedBody)),
+                    await FireAsync(Signal.FromJson(TimeSignals.TimerElapsed, body, TimeJson.Default.TimerElapsedBody),
                         to: null, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
                     await Alarm(generation).Retire().ConfigureAwait(true);
                     break;
@@ -118,7 +125,4 @@ internal sealed class TimerNeuron(
     }
 
     private ITimerAlarm Alarm(long generation) => GrainFactory.GetGrain<ITimerAlarm>($"{Id.Name}/{generation}");
-
-    private static T Body<T>(SignalDelivery delivery, JsonTypeInfo<T> json)
-        => JsonSerializer.Deserialize(delivery.Signal.Body, json)!;
 }

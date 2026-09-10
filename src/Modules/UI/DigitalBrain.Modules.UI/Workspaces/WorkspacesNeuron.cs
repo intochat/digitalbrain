@@ -25,7 +25,7 @@ internal sealed class WorkspacesNeuron(
             // the kernel keeps that receipt (including its timestamp) stable on a command-id retry.
             var correlation = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(name)))[..32];
             var receipt = new WorkspaceRecord(name, correlation, arguments.Title.Trim(), TimeProvider.GetUtcNow());
-            var work = Schedule(UIBodies.Signal(UIVocabulary.WorkspaceEnsuring, receipt, UIJson.Default.WorkspaceRecord));
+            var work = Schedule(Signal.FromJson(UIVocabulary.WorkspaceEnsuring, receipt, UIJson.Default.WorkspaceRecord));
             return new Accepted<WorkspaceRecord>(receipt, work);
         });
 
@@ -42,7 +42,11 @@ internal sealed class WorkspacesNeuron(
             return;
         }
 
-        var record = UIBodies.Read(delivery, UIJson.Default.WorkspaceRecord);
+        if (Body(delivery, UIJson.Default.WorkspaceRecord) is not { } record)
+        {
+            return;
+        }
+
         var current = State?.Workspaces ?? [];
         await SaveAsync(new WorkspaceIndexState(current.Any(item => item.Name == record.Name)
             ? [.. current.Select(item => item.Name == record.Name ? record : item)]

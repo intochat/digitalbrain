@@ -1,3 +1,4 @@
+using DigitalBrain.AI;
 using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -24,7 +25,12 @@ internal static class GitHubModule
         builder.Services.AddSingleton<GitHubSetupService>();
         builder.Services.AddSingleton<GitHubWebhookIngress>();
         builder.Services.AddSingleton<IHttpSurface, GitHubWebhookSurface>();
-        // NativeTools contributor lands after the AI module merge
+        builder.Services.AddNativeTool("github_connect_repository", services => services.GetRequiredService<GitHubNativeTools>().CreateConnectGitHubRepository());
+        builder.Services.AddNativeTool("github_pull_request", services => services.GetRequiredService<GitHubNativeTools>().CreateReadPullRequest());
+        builder.Services.AddNativeTool("github_pull_requests", services => services.GetRequiredService<GitHubNativeTools>().CreateReadPullRequests());
+        builder.Services.AddNativeTool("github_review_evidence", services => services.GetRequiredService<GitHubNativeTools>().CreateReadReviewEvidence());
+        builder.Services.AddNativeTool("github_required_checks", services => services.GetRequiredService<GitHubNativeTools>().CreateReadRequiredChecks());
+        builder.Services.AddNativeTool("github_resolve_repository", services => services.GetRequiredService<GitHubNativeTools>().CreateResolveRepository());
         builder.Services.AddSingleton(static services => new GitHubNativeTools(
             services.GetRequiredService<IGrainFactory>(), services.GetRequiredService<GitHubLogins>()));
     }

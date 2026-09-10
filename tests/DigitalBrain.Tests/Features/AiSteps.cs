@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.AI;
 using DigitalBrain.AI.XAI;
+using DigitalBrain.Google;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.AI;
 using Reqnroll;
@@ -12,6 +13,15 @@ namespace DigitalBrain.Tests;
 [Binding]
 public sealed class AiSteps(BrainWorld world, BrainSteps brain)
 {
+    [Given("a running brain with AI and fake Google")]
+    public async Task GivenAiAndGoogle()
+        => world.Simulation = await BrainSimulation.StartAsync(new()
+        {
+            Modules = new([typeof(AIModule), typeof(GoogleModule)]),
+            ConfigureSilo = ScriptedAi.Configure(world),
+            Configuration = new Dictionary<string, string?> { ["DigitalBrain:Fakes:Enabled"] = "true" },
+        });
+
     [Given("a running brain with AI")]
     public async Task GivenAi()
         => world.Simulation = await BrainSimulation.StartAsync(new()
@@ -80,6 +90,13 @@ public sealed class AiSteps(BrainWorld world, BrainSteps brain)
             results.Any(result => result.Contains(fragment, StringComparison.Ordinal)),
             $"no tool result contained '{fragment}'; results were: {string.Join(" | ", results)}");
     }
+
+    [Then(@"the scripted model received no tool result containing ""(.*)""")]
+    public void ThenNoToolResult(string fragment)
+        => Assert.All(
+            world.Scripted.Calls.SelectMany(call => call)
+                .SelectMany(message => message.Contents.OfType<FunctionResultContent>()),
+            result => Assert.DoesNotContain(fragment, result.Result?.ToString() ?? "", StringComparison.Ordinal));
 
     [Then(@"the scripted model saw (\d+) conversations with (\d+) user message each")]
     public void ThenConversations(int conversations, int userMessages)

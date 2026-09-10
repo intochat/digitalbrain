@@ -1,5 +1,3 @@
-using System.Text.Json;
-using System.Text.Json.Serialization.Metadata;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Signals;
@@ -27,7 +25,7 @@ internal sealed class RepositoryNeuron(
             ArgumentOutOfRangeException.ThrowIfLessThan(arguments.RepositoryId, 1);
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.RepositoryOwner);
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.RepositoryName);
-            var work = Schedule(CreateSignal(GitHubSignals.RepositoryConnected, arguments, GitHubJson.Default.ConnectRepository));
+            var work = Schedule(Signal.FromJson(GitHubSignals.RepositoryConnected, arguments, GitHubJson.Default.ConnectRepository));
             return new Accepted<RepositoryView>(View(), work);
         });
 
@@ -43,7 +41,7 @@ internal sealed class RepositoryNeuron(
             {
                 ArgumentOutOfRangeException.ThrowIfLessThan(number, 1);
             }
-            var work = Schedule(CreateSignal(GitHubSignals.RepositoryRefreshRequested, arguments, GitHubJson.Default.RefreshRepository));
+            var work = Schedule(Signal.FromJson(GitHubSignals.RepositoryRefreshRequested, arguments, GitHubJson.Default.RefreshRepository));
             return new Accepted<RepositoryView>(View(), work);
         });
 
@@ -86,7 +84,11 @@ internal sealed class RepositoryNeuron(
         switch (delivery.Signal.Type)
         {
             case GitHubSignals.RepositoryConnected:
-                var command = JsonSerializer.Deserialize(delivery.Signal.Body, GitHubJson.Default.ConnectRepository)!;
+                if (Body(delivery, GitHubJson.Default.ConnectRepository) is not { } command)
+                {
+                    return;
+                }
+
                 var binding = Binding;
                 binding.RequireEnabled();
                 if (command.AppId != binding.AppId || command.InstallationId != binding.InstallationId
@@ -99,10 +101,20 @@ internal sealed class RepositoryNeuron(
                 number = null;
                 break;
             case GitHubSignals.RepositoryRefreshRequested:
-                number = JsonSerializer.Deserialize(delivery.Signal.Body, GitHubJson.Default.RefreshRepository)!.Number;
+                if (Body(delivery, GitHubJson.Default.RefreshRepository) is not { } refresh)
+                {
+                    return;
+                }
+
+                number = refresh.Number;
                 break;
             case GitHubSignals.RepositoryEvent:
-                trigger = JsonSerializer.Deserialize(delivery.Signal.Body, GitHubJson.Default.RepositoryEvent)!;
+                if (Body(delivery, GitHubJson.Default.RepositoryEvent) is not { } repositoryEvent)
+                {
+                    return;
+                }
+
+                trigger = repositoryEvent;
                 number = trigger.Number;
                 break;
             default:
@@ -121,7 +133,7 @@ internal sealed class RepositoryNeuron(
         {
             await SaveAsync(next with { Revoked = true }, cancellationToken).ConfigureAwait(true);
             Binding.Revoke();
-            await FireAsync(CreateSignal(GitHubSignals.RepositoryAccessRevoked,
+            await FireAsync(Signal.FromJson(GitHubSignals.RepositoryAccessRevoked,
                 new RepositoryAccessRevoked(Binding.Id), GitHubJson.Default.RepositoryAccessRevoked), cancellationToken: cancellationToken).ConfigureAwait(true);
             return;
         }
@@ -138,7 +150,7 @@ internal sealed class RepositoryNeuron(
         await SaveAsync(next, cancellationToken).ConfigureAwait(true);
         foreach (var fact in facts)
         {
-            await FireAsync(CreateSignal(GitHubSignals.PullRequestChanged, fact, GitHubJson.Default.PullRequestChanged),
+            await FireAsync(Signal.FromJson(GitHubSignals.PullRequestChanged, fact, GitHubJson.Default.PullRequestChanged),
                 cancellationToken: cancellationToken).ConfigureAwait(true);
         }
     }
@@ -211,7 +223,4 @@ internal sealed class RepositoryNeuron(
 
     private RepositoryView View() => new(Id.Name, State is { BindingRevision: not null, Revoked: false },
         State?.Revoked ?? false, State?.PullRequests.Values.OrderBy(item => item.Number).ToArray() ?? [], State?.LastWebhookAt);
-
-    private static Signal CreateSignal<T>(string type, T body, JsonTypeInfo<T> json)
-        => Signal.Create(type, JsonSerializer.Serialize(body, json));
 }

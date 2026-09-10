@@ -9,6 +9,13 @@ internal static class DrainTelemetry
 {
     private static readonly ActivitySource Source = new("DigitalBrain");
 
+    internal static void BodyUnreadable(ILogger? logger, NeuronId neuron, string signalType, SignalId signal)
+        => logger?.LogWarning(
+            "Neuron {Neuron} signal {SignalType} {SignalId} body could not be read; the signal is journaled and ignored.",
+            neuron,
+            signalType,
+            signal);
+
     internal static void Failed(ILogger? logger, NeuronId neuron, SignalId signal, Exception failure)
     {
         using var activity = Source.StartActivity("db.drain.failed");

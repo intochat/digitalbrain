@@ -19,7 +19,7 @@ internal sealed class ChartNeuron(
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.Title);
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.ChartKind);
             ArgumentNullException.ThrowIfNull(arguments.Points);
-            var work = Schedule(UIBodies.Signal(UIVocabulary.ChartRendering, arguments, UIJson.Default.RenderChart));
+            var work = Schedule(Signal.FromJson(UIVocabulary.ChartRendering, arguments, UIJson.Default.RenderChart));
             return new Accepted<string>(Id.Name, work);
         });
 
@@ -28,7 +28,7 @@ internal sealed class ChartNeuron(
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.Title);
             ArgumentNullException.ThrowIfNull(arguments.Point);
-            var work = Schedule(UIBodies.Signal(UIVocabulary.ChartAppending, arguments, UIJson.Default.AppendChartPoint));
+            var work = Schedule(Signal.FromJson(UIVocabulary.ChartAppending, arguments, UIJson.Default.AppendChartPoint));
             return new Accepted<string>(Id.Name, work);
         });
 
@@ -41,11 +41,19 @@ internal sealed class ChartNeuron(
         switch (delivery.Signal.Type)
         {
             case UIVocabulary.ChartRendering:
-                var render = UIBodies.Read(delivery, UIJson.Default.RenderChart);
+                if (Body(delivery, UIJson.Default.RenderChart) is not { } render)
+                {
+                    return;
+                }
+
                 next = new ChartState(render.Title, render.ChartKind, render.Points);
                 break;
             case UIVocabulary.ChartAppending:
-                var append = UIBodies.Read(delivery, UIJson.Default.AppendChartPoint);
+                if (Body(delivery, UIJson.Default.AppendChartPoint) is not { } append)
+                {
+                    return;
+                }
+
                 var current = State ?? new ChartState(append.Title.Trim(), "line", []);
                 next = !string.IsNullOrWhiteSpace(append.Point.EventId)
                     && current.Points.Any(point => point.EventId == append.Point.EventId)
@@ -57,7 +65,7 @@ internal sealed class ChartNeuron(
         }
 
         await SaveAsync(next, cancellationToken).ConfigureAwait(true);
-        await FireAsync(UIBodies.Card(UIVocabulary.ChartRendered, Id.Name, next.Title),
+        await FireAsync(Signal.FromJson(UIVocabulary.ChartRendered, new KitCard(Id.Name, next.Title), UIJson.Default.KitCard),
             cancellationToken: cancellationToken).ConfigureAwait(true);
     }
 }

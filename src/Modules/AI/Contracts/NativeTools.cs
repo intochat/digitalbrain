@@ -1,4 +1,6 @@
+using DigitalBrain.AI.Interactions;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.AI;
 
@@ -7,6 +9,7 @@ namespace DigitalBrain.AI;
 public sealed class NativeTools
 {
     private readonly Lazy<IReadOnlyDictionary<string, AIFunction>> _functions;
+    private readonly Lazy<IUntrustedContentScreen?> _screen;
 
     public NativeTools(IEnumerable<INativeToolContributor> contributors, IServiceProvider services)
     {
@@ -27,6 +30,7 @@ public sealed class NativeTools
 
             return functions;
         });
+        _screen = new(services.GetService<IUntrustedContentScreen>);
     }
 
     public bool Contains(string name) => _functions.Value.ContainsKey(name);
@@ -39,7 +43,8 @@ public sealed class NativeTools
             // Dropping a contributing module must not stop agents that once used it.
             if (_functions.Value.TryGetValue(name, out var function))
             {
-                yield return function;
+                // Native results are external content; brain operations and typed neurons return our own data.
+                yield return _screen.Value is { } screen ? new ScreenedFunction(function, screen) : function;
             }
         }
     }

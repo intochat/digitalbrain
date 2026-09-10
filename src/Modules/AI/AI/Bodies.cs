@@ -12,7 +12,7 @@ internal sealed record InstructBody(
     string? Manager,
     int Rounds);
 
-// Signal bodies are JSON, not C# types. These helpers read the shapes documented in
+// These tolerant readers read the JSON shapes documented in
 // AIVocabulary and never throw on a missing or mistyped field: a body the module does not
 // understand reads as empty rather than as a failed turn.
 internal static class Bodies
@@ -20,11 +20,6 @@ internal static class Bodies
     private static readonly string[] None = [];
 
     internal static string Text(string body) => String(Parse(body), "text") ?? string.Empty;
-
-    internal static string Write(string text) => new JsonObject { ["text"] = text }.ToJsonString();
-
-    internal static string Said(string author, string text)
-        => new JsonObject { ["author"] = author, ["text"] = text }.ToJsonString();
 
     // One transcript line as the model reads it: "{author}: {text}".
     internal static string SaidLine(string body)

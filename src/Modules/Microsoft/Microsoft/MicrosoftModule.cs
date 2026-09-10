@@ -1,3 +1,4 @@
+using DigitalBrain.AI;
 using DigitalBrain.Core;
 using DigitalBrain.Microsoft.GitHub;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,7 +24,10 @@ public sealed class MicrosoftModule : IModule
             settings = new(project, configuration["ApplicationName"] ?? "DigitalBrain", configuration["Command"] ?? "aspire");
         }
         builder.Services.AddSingleton(new AspireConnection(settings));
-        // NativeTools contributor lands after the AI module merge
+        if (settings is not null)
+        {
+            builder.Services.AddNativeTool("aspire_read", services => services.GetRequiredService<AspireNativeTools>().CreateRead());
+        }
         builder.Services.AddSingleton<AspireNativeTools>();
         GitHubModule.Configure(builder);
     }

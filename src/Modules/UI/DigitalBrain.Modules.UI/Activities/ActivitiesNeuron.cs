@@ -25,7 +25,11 @@ internal sealed class ActivitiesNeuron(
             return;
         }
 
-        var fact = UIBodies.Read(delivery, UIJson.Default.ActivityExecutionChanged);
+        if (Body(delivery, UIJson.Default.ActivityExecutionChanged) is not { } fact)
+        {
+            return;
+        }
+
         // An unknown phase is vocabulary this module does not speak: journalled and ignored,
         // because throwing would retry the same fact forever.
         if (fact.Phase is not ("running" or "waiting" or "completed" or "failed" or "cancelled" or "observed"))
@@ -47,7 +51,7 @@ internal sealed class ActivitiesNeuron(
         }
         // An earlier delivery can have committed state before an observer failed.
         // Retrying republishes the same version without applying the fact twice.
-        await FireAsync(UIBodies.Signal(UIVocabulary.ActivityChanged, new ActivityChanged(activity.View()), UIJson.Default.ActivityChanged),
+        await FireAsync(Signal.FromJson(UIVocabulary.ActivityChanged, new ActivityChanged(activity.View()), UIJson.Default.ActivityChanged),
             cancellationToken: cancellationToken).ConfigureAwait(true);
     }
 }

@@ -17,7 +17,7 @@ internal sealed class TranscriptNeuron(
         => ExecuteCommandAsync(Descriptor("append"), command, UIJson.Default.AppendTranscript, UIJson.Default.AcceptedString, arguments =>
         {
             ArgumentNullException.ThrowIfNull(arguments.Entry);
-            var work = Schedule(UIBodies.Signal(UIVocabulary.TranscriptAppending, arguments, UIJson.Default.AppendTranscript));
+            var work = Schedule(Signal.FromJson(UIVocabulary.TranscriptAppending, arguments, UIJson.Default.AppendTranscript));
             return new Accepted<string>(Id.Name, work);
         });
 
@@ -31,7 +31,11 @@ internal sealed class TranscriptNeuron(
             return;
         }
 
-        var command = UIBodies.Read(delivery, UIJson.Default.AppendTranscript);
+        if (Body(delivery, UIJson.Default.AppendTranscript) is not { } command)
+        {
+            return;
+        }
+
         await SaveAsync(new TranscriptState(BoundedList.Append(State?.Entries ?? [], command.Entry, 500)),
             cancellationToken).ConfigureAwait(true);
     }

@@ -97,7 +97,7 @@ internal sealed class ChatNeuron(
         if (participants.Count < 2)
         {
             await FireAsync(
-                Signal.Create(AIVocabulary.Reply, Bodies.Write(NeedsParticipants)),
+                Signal.FromJson(AIVocabulary.Reply, new TextBody(NeedsParticipants), AIJson.Default.TextBody),
                 delivery.Source,
                 delivery.CorrelationId,
                 cancellationToken).ConfigureAwait(true);
@@ -180,7 +180,7 @@ internal sealed class ChatNeuron(
         // The retry reads the marker, not the journal, to avoid answering the same conversation twice.
         if (!run.ReplyFired)
         {
-            await FireAsync(Signal.Create(AIVocabulary.Reply, Bodies.Write(text)), asker, correlation, cancellationToken).ConfigureAwait(true);
+            await FireAsync(Signal.FromJson(AIVocabulary.Reply, new TextBody(text), AIJson.Default.TextBody), asker, correlation, cancellationToken).ConfigureAwait(true);
             await SaveRunAsync(run with { ReplyFired = true }, cancellationToken).ConfigureAwait(true);
         }
 
@@ -319,6 +319,6 @@ internal sealed class ChatNeuron(
             await SaveRunAsync(run, cancellationToken, remove: true).ConfigureAwait(true);
         }
 
-        await FireAsync(Signal.Create(AIVocabulary.Reply, Bodies.Write(text)), asker, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
+        await FireAsync(Signal.FromJson(AIVocabulary.Reply, new TextBody(text), AIJson.Default.TextBody), asker, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
     }
 }

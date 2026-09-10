@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Serialization.Metadata;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Signals;
@@ -27,7 +26,7 @@ internal sealed class SalesforceNeuron(
             }
             var expiry = SalesforceTokenRefresh.Expiry(arguments.ExpiresInSeconds, TimeProvider);
             var receipt = new SalesforceConnection(true, arguments.InstanceUrl, expiry);
-            var work = Schedule(CreateSignal(SalesforceSignals.SalesforceConnectionRequested, arguments, SalesforceJson.Default.ConnectSalesforceAccount));
+            var work = Schedule(Signal.FromJson(SalesforceSignals.SalesforceConnectionRequested, arguments, SalesforceJson.Default.ConnectSalesforceAccount));
             return new Accepted<SalesforceConnection>(receipt, work);
         });
 
@@ -38,14 +37,14 @@ internal sealed class SalesforceNeuron(
             {
                 throw new SalesforceNotConnectedException();
             }
-            var work = Schedule(CreateSignal(SalesforceSignals.SalesforceRefreshRequested, arguments, SalesforceJson.Default.RefreshSalesforceConnection));
+            var work = Schedule(Signal.FromJson(SalesforceSignals.SalesforceRefreshRequested, arguments, SalesforceJson.Default.RefreshSalesforceConnection));
             return new Accepted<SalesforceConnection>(Connection(), work);
         });
 
     public Task<Accepted<SalesforceConnection>> Disconnect(DisconnectSalesforce command) => ExecuteCommandAsync(
         Descriptor("disconnect"), command, SalesforceJson.Default.DisconnectSalesforce, SalesforceJson.Default.AcceptedSalesforceConnection, arguments =>
         {
-            var work = Schedule(CreateSignal(SalesforceSignals.SalesforceDisconnectionRequested, arguments, SalesforceJson.Default.DisconnectSalesforce));
+            var work = Schedule(Signal.FromJson(SalesforceSignals.SalesforceDisconnectionRequested, arguments, SalesforceJson.Default.DisconnectSalesforce));
             return new Accepted<SalesforceConnection>(new(false, null, null), work);
         });
 
@@ -75,7 +74,7 @@ internal sealed class SalesforceNeuron(
             }
             var preview = new SalesforceWritePreview(arguments.Id.ToString(), arguments.Tool, "", arguments.Arguments,
                 TimeProvider.GetUtcNow().AddMinutes(10));
-            var work = Schedule(CreateSignal(SalesforceSignals.SalesforceWriteRequested,
+            var work = Schedule(Signal.FromJson(SalesforceSignals.SalesforceWriteRequested,
                 new SalesforceWriteRequested(preview, connection.InstanceUrl!), SalesforceJson.Default.SalesforceWriteRequested));
             return new Accepted<SalesforceWritePreview>(preview, work);
         });
@@ -89,7 +88,7 @@ internal sealed class SalesforceNeuron(
             {
                 throw new SalesforceUnavailableException("The Salesforce preview expired or changed. Prepare a fresh preview.");
             }
-            var work = Schedule(CreateSignal(SalesforceSignals.SalesforceWriteConfirmed,
+            var work = Schedule(Signal.FromJson(SalesforceSignals.SalesforceWriteConfirmed,
                 new SalesforceWriteConfirmed(preview.PreviewId, preview.ToolSchemaHash), SalesforceJson.Default.SalesforceWriteConfirmed));
             return new Accepted<SalesforceWritePreview>(preview, work);
         });
@@ -125,7 +124,11 @@ internal sealed class SalesforceNeuron(
         switch (delivery.Signal.Type)
         {
             case SalesforceSignals.SalesforceConnectionRequested:
-                var account = JsonSerializer.Deserialize(delivery.Signal.Body, SalesforceJson.Default.ConnectSalesforceAccount)!;
+                if (Body(delivery, SalesforceJson.Default.ConnectSalesforceAccount) is not { } account)
+                {
+                    return;
+                }
+
                 if (!handoff.TryRedeem(account.Nonce, out var tokens))
                 {
                     await RejectConnectionAsync(new TokenHandoffExpiredException().Message, cancellationToken).ConfigureAwait(true);
@@ -147,7 +150,7 @@ internal sealed class SalesforceNeuron(
                 await SaveAsync(new SalesforceState(tokens.AccessToken,
                     tokens.RefreshToken ?? (State?.InstanceUrl == account.InstanceUrl ? State.RefreshToken : null),
                     delivery.Timestamp.AddSeconds(account.ExpiresInSeconds), account.InstanceUrl), cancellationToken).ConfigureAwait(true);
-                await FireAsync(CreateSignal(SalesforceSignals.SalesforceConnected, new SalesforceConnected(Connection()),
+                await FireAsync(Signal.FromJson(SalesforceSignals.SalesforceConnected, new SalesforceConnected(Connection()),
                     SalesforceJson.Default.SalesforceConnected), cancellationToken: cancellationToken).ConfigureAwait(true);
                 break;
             case SalesforceSignals.SalesforceRefreshRequested:
@@ -168,16 +171,20 @@ internal sealed class SalesforceNeuron(
                     return;
                 }
                 await SaveAsync(refreshed, cancellationToken).ConfigureAwait(true);
-                await FireAsync(CreateSignal(SalesforceSignals.SalesforceRefreshed, new SalesforceRefreshed(Connection()),
+                await FireAsync(Signal.FromJson(SalesforceSignals.SalesforceRefreshed, new SalesforceRefreshed(Connection()),
                     SalesforceJson.Default.SalesforceRefreshed), cancellationToken: cancellationToken).ConfigureAwait(true);
                 break;
             case SalesforceSignals.SalesforceDisconnectionRequested:
                 await SaveAsync(new SalesforceState(), cancellationToken).ConfigureAwait(true);
-                await FireAsync(CreateSignal(SalesforceSignals.SalesforceDisconnected, new SalesforceDisconnected(),
+                await FireAsync(Signal.FromJson(SalesforceSignals.SalesforceDisconnected, new SalesforceDisconnected(),
                     SalesforceJson.Default.SalesforceDisconnected), cancellationToken: cancellationToken).ConfigureAwait(true);
                 break;
             case SalesforceSignals.SalesforceWriteRequested:
-                var requested = JsonSerializer.Deserialize(delivery.Signal.Body, SalesforceJson.Default.SalesforceWriteRequested)!;
+                if (Body(delivery, SalesforceJson.Default.SalesforceWriteRequested) is not { } requested)
+                {
+                    return;
+                }
+
                 string hash;
                 try
                 {
@@ -194,11 +201,16 @@ internal sealed class SalesforceNeuron(
                 }
                 var preview = requested.Preview with { ToolSchemaHash = hash, ExpiresAt = TimeProvider.GetUtcNow().AddMinutes(10) };
                 await SaveAsync(State! with { PendingWrite = preview }, cancellationToken).ConfigureAwait(true);
-                await FireAsync(CreateSignal(SalesforceSignals.SalesforceWritePrepared, new SalesforceWritePrepared(preview),
+                await FireAsync(Signal.FromJson(SalesforceSignals.SalesforceWritePrepared, new SalesforceWritePrepared(preview),
                     SalesforceJson.Default.SalesforceWritePrepared), cancellationToken: cancellationToken).ConfigureAwait(true);
                 break;
             case SalesforceSignals.SalesforceWriteConfirmed:
-                await SubmitWriteAsync(JsonSerializer.Deserialize(delivery.Signal.Body, SalesforceJson.Default.SalesforceWriteConfirmed)!, cancellationToken).ConfigureAwait(true);
+                if (Body(delivery, SalesforceJson.Default.SalesforceWriteConfirmed) is not { } confirmed)
+                {
+                    return;
+                }
+
+                await SubmitWriteAsync(confirmed, cancellationToken).ConfigureAwait(true);
                 break;
         }
     }
@@ -227,13 +239,13 @@ internal sealed class SalesforceNeuron(
                 State!.AccessToken!, cancellationToken).ConfigureAwait(true);
             if (result.TryGetProperty("isError", out var error) && error.ValueKind == JsonValueKind.True)
             {
-                outcome = CreateSignal(SalesforceSignals.SalesforceWriteFailed, new SalesforceWriteFailed(preview.PreviewId),
+                outcome = Signal.FromJson(SalesforceSignals.SalesforceWriteFailed, new SalesforceWriteFailed(preview.PreviewId),
                     SalesforceJson.Default.SalesforceWriteFailed);
             }
             else
             {
                 var recordId = result.TryGetProperty("id", out var id) ? id.GetString() : null;
-                outcome = CreateSignal(SalesforceSignals.RecordWritten, new RecordWritten(preview with { RecordId = recordId }),
+                outcome = Signal.FromJson(SalesforceSignals.RecordWritten, new RecordWritten(preview with { RecordId = recordId }),
                     SalesforceJson.Default.RecordWritten);
             }
         }
@@ -252,7 +264,7 @@ internal sealed class SalesforceNeuron(
     }
 
     private Task FireUncertainAsync(string previewId, CancellationToken cancellationToken)
-        => FireAsync(CreateSignal(SalesforceSignals.SalesforceWriteUncertain, new SalesforceWriteUncertain(previewId),
+        => FireAsync(Signal.FromJson(SalesforceSignals.SalesforceWriteUncertain, new SalesforceWriteUncertain(previewId),
             SalesforceJson.Default.SalesforceWriteUncertain), cancellationToken: cancellationToken);
 
     private async Task<string> ReadWriteSchemaAsync(string tool, CancellationToken cancellationToken)
@@ -271,11 +283,8 @@ internal sealed class SalesforceNeuron(
     }
 
     private Task RejectConnectionAsync(string reason, CancellationToken cancellationToken)
-        => FireAsync(CreateSignal(SalesforceSignals.SalesforceConnectionRejected, new SalesforceConnectionRejected(reason),
+        => FireAsync(Signal.FromJson(SalesforceSignals.SalesforceConnectionRejected, new SalesforceConnectionRejected(reason),
             SalesforceJson.Default.SalesforceConnectionRejected), cancellationToken: cancellationToken);
-
-    private static Signal CreateSignal<T>(string type, T body, JsonTypeInfo<T> json)
-        => Signal.Create(type, JsonSerializer.Serialize(body, json));
 
     private SalesforceState RequireConnection()
     {

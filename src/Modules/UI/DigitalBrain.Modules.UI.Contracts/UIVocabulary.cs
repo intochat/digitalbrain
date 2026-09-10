@@ -67,10 +67,10 @@ public static class UIVocabulary
     public const string TurnCancelling = "TurnCancelling";
 
     // { ...OpenSurface... }
-    public const string Opening = "Opening";
+    public const string SurfaceOpening = "SurfaceOpening";
 
     // { ...ActivateControl... }
-    public const string Activating = "Activating";
+    public const string SurfaceActivating = "SurfaceActivating";
 
     // { ...RenderChart... }
     public const string ChartRendering = "ChartRendering";

@@ -1,3 +1,6 @@
+using DigitalBrain.AI;
+using Microsoft.Extensions.DependencyInjection;
+
 namespace DigitalBrain.Excel;
 
 public sealed class ExcelModule : Core.IModule
@@ -5,6 +8,7 @@ public sealed class ExcelModule : Core.IModule
     public void Configure(ISiloBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        // NativeTools contributor lands after the AI module merge
+        builder.Services.AddSingleton<ExcelNativeTools>();
+        builder.Services.AddNativeTool("show_spreadsheet", services => services.GetRequiredService<ExcelNativeTools>().Create());
     }
 }

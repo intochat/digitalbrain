@@ -1,4 +1,3 @@
-using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Identity;
@@ -39,7 +38,7 @@ internal sealed class MemoryNeuron : Neuron<MemoryState>, IMemory
             }
 
             var body = new RememberingBody(arguments.Namespace, arguments.Key, arguments.Text, arguments.Tags, arguments.Payload);
-            var work = Schedule(Signal.Create(MemorySignals.Remembering, JsonSerializer.Serialize(body, MemoryJson.Default.RememberingBody)));
+            var work = Schedule(Signal.FromJson(MemorySignals.MemoryRemembering, body, MemoryJson.Default.RememberingBody));
             return new Accepted<MemoryKey>(key, work);
         });
 
@@ -47,7 +46,7 @@ internal sealed class MemoryNeuron : Neuron<MemoryState>, IMemory
         Descriptor("forget"), command, MemoryJson.Default.Forget, MemoryJson.Default.AcceptedMemoryKey, arguments =>
         {
             var key = RequireWritableKey(arguments.Id, arguments.Namespace, arguments.Key);
-            var work = Schedule(Signal.Create(MemorySignals.Forgetting, JsonSerializer.Serialize(key, MemoryJson.Default.MemoryKey)));
+            var work = Schedule(Signal.FromJson(MemorySignals.MemoryForgetting, key, MemoryJson.Default.MemoryKey));
             return new Accepted<MemoryKey>(key, work);
         });
 
@@ -73,9 +72,13 @@ internal sealed class MemoryNeuron : Neuron<MemoryState>, IMemory
     {
         switch (delivery.Signal.Type)
         {
-            case MemorySignals.Remembering:
+            case MemorySignals.MemoryRemembering:
                 {
-                    var body = JsonSerializer.Deserialize(delivery.Signal.Body, MemoryJson.Default.RememberingBody)!;
+                    if (Body(delivery, MemoryJson.Default.RememberingBody) is not { } body)
+                    {
+                        return;
+                    }
+
                     var (embeddings, store) = RequireDependencies();
                     var generated = await embeddings.GenerateAsync([body.Text], cancellationToken: cancellationToken).ConfigureAwait(true);
                     await store.UpsertAsync(new VectorMemoryEntry(Id.Name, body.Namespace, body.Key, body.Text, body.Tags,
@@ -83,18 +86,22 @@ internal sealed class MemoryNeuron : Neuron<MemoryState>, IMemory
                     await SaveAsync(new MemoryState((State?.RememberedCount ?? 0) + 1, State?.ForgottenCount ?? 0,
                         TimeProvider.GetUtcNow()), cancellationToken).ConfigureAwait(true);
                     var key = new MemoryKey(body.Namespace, body.Key);
-                    await FireAsync(Signal.Create(MemorySignals.Remembered, JsonSerializer.Serialize(key, MemoryJson.Default.MemoryKey)),
+                    await FireAsync(Signal.FromJson(MemorySignals.Remembered, key, MemoryJson.Default.MemoryKey),
                         to: null, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
                     break;
                 }
-            case MemorySignals.Forgetting:
+            case MemorySignals.MemoryForgetting:
                 {
-                    var key = JsonSerializer.Deserialize(delivery.Signal.Body, MemoryJson.Default.MemoryKey)!;
+                    if (Body(delivery, MemoryJson.Default.MemoryKey) is not { } key)
+                    {
+                        return;
+                    }
+
                     var (_, store) = RequireDependencies();
                     await store.RemoveAsync(Id.Name, key.Namespace, key.Key, cancellationToken).ConfigureAwait(true);
                     await SaveAsync(new MemoryState(State?.RememberedCount ?? 0, (State?.ForgottenCount ?? 0) + 1,
                         TimeProvider.GetUtcNow()), cancellationToken).ConfigureAwait(true);
-                    await FireAsync(Signal.Create(MemorySignals.Forgotten, JsonSerializer.Serialize(key, MemoryJson.Default.MemoryKey)),
+                    await FireAsync(Signal.FromJson(MemorySignals.Forgotten, key, MemoryJson.Default.MemoryKey),
                         to: null, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
                     break;
                 }

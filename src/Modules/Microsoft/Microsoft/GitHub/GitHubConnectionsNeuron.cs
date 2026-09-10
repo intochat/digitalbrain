@@ -1,4 +1,3 @@
-using System.Text.Json;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Signals;
@@ -29,8 +28,8 @@ internal sealed class GitHubConnectionsNeuron(NeuronRuntime runtime,
             }
             var record = new GitHubConnectionRecord(arguments.ConnectionId, arguments.AppId, arguments.InstallationId,
                 arguments.RepositoryId, arguments.RepositoryOwner, arguments.RepositoryName, arguments.Epoch);
-            var work = Schedule(Signal.Create(GitHubSignals.GitHubConnectionRegistered,
-                JsonSerializer.Serialize(record, GitHubJson.Default.GitHubConnectionRecord)));
+            var work = Schedule(Signal.FromJson(GitHubSignals.GitHubConnectionRegistered,
+                record, GitHubJson.Default.GitHubConnectionRecord));
             return new Accepted<GitHubConnectionRecord>(record, work);
         });
 
@@ -42,7 +41,11 @@ internal sealed class GitHubConnectionsNeuron(NeuronRuntime runtime,
         {
             return;
         }
-        var record = JsonSerializer.Deserialize(delivery.Signal.Body, GitHubJson.Default.GitHubConnectionRecord)!;
+        if (Body(delivery, GitHubJson.Default.GitHubConnectionRecord) is not { } record)
+        {
+            return;
+        }
+
         var items = State?.Connections.Where(item => item.Id != record.Id).ToList() ?? [];
         if (items.Count >= 256)
         {
