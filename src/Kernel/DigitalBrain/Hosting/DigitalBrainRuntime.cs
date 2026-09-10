@@ -14,6 +14,17 @@ public static class DigitalBrainRuntime
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(modules);
 
+        builder.AddStartupTask(static (services, _) =>
+        {
+            if (services.GetService<Orleans.IReminderTable>() is null)
+            {
+                throw new InvalidOperationException(
+                    "Neurons hold a retry reminder for pending work. Configure UseAzureTableReminderService for a real host or UseInMemoryReminderService for a test host.");
+            }
+
+            return Task.CompletedTask;
+        });
+
         builder.AddJournalStorage();
         builder.AddActivityPropagation();
         builder.UseJsonJournalFormat(DurableStateJson.TypeInfoResolver);

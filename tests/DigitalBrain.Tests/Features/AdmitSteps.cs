@@ -18,6 +18,14 @@ public sealed class AdmitSteps(BrainSteps brain, BrainWorld world)
     {
         world.Fixtures[name] = new NeuronId("slow", name);
         FixtureSwitches.Cancelled[name] = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        FixtureSwitches.Release[name] = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    [When(@"the slow reaction on ""(.*)"" is released")]
+    public static void ReleaseSlow(string name)
+    {
+        // Flipping an in-process switch is not traffic: it makes no grain call and activates nothing.
+        FixtureSwitches.Release[name].TrySetResult();
     }
 
     [Given(@"a throwing ""(.*)"" whose reaction fails (\d+) times then succeeds")]

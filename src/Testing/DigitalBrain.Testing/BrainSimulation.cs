@@ -57,23 +57,17 @@ public sealed class BrainSimulation : IAsyncDisposable
             silo.Services.Configure<ReminderOptions>(reminders => reminders.MinimumReminderPeriod = TimeSpan.FromSeconds(1));
             // Seconds prove a cold restart within a test's patience; Orleans skips ticks missed while the cluster is down.
             silo.Services.AddSingleton(new NeuronOptions { RetryReminderPeriod = TimeSpan.FromSeconds(2) });
-        }
-        else
-        {
-            silo.Services.AddSingleton<IJournalStorageProvider, VolatileJournalStorageProvider>();
-            silo.UseInMemoryReminderService();
-        }
-        DigitalBrainRuntime.Add(silo, options.Modules);
-        if (!string.IsNullOrWhiteSpace(options.PersistenceDirectory))
-        {
             silo.Services.AddKeyedSingleton<IGrainStorage>(DigitalBrainNames.DefaultGrainStorage,
                 (services, _) => new FileGrainStorage(options.PersistenceDirectory,
                     services.GetRequiredService<Orleans.Serialization.Serializer>()));
         }
         else
         {
+            silo.Services.AddSingleton<IJournalStorageProvider, VolatileJournalStorageProvider>();
+            silo.UseInMemoryReminderService();
             silo.AddMemoryGrainStorage(DigitalBrainNames.DefaultGrainStorage);
         }
+        DigitalBrainRuntime.Add(silo, options.Modules);
         options.ConfigureSilo?.Invoke(silo);
     }
 

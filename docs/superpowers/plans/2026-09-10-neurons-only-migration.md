@@ -45,7 +45,7 @@ src/Kernel/DigitalBrain/                    runtime
   Hosting/{DigitalBrainRuntime,ModuleAssemblies,ModelPayloadSerialization}.cs
   Neuron/{Neuron,NeuronOfState,PlainNeuron,NeuronRuntime,NeuronConcurrency,INeuronInbox,DrainTelemetry}.cs
   Neuron/{JournalWindow,JournalEntry,NeuronJournals,NeuronSynapses}.cs
-  Neuron/{PendingWork,ReactionContext,RetryTimer}.cs
+  Neuron/{PendingWork,ReactionContext,RetryScheduler}.cs
   Commands/{CommandExecution,CommandJournal,CommandDedup,CommandReconciliation}.cs
   Persistence/{PersistenceFence,BudgetedJournalStorage}.cs
   Context/{CallerContext,OutgoingCallerFilter,CommandLocalityFilter}.cs
@@ -87,7 +87,7 @@ Modules keep `src/Modules/<Name>/{Contracts,<Name>,Aspire.Hosting}` with a vocab
 ### Task A2: Durable admission, pending queue, drain, retry, cancellation
 
 **Files:**
-- Modify: `Contracts/Neurons/INeuron.cs` (`Deliver` → `Task<DeliveryAdmission>`, add `CancelReaction`), `Contracts/Signals/DeliveryAdmission.cs` (new enum), `DigitalBrain/Neuron/Neuron.cs`, `NeuronRuntime.cs` (register `IDurableQueue<SignalDelivery>` "pending", `IDurableSet<SignalId>` "pending.cancelled", `IDurableList<SignalId>` "reacted" ring), new `Neuron/PendingWork.cs` (queue + cancelled set + reacted ring behind one class: `TryAdmit(delivery) → DeliveryAdmission`, `Peek()`, `Complete(id)`, `Cancel(id) → bool`, `IsCancelled(id)`), new `Neuron/RetryTimer.cs` (exponential 1 s→60 s, `Interleave=false`, `KeepAlive=true`, armed only while head failed), `Neuron/NeuronConcurrency.cs` (allow `[AlwaysInterleave]` on `INeuron.CancelReaction`), `Mcp/BrainOperations.cs` (`Fire` reports per-target admission), `Mcp/Requests.cs` (`FireResult` gains `Busy` count), `Mcp/BrainTools.cs` (new `cancel` tool).
+- Modify: `Contracts/Neurons/INeuron.cs` (`Deliver` → `Task<DeliveryAdmission>`, add `CancelReaction`), `Contracts/Signals/DeliveryAdmission.cs` (new enum), `DigitalBrain/Neuron/Neuron.cs`, `NeuronRuntime.cs` (register `IDurableQueue<SignalDelivery>` "pending", `IDurableSet<SignalId>` "pending.cancelled", `IDurableList<SignalId>` "reacted" ring), new `Neuron/PendingWork.cs` (queue + cancelled set + reacted ring behind one class: `TryAdmit(delivery) → DeliveryAdmission`, `Peek()`, `Complete(id)`, `Cancel(id) → bool`, `IsCancelled(id)`), new `Neuron/RetryScheduler.cs` (exponential 1 s→60 s, `Interleave=false`, `KeepAlive=true`, armed only while head failed), `Neuron/NeuronConcurrency.cs` (allow `[AlwaysInterleave]` on `INeuron.CancelReaction`), `Mcp/BrainOperations.cs` (`Fire` reports per-target admission), `Mcp/Requests.cs` (`FireResult` gains `Busy` count), `Mcp/BrainTools.cs` (new `cancel` tool).
 - Test: `tests/DigitalBrain.Tests/Features/admit.feature`, `cancel.feature`; modify `react.feature` (retry without traffic), `Fixtures.cs` (add `SlowNeuron` whose reaction awaits a `TaskCompletionSource` the test controls and observes its token; `ThrowingNeuron` whose reaction throws N times then succeeds).
 
 **Interfaces:**
@@ -141,18 +141,18 @@ Feature: Cancel
 ```
 
 - [ ] **Step 2:** Run `dotnet test tests/DigitalBrain.Tests --filter "FullyQualifiedName~Admit|FullyQualifiedName~Cancel"`; expected: fail on missing steps / members.
-- [ ] **Step 3:** Implement `PendingWork`, `RetryTimer`, `Deliver`, `Schedule`, `CancelReaction`, drain rewrite (peek → react → complete → persist; cancelled-head skip; failed-head retry timer; activation re-arm), `FireOutcome.Busy`. `Drain` clears `RequestContext` on entry.
+- [ ] **Step 3:** Implement `PendingWork`, `RetryScheduler`, `Deliver`, `Schedule`, `CancelReaction`, drain rewrite (peek → react → complete → persist; cancelled-head skip; failed-head retry timer; activation re-arm), `FireOutcome.Busy`. `Drain` clears `RequestContext` on entry.
 - [ ] **Step 4:** All features green. Existing `react.feature` scenario "Reactions run in journal order" still green.
 - [ ] **Step 5:** Commit: `feat(kernel): durable pending queue with admission, kernel cancellation and retry`.
 
 ### Task A2b: Retry liveness across a cold restart
 
 **Files:**
-- Modify: `DigitalBrain/Neuron/Neuron.cs` (implement `IRemindable`; register reminder `retry` when the head of `Pending` first fails, unregister when the head completes or is cancelled; `ReceiveReminder` only re-arms the drain), `DigitalBrain/Neuron/RetryTimer.cs` (owns the reminder handle alongside the timer), `Testing/BrainSimulation.cs` (+ new `Testing/FileReminderTable.cs`: an `IReminderTable` backed by a JSON file so reminders survive `RestartSiloAsync`; volatile mode keeps `UseInMemoryReminderService`), `tests/DigitalBrain.Tests/Features/admit.feature` restart scenario (the restart step must NOT touch the neuron; remove the `ReadPendingCount` workaround from the step), `Aspire/DigitalBrain.Aspire` (reminder service already wired for Azure; nothing to add).
+- Modify: `DigitalBrain/Neuron/Neuron.cs` (implement `IRemindable`; register reminder `retry` when the head of `Pending` first fails, unregister when the head completes or is cancelled; `ReceiveReminder` only re-arms the drain), `DigitalBrain/Neuron/RetryScheduler.cs` (owns the reminder handle alongside the timer), `Testing/BrainSimulation.cs` (+ new `Testing/FileReminderTable.cs`: an `IReminderTable` backed by a JSON file so reminders survive `RestartSiloAsync`; volatile mode keeps `UseInMemoryReminderService`), `tests/DigitalBrain.Tests/Features/admit.feature` restart scenario (the restart step must NOT touch the neuron; remove the `ReadPendingCount` workaround from the step), `Aspire/DigitalBrain.Aspire` (reminder service already wired for Azure; nothing to add).
 - Test: the existing restart scenario in `admit.feature`, unchanged text, now proven without traffic.
 
 **Interfaces:**
-- Consumes: A2 `PendingWork`, `RetryTimer`.
+- Consumes: A2 `PendingWork`, `RetryScheduler`.
 - Produces: nothing new on `INeuron`.
 
 - [ ] **Step 1:** Remove the read-on-restart workaround from the "the silo restarts" step; run the Admit restart scenario; expected: fails (pending count stays 1, no `Pong`).

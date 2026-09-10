@@ -61,6 +61,8 @@ public static class FixtureSwitches
     public static ConcurrentDictionary<string, int> ThrowingFailuresLeft { get; } = new(StringComparer.Ordinal);
 
     public static ConcurrentDictionary<string, TaskCompletionSource> Cancelled { get; } = new(StringComparer.Ordinal);
+
+    public static ConcurrentDictionary<string, TaskCompletionSource> Release { get; } = new(StringComparer.Ordinal);
 }
 
 // Throws on the first reaction to each entry while FlakyFailuresLeft[name] > 0, then echoes.
@@ -102,13 +104,16 @@ internal sealed class SlowNeuron(NeuronRuntime runtime) : Neuron(runtime)
     {
         try
         {
-            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            await FixtureSwitches.Release[Id.Name].Task.WaitAsync(cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             FixtureSwitches.Cancelled[Id.Name].TrySetResult();
             throw;
         }
+
+        // Pong lets tests observe the reaction from the firing neuron without touching the slow neuron.
+        await FireAsync(Signal.Create("Pong", delivery.Signal.Body), delivery.Source, delivery.CorrelationId, cancellationToken);
     }
 }
 

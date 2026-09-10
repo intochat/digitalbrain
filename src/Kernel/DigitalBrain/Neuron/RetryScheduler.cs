@@ -2,19 +2,22 @@ using Orleans.Runtime;
 
 namespace DigitalBrain.Core;
 
-internal sealed class RetryTimer(IGrainBase grain, Func<CancellationToken, Task> retry, TimeSpan period)
+internal sealed class RetryScheduler(IGrainBase grain, Func<CancellationToken, Task> retry, TimeSpan period)
 {
-    private const string ReminderName = "retry";
+    internal const string ReminderName = "retry";
 
     private IGrainTimer? _timer;
     private IGrainReminder? _reminder;
     private bool _tickObserved;
     private TimeSpan _delay = TimeSpan.FromSeconds(1);
 
-    internal async Task ArmAsync()
+    internal async Task EnsureReminderAsync()
     {
         _reminder ??= await grain.RegisterOrUpdateReminder(ReminderName, dueTime: period, period: period).ConfigureAwait(true);
+    }
 
+    internal void ArmTimer()
+    {
         if (_timer is not null)
         {
             return;
@@ -32,16 +35,15 @@ internal sealed class RetryTimer(IGrainBase grain, Func<CancellationToken, Task>
 
     internal void NoteTick() => _tickObserved = true;
 
-    internal async Task DisarmAsync()
+    internal async Task SettleAsync(bool anyPending)
     {
-        // Work that never failed never registered a reminder, so the hot path costs no lookup.
-        if (_reminder is not null || _tickObserved)
+        Suspend();
+        _delay = TimeSpan.FromSeconds(1);
+
+        if (!anyPending && (_reminder is not null || _tickObserved))
         {
             await RemoveReminderAsync().ConfigureAwait(true);
         }
-
-        Suspend();
-        _delay = TimeSpan.FromSeconds(1);
     }
 
     private async Task RemoveReminderAsync()
