@@ -135,11 +135,24 @@ snapshot facet.
   across restarts, with retries needing no new traffic. Loss means `Busy`, which the emitter
   sees. The incoming journal is history, not schedule.
 - Reactions may await reads, signal admission and I/O, but never wait for a downstream
-  reaction to complete.
-- Reactions are at-least-once and a snapshot save is not atomic with the pending queue: a
-  reaction that saved its snapshot and then lost the activation runs again on the retry and
-  must be idempotent against the state it already wrote (re-fire what has no reply yet, never
-  skip because the state says "done").
+  reaction to complete. A reaction catches only errors it can classify as permanent at the
+  operation that raises them (a bad grant, a rejected schema, a model refusal); transport,
+  persistence, delivery and timeout failures escape so the drain retries
+  (`TransientFailure.Covers` in the kernel Contracts is the shared predicate).
+- Reactions are at-least-once and a snapshot save is not atomic with the pending queue. The
+  kernel makes the common shape safe instead of asking every module to be clever:
+  `Neuron<TState>` stores its snapshot in an envelope `{State, AppliedBy, Announcements}`.
+  Inside a reaction, `Announce(signal, to?, correlation?)` buffers an outgoing signal with a
+  pre-minted `SignalId`; `SaveAsync(state)` writes state, `AppliedBy = the reacting delivery's
+  id` and the buffered announcements in one snapshot write. After the reaction, and again on
+  every activation, the kernel fires each stored announcement with its pre-minted id
+  (`Busy` keeps it for the retry scheduler; a duplicate fire is `Duplicate` at the receiver)
+  and removes it with a snapshot save once every target accepted. A retry whose head id equals
+  `AppliedBy` skips `ReceiveAsync` and only drains announcements. A reaction that must fire
+  before saving (a request whose reply it awaits) still uses `FireAsync` and must be
+  idempotent against its own state; everything that is "save then tell the graph" uses
+  `Announce`. `FireOutcome.Busy` from a required target is a transient failure, never a
+  success.
 
 ## 4. Commands
 
@@ -254,7 +267,7 @@ aliases`, `interface alias → MethodDescriptor[]`.
 | Methods | `[Alias]` required, unique per interface; `Task` or `Task<T>` only |
 | Args | one DTO deriving from `Command` for mutators; zero or one DTO for `[ReadOnly]`; optional trailing `CancellationToken` |
 | DTO fields | STJ source-generated context per Contracts assembly is the JSON contract; Orleans `[Id]`s are the wire contract |
-| Types | records, primitives, string enums, `NeuronId`, ids, `DateTimeOffset`, `IReadOnlyList<>` and nullable of these |
+| Types | records, primitives, string enums, `NeuronId`, ids, `DateTimeOffset`, `IReadOnlyList<>` and nullable of these; `JsonElement` only for deliberately opaque provider content |
 | JSON | `Task` → `null`; omitted field → default, `required` enforced; `null` only for nullable members; nullability enforced at invocation |
 | Summary | `<summary>` from the Contracts XML doc file when present |
 
