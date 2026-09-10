@@ -12,6 +12,7 @@ internal sealed class PendingWork
     private readonly IDurableQueue<SignalDelivery> _queue;
     private readonly IDurableSet<SignalId> _cancelled;
     private readonly IDurableList<SignalId> _reacted;
+    private readonly HashSet<SignalId> _queuedIds = [];
 
     internal PendingWork(IDurableQueue<SignalDelivery> queue, IDurableSet<SignalId> cancelled, IDurableList<SignalId> reacted)
     {
@@ -25,11 +26,20 @@ internal sealed class PendingWork
 
     internal int Count => _queue.Count;
 
+    internal void NoteReloaded()
+    {
+        _queuedIds.Clear();
+        foreach (var delivery in _queue)
+        {
+            _queuedIds.Add(delivery.SignalId);
+        }
+    }
+
     internal bool HasRoomFor(int staged) => Count + staged < MaxPending;
 
     internal DeliveryAdmission Classify(SignalDelivery delivery)
     {
-        if (_queue.Any(entry => entry.SignalId == delivery.SignalId) || _reacted.Contains(delivery.SignalId))
+        if (_queuedIds.Contains(delivery.SignalId) || _reacted.Contains(delivery.SignalId))
         {
             return DeliveryAdmission.Duplicate;
         }
@@ -42,7 +52,11 @@ internal sealed class PendingWork
         return DeliveryAdmission.Accepted;
     }
 
-    internal void Admit(SignalDelivery delivery) => _queue.Enqueue(delivery);
+    internal void Admit(SignalDelivery delivery)
+    {
+        _queue.Enqueue(delivery);
+        _queuedIds.Add(delivery.SignalId);
+    }
 
     internal HeadToken? Peek() => _queue.TryPeek(out var delivery) ? new HeadToken(delivery) : null;
 
@@ -55,6 +69,7 @@ internal sealed class PendingWork
         }
 
         _queue.Dequeue();
+        _queuedIds.Remove(id);
         _cancelled.Remove(id);
         // Cancelled work is finished too; remembering its id prevents admission on redelivery.
         _reacted.Add(id);
@@ -66,7 +81,7 @@ internal sealed class PendingWork
 
     internal bool Cancel(SignalId id)
     {
-        if (!_queue.Any(entry => entry.SignalId == id))
+        if (!_queuedIds.Contains(id))
         {
             return false;
         }

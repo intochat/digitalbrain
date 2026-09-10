@@ -24,6 +24,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     private readonly NeuronActivationComponents _components;
     private readonly PersistenceFence _fence;
     private readonly DescriptorTable _descriptors;
+    private readonly ILogger? _logger;
 
     private readonly CancellationTokenSource _activation = new();
     private readonly RetryScheduler _retry;
@@ -33,6 +34,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     protected Neuron(NeuronRuntime runtime)
     {
         ArgumentNullException.ThrowIfNull(runtime);
+        _logger = ServiceProvider.GetService<ILogger<Neuron>>();
         _descriptors = ServiceProvider.GetRequiredService<DescriptorTable>();
         _components = runtime.Bind(ServiceProvider, Id);
         _fence = new PersistenceFence(Id, StateManager, _activation.Token,
@@ -314,7 +316,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
             {
                 if (_components.Pending.IsCancelled(delivery.SignalId))
                 {
-                    DrainTelemetry.Cancelled(Logger, Id, delivery.SignalId);
+                    DrainTelemetry.Cancelled(_logger, Id, delivery.SignalId);
                     _components.Pending.CompleteHead(head);
                     await PersistAsync().ConfigureAwait(true);
                     await _retry.AfterDrainAsync().ConfigureAwait(true);
@@ -322,7 +324,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
                 }
                 else
                 {
-                    DrainTelemetry.Failed(Logger, Id, delivery.SignalId, failure);
+                    DrainTelemetry.Failed(_logger, Id, delivery.SignalId, failure);
                     await _fence.DiscardStagedChangesAsync(failure).ConfigureAwait(true);
                     _retry.ArmTimer();
                 }
@@ -492,8 +494,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         Wake();
         return Task.CompletedTask;
     }
-
-    private ILogger? Logger => ServiceProvider.GetService<ILogger<Neuron>>();
 
     // A one-way call to ourselves: it returns immediately and is queued behind the current turn.
     private void Wake() => GrainFactory.GetGrain<INeuronInbox>(this.GetGrainId()).Drain().Ignore();

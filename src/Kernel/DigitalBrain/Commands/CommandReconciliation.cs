@@ -11,10 +11,17 @@ internal static class CommandReconciliation
     // id re-executes as the next incarnation.
     internal static bool Reconcile(CommandJournal journal, CommandDedup dedup, DateTimeOffset at)
     {
-        var changed = false;
-        foreach (var (id, outcome) in dedup.Unresolved())
+        var unresolved = dedup.Unresolved();
+        if (unresolved.Count == 0)
         {
-            if (journal.HasTerminalRecord(id, outcome.Incarnation))
+            return false;
+        }
+
+        var terminal = journal.TerminalRecords();
+        var changed = false;
+        foreach (var (id, outcome) in unresolved)
+        {
+            if (terminal.Contains((id, outcome.Incarnation)))
             {
                 continue;
             }

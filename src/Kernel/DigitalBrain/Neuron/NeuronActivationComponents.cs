@@ -26,6 +26,8 @@ internal sealed record NeuronActivationComponents(
     {
         Journals.NoteReloaded();
         Commands.NoteReloaded();
+        Dedup.NoteReloaded();
+        Pending.NoteReloaded();
     }
 }
 

@@ -9,28 +9,74 @@ namespace DigitalBrain.Core;
 internal sealed class CommandDedup(IDurableDictionary<CommandId, CommandOutcome> outcomes)
 {
     internal const int MaxResolved = 1024;
+    private int _resolvedCount;
+    private int _unresolvedCount;
+
+    internal void NoteReloaded()
+    {
+        _resolvedCount = 0;
+        _unresolvedCount = 0;
+        foreach (var entry in outcomes)
+        {
+            if (entry.Value.Phase == CommandPhase.Attempted)
+            {
+                _unresolvedCount++;
+            }
+            else
+            {
+                _resolvedCount++;
+            }
+        }
+    }
 
     internal CommandOutcome? Find(CommandId id) => outcomes.TryGetValue(id, out var outcome) ? outcome : null;
 
     internal void Record(CommandId id, CommandOutcome outcome)
     {
+        var previous = Find(id);
         outcomes[id] = outcome;
+        if (previous is not null)
+        {
+            if (previous.Phase == CommandPhase.Attempted)
+            {
+                _unresolvedCount--;
+            }
+            else
+            {
+                _resolvedCount--;
+            }
+        }
+
         if (outcome.Phase == CommandPhase.Attempted)
         {
+            _unresolvedCount++;
             return;
         }
 
-        var resolved = outcomes.Where(entry => entry.Value.Phase != CommandPhase.Attempted)
-            .OrderBy(entry => entry.Value.Sequence).ToArray();
-        foreach (var entry in resolved.Take(Math.Max(0, resolved.Length - MaxResolved)))
+        _resolvedCount++;
+        if (_resolvedCount > MaxResolved)
         {
-            outcomes.Remove(entry.Key);
+            KeyValuePair<CommandId, CommandOutcome>? oldest = null;
+            foreach (var entry in outcomes)
+            {
+                if (entry.Value.Phase != CommandPhase.Attempted
+                    && (oldest is null || entry.Value.Sequence < oldest.Value.Value.Sequence))
+                {
+                    oldest = entry;
+                }
+            }
+
+            if (oldest is { } evicted)
+            {
+                outcomes.Remove(evicted.Key);
+                _resolvedCount--;
+            }
         }
     }
 
     // Unresolved outcomes are never evicted; the 1024 bound prevents unbounded growth when commands stop resolving.
     internal bool IsFullOfUnresolved
-        => UnresolvedEntries.Count() >= MaxResolved;
+        => _unresolvedCount >= MaxResolved;
 
     internal IReadOnlyList<KeyValuePair<CommandId, CommandOutcome>> Unresolved()
         => [.. UnresolvedEntries];

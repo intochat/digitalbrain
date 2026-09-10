@@ -52,18 +52,18 @@ internal sealed class CommandJournal
         return new(CommittedSequence, earliest, gap, delta);
     }
 
-    internal bool HasTerminalRecord(CommandId id, int incarnation)
+    internal HashSet<(CommandId Id, int Incarnation)> TerminalRecords()
     {
+        HashSet<(CommandId Id, int Incarnation)> terminal = [];
         for (var index = 0; index < _retained.Count; index++)
         {
             var record = _retained[index];
-            if (record.Id == id && record.Incarnation == incarnation
-                && record.Phase is CommandPhase.Completed or CommandPhase.Failed or CommandPhase.Unknown)
+            if (record.Phase is CommandPhase.Completed or CommandPhase.Failed or CommandPhase.Unknown)
             {
-                return true;
+                terminal.Add((record.Id, record.Incarnation));
             }
         }
 
-        return false;
+        return terminal;
     }
 }

@@ -13,6 +13,7 @@ internal sealed class BoundedJournal<T>(
 {
     private const int MaxRetainedEntries = 512;
     private const int MaxRetainedBytes = 512 * 1024;
+    private long _retainedBytes;
 
     internal int Count => retained.Count;
 
@@ -33,7 +34,11 @@ internal sealed class BoundedJournal<T>(
     // A completed write may only ever advance the committed cursor.
     internal void NoteCommitted(long boundarySequence) => CommittedSequence = Math.Max(CommittedSequence, boundarySequence);
 
-    internal void NoteReloaded() => CommittedSequence = LastSequence;
+    internal void NoteReloaded()
+    {
+        CommittedSequence = LastSequence;
+        _retainedBytes = retained.Sum(encoded => (long)encoded.Length);
+    }
 
     internal T this[int index]
     {
@@ -49,13 +54,14 @@ internal sealed class BoundedJournal<T>(
     {
         var sequence = LastSequence + 1;
         var entry = create(sequence);
-        retained.Add(entries.SerializeToArray(entry));
+        var encoded = entries.SerializeToArray(entry);
+        retained.Add(encoded);
+        _retainedBytes += encoded.Length;
         lastSequence.Value = sequence;
-        var retainedBytes = retained.Sum(encoded => (long)encoded.Length);
         while (retained.Count > MaxRetainedEntries
-            || (retainedBytes > MaxRetainedBytes && retained.Count > 1))
+            || (_retainedBytes > MaxRetainedBytes && retained.Count > 1))
         {
-            retainedBytes -= retained[0].Length;
+            _retainedBytes -= retained[0].Length;
             retained.RemoveAt(0);
         }
 
