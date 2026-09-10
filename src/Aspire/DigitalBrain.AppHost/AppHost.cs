@@ -3,6 +3,8 @@ using DigitalBrain.AI;
 using DigitalBrain.AI.Aspire.Hosting;
 using DigitalBrain.AI.FoundryLocal;
 using DigitalBrain.Aspire.Hosting;
+using DigitalBrain.UI;
+using DigitalBrain.UI.Aspire.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using OpenAIModels = DigitalBrain.AI.OpenAI;
@@ -50,7 +52,8 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
 
         ai.WithVoiceToText<IWhisperTiny>();
         ai.WithTavilySearch();
-    });
+    })
+    .AddModule<UIModule>(ui => ui.WithWindowHost());
 // Phase B: the module wiring these eight lines stand in for is in AppHost.cs at b225d085.
 // Phase B: .AddModule<MemoryModule>(memory => memory.WithQdrant())
 // Phase B: .AddModule<TimeModule>()
@@ -59,7 +62,6 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
 // Phase B: .AddModule<GoogleModule>(google => google.WithGmail())
 // Phase B: .AddModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
 // Phase B: .AddModule<MicrosoftModule>(microsoft => ...)
-// Phase B: .AddModule<UIModule>(ui => ui.WithWindowHost())
 
 // Isolated Aspire runs reuse the persistent Azurite volume while assigning new random silo
 // ports. A per-run development cluster avoids trying to contact a dead membership row from the

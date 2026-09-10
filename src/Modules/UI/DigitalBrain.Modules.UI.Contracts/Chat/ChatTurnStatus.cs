@@ -9,6 +9,4 @@ public enum ChatTurnStatus
     Completed = 2,
     Failed = 3,
     Cancelled = 4,
-    Cancelling = 5,
-    WaitingForUser = 6,
 }
