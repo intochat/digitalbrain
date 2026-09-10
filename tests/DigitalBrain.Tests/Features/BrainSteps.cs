@@ -4,6 +4,8 @@ using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Core;
 using DigitalBrain.Testing;
+using DigitalBrain.Memory;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Reqnroll;
 using Xunit;
@@ -110,11 +112,12 @@ public sealed class BrainSteps(BrainWorld world)
         var counterFixtureState = new CounterFixtureState();
         return BrainSimulation.StartAsync(new()
         {
-            Modules = new([]),
+            Modules = new([typeof(MemoryModule)]),
             PersistenceDirectory = persistenceDirectory,
             JournalFaults = journalFaults,
             ConfigureSilo = silo =>
             {
+                silo.Services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>, DeterministicEmbeddingGenerator>();
                 silo.Services.AddSingleton(counterFixtureState);
                 silo.Services.AddSingleton<ICommandCrashPoint, FixtureCommandCrashPoint>();
             },

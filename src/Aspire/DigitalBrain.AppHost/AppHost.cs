@@ -1,13 +1,15 @@
 using Aspire.Hosting;
 using DigitalBrain.Aspire.Hosting;
+using DigitalBrain.Memory;
+using DigitalBrain.Memory.Aspire.Hosting;
 using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain);
-// Phase B: the module wiring these nine lines stand in for is in AppHost.cs at b225d085.
+var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
+    .AddModule<MemoryModule>(memory => memory.WithQdrant());
+// Phase B: the module wiring these eight lines stand in for is in AppHost.cs at b225d085.
 // Phase B: .AddModule<AIModule>(ai => ...)
-// Phase B: .AddModule<MemoryModule>(memory => memory.WithQdrant())
 // Phase B: .AddModule<TimeModule>()
 // Phase B: .AddModule<ExcelModule>()
 // Phase B: .AddModule<ExecutionModule>()

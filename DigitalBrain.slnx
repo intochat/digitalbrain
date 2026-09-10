@@ -15,13 +15,11 @@
     <Project Path="src/Modules/AI/Sdk/DigitalBrain.Modules.AI.Sdk.csproj" />
   </Folder>
   -->
-  <!-- Phase B: restore from b225d085.
   <Folder Name="/Modules/Memory/">
     <Project Path="src/Modules/Memory/Aspire.Hosting/DigitalBrain.Modules.Memory.Aspire.Hosting.csproj" />
     <Project Path="src/Modules/Memory/Contracts/DigitalBrain.Modules.Memory.Contracts.csproj" />
     <Project Path="src/Modules/Memory/Memory/DigitalBrain.Modules.Memory.csproj" />
   </Folder>
-  -->
   <!-- Phase B: restore from b225d085.
   <Folder Name="/Modules/UI/">
     <Project Path="src/Modules/UI/DigitalBrain.Modules.UI.Aspire.Hosting/DigitalBrain.Modules.UI.Aspire.Hosting.csproj" />

@@ -3,7 +3,7 @@ namespace DigitalBrain.Memory;
 internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore
 {
     private readonly object _gate = new();
-    private readonly Dictionary<(string Owner, string Namespace, string Key), VectorMemoryEntry> _entries = new();
+    private readonly Dictionary<(string Name, string Namespace, string Key), VectorMemoryEntry> _entries = new();
 
     public Task UpsertAsync(VectorMemoryEntry entry, CancellationToken cancellationToken)
     {
@@ -11,24 +11,24 @@ internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore
         cancellationToken.ThrowIfCancellationRequested();
         lock (_gate)
         {
-            _entries[(entry.Owner, entry.Namespace, entry.Key)] = entry with
+            _entries[(entry.Name, entry.Namespace, entry.Key)] = entry with
             {
-                Metadata = SnapshotMetadata(entry.Metadata),
+                Tags = entry.Tags.ToArray(),
             };
         }
 
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyList<VectorMemoryMatch>> SearchAsync(
-        string owner,
+    public Task<IReadOnlyList<RecalledMemory>> SearchAsync(
+        string name,
         string @namespace,
         float[] queryEmbedding,
         int limit,
         IReadOnlyDictionary<string, string>? metadataFilter,
         CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(@namespace);
         ArgumentNullException.ThrowIfNull(queryEmbedding);
         ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
@@ -40,7 +40,7 @@ internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore
 
             foreach (var entry in _entries.Values)
             {
-                if (!string.Equals(entry.Owner, owner, StringComparison.Ordinal))
+                if (!string.Equals(entry.Name, name, StringComparison.Ordinal))
                 {
                     continue;
                 }
@@ -50,7 +50,7 @@ internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore
                     continue;
                 }
 
-                if (!MatchesMetadata(entry.Metadata, metadataFilter))
+                if (!MatchesMetadata(entry.Tags, metadataFilter))
                 {
                     continue;
                 }
@@ -58,14 +58,14 @@ internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore
                 scored.Add((entry, CosineSimilarity(queryEmbedding, entry.Embedding)));
             }
 
-            IReadOnlyList<VectorMemoryMatch> matches = scored
+            IReadOnlyList<RecalledMemory> matches = scored
                 .OrderByDescending(static s => s.Score)
                 .ThenBy(static s => s.Entry.Key, StringComparer.Ordinal)
                 .Take(limit)
-                .Select(static s => new VectorMemoryMatch(
+                .Select(static s => new RecalledMemory(
                     s.Entry.Key,
                     s.Entry.Text,
-                    SnapshotMetadata(s.Entry.Metadata),
+                    s.Entry.Tags.ToArray(),
                     s.Entry.Payload))
                 .ToArray();
 
@@ -73,46 +73,21 @@ internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore
         }
     }
 
-    public Task<bool> RemoveAsync(string owner, string @namespace, string key, CancellationToken cancellationToken)
+    public Task<bool> RemoveAsync(string name, string @namespace, string key, CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(@namespace);
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         cancellationToken.ThrowIfCancellationRequested();
 
         lock (_gate)
         {
-            return Task.FromResult(_entries.Remove((owner, @namespace, key)));
+            return Task.FromResult(_entries.Remove((name, @namespace, key)));
         }
     }
-
-    public Task<IReadOnlyList<string>> ListKeysAsync(
-        string owner,
-        string @namespace,
-        CancellationToken cancellationToken)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
-        ArgumentException.ThrowIfNullOrWhiteSpace(@namespace);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        lock (_gate)
-        {
-            IReadOnlyList<string> keys = _entries.Values
-                .Where(entry =>
-                    string.Equals(entry.Owner, owner, StringComparison.Ordinal)
-                    && string.Equals(entry.Namespace, @namespace, StringComparison.Ordinal))
-                .Select(static entry => entry.Key)
-                .Order(StringComparer.Ordinal)
-                .ToArray();
-            return Task.FromResult(keys);
-        }
-    }
-
-    private static Dictionary<string, string> SnapshotMetadata(IReadOnlyDictionary<string, string> metadata)
-        => new(metadata, StringComparer.Ordinal);
 
     private static bool MatchesMetadata(
-        IReadOnlyDictionary<string, string> metadata,
+        IReadOnlyList<MemoryTag> tags,
         IReadOnlyDictionary<string, string>? filter)
     {
         if (filter is null || filter.Count == 0)
@@ -122,8 +97,8 @@ internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore
 
         foreach (var (key, value) in filter)
         {
-            if (!metadata.TryGetValue(key, out var actual)
-                || !string.Equals(actual, value, StringComparison.Ordinal))
+            if (!tags.Any(tag => string.Equals(tag.Name, key, StringComparison.Ordinal)
+                && string.Equals(tag.Value, value, StringComparison.Ordinal)))
             {
                 return false;
             }
