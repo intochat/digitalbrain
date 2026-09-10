@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
 
 namespace DigitalBrain.Core;
@@ -122,30 +123,13 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
                 errorText = TruncateError(failure.Message);
             }
 
-            var terminal = record with
-            {
-                Phase = failure is null ? CommandPhase.Completed : CommandPhase.Failed,
-                ArgsJson = null,
-                ResultJson = resultText,
-                Error = errorText,
-                At = clock.GetUtcNow(),
-                ScheduledWork = scheduledWork,
-            };
-            crashPoint?.BeforeTerminalRecord(arguments.Id);
-            terminal = journal.Append(terminal);
-            dedup.Record(arguments.Id, outcome with
-            {
-                Phase = terminal.Phase,
-                ResultJson = terminal.ResultJson,
-                Error = terminal.Error,
-                Sequence = terminal.Sequence,
-            });
+            AppendTerminalRecord(record, outcome, failure, resultText, errorText, scheduledWork);
             host.AdmitCommandWork();
             await host.PersistAsync().ConfigureAwait(true);
         }
         catch (Exception error) when (error is not NeuronPersistenceException and not NeuronRecoveringException)
         {
-            await host.DiscardStagedChangesAsync().ConfigureAwait(true);
+            await host.DiscardStagedChangesAsync(error).ConfigureAwait(true);
             throw;
         }
 
@@ -158,6 +142,29 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
         }
 
         return result;
+    }
+
+    private void AppendTerminalRecord(CommandRecord record, CommandOutcome outcome, Exception? failure,
+        string? resultText, string? errorText, IReadOnlyList<SignalId>? scheduledWork)
+    {
+        var terminal = record with
+        {
+            Phase = failure is null ? CommandPhase.Completed : CommandPhase.Failed,
+            ArgsJson = null,
+            ResultJson = resultText,
+            Error = errorText,
+            At = clock.GetUtcNow(),
+            ScheduledWork = scheduledWork,
+        };
+        crashPoint?.BeforeTerminalRecord(record.Id);
+        terminal = journal.Append(terminal);
+        dedup.Record(record.Id, outcome with
+        {
+            Phase = terminal.Phase,
+            ResultJson = terminal.ResultJson,
+            Error = terminal.Error,
+            Sequence = terminal.Sequence,
+        });
     }
 
     private async Task<TResult> RejectAsync<TResult>(ICommandHost host, CommandRecord record, Exception error)

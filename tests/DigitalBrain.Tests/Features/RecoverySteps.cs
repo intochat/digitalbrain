@@ -1,8 +1,8 @@
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Synapses;
-using DigitalBrain.Core;
 using Reqnroll;
 using Xunit;
 

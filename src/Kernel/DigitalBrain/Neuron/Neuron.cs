@@ -15,6 +15,7 @@ namespace DigitalBrain.Core;
 
 // A durable actor with one receive slot. Owns its synapses, three bounded journals, and the
 // latest signal of each type it received. Fire travels along synapses; nothing else routes.
+// A subclass calls Guard() first in its own methods.
 public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable, ICommandHost
 {
     // Latest-per-type is keyed by type name, so a caller putting identity in the type would
@@ -49,13 +50,11 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     protected new Task WriteStateAsync(CancellationToken cancellationToken = default)
         => throw new InvalidOperationException($"Neuron '{Id}' must call PersistAsync to write through the persistence fence.");
 
-    private void Guard() => _fence.Guard();
-
-    internal bool IsExecutingCommand => ReactionContext is CommandReaction;
+    protected void Guard() => _fence.Guard();
 
     protected ReactionContext? ReactionContext { get; private set; }
 
-    private protected CommandId? ExecutingCommand => (ReactionContext as CommandReaction)?.Command;
+    internal CommandId? ExecutingCommand => (ReactionContext as CommandReaction)?.Command;
 
     NeuronId ICommandHost.Id => Id;
 
@@ -67,7 +66,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
 
     Task ICommandHost.PersistAsync() => PersistAsync();
 
-    Task ICommandHost.DiscardStagedChangesAsync() => _fence.DiscardStagedChangesAsync();
+    Task ICommandHost.DiscardStagedChangesAsync(Exception cause) => _fence.DiscardStagedChangesAsync(cause);
 
     void ICommandHost.AdmitCommandWork()
     {
@@ -94,6 +93,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     {
         NeuronConcurrency.RequireSerializedTurns(GetType());
         await base.OnActivateAsync(cancellationToken).ConfigureAwait(true);
+        _fence.NoteStoredState(StorageHoldsState());
         if (CommandReconciliation.Reconcile(_components.Commands, _components.Dedup, TimeProvider.GetUtcNow()))
         {
             await PersistAsync().ConfigureAwait(true);
@@ -108,6 +108,14 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
             Wake();
         }
     }
+
+    private bool StorageHoldsState()
+        => _components.Journals.IncomingNextSequence > 1
+            || _components.Journals.OutgoingNextSequence > 1
+            || _components.Commands.CommittedSequence > 0
+            || _components.Synapses.All().Count > 0
+            || _components.Pending.Count > 0
+            || _components.Latest.Count > 0;
 
     // Shutting down cancels the reaction in flight. The pending head stays and
     // the next activation retries the entry.

@@ -16,7 +16,6 @@
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Tests" />
     <InternalsVisibleTo Include="DigitalBrain.Testing" />
-    <InternalsVisibleTo Include="DigitalBrain.Aspire" />
     <InternalsVisibleTo Include="DigitalBrain.Mcp" />
   </ItemGroup>
 </Project>

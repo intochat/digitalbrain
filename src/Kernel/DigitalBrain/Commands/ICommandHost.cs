@@ -7,7 +7,7 @@ internal interface ICommandHost
     NeuronId Id { get; }
     ReactionContext? ReactionContext { get; set; }
     Task PersistAsync();
-    Task DiscardStagedChangesAsync();
+    Task DiscardStagedChangesAsync(Exception cause);
     void AdmitCommandWork();
     Task WakeCommandWorkAsync();
 }

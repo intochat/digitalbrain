@@ -14,11 +14,11 @@ public sealed class JournalFaultPlan
 
     public void CancelNextWrite() => Interlocked.Exchange(ref _nextWrite, (int)NextWriteFault.Cancel);
 
-    public void FailWriteNumber(string journalIdFragment, int ordinal)
+    public void FailWriteNumber(string journalId, int ordinal)
     {
-        ArgumentException.ThrowIfNullOrEmpty(journalIdFragment);
+        ArgumentException.ThrowIfNullOrEmpty(journalId);
         ArgumentOutOfRangeException.ThrowIfLessThan(ordinal, 1);
-        Interlocked.Exchange(ref _numberedFault, new(journalIdFragment, ordinal));
+        Interlocked.Exchange(ref _numberedFault, new(journalId, ordinal));
     }
 
     public void Clear()
@@ -34,7 +34,7 @@ public sealed class JournalFaultPlan
         var nextWrite = (NextWriteFault)Interlocked.Exchange(ref _nextWrite, (int)NextWriteFault.None);
         var numberedFault = Volatile.Read(ref _numberedFault);
         var failNumberedWrite = numberedFault is not null
-            && journalId.Contains(numberedFault.Fragment, StringComparison.Ordinal)
+            && string.Equals(journalId, numberedFault.JournalId, StringComparison.Ordinal)
             && ordinal == numberedFault.Ordinal
             && ReferenceEquals(Interlocked.CompareExchange(ref _numberedFault, null, numberedFault), numberedFault);
         if (nextWrite == NextWriteFault.Cancel)
@@ -48,7 +48,7 @@ public sealed class JournalFaultPlan
         }
     }
 
-    private sealed record NumberedFault(string Fragment, int Ordinal);
+    private sealed record NumberedFault(string JournalId, int Ordinal);
 
     private enum NextWriteFault
     {
