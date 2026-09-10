@@ -54,6 +54,7 @@ public sealed class BrainSteps(BrainWorld world)
     }
 
     [Then(@"the fire was rejected with a message containing ""(.*)""")]
+    [Then(@"the command was refused with a message containing ""(.*)""")]
     public void ThenRejected(string fragment)
     {
         Assert.NotNull(_lastError);

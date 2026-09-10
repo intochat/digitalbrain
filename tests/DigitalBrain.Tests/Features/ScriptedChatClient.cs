@@ -27,7 +27,10 @@ internal sealed class ScriptedChatClient : IChatClient
     private readonly List<ChatOptions?> _options = [];
     private readonly Lock _gate = new();
     private readonly TaskCompletionSource _never = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _paused = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private bool _unpaused;
+
+    public Task Paused => _paused.Task;
 
     public IReadOnlyList<IReadOnlyList<ChatMessage>> Calls
     {
@@ -111,6 +114,7 @@ internal sealed class ScriptedChatClient : IChatClient
 
                     if (!freed)
                     {
+                        _paused.TrySetResult();
                         await _never.Task.ConfigureAwait(false);
                     }
 

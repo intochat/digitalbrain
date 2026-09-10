@@ -41,6 +41,7 @@ Feature: chat
     When session "claude" fires "Instruct" {"participants":["agent:writer","agent:reviewer"],"manager":"roundrobin","rounds":1} at "chat:design"
     And session "claude" fires "Ask" {"text":"go"} at "chat:design"
     And "chat:design" waits up to 10 seconds for an incoming "Said"
+    And the scripted model is paused
     And the silo restarts
     And the scripted model is unpaused
     And "chat:design" waits up to 10 seconds for an incoming "Said"

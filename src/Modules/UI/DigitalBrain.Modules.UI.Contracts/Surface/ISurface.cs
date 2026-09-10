@@ -1,19 +1,21 @@
-using DigitalBrain.Abstractions.Entities;
-using DigitalBrain.Abstractions.Signals;
-using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Commands;
+using DigitalBrain.Abstractions.Neurons;
+using Orleans.Concurrency;
+
 namespace DigitalBrain.UI;
 
-// Deliberately no [ClientEntryPoint] here (same wall as IChart): Read() arrives through
-// IEntity<TState>'s entry point, while Open stays reachable only to an attributed,
-// same-owner grain call (UIRenderer's OpenSurface handler).
 [Alias("ui.surface")]
-public interface ISurface : IEntity<SurfaceState>
+public interface ISurface : INeuron
 {
-    const string DefaultInstanceName = "desk";
+    /// <summary>Opens a scene. The receipt is advisory - what the caller can show at once; the reaction recomputes the authoritative one and publishes it on SurfaceOpened.</summary>
+    [Alias("open")]
+    Task<Accepted<SurfaceOpenReceipt>> Open(OpenSurface command, CancellationToken cancellationToken = default);
 
-    [Alias(nameof(Open))]
-    Task<SurfaceOpenReceipt> Open(CommandId commandId, SurfaceScene scene, int cap);
+    /// <summary>Activates a button in the current scene.</summary>
+    [Alias("activate")]
+    Task<Accepted<ControlActivation>> Activate(ActivateControl command, CancellationToken cancellationToken = default);
 
-    [Alias(nameof(ApplyActivity))]
-    Task ApplyActivity(ActivityView activity, int cap);
+    /// <summary>Reads the surface scenes, activities, and receipts.</summary>
+    [ReadOnly, Alias("read")]
+    Task<SurfaceState> Read();
 }

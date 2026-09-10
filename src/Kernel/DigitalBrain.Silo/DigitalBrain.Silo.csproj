@@ -15,5 +15,6 @@
     <ProjectReference Include="../../Modules/Google/Google/DigitalBrain.Modules.Google.csproj" />
     <ProjectReference Include="../../Modules/Salesforce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
     <ProjectReference Include="../../Modules/Microsoft/Microsoft/DigitalBrain.Modules.Microsoft.csproj" />
+    <ProjectReference Include="../../Modules/UI/DigitalBrain.Modules.UI/DigitalBrain.Modules.UI.csproj" />
   </ItemGroup>
 </Project>

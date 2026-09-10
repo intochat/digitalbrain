@@ -4,8 +4,6 @@ using DigitalBrain.AI;
 using DigitalBrain.AI.XAI;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
 using Reqnroll;
 using Xunit;
 
@@ -19,7 +17,7 @@ public sealed class AiSteps(BrainWorld world, BrainSteps brain)
         => world.Simulation = await BrainSimulation.StartAsync(new()
         {
             Modules = new([typeof(AIModule)]),
-            ConfigureSilo = Scripted(world),
+            ConfigureSilo = ScriptedAi.Configure(world),
         });
 
     [Given("a running brain with durable storage and AI")]
@@ -28,7 +26,7 @@ public sealed class AiSteps(BrainWorld world, BrainSteps brain)
         {
             Modules = new([typeof(AIModule)]),
             PersistenceDirectory = Path.Combine(Path.GetTempPath(), "digitalbrain-tests", Guid.NewGuid().ToString("N")),
-            ConfigureSilo = Scripted(world),
+            ConfigureSilo = ScriptedAi.Configure(world),
         });
 
     [Given(@"the scripted model will say ""(.*)""")]
@@ -57,6 +55,9 @@ public sealed class AiSteps(BrainWorld world, BrainSteps brain)
 
     [When("the scripted model is unpaused")]
     public void WhenUnpaused() => world.Scripted.Unpause();
+
+    [When("the scripted model is paused")]
+    public Task WhenPaused() => world.Scripted.Paused.WaitAsync(TimeSpan.FromSeconds(10));
 
     // A system prompt reaches a chat client as ChatOptions.Instructions, or as a system
     // message for a client that materialises it; either counts as the model having seen it.
@@ -114,14 +115,4 @@ public sealed class AiSteps(BrainWorld world, BrainSteps brain)
         var text = (JsonNode.Parse(body) as JsonObject)?["text"]?.GetValue<string>() ?? string.Empty;
         Assert.Contains(fragment, text, StringComparison.Ordinal);
     }
-
-    // The marker registration exercises catalogue resolution by default; the raw key exercises provider fallback.
-    private static Action<ISiloBuilder> Scripted(BrainWorld world)
-        => silo =>
-        {
-            silo.Services.AddKeyedSingleton<IChatClient>("scripted", (_, _) => world.Scripted);
-            silo.Services.AddKeyedSingleton<IChatClient>(typeof(IGrok46), (_, _) => world.Scripted);
-            silo.Services.AddSingleton(new AIDefaults("IGrok46"));
-            silo.Services.AddSingleton(new CounterFixtureState());
-        };
 }

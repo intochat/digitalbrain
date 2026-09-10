@@ -1,5 +1,3 @@
-using DigitalBrain.UI;
-
 namespace DigitalBrain.Chat;
 
 [GenerateSerializer]

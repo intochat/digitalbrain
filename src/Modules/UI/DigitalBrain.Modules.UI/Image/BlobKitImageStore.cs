@@ -1,12 +1,9 @@
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
-using DigitalBrain.Abstractions;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.UI;
 
-internal sealed class BlobKitImageStore([FromKeyedServices(DigitalBrainNames.GrainState)] BlobServiceClient blobs)
-    : IKitImageStore
+internal sealed class BlobKitImageStore(BlobServiceClient blobs) : IKitImageStore
 {
     internal const string ContainerName = "kit-images";
 

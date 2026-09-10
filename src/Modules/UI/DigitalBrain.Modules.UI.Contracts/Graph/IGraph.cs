@@ -1,12 +1,17 @@
-using DigitalBrain.Abstractions.Entities;
+using DigitalBrain.Abstractions.Commands;
+using DigitalBrain.Abstractions.Neurons;
+using Orleans.Concurrency;
 
 namespace DigitalBrain.UI;
 
-// Same wall as IChart: Read() is the client-facing query via IEntity<TState>;
-// Render stays a same-silo grain call driven by the kit tools.
 [Alias("ui.graph")]
-public interface IGraph : IEntity<GraphState>
+public interface IGraph : INeuron
 {
-    [Alias(nameof(Render))]
-    Task Render(GraphState state);
+    /// <summary>Renders a graph and returns its instance name.</summary>
+    [Alias("render")]
+    Task<Accepted<string>> Render(RenderGraph command, CancellationToken cancellationToken = default);
+
+    /// <summary>Reads the graph snapshot.</summary>
+    [ReadOnly, Alias("read")]
+    Task<GraphState> Read();
 }
