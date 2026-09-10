@@ -17,6 +17,11 @@ public sealed class LineageSteps(BrainSteps brain, CommandSteps commands)
             .Connect(BrainSteps.Id(listener), type);
     }
 
+    [Given(@"""(.*)"" is disconnected from counter ""(.*)"" for ""(.*)""")]
+    public Task DisconnectFromCounter(string listener, string name, string type)
+        => brain.Brain.Grains.GetGrain<INeuron>(new NeuronId("counter", name).ToGrainId())
+            .Disconnect(BrainSteps.Id(listener), type);
+
     [Then(@"the latest ""(.*)"" incoming entry causation equals the work id of ""(.*)""")]
     public async Task ThenCausationEqualsWork(string name, string handle)
     {

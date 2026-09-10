@@ -1,8 +1,6 @@
 using System.Diagnostics;
-using System.Runtime.ExceptionServices;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
-using DigitalBrain.Abstractions.Synapses;
 using Reqnroll;
 using Xunit;
 
@@ -11,6 +9,10 @@ namespace DigitalBrain.Tests;
 [Binding]
 public sealed class RecoverySteps(BrainWorld world, BrainSteps brain)
 {
+    private Exception? _readError;
+    private Exception? _connectError;
+    private string? _interleavingNeuron;
+
     [Given("a running brain with faulting storage")]
     public async Task GivenAFaultingBrain()
         => world.Simulation = await BrainSteps.StartSimulationAsync(
@@ -43,23 +45,41 @@ public sealed class RecoverySteps(BrainWorld world, BrainSteps brain)
         Assert.NotNull(brain.LastError);
     }
 
-    [Then(@"reading synapses of ""(.*)"" throws NeuronRecovering or shows no ""(.*)"" synapse")]
-    public async Task ReadSynapsesDuringRecovery(string name, string type)
+    [When(@"""(.*)"" connects ""(.*)"" to plain ""(.*)"" for ""(.*)"" and a read interleaves during the recovery")]
+    public async Task ConnectWithInterleavingRead(string _, string from, string target, string type)
     {
-        IReadOnlyList<Synapse>? synapses = null;
-        var error = await Record.ExceptionAsync(async () => { synapses = await brain.Query(name).ReadSynapses(); });
-        if (error is NeuronRecoveringException)
+        var neuron = brain.Neuron(from);
+        // Activate before arming the hold so only the recovery reload can claim it.
+        await neuron.ReadPendingCount().WaitAsync(TimeSpan.FromSeconds(10));
+        world.JournalFaults.HoldNextRead();
+        var connect = Task.Run(() => neuron.Connect(NeuronId.Plain(target), type));
+        try
         {
-            return;
+            await world.JournalFaults.ReadHeld.WaitAsync(TimeSpan.FromSeconds(10));
+            _interleavingNeuron = from;
+            _readError = await Record.ExceptionAsync(() => neuron.ReadPendingCount().WaitAsync(TimeSpan.FromSeconds(10)));
         }
-
-        if (error is not null)
+        finally
         {
-            ExceptionDispatchInfo.Capture(error).Throw();
+            world.JournalFaults.ReleaseRead();
+            _connectError = await Record.ExceptionAsync(() => connect.WaitAsync(TimeSpan.FromSeconds(10)));
         }
+    }
 
-        Assert.NotNull(synapses);
-        Assert.DoesNotContain(synapses, synapse => synapse.SignalType == type);
+    [Then(@"the interleaving read of ""(.*)"" threw NeuronRecovering")]
+    public void InterleavingReadRefused(string name)
+    {
+        Assert.Equal(name, _interleavingNeuron);
+        Assert.IsType<NeuronRecoveringException>(_readError);
+    }
+
+    [Then("the connect failed")]
+    public void ConnectFailed()
+    {
+        var error = _connectError is AggregateException aggregate
+            ? Assert.Single(aggregate.Flatten().InnerExceptions)
+            : _connectError;
+        Assert.IsType<NeuronPersistenceException>(error);
     }
 
     [Then(@"after storage recovers, ""(.*)"" synapses do not include ""(.*)"" to ""(.*)""")]

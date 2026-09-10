@@ -62,6 +62,8 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
 
     NeuronId ICommandHost.Id => Id;
 
+    bool ICommandHost.HasPendingRoom => _components.Pending.HasRoomFor(0);
+
     ReactionContext? ICommandHost.ReactionContext
     {
         get => ReactionContext;

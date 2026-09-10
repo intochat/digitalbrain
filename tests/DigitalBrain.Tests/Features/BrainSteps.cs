@@ -106,19 +106,29 @@ public sealed class BrainSteps(BrainWorld world)
     // ---- helpers shared with later features ----
 
     internal static Task<BrainSimulation> StartSimulationAsync(string? persistenceDirectory = null, JournalFaultPlan? journalFaults = null)
-        => BrainSimulation.StartAsync(new()
+    {
+        var counterFixtureState = new CounterFixtureState();
+        return BrainSimulation.StartAsync(new()
         {
             Modules = new([]),
             PersistenceDirectory = persistenceDirectory,
             JournalFaults = journalFaults,
-            ConfigureSilo = static silo => silo.Services.AddSingleton<ICommandCrashPoint, FixtureCommandCrashPoint>(),
+            ConfigureSilo = silo =>
+            {
+                silo.Services.AddSingleton(counterFixtureState);
+                silo.Services.AddSingleton<ICommandCrashPoint, FixtureCommandCrashPoint>();
+            },
         });
+    }
 
     internal BrainSimulation Brain => world.Brain;
     internal Exception? LastError => _lastError;
     internal FireOutcome? LastFire { get; private set; }
     internal static NeuronId Id(string name)
         => NeuronId.TryParse(name, out var id) ? id : NeuronId.Plain(name);
+
+    internal static NeuronId Id(string grainType, string name)
+        => grainType == "plain" ? NeuronId.Plain(name) : new NeuronId(grainType, name);
 
     // The "db" prefix keeps deterministic fixture signal IDs non-empty, even for handle "0".
     internal static SignalId SignalIdFrom(string handle)

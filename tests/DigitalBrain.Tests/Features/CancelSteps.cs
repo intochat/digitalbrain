@@ -21,9 +21,9 @@ public sealed class CancelSteps(BrainSteps brain, BrainWorld world)
     public static Task ThenCancelled(string name)
         => FixtureSwitches.Cancelled[name].Task.WaitAsync(TimeSpan.FromSeconds(10));
 
-    [When(@"""[^""]+"" cancels signal id ""(.*)"" on plain ""(.*)""")]
-    public Task CancelId(string handle, string name)
-        => brain.Brain.Grains.GetGrain<INeuron>(NeuronId.Plain(name).ToGrainId())
+    [When(@"""[^""]+"" cancels signal id ""(.*)"" on (\w+) ""(.*)""")]
+    public Task CancelId(string handle, string grainType, string name)
+        => brain.Brain.Grains.GetGrain<INeuron>(BrainSteps.Id(grainType, name).ToGrainId())
             .CancelReaction(BrainSteps.SignalIdFrom(handle));
 
     [Then(@"""(.*)"" journal total recorded is (\d+)")]

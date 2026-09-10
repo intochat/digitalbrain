@@ -22,12 +22,20 @@ public sealed class BudgetedJournalStorageFacts
         var singleton = provider.GetRequiredService<RecordingJournalStorageProvider>();
         var budgeted = Assert.IsType<BudgetedJournalStorageProvider>(provider.GetRequiredService<IJournalStorageProvider>());
         var journalId = new JournalId("counter/c");
-        var storage = Assert.IsType<BudgetedJournalStorage>(budgeted.CreateStorage(journalId));
+        Assert.IsType<BudgetedJournalStorage>(budgeted.CreateStorage(journalId));
 
         Assert.Equal(journalId, Assert.Single(singleton.RequestedJournals));
         Assert.Same(budgeted, provider.GetRequiredService<IJournalStorageProvider>());
+    }
+
+    [Fact]
+    public void CompactionRequestReflectsInnerStorageFlag()
+    {
+        var inner = new SettlingJournalStorage();
+        var storage = new BudgetedJournalStorage(inner, TimeSpan.FromSeconds(1));
+
         Assert.False(storage.IsCompactionRequested);
-        singleton.Storage.IsCompactionRequested = true;
+        inner.IsCompactionRequested = true;
         Assert.True(storage.IsCompactionRequested);
     }
 
@@ -37,6 +45,7 @@ public sealed class BudgetedJournalStorageFacts
         var inner = new SettlingJournalStorage();
         var storage = new BudgetedJournalStorage(inner, TimeSpan.FromMilliseconds(30));
 
+        // The budget decorator must await inner storage settlement instead of abandoning an active storage call.
         await Assert.ThrowsAsync<OperationCanceledException>(() => storage.ReadAsync(null!, CancellationToken.None).AsTask());
 
         Assert.True(inner.Settled);

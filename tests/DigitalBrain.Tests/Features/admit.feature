@@ -16,12 +16,11 @@ Feature: Admit
 
   Scenario: Accepted work survives restart and is reacted to without new traffic
     Given a running brain with file-backed storage
-    And a throwing "t" whose reaction fails 2 times then succeeds
-    When "claude" fires "Ping" at throwing "t"
+    And a failing "t" whose reaction fails 2 times then succeeds
+    When "claude" fires "Ping" at failing "t"
     And the silo restarts
     And "claude" waits up to 10 seconds for an incoming "Pong"
     And "claude" waits up to 10 seconds until "t" pending count is 0
-    Then "t" pending count is 0
 
   Scenario: Work accepted but never reacted to is resumed after a cold restart
     Given a running brain with file-backed storage
@@ -31,4 +30,3 @@ Feature: Admit
     And the slow reaction on "s" is released
     And "claude" waits up to 10 seconds for an incoming "Pong"
     And "claude" waits up to 10 seconds until "s" pending count is 0
-    Then "s" pending count is 0

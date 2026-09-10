@@ -75,17 +75,6 @@ public sealed class DescribeSteps(BrainSteps brain)
         Assert.Contains("kernel operations are the fire/connect/disconnect/read/cancel tools", error.Message, StringComparison.Ordinal);
     }
 
-    [When(@"""(.*)"" fires (\d+) ""(\w+)"" signals at plain ""(.*)""")]
-    public async Task FireSignals(string from, int count, string type, string to)
-    {
-        for (var i = 0; i < count; i++)
-        {
-            await brain.FireCore(from, type, "{}", to);
-        }
-
-        Assert.Null(brain.LastError);
-    }
-
     [When(@"""(.*)"" reads ""(.*)"" incoming journal after sequence (\d+)")]
     public async Task ReadIncoming(string _, string name, long after)
         => _read = await brain.Neuron(name).ReadJournal(JournalKind.Incoming, after);

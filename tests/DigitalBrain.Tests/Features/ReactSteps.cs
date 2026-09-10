@@ -9,23 +9,23 @@ namespace DigitalBrain.Tests;
 [Binding]
 public sealed class ReactSteps(BrainSteps brain)
 {
-    [When(@"""(.*)"" fires ""(\w+)"" (\{.*\}) at (echo|flaky|sleepy) ""(.*)""")]
+    [When(@"""(.*)"" fires ""(\w+)"" (\{.*\}) at (echo|flaky|slow|failing|counter|plain) ""(.*)""")]
     public Task FireAtTyped(string from, string type, string body, string grainType, string name)
-        => brain.FireCore(from, type, body, new NeuronId(grainType, name));
+        => brain.FireCore(from, type, body, BrainSteps.Id(grainType, name));
 
     [Given(@"flaky ""(.*)"" fails its first reaction")]
     public static void GivenFlaky(string name) => FixtureSwitches.FlakyFailuresLeft[name] = 1;
 
-    [Given(@"sleepy ""(.*)"" is asleep")]
-    public static void GivenAsleep(string name) => FixtureSwitches.Asleep[name] = true;
+    [Given(@"failing ""(.*)"" fails every reaction")]
+    public static void GivenFailsEveryReaction(string name) => FixtureSwitches.ReactionFailuresLeft[name] = int.MaxValue;
 
-    [When(@"sleepy ""(.*)"" is awake")]
-    public async Task WhenAwake(string name)
+    [When(@"failing ""(.*)"" stops failing")]
+    public async Task StopFailing(string name)
     {
-        FixtureSwitches.Asleep[name] = false;
+        FixtureSwitches.ReactionFailuresLeft[name] = 0;
 
         // Touching the neuron activates it; activation resumes the drain.
-        _ = await brain.Brain.Grains.GetGrain<INeuron>(new NeuronId("sleepy", name).ToGrainId()).ReadState();
+        _ = await brain.Brain.Grains.GetGrain<INeuron>(new NeuronId("failing", name).ToGrainId()).ReadState();
     }
 
     [When(@"""(.*)"" waits up to (\d+) seconds for an incoming ""(\w+)""")]
@@ -68,11 +68,11 @@ public sealed class ReactSteps(BrainSteps brain)
     public static void ThenReacted(string name, int times, long sequence)
         => Assert.Equal(times, FixtureSwitches.Reactions[$"{name}:{sequence}"]);
 
-    [Then(@"(echo|flaky|sleepy) ""(.*)"" incoming journal contains ""(\w+)"" (\{.*\})$")]
+    [Then(@"(echo|flaky|slow|failing|counter|plain) ""(.*)"" incoming journal contains ""(\w+)"" (\{.*\})$")]
     public async Task ThenTypedIncoming(string grainType, string name, string type, string body)
     {
         var read = await brain.Brain.Grains
-            .GetGrain<INeuron>(new NeuronId(grainType, name).ToGrainId())
+            .GetGrain<INeuron>(BrainSteps.Id(grainType, name).ToGrainId())
             .ReadJournal(JournalKind.Incoming, 0);
         Assert.Contains(read.Delta, d => d.Signal.Type == type && d.Signal.Body == body);
     }

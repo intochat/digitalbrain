@@ -51,3 +51,36 @@ Feature: Command
     When "claude" adds 3 to counter "c" with command id "x9"
     Then "c" commands journal shows "x9" incarnation 2 as Attempted then Completed
     And "claude" waits up to 5 seconds until counter "c" total is 3
+
+  Scenario: A full pending queue refuses a command before it is attempted
+    Given a running brain
+    And counter "c" fails every reaction
+    When "claude" fires 256 "Counted" signals at counter "c"
+    And "claude" adds 1 to counter "c" with command id "f1"
+    Then it fails with "pending signals"
+    And "c" commands journal shows one Rejected record
+    And counter "c" executed 0 times
+
+  Scenario: A retry while the first attempt is still unresolved reports an unknown outcome
+    Given a running brain
+    And counter "c" loses its turn after recording Attempted for command id "u1"
+    When "claude" adds 3 to counter "c" with command id "u1" and the call fails
+    And "claude" adds 3 to counter "c" with command id "u1"
+    Then it fails with "outcome is unknown"
+
+  Scenario: Connect, disconnect, deliver, cancel and drain leave the command journal empty
+    Given a running brain
+    And "claude" is connected to counter "c" for "Counted"
+    And "claude" is disconnected from counter "c" for "Counted"
+    When "claude" fires "Counted" {"amount":2} at counter "c"
+    And "claude" waits up to 5 seconds until counter "c" total is 2
+    And "claude" cancels signal id "00" on counter "c"
+    Then "c" commands journal is empty
+
+  Scenario: A read-only module method leaves no journal entry
+    Given a running brain
+    When "claude" adds 2 to counter "c" with command id "q1"
+    And "claude" waits up to 5 seconds until counter "c" total is 2
+    And counter "c" journal sizes are recorded
+    And counter "c" total is read 5 times
+    Then counter "c" journal sizes are unchanged

@@ -2,8 +2,10 @@ using System.Security.Cryptography;
 using System.Text;
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Core;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Reqnroll;
 using Xunit;
@@ -17,6 +19,50 @@ public sealed class CommandSteps(BrainSteps brain)
     private Exception? _lastError;
     private Exception? _previousError;
     private CommandId _lastCommandId;
+    private readonly Dictionary<string, (long Incoming, long Outgoing, long Commands)> _journalSizes = new(StringComparer.Ordinal);
+
+    [Given(@"counter ""(.*)"" fails every reaction")]
+    public void FailEveryReaction(string name)
+        => FixtureState.FailingReactions[name] = 0;
+
+    [Given(@"counter ""(.*)"" loses its turn after recording Attempted for command id ""(.*)""")]
+    public void LoseTurnAfterAttempted(string name, string handle)
+        => FixtureState.LostTurns[CommandIdFrom(handle)] = name;
+
+    [When(@"counter ""(.*)"" journal sizes are recorded")]
+    public async Task RecordJournalSizes(string name) => _journalSizes[name] = await JournalSizes(name);
+
+    [When(@"counter ""(.*)"" total is read (\d+) times")]
+    public async Task ReadTotalRepeatedly(string name, int count)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            await Counter(name).ReadTotal();
+        }
+    }
+
+    [Then(@"counter ""(.*)"" journal sizes are unchanged")]
+    public async Task JournalSizesUnchanged(string name) => Assert.Equal(_journalSizes[name], await JournalSizes(name));
+
+    [Then(@"""(.*)"" commands journal is empty")]
+    public async Task CommandJournalEmpty(string name)
+    {
+        var read = await Journal(name);
+        Assert.Empty(read.Delta);
+        Assert.Equal(0, read.ResumeSequence);
+    }
+
+    private CounterFixtureState FixtureState => brain.Brain.SiloServices.GetRequiredService<CounterFixtureState>();
+
+    private async Task<(long Incoming, long Outgoing, long Commands)> JournalSizes(string name)
+    {
+        var counter = Counter(name);
+        var incoming = counter.ReadJournal(JournalKind.Incoming, 0);
+        var outgoing = counter.ReadJournal(JournalKind.Outgoing, 0);
+        var commands = counter.ReadCommands(0);
+        await Task.WhenAll(incoming, outgoing, commands);
+        return ((await incoming).ResumeSequence, (await outgoing).ResumeSequence, (await commands).ResumeSequence);
+    }
 
     internal Dictionary<string, SignalId> WorkByCommand { get; } = new(StringComparer.Ordinal);
 
@@ -79,6 +125,7 @@ public sealed class CommandSteps(BrainSteps brain)
         Assert.Null(rejected.ArgsJson);
     }
 
+    [When(@"""(.*)"" waits up to (\d+) seconds until counter ""(.*)"" total is (\d+)")]
     [Then(@"""(.*)"" waits up to (\d+) seconds until counter ""(.*)"" total is (\d+)")]
     public async Task WaitForTotal(string principal, int seconds, string name, int expected)
     {
@@ -99,8 +146,8 @@ public sealed class CommandSteps(BrainSteps brain)
     }
 
     [Then(@"counter ""(.*)"" executed (\d+) times?")]
-    public static void ThenExecuted(string name, int times)
-        => Assert.Equal(times, FixtureSwitches.CommandExecutions.GetValueOrDefault(name));
+    public void ThenExecuted(string name, int times)
+        => Assert.Equal(times, FixtureState.Executions.GetValueOrDefault(name));
 
     [Then("both adds return the same work id")]
     public void ThenSameWork()
@@ -152,7 +199,6 @@ public sealed class CommandSteps(BrainSteps brain)
     [Scope(Feature = "Command")]
     public static void AfterScenario()
     {
-        FixtureSwitches.CommandExecutions.Clear();
         FixtureCommandCrashPoint.CrashOnce.Clear();
     }
 

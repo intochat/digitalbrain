@@ -65,15 +65,20 @@ public static class FixtureSwitches
 
     public static ConcurrentDictionary<string, int> Reactions { get; } = new(StringComparer.Ordinal);
 
-    public static ConcurrentDictionary<string, bool> Asleep { get; } = new(StringComparer.Ordinal);
-
-    public static ConcurrentDictionary<string, int> ThrowingFailuresLeft { get; } = new(StringComparer.Ordinal);
+    public static ConcurrentDictionary<string, int> ReactionFailuresLeft { get; } = new(StringComparer.Ordinal);
 
     public static ConcurrentDictionary<string, TaskCompletionSource> Cancelled { get; } = new(StringComparer.Ordinal);
 
     public static ConcurrentDictionary<string, TaskCompletionSource> Release { get; } = new(StringComparer.Ordinal);
+}
 
-    public static ConcurrentDictionary<string, int> CommandExecutions { get; } = new(StringComparer.Ordinal);
+internal sealed class CounterFixtureState
+{
+    public ConcurrentDictionary<string, byte> FailingReactions { get; } = new(StringComparer.Ordinal);
+
+    public ConcurrentDictionary<CommandId, string> LostTurns { get; } = new();
+
+    public ConcurrentDictionary<string, int> Executions { get; } = new(StringComparer.Ordinal);
 }
 
 // Throws on the first reaction to each entry while FlakyFailuresLeft[name] > 0, then echoes.
@@ -87,21 +92,6 @@ internal sealed class FlakyNeuron(NeuronRuntime runtime) : Neuron(runtime)
         if (FixtureSwitches.FlakyFailuresLeft.AddOrUpdate(Id.Name, 0, (_, left) => left - 1) >= 0)
         {
             throw new InvalidOperationException("flaky: first reaction fails");
-        }
-
-        return FireAsync(Signal.Create("Pong", delivery.Signal.Body), delivery.Source, delivery.CorrelationId, cancellationToken);
-    }
-}
-
-// While Asleep[name] is true the reaction throws (so the cursor stays); when awake it echoes.
-[GrainType("sleepy")]
-internal sealed class SleepyNeuron(NeuronRuntime runtime) : Neuron(runtime)
-{
-    protected override Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
-    {
-        if (FixtureSwitches.Asleep.TryGetValue(Id.Name, out var asleep) && asleep)
-        {
-            throw new InvalidOperationException("sleepy: not yet");
         }
 
         return FireAsync(Signal.Create("Pong", delivery.Signal.Body), delivery.Source, delivery.CorrelationId, cancellationToken);
@@ -128,15 +118,17 @@ internal sealed class SlowNeuron(NeuronRuntime runtime) : Neuron(runtime)
     }
 }
 
-[GrainType("throwing")]
-internal sealed class ThrowingNeuron(NeuronRuntime runtime) : Neuron(runtime)
+[GrainType("failing")]
+internal sealed class FailingNeuron(NeuronRuntime runtime) : Neuron(runtime)
 {
     protected override Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
     {
-        if (FixtureSwitches.ThrowingFailuresLeft[Id.Name] > 0)
+        while (FixtureSwitches.ReactionFailuresLeft.TryGetValue(Id.Name, out var failuresLeft) && failuresLeft > 0)
         {
-            FixtureSwitches.ThrowingFailuresLeft[Id.Name]--;
-            throw new InvalidOperationException("throwing: reaction fails");
+            if (FixtureSwitches.ReactionFailuresLeft.TryUpdate(Id.Name, failuresLeft - 1, failuresLeft))
+            {
+                throw new InvalidOperationException("failing: reaction fails");
+            }
         }
 
         return FireAsync(Signal.Create("Pong", delivery.Signal.Body), delivery.Source, delivery.CorrelationId, cancellationToken);
@@ -196,13 +188,14 @@ internal sealed partial class CounterJson : JsonSerializerContext;
 [GrainType("counter")]
 internal sealed class CounterNeuron(
     NeuronRuntime runtime,
+    CounterFixtureState fixtureState,
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<CounterState> state)
     : Neuron<CounterState>(runtime, state), ICounter
 {
     public Task<Accepted<int>> Add(AddCount command) => ExecuteCommandAsync(
         Descriptor("add"), command, CounterJson.Default.AddCount, CounterJson.Default.AcceptedInt32, arguments =>
         {
-            FixtureSwitches.CommandExecutions.AddOrUpdate(Id.Name, 1, (_, count) => count + 1);
+            fixtureState.Executions.AddOrUpdate(Id.Name, 1, (_, count) => count + 1);
             var work = Schedule(Signal.Create("Counted", "{\"amount\":" + arguments.Count + "}"));
             return new Accepted<int>(arguments.Count, work);
         });
@@ -225,6 +218,11 @@ internal sealed class CounterNeuron(
 
     protected override async Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
     {
+        if (fixtureState.FailingReactions.ContainsKey(Id.Name))
+        {
+            throw new InvalidOperationException("counter: every reaction fails");
+        }
+
         if (delivery.Signal.Type != "Counted")
         {
             return;
@@ -241,12 +239,18 @@ internal sealed class CounterNeuron(
 
 // The kernel calls this before staging a command's terminal record. The test
 // implementation simulates process loss for one command id so the silo restart finds only Attempted.
-internal sealed class FixtureCommandCrashPoint : ICommandCrashPoint
+internal sealed class FixtureCommandCrashPoint(CounterFixtureState fixtureState) : ICommandCrashPoint
 {
     internal static ConcurrentDictionary<CommandId, byte> CrashOnce { get; } = new();
 
     public void BeforeTerminalRecord(CommandId command)
     {
+        if (fixtureState.LostTurns.TryRemove(command, out var name))
+        {
+            // Simulates the wrapper losing its turn after Attempted without the fence resolving it.
+            throw new NeuronPersistenceException(new NeuronId("counter", name), "simulated lost command turn", new IOException("turn lost"));
+        }
+
         if (CrashOnce.TryRemove(command, out _))
         {
             throw new InvalidOperationException(

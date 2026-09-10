@@ -71,6 +71,16 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
             throw error;
         }
 
+        if (!host.HasPendingRoom)
+        {
+            // Do not remember this transient rejection in dedup: pending capacity can free up.
+            var error = new NeuronBusyException(
+                $"Neuron '{host.Id}' already holds {PendingWork.MaxPending} pending signals. Retry after pending work finishes.");
+            journal.Append(record with { Error = TruncateError(error.Message) });
+            await host.PersistAsync().ConfigureAwait(true);
+            throw error;
+        }
+
         record = journal.Append(record with { Phase = CommandPhase.Attempted, ArgsJson = argumentsText });
         var outcome = new CommandOutcome(
             CommandPhase.Attempted, record.Incarnation, caller, command.InterfaceAlias, command.MethodAlias,

@@ -28,25 +28,26 @@ public sealed class AdmitSteps(BrainSteps brain, BrainWorld world)
         FixtureSwitches.Release[name].TrySetResult();
     }
 
-    [Given(@"a throwing ""(.*)"" whose reaction fails (\d+) times then succeeds")]
-    public void GivenThrowing(string name, int failures)
+    [Given(@"a failing ""(.*)"" whose reaction fails (\d+) times then succeeds")]
+    public void GivenFailing(string name, int failures)
     {
-        world.Fixtures[name] = new NeuronId("throwing", name);
-        FixtureSwitches.ThrowingFailuresLeft[name] = failures;
+        world.Fixtures[name] = new NeuronId("failing", name);
+        FixtureSwitches.ReactionFailuresLeft[name] = failures;
     }
 
-    [When(@"""(.*)"" fires (\d+) ""(\w+)"" signals at slow ""(.*)""")]
-    public async Task FireMany(string from, int count, string type, string name)
+    [When(@"""(.*)"" fires (\d+) ""(\w+)"" signals at (slow|failing|counter|plain) ""(.*)""")]
+    public async Task FireMany(string from, int count, string type, string grainType, string name)
     {
         for (var i = 0; i < count; i++)
         {
-            await brain.FireCore(from, type, "{}", new NeuronId("slow", name));
+            await brain.FireCore(from, type, "{}", BrainSteps.Id(grainType, name));
+            Assert.Null(brain.LastError);
         }
     }
 
-    [When(@"""(.*)"" fires ""(\w+)"" at (slow|throwing) ""(.*)""")]
+    [When(@"""(.*)"" fires ""(\w+)"" at (slow|failing|counter|plain) ""(.*)""")]
     public Task FireAtTyped(string from, string type, string grainType, string name)
-        => brain.FireCore(from, type, "{}", new NeuronId(grainType, name));
+        => brain.FireCore(from, type, "{}", BrainSteps.Id(grainType, name));
 
     [Then(@"the last fire reports (\d+) busy target")]
     public void ThenBusy(int count)

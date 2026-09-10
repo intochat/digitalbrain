@@ -8,7 +8,15 @@ public sealed class JournalFaultPlan
 {
     private readonly ConcurrentDictionary<string, int> _writes = new(StringComparer.Ordinal);
     private int _nextWrite;
+    private ReadHold? _readHold;
     private NumberedFault? _numberedFault;
+
+    public Task ReadHeld => Volatile.Read(ref _readHold)?.Held.Task
+        ?? throw new InvalidOperationException("No storage read hold was armed.");
+
+    public void HoldNextRead() => Interlocked.Exchange(ref _readHold, new ReadHold())?.Release.TrySetResult();
+
+    public void ReleaseRead() => Volatile.Read(ref _readHold)?.Release.TrySetResult();
 
     public void FailNextWrite() => Interlocked.Exchange(ref _nextWrite, (int)NextWriteFault.Refuse);
 
@@ -26,6 +34,17 @@ public sealed class JournalFaultPlan
         Interlocked.Exchange(ref _nextWrite, (int)NextWriteFault.None);
         Interlocked.Exchange(ref _numberedFault, null);
         _writes.Clear();
+        Interlocked.Exchange(ref _readHold, null)?.Release.TrySetResult();
+    }
+
+    internal async Task BeforeReadAsync(CancellationToken cancellationToken)
+    {
+        var hold = Volatile.Read(ref _readHold);
+        if (hold is not null && Interlocked.Exchange(ref hold.Claimed, 1) == 0)
+        {
+            hold.Held.TrySetResult();
+            await hold.Release.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
     }
 
     internal void BeforeWrite(string journalId)
@@ -48,6 +67,13 @@ public sealed class JournalFaultPlan
         }
     }
 
+    private sealed class ReadHold
+    {
+        internal readonly TaskCompletionSource Held = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal readonly TaskCompletionSource Release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal int Claimed;
+    }
+
     private sealed record NumberedFault(string JournalId, int Ordinal);
 
     private enum NextWriteFault
@@ -68,8 +94,11 @@ internal sealed class FaultingJournalStorage(IJournalStorage inner, string journ
 {
     public bool IsCompactionRequested => inner.IsCompactionRequested;
 
-    public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
-        => inner.ReadAsync(consumer, cancellationToken);
+    public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+    {
+        await faults.BeforeReadAsync(cancellationToken).ConfigureAwait(false);
+        await inner.ReadAsync(consumer, cancellationToken).ConfigureAwait(false);
+    }
 
     public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {

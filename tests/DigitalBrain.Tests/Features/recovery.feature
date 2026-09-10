@@ -1,12 +1,19 @@
 Feature: Recovery
   A neuron never serves state that storage does not hold.
 
-  Scenario: A failed write fences the activation until revert completes
+  Scenario: A read issued while the neuron is recovering is refused
+    Given a running brain with faulting storage
+    And "claude" is connected to "p" for "Existing"
+    And storage fails the next write
+    When "claude" connects "claude" to plain "p" for "Note" and a read interleaves during the recovery
+    Then the interleaving read of "claude" threw NeuronRecovering
+    And the connect failed
+
+  Scenario: A failed write leaves no synapse behind
     Given a running brain with faulting storage
     And storage fails the next write
     When "claude" connects "claude" to plain "p" for "Note" and the call fails
-    Then reading synapses of "claude" throws NeuronRecovering or shows no "Note" synapse
-    And after storage recovers, "claude" synapses do not include "Note" to "p"
+    Then after storage recovers, "claude" synapses do not include "Note" to "p"
 
   Scenario: Storage cancellation with a live activation is a fault, not a shutdown
     Given a running brain with faulting storage
