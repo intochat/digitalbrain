@@ -39,6 +39,14 @@ internal sealed class AgentNeuron(
             return;
         }
 
+        // Causation identifies this answer; a second Ask on the same correlation is a new question.
+        var answerType = delivery.Signal.Type == AIVocabulary.Ask ? AIVocabulary.Reply : AIVocabulary.Said;
+        var outgoing = await ReadJournal(JournalKind.Outgoing, 0).ConfigureAwait(true);
+        if (outgoing.Delta.Any(entry => entry.Signal.Type == answerType && entry.CausationId == delivery.SignalId))
+        {
+            return;
+        }
+
         // A tool runs on whatever thread the function-invocation loop happens to be on. Grain
         // state may only be touched on the grain's own scheduler, so every tool that reaches the
         // graph hops back to the scheduler this turn started on.
@@ -106,6 +114,13 @@ internal sealed class AgentNeuron(
         // drain would retry the same timeout forever, so it answers like any other failure.
         catch (Exception failure) when (failure is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
+            // A failure to reach or persist escapes instead: the drain retries the whole
+            // reaction, where answering here would end the conversation over a passing fault.
+            if (TransientFailure.Covers(failure))
+            {
+                throw;
+            }
+
             ServiceProvider.GetService<ILogger<AgentNeuron>>()?.LogError(failure, "Agent {Neuron} failed to answer.", Id);
             await ReplyAsync(delivery, failure.Message, cancellationToken).ConfigureAwait(true);
         }

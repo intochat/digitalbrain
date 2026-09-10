@@ -35,7 +35,7 @@ internal sealed class ChatNeuron(
             switch (delivery.Signal.Type)
             {
                 case AIVocabulary.Instruct:
-                    await WireAsync(delivery).ConfigureAwait(true);
+                    await WireAsync(delivery.Signal.Body).ConfigureAwait(true);
                     break;
                 case AIVocabulary.Ask:
                     await StartAsync(delivery, cancellationToken).ConfigureAwait(true);
@@ -51,6 +51,13 @@ internal sealed class ChatNeuron(
         // broken run answers the asker instead of escaping. Nobody else would ever hear why.
         catch (Exception failure) when (failure is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
+            // A failure to reach or persist escapes instead: the drain retries the whole
+            // reaction, where answering here would end the conversation over a passing fault.
+            if (TransientFailure.Covers(failure))
+            {
+                throw;
+            }
+
             ServiceProvider.GetService<ILogger<ChatNeuron>>()?.LogError(failure, "Chat {Neuron} failed to run a turn.", Id);
             await ApologiseAsync(delivery, failure.Message, cancellationToken).ConfigureAwait(true);
         }
@@ -61,9 +68,9 @@ internal sealed class ChatNeuron(
     // The chat wires only its own edges. The participant's Said synapse back to the chat
     // is created by its first Said, because a directed fire creates the synapse it
     // travels on — so a turn never makes a grain call to another neuron, and never a cycle.
-    private async Task WireAsync(SignalDelivery delivery)
+    private async Task WireAsync(string body)
     {
-        var wanted = Participants(Bodies.Instruct(delivery.Signal.Body).Participants);
+        var wanted = Participants(Bodies.Instruct(body).Participants);
 
         foreach (var participant in wanted)
         {
@@ -102,7 +109,7 @@ internal sealed class ChatNeuron(
             instruct.Rounds > 0 ? instruct.Rounds : 1,
             Turn: 0);
         var run = new ChatRun(delivery.CorrelationId.ToString(), delivery.Source.ToString(), policy.ToJson(), PendingParticipant: null);
-        await InviteAsync(run, policy, delivery, cancellationToken).ConfigureAwait(true);
+        await InviteAsync(run, policy, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
     }
 
     // ---- Said: one turn spoken, so either invite the next or answer the asker ----
@@ -112,14 +119,39 @@ internal sealed class ChatNeuron(
         var correlation = delivery.CorrelationId.ToString();
         var run = State?.Runs.FirstOrDefault(r => string.Equals(r.Correlation, correlation, StringComparison.Ordinal));
 
-        // A Said the chat is not waiting for is already the transcript: it is journaled, and
-        // that is all a bystander's line ever needs to be.
-        if (run is null || !string.Equals(run.PendingParticipant, delivery.Source.ToString(), StringComparison.Ordinal))
+        // A Said on a conversation the chat is not tracking is already the transcript: it is
+        // journaled, and that is all a bystander's line ever needs to be.
+        if (run is null)
         {
             return;
         }
 
         var policy = RunPolicy.Parse(run.StateJson);
+        if (!string.Equals(run.PendingParticipant, delivery.Source.ToString(), StringComparison.Ordinal))
+        {
+            if (!policy.Participants.Contains(delivery.Source.ToString(), StringComparer.Ordinal))
+            {
+                return;
+            }
+
+            // Reactions are at-least-once and a snapshot is not written with the pending queue,
+            // so a redelivered Said can meet a run it has already advanced. The transcript, not
+            // the snapshot, says whether the pending participant still owes this turn a line.
+            var transcript = await ReadJournal(JournalKind.Incoming, 0).ConfigureAwait(true);
+            var turnsSpoken = transcript.Delta.Count(entry => entry.Signal.Type == AIVocabulary.Said
+                && entry.CorrelationId == delivery.CorrelationId
+                && policy.Participants.Contains(entry.Source.ToString(), StringComparer.Ordinal));
+            if (turnsSpoken > policy.Turn)
+            {
+                return;
+            }
+
+            // An unchanged policy re-selects the participant the run recorded as pending, so this
+            // re-fires the invitation that was lost. Skipping would end the conversation in silence.
+            await InviteAsync(run, policy, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
+            return;
+        }
+
         policy = policy with { Turn = policy.Turn + 1 };
         if (policy.Turn >= policy.TotalTurns)
         {
@@ -127,16 +159,16 @@ internal sealed class ChatNeuron(
             return;
         }
 
-        await InviteAsync(run, policy, delivery, cancellationToken).ConfigureAwait(true);
+        await InviteAsync(run, policy, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
     }
 
     // Persists the turn state, then fires Turn at the speaker the manager picked. The
     // Said that comes back is this neuron's next inbox entry: fire and read, never wait.
-    private async Task InviteAsync(ChatRun run, RunPolicy policy, SignalDelivery delivery, CancellationToken cancellationToken)
+    private async Task InviteAsync(ChatRun run, RunPolicy policy, CorrelationId correlation, CancellationToken cancellationToken)
     {
-        var next = await SelectAsync(policy, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
+        var next = await SelectAsync(policy, correlation, cancellationToken).ConfigureAwait(true);
         await SaveRunAsync(run with { StateJson = policy.ToJson(), PendingParticipant = next.ToString() }, cancellationToken).ConfigureAwait(true);
-        await FireAsync(Signal.Create(AIVocabulary.Turn, "{}"), next, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
+        await FireAsync(Signal.Create(AIVocabulary.Turn, "{}"), next, correlation, cancellationToken).ConfigureAwait(true);
     }
 
     private async Task CloseAsync(ChatRun run, string text, CorrelationId correlation, CancellationToken cancellationToken)
@@ -144,8 +176,15 @@ internal sealed class ChatNeuron(
         var asker = NeuronId.TryParse(run.Asker, out var parsed)
             ? parsed
             : throw new InvalidOperationException($"'{run.Asker}' is not a neuron name.");
+        // Fire before forgetting the run, so a lost activation leaves the retry something to close.
+        // The outgoing journal keeps that retry from answering the same conversation twice.
+        var read = await ReadJournal(JournalKind.Outgoing, 0).ConfigureAwait(true);
+        if (!read.Delta.Any(entry => entry.Signal.Type == AIVocabulary.Reply && entry.CorrelationId == correlation))
+        {
+            await FireAsync(Signal.Create(AIVocabulary.Reply, Bodies.Write(text)), asker, correlation, cancellationToken).ConfigureAwait(true);
+        }
+
         await SaveRunAsync(run, cancellationToken, remove: true).ConfigureAwait(true);
-        await FireAsync(Signal.Create(AIVocabulary.Reply, Bodies.Write(text)), asker, correlation, cancellationToken).ConfigureAwait(true);
     }
 
     // ---- the turn policy ----
