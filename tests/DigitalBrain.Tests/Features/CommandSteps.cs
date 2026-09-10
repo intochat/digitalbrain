@@ -81,7 +81,7 @@ public sealed class CommandSteps(BrainSteps brain)
     [Then(@"""(.*)"" waits up to (\d+) seconds until counter ""(.*)"" total is (\d+)")]
     public async Task WaitForTotal(string principal, int seconds, string name, int expected)
     {
-        RequestContext.Set(CallerContext.Caller, NeuronId.Plain(principal).ToString());
+        RequestContext.Set(NeuronRequestKeys.Caller, NeuronId.Plain(principal).ToString());
         var counter = Counter(name);
         var deadline = DateTime.UtcNow.AddSeconds(seconds);
         var observed = await counter.ReadTotal();
@@ -147,7 +147,7 @@ public sealed class CommandSteps(BrainSteps brain)
     {
         _lastError = null;
         _lastCommandId = id;
-        RequestContext.Set(CallerContext.Caller, NeuronId.Plain(principal).ToString());
+        RequestContext.Set(NeuronRequestKeys.Caller, NeuronId.Plain(principal).ToString());
         try
         {
             var accepted = await call(id);

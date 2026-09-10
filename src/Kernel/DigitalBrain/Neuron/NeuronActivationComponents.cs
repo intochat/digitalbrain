@@ -12,4 +12,11 @@ internal sealed record NeuronActivationComponents(
     CommandExecution Execution,
     NeuronSynapses Synapses,
     IDurableDictionary<string, SignalDelivery> Latest,
-    PendingWork Pending);
+    PendingWork Pending)
+{
+    internal void NoteCommitted()
+    {
+        Journals.NoteCommitted();
+        Commands.NoteCommitted();
+    }
+}

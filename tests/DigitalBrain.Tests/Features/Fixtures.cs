@@ -3,12 +3,16 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Commands;
+using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Core;
+using DigitalBrain.Tests;
 using Orleans.Concurrency;
 using Orleans.Runtime;
+
+[assembly: NeuronJsonContext(typeof(CounterJson))]
 
 namespace DigitalBrain.Tests;
 
@@ -146,9 +150,9 @@ public sealed record CounterState([property: Id(0)] int Total);
 [GenerateSerializer]
 [Alias("db.test.add-count")]
 public sealed record AddCount(
-    [property: Id(0)] CommandId CommandId,
-    [property: Id(1)] int Amount,
-    [property: Id(2)] string Note = "") : Command(CommandId);
+    CommandId Id,
+    [property: Id(0)] int Count,
+    [property: Id(1)] string Note = "") : Command(Id);
 
 [Alias("test.counter")]
 public interface ICounter : INeuron
@@ -167,8 +171,10 @@ public interface ICounter : INeuron
     Task<int> ReadTotal();
 }
 
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(AddCount))]
 [JsonSerializable(typeof(Accepted<int>))]
+[JsonSerializable(typeof(int))]
 internal sealed partial class CounterJson : JsonSerializerContext;
 
 [GrainType("counter")]
@@ -177,32 +183,28 @@ internal sealed class CounterNeuron(
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<CounterState> state)
     : Neuron<CounterState>(runtime, state), ICounter
 {
-    private static readonly CommandDescriptor AddCommand = new("test.counter", "add");
-    private static readonly CommandDescriptor SaveCommand = new("test.counter", "save");
-    private static readonly CommandDescriptor CallOutCommand = new("test.counter", "callout");
-
     public Task<Accepted<int>> Add(AddCount command) => ExecuteCommandAsync(
-        AddCommand, command, CounterJson.Default.AddCount, CounterJson.Default.AcceptedInt32, arguments =>
+        Descriptor("add"), command, CounterJson.Default.AddCount, CounterJson.Default.AcceptedInt32, arguments =>
         {
             FixtureSwitches.CommandExecutions.AddOrUpdate(Id.Name, 1, (_, count) => count + 1);
-            var work = Schedule(Signal.Create("Counted", "{\"amount\":" + arguments.Amount + "}"));
-            return new Accepted<int>(arguments.Amount, work);
+            var work = Schedule(Signal.Create("Counted", "{\"amount\":" + arguments.Count + "}"));
+            return new Accepted<int>(arguments.Count, work);
         });
 
     public Task<Accepted<int>> AddAndSave(AddCount command) => ExecuteCommandAsync(
-        SaveCommand, command, CounterJson.Default.AddCount, CounterJson.Default.AcceptedInt32, arguments =>
+        Descriptor("save"), command, CounterJson.Default.AddCount, CounterJson.Default.AcceptedInt32, arguments =>
         {
             // The fixture deliberately breaks the reaction-only snapshot rule.
-            _ = SaveAsync(new CounterState(arguments.Amount));
-            return new Accepted<int>(arguments.Amount, default);
+            _ = SaveAsync(new CounterState(arguments.Count));
+            return new Accepted<int>(arguments.Count, default);
         });
 
     public Task<Accepted<int>> AddAndCallOut(AddCount command) => ExecuteCommandAsync(
-        CallOutCommand, command, CounterJson.Default.AddCount, CounterJson.Default.AcceptedInt32, arguments =>
+        Descriptor("callout"), command, CounterJson.Default.AddCount, CounterJson.Default.AcceptedInt32, arguments =>
         {
             // The fixture deliberately breaks the commands-are-local rule; the outgoing filter rejects before dispatch, so the wait never blocks.
             GrainFactory.GetGrain<INeuron>(NeuronId.Plain("bystander").ToGrainId()).ReadState().GetAwaiter().GetResult();
-            return new Accepted<int>(arguments.Amount, default);
+            return new Accepted<int>(arguments.Count, default);
         });
 
     protected override async Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)

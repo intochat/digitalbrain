@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Neurons;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Core;
@@ -13,8 +14,8 @@ internal sealed class OutgoingCallerFilter : IOutgoingGrainCallFilter
             return;
         }
 
-        var previous = RequestContext.Get(CallerContext.Caller);
-        RequestContext.Set(CallerContext.Caller, NeuronId.FromGrainId(sourceId).ToString());
+        var previous = RequestContext.Get(NeuronRequestKeys.Caller);
+        RequestContext.Set(NeuronRequestKeys.Caller, NeuronId.FromGrainId(sourceId).ToString());
         try
         {
             await context.Invoke().ConfigureAwait(true);
@@ -23,11 +24,11 @@ internal sealed class OutgoingCallerFilter : IOutgoingGrainCallFilter
         {
             if (previous is null)
             {
-                RequestContext.Remove(CallerContext.Caller);
+                RequestContext.Remove(NeuronRequestKeys.Caller);
             }
             else
             {
-                RequestContext.Set(CallerContext.Caller, previous);
+                RequestContext.Set(NeuronRequestKeys.Caller, previous);
             }
         }
     }

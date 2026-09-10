@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Mcp;
+using Microsoft.Extensions.DependencyInjection;
 using Reqnroll;
 using Xunit;
 
@@ -15,7 +17,7 @@ public sealed class OperationSteps(BrainSteps brain)
     private List<string> _walk = [];
     private int _types;
 
-    private BrainOperations Ops => new(brain.Brain.Grains);
+    private BrainOperations Ops => new(brain.Brain.Grains, brain.Brain.SiloServices.GetRequiredService<INeuronInvoker>());
 
     [Given(@"session ""(.*)"" fires ""([^""]+)"" (\{.*\}) at ""(.*)""")]
     [When(@"session ""(.*)"" fires ""([^""]+)"" (\{.*\}) at ""(.*)""")]

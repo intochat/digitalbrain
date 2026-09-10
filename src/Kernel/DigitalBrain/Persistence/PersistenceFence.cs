@@ -5,7 +5,7 @@ using Orleans.Journaling;
 namespace DigitalBrain.Core;
 
 internal sealed class PersistenceFence(NeuronId neuron, IJournaledStateManager stateManager,
-    CancellationToken activation, Func<bool> reconcile, Action deactivateOnIdle)
+    CancellationToken activation, Func<bool> reconcile, Action deactivateOnIdle, Action noteCommitted)
 {
     private bool _faulted;
     private bool _storageHoldsJournal;
@@ -33,6 +33,7 @@ internal sealed class PersistenceFence(NeuronId neuron, IJournaledStateManager s
         try
         {
             await stateManager.WriteStateAsync(activation).ConfigureAwait(true);
+            noteCommitted();
             _storageHoldsJournal = true;
         }
         catch (OperationCanceledException) when (activation.IsCancellationRequested)
@@ -59,6 +60,7 @@ internal sealed class PersistenceFence(NeuronId neuron, IJournaledStateManager s
         try
         {
             await stateManager.RevertPendingChangesAsync(activation).ConfigureAwait(true);
+            noteCommitted();
         }
         catch (Exception failure)
         {
@@ -80,6 +82,7 @@ internal sealed class PersistenceFence(NeuronId neuron, IJournaledStateManager s
             if (reconcile())
             {
                 await stateManager.WriteStateAsync(activation).ConfigureAwait(true);
+                noteCommitted();
                 _storageHoldsJournal = true;
             }
         }

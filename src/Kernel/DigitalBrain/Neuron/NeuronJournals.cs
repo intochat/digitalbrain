@@ -15,6 +15,12 @@ internal sealed class NeuronJournals(JournalWindow incoming, JournalWindow outgo
 
     internal void AppendOutgoing(SignalDelivery delivery) => outgoing.Append(delivery);
 
+    internal void NoteCommitted()
+    {
+        incoming.NoteCommitted();
+        outgoing.NoteCommitted();
+    }
+
     private JournalWindow WindowFor(JournalKind kind) => kind switch
     {
         JournalKind.Incoming => incoming,

@@ -9,7 +9,6 @@ namespace DigitalBrain.Core;
 internal sealed class CommandJournal
 {
     private readonly BoundedJournal<CommandRecord> _retained;
-    private readonly IDurableValue<long> _lastSequence;
 
     internal CommandJournal(
         IDurableList<byte[]> retained,
@@ -21,38 +20,34 @@ internal sealed class CommandJournal
         ArgumentNullException.ThrowIfNull(lastSequence);
         ArgumentNullException.ThrowIfNull(records);
         ArgumentNullException.ThrowIfNull(sessions);
-        _retained = new(retained, records, sessions);
-        _lastSequence = lastSequence;
+        _retained = new(retained, lastSequence, records, sessions);
     }
 
-    internal long CommittedSequence => _lastSequence.Value; // A5 makes this a real committed cursor.
+    internal long LastSequence => _retained.LastSequence;
 
-    internal long EarliestRetained => _retained.Count == 0 ? CommittedSequence + 1 : CommittedSequence - _retained.Count + 1;
+    internal long CommittedSequence => _retained.CommittedSequence;
 
-    internal CommandRecord Append(CommandRecord record)
-    {
-        var next = CommittedSequence + 1;
-        var stored = record with { Sequence = next };
-        _retained.Append(stored);
-        _lastSequence.Value = next;
-        return stored;
-    }
+    internal long EarliestRetained => _retained.EarliestRetained;
+
+    internal void NoteCommitted() => _retained.NoteCommitted();
+
+    internal CommandRecord Append(CommandRecord record) => _retained.Append(sequence => record with { Sequence = sequence });
 
     internal CommandJournalRead Read(long afterSequence)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
         var earliest = EarliestRetained;
+        var gap = afterSequence + 1 < earliest;
         List<CommandRecord> delta = [];
-        for (var index = 0; index < _retained.Count; index++)
+        if (!gap && afterSequence < CommittedSequence)
         {
-            var record = _retained[index];
-            if (record.Sequence > afterSequence)
+            for (var index = _retained.FirstIndexAfter(afterSequence); index < _retained.CommittedCount; index++)
             {
-                delta.Add(record);
+                delta.Add(_retained[index]);
             }
         }
 
-        return new(CommittedSequence, earliest, afterSequence + 1 < earliest, delta);
+        return new(CommittedSequence, earliest, gap, delta);
     }
 
     internal bool HasTerminalRecord(CommandId id, int incarnation)

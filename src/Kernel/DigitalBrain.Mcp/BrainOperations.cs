@@ -1,17 +1,60 @@
+using System.Text.Json;
+using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
+using Orleans.Runtime;
 
 namespace DigitalBrain.Mcp;
 
-// The client. Five operations; the MCP tools are thin wrappers over these.
-public sealed class BrainOperations(IGrainFactory grains)
+// The client. Seven operations; the MCP tools are thin wrappers over these.
+public sealed class BrainOperations(IGrainFactory grains, INeuronInvoker invoker)
 {
     // A read is a query, not a subscription: a client that wants to wait longer polls again.
     public const int MaxTimeoutSeconds = 60;
 
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(100);
+
+    public Task<IReadOnlyList<MethodDescriptor>> DescribeAsync(DescribeRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (request is { Neuron: not null, Interface: null, Method: null })
+        {
+            return Task.FromResult(invoker.Describe(Parse(request.Neuron, nameof(request))));
+        }
+
+        if (request is { Neuron: null, Interface: not null, Method: not null })
+        {
+            return Task.FromResult<IReadOnlyList<MethodDescriptor>>([invoker.Describe(request.Interface, request.Method)]);
+        }
+
+        throw new ArgumentException("Use either neuron alone, or interface plus method, to describe callable methods.", nameof(request));
+    }
+
+    public async Task<JsonElement?> CallAsync(string session, CallRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var caller = Session(session);
+        var previous = RequestContext.Get(NeuronRequestKeys.Caller);
+        RequestContext.Set(NeuronRequestKeys.Caller, caller.ToString());
+        try
+        {
+            return await invoker.InvokeAsync(Parse(request.Neuron, nameof(request)), request.Interface,
+                request.Method, request.Arguments, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (previous is null)
+            {
+                RequestContext.Remove(NeuronRequestKeys.Caller);
+            }
+            else
+            {
+                RequestContext.Set(NeuronRequestKeys.Caller, previous);
+            }
+        }
+    }
 
     public async Task<FireResult> FireAsync(string session, FireRequest request, CancellationToken cancellationToken = default)
     {
@@ -62,7 +105,7 @@ public sealed class BrainOperations(IGrainFactory grains)
         var what = request.What?.Trim().ToLowerInvariant();
         if (what is not (null or "" or "state" or "synapses" or "incoming" or "outgoing" or "commands"))
         {
-            throw new ArgumentException($"'{request.What}' is not a view. Use state, synapses, incoming, outgoing or commands, or omit it for all five.", nameof(request));
+            throw new ArgumentException($"'{request.What}' is not a view. Use state, synapses, incoming, outgoing or commands, or omit it for all but commands.", nameof(request));
         }
 
         // One budget for the whole read: a default read must not wait it out twice.
@@ -94,7 +137,7 @@ public sealed class BrainOperations(IGrainFactory grains)
             outgoing = await ReadJournalAsync(query, JournalKind.Outgoing, request.After, deadline, cancellationToken).ConfigureAwait(false);
         }
 
-        if (all || what == "commands")
+        if (what == "commands")
         {
             var read = await query.ReadCommands(request.After).ConfigureAwait(false);
             commands = new(read.ResumeSequence, read.EarliestRetained, read.Gap,

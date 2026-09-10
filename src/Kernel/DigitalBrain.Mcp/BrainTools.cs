@@ -68,16 +68,46 @@ public sealed class BrainTools(BrainOperations operations, SessionPrincipal sess
     [McpServerTool(Name = "read"), Description(
         "Read a neuron without changing anything. Returns its state (latest signal per type), its synapses, and its incoming and outgoing journals. "
         + "Recall pattern: read a topic's synapses, follow each target, read its state. "
-        + "`what` narrows to state | synapses | incoming | outgoing. `after` is a journal sequence to resume from. "
+        + "`what` narrows to state | synapses | incoming | outgoing | commands. Omitting `what` returns all but commands. `after` is a journal sequence to resume from. "
         + "`timeoutSeconds` makes an incoming/outgoing read wait for the next entry. Your own Session neuron is named after your principal (default `claude`).")]
     public Task<string> Read(
         [Description("Neuron name, e.g. git or run-tests-before-commit")] string neuron,
-        [Description("state | synapses | incoming | outgoing; omit for all four")] string? what = null,
+        [Description("state | synapses | incoming | outgoing | commands; omit for all but commands")] string? what = null,
         [Description("Journal sequence to read after; 0 for the retained window")] long after = 0,
         [Description("Seconds to wait for a new journal entry, at most 60; 0 returns immediately")] int timeoutSeconds = 0,
         CancellationToken cancellationToken = default)
         => Guard(async () => JsonSerializer.Serialize(
             await operations.ReadAsync(new(neuron, what, after, timeoutSeconds), cancellationToken).ConfigureAwait(false), Json));
+
+    [McpServerTool(Name = "describe"), Description(
+        "Discover the typed methods a neuron exposes before calling them. Pass `neuron` alone to list its module methods, "
+        + "or pass `interface` and `method` aliases together to inspect one method. Returns interface and method aliases, "
+        + "whether each method is read-only, JSON schemas for its arguments and result, and documentation when available. "
+        + "Use the argument schema to construct the JSON for call; kernel operations are available as separate tools.")]
+    public Task<string> Describe(
+        [Description("Neuron name, e.g. counter:items; omit when selecting an interface and method")] string? neuron = null,
+        [Description("Interface alias returned by describe; provide together with method")] string? @interface = null,
+        [Description("Method alias within the interface; provide together with interface")] string? method = null)
+        => Guard(async () => JsonSerializer.Serialize(
+            await operations.DescribeAsync(new(neuron, @interface, method)).ConfigureAwait(false), Json));
+
+    [McpServerTool(Name = "call"), Description(
+        "Invoke a typed method on a neuron using aliases and the argument schema returned by describe. Pass the target `neuron`, "
+        + "its `interface` alias, the `method` alias and an `args` JSON object matching that method's schema; use {} for no arguments. "
+        + "Mutating methods take a command id for retries and record your Session neuron as caller. Returns the method's JSON result, "
+        + "or null when it has no result. A wrong interface returns the interfaces the target actually implements.")]
+    public Task<string> Call(
+        [Description("Target neuron name, including its type, e.g. counter:items")] string neuron,
+        [Description("Interface alias returned by describe")] string @interface,
+        [Description("Method alias returned by describe")] string method,
+        [Description("JSON arguments matching the method's args schema; {} when there are none")] string args,
+        CancellationToken cancellationToken = default)
+        => Guard(async () =>
+        {
+            using var document = JsonDocument.Parse(args);
+            return JsonSerializer.Serialize(await operations.CallAsync(session.Name,
+                new(neuron, @interface, method, document.RootElement), cancellationToken).ConfigureAwait(false), Json);
+        });
 
     // A rejection is advice, so the caller must see the kernel's own wording, not a generic
     // "an error occurred". McpException is the one exception the SDK relays verbatim.

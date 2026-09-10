@@ -1,5 +1,6 @@
 using System.IO.Pipelines;
 using System.Text.Json;
+using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Mcp;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Client;
@@ -25,6 +26,7 @@ public sealed class McpSteps(BrainSteps brain)
         Pipe toServer = new(), toClient = new();
         var services = new ServiceCollection();
         services.AddSingleton(brain.Brain.Grains);
+        services.AddSingleton(brain.Brain.SiloServices.GetRequiredService<INeuronInvoker>());
         services.AddSingleton(new SessionPrincipal(principal));
         services.AddDigitalBrainMcp()
             .WithStreamServerTransport(toServer.Reader.AsStream(), toClient.Writer.AsStream());

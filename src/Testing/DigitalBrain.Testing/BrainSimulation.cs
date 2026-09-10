@@ -32,6 +32,8 @@ public sealed class BrainSimulation : IAsyncDisposable
 
     public IGrainFactory Grains { get; }
 
+    public IServiceProvider SiloServices => inProcess.GetActiveSilos().Single().ServiceProvider;
+
     public static async Task<BrainSimulation> StartAsync(BrainSimulationOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);

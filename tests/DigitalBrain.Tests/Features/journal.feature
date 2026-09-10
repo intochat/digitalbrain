@@ -1,5 +1,6 @@
 Feature: Journal
   Two bounded windows per neuron. Envelopes only. Tallies and sequences outlive the window.
+  A read serves the committed view and reports a gap when the cursor falls behind the retained window.
 
   Scenario: Tallies count every delivery per type and survive restart
     Given a running brain with durable storage

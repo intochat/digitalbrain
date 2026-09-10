@@ -7,6 +7,7 @@ namespace DigitalBrain.Core;
 
 internal sealed class BoundedJournal<T>(
     IDurableList<byte[]> retained,
+    IDurableValue<long> lastSequence,
     Serializer<T> entries,
     SerializerSessionPool sessions)
 {
@@ -14,6 +15,18 @@ internal sealed class BoundedJournal<T>(
     private const int MaxRetainedBytes = 512 * 1024;
 
     internal int Count => retained.Count;
+
+    internal long LastSequence => lastSequence.Value;
+
+    internal long CommittedSequence { get; private set; }
+
+    internal long EarliestRetained => LastSequence - Count + 1;
+
+    internal int CommittedCount => (int)Math.Clamp(CommittedSequence - EarliestRetained + 1, 0, Count);
+
+    internal int FirstIndexAfter(long afterSequence) => (int)Math.Clamp(afterSequence - EarliestRetained + 1, 0, Count);
+
+    internal void NoteCommitted() => CommittedSequence = LastSequence;
 
     internal T this[int index]
     {
@@ -25,9 +38,12 @@ internal sealed class BoundedJournal<T>(
         }
     }
 
-    internal void Append(T entry)
+    internal T Append(Func<long, T> create)
     {
+        var sequence = LastSequence + 1;
+        var entry = create(sequence);
         retained.Add(entries.SerializeToArray(entry));
+        lastSequence.Value = sequence;
         var retainedBytes = retained.Sum(encoded => (long)encoded.Length);
         while (retained.Count > MaxRetainedEntries
             || (retainedBytes > MaxRetainedBytes && retained.Count > 1))
@@ -35,5 +51,7 @@ internal sealed class BoundedJournal<T>(
             retainedBytes -= retained[0].Length;
             retained.RemoveAt(0);
         }
+
+        return entry;
     }
 }

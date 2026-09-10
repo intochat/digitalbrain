@@ -12,7 +12,7 @@ internal sealed class JournalWindow
 {
     private readonly BoundedJournal<JournalEntry> _retained;
     private readonly IDurableDictionary<string, long> _tallies;
-    private readonly IDurableValue<long> _lastSequence;
+    private JournalTally[] _committedTallies = [];
 
     internal JournalWindow(
         IDurableList<byte[]> retained,
@@ -27,29 +27,27 @@ internal sealed class JournalWindow
         ArgumentNullException.ThrowIfNull(entries);
         ArgumentNullException.ThrowIfNull(sessions);
 
-        _retained = new(retained, entries, sessions);
+        _retained = new(retained, lastSequence, entries, sessions);
         _tallies = tallies;
-        _lastSequence = lastSequence;
     }
 
-    internal long NextSequence => _lastSequence.Value + 1;
+    internal long NextSequence => _retained.LastSequence + 1;
 
     internal JournalRead Read(long afterSequence)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
 
-        var lastSequence = _lastSequence.Value;
-        var earliest = EarliestRetainedSequence();
+        var lastSequence = _retained.CommittedSequence;
+        var earliest = _retained.EarliestRetained;
         var gap = afterSequence + 1 < earliest;
 
-        if (afterSequence > lastSequence || gap)
+        if (afterSequence >= lastSequence || gap)
         {
             return new(lastSequence, earliest, gap, [], Snapshot());
         }
 
-        var firstIndex = (int)(afterSequence - earliest + 1);
         List<SignalDelivery> deliveries = [];
-        for (var index = firstIndex; index < _retained.Count; index++)
+        for (var index = _retained.FirstIndexAfter(afterSequence); index < _retained.CommittedCount; index++)
         {
             deliveries.Add(_retained[index].Delivery);
         }
@@ -59,23 +57,24 @@ internal sealed class JournalWindow
 
     internal void Append(SignalDelivery delivery)
     {
-        var sequence = _lastSequence.Value + 1;
         var signalType = TallyKeyFor(delivery);
 
-        _lastSequence.Value = sequence;
-        _retained.Append(new JournalEntry(sequence, delivery));
+        _retained.Append(sequence => new JournalEntry(sequence, delivery));
         _tallies[signalType] = RecordedOf(signalType) + 1;
     }
 
     internal JournalSnapshot Snapshot() => new(
-        TotalRecorded: _tallies.Sum(tally => tally.Value),
-        LastSequence: _lastSequence.Value,
-        EarliestRetainedSequence: EarliestRetainedSequence(),
-        RetainedCount: _retained.Count,
-        Tallies: [.. _tallies.Select(tally => new JournalTally(tally.Key, tally.Value))]);
+        TotalRecorded: _committedTallies.Sum(tally => tally.Recorded),
+        LastSequence: _retained.CommittedSequence,
+        EarliestRetainedSequence: _retained.EarliestRetained,
+        RetainedCount: _retained.CommittedCount,
+        Tallies: _committedTallies);
 
-    private long EarliestRetainedSequence()
-        => _retained.Count == 0 ? _lastSequence.Value + 1 : _lastSequence.Value - _retained.Count + 1;
+    internal void NoteCommitted()
+    {
+        _retained.NoteCommitted();
+        _committedTallies = [.. _tallies.Select(tally => new JournalTally(tally.Key, tally.Value))];
+    }
 
     private long RecordedOf(string signalType)
         => _tallies.TryGetValue(signalType, out var recorded) ? recorded : 0;

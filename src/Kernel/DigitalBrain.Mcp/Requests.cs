@@ -1,4 +1,10 @@
+using System.Text.Json;
+
 namespace DigitalBrain.Mcp;
+
+public sealed record DescribeRequest(string? Neuron = null, string? Interface = null, string? Method = null);
+
+public sealed record CallRequest(string Neuron, string Interface, string Method, JsonElement Arguments);
 
 public sealed record FireRequest(string Type, string Body, string? To = null, string? Correlation = null);
 

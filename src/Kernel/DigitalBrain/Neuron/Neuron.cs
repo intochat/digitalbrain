@@ -24,6 +24,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
 
     private readonly NeuronActivationComponents _components;
     private readonly PersistenceFence _fence;
+    private readonly DescriptorTable _descriptors;
 
     private readonly CancellationTokenSource _activation = new();
     private readonly RetryScheduler _retry;
@@ -33,10 +34,11 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     protected Neuron(NeuronRuntime runtime)
     {
         ArgumentNullException.ThrowIfNull(runtime);
+        _descriptors = ServiceProvider.GetRequiredService<DescriptorTable>();
         _components = runtime.Bind(ServiceProvider, Id);
         _fence = new PersistenceFence(Id, StateManager, _activation.Token,
             () => CommandReconciliation.Reconcile(_components.Commands, _components.Dedup, TimeProvider.GetUtcNow()),
-            DeactivateOnIdle);
+            DeactivateOnIdle, _components.NoteCommitted);
         _retry = new RetryScheduler(this, _ => ((INeuronInbox)this).Drain(), _components.Options.RetryReminderPeriod);
     }
 
@@ -93,6 +95,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     {
         NeuronConcurrency.RequireSerializedTurns(GetType());
         await base.OnActivateAsync(cancellationToken).ConfigureAwait(true);
+        _components.NoteCommitted();
         _fence.NoteStoredState(StorageHoldsState());
         if (CommandReconciliation.Reconcile(_components.Commands, _components.Dedup, TimeProvider.GetUtcNow()))
         {
@@ -112,7 +115,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     private bool StorageHoldsState()
         => _components.Journals.IncomingNextSequence > 1
             || _components.Journals.OutgoingNextSequence > 1
-            || _components.Commands.CommittedSequence > 0
+            || _components.Commands.LastSequence > 0
             || _components.Synapses.All().Count > 0
             || _components.Pending.Count > 0
             || _components.Latest.Count > 0;
@@ -280,9 +283,9 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
             return;
         }
 
-        RequestContext.Set(CallerContext.Caller, delivery.Source.ToString());
-        RequestContext.Set(CallerContext.Correlation, delivery.CorrelationId.ToString());
-        RequestContext.Set(CallerContext.Causation, delivery.SignalId.ToString());
+        RequestContext.Set(NeuronRequestKeys.Caller, delivery.Source.ToString());
+        RequestContext.Set(NeuronRequestKeys.Correlation, delivery.CorrelationId.ToString());
+        RequestContext.Set(NeuronRequestKeys.Causation, delivery.SignalId.ToString());
 
         var previous = ReactionContext;
         var previousReacting = _reacting;
@@ -365,6 +368,8 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     }
 
     // ---- for subclasses ----
+
+    protected CommandDescriptor Descriptor(string methodAlias) => _descriptors.DescriptorFor(this.GetGrainId().Type, methodAlias);
 
     protected async Task<TResult> ExecuteCommandAsync<TArguments, TResult>(
         CommandDescriptor command, TArguments arguments,
