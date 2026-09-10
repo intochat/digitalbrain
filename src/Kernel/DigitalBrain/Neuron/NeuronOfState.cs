@@ -33,7 +33,9 @@ public abstract class Neuron<TState> : Neuron where TState : class
 
     private protected override bool IsAppliedBy(SignalId delivery) => Envelope.AppliedBy == delivery;
 
-    private protected override void DiscardBufferedAnnouncements() => _announcements.DiscardBuffered();
+    private protected override bool HasBufferedAnnouncements => _announcements.HasBuffered;
+
+    private protected override void DiscardBufferedAnnouncements() => _announcements.Clear();
 
     private protected override async Task<bool> DrainAnnouncementsAsync(CancellationToken cancellationToken)
     {
@@ -64,12 +66,14 @@ public abstract class Neuron<TState> : Neuron where TState : class
     private async Task SaveSnapshotAsync(SnapshotEnvelope<TState> envelope, CancellationToken cancellationToken)
     {
         await WriteEnvelopeAsync(envelope, cancellationToken).ConfigureAwait(true);
-        _announcements.NoteSaved();
+        NoteSnapshotSaved();
+        _announcements.Clear();
         _crashPoint?.AfterSnapshotSave(Id);
     }
 
     protected void Announce(Signal signal, NeuronId? to = null, CorrelationId? correlation = null)
     {
+        ArgumentNullException.ThrowIfNull(signal);
         if (ExecutingCommand is { } id)
         {
             throw new InvalidOperationException(
@@ -82,7 +86,6 @@ public abstract class Neuron<TState> : Neuron where TState : class
                 $"Neuron '{Id}' can only announce from a reaction: announcements are saved with the snapshot.");
         }
 
-        ArgumentNullException.ThrowIfNull(signal);
         signal = Signal.Create(signal.Type, signal.Body);
         if (to == Id)
         {

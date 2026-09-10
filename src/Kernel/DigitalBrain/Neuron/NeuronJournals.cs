@@ -1,3 +1,4 @@
+using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Signals;
 
@@ -14,6 +15,8 @@ internal sealed class NeuronJournals(JournalWindow incoming, JournalWindow outgo
     internal void AppendIncoming(SignalDelivery delivery) => incoming.Append(delivery);
 
     internal void AppendOutgoing(SignalDelivery delivery) => outgoing.Append(delivery);
+
+    internal bool RetainsOutgoing(SignalId signalId) => outgoing.Retains(signalId);
 
     internal NeuronJournalsBoundary CaptureCommitBoundary() => new(incoming.CaptureCommitBoundary(), outgoing.CaptureCommitBoundary());
 

@@ -45,10 +45,13 @@ internal sealed class RetryScheduler(IGrainBase grain, Func<CancellationToken, T
 
     internal void NoteTick() => _tickObserved = true;
 
-    internal async Task AfterDrainAsync()
+    internal async Task AfterDrainAsync(bool announcementsRemain)
     {
         Suspend();
-        _delay = TimeSpan.FromSeconds(1);
+        if (!announcementsRemain)
+        {
+            _delay = TimeSpan.FromSeconds(1);
+        }
 
         await _reminderGate.WaitAsync(activation).ConfigureAwait(true);
         try

@@ -147,8 +147,12 @@ snapshot facet.
   id` and the buffered announcements in one snapshot write. After the reaction, and again on
   every activation, the kernel fires each stored announcement with its pre-minted id
   (`Busy` keeps it for the retry scheduler; a duplicate fire is `Duplicate` at the receiver)
-  and removes it with a snapshot save once every target accepted. A retry whose head id equals
-  `AppliedBy` skips `ReceiveAsync` and only drains announcements. A reaction that must fire
+  and removes it with a snapshot save once every target accepted. The drain retries any failure —
+  `Busy`, a delivery that throws, a snapshot save that fails — without bound on the same timer and
+  reminder as the pending head, until every target has accepted. A retry whose head id equals
+  `AppliedBy` skips `ReceiveAsync` and only drains announcements, so a reaction saves once, last:
+  the kernel refuses a `Schedule` after the save, a second save in one reaction, and an `Announce`
+  the turn never saved. A reaction that must fire
   before saving (a request whose reply it awaits) still uses `FireAsync` and must be
   idempotent against its own state; everything that is "save then tell the graph" uses
   `Announce`. `FireOutcome.Busy` from a required target is a transient failure, never a

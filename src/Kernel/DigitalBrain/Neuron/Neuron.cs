@@ -30,6 +30,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     private readonly RetryScheduler _retry;
     private (SignalId Id, CancellationTokenSource Cancellation)? _reacting;
     private readonly List<SignalDelivery> _turnWork = [];
+    private bool _reactionSaved;
 
     protected Neuron(NeuronRuntime runtime)
     {
@@ -165,6 +166,10 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     // Snapshot hooks let the drain finish saved reactions and their announcements.
     private protected virtual bool HasStoredAnnouncements => false;
 
+    private protected virtual bool HasBufferedAnnouncements => false;
+
+    private protected void NoteSnapshotSaved() => _reactionSaved = ReactionContext is DeliveryReaction;
+
     private protected virtual bool IsAppliedBy(SignalId delivery) => false;
 
     private protected virtual void DiscardBufferedAnnouncements() { }
@@ -226,6 +231,12 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     protected SignalId Schedule(Signal signal, CorrelationId? correlation = null)
     {
         ArgumentNullException.ThrowIfNull(signal);
+        if (_reactionSaved)
+        {
+            throw new InvalidOperationException(
+                $"Neuron '{Id}' must schedule and announce before the save; a reaction saves once, last.");
+        }
+
         signal = Signal.Create(signal.Type, signal.Body);
         RequireSignalTypeCapacity(signal.Type);
         var delivery = SignalDelivery.Create(signal, Id, _components.Journals.IncomingNextSequence, TimeProvider, (ReactionContext as DeliveryReaction)?.Delivery, correlation);
@@ -334,6 +345,12 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
             try
             {
                 await ReceiveAsync(delivery, reaction.Token).ConfigureAwait(true);
+                if (HasBufferedAnnouncements)
+                {
+                    throw new InvalidOperationException(
+                        $"Neuron '{Id}' announced without saving: announcements are saved with the snapshot.");
+                }
+
                 AdmitTurnWork();
             }
             catch (OperationCanceledException) when (_activation.Token.IsCancellationRequested)
@@ -363,6 +380,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         {
             // A failed or cancelled attempt drops whatever it scheduled.
             _turnWork.Clear();
+            _reactionSaved = false;
             DiscardBufferedAnnouncements();
             ReactionContext = previous;
             _reacting = previousReacting;
@@ -379,7 +397,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
             return;
         }
 
-        await _retry.AfterDrainAsync().ConfigureAwait(true);
+        await _retry.AfterDrainAsync(remaining).ConfigureAwait(true);
         if (remaining)
         {
             _retry.ArmTimer();
@@ -512,7 +530,11 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
             delivery = delivery with { SignalId = announcementId, CausationId = fixedCausation };
         }
 
-        _components.Journals.AppendOutgoing(delivery);
+        // A re-fire is the same signal, so the journal keeps one entry for it.
+        if (fixedId is null || !_components.Journals.RetainsOutgoing(delivery.SignalId))
+        {
+            _components.Journals.AppendOutgoing(delivery);
+        }
         await PersistAsync().ConfigureAwait(true);
 
         var targets = to is { } one

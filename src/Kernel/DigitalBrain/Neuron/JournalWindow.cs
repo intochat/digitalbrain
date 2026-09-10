@@ -1,3 +1,4 @@
+using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Signals;
 using Orleans.Journaling;
@@ -37,6 +38,19 @@ internal sealed class JournalWindow
     }
 
     internal long NextSequence => _retained.LastSequence + 1;
+
+    internal bool Retains(SignalId signalId)
+    {
+        for (var index = _retained.Count - 1; index >= 0; index--)
+        {
+            if (_retained[index].Delivery.SignalId == signalId)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     internal JournalRead Read(long afterSequence)
     {

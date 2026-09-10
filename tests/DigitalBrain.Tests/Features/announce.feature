@@ -26,3 +26,12 @@ Feature: Announce
     When "claude" fires "Ping" at announcing "a"
     And "p" waits up to 10 seconds for an incoming "Pong"
     Then "a" tally is 1
+
+  Scenario: A reaction that announces without saving fails and is retried
+    Given a running brain
+    And "claude" is connected from announcing "a" for "Pong"
+    And announcing "a" forgets to save its first reaction
+    When "claude" fires "Ping" at announcing "a"
+    And "claude" waits up to 10 seconds for an incoming "Pong"
+    Then "a" tally is 1
+    And "claude" incoming journal contains exactly 1 "Pong"

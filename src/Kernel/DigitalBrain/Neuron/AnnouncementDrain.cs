@@ -8,11 +8,11 @@ internal sealed class AnnouncementDrain(Func<Announcement, CancellationToken, Ta
 
     internal void Buffer(Announcement announcement) => _buffered.Add(announcement);
 
-    internal void DiscardBuffered() => _buffered.Clear();
+    internal bool HasBuffered => _buffered.Count > 0;
 
     internal IReadOnlyList<Announcement> WithBuffered(IReadOnlyList<Announcement> stored) => [.. stored, .. _buffered];
 
-    internal void NoteSaved() => _buffered.Clear();
+    internal void Clear() => _buffered.Clear();
 
     internal async Task<IReadOnlyList<Announcement>> FireStoredAsync(IReadOnlyList<Announcement> stored, CancellationToken cancellationToken)
     {

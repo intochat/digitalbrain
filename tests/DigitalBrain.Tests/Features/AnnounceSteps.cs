@@ -28,6 +28,9 @@ public sealed class AnnounceSteps(BrainSteps brain, BrainWorld world)
     [Given(@"delivery to ""(.*)"" fails once")]
     public static void FailDeliveryOnce(string name) => FixtureSwitches.DeliveryFailuresLeft[name] = 1;
 
+    [Given(@"announcing ""(.*)"" forgets to save its first reaction")]
+    public static void ForgetFirstReactionSave(string name) => FixtureSwitches.ForgetAnnouncementSaveOnce[name] = 0;
+
     [Given(@"session ""(.*)"" pending queue is full")]
     public async Task FillPendingQueue(string name)
     {

@@ -41,6 +41,11 @@ internal sealed class AnnouncingNeuron(
 
         var tally = (State?.Tally ?? 0) + 1;
         Announce(Signal.Create("Pong", "{\"n\":" + tally + "}"), correlation: delivery.CorrelationId);
+        if (FixtureSwitches.ForgetAnnouncementSaveOnce.TryRemove(Id.Name, out _))
+        {
+            return Task.CompletedTask;
+        }
+
         return SaveAsync(new TallyState(tally), cancellationToken);
     }
 }

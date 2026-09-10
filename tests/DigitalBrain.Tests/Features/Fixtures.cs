@@ -67,6 +67,8 @@ public static class FixtureSwitches
 
     public static ConcurrentDictionary<string, int> DeliveryFailuresLeft { get; } = new(StringComparer.Ordinal);
 
+    public static ConcurrentDictionary<string, byte> ForgetAnnouncementSaveOnce { get; } = new(StringComparer.Ordinal);
+
     public static ConcurrentDictionary<string, int> Reactions { get; } = new(StringComparer.Ordinal);
 
     public static ConcurrentDictionary<string, int> ReactionFailuresLeft { get; } = new(StringComparer.Ordinal);
