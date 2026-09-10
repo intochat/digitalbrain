@@ -26,21 +26,21 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
             cause?.SignalId ?? CallerContext.CurrentCausation(), null, null, null, clock.GetUtcNow());
         var argumentsText = JsonSerializer.Serialize(arguments, argumentsJson);
         var bytes = Encoding.UTF8.GetBytes(argumentsText);
+        var hash = Convert.ToHexStringLower(SHA256.HashData(bytes));
+        var existing = dedup.Find(arguments.Id);
+        record = record with { Incarnation = existing is null ? 1 : existing.Incarnation + 1 };
         if (bytes.Length > CommandLimits.MaxArgumentBytes)
         {
-            return await RejectAsync<TResult>(host, record, new CommandRejectedException(
+            return await RejectAsync<TResult>(host, record, hash, new CommandRejectedException(
                 arguments.Id, "arguments over the 64 KB limit",
                 $"Command arguments are {(bytes.Length + 1023) / 1024} KB; the limit is 64 KB. Pass a reference instead of the payload.")).ConfigureAwait(true);
         }
 
-        var hash = Convert.ToHexStringLower(SHA256.HashData(bytes));
-        var existing = dedup.Find(arguments.Id);
         if (existing is not null)
         {
-            record = record with { Incarnation = existing.Incarnation + 1 };
             if (existing.MismatchAgainst(caller, command.InterfaceAlias, command.MethodAlias, hash) is { } mismatch)
             {
-                return await RejectAsync<TResult>(host, record, new CommandRejectedException(
+                return await RejectAsync<TResult>(host, record, hash, new CommandRejectedException(
                     arguments.Id, mismatch,
                     $"Neuron '{host.Id}' refuses a command id reused with {mismatch}. Mint a new command id.")).ConfigureAwait(true);
             }
@@ -63,8 +63,12 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
         }
         else if (dedup.IsFullOfUnresolved)
         {
-            return await RejectAsync<TResult>(host, record, new NeuronBusyException(
-                $"Neuron '{host.Id}' already holds {CommandDedup.MaxResolved} unresolved commands. Retry after pending commands resolve.")).ConfigureAwait(true);
+            // A full unresolved dedup cannot admit an entry to remember this rejection.
+            var error = new NeuronBusyException(
+                $"Neuron '{host.Id}' already holds {CommandDedup.MaxResolved} unresolved commands. Retry after pending commands resolve.");
+            journal.Append(record with { Error = TruncateError(error.Message) });
+            await host.PersistAsync().ConfigureAwait(true);
+            throw error;
         }
 
         record = journal.Append(record with { Phase = CommandPhase.Attempted, ArgsJson = argumentsText });
@@ -167,9 +171,22 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
         });
     }
 
-    private async Task<TResult> RejectAsync<TResult>(ICommandHost host, CommandRecord record, Exception error)
+    private async Task<TResult> RejectAsync<TResult>(ICommandHost host, CommandRecord record, string hash,
+        CommandRejectedException error)
     {
-        journal.Append(record with { Error = TruncateError(error.Message) });
+        var existing = dedup.Find(error.Id);
+        // The reason alone identifies a rejection because each new attempt replaces the outcome without a rejection.
+        if (existing?.RepeatsRejection(error.Reason) == true)
+        {
+            throw new CommandRejectedException(error.Id, existing.Rejection!.Reason, existing.Rejection.Message);
+        }
+
+        record = journal.Append(record with { Error = TruncateError(error.Message) });
+        var rejection = new CommandRejection(record.Incarnation, error.Reason, error.Message);
+        dedup.Record(error.Id, existing is not null
+            ? existing with { Rejection = rejection }
+            : new CommandOutcome(CommandPhase.Rejected, record.Incarnation, record.Caller, record.Interface,
+                record.Method, hash, null, null, record.Sequence, rejection));
         await host.PersistAsync().ConfigureAwait(true);
         throw error;
     }

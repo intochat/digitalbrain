@@ -2,18 +2,27 @@ using Orleans.Runtime;
 
 namespace DigitalBrain.Core;
 
-internal sealed class RetryScheduler(IGrainBase grain, Func<CancellationToken, Task> retry, TimeSpan period)
+internal sealed class RetryScheduler(IGrainBase grain, Func<CancellationToken, Task> retry, TimeSpan period, Func<bool> hasPendingWork)
 {
     internal const string ReminderName = "retry";
 
     private IGrainTimer? _timer;
+    private readonly SemaphoreSlim _reminderGate = new(1, 1);
     private IGrainReminder? _reminder;
     private bool _tickObserved;
     private TimeSpan _delay = TimeSpan.FromSeconds(1);
 
     internal async Task EnsureReminderAsync()
     {
-        _reminder ??= await grain.RegisterOrUpdateReminder(ReminderName, dueTime: period, period: period).ConfigureAwait(true);
+        await _reminderGate.WaitAsync().ConfigureAwait(true);
+        try
+        {
+            _reminder ??= await grain.RegisterOrUpdateReminder(ReminderName, dueTime: period, period: period).ConfigureAwait(true);
+        }
+        finally
+        {
+            _reminderGate.Release();
+        }
     }
 
     internal void ArmTimer()
@@ -35,14 +44,22 @@ internal sealed class RetryScheduler(IGrainBase grain, Func<CancellationToken, T
 
     internal void NoteTick() => _tickObserved = true;
 
-    internal async Task SettleAsync(bool anyPending)
+    internal async Task AfterDrainAsync()
     {
         Suspend();
         _delay = TimeSpan.FromSeconds(1);
 
-        if (!anyPending && (_reminder is not null || _tickObserved))
+        await _reminderGate.WaitAsync().ConfigureAwait(true);
+        try
         {
-            await RemoveReminderAsync().ConfigureAwait(true);
+            if (!hasPendingWork() && (_reminder is not null || _tickObserved))
+            {
+                await RemoveReminderAsync().ConfigureAwait(true);
+            }
+        }
+        finally
+        {
+            _reminderGate.Release();
         }
     }
 

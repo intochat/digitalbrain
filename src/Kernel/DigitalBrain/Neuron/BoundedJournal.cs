@@ -13,7 +13,6 @@ internal sealed class BoundedJournal<T>(
 {
     private const int MaxRetainedEntries = 512;
     private const int MaxRetainedBytes = 512 * 1024;
-    private long _committedEarliestRetained;
 
     internal int Count => retained.Count;
 
@@ -21,19 +20,20 @@ internal sealed class BoundedJournal<T>(
 
     internal long CommittedSequence { get; private set; }
 
-    // A staged eviction raises the floor before its write commits, and the reader cannot serve an
-    // entry that is already out of the window, so the servable committed floor is the higher of the two.
-    internal long CommittedEarliestRetained => Math.Max(_committedEarliestRetained, LastSequence - Count + 1);
+    // An evicted entry is gone even before its eviction commits, so readers cannot serve below the live floor.
+    // CommittedSequence caps the top of the readable window.
+    internal long CommittedEarliestRetained => LastSequence - Count + 1;
 
     internal int CommittedCount => (int)Math.Clamp(CommittedSequence - CommittedEarliestRetained + 1, 0, Count);
 
     internal int FirstIndexAfter(long afterSequence) => (int)Math.Clamp(afterSequence - CommittedEarliestRetained + 1, 0, Count);
 
-    internal void NoteCommitted()
-    {
-        CommittedSequence = LastSequence;
-        _committedEarliestRetained = LastSequence - Count + 1;
-    }
+    internal long CaptureCommitBoundary() => LastSequence;
+
+    // A completed write may only ever advance the committed cursor.
+    internal void NoteCommitted(long boundarySequence) => CommittedSequence = Math.Max(CommittedSequence, boundarySequence);
+
+    internal void NoteReloaded() => CommittedSequence = LastSequence;
 
     internal T this[int index]
     {

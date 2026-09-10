@@ -15,10 +15,18 @@ internal sealed class NeuronJournals(JournalWindow incoming, JournalWindow outgo
 
     internal void AppendOutgoing(SignalDelivery delivery) => outgoing.Append(delivery);
 
-    internal void NoteCommitted()
+    internal NeuronJournalsBoundary CaptureCommitBoundary() => new(incoming.CaptureCommitBoundary(), outgoing.CaptureCommitBoundary());
+
+    internal void NoteCommitted(NeuronJournalsBoundary boundary)
     {
-        incoming.NoteCommitted();
-        outgoing.NoteCommitted();
+        incoming.NoteCommitted(boundary.Incoming);
+        outgoing.NoteCommitted(boundary.Outgoing);
+    }
+
+    internal void NoteReloaded()
+    {
+        incoming.NoteReloaded();
+        outgoing.NoteReloaded();
     }
 
     private JournalWindow WindowFor(JournalKind kind) => kind switch
@@ -28,3 +36,5 @@ internal sealed class NeuronJournals(JournalWindow incoming, JournalWindow outgo
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };
 }
+
+internal readonly record struct NeuronJournalsBoundary(JournalWindowBoundary Incoming, JournalWindowBoundary Outgoing);

@@ -36,6 +36,13 @@ Feature: Read
     And "run-tests" is read for "incoming"
     Then the read incoming sequences are "1, 2, 3"
     And the read incoming total recorded is 3
+    And the read incoming has no gap and earliest retained sequence 1
+
+  Scenario: A stale journal cursor returns its retention gap before the timeout
+    Given a running brain
+    When session "claude" fires "Tick" {} at "p" 600 times
+    And "p" incoming is read from a stale cursor with a 5 second timeout
+    Then the timed read reports a gap with total recorded 600
 
   Scenario: A walk from a topic reaches exactly its targets
     Given a running brain

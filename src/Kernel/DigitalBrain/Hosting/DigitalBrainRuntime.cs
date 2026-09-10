@@ -29,6 +29,7 @@ public static class DigitalBrainRuntime
         });
 
         builder.AddJournalStorage();
+        builder.AddIncomingGrainCallFilter<NeuronActivationGuardFilter>();
         builder.AddOutgoingGrainCallFilter<CommandLocalityFilter>();
         builder.AddOutgoingGrainCallFilter<OutgoingCallerFilter>();
         builder.AddActivityPropagation();

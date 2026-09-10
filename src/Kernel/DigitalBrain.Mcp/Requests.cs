@@ -22,7 +22,8 @@ public sealed record SynapseEntry(string From, string To, string Type);
 
 public sealed record JournalEntryView(long Sequence, string Type, string Body, string From, string SignalId, string Correlation, DateTimeOffset At);
 
-public sealed record JournalView(long ResumeSequence, IReadOnlyList<JournalEntryView> Entries, long TotalRecorded);
+public sealed record JournalView(long ResumeSequence, long EarliestRetained, bool Gap,
+    IReadOnlyList<JournalEntryView> Entries, long TotalRecorded);
 
 public sealed record ReadResult(string Neuron, IReadOnlyList<StateEntry>? State, IReadOnlyList<SynapseEntry>? Synapses, JournalView? Incoming, JournalView? Outgoing, CommandsView? Commands);
 

@@ -25,21 +25,24 @@ internal sealed class PendingWork
 
     internal int Count => _queue.Count;
 
-    internal DeliveryAdmission TryAdmit(SignalDelivery delivery)
+    internal bool HasRoomFor(int staged) => Count + staged < MaxPending;
+
+    internal DeliveryAdmission Classify(SignalDelivery delivery)
     {
         if (_queue.Any(entry => entry.SignalId == delivery.SignalId) || _reacted.Contains(delivery.SignalId))
         {
             return DeliveryAdmission.Duplicate;
         }
 
-        if (Count >= MaxPending)
+        if (!HasRoomFor(0))
         {
             return DeliveryAdmission.Busy;
         }
 
-        _queue.Enqueue(delivery);
         return DeliveryAdmission.Accepted;
     }
+
+    internal void Admit(SignalDelivery delivery) => _queue.Enqueue(delivery);
 
     internal SignalDelivery? Peek() => _queue.TryPeek(out var delivery) ? delivery : null;
 

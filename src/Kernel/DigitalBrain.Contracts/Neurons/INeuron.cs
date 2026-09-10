@@ -39,7 +39,6 @@ public interface INeuron : IGrainWithStringKey
     Task CancelReaction(SignalId pending);
 
     [ReadOnly]
-    [AlwaysInterleave]
     [Alias(nameof(ReadState))]
     Task<IReadOnlyList<SignalDelivery>> ReadState();
 
@@ -52,7 +51,6 @@ public interface INeuron : IGrainWithStringKey
     Task<int> ReadPendingCount();
 
     [ReadOnly]
-    [AlwaysInterleave]
     [Alias(nameof(ReadSynapses))]
     Task<IReadOnlyList<Synapse>> ReadSynapses();
 

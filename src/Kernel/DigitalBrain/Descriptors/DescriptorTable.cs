@@ -39,7 +39,6 @@ public sealed class DescriptorTable
             foreach (var contract in grainClass.GetInterfaces().Where(type => typeof(INeuron).IsAssignableFrom(type)))
             {
                 var alias = contract.GetCustomAttribute<AliasAttribute>()!.Alias;
-                aliases.Add(alias);
                 if (interfaces.TryGetValue(alias, out var existing) && existing != contract)
                 {
                     throw new InvalidOperationException($"Interface alias '{alias}' is shared by '{existing.FullName}' and '{contract.FullName}'. Choose unique interface aliases.");
@@ -51,6 +50,7 @@ public sealed class DescriptorTable
                     continue;
                 }
 
+                aliases.Add(alias);
                 var json = JsonOptions(contract, contexts);
                 foreach (var method in contract.GetMethods())
                 {

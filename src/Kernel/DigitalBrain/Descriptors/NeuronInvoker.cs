@@ -17,12 +17,18 @@ internal sealed class NeuronInvoker(IGrainFactory grains, DescriptorTable table)
         var aliases = table.InterfaceAliasesOf(grainId.Type);
         if (!aliases.Contains(interfaceAlias, StringComparer.Ordinal))
         {
+            if (aliases.Count == 0)
+            {
+                throw new ArgumentException($"Neuron '{neuron}' implements no callable interfaces. The kernel operations are the fire/connect/disconnect/read/cancel tools.", nameof(interfaceAlias));
+            }
+
             throw new ArgumentException($"Neuron '{neuron}' does not implement interface '{interfaceAlias}'. Use one of: {string.Join(", ", aliases)}.", nameof(interfaceAlias));
         }
 
         var method = table.Method(interfaceAlias, methodAlias);
         var proxy = grains.GetGrain(grainId, method.InterfaceType);
-        var argument = method.ArgumentsJson is null ? null : JsonSerializer.Deserialize(arguments, method.ArgumentsJson);
+        var argument = method.ArgumentsJson is null ? null : JsonSerializer.Deserialize(arguments, method.ArgumentsJson)
+            ?? throw new ArgumentException($"Arguments for interface '{interfaceAlias}', method '{methodAlias}' must match the method's schema.", nameof(arguments));
         var task = method.Invoke(proxy, argument, cancellationToken);
         await task.ConfigureAwait(true);
         return method.ResultJson is null ? null : JsonSerializer.SerializeToElement(method.Result!(task), method.ResultJson);

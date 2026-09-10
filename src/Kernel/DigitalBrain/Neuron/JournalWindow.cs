@@ -12,7 +12,12 @@ internal sealed class JournalWindow
 {
     private readonly BoundedJournal<JournalEntry> _retained;
     private readonly IDurableDictionary<string, long> _tallies;
-    private JournalTally[] _committedTallies = [];
+    private readonly List<KeyValuePair<string, long>> _stagedTallies = [];
+    private long _stagedTallyCount;
+    private long _committedTallyCount;
+    private readonly Dictionary<string, long> _committedTallies = new(StringComparer.Ordinal);
+    private JournalTally[]? _cachedTallies;
+    private long _cachedTotalRecorded;
 
     internal JournalWindow(
         IDurableList<byte[]> retained,
@@ -57,27 +62,64 @@ internal sealed class JournalWindow
 
     internal void Append(SignalDelivery delivery)
     {
-        var signalType = TallyKeyFor(delivery);
+        var signalType = delivery.Signal.Type;
 
         _retained.Append(sequence => new JournalEntry(sequence, delivery));
-        _tallies[signalType] = RecordedOf(signalType) + 1;
+        var recorded = RecordedOf(signalType) + 1;
+        _tallies[signalType] = recorded;
+        _stagedTallies.Add(new(signalType, recorded));
+        _stagedTallyCount++;
     }
 
-    internal JournalSnapshot Snapshot() => new(
-        TotalRecorded: _committedTallies.Sum(tally => tally.Recorded),
-        LastSequence: _retained.CommittedSequence,
-        EarliestRetainedSequence: _retained.CommittedEarliestRetained,
-        RetainedCount: _retained.CommittedCount,
-        Tallies: _committedTallies);
-
-    internal void NoteCommitted()
+    internal JournalSnapshot Snapshot()
     {
-        _retained.NoteCommitted();
-        _committedTallies = [.. _tallies.Select(tally => new JournalTally(tally.Key, tally.Value))];
+        if (_cachedTallies is null)
+        {
+            _cachedTallies = [.. _committedTallies.Select(tally => new JournalTally(tally.Key, tally.Value))];
+            _cachedTotalRecorded = _cachedTallies.Sum(tally => tally.Recorded);
+        }
+
+        return new(
+            TotalRecorded: _cachedTotalRecorded,
+            LastSequence: _retained.CommittedSequence,
+            EarliestRetainedSequence: _retained.CommittedEarliestRetained,
+            RetainedCount: _retained.CommittedCount,
+            Tallies: _cachedTallies);
+    }
+
+    internal JournalWindowBoundary CaptureCommitBoundary() => new(_retained.CaptureCommitBoundary(), _stagedTallyCount);
+
+    internal void NoteCommitted(JournalWindowBoundary boundary)
+    {
+        _retained.NoteCommitted(boundary.Sequence);
+        var promote = (int)Math.Clamp(boundary.StagedTallyCount - _committedTallyCount, 0, _stagedTallies.Count);
+        for (var index = 0; index < promote; index++)
+        {
+            var tally = _stagedTallies[index];
+            _committedTallies[tally.Key] = tally.Value;
+        }
+
+        _stagedTallies.RemoveRange(0, promote);
+        _committedTallyCount += promote;
+        _cachedTallies = null;
+    }
+
+    internal void NoteReloaded()
+    {
+        _retained.NoteReloaded();
+        _stagedTallies.Clear();
+        _committedTallyCount = _stagedTallyCount;
+        _committedTallies.Clear();
+        foreach (var tally in _tallies)
+        {
+            _committedTallies[tally.Key] = tally.Value;
+        }
+
+        _cachedTallies = null;
     }
 
     private long RecordedOf(string signalType)
         => _tallies.TryGetValue(signalType, out var recorded) ? recorded : 0;
-
-    private static string TallyKeyFor(SignalDelivery delivery) => delivery.Signal.Type;
 }
+
+internal readonly record struct JournalWindowBoundary(long Sequence, long StagedTallyCount);

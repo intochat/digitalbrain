@@ -165,6 +165,33 @@ public sealed class OperationSteps(BrainSteps brain)
     [Then(@"the timed read returned (\d+) entries")]
     public void ThenTimed(int count) => Assert.Equal(count, _timed!.Entries.Count);
 
+    [Then(@"the read incoming has no gap and earliest retained sequence (\d+)")]
+    public void ThenNoGap(long earliest)
+    {
+        Assert.False(_read!.Incoming!.Gap);
+        Assert.Equal(earliest, _read.Incoming.EarliestRetained);
+    }
+
+    [When(@"""(.*)"" incoming is read from a stale cursor with a (\d+) second timeout")]
+    public async Task ReadGap(string neuron, int seconds)
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(seconds));
+        var watch = Stopwatch.StartNew();
+        _timed = (await Ops.ReadAsync(new(neuron, "incoming", 0, seconds), cancellation.Token)).Incoming;
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(seconds), "gap read waited until the deadline");
+    }
+
+    [Then(@"the timed read reports a gap with total recorded (\d+)")]
+    public void ThenTimedGap(long total)
+    {
+        Assert.NotNull(_timed);
+        Assert.True(_timed.Gap);
+        Assert.True(_timed.EarliestRetained > 1);
+        Assert.Empty(_timed.Entries);
+        Assert.Equal(total, _timed.ResumeSequence);
+        Assert.Equal(total, _timed.TotalRecorded);
+    }
+
     private static string TypeName(int index)
     {
         Span<char> letters = ['T', (char)('a' + (index / 676 % 26)), (char)('a' + (index / 26 % 26)), (char)('a' + (index % 26))];

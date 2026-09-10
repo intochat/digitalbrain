@@ -154,9 +154,10 @@ public sealed class BrainOperations(IGrainFactory grains, INeuronInvoker invoker
         while (true)
         {
             var read = await query.ReadJournal(kind, after).ConfigureAwait(false);
-            if (read.Delta.Count > 0 || DateTimeOffset.UtcNow >= deadline)
+            if (read.Gap || read.Delta.Count > 0 || DateTimeOffset.UtcNow >= deadline)
             {
-                return new(read.ResumeSequence, [.. read.Delta.Select((d, index) => Entry(read, d, index))], await TotalAsync(query, kind, read).ConfigureAwait(false));
+                return new(read.ResumeSequence, read.EarliestRetained, read.Gap,
+                    [.. read.Delta.Select((d, index) => Entry(read, d, index))], await TotalAsync(query, kind, read).ConfigureAwait(false));
             }
 
             await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);

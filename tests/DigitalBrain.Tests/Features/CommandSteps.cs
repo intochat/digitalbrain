@@ -15,6 +15,7 @@ public sealed class CommandSteps(BrainSteps brain)
 {
     private readonly List<Accepted<int>> _results = [];
     private Exception? _lastError;
+    private Exception? _previousError;
     private CommandId _lastCommandId;
 
     internal Dictionary<string, SignalId> WorkByCommand { get; } = new(StringComparer.Ordinal);
@@ -134,6 +135,18 @@ public sealed class CommandSteps(BrainSteps brain)
     [Then("the add fails with the membrane message")]
     public void ThenMembraneFailure() => ThenFails("the limit is 64 KB");
 
+    [Then("the repeated add fails with the same rejection")]
+    public void ThenSameRejection()
+    {
+        Assert.NotNull(_previousError);
+        Assert.NotNull(_lastError);
+        var previous = Assert.IsType<CommandRejectedException>(Flatten(_previousError));
+        var current = Assert.IsType<CommandRejectedException>(Flatten(_lastError));
+        Assert.Equal(previous.Id, current.Id);
+        Assert.Equal(previous.Reason, current.Reason);
+        Assert.Equal(previous.Message, current.Message);
+    }
+
     // Feature classes run in parallel, so this reset must not reach other features.
     [AfterScenario]
     [Scope(Feature = "Command")]
@@ -145,6 +158,7 @@ public sealed class CommandSteps(BrainSteps brain)
 
     private async Task Capture(string principal, string handle, CommandId id, Func<CommandId, Task<Accepted<int>>> call)
     {
+        _previousError = _lastError;
         _lastError = null;
         _lastCommandId = id;
         RequestContext.Set(NeuronRequestKeys.Caller, NeuronId.Plain(principal).ToString());

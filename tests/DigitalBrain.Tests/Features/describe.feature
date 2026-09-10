@@ -14,10 +14,12 @@ Feature: Describe
     Then the call returns a receipt and a work id
     And "claude" waits up to 5 seconds until counter "c" total is 2
 
-  Scenario: Calling an interface the neuron does not implement names the valid ones
+  Scenario: A wrong interface names the ones the neuron implements; a plain neuron names the kernel tools
     Given a running brain
-    When "claude" calls "test.counter" "add" on plain "p" with {"id":"c2","count":1}
-    Then the call fails naming "db.v3.neuron"
+    When "claude" calls "test.bad" "bad" on counter "c" with {"id":"c2","count":1}
+    Then the call fails naming "test.counter"
+    When "claude" calls "test.counter" "add" on plain "p" with {"id":"c3","count":1}
+    Then the call fails explaining there are no callable interfaces and naming the kernel tools
 
   Scenario: A read past the retained window reports a gap
     Given a running brain

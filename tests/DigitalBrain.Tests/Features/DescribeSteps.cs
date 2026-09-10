@@ -63,8 +63,16 @@ public sealed class DescribeSteps(BrainSteps brain)
     [Then(@"the call fails naming ""(.*)""")]
     public void ThenFailsNaming(string interfaceAlias)
     {
-        Assert.NotNull(_lastError);
-        Assert.Contains(interfaceAlias, _lastError.Message, StringComparison.Ordinal);
+        var error = Assert.IsType<ArgumentException>(_lastError);
+        Assert.Contains(interfaceAlias, error.Message, StringComparison.Ordinal);
+    }
+
+    [Then("the call fails explaining there are no callable interfaces and naming the kernel tools")]
+    public void ThenFailsWithKernelToolAdvice()
+    {
+        var error = Assert.IsType<ArgumentException>(_lastError);
+        Assert.Contains("implements no callable interfaces", error.Message, StringComparison.Ordinal);
+        Assert.Contains("kernel operations are the fire/connect/disconnect/read/cancel tools", error.Message, StringComparison.Ordinal);
     }
 
     [When(@"""(.*)"" fires (\d+) ""(\w+)"" signals at plain ""(.*)""")]

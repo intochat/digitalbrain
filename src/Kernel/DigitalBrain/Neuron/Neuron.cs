@@ -15,7 +15,6 @@ namespace DigitalBrain.Core;
 
 // A durable actor with one receive slot. Owns its synapses, three bounded journals, and the
 // latest signal of each type it received. Fire travels along synapses; nothing else routes.
-// A subclass calls Guard() first in its own methods.
 public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable, ICommandHost
 {
     // Latest-per-type is keyed by type name, so a caller putting identity in the type would
@@ -38,8 +37,9 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         _components = runtime.Bind(ServiceProvider, Id);
         _fence = new PersistenceFence(Id, StateManager, _activation.Token,
             () => CommandReconciliation.Reconcile(_components.Commands, _components.Dedup, TimeProvider.GetUtcNow()),
-            DeactivateOnIdle, _components.NoteCommitted);
-        _retry = new RetryScheduler(this, _ => ((INeuronInbox)this).Drain(), _components.Options.RetryReminderPeriod);
+            DeactivateOnIdle, _components);
+        _retry = new RetryScheduler(this, _ => ((INeuronInbox)this).Drain(), _components.Options.RetryReminderPeriod,
+            () => _components.Pending.Count > 0);
     }
 
     public NeuronId Id => NeuronId.FromGrainId(this.GetGrainId());
@@ -52,7 +52,9 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     protected new Task WriteStateAsync(CancellationToken cancellationToken = default)
         => throw new InvalidOperationException($"Neuron '{Id}' must call PersistAsync to write through the persistence fence.");
 
-    protected void Guard() => _fence.Guard();
+    internal Task GuardActivationAsync() => _fence.GuardAsync();
+
+    private protected void Guard() => _fence.Guard();
 
     protected ReactionContext? ReactionContext { get; private set; }
 
@@ -95,7 +97,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     {
         NeuronConcurrency.RequireSerializedTurns(GetType());
         await base.OnActivateAsync(cancellationToken).ConfigureAwait(true);
-        _components.NoteCommitted();
+        _components.NoteReloaded();
         _fence.NoteStoredState(StorageHoldsState());
         if (CommandReconciliation.Reconcile(_components.Commands, _components.Dedup, TimeProvider.GetUtcNow()))
         {
@@ -175,13 +177,14 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         ArgumentNullException.ThrowIfNull(delivery);
         cancellationToken.ThrowIfCancellationRequested();
 
-        RequireSignalTypeCapacity(delivery.Signal.Type);
-        var admission = _components.Pending.TryAdmit(delivery);
+        var admission = _components.Pending.Classify(delivery);
         if (admission != DeliveryAdmission.Accepted)
         {
             return admission;
         }
 
+        RequireSignalTypeCapacity(delivery.Signal.Type);
+        _components.Pending.Admit(delivery);
         StageAdmitted(delivery);
         await PersistAsync().ConfigureAwait(true);
         // Register after persistence so work that never committed cannot leave an orphan reminder row.
@@ -197,8 +200,8 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         ArgumentNullException.ThrowIfNull(signal);
         signal = Signal.Create(signal.Type, signal.Body);
         RequireSignalTypeCapacity(signal.Type);
-        var delivery = SignalDelivery.Create(signal, Id, _components.Journals.IncomingNextSequence + _commandWork.Count, TimeProvider, (ReactionContext as DeliveryReaction)?.Delivery, correlation);
-        if (_components.Pending.Count + _commandWork.Count >= PendingWork.MaxPending)
+        var delivery = SignalDelivery.Create(signal, Id, _components.Journals.IncomingNextSequence, TimeProvider, (ReactionContext as DeliveryReaction)?.Delivery, correlation);
+        if (!_components.Pending.HasRoomFor(_commandWork.Count))
         {
             throw new NeuronBusyException($"Neuron '{Id}' already holds {PendingWork.MaxPending} pending signals. Retry after pending work finishes.");
         }
@@ -218,11 +221,13 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
 
     private void AdmitAndStageDelivery(SignalDelivery delivery)
     {
-        if (_components.Pending.TryAdmit(delivery) != DeliveryAdmission.Accepted)
+        delivery = delivery with { Sequence = _components.Journals.IncomingNextSequence };
+        if (_components.Pending.Classify(delivery) != DeliveryAdmission.Accepted)
         {
-            throw new InvalidOperationException($"Scheduled signal '{delivery.SignalId}' could not be admitted.");
+            throw new InvalidOperationException($"Scheduled signal '{delivery.SignalId}' admission was already classified as Accepted; this state is unreachable.");
         }
 
+        _components.Pending.Admit(delivery);
         StageAdmitted(delivery);
     }
 
@@ -268,7 +273,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         var delivery = _components.Pending.Peek();
         if (delivery is null)
         {
-            await _retry.SettleAsync(_components.Pending.Count > 0).ConfigureAwait(true);
+            await _retry.AfterDrainAsync().ConfigureAwait(true);
             return;
         }
 
@@ -278,7 +283,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         {
             _components.Pending.CompleteHead(delivery.SignalId);
             await PersistAsync().ConfigureAwait(true);
-            await _retry.SettleAsync(_components.Pending.Count > 0).ConfigureAwait(true);
+            await _retry.AfterDrainAsync().ConfigureAwait(true);
             Wake();
             return;
         }
@@ -310,12 +315,13 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
                     DrainTelemetry.Cancelled(Logger, Id, delivery.SignalId);
                     _components.Pending.CompleteHead(delivery.SignalId);
                     await PersistAsync().ConfigureAwait(true);
-                    await _retry.SettleAsync(_components.Pending.Count > 0).ConfigureAwait(true);
+                    await _retry.AfterDrainAsync().ConfigureAwait(true);
                     Wake();
                 }
                 else
                 {
                     DrainTelemetry.Failed(Logger, Id, delivery.SignalId, failure);
+                    await _fence.DiscardStagedChangesAsync(failure).ConfigureAwait(true);
                     _retry.ArmTimer();
                 }
 
@@ -324,7 +330,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
 
             _components.Pending.CompleteHead(delivery.SignalId);
             await PersistAsync().ConfigureAwait(true);
-            await _retry.SettleAsync(_components.Pending.Count > 0).ConfigureAwait(true);
+            await _retry.AfterDrainAsync().ConfigureAwait(true);
             Wake();
         }
         finally
@@ -412,7 +418,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         cancellationToken.ThrowIfCancellationRequested();
 
         // Re-validate: a Signal deserialized from the wire may bypass Create. Keep the
-        // normalized instance — Create fills a blank body with "{}".
+        // normalized instance â€” Create fills a blank body with "{}".
         signal = Signal.Create(signal.Type, signal.Body);
 
         if (to is { } target && target == Id)

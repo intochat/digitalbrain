@@ -13,8 +13,12 @@ public sealed record CommandOutcome(
     [property: Id(5)] string ArgumentsHash,
     [property: Id(6)] string? ResultJson,
     [property: Id(7)] string? Error,
-    [property: Id(8)] long Sequence)
+    [property: Id(8)] long Sequence,
+    [property: Id(9)] CommandRejection? Rejection = null)
 {
+    public bool RepeatsRejection(string reason)
+        => Rejection is { } rejection && StringComparer.Ordinal.Equals(rejection.Reason, reason);
+
     public string? MismatchAgainst(NeuronId caller, string interfaceAlias, string method, string argumentsHash)
     {
         if (Caller != caller)

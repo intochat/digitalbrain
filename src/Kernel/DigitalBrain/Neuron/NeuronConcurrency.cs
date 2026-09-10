@@ -6,6 +6,23 @@ namespace DigitalBrain.Core;
 
 internal static class NeuronConcurrency
 {
+    private static readonly HashSet<string> KernelInterleavedMethods = new(StringComparer.Ordinal)
+    {
+        nameof(INeuron.Deliver),
+        nameof(INeuron.CancelReaction),
+        nameof(INeuron.ReadJournal),
+        nameof(INeuron.ReadCommands),
+        nameof(INeuron.ReadPendingCount),
+    };
+
+    static NeuronConcurrency()
+    {
+        if (KernelInterleavedMethods.Count != 5)
+        {
+            throw new InvalidOperationException("Exactly five kernel operations may interleave. Revisit the specification before changing this set.");
+        }
+    }
+
     internal static void RequireSerializedTurns(Type neuronType)
     {
         ArgumentNullException.ThrowIfNull(neuronType);
@@ -40,9 +57,7 @@ internal static class NeuronConcurrency
     // AlwaysInterleave is kernel-only; module methods may use ReadOnly.
     private static bool IsKernelInterleaved(MethodInfo method)
         => method.DeclaringType == typeof(INeuron)
-        && (method.Name.StartsWith("Read", StringComparison.Ordinal)
-            || method.Name == nameof(INeuron.Deliver)
-            || method.Name == nameof(INeuron.CancelReaction));
+        && KernelInterleavedMethods.Contains(method.Name);
 
     private static void Refuse(Type neuronType, string attribute)
         => throw new InvalidOperationException(

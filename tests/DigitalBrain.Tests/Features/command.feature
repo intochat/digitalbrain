@@ -21,12 +21,21 @@ Feature: Command
     And "claude" adds 4 to counter "c" with command id "a1"
     Then the second add fails with "command id reused"
     And "c" commands journal shows one Rejected record
+    When "claude" adds 4 to counter "c" with command id "a1"
+    Then the repeated add fails with the same rejection
+    And "c" commands journal shows one Rejected record
+    When "claude" adds 3 to counter "c" with command id "a1"
+    Then both adds return the same work id
+    And counter "c" executed 1 time
 
   Scenario: Oversize arguments are rejected before execution
     Given a running brain
     When "claude" adds a 70000-byte note to counter "c" with command id "big"
     Then the add fails with the membrane message
     And counter "c" executed 0 times
+    When "claude" adds a 70000-byte note to counter "c" with command id "big"
+    Then the repeated add fails with the same rejection
+    And "c" commands journal shows one Rejected record
 
   Scenario: Saving a snapshot inside a command is refused
     Given a running brain

@@ -5,10 +5,11 @@ using Orleans.Journaling;
 namespace DigitalBrain.Core;
 
 internal sealed class PersistenceFence(NeuronId neuron, IJournaledStateManager stateManager,
-    CancellationToken activation, Func<bool> reconcile, Action deactivateOnIdle, Action noteCommitted)
+    CancellationToken activation, Func<bool> reconcile, Action deactivateOnIdle, NeuronActivationComponents components)
 {
     private bool _faulted;
     private bool _storageHoldsJournal;
+    private Task? _reactionRollback;
 
     internal void NoteStoredState(bool present)
     {
@@ -27,13 +28,27 @@ internal sealed class PersistenceFence(NeuronId neuron, IJournaledStateManager s
         }
     }
 
+    // A failed write leaves the activation fenced and every call is refused.
+    // A failed reaction's rollback is ordinary, so a caller waits for it to finish instead of being refused.
+    internal async Task GuardAsync()
+    {
+        if (_reactionRollback is { } rollback)
+        {
+            await rollback.ConfigureAwait(true);
+        }
+
+        Guard();
+    }
+
     internal async Task PersistAsync()
     {
         Guard();
+        // This boundary limits what this write may mark committed, excluding a later interleaving Deliver's staging.
+        var boundary = components.CaptureCommitBoundary();
         try
         {
             await stateManager.WriteStateAsync(activation).ConfigureAwait(true);
-            noteCommitted();
+            components.NoteCommitted(boundary);
             _storageHoldsJournal = true;
         }
         catch (OperationCanceledException) when (activation.IsCancellationRequested)
@@ -52,7 +67,15 @@ internal sealed class PersistenceFence(NeuronId neuron, IJournaledStateManager s
     internal async Task DiscardStagedChangesAsync(Exception cause)
     {
         _faulted = true;
-        await RecoverAsync(cause).ConfigureAwait(true);
+        _reactionRollback = RecoverAsync(cause);
+        try
+        {
+            await _reactionRollback.ConfigureAwait(true);
+        }
+        finally
+        {
+            _reactionRollback = null;
+        }
     }
 
     private async Task RecoverAsync(Exception cause)
@@ -60,7 +83,7 @@ internal sealed class PersistenceFence(NeuronId neuron, IJournaledStateManager s
         try
         {
             await stateManager.RevertPendingChangesAsync(activation).ConfigureAwait(true);
-            noteCommitted();
+            components.NoteReloaded();
         }
         catch (Exception failure)
         {
@@ -81,8 +104,9 @@ internal sealed class PersistenceFence(NeuronId neuron, IJournaledStateManager s
         {
             if (reconcile())
             {
+                var boundary = components.CaptureCommitBoundary();
                 await stateManager.WriteStateAsync(activation).ConfigureAwait(true);
-                noteCommitted();
+                components.NoteCommitted(boundary);
                 _storageHoldsJournal = true;
             }
         }
