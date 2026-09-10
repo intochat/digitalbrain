@@ -12,5 +12,8 @@
     <ProjectReference Include="../../Modules/Memory/Memory/DigitalBrain.Modules.Memory.csproj" />
     <ProjectReference Include="../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
     <ProjectReference Include="../../Modules/Excel/Excel/DigitalBrain.Modules.Excel.csproj" />
+    <ProjectReference Include="../../Modules/Google/Google/DigitalBrain.Modules.Google.csproj" />
+    <ProjectReference Include="../../Modules/Salesforce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
+    <ProjectReference Include="../../Modules/Microsoft/Microsoft/DigitalBrain.Modules.Microsoft.csproj" />
   </ItemGroup>
 </Project>

@@ -3,19 +3,9 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using DigitalBrain.Sdk;
 
 namespace DigitalBrain.Microsoft.GitHub;
 
-internal interface IGitHubRepositorySource
-{
-    Task<PullRequestSnapshot> GetPullRequestAsync(GitHubRepositoryBinding binding, int number, CancellationToken cancellationToken);
-    Task<IReadOnlyList<PullRequestSnapshot>> ListOpenPullRequestsAsync(GitHubRepositoryBinding binding, CancellationToken cancellationToken);
-    Task<GitHubReviewEvidence> GetReviewEvidenceAsync(GitHubRepositoryBinding binding, PullRequestSnapshot snapshot, CancellationToken cancellationToken);
-    Task<RequiredChecksRead> GetRequiredChecksAsync(GitHubRepositoryBinding binding, string? branch, CancellationToken cancellationToken) => Task.FromResult(new RequiredChecksRead([], false, "Required CI checks have not been discovered for this source."));
-}
-
-/// <summary>A small deterministic read adapter supplies authoritative CI fields; agents retain native MCP schemas.</summary>
 internal sealed class GitHubRepositorySource : IGitHubRepositorySource, IDisposable
 {
     internal const int EvidenceBudgetBytes = 131072;
@@ -84,7 +74,7 @@ internal sealed class GitHubRepositorySource : IGitHubRepositorySource, IDisposa
                     }
                 }
             }
-            catch (McpOperationException)
+            catch (Exception error) when (error is GitHubUnavailableException or GitHubAccessDeniedException)
             {
                 // A pending/unavailable merge revision cannot establish complete current evidence.
                 complete = false;
@@ -108,7 +98,7 @@ internal sealed class GitHubRepositorySource : IGitHubRepositorySource, IDisposa
         var page = await GetAsync(binding, $"{binding.RepositoryPath}/pulls?state=open&sort=created&direction=desc&per_page=100&page=1", cancellationToken).ConfigureAwait(false);
         if (page.HasNext || page.Json.ValueKind != JsonValueKind.Array)
         {
-            throw new McpOperationException("GitHub reconciliation supports up to 100 open pull requests per binding. Narrow the configured repository workload.", McpFailureKind.Capacity);
+            throw new GitHubUnavailableException("GitHub reconciliation supports up to 100 open pull requests per binding. Narrow the configured repository workload.");
         }
 
         var result = new List<PullRequestSnapshot>();
@@ -122,7 +112,7 @@ internal sealed class GitHubRepositorySource : IGitHubRepositorySource, IDisposa
 
     public async Task<RequiredChecksRead> GetRequiredChecksAsync(GitHubRepositoryBinding binding, string? branch, CancellationToken cancellationToken)
     {
-        binding.Authorize(binding.Owner, binding.Principal);
+        binding.RequireEnabled();
         try
         {
             var connection = await ConnectionAsync(binding, false, cancellationToken).ConfigureAwait(false);
@@ -194,10 +184,10 @@ internal sealed class GitHubRepositorySource : IGitHubRepositorySource, IDisposa
 
             var found = requirements.Distinct().ToArray();
             complete &= found.Length is > 0 and <= 64;
-            binding.Authorize(binding.Owner, binding.Principal);
+            binding.RequireEnabled();
             return new(found, complete, complete ? null : "Required CI policy is empty, incomplete or inaccessible. Select explicit required checks; unknown requirements never count as green.");
         }
-        catch (Exception error) when (error is Octokit.ApiException or McpOperationException or JsonException or InvalidOperationException)
+        catch (Exception error) when (error is Octokit.ApiException or GitHubUnavailableException or JsonException or InvalidOperationException)
         {
             return new([], false, "Required CI configuration could not be read. Verify branch/ruleset access or select an explicit nonempty required-check set.");
         }
@@ -207,7 +197,7 @@ internal sealed class GitHubRepositorySource : IGitHubRepositorySource, IDisposa
     {
         if (snapshot.RepositoryId != binding.RepositoryId)
         {
-            throw new McpOperationException("Review evidence belongs to a different repository.", McpFailureKind.AccessDenied);
+            throw new GitHubAccessDeniedException("Review evidence belongs to a different repository.");
         }
 
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -366,7 +356,7 @@ internal sealed class GitHubRepositorySource : IGitHubRepositorySource, IDisposa
         if (json.GetProperty("number").GetInt32() != number || repo.GetProperty("id").GetInt64() != binding.RepositoryId || !string.Equals(repo.GetProperty("name").GetString(), binding.RepoName, StringComparison.OrdinalIgnoreCase) || !string.Equals(repo.GetProperty("owner").GetProperty("login").GetString(), binding.RepoOwner, StringComparison.OrdinalIgnoreCase))
         {
             binding.Revoke();
-            throw new McpOperationException("The repository was renamed, transferred or no longer matches this binding. Reauthorize its configuration.", McpFailureKind.ConnectionChanged);
+            throw new GitHubAccessDeniedException("The repository was renamed, transferred or no longer matches this binding. Reauthorize its configuration.");
         }
 
         return json;
@@ -374,7 +364,7 @@ internal sealed class GitHubRepositorySource : IGitHubRepositorySource, IDisposa
 
     private async Task<ApiPage> GetAsync(GitHubRepositoryBinding binding, string path, CancellationToken token)
     {
-        binding.Authorize(binding.Owner, binding.Principal);
+        binding.RequireEnabled();
         try
         {
             for (var attempt = 0; attempt < 2; attempt++)
@@ -392,20 +382,22 @@ internal sealed class GitHubRepositorySource : IGitHubRepositorySource, IDisposa
 
                 var hasNext = response.HttpResponse.Headers.TryGetValue("Link", out var link) && link.Contains("rel=\"next\"", StringComparison.Ordinal);
                 // Never follow server-provided URLs; pagination remains on our configured route/host.
-                binding.Authorize(binding.Owner, binding.Principal);
+                binding.RequireEnabled();
                 return new ApiPage(response.Body, hasNext);
             }
         }
         catch (Octokit.ApiException error)
         {
-            throw new McpOperationException("GitHub repository evidence is unavailable. Verify repository access or retry after rate limiting clears.", error.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden or HttpStatusCode.NotFound ? McpFailureKind.AccessDenied : McpFailureKind.Unavailable);
+            throw error.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden or HttpStatusCode.NotFound
+                ? new GitHubAccessDeniedException("GitHub repository evidence is unavailable. Verify repository access or retry after rate limiting clears.")
+                : new GitHubUnavailableException("GitHub repository evidence is unavailable. Verify repository access or retry after rate limiting clears.");
         }
         catch (Exception error) when (error is HttpRequestException or JsonException)
         {
-            throw new McpOperationException("GitHub repository evidence could not be read.", McpFailureKind.Unavailable);
+            throw new GitHubUnavailableException("GitHub repository evidence could not be read.");
         }
 
-        throw new McpOperationException("GitHub rejected the refreshed installation credentials.", McpFailureKind.AccessDenied);
+        throw new GitHubAccessDeniedException("GitHub rejected the refreshed installation credentials.");
     }
 
     private static bool Matches(PullRequestSnapshot snapshot, JsonElement pull) => snapshot.HeadSha == Sha(pull.GetProperty("head").GetProperty("sha")) && snapshot.BaseSha == Sha(pull.GetProperty("base").GetProperty("sha")) && snapshot.IsOpen == (pull.GetProperty("state").GetString() == "open") && snapshot.IsDraft == pull.GetProperty("draft").GetBoolean();
@@ -421,7 +413,7 @@ internal sealed class GitHubRepositorySource : IGitHubRepositorySource, IDisposa
     internal static bool IsSha(string value) => value.Length == 40 && value.All(char.IsAsciiHexDigit);
     private static string Sha(JsonElement value) => value.GetString() is { } text && IsSha(text) ? text : throw InvalidEvidence();
     internal static string Hash(string text) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
-    private static McpOperationException InvalidEvidence() => new("GitHub returned incomplete or incompatible repository evidence.", McpFailureKind.ContentRejected);
+    private static GitHubUnavailableException InvalidEvidence() => new("GitHub returned incomplete or incompatible repository evidence.");
     public void Dispose() => _http.Dispose();
     private async Task<Octokit.Connection> ConnectionAsync(GitHubRepositoryBinding binding, bool refresh, CancellationToken token) => new(new Octokit.ProductHeaderValue("DigitalBrain"), binding.ApiHost, new Octokit.Internal.InMemoryCredentialStore(new Octokit.Credentials(await _tokens.GetTokenAsync(binding, refresh, token).ConfigureAwait(false))), _http, _json);
     // Octokit owns HTTP, error handling and provider DTO conversion. JsonElement is used only

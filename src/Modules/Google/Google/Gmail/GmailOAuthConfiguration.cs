@@ -1,4 +1,3 @@
-using DigitalBrain.Sdk;
 using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Google;
@@ -12,7 +11,7 @@ internal sealed class GmailOAuthConfiguration(IConfiguration configuration)
     internal string ClientSecret => configuration[$"{Root}:ClientSecret"] ?? "";
     internal bool IsConfigured => !string.IsNullOrWhiteSpace(ClientId) && !string.IsNullOrWhiteSpace(ClientSecret)
         && TryOrigin(out _);
-    internal Uri PublicOrigin => TryOrigin(out var origin) ? origin! : throw new McpOperationException("Gmail setup is incomplete. Configure the kernel Gmail OAuth ClientId, ClientSecret and PublicOrigin privately in Aspire.");
+    internal Uri PublicOrigin => TryOrigin(out var origin) ? origin! : throw new GmailUnavailableException("Gmail setup is incomplete. Configure the kernel Gmail OAuth ClientId, ClientSecret and PublicOrigin privately in Aspire.");
 
     private bool TryOrigin(out Uri? origin)
     {
@@ -32,7 +31,7 @@ internal sealed class GmailOAuthConfiguration(IConfiguration configuration)
     {
         if (!IsConfigured)
         {
-            throw new McpOperationException("Gmail setup is incomplete. Configure the kernel Gmail OAuth ClientId, ClientSecret and PublicOrigin privately in Aspire.");
+            throw new GmailUnavailableException("Gmail setup is incomplete. Configure the kernel Gmail OAuth ClientId, ClientSecret and PublicOrigin privately in Aspire.");
         }
     }
 }

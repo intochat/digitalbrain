@@ -6,7 +6,6 @@ namespace DigitalBrain.Microsoft.Hosting;
 
 public static class GitHubAppHostingExtensions
 {
-    /// <summary>Projects one reusable GitHub App to the kernel. Repository access is connected by each signed-in principal.</summary>
     public static DigitalBrainModuleBuilder<MicrosoftModule> WithGitHubApp(
         this DigitalBrainModuleBuilder<MicrosoftModule> module,
         long appId, string slug, string clientId, Uri publicOrigin, Uri publicWebhookUrl)

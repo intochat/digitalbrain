@@ -6,15 +6,14 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Tests" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
+    <PackageReference Include="ModelContextProtocol.Core" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Google.Contracts.csproj" />
-    <ProjectReference Include="../../AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
-    <ProjectReference Include="../../AI/AI/DigitalBrain.Modules.AI.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain/DigitalBrain.csproj" />
-    <ProjectReference Include="../../../Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
   </ItemGroup>
 
 </Project>

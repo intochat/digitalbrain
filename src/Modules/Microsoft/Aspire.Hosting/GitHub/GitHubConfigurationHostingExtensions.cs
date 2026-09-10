@@ -5,15 +5,13 @@ namespace DigitalBrain.Microsoft.Hosting;
 
 public static class GitHubConfigurationHostingExtensions
 {
-    /// <summary>Opt in configured repositories while keeping App keys and HMAC secrets in Aspire parameters.</summary>
     public static DigitalBrainModuleBuilder<MicrosoftModule> WithConfiguredGitHubRepositories(
         this DigitalBrainModuleBuilder<MicrosoftModule> module, IConfiguration configuration)
     {
         module.WithConfiguredGitHubApp(configuration);
         foreach (var repository in configuration.GetSection("DigitalBrain:Microsoft:GitHub:Repositories").GetChildren())
         {
-            module.WithGitHubRepository(repository.Key, Required(repository, "Owner"),
-                Guid.Parse(Required(repository, "Principal")), Number(repository, "AppId"),
+            module.WithGitHubRepository(repository.Key, Number(repository, "AppId"),
                 Number(repository, "InstallationId"), Number(repository, "RepositoryId"),
                 Required(repository, "RepoOwner"), Required(repository, "RepoName"),
                 repository["EndpointId"], repository["ApiHost"] is { } api ? new Uri(api) : null,

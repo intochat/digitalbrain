@@ -3,11 +3,17 @@ using DigitalBrain.AI;
 using DigitalBrain.AI.Aspire.Hosting;
 using DigitalBrain.AI.FoundryLocal;
 using DigitalBrain.Aspire.Hosting;
-using Microsoft.Extensions.Configuration;
 using DigitalBrain.Excel;
-using DigitalBrain.Memory;
+using DigitalBrain.Google.Aspire.Hosting;
+using DigitalBrain.Google;
 using DigitalBrain.Memory.Aspire.Hosting;
+using DigitalBrain.Memory;
+using DigitalBrain.Microsoft.Hosting;
+using DigitalBrain.Microsoft;
+using DigitalBrain.Salesforce.Aspire.Hosting;
+using DigitalBrain.Salesforce;
 using DigitalBrain.Time;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using OpenAIModels = DigitalBrain.AI.OpenAI;
 
@@ -57,12 +63,14 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
     })
     .AddModule<MemoryModule>(memory => memory.WithQdrant())
     .AddModule<TimeModule>()
-    .AddModule<ExcelModule>();
-// Phase B: the module wiring these five lines stand in for is in AppHost.cs at b225d085.
+    .AddModule<ExcelModule>()
+    .AddModule<GoogleModule>(google => google.WithGmail())
+    .AddModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
+    .AddModule<MicrosoftModule>(microsoft => microsoft
+        .WithAspire(Path.Combine(builder.AppHostDirectory, "DigitalBrain.AppHost.csproj"))
+        .WithConfiguredGitHubRepositories(builder.Configuration));
+// Phase B: the module wiring these two lines stand in for is in AppHost.cs at b225d085.
 // Phase B: .AddModule<ExecutionModule>()
-// Phase B: .AddModule<GoogleModule>(google => google.WithGmail())
-// Phase B: .AddModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
-// Phase B: .AddModule<MicrosoftModule>(microsoft => ...)
 // Phase B: .AddModule<UIModule>(ui => ui.WithWindowHost())
 
 // Isolated Aspire runs reuse the persistent Azurite volume while assigning new random silo

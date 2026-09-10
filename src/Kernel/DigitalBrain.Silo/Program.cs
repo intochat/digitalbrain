@@ -1,4 +1,5 @@
 using DigitalBrain.Aspire;
+using DigitalBrain.Core;
 using DigitalBrain.Kernel;
 using DigitalBrain.Mcp;
 using DigitalBrain.ServiceDefaults;
@@ -16,6 +17,9 @@ builder.Services.AddDigitalBrainMcp()
 var app = builder.Build();
 
 app.UseKernelCors();
+// Module surfaces (browser OAuth callbacks) carry their own one-use request guards and must
+// run before authentication and the Basic gate.
+app.UseModuleHttpSurfaces();
 app.UseAuthentication();
 app.UseBasicAuthGate();
 app.MapDefaultEndpoints();
