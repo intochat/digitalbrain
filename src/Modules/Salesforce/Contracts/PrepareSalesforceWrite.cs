@@ -3,7 +3,6 @@ using DigitalBrain.Abstractions.Identity;
 
 namespace DigitalBrain.Salesforce;
 
-/// <summary>Requests an exact Salesforce write preview.</summary>
 [GenerateSerializer]
 [Alias("db.salesforce.prepare-write")]
 public sealed record PrepareSalesforceWrite(

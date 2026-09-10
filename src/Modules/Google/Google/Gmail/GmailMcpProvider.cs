@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DigitalBrain.Core;
 using ModelContextProtocol;
 using ModelContextProtocol.Client;
 
@@ -19,29 +20,24 @@ internal sealed class GmailMcpProvider : IGmailProvider
             throw new GmailUnavailableException("This Gmail operation is not allowed.");
         }
         var normalized = GmailContent.Normalize(tool, arguments);
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(30));
         try
         {
-            await using var transport = new HttpClientTransport(new HttpClientTransportOptions
+            return await McpHttpSession.RunAsync(GoogleModule.GmailMcpEndpoint, accessToken, async (client, token) =>
             {
-                Endpoint = GoogleModule.GmailMcpEndpoint,
-                AdditionalHeaders = new Dictionary<string, string> { ["Authorization"] = "Bearer " + accessToken },
-            });
-            await using var client = await McpClient.CreateAsync(transport, cancellationToken: timeout.Token).ConfigureAwait(false);
-            var catalog = await client.ListToolsAsync(cancellationToken: timeout.Token).ConfigureAwait(false);
-            ValidateCatalog(catalog);
-            var result = await client.CallToolAsync(tool, normalized, cancellationToken: timeout.Token).ConfigureAwait(false);
-            if (result.IsError == true)
-            {
-                throw new GmailUnavailableException("Gmail did not return complete successful evidence. Narrow the request or check service access.");
-            }
-            var envelope = JsonSerializer.SerializeToElement(result, McpJsonUtilities.DefaultOptions);
-            if (Encoding.UTF8.GetByteCount(envelope.GetRawText()) > 1048576)
-            {
-                throw new GmailUnavailableException("Gmail response exceeds the provider response budget.");
-            }
-            return GmailContent.Project(tool, ReadContent(envelope), normalized);
+                var catalog = await client.ListToolsAsync(cancellationToken: token).ConfigureAwait(false);
+                ValidateCatalog(catalog);
+                var result = await client.CallToolAsync(tool, normalized, cancellationToken: token).ConfigureAwait(false);
+                if (result.IsError == true)
+                {
+                    throw new GmailUnavailableException("Gmail did not return complete successful evidence. Narrow the request or check service access.");
+                }
+                var envelope = JsonSerializer.SerializeToElement(result, McpJsonUtilities.DefaultOptions);
+                if (Encoding.UTF8.GetByteCount(envelope.GetRawText()) > 1048576)
+                {
+                    throw new GmailUnavailableException("Gmail response exceeds the provider response budget.");
+                }
+                return GmailContent.Project(tool, ReadContent(envelope), normalized);
+            }, cancellationToken).ConfigureAwait(false);
         }
         catch (GmailUnavailableException) { throw; }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
@@ -59,17 +55,9 @@ internal sealed class GmailMcpProvider : IGmailProvider
         {
             throw new GmailUnavailableException("This Gmail operation is not allowed.");
         }
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(30));
         try
         {
-            await using var transport = new HttpClientTransport(new HttpClientTransportOptions
-            {
-                Endpoint = GoogleModule.GmailMcpEndpoint,
-                AdditionalHeaders = new Dictionary<string, string> { ["Authorization"] = "Bearer " + accessToken },
-            });
-            await using var client = await McpClient.CreateAsync(transport, cancellationToken: timeout.Token).ConfigureAwait(false);
-            var catalog = await client.ListToolsAsync(cancellationToken: timeout.Token).ConfigureAwait(false);
+            var catalog = await McpHttpSession.ReadCatalogAsync(GoogleModule.GmailMcpEndpoint, accessToken, cancellationToken).ConfigureAwait(false);
             ValidateCatalog(catalog);
             var selected = catalog.Single(item => item.Name == tool);
             return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(selected.JsonSchema.GetRawText())));

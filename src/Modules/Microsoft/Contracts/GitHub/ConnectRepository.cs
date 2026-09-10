@@ -3,7 +3,6 @@ using DigitalBrain.Abstractions.Identity;
 
 namespace DigitalBrain.Microsoft.GitHub;
 
-/// <summary>Connects a validated GitHub repository.</summary>
 [GenerateSerializer, Alias("db.github.connect-repository")]
 public sealed record ConnectRepository(
     CommandId Id,

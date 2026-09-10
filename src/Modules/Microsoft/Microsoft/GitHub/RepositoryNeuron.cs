@@ -34,6 +34,7 @@ internal sealed class RepositoryNeuron(
     public Task<Accepted<RepositoryView>> Refresh(RefreshRepository command) => ExecuteCommandAsync(
         Descriptor("refresh"), command, GitHubJson.Default.RefreshRepository, GitHubJson.Default.AcceptedRepositoryView, arguments =>
         {
+            // Fast-fail only; the reaction re-validates revocation.
             if (State?.Revoked == true)
             {
                 throw new GitHubAccessDeniedException("Reconnect repository access before refreshing.");

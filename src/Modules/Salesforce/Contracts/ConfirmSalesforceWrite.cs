@@ -3,7 +3,6 @@ using DigitalBrain.Abstractions.Identity;
 
 namespace DigitalBrain.Salesforce;
 
-/// <summary>Confirms the stored preview and provider schema.</summary>
 [GenerateSerializer]
 [Alias("db.salesforce.confirm-write")]
 public sealed record ConfirmSalesforceWrite(

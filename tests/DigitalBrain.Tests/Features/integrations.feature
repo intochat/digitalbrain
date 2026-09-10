@@ -29,10 +29,28 @@ Feature: Integrations
     Given a running brain with the Salesforce module in fake mode
     When the Salesforce account connects
     Then the Salesforce connection is reported
+    And no Salesforce journal contains the OAuth tokens
     When the guarded query "SELECT Id FROM Account WHERE Name = 'intochat' LIMIT 5" runs
     Then the Salesforce query returns 0 records
     When the guarded query "SELECT Id FROM Account" runs
     Then the Salesforce query was refused
+
+  Scenario: A Salesforce write requires the reviewed schema and can be confirmed only once
+    Given a running brain with the Salesforce module in fake mode
+    When the Salesforce account connects
+    Then the Salesforce connection is reported
+    When a native Salesforce record creation is prepared
+    Then the exact Salesforce preview is published without writing
+    And Salesforce refuses a confirmation with another schema
+    When the reviewed Salesforce write is confirmed twice
+    Then Salesforce reports one written record
+    And Salesforce refuses another confirmation of the consumed preview
+
+  Scenario: An expired Salesforce token is refreshed and the read is retried once
+    Given a running brain with the Salesforce module in fake mode
+    When the Salesforce account connects with a one-second token
+    And the Salesforce token lifetime elapses
+    Then the Salesforce read succeeds after a single refresh
 
   Scenario: A signed GitHub webhook delivery refreshes the bound repository
     Given a running brain with the Microsoft module in fake mode

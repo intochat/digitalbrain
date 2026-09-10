@@ -43,15 +43,13 @@ public sealed class GmailSteps(BrainWorld world)
     public async Task Connection(string email)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        GmailConnection connection;
-        do
+        GmailConnection? connection = null;
+        await ReactionWait.UntilAsync(async () =>
         {
             connection = await Gmail.ReadConnection().WaitAsync(timeout.Token);
-            if (!connection.Connected)
-            {
-                await Task.Delay(20, timeout.Token);
-            }
-        } while (!connection.Connected);
+            return connection.Connected;
+        }, timeout.Token);
+        Assert.NotNull(connection);
         Assert.Equal(email, connection.Email);
     }
 
@@ -73,10 +71,17 @@ public sealed class GmailSteps(BrainWorld world)
     }
 
     [When("the {string} Gmail tool runs for {string}")]
-    public async Task Search(string tool, string query)
+    public async Task RunTool(string tool, string argument)
     {
-        Assert.Equal("search_threads", tool);
-        _read = await world.Brain.SiloServices.GetRequiredService<GmailNativeTools>().SearchThreads(new(query));
+        var tools = world.Brain.SiloServices.GetRequiredService<GmailNativeTools>();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        _read = tool switch
+        {
+            "search_threads" => await tools.SearchThreads(new(argument), cancellationToken),
+            "get_thread" => await tools.GetThread(new(argument), cancellationToken),
+            "list_labels" => await tools.ListLabels(cancellationToken),
+            _ => throw new ArgumentException($"Unsupported Gmail read tool: {tool}.", nameof(tool)),
+        };
     }
 
     [Then("the Gmail read returns thread {string}")]
@@ -178,18 +183,6 @@ public sealed class GmailSteps(BrainWorld world)
         await Created();
     }
 
-    private async Task<SignalDelivery> WaitForSignal(string type)
-    {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        while (true)
-        {
-            var journal = await Gmail.ReadJournal(JournalKind.Outgoing, 0).WaitAsync(timeout.Token);
-            var signal = journal.Delta.FirstOrDefault(entry => entry.Signal.Type == type);
-            if (signal is not null)
-            {
-                return signal;
-            }
-            await Task.Delay(20, timeout.Token);
-        }
-    }
+    private Task<SignalDelivery> WaitForSignal(string type)
+        => ReactionWait.ForSignalAsync(Gmail, type, TestContext.Current.CancellationToken);
 }

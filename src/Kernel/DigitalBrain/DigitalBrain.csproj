@@ -5,6 +5,7 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.Core" />
     <PackageReference Include="Microsoft.Orleans.Journaling" />
     <PackageReference Include="Microsoft.Orleans.Reminders" />
     <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
@@ -17,6 +18,8 @@
     <ProjectReference Include="../DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Google" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Salesforce" />
     <InternalsVisibleTo Include="DigitalBrain.Tests" />
     <InternalsVisibleTo Include="DigitalBrain.Testing" />
     <InternalsVisibleTo Include="DigitalBrain.Mcp" />

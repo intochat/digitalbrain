@@ -38,13 +38,34 @@ internal sealed class GitHubRepositoryBindings
         });
     }
 
-    internal GitHubRepositoryBinding? FindByRepository(string repoOwner, string repoName) => _bindings.Values.FirstOrDefault(binding => string.Equals(binding.RepoOwner, repoOwner, StringComparison.OrdinalIgnoreCase) && string.Equals(binding.RepoName, repoName, StringComparison.OrdinalIgnoreCase));
+    internal GitHubRepositoryBinding? FindByRepository(string repoOwner, string repoName)
+        => _bindings.Values.FirstOrDefault(binding =>
+            string.Equals(binding.RepoOwner, repoOwner, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(binding.RepoName, repoName, StringComparison.OrdinalIgnoreCase));
     public GitHubRepositoryBinding? Find(string id) => _bindings.GetValueOrDefault(id);
     public GitHubRepositoryBinding GetFor(NeuronId neuron)
         => neuron.Type == "repository" && Find(neuron.Name) is { } binding
             ? binding
             : throw new GitHubAccessDeniedException("The GitHub repository neuron is not bound to a configured repository.");
 
-    public static GitHubRepositoryBindings Read(IConfiguration configuration) => new(configuration.GetSection(ConfigurationRoot).GetChildren().Select(static section => new GitHubRepositoryBinding(section.Key, long.Parse(Required(section, "RepositoryId"), System.Globalization.CultureInfo.InvariantCulture), long.Parse(Required(section, "InstallationId"), System.Globalization.CultureInfo.InvariantCulture), long.Parse(Required(section, "AppId"), System.Globalization.CultureInfo.InvariantCulture), Required(section, "RepoOwner"), Required(section, "RepoName"), Required(section, "PrivateKeyPem"), Required(section, "WebhookSecret"), section["EndpointId"], section["ApiHost"] is { } api ? new Uri(api) : null, section["McpEndpoint"] is { } mcp ? new Uri(mcp) : null)));
-    private static string Required(IConfiguration section, string name) => string.IsNullOrWhiteSpace(section[name]) ? throw new InvalidOperationException($"GitHub binding configuration requires {name}.") : section[name]!;
+    public static GitHubRepositoryBindings Read(IConfiguration configuration)
+    {
+        return new(configuration.GetSection(ConfigurationRoot).GetChildren().Select(static section => new GitHubRepositoryBinding(
+            section.Key,
+            long.Parse(Required(section, "RepositoryId"), System.Globalization.CultureInfo.InvariantCulture),
+            long.Parse(Required(section, "InstallationId"), System.Globalization.CultureInfo.InvariantCulture),
+            long.Parse(Required(section, "AppId"), System.Globalization.CultureInfo.InvariantCulture),
+            Required(section, "RepoOwner"),
+            Required(section, "RepoName"),
+            Required(section, "PrivateKeyPem"),
+            Required(section, "WebhookSecret"),
+            section["EndpointId"],
+            section["ApiHost"] is { } api ? new Uri(api) : null,
+            section["McpEndpoint"] is { } mcp ? new Uri(mcp) : null)));
+    }
+
+    private static string Required(IConfiguration section, string name)
+        => string.IsNullOrWhiteSpace(section[name])
+            ? throw new InvalidOperationException($"GitHub binding configuration requires {name}.")
+            : section[name]!;
 }

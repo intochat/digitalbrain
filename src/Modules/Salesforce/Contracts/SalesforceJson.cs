@@ -8,6 +8,9 @@ using DigitalBrain.Salesforce;
 namespace DigitalBrain.Salesforce;
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(RefreshSalesforceConnection))]
+[JsonSerializable(typeof(SalesforceRefreshed))]
+[JsonSerializable(typeof(SalesforceConnectionRejected))]
 [JsonSerializable(typeof(ConnectSalesforceAccount))]
 [JsonSerializable(typeof(DisconnectSalesforce))]
 [JsonSerializable(typeof(PrepareSalesforceWrite))]

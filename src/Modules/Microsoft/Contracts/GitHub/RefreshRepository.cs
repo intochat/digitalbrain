@@ -3,7 +3,6 @@ using DigitalBrain.Abstractions.Identity;
 
 namespace DigitalBrain.Microsoft.GitHub;
 
-/// <summary>Requests current repository evidence.</summary>
 [GenerateSerializer, Alias("db.github.refresh-repository")]
 public sealed record RefreshRepository(
     CommandId Id,

@@ -7,11 +7,13 @@ namespace DigitalBrain.Salesforce;
 [Alias("salesforce")]
 public interface ISalesforce : INeuron
 {
-    /// <summary>Connects the selected Salesforce account.</summary>
     [Alias("connect")]
     Task<Accepted<SalesforceConnection>> Connect(ConnectSalesforceAccount command);
 
-    /// <summary>Disconnects the selected Salesforce account.</summary>
+    /// <summary>Requires a stored refresh token; wait for SalesforceRefreshed before retrying a read.</summary>
+    [Alias("refresh")]
+    Task<Accepted<SalesforceConnection>> Refresh(RefreshSalesforceConnection command);
+
     [Alias("disconnect")]
     Task<Accepted<SalesforceConnection>> Disconnect(DisconnectSalesforce command);
 
@@ -23,15 +25,12 @@ public interface ISalesforce : INeuron
     [Alias("confirm-write")]
     Task<Accepted<SalesforceWritePreview>> ConfirmWrite(ConfirmSalesforceWrite command);
 
-    /// <summary>Reads the stored Salesforce connection.</summary>
     [ReadOnly, Alias("connection")]
     Task<SalesforceConnection> ReadConnection();
 
-    /// <summary>Runs a guarded Salesforce SELECT query.</summary>
     [ReadOnly, Alias("query")]
     Task<SalesforceQueryResult> Query(SoqlQuery query, CancellationToken cancellationToken = default);
 
-    /// <summary>Reads the connected Salesforce user.</summary>
     [ReadOnly, Alias("user")]
     Task<SalesforceUserInfo> ReadUserInfo(CancellationToken cancellationToken = default);
 }

@@ -13,31 +13,39 @@ internal sealed class SalesforceNeuron(
     NeuronRuntime runtime,
     ISalesforceProvider provider,
     SalesforceTokenRefresh tokenRefresh,
+    TokenHandoff handoff,
+    SalesforceWriteAccess writeAccess,
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SalesforceState> state)
     : Neuron<SalesforceState>(runtime, state), ISalesforce
 {
     public Task<Accepted<SalesforceConnection>> Connect(ConnectSalesforceAccount command) => ExecuteCommandAsync(
         Descriptor("connect"), command, SalesforceJson.Default.ConnectSalesforceAccount, SalesforceJson.Default.AcceptedSalesforceConnection, arguments =>
         {
-            SalesforceTokenRefresh.ValidateToken(arguments.AccessToken);
-            if (arguments.RefreshToken is not null)
-            {
-                SalesforceTokenRefresh.ValidateToken(arguments.RefreshToken);
-            }
             if (!Uri.TryCreate(arguments.InstanceUrl, UriKind.Absolute, out var instanceUrl) || instanceUrl.Scheme != Uri.UriSchemeHttps)
             {
                 throw new SalesforceUnavailableException("Salesforce did not issue a valid HTTPS instance URL.");
             }
             var expiry = SalesforceTokenRefresh.Expiry(arguments.ExpiresInSeconds, TimeProvider);
             var receipt = new SalesforceConnection(true, arguments.InstanceUrl, expiry);
-            var work = Schedule(CreateSignal(SalesforceSignals.SalesforceConnected, arguments, SalesforceJson.Default.ConnectSalesforceAccount));
+            var work = Schedule(CreateSignal(SalesforceSignals.SalesforceConnectionRequested, arguments, SalesforceJson.Default.ConnectSalesforceAccount));
             return new Accepted<SalesforceConnection>(receipt, work);
+        });
+
+    public Task<Accepted<SalesforceConnection>> Refresh(RefreshSalesforceConnection command) => ExecuteCommandAsync(
+        Descriptor("refresh"), command, SalesforceJson.Default.RefreshSalesforceConnection, SalesforceJson.Default.AcceptedSalesforceConnection, arguments =>
+        {
+            if (RequireConnection().RefreshToken is null)
+            {
+                throw new SalesforceNotConnectedException();
+            }
+            var work = Schedule(CreateSignal(SalesforceSignals.SalesforceRefreshRequested, arguments, SalesforceJson.Default.RefreshSalesforceConnection));
+            return new Accepted<SalesforceConnection>(Connection(), work);
         });
 
     public Task<Accepted<SalesforceConnection>> Disconnect(DisconnectSalesforce command) => ExecuteCommandAsync(
         Descriptor("disconnect"), command, SalesforceJson.Default.DisconnectSalesforce, SalesforceJson.Default.AcceptedSalesforceConnection, arguments =>
         {
-            var work = Schedule(CreateSignal(SalesforceSignals.SalesforceDisconnected, new SalesforceDisconnected(), SalesforceJson.Default.SalesforceDisconnected));
+            var work = Schedule(CreateSignal(SalesforceSignals.SalesforceDisconnectionRequested, arguments, SalesforceJson.Default.DisconnectSalesforce));
             return new Accepted<SalesforceConnection>(new(false, null, null), work);
         });
 
@@ -82,7 +90,7 @@ internal sealed class SalesforceNeuron(
                 throw new SalesforceUnavailableException("The Salesforce preview expired or changed. Prepare a fresh preview.");
             }
             var work = Schedule(CreateSignal(SalesforceSignals.SalesforceWriteConfirmed,
-                new SalesforceWriteConfirmed(preview), SalesforceJson.Default.SalesforceWriteConfirmed));
+                new SalesforceWriteConfirmed(preview.PreviewId, preview.ToolSchemaHash), SalesforceJson.Default.SalesforceWriteConfirmed));
             return new Accepted<SalesforceWritePreview>(preview, work);
         });
 
@@ -96,7 +104,7 @@ internal sealed class SalesforceNeuron(
             throw new SalesforceUnavailableException("Use one SELECT with an outer WHERE and positive LIMIT. Comments, multiple statements and locking queries are not allowed.");
         }
         var result = await ReadAsync("soqlQuery", JsonSerializer.SerializeToElement(query, SalesforceJson.Default.SoqlQuery), cancellationToken).ConfigureAwait(true);
-        return new(result.GetProperty("records").Clone(), result.GetProperty("totalSize").GetInt32());
+        return new(result, result.GetProperty("totalSize").GetInt32());
     }
 
     public async Task<SalesforceUserInfo> ReadUserInfo(CancellationToken cancellationToken = default)
@@ -107,7 +115,7 @@ internal sealed class SalesforceNeuron(
         var connection = RequireConnection();
         if (connection.ExpiresAt <= TimeProvider.GetUtcNow())
         {
-            throw new SalesforceNotConnectedException("The Salesforce access token expired. Reconnect Salesforce.");
+            throw new SalesforceNotConnectedException("The Salesforce access token expired. Refresh the connection.");
         }
         return await provider.InvokeAsync(tool, arguments, connection.AccessToken!, cancellationToken).ConfigureAwait(true);
     }
@@ -116,43 +124,91 @@ internal sealed class SalesforceNeuron(
     {
         switch (delivery.Signal.Type)
         {
-            case SalesforceSignals.SalesforceConnected:
+            case SalesforceSignals.SalesforceConnectionRequested:
                 var account = JsonSerializer.Deserialize(delivery.Signal.Body, SalesforceJson.Default.ConnectSalesforceAccount)!;
-                await SaveAsync(new SalesforceState(account.AccessToken,
-                    account.RefreshToken ?? (State?.InstanceUrl == account.InstanceUrl ? State.RefreshToken : null),
+                if (!handoff.TryRedeem(account.Nonce, out var tokens))
+                {
+                    await RejectConnectionAsync(new TokenHandoffExpiredException().Message, cancellationToken).ConfigureAwait(true);
+                    return;
+                }
+                try
+                {
+                    SalesforceTokenRefresh.ValidateToken(tokens.AccessToken);
+                    if (tokens.RefreshToken is not null)
+                    {
+                        SalesforceTokenRefresh.ValidateToken(tokens.RefreshToken);
+                    }
+                }
+                catch (SalesforceUnavailableException error)
+                {
+                    await RejectConnectionAsync(error.Message, cancellationToken).ConfigureAwait(true);
+                    return;
+                }
+                await SaveAsync(new SalesforceState(tokens.AccessToken,
+                    tokens.RefreshToken ?? (State?.InstanceUrl == account.InstanceUrl ? State.RefreshToken : null),
                     delivery.Timestamp.AddSeconds(account.ExpiresInSeconds), account.InstanceUrl), cancellationToken).ConfigureAwait(true);
                 await FireAsync(CreateSignal(SalesforceSignals.SalesforceConnected, new SalesforceConnected(Connection()),
                     SalesforceJson.Default.SalesforceConnected), cancellationToken: cancellationToken).ConfigureAwait(true);
                 break;
-            case SalesforceSignals.SalesforceDisconnected:
+            case SalesforceSignals.SalesforceRefreshRequested:
+                SalesforceState refreshed;
+                try
+                {
+                    refreshed = await tokenRefresh.RefreshAsync(RequireConnection(), TimeProvider, cancellationToken).ConfigureAwait(true);
+                }
+                catch (SalesforceNotConnectedException error)
+                {
+                    await SaveAsync(new SalesforceState(), cancellationToken).ConfigureAwait(true);
+                    await RejectConnectionAsync(error.Message, cancellationToken).ConfigureAwait(true);
+                    return;
+                }
+                catch (SalesforceUnavailableException error)
+                {
+                    await RejectConnectionAsync(error.Message, cancellationToken).ConfigureAwait(true);
+                    return;
+                }
+                await SaveAsync(refreshed, cancellationToken).ConfigureAwait(true);
+                await FireAsync(CreateSignal(SalesforceSignals.SalesforceRefreshed, new SalesforceRefreshed(Connection()),
+                    SalesforceJson.Default.SalesforceRefreshed), cancellationToken: cancellationToken).ConfigureAwait(true);
+                break;
+            case SalesforceSignals.SalesforceDisconnectionRequested:
                 await SaveAsync(new SalesforceState(), cancellationToken).ConfigureAwait(true);
                 await FireAsync(CreateSignal(SalesforceSignals.SalesforceDisconnected, new SalesforceDisconnected(),
                     SalesforceJson.Default.SalesforceDisconnected), cancellationToken: cancellationToken).ConfigureAwait(true);
                 break;
             case SalesforceSignals.SalesforceWriteRequested:
                 var requested = JsonSerializer.Deserialize(delivery.Signal.Body, SalesforceJson.Default.SalesforceWriteRequested)!;
-                if (RequireConnection().InstanceUrl != requested.InstanceUrl)
+                string hash;
+                try
                 {
+                    if (RequireConnection().InstanceUrl != requested.InstanceUrl)
+                    {
+                        throw new SalesforceNotConnectedException("The Salesforce account changed. Prepare a fresh preview.");
+                    }
+                    hash = await ReadWriteSchemaAsync(requested.Preview.Tool, cancellationToken).ConfigureAwait(true);
+                }
+                catch (Exception error) when (error is SalesforceNotConnectedException or SalesforceUnavailableException)
+                {
+                    await RejectConnectionAsync(error.Message, cancellationToken).ConfigureAwait(true);
                     return;
                 }
-                var hash = await ReadWriteSchemaAsync(requested.Preview.Tool, cancellationToken).ConfigureAwait(true);
                 var preview = requested.Preview with { ToolSchemaHash = hash, ExpiresAt = TimeProvider.GetUtcNow().AddMinutes(10) };
                 await SaveAsync(State! with { PendingWrite = preview }, cancellationToken).ConfigureAwait(true);
                 await FireAsync(CreateSignal(SalesforceSignals.SalesforceWritePrepared, new SalesforceWritePrepared(preview),
                     SalesforceJson.Default.SalesforceWritePrepared), cancellationToken: cancellationToken).ConfigureAwait(true);
                 break;
             case SalesforceSignals.SalesforceWriteConfirmed:
-                await SubmitWriteAsync(JsonSerializer.Deserialize(delivery.Signal.Body, SalesforceJson.Default.SalesforceWriteConfirmed)!.Preview, cancellationToken).ConfigureAwait(true);
+                await SubmitWriteAsync(JsonSerializer.Deserialize(delivery.Signal.Body, SalesforceJson.Default.SalesforceWriteConfirmed)!, cancellationToken).ConfigureAwait(true);
                 break;
         }
     }
 
-    private async Task SubmitWriteAsync(SalesforceWritePreview confirmed, CancellationToken cancellationToken)
+    private async Task SubmitWriteAsync(SalesforceWriteConfirmed confirmed, CancellationToken cancellationToken)
     {
         var preview = State?.PendingWrite;
         if (preview is null || preview.PreviewId != confirmed.PreviewId || preview.ToolSchemaHash != confirmed.ToolSchemaHash)
         {
-            await FireUncertainAsync(confirmed, cancellationToken).ConfigureAwait(true);
+            await FireUncertainAsync(confirmed.PreviewId, cancellationToken).ConfigureAwait(true);
             return;
         }
         // Consume durably before provider I/O so a crash cannot retry the same preview.
@@ -181,36 +237,42 @@ internal sealed class SalesforceNeuron(
                     SalesforceJson.Default.RecordWritten);
             }
         }
+        catch (SalesforceNotConnectedException error)
+        {
+            await RejectConnectionAsync(error.Message, cancellationToken).ConfigureAwait(true);
+            await FireUncertainAsync(preview.PreviewId, cancellationToken).ConfigureAwait(true);
+            return;
+        }
         catch (Exception)
         {
-            await FireUncertainAsync(preview, cancellationToken).ConfigureAwait(true);
+            await FireUncertainAsync(preview.PreviewId, cancellationToken).ConfigureAwait(true);
             return;
         }
         await FireAsync(outcome, cancellationToken: cancellationToken).ConfigureAwait(true);
     }
 
-    private Task FireUncertainAsync(SalesforceWritePreview preview, CancellationToken cancellationToken)
-        => FireAsync(CreateSignal(SalesforceSignals.SalesforceWriteUncertain, new SalesforceWriteUncertain(preview.PreviewId),
+    private Task FireUncertainAsync(string previewId, CancellationToken cancellationToken)
+        => FireAsync(CreateSignal(SalesforceSignals.SalesforceWriteUncertain, new SalesforceWriteUncertain(previewId),
             SalesforceJson.Default.SalesforceWriteUncertain), cancellationToken: cancellationToken);
 
     private async Task<string> ReadWriteSchemaAsync(string tool, CancellationToken cancellationToken)
     {
-        var connection = RequireConnection();
-        if (connection.ExpiresAt <= TimeProvider.GetUtcNow().AddSeconds(30))
+        try
         {
-            try
-            {
-                connection = await tokenRefresh.RefreshAsync(connection, TimeProvider, cancellationToken).ConfigureAwait(true);
-                await SaveAsync(connection, cancellationToken).ConfigureAwait(true);
-            }
-            catch (SalesforceNotConnectedException)
-            {
-                await SaveAsync(new SalesforceState(), cancellationToken).ConfigureAwait(true);
-                throw;
-            }
+            var access = await writeAccess.ReadAsync(tool, RequireConnection(), TimeProvider, cancellationToken).ConfigureAwait(true);
+            await SaveAsync(access.Connection, cancellationToken).ConfigureAwait(true);
+            return access.SchemaHash;
         }
-        return await provider.ReadToolSchemaHashAsync(tool, connection.AccessToken!, cancellationToken).ConfigureAwait(true);
+        catch (SalesforceNotConnectedException)
+        {
+            await SaveAsync(new SalesforceState(), cancellationToken).ConfigureAwait(true);
+            throw;
+        }
     }
+
+    private Task RejectConnectionAsync(string reason, CancellationToken cancellationToken)
+        => FireAsync(CreateSignal(SalesforceSignals.SalesforceConnectionRejected, new SalesforceConnectionRejected(reason),
+            SalesforceJson.Default.SalesforceConnectionRejected), cancellationToken: cancellationToken);
 
     private static Signal CreateSignal<T>(string type, T body, JsonTypeInfo<T> json)
         => Signal.Create(type, JsonSerializer.Serialize(body, json));

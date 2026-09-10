@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace DigitalBrain.Salesforce;
 
@@ -15,8 +16,10 @@ internal sealed class FakeSalesforceProvider : ISalesforceProvider
             "createRecord" or "updateRecord" => """{"mode":"fake","id":"record-intochat"}""",
             _ => throw new SalesforceUnavailableException("This Salesforce operation is not allowed."),
         };
-        using var document = JsonDocument.Parse(payload);
-        return Task.FromResult(document.RootElement.Clone());
+        var result = JsonNode.Parse(payload)!.AsObject();
+        // screened at the NativeTools boundary (AI module)
+        result["untrustedData"] = true;
+        return Task.FromResult(JsonSerializer.SerializeToElement(result));
     }
 
     public Task<string> ReadToolSchemaHashAsync(string tool, string accessToken, CancellationToken cancellationToken)

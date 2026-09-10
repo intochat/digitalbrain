@@ -1,52 +1,31 @@
-using System.Globalization;
-using System.Text.Json;
-
 namespace DigitalBrain.Salesforce;
 
-internal sealed class SalesforceTokenRefresh(SalesforceOAuthConfiguration configuration) : IDisposable
+internal sealed class SalesforceTokenRefresh(ISalesforceTokenExchange exchange)
 {
-    private readonly HttpClient _oauth = new(new HttpClientHandler { AllowAutoRedirect = false })
-    { Timeout = TimeSpan.FromSeconds(30), MaxResponseContentBufferSize = 65536 };
-
     internal async Task<SalesforceState> RefreshAsync(SalesforceState connection, TimeProvider clock, CancellationToken cancellationToken)
     {
         if (connection.RefreshToken is null)
         {
             throw new SalesforceNotConnectedException();
         }
-        using var request = configuration.RefreshRequest(connection.RefreshToken);
-        using var response = await _oauth.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode)
+        var grant = await exchange.ExchangeAsync(connection.RefreshToken, cancellationToken).ConfigureAwait(false);
+        ValidateToken(grant.AccessToken);
+        if (grant.RefreshToken is not null)
         {
-            if ((int)response.StatusCode >= 500 || response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-            {
-                throw new SalesforceUnavailableException("Salesforce token refresh is temporarily unavailable. Try again shortly.");
-            }
-            throw new SalesforceNotConnectedException();
+            ValidateToken(grant.RefreshToken);
         }
         try
         {
-            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
-            var root = document.RootElement;
-            var token = root.GetProperty("access_token").GetString();
-            ValidateToken(token);
-            var refreshToken = root.TryGetProperty("refresh_token", out var refreshed) ? refreshed.GetString() : connection.RefreshToken;
-            if (refreshToken is not null)
-            {
-                ValidateToken(refreshToken);
-            }
             return connection with
             {
-                AccessToken = token,
-                RefreshToken = refreshToken,
-                ExpiresAt = root.TryGetProperty("expires_in", out var expires)
-                    && double.TryParse(expires.ToString(), CultureInfo.InvariantCulture, out var seconds)
-                        ? clock.GetUtcNow().AddSeconds(seconds) : DateTimeOffset.MaxValue,
+                AccessToken = grant.AccessToken,
+                RefreshToken = grant.RefreshToken ?? connection.RefreshToken,
+                ExpiresAt = grant.ExpiresInSeconds is { } seconds ? clock.GetUtcNow().AddSeconds(seconds) : DateTimeOffset.MaxValue,
             };
         }
-        catch (JsonException)
+        catch (ArgumentOutOfRangeException)
         {
-            throw new SalesforceNotConnectedException();
+            throw new SalesforceUnavailableException("Salesforce returned an invalid token lifetime.");
         }
     }
 
@@ -62,5 +41,4 @@ internal sealed class SalesforceTokenRefresh(SalesforceOAuthConfiguration config
         }
     }
 
-    public void Dispose() => _oauth.Dispose();
 }

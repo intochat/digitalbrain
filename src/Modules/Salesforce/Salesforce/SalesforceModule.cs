@@ -1,6 +1,7 @@
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace DigitalBrain.Salesforce;
 
@@ -17,6 +18,8 @@ public sealed class SalesforceModule : IModule
         ArgumentNullException.ThrowIfNull(builder);
         var services = builder.Services;
         var settings = new SalesforceOAuthConfiguration(builder.Configuration);
+        services.TryAddSingleton<TokenHandoff>();
+        services.AddSingleton<SalesforceWriteAccess>();
         services.AddSingleton(settings);
         services.AddSingleton<SalesforceLogins>();
         services.AddSingleton<IHttpSurface>(static services => new BrowserLoginSurface(services.GetRequiredService<SalesforceLogins>()));
@@ -24,15 +27,18 @@ public sealed class SalesforceModule : IModule
         if (DigitalBrainFakes.Enabled(builder.Configuration))
         {
             services.AddSingleton<ISalesforceProvider, FakeSalesforceProvider>();
+            services.AddSingleton<ISalesforceTokenExchange, FakeSalesforceTokenExchange>();
         }
         else
         {
             services.AddSingleton<ISalesforceProvider>(new SalesforceMcpProvider(endpoint));
+            services.AddSingleton<ISalesforceTokenExchange, SalesforceTokenExchange>();
         }
         services.AddSingleton<SalesforceTokenRefresh>();
         // NativeTools contributor lands after the AI module merge
         services.AddSingleton(static services => new SalesforceNativeTools(
-            services.GetRequiredService<IGrainFactory>().GetGrain<ISalesforce>(new NeuronId("salesforce", "salesforce").ToGrainId())));
+            services.GetRequiredService<IGrainFactory>().GetGrain<ISalesforce>(new NeuronId("salesforce", "salesforce").ToGrainId()),
+            services.GetRequiredService<TimeProvider>()));
         services.AddSalesforceAuthentication(settings, SalesforceLogins.LoginDefinition);
     }
 

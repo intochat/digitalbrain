@@ -1,8 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using DigitalBrain.Core;
 using ModelContextProtocol;
-using ModelContextProtocol.Client;
 
 namespace DigitalBrain.Salesforce;
 
@@ -23,31 +24,26 @@ internal sealed class SalesforceMcpProvider(Uri? endpoint) : ISalesforceProvider
             throw new SalesforceUnavailableException("Salesforce MCP is not configured.");
         }
         var normalized = arguments.EnumerateObject().ToDictionary(property => property.Name, property => (object?)property.Value.Clone());
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(30));
         try
         {
-            await using var transport = new HttpClientTransport(new HttpClientTransportOptions
+            return await McpHttpSession.RunAsync(endpoint, accessToken, async (client, token) =>
             {
-                Endpoint = endpoint,
-                AdditionalHeaders = new Dictionary<string, string> { ["Authorization"] = "Bearer " + accessToken },
-            });
-            await using var client = await McpClient.CreateAsync(transport, cancellationToken: timeout.Token).ConfigureAwait(false);
-            var result = await client.CallToolAsync(tool, normalized, cancellationToken: timeout.Token).ConfigureAwait(false);
-            var envelope = JsonSerializer.SerializeToElement(result, McpJsonUtilities.DefaultOptions);
-            if (Encoding.UTF8.GetByteCount(envelope.GetRawText()) > 128 * 1024)
-            {
-                throw new SalesforceUnavailableException("Salesforce response exceeds the provider response budget.");
-            }
-            if (result.IsError == true)
-            {
-                if (tool is "createRecord" or "updateRecord")
+                var result = await client.CallToolAsync(tool, normalized, cancellationToken: token).ConfigureAwait(false);
+                var envelope = JsonSerializer.SerializeToElement(result, McpJsonUtilities.DefaultOptions);
+                if (Encoding.UTF8.GetByteCount(envelope.GetRawText()) > 128 * 1024)
                 {
-                    return envelope;
+                    throw new SalesforceUnavailableException("Salesforce response exceeds the provider response budget.");
                 }
-                throw new SalesforceUnavailableException("Salesforce returned a provider error.");
-            }
-            return ReadContent(envelope);
+                if (result.IsError == true)
+                {
+                    if (tool is "createRecord" or "updateRecord")
+                    {
+                        return MarkUntrusted(envelope);
+                    }
+                    throw new SalesforceUnavailableException("Salesforce returned a provider error.");
+                }
+                return MarkUntrusted(ReadContent(envelope));
+            }, cancellationToken).ConfigureAwait(false);
         }
         catch (SalesforceUnavailableException) { throw; }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
@@ -69,17 +65,9 @@ internal sealed class SalesforceMcpProvider(Uri? endpoint) : ISalesforceProvider
         {
             throw new SalesforceUnavailableException("Salesforce MCP is not configured.");
         }
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(30));
         try
         {
-            await using var transport = new HttpClientTransport(new HttpClientTransportOptions
-            {
-                Endpoint = endpoint,
-                AdditionalHeaders = new Dictionary<string, string> { ["Authorization"] = "Bearer " + accessToken },
-            });
-            await using var client = await McpClient.CreateAsync(transport, cancellationToken: timeout.Token).ConfigureAwait(false);
-            var catalog = await client.ListToolsAsync(cancellationToken: timeout.Token).ConfigureAwait(false);
+            var catalog = await McpHttpSession.ReadCatalogAsync(endpoint, accessToken, cancellationToken).ConfigureAwait(false);
             var selected = catalog.SingleOrDefault(item => item.Name == tool)
                 ?? throw new SalesforceUnavailableException("The authenticated Salesforce catalog does not contain this tool.");
             return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(
@@ -91,6 +79,18 @@ internal sealed class SalesforceMcpProvider(Uri? endpoint) : ISalesforceProvider
         {
             throw new SalesforceUnavailableException("Salesforce is unavailable. Check service access and try again later.");
         }
+    }
+
+    private static JsonElement MarkUntrusted(JsonElement content)
+    {
+        if (content.ValueKind != JsonValueKind.Object)
+        {
+            throw new SalesforceUnavailableException("Salesforce MCP returned an invalid response shape.");
+        }
+        var result = JsonNode.Parse(content.GetRawText())!.AsObject();
+        // screened at the NativeTools boundary (AI module)
+        result["untrustedData"] = true;
+        return JsonSerializer.SerializeToElement(result);
     }
 
     private static JsonElement ReadContent(JsonElement envelope)

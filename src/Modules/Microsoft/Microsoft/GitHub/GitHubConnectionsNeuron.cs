@@ -22,6 +22,7 @@ internal sealed class GitHubConnectionsNeuron(NeuronRuntime runtime,
             ArgumentOutOfRangeException.ThrowIfLessThan(arguments.AppId, 1);
             ArgumentOutOfRangeException.ThrowIfLessThan(arguments.InstallationId, 1);
             ArgumentOutOfRangeException.ThrowIfLessThan(arguments.RepositoryId, 1);
+            // Fast-fail only; the reaction re-validates connection capacity.
             if (State?.Connections.Count(item => item.Id != arguments.ConnectionId) >= 256)
             {
                 throw new InvalidOperationException("The GitHub connection capacity is full.");

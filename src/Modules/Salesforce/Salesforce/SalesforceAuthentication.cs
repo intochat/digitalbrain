@@ -58,10 +58,12 @@ internal static class SalesforceAuthentication
                             {
                                 throw new InvalidOperationException("Salesforce did not issue a valid HTTPS instance URL.");
                             }
+                            var nonce = context.HttpContext.RequestServices.GetRequiredService<TokenHandoff>()
+                                .Deposit(new OAuthTokens(context.AccessToken!, context.RefreshToken));
                             var grains = context.HttpContext.RequestServices.GetRequiredService<IGrainFactory>();
                             await grains.GetGrain<ISalesforce>(new NeuronId("salesforce", "salesforce").ToGrainId())
-                                .Connect(new ConnectSalesforceAccount(CommandId.New(), context.AccessToken!, context.RefreshToken,
-                                    checked((int)(context.ExpiresIn?.TotalSeconds ?? 3600)), instanceUrl.AbsoluteUri)).ConfigureAwait(false);
+                                .Connect(new ConnectSalesforceAccount(CommandId.New(), instanceUrl.AbsoluteUri,
+                                    checked((int)(context.ExpiresIn?.TotalSeconds ?? 3600)), nonce)).ConfigureAwait(false);
                         }
                         catch
                         {

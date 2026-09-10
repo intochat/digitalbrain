@@ -3,10 +3,13 @@ using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Microsoft.GitHub;
 
-internal sealed class GitHubSetupService(IConfiguration configuration, GitHubRepositoryBindings bindings, IGrainFactory grains, GitHubInstallationTokens tokens, IGitHubRepositorySource source)
+internal sealed class GitHubSetupService(
+    IConfiguration configuration, GitHubRepositoryBindings bindings, IGrainFactory grains,
+    GitHubInstallationTokens tokens, IGitHubRepositorySource source)
 {
     internal const string AppRoot = "DigitalBrain:Microsoft:GitHub:App";
-    public async Task<GitHubSetupResult> ResolveAsync(string repositoryUrl, CancellationToken cancellationToken = default, RepositoryView? localView = null)
+    public async Task<GitHubSetupResult> ResolveAsync(
+        string repositoryUrl, CancellationToken cancellationToken = default, RepositoryView? localView = null)
     {
         var coordinates = ParseUrl(repositoryUrl);
         var url = $"https://github.com/{coordinates.Owner}/{coordinates.Name}";
@@ -24,7 +27,10 @@ internal sealed class GitHubSetupService(IConfiguration configuration, GitHubRep
         }
         if (binding is null)
         {
-            return new(url, Configured(null) ? "authentication_required" : "operator_setup_required", null, [], Configured(null) ? "Connect GitHub and select repository access to resume this request." : "The operator must configure the GitHub App id, private key, webhook secret and OAuth callback before connection.");
+            return new(url, Configured(null) ? "authentication_required" : "operator_setup_required", null, [],
+                Configured(null)
+                    ? "Connect GitHub and select repository access to resume this request."
+                    : "The operator must configure the GitHub App id, private key, webhook secret and OAuth callback before connection.");
         }
 
         var id = binding.Id;
@@ -40,13 +46,17 @@ internal sealed class GitHubSetupService(IConfiguration configuration, GitHubRep
             || endpoint.AbsolutePath != "/integrations/github/webhook" || endpoint.UserInfo.Length != 0
             || endpoint.Query.Length != 0 || endpoint.Fragment.Length != 0)
         {
-            return new(url, "webhook_setup_required", id, [], "Configure a public HTTPS URL for /integrations/github/webhook. Successful sign-in does not establish inbound reachability.");
+            return new(url, "webhook_setup_required", id, [],
+                "Configure a public HTTPS URL for /integrations/github/webhook. "
+                + "Successful sign-in does not establish inbound reachability.");
         }
 
         var proof = view.LastWebhookAt;
         if (proof is null)
         {
-            return new(url, "webhook_verification_required", id, [], "Repository access is connected. Send a GitHub App ping or redeliver an event to verify authenticated inbound delivery. Required CI checks are validated after delivery is verified.", ingress);
+            return new(url, "webhook_verification_required", id, [],
+                "Repository access is connected. Send a GitHub App ping or redeliver an event to verify authenticated inbound delivery. "
+                + "Required CI checks are validated after delivery is verified.", ingress);
         }
 
         RequiredChecksRead checks;
@@ -56,15 +66,18 @@ internal sealed class GitHubSetupService(IConfiguration configuration, GitHubRep
         }
         catch (Exception error) when (error is GitHubAccessDeniedException or GitHubUnavailableException)
         {
-            return new(url, error is GitHubAccessDeniedException ? "access_denied" : "unavailable", id, [], "GitHub readiness could not be established. Verify repository access and try again.");
+            return new(url, error is GitHubAccessDeniedException ? "access_denied" : "unavailable", id, [],
+                "GitHub readiness could not be established. Verify repository access and try again.");
         }
 
         if (!checks.Complete || checks.Checks.Count == 0)
         {
-            return new(url, "ci_setup_required", id, checks.Checks, checks.Detail ?? "Select an explicit nonempty set of required CI checks.", ingress);
+            return new(url, "ci_setup_required", id, checks.Checks,
+                checks.Detail ?? "Select an explicit nonempty set of required CI checks.", ingress);
         }
 
-        return new(url, "ready", id, checks.Checks, "Repository access, required CI checks and authenticated webhook delivery are validated.", ingress);
+        return new(url, "ready", id, checks.Checks,
+            "Repository access, required CI checks and authenticated webhook delivery are validated.", ingress);
     }
 
     public async Task<GitHubSetupResult> ConnectAsync(GitHubRepositoryAccess access, CancellationToken cancellationToken = default)
@@ -78,7 +91,10 @@ internal sealed class GitHubSetupService(IConfiguration configuration, GitHubRep
         var identity = prior?.Id ?? $"r-{access.RepositoryId}";
         var previous = await grains.GetGrain<IRepository>(new NeuronId("repository", identity).ToGrainId())
             .Read().WaitAsync(cancellationToken);
-        var record = new GitHubConnectionRecord(identity, access.AppId, access.InstallationId, access.RepositoryId, access.RepositoryOwner, access.RepositoryName, prior is { Enabled: true } && !previous.Revoked && prior.InstallationId == access.InstallationId ? prior.Revision : Guid.NewGuid().ToString("N"));
+        var record = new GitHubConnectionRecord(identity, access.AppId, access.InstallationId,
+            access.RepositoryId, access.RepositoryOwner, access.RepositoryName,
+            prior is { Enabled: true } && !previous.Revoked && prior.InstallationId == access.InstallationId
+                ? prior.Revision : Guid.NewGuid().ToString("N"));
         var binding = Create(record);
         // Installation-token exchange verifies the App can actually read this numeric repository.
         _ = await tokens.GetTokenAsync(binding, true, cancellationToken);
@@ -93,17 +109,29 @@ internal sealed class GitHubSetupService(IConfiguration configuration, GitHubRep
         return await ResolveAsync($"https://github.com/{access.RepositoryOwner}/{access.RepositoryName}", cancellationToken);
     }
 
-    private bool Configured(long? appId) => long.TryParse(configuration[$"{AppRoot}:AppId"], out var configured) && configured > 0 && (appId is null || appId == configured) && !string.IsNullOrWhiteSpace(configuration[$"{AppRoot}:PrivateKeyPem"]) && configuration[$"{AppRoot}:WebhookSecret"] is { Length: >= 16 };
-    private GitHubRepositoryBinding Create(GitHubConnectionRecord record) => new(record.Id, record.RepositoryId, record.InstallationId, record.AppId, record.RepositoryOwner, record.RepositoryName, configuration[$"{AppRoot}:PrivateKeyPem"]!, configuration[$"{AppRoot}:WebhookSecret"]!, authorizationEpoch: record.Epoch);
+    private bool Configured(long? appId)
+        => long.TryParse(configuration[$"{AppRoot}:AppId"], out var configured)
+            && configured > 0 && (appId is null || appId == configured)
+            && !string.IsNullOrWhiteSpace(configuration[$"{AppRoot}:PrivateKeyPem"])
+            && configuration[$"{AppRoot}:WebhookSecret"] is { Length: >= 16 };
+
+    private GitHubRepositoryBinding Create(GitHubConnectionRecord record)
+        => new(record.Id, record.RepositoryId, record.InstallationId, record.AppId,
+            record.RepositoryOwner, record.RepositoryName,
+            configuration[$"{AppRoot}:PrivateKeyPem"]!, configuration[$"{AppRoot}:WebhookSecret"]!,
+            authorizationEpoch: record.Epoch);
+
     internal static (string Owner, string Name) ParseUrl(string value)
     {
-        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || uri.Scheme != "https" || uri.Host != "github.com" || uri.UserInfo.Length != 0 || uri.Query.Length != 0 || uri.Fragment.Length != 0)
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || uri.Scheme != "https" || uri.Host != "github.com"
+            || uri.UserInfo.Length != 0 || uri.Query.Length != 0 || uri.Fragment.Length != 0)
         {
             throw new GitHubUnavailableException("Use the HTTPS GitHub repository URL, for example https://github.com/intochat/digitalbrain.");
         }
 
         var parts = uri.AbsolutePath.Trim('/').Split('/');
-        if (parts.Length != 2 || parts.Any(part => part.Length == 0 || part.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not '-' and not '_' and not '.')))
+        if (parts.Length != 2 || parts.Any(part => part.Length == 0
+            || part.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not '-' and not '_' and not '.')))
         {
             throw new GitHubUnavailableException("Use a repository URL with an owner and repository name.");
         }

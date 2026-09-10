@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using ModelContextProtocol;
 using ModelContextProtocol.Client;
 
@@ -43,7 +44,10 @@ public sealed class AspireConnection
             {
                 throw new InvalidOperationException("Aspire evidence exceeds the response budget.");
             }
-            return envelope;
+            var content = JsonNode.Parse(envelope.GetRawText())!.AsObject();
+            // screened at the NativeTools boundary (AI module)
+            content["untrustedData"] = true;
+            return JsonSerializer.SerializeToElement(content);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception)
