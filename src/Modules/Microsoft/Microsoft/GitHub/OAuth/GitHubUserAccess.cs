@@ -1,6 +1,5 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
-using DigitalBrain.Sdk;
 
 namespace DigitalBrain.Microsoft.GitHub;
 
@@ -14,12 +13,12 @@ internal static class GitHubUserAccess
         if (!Uri.TryCreate(repositoryUrl, UriKind.Absolute, out var uri) || uri.Scheme != "https"
             || uri.Host != "github.com" || uri.UserInfo.Length != 0 || uri.Query.Length != 0 || uri.Fragment.Length != 0)
         {
-            throw new McpOperationException("Use the HTTPS URL of the GitHub repository.");
+            throw new GitHubUnavailableException("Use the HTTPS URL of the GitHub repository.");
         }
         var parts = uri.AbsolutePath.Trim('/').Split('/');
         if (parts.Length != 2 || parts.Any(string.IsNullOrWhiteSpace))
         {
-            throw new McpOperationException("Choose one GitHub repository.");
+            throw new GitHubUnavailableException("Choose one GitHub repository.");
         }
         var coordinates = GitHubSetupService.ParseUrl(repositoryUrl);
         var expected = $"{coordinates.Owner}/{coordinates.Name}";
@@ -58,7 +57,7 @@ internal static class GitHubUserAccess
                 break;
             }
         }
-        throw new McpOperationException("The user and GitHub App must both have access to the requested repository. Install or configure the App, then connect again.");
+        throw new GitHubUnavailableException("The user and GitHub App must both have access to the requested repository. Install or configure the App, then connect again.");
     }
 
     private static async Task<JsonDocument> Read(HttpClient client, string token, string path, CancellationToken cancellationToken)
@@ -71,7 +70,7 @@ internal static class GitHubUserAccess
         using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
         {
-            throw new McpOperationException("GitHub repository authorization could not be verified.");
+            throw new GitHubUnavailableException("GitHub repository authorization could not be verified.");
         }
         await response.Content.LoadIntoBufferAsync(4 * 1024 * 1024, cancellationToken).ConfigureAwait(false);
         return await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false), cancellationToken: cancellationToken).ConfigureAwait(false);

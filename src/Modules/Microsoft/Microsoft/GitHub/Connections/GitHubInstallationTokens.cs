@@ -5,11 +5,9 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using DigitalBrain.Sdk;
 
 namespace DigitalBrain.Microsoft.GitHub;
 
-/// <summary>Kernel-private App authentication. Tokens are narrowed to one numeric repository and read permissions.</summary>
 internal sealed class GitHubInstallationTokens : IDisposable
 {
     private readonly HttpClient _http;
@@ -26,16 +24,16 @@ internal sealed class GitHubInstallationTokens : IDisposable
 
     internal async Task<string> GetTokenAsync(GitHubRepositoryBinding binding, bool refresh, CancellationToken cancellationToken)
     {
-        binding.Authorize(binding.Owner, binding.Principal);
+        binding.RequireEnabled();
         if (_slots.Count >= 32 && !_slots.ContainsKey(binding.Id))
         {
-            throw new McpOperationException("The GitHub connection capacity was reached.", McpFailureKind.Capacity);
+            throw new GitHubUnavailableException("The GitHub connection capacity was reached.");
         }
         var slot = _slots.GetOrAdd(binding.Id, static _ => new Slot());
         await slot.Gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            binding.Authorize(binding.Owner, binding.Principal);
+            binding.RequireEnabled();
             if (!refresh && slot.Revision == binding.Revision && slot.Token is not null && slot.Expiry > _time.GetUtcNow().AddMinutes(2))
             {
                 return slot.Token;
@@ -53,11 +51,11 @@ internal sealed class GitHubInstallationTokens : IDisposable
             using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
             if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden or HttpStatusCode.NotFound)
             {
-                throw new McpOperationException("GitHub App authentication was refused. Verify the installation, repository access and App permissions.", McpFailureKind.AccessDenied);
+                throw new GitHubAccessDeniedException("GitHub App authentication was refused. Verify the installation, repository access and App permissions.");
             }
             if (!response.IsSuccessStatusCode)
             {
-                throw new McpOperationException("GitHub App authentication is temporarily unavailable.", McpFailureKind.Unavailable);
+                throw new GitHubUnavailableException("GitHub App authentication is temporarily unavailable.");
             }
             using var document = JsonDocument.Parse(await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false));
             var json = document.RootElement;
@@ -65,26 +63,26 @@ internal sealed class GitHubInstallationTokens : IDisposable
             if (string.IsNullOrWhiteSpace(token) || token.Length > 4096 || token.Any(char.IsControl)
                 || !json.GetProperty("expires_at").TryGetDateTimeOffset(out var expiry) || expiry <= _time.GetUtcNow().AddMinutes(2))
             {
-                throw new McpOperationException("GitHub returned invalid installation credentials.", McpFailureKind.AccessDenied);
+                throw new GitHubAccessDeniedException("GitHub returned invalid installation credentials.");
             }
             if (json.TryGetProperty("repositories", out var repositories)
                 && (repositories.ValueKind != JsonValueKind.Array || repositories.GetArrayLength() != 1
                     || repositories[0].GetProperty("id").GetInt64() != binding.RepositoryId))
             {
-                throw new McpOperationException("GitHub did not scope the installation token to the configured repository.", McpFailureKind.AccessDenied);
+                throw new GitHubAccessDeniedException("GitHub did not scope the installation token to the configured repository.");
             }
             if (!json.TryGetProperty("permissions", out var permissions) || permissions.ValueKind != JsonValueKind.Object
                 || permissions.EnumerateObject().Any(static permission => permission.Value.GetString() != "read"))
             {
-                throw new McpOperationException("GitHub did not grant a read-only installation token.", McpFailureKind.AccessDenied);
+                throw new GitHubAccessDeniedException("GitHub did not grant a read-only installation token.");
             }
-            binding.Authorize(binding.Owner, binding.Principal);
+            binding.RequireEnabled();
             slot.Token = token; slot.Expiry = expiry; slot.Revision = binding.Revision;
             return token;
         }
-        catch (Exception error) when (error is HttpRequestException or JsonException or CryptographicException or InvalidOperationException or KeyNotFoundException or ArgumentException)
+        catch (Exception error) when (error is not GitHubAccessDeniedException && (error is HttpRequestException or JsonException or CryptographicException or InvalidOperationException or KeyNotFoundException or ArgumentException))
         {
-            throw new McpOperationException("GitHub App authentication could not be completed. Check the configured App key and connection.", McpFailureKind.Unavailable);
+            throw new GitHubUnavailableException("GitHub App authentication could not be completed. Check the configured App key and connection.");
         }
         finally { slot.Gate.Release(); }
     }
@@ -114,7 +112,7 @@ internal sealed class GitHubInstallationTokens : IDisposable
             using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {
-                throw new McpOperationException("The configured GitHub repository could not be verified.", McpFailureKind.AccessDenied);
+                throw new GitHubAccessDeniedException("The configured GitHub repository could not be verified.");
             }
             using var document = JsonDocument.Parse(await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false));
             var repo = document.RootElement;
@@ -123,13 +121,13 @@ internal sealed class GitHubInstallationTokens : IDisposable
                 || !string.Equals(repo.GetProperty("owner").GetProperty("login").GetString(), binding.RepoOwner, StringComparison.OrdinalIgnoreCase))
             {
                 binding.Revoke();
-                throw new McpOperationException("The repository was renamed or transferred. Reauthorize the GitHub binding.", McpFailureKind.ConnectionChanged);
+                throw new GitHubAccessDeniedException("The repository was renamed or transferred. Reauthorize the GitHub binding.");
             }
-            binding.Authorize(binding.Owner, binding.Principal);
+            binding.RequireEnabled();
         }
-        catch (Exception error) when (error is HttpRequestException or JsonException or KeyNotFoundException or InvalidOperationException)
+        catch (Exception error) when (error is not GitHubAccessDeniedException && (error is HttpRequestException or JsonException or KeyNotFoundException or InvalidOperationException))
         {
-            throw new McpOperationException("The configured GitHub repository could not be verified.", McpFailureKind.Unavailable);
+            throw new GitHubUnavailableException("The configured GitHub repository could not be verified.");
         }
     }
 

@@ -15,3 +15,10 @@ Feature: Integrations
     Then the Salesforce query returns 0 records
     When the guarded query "SELECT Id FROM Account" runs
     Then the Salesforce query was refused
+
+  Scenario: A signed GitHub webhook delivery refreshes the bound repository
+    Given a running brain with the Microsoft module in fake mode
+    When a signed "pull_request" webhook delivery for pull request 42 arrives
+    Then the repository reports pull request 42 as open
+    When the same signed webhook delivery arrives again
+    Then the repository accepted it as a duplicate

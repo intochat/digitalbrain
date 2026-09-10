@@ -6,21 +6,19 @@ namespace DigitalBrain.Microsoft.Hosting;
 
 public static class GitHubHostingExtensions
 {
-    /// <summary>Configures one fixed GitHub App repository and private webhook endpoint on the kernel.</summary>
     public static DigitalBrainModuleBuilder<MicrosoftModule> WithGitHubRepository(
         this DigitalBrainModuleBuilder<MicrosoftModule> module,
-        string bindingId, string owner, Guid principal, long appId, long installationId,
+        string bindingId, long appId, long installationId,
         long repositoryId, string repositoryOwner, string repositoryName,
         string? endpointId = null, Uri? apiHost = null, Uri? mcpEndpoint = null)
     {
         ArgumentNullException.ThrowIfNull(module);
         ArgumentException.ThrowIfNullOrWhiteSpace(bindingId);
-        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryOwner);
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryName);
-        if (principal == Guid.Empty || appId < 1 || installationId < 1 || repositoryId < 1)
+        if (appId < 1 || installationId < 1 || repositoryId < 1)
         {
-            throw new ArgumentException("A fixed principal, GitHub App, installation and numeric repository identity are required.");
+            throw new ArgumentException("A GitHub App, installation and numeric repository identity are required.");
         }
         if (bindingId.Length > 80 || bindingId.Any(static character => !char.IsAsciiLetterOrDigit(character) && character != '-'))
         {
@@ -31,7 +29,7 @@ public static class GitHubHostingExtensions
         {
             module.AddProjection(state);
         }
-        state.Add(bindingId, endpointId ?? bindingId, new GitHubProjection(module.Brain, bindingId, owner, principal, appId,
+        state.Add(bindingId, endpointId ?? bindingId, new GitHubProjection(module.Brain, bindingId, appId,
             installationId, repositoryId, repositoryOwner, repositoryName, endpointId ?? bindingId, apiHost, mcpEndpoint));
         return module;
     }
@@ -59,7 +57,7 @@ public static class GitHubHostingExtensions
         }
     }
 
-    private sealed class GitHubProjection(DigitalBrainBuilder brain, string id, string owner, Guid principal,
+    private sealed class GitHubProjection(DigitalBrainBuilder brain, string id,
         long appId, long installationId, long repositoryId, string repoOwner, string repoName,
         string endpointId, Uri? apiHost, Uri? mcpEndpoint) : DigitalBrainModuleProjection
     {
@@ -75,11 +73,9 @@ public static class GitHubHostingExtensions
             _privateKey ??= brain.ApplicationBuilder.AddParameter($"github-{id}-app-private-key", secret: true)
                 .WithDescription("PEM private key for the configured GitHub App. Only the kernel receives this secret.");
             _webhookSecret ??= brain.ApplicationBuilder.AddParameter($"github-{id}-webhook-secret", secret: true)
-                .WithDescription($"GitHub webhook HMAC secret (at least 16 characters). Forward only /integrations/github/{endpointId}/webhook through HTTPS.");
+                .WithDescription("GitHub webhook HMAC secret (at least 16 characters). Forward only /integrations/github/webhook through HTTPS.");
             var root = $"DigitalBrain:Microsoft:GitHub:Repositories:{id}";
             builder
-                .WithEnvironment(EnvironmentKeys.For(root, "Owner"), owner)
-                .WithEnvironment(EnvironmentKeys.For(root, "Principal"), principal.ToString("D"))
                 .WithEnvironment(EnvironmentKeys.For(root, "AppId"), appId.ToString(System.Globalization.CultureInfo.InvariantCulture))
                 .WithEnvironment(EnvironmentKeys.For(root, "InstallationId"), installationId.ToString(System.Globalization.CultureInfo.InvariantCulture))
                 .WithEnvironment(EnvironmentKeys.For(root, "RepositoryId"), repositoryId.ToString(System.Globalization.CultureInfo.InvariantCulture))

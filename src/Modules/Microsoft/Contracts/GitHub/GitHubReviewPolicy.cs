@@ -1,6 +1,5 @@
 namespace DigitalBrain.Microsoft.GitHub;
 
-/// <summary>The behavior supplies requirements and conclusions; only authoritative complete facts satisfy them.</summary>
 public static class GitHubReviewPolicy
 {
     public static bool ChecksSucceeded(PullRequestSnapshot snapshot,

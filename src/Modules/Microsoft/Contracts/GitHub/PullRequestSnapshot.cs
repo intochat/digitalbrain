@@ -1,6 +1,5 @@
 namespace DigitalBrain.Microsoft.GitHub;
 
-/// <summary>Authoritative observed PR and CI state. Incomplete evidence never grants a review.</summary>
 [GenerateSerializer, Alias("db.github.pull-request-snapshot")]
 public sealed record PullRequestSnapshot(
     [property: Id(0)] int Number,
@@ -12,7 +11,7 @@ public sealed record PullRequestSnapshot(
     [property: Id(6)] string BaseSha,
     [property: Id(7)] string? MergeSha,
     [property: Id(8)] string CiSha,
-    [property: Id(9)] GitHubCheck[] Checks,
+    [property: Id(9)] IReadOnlyList<GitHubCheck> Checks,
     [property: Id(10)] bool ChecksComplete,
     [property: Id(11)] DateTimeOffset ObservedAt,
     [property: Id(12)] DateTimeOffset CreatedAt,
