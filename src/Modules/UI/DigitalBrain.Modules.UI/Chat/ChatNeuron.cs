@@ -9,6 +9,7 @@ using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.AI;
 using DigitalBrain.Chat;
 using DigitalBrain.Core;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
@@ -113,33 +114,55 @@ internal sealed class ChatNeuron(
 
         try
         {
+            // Backstops the kernel's bound of 1024 resolved commands without suppressing this entry's retries.
+            if (State?.TurnByCommand.Any(item => item.Command == commandId && item.Turn != turn && Find(item.Turn) is not null) == true)
+            {
+                return;
+            }
+
             var record = Find(turn);
-            if (record is not null && (record.Snapshot.Status != ChatTurnStatus.Running || record.ResponderWork is not null))
+            if (record is not null && record.Snapshot.Status != ChatTurnStatus.Running)
+            {
+                if (!record.SettlementFired)
+                {
+                    await AnnounceAsync(record, cancellationToken).ConfigureAwait(true);
+                }
+
+                return;
+            }
+
+            if (record?.ResponderWork is not null)
             {
                 return;
             }
 
             var text = ChatBodies.String(body, "text") ?? string.Empty;
-            var context = TurnContexts.For(turn, text, ChatBodies.Context(body));
+            var store = ServiceProvider.GetRequiredService<ITurnContextBlobStore>();
+            // A retry reuses the context the first attempt built, so the digests a caller already read stay put.
+            var context = State?.Contexts.FirstOrDefault(stored => stored.Turn == turn)
+                ?? TurnContexts.For(turn, text, ChatBodies.Context(body), State?.Contexts ?? []);
             if (record is null)
             {
                 var current = Current();
-                record = new ChatTurnRecord(new ChatTurnSnapshot(turn, commandId, text, ChatTurnStatus.Running, TimeProvider.GetUtcNow()), null);
+                record = new ChatTurnRecord(new ChatTurnSnapshot(turn, commandId, text, ChatTurnStatus.Running, TimeProvider.GetUtcNow(),
+                    Context: [.. context.Slots.Select(slot => new ContextDigest(slot.Path, slot.Digest))]), null, false);
                 var contexts = BoundedList.Append(current.Contexts, context, ChatState.MaxTurns);
-                TurnContexts.Retain(contexts);
+                await TurnContexts.RetainAsync(contexts, store, cancellationToken).ConfigureAwait(true);
                 await SaveAsync(current with
                 {
                     Turns = BoundedList.Append(current.Turns, record, ChatState.MaxTurns),
+                    TurnByCommand = BoundedList.Append(current.TurnByCommand, new CommandTurn(commandId, turn), ChatState.MaxCommandTurns),
                     Transcript = BoundedList.Append(current.Transcript, new ChatTurn(true, text), ChatState.MaxTranscript),
                     Contexts = contexts,
                     Version = current.Version + 1,
                 }, cancellationToken).ConfigureAwait(true);
             }
 
+            var preamble = await TurnContexts.PreambleAsync(context, store, cancellationToken).ConfigureAwait(true);
             var responder = Responder;
             // Ask carries the question; Turn ignores its body and reads a group-chat journal.
             var outcome = await FireAsync(Signal.Create(AIVocabulary.Ask,
-                ChatBodies.Text($"Chat: {Id}\n" + TurnContexts.Preamble(context) + text)),
+                ChatBodies.Text($"Chat: {Id}\n" + preamble + text)),
                 responder, new CorrelationId(turn.Value), cancellationToken).ConfigureAwait(true);
             record = record with { ResponderWork = outcome.SignalId };
             await StoreAsync(record, cancellationToken).ConfigureAwait(true);
@@ -155,6 +178,8 @@ internal sealed class ChatNeuron(
                 await StoreAsync(running with
                 {
                     Snapshot = running.Snapshot with { Status = ChatTurnStatus.Cancelled, SettledAt = TimeProvider.GetUtcNow(), Detail = "cancelled" },
+                    // The edge cancelled this reaction and already knows the outcome; the kernel will not retry it to announce.
+                    SettlementFired = true,
                 }, CancellationToken.None).ConfigureAwait(true);
             }
 
@@ -165,26 +190,29 @@ internal sealed class ChatNeuron(
     private async Task AnswerAsync(SignalDelivery delivery, JsonNode? body, CancellationToken cancellationToken)
     {
         var record = Find(new SignalId(delivery.CorrelationId.Value));
-        if (record is not { Snapshot.Status: ChatTurnStatus.Running })
+        if (record is null)
         {
             return;
         }
 
-        var answer = ChatBodies.String(body, "text") ?? string.Empty;
-        var author = delivery.Signal.Type == AIVocabulary.Said
-            ? ChatBodies.String(body, "author") ?? delivery.Source.ToString()
-            : delivery.Source.ToString();
-        record = record with
+        if (record.Snapshot.Status == ChatTurnStatus.Running)
         {
-            Snapshot = record.Snapshot with { Status = ChatTurnStatus.Completed, Answer = answer, Author = author, SettledAt = TimeProvider.GetUtcNow() },
-        };
-        await StoreAsync(record, cancellationToken, new ChatTurn(false, answer)).ConfigureAwait(true);
-        if (answer.Length > 0)
-        {
-            var response = new Responded(record.Snapshot.Turn, record.Snapshot.CommandId, Id, answer, author, record.Snapshot.Cards);
-            await FireAsync(Signal.Create(UIVocabulary.Responded, JsonSerializer.Serialize(response, UIJson.Default.Responded)),
-                correlation: delivery.CorrelationId, cancellationToken: cancellationToken).ConfigureAwait(true);
+            var answer = ChatBodies.String(body, "text") ?? string.Empty;
+            var author = delivery.Signal.Type == AIVocabulary.Said
+                ? ChatBodies.String(body, "author") ?? delivery.Source.ToString()
+                : delivery.Source.ToString();
+            record = record with
+            {
+                Snapshot = record.Snapshot with { Status = ChatTurnStatus.Completed, Answer = answer, Author = author, SettledAt = TimeProvider.GetUtcNow() },
+            };
+            await StoreAsync(record, cancellationToken, new ChatTurn(false, answer)).ConfigureAwait(true);
         }
+        else if (record.SettlementFired || record.Snapshot.Status != ChatTurnStatus.Completed)
+        {
+            return;
+        }
+
+        await AnnounceAsync(record, cancellationToken).ConfigureAwait(true);
     }
 
     private async Task OfferAsync(SignalDelivery delivery, JsonNode? body, CancellationToken cancellationToken)
@@ -209,12 +237,13 @@ internal sealed class ChatNeuron(
 
     private async Task CancelAsync(SignalId turn, CancellationToken cancellationToken)
     {
-        if (Find(turn) is not { Snapshot.Status: ChatTurnStatus.Running } record)
+        var record = Find(turn);
+        if (record is null || (record.Snapshot.Status != ChatTurnStatus.Running && record.SettlementFired))
         {
             return;
         }
 
-        if (record.ResponderWork is { } work)
+        if (record.Snapshot.Status == ChatTurnStatus.Running && record.ResponderWork is { } work)
         {
             await GrainFactory.GetGrain<INeuron>(Responder.ToGrainId()).CancelReaction(work).ConfigureAwait(true);
         }
@@ -224,21 +253,55 @@ internal sealed class ChatNeuron(
 
     private async Task FailAsync(ChatTurnRecord record, ChatTurnStatus status, string detail, CancellationToken cancellationToken)
     {
-        await StoreAsync(record with
+        if (record.Snapshot.Status == ChatTurnStatus.Running)
         {
-            Snapshot = record.Snapshot with { Status = status, Detail = detail, SettledAt = TimeProvider.GetUtcNow() },
-        }, cancellationToken).ConfigureAwait(true);
-        await FireAsync(Signal.Create(UIVocabulary.TurnFailed, new JsonObject
+            record = record with
+            {
+                Snapshot = record.Snapshot with { Status = status, Detail = detail, SettledAt = TimeProvider.GetUtcNow() },
+            };
+            await StoreAsync(record, cancellationToken).ConfigureAwait(true);
+        }
+        else if (record.SettlementFired)
         {
-            ["turn"] = record.Snapshot.Turn.ToString(),
-            ["commandId"] = record.Snapshot.CommandId.ToString(),
-            ["detail"] = detail,
-        }.ToJsonString()), correlation: new CorrelationId(record.Snapshot.Turn.Value), cancellationToken: cancellationToken).ConfigureAwait(true);
+            return;
+        }
+
+        await AnnounceAsync(record, cancellationToken).ConfigureAwait(true);
+    }
+
+    private async Task AnnounceAsync(ChatTurnRecord record, CancellationToken cancellationToken)
+    {
+        var snapshot = record.Snapshot;
+        // A completed turn with no answer has nothing to announce, but still needs the marker or it retries forever.
+        var announcement = snapshot.Status switch
+        {
+            ChatTurnStatus.Completed when snapshot.Answer is { Length: > 0 } answer => Signal.Create(
+                UIVocabulary.Responded,
+                JsonSerializer.Serialize(
+                    new Responded(snapshot.Turn, snapshot.CommandId, Id, answer, snapshot.Author ?? string.Empty, snapshot.Cards),
+                    UIJson.Default.Responded)),
+            ChatTurnStatus.Completed => null,
+            _ => Signal.Create(UIVocabulary.TurnFailed, new JsonObject
+            {
+                ["turn"] = snapshot.Turn.ToString(),
+                ["commandId"] = snapshot.CommandId.ToString(),
+                ["detail"] = snapshot.Detail,
+            }.ToJsonString()),
+        };
+
+        if (announcement is not null)
+        {
+            ServiceProvider.GetService<IChatSettlementCrashPoint>()?.BeforeSettlementFire(snapshot.Turn);
+            await FireAsync(announcement, correlation: new CorrelationId(snapshot.Turn.Value),
+                cancellationToken: cancellationToken).ConfigureAwait(true);
+        }
+
+        await StoreAsync(record with { SettlementFired = true }, cancellationToken).ConfigureAwait(true);
     }
 
     private ChatTurnRecord? Find(SignalId turn) => State?.Turns.FirstOrDefault(record => record.Snapshot.Turn == turn);
 
-    private ChatState Current() => State ?? new ChatState([], [], [], null, 0);
+    private ChatState Current() => State ?? new ChatState([], [], [], null, 0, []);
 
     private Task StoreAsync(ChatTurnRecord record, CancellationToken cancellationToken, ChatTurn? line = null)
     {

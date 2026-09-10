@@ -1,6 +1,17 @@
 Feature: uichat
   A user-facing chat keeps turns and context while an agent answers asynchronously.
 
+  Scenario: A settlement lost before its fire is announced exactly once after the retry
+    Given a running brain with AI and UI
+    And the chat settlement fire is lost once
+    And "uichat:desk" is connected to "alice" for "Responded"
+    And the scripted model will say "welcome"
+    When chat "desk" sends "hello"
+    And chat "desk" waits up to 10 seconds for its turn to be "Completed"
+    And "alice" waits up to 10 seconds for an incoming "Responded"
+    Then "alice" incoming journal has 1 entries
+    And chat "desk" transcript has 2 turns
+
   Scenario: A send appears in the transcript as a running turn
     Given a running brain with AI and UI
     And the scripted model will pause before its next answer
@@ -58,3 +69,16 @@ Feature: uichat
     And "agent:desk" waits up to 10 seconds for an incoming "Ask"
     Then the latest "agent:desk" incoming "Ask" text contains "current"
     And the latest "agent:desk" incoming "Ask" text does not contain "obsolete"
+
+  Scenario: A later turn inherits context from a related turn
+    Given a running brain with AI and UI
+    And the scripted model will say "understood"
+    When chat "desk" sends "remember this" with context
+      | Path          | SchemaHash | PayloadJson          |
+      | customer.name | text.v1    | {"name":"inherited"} |
+    And chat "desk" waits up to 10 seconds for its turn to be "Completed"
+    Given the scripted model will say "remembered"
+    When chat "desk" sends "use the earlier context" naming the previous turn
+    And chat "desk" waits up to 10 seconds for its turn to be "Completed"
+    Then chat "desk" turn inherits the previous turn's context digests
+    And the latest "agent:desk" incoming "Ask" text contains "inherited"

@@ -17,6 +17,7 @@ namespace DigitalBrain.UI;
 [JsonSerializable(typeof(ReadTurns))]
 [JsonSerializable(typeof(ReadTurn))]
 [JsonSerializable(typeof(ContextRef))]
+[JsonSerializable(typeof(ContextDigest))]
 [JsonSerializable(typeof(ChatTurn))]
 [JsonSerializable(typeof(ChatTranscript))]
 [JsonSerializable(typeof(ChatTurns))]

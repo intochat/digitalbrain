@@ -14,4 +14,5 @@ public sealed record ChatTurnSnapshot(
     [property: Id(6)] string? Answer = null,
     [property: Id(7)] string? Author = null,
     [property: Id(8)] string? Detail = null,
-    [property: Id(9)] IReadOnlyList<KitCardOffer>? Cards = null);
+    [property: Id(9)] IReadOnlyList<KitCardOffer>? Cards = null,
+    [property: Id(10)] IReadOnlyList<ContextDigest>? Context = null);

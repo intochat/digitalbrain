@@ -14,11 +14,11 @@ public sealed class UIModule : IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
         // Resolved lazily so the choice does not depend on whether the host registered its blob
-        // client before or after this module: with no blob storage, images live in memory.
+        // client before or after this module.
         builder.Services.TryAddSingleton<IKitImageStore>(services =>
-            services.GetKeyedService<BlobServiceClient>(DigitalBrainNames.GrainState) is { } blobs
-                ? new BlobKitImageStore(blobs)
-                : new MemoryKitImageStore());
+            CreateStore<IKitImageStore>(services, blobs => new BlobKitImageStore(blobs), () => new MemoryKitImageStore()));
+        builder.Services.TryAddSingleton<ITurnContextBlobStore>(services =>
+            CreateStore<ITurnContextBlobStore>(services, blobs => new BlobTurnContextStore(blobs), () => new MemoryTurnContextStore()));
 
         builder.AddStartupTask((services, cancellationToken) =>
         {
@@ -43,4 +43,9 @@ public sealed class UIModule : IModule
             return Task.CompletedTask;
         });
     }
+
+    private static T CreateStore<T>(IServiceProvider services, Func<BlobServiceClient, T> blobStore, Func<T> memoryStore)
+        => services.GetKeyedService<BlobServiceClient>(DigitalBrainNames.GrainState) is { } blobs
+            ? blobStore(blobs)
+            : memoryStore();
 }

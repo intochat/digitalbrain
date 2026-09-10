@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Signals;
@@ -23,20 +22,9 @@ internal sealed class SurfaceNeuron(
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.SurfaceKey);
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.Title);
             var scene = new SurfaceScene(arguments.SurfaceKey, arguments.Title, arguments.Root);
-            var fingerprint = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(scene, UIJson.Default.SurfaceScene)));
-            var previousKeys = Components(State?.Scenes.FirstOrDefault(existing => existing.SurfaceKey == scene.SurfaceKey)?.Root)
-                .Select(component => component.Key).OfType<string>().ToHashSet(StringComparer.Ordinal);
-            var additions = Components(scene.Root)
-                .Where(component => component.Key is { Length: > 0 } key && !previousKeys.Contains(key))
-                .DistinctBy(component => component.Key, StringComparer.Ordinal).ToList();
-            var receipt = new SurfaceOpenReceipt(arguments.Id, fingerprint, additions);
-            // Carry the computed receipt so queued opens publish exactly the additions their callers saw.
-            var body = new JsonObject
-            {
-                ["command"] = JsonSerializer.SerializeToNode(arguments, UIJson.Default.OpenSurface),
-                ["receipt"] = JsonSerializer.SerializeToNode(receipt, UIJson.Default.SurfaceOpenReceipt),
-            };
-            var work = Schedule(Signal.Create(UIVocabulary.Opening, body.ToJsonString()));
+            // This receipt is advisory: it is what the caller can show immediately.
+            var receipt = CreateReceipt(arguments, scene, State);
+            var work = Schedule(UIBodies.Signal(UIVocabulary.Opening, arguments, UIJson.Default.OpenSurface));
             return new Accepted<SurfaceOpenReceipt>(receipt, work);
         });
 
@@ -93,11 +81,10 @@ internal sealed class SurfaceNeuron(
 
     private async Task OpenAsync(SignalDelivery delivery, CancellationToken cancellationToken)
     {
-        var body = JsonNode.Parse(delivery.Signal.Body)!;
-        var command = body["command"].Deserialize(UIJson.Default.OpenSurface)!;
-        var receipt = body["receipt"].Deserialize(UIJson.Default.SurfaceOpenReceipt)!;
+        var command = UIBodies.Read(delivery, UIJson.Default.OpenSurface);
         var current = State ?? new SurfaceState([]);
         var scene = new SurfaceScene(command.SurfaceKey, command.Title, command.Root);
+        var receipt = CreateReceipt(command, scene, current);
         await SaveAsync(current with
         {
             Scenes = BoundedList.Append(current.Scenes.Where(item => item.SurfaceKey != command.SurfaceKey), scene, 64),
@@ -108,12 +95,24 @@ internal sealed class SurfaceNeuron(
             cancellationToken: cancellationToken).ConfigureAwait(true);
         foreach (var component in receipt.AddedComponents)
         {
+            // Identical queued scenes mint the same ids so clients deduplicating by event id cannot double-add.
             var eventId = new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(
-                $"component-added:{Id}:{command.Id}:{command.SurfaceKey}:{component.Key}")).AsSpan(0, 16)).ToString();
+                $"component-added:{Id}:{receipt.Fingerprint}:{command.SurfaceKey}:{component.Key}")).AsSpan(0, 16)).ToString();
             await FireAsync(UIBodies.Signal(UIVocabulary.ComponentAdded,
                 new ComponentAdded(command.Id, Id, command.SurfaceKey, component, eventId), UIJson.Default.ComponentAdded),
                 cancellationToken: cancellationToken).ConfigureAwait(true);
         }
+    }
+
+    private static SurfaceOpenReceipt CreateReceipt(OpenSurface command, SurfaceScene scene, SurfaceState? current)
+    {
+        var fingerprint = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(scene, UIJson.Default.SurfaceScene)));
+        var previousKeys = Components(current?.Scenes.FirstOrDefault(existing => existing.SurfaceKey == scene.SurfaceKey)?.Root)
+            .Select(component => component.Key).OfType<string>().ToHashSet(StringComparer.Ordinal);
+        var additions = Components(scene.Root)
+            .Where(component => component.Key is { Length: > 0 } key && !previousKeys.Contains(key))
+            .DistinctBy(component => component.Key, StringComparer.Ordinal).ToList();
+        return new SurfaceOpenReceipt(command.Id, fingerprint, additions);
     }
 
     private static IEnumerable<SurfaceComponent> Components(SurfaceComponent? root)

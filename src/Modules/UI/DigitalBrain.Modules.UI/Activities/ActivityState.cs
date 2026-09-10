@@ -1,42 +1,52 @@
+using System.Collections.Immutable;
+
 namespace DigitalBrain.UI;
 
 [GenerateSerializer, Alias("db.ui.activity-state")]
-internal sealed class ActivityState
+internal sealed record ActivityState
 {
-    [Id(0)] public ActivityExecutionChanged? Root { get; set; }
-    [Id(1)] public Dictionary<string, ActivityExecutionChanged> Operations { get; set; } = [];
-    [Id(2)] public List<ActivityExecutionChanged> Events { get; set; } = [];
-    [Id(3)] public bool RootSettled { get; set; }
-    [Id(4)] public long Version { get; set; }
+    [Id(0)] public ActivityExecutionChanged? Root { get; init; }
+    [Id(1)] public ImmutableDictionary<string, ActivityExecutionChanged> Operations { get; init; } = [];
+    [Id(2)] public ImmutableList<ActivityExecutionChanged> Events { get; init; } = [];
+    [Id(3)] public bool RootSettled { get; init; }
+    [Id(4)] public long Version { get; init; }
 
-    public bool Apply(ActivityExecutionChanged fact)
+    public ActivityState? Apply(ActivityExecutionChanged fact)
     {
         if (Operations.TryGetValue(fact.OperationId, out var previous)
             && (previous.Timestamp > fact.Timestamp
                 || previous == fact
                 || (previous.Timestamp == fact.Timestamp && IsTerminal(previous.Phase) && !IsTerminal(fact.Phase))))
         {
-            return false;
+            return null;
         }
 
-        Root ??= fact;
-        if (fact.CausationId is null && Root.CausationId is not null)
+        var root = Root ?? fact;
+        if (fact.CausationId is null && root.CausationId is not null)
         {
-            Root = fact;
+            root = fact;
         }
+        var rootSettled = RootSettled;
         if (fact.CausationId is null && IsTerminal(fact.Phase))
         {
-            RootSettled = true;
+            rootSettled = true;
         }
-        Operations[fact.OperationId] = fact;
-        Version++;
-        Events.Add(fact);
+        var operations = Operations.SetItem(fact.OperationId, fact);
+        var version = Version + 1;
+        var events = Events.Add(fact);
         // The current operation ledger remains intact when the display trace rolls over.
-        if (Events.Count > 512)
+        if (events.Count > 512)
         {
-            Events.RemoveRange(0, Events.Count - 512);
+            events = events.RemoveRange(0, events.Count - 512);
         }
-        return true;
+        return this with
+        {
+            Root = root,
+            RootSettled = rootSettled,
+            Operations = operations,
+            Version = version,
+            Events = events,
+        };
     }
 
     public ActivityView View()

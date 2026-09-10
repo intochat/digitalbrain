@@ -15,5 +15,7 @@
     <ProjectReference Include="../../AI/AI/DigitalBrain.Modules.AI.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain/DigitalBrain.csproj" />
   </ItemGroup>
-
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Tests" />
+  </ItemGroup>
 </Project>

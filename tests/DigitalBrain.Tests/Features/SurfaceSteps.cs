@@ -13,34 +13,27 @@ public sealed class SurfaceSteps(BrainSteps brain)
 {
     private OpenSurface? _open;
     private Accepted<SurfaceOpenReceipt>? _accepted;
-    private Accepted<SurfaceOpenReceipt>? _repeated;
+    private Accepted<SurfaceOpenReceipt>? _previous;
     private ActivityExecutionChanged? _fact;
 
-    [When(@"surface ""(.*)"" opens ""(.*)"" titled ""(.*)"" with button ""(.*)""")]
-    public async Task Open(string name, string key, string title, string button)
+    [When(@"surface ""(.*)"" opens ""(.*)"" titled ""(.*)"" with button ""(.*)"" using command ""(.*)""")]
+    public async Task Open(string name, string key, string title, string button, string commandId)
     {
-        var commandId = _open is null ? new CommandId(Guid.Parse("11111111-1111-1111-1111-111111111111")) : CommandId.New();
-        _open = new OpenSurface(commandId, key, title,
+        _open = new OpenSurface(new CommandId(Guid.Parse(commandId)), key, title,
             new SurfaceComponent("column", "root", Children:
                 [new SurfaceComponent("button", button, JsonSerializer.Deserialize<JsonElement>("{\"label\":\"Continue\"}"))]));
+        _previous = _accepted;
         _accepted = await Surface(name).Open(_open);
-    }
-
-    [When(@"surface ""(.*)"" retries its open command")]
-    public async Task Retry(string name)
-    {
-        Assert.NotNull(_open);
-        _repeated = await Surface(name).Open(_open);
     }
 
     [Then("the repeated surface receipt and work are unchanged")]
     public void Repeated()
     {
         Assert.NotNull(_accepted);
-        Assert.NotNull(_repeated);
-        Assert.Equal(_accepted.Work, _repeated.Work);
+        Assert.NotNull(_previous);
+        Assert.Equal(_accepted.Work, _previous.Work);
         Assert.Equal(JsonSerializer.Serialize(_accepted.Receipt, UIJson.Default.SurfaceOpenReceipt),
-            JsonSerializer.Serialize(_repeated.Receipt, UIJson.Default.SurfaceOpenReceipt));
+            JsonSerializer.Serialize(_previous.Receipt, UIJson.Default.SurfaceOpenReceipt));
     }
 
     [Then(@"surface ""(.*)"" contains the opened scene and receipt")]
@@ -72,7 +65,7 @@ public sealed class SurfaceSteps(BrainSteps brain)
             .Where(item => item.Signal.Type == UIVocabulary.ComponentAdded)
             .Select(item => JsonSerializer.Deserialize(item.Signal.Body, UIJson.Default.ComponentAdded)!).ToList();
         Assert.Equal(["root", "go"], events.Select(item => item.Component.Key));
-        Assert.Equal(["313e3174-2f39-3f8e-cfd1-91ce29a6f036", "310788fa-5633-61c8-70ad-74de80cb440c"],
+        Assert.Equal(["3759ef41-7b47-00b4-6f17-83718a0c0821", "6f23934f-48bc-de77-0037-ab4c069ec3e7"],
             events.Select(item => item.EventId));
         Assert.NotNull(_accepted);
         Assert.Equal("5BFE7B147907E88956C837A6937510A95562F9EF98D0803D1E9AF1FB6BEADA4F", _accepted.Receipt.Fingerprint);

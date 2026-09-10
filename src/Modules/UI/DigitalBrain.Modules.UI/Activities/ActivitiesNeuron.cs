@@ -36,10 +36,14 @@ internal sealed class ActivitiesNeuron(
         var current = State ?? new ActivitiesState(new Dictionary<string, ActivityState>(StringComparer.Ordinal));
         var key = fact.CorrelationId.ToString();
         var activity = current.Activities.TryGetValue(key, out var existing) ? existing : new ActivityState();
-        if (activity.Apply(fact))
+        if (activity.Apply(fact) is { } updated)
         {
-            current.Activities[key] = activity;
-            await SaveAsync(current, cancellationToken).ConfigureAwait(true);
+            var activities = new Dictionary<string, ActivityState>(current.Activities, StringComparer.Ordinal)
+            {
+                [key] = updated,
+            };
+            await SaveAsync(new ActivitiesState(activities), cancellationToken).ConfigureAwait(true);
+            activity = updated;
         }
         // An earlier delivery can have committed state before an observer failed.
         // Retrying republishes the same version without applying the fact twice.

@@ -7,7 +7,7 @@ namespace DigitalBrain.UI;
 [Alias("ui.surface")]
 public interface ISurface : INeuron
 {
-    /// <summary>Opens a scene and returns its receipt.</summary>
+    /// <summary>Opens a scene. The receipt is advisory - what the caller can show at once; the reaction recomputes the authoritative one and publishes it on SurfaceOpened.</summary>
     [Alias("open")]
     Task<Accepted<SurfaceOpenReceipt>> Open(OpenSurface command, CancellationToken cancellationToken = default);
 

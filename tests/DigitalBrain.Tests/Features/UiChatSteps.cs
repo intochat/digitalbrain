@@ -7,6 +7,7 @@ using DigitalBrain.AI;
 using DigitalBrain.Chat;
 using DigitalBrain.Testing;
 using DigitalBrain.UI;
+using Microsoft.Extensions.DependencyInjection;
 using Reqnroll;
 using Xunit;
 
@@ -16,14 +17,23 @@ namespace DigitalBrain.Tests;
 public sealed class UiChatSteps(BrainWorld world, BrainSteps brain)
 {
     private Accepted<SignalId>? _lastSend;
+    private SignalId? _previousTurn;
+    private readonly FixtureChatSettlementCrashPoint _settlementCrashPoint = new();
 
     [Given("a running brain with AI and UI")]
     public async Task GivenAiAndUi()
         => world.Simulation = await BrainSimulation.StartAsync(new()
         {
             Modules = new([typeof(AIModule), typeof(UIModule)]),
-            ConfigureSilo = ScriptedAi.Configure(world),
+            ConfigureSilo = silo =>
+            {
+                ScriptedAi.Configure(world)(silo);
+                silo.Services.AddSingleton<IChatSettlementCrashPoint>(_settlementCrashPoint);
+            },
         });
+
+    [Given("the chat settlement fire is lost once")]
+    public void LoseSettlementFire() => _settlementCrashPoint.CrashOnce = true;
 
     [When(@"chat ""(.*)"" sends ""(.*)""$")]
     public async Task Send(string name, string text)
@@ -33,6 +43,31 @@ public sealed class UiChatSteps(BrainWorld world, BrainSteps brain)
     public async Task SendWithContext(string name, string text, Table table)
         => _lastSend = await Chat(name).Send(new SendMessage(CommandId.New(), text,
             [.. table.Rows.Select(row => new ContextRef(row["Path"], row["SchemaHash"], row["PayloadJson"]))]));
+
+    [When(@"chat ""(.*)"" sends ""(.*)"" naming the previous turn")]
+    public async Task SendNamingPreviousTurn(string name, string text)
+    {
+        Assert.NotNull(_lastSend);
+        _previousTurn = _lastSend.Receipt;
+        _lastSend = await Chat(name).Send(new SendMessage(CommandId.New(), text,
+            [new ContextRef($"chat.turn.{_previousTurn}", "chat.turn.v1")]));
+    }
+
+    [Then(@"chat ""(.*)"" turn inherits the previous turn's context digests")]
+    public async Task InheritsPreviousContext(string name)
+    {
+        Assert.NotNull(_previousTurn);
+        Assert.NotNull(_lastSend);
+        var previous = await Chat(name).ReadTurn(new ReadTurn(_previousTurn.Value));
+        Assert.NotNull(previous);
+        Assert.NotNull(previous.Context);
+        Assert.NotEmpty(previous.Context);
+        var current = Assert.Single((await Chat(name).ReadTurns(new ReadTurns())).Turns, turn => turn.Turn == _lastSend.Receipt);
+        Assert.NotNull(current.Context);
+        Assert.Equal(previous.Context, current.Context.Take(previous.Context.Count));
+        Assert.Equal(previous.Context.Count + 1, current.Context.Count);
+        Assert.Equal($"chat.turn.{current.Turn}", current.Context[^1].Path);
+    }
 
     [When(@"chat ""(.*)"" cancels its turn")]
     public async Task Cancel(string name)
@@ -64,6 +99,10 @@ public sealed class UiChatSteps(BrainWorld world, BrainSteps brain)
     public async Task TranscriptContains(string name, string role, string text)
         => Assert.Contains((await Chat(name).ReadTranscript(new ReadTranscript())).Turns,
             turn => turn.FromUser == (role == "user") && turn.Text == text);
+
+    [Then(@"chat ""(.*)"" transcript has (\d+) turns")]
+    public async Task TranscriptCount(string name, int count)
+        => Assert.Equal(count, (await Chat(name).ReadTranscript(new ReadTranscript())).Turns.Count);
 
     [Then(@"chat ""(.*)"" turn was answered by ""(.*)""")]
     public async Task AnsweredBy(string name, string author)

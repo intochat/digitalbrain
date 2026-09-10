@@ -23,8 +23,6 @@ public static class UIVocabulary
 
     public const string ActivitiesType = "activities";
 
-    public const string DefaultSurfaceName = "desk";
-
     // ---- what other neurons say to the UI, and what it says back ----
 
     // { "commandId": "...", "text": "...", "context": [{ "path": "...", "schemaHash": "...", "payloadJson": null, "blobRef": null }] }
@@ -68,7 +66,7 @@ public static class UIVocabulary
     // { "turn": "..." }
     public const string TurnCancelling = "TurnCancelling";
 
-    // { "command": { ...OpenSurface... }, "receipt": { ...SurfaceOpenReceipt... } }
+    // { ...OpenSurface... }
     public const string Opening = "Opening";
 
     // { ...ActivateControl... }

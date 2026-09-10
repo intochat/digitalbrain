@@ -10,15 +10,11 @@ public sealed record ChatState(
     [property: Id(1)] List<ChatTurn> Transcript,
     [property: Id(2)] List<TurnContext> Contexts,
     [property: Id(3)] NeuronId? Agent,
-    [property: Id(4)] long Version)
+    [property: Id(4)] long Version,
+    [property: Id(5)] List<CommandTurn> TurnByCommand)
 {
     public const int MaxTurns = 64;
     public const int MaxTranscript = 500;
     public const int MaxInlineContexts = 32;
+    public const int MaxCommandTurns = 1024;
 }
-
-// The responder's kernel work id lets a later cancellation stop its reaction.
-[GenerateSerializer, Alias("db.ui.chat-turn-record")]
-public sealed record ChatTurnRecord(
-    [property: Id(0)] ChatTurnSnapshot Snapshot,
-    [property: Id(1)] SignalId? ResponderWork);

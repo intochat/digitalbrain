@@ -199,31 +199,38 @@ internal sealed class KitTools(
         string prompt,
         CancellationToken cancellationToken)
     {
-        if (!NeuronId.TryParse(chatName, out var chat) || chat.Type != UIVocabulary.ChatType)
+        try
         {
-            return InvalidChat;
-        }
+            if (!NeuronId.TryParse(chatName, out var chat) || chat.Type != UIVocabulary.ChatType)
+            {
+                return InvalidChat;
+            }
 
-        if (string.IsNullOrWhiteSpace(prompt))
+            if (string.IsNullOrWhiteSpace(prompt))
+            {
+                return "prompt must not be blank.";
+            }
+
+            var trimmedPrompt = prompt.Trim();
+            var generated = await generator.GenerateAsync(trimmedPrompt, cancellationToken).ConfigureAwait(false);
+
+            var name = $"image-{Guid.NewGuid():N}"[..14];
+            var blobName = $"{name}.png";
+            await imageStore.SaveAsync(blobName, generated.Content, generated.MediaType, cancellationToken).ConfigureAwait(false);
+
+            var neuron = new NeuronId(UIVocabulary.ImageType, name);
+
+            // Connect first: the reaction fires the card signal and needs a chat listener.
+            await grains.GetGrain<INeuron>(neuron.ToGrainId()).Connect(chat, UIVocabulary.ImageDescribed).ConfigureAwait(false);
+            await invoker.InvokeAsync(neuron, "ui.image", "describe",
+                JsonSerializer.SerializeToElement(new DescribeImage(CommandId.New(), trimmedPrompt, generated.Model, generated.MediaType, blobName),
+                    UIJson.Default.DescribeImage), cancellationToken).ConfigureAwait(false);
+
+            return $"Image for '{trimmedPrompt}' is now showing in the chat as card '{name}'.";
+        }
+        catch (Exception error)
         {
-            return "prompt must not be blank.";
+            return $"generate_image failed: {error.GetType().Name}: {error.Message}";
         }
-
-        var trimmedPrompt = prompt.Trim();
-        var generated = await generator.GenerateAsync(trimmedPrompt, cancellationToken).ConfigureAwait(false);
-
-        var name = $"image-{Guid.NewGuid():N}"[..14];
-        var blobName = $"{name}.png";
-        await imageStore.SaveAsync(blobName, generated.Content, generated.MediaType, cancellationToken).ConfigureAwait(false);
-
-        var neuron = new NeuronId(UIVocabulary.ImageType, name);
-
-        // Connect first: the reaction fires the card signal and needs a chat listener.
-        await grains.GetGrain<INeuron>(neuron.ToGrainId()).Connect(chat, UIVocabulary.ImageDescribed).ConfigureAwait(false);
-        await invoker.InvokeAsync(neuron, "ui.image", "describe",
-            JsonSerializer.SerializeToElement(new DescribeImage(CommandId.New(), trimmedPrompt, generated.Model, generated.MediaType, blobName),
-                UIJson.Default.DescribeImage), cancellationToken).ConfigureAwait(false);
-
-        return $"Image for '{trimmedPrompt}' is now showing in the chat as card '{name}'.";
     }
 }
