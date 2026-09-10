@@ -35,11 +35,17 @@ internal static class SalesforceAuthentication
                 options.RemoteAuthenticationTimeout = TimeSpan.FromMinutes(10);
                 options.CorrelationCookie.HttpOnly = true;
                 options.CorrelationCookie.SameSite = SameSiteMode.Lax;
-                options.CorrelationCookie.SecurePolicy = settings.PublicOrigin.Scheme == "https"
+                options.CorrelationCookie.SecurePolicy = settings.IsConfigured && settings.PublicOrigin!.Scheme == "https"
                     ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
                 options.BackchannelHttpHandler = new HttpClientHandler { AllowAutoRedirect = false };
                 options.Events = new OAuthEvents
                 {
+                    OnRedirectToAuthorizationEndpoint = context =>
+                    {
+                        settings.RequireConfigured();
+                        context.Response.Redirect(context.RedirectUri);
+                        return Task.CompletedTask;
+                    },
                     OnCreatingTicket = async context =>
                     {
                         var claimedLoginRequest = BrowserLoginCorrelation.VerifiedRequest(context.HttpContext)
