@@ -105,7 +105,7 @@ snapshot facet.
 
 ## 3. Signals: admission, reaction, cancellation
 
-- `Deliver`: capture caller metadata; `Duplicate` if the signal id is pending or in
+- `Deliver`: the envelope carries its source, correlation and causation; `Duplicate` if the signal id is pending or in
   `ReactedIds`; `Busy` if `Pending` is full, writing nothing; else append incoming journal,
   set latest, enqueue, persist, wake, `Accepted`. `FireAsync` awaits every target's
   `Deliver` and reports non-acceptance per target.
@@ -118,7 +118,8 @@ snapshot facet.
   id to `ReactedIds` (a re-delivery of a cancelled id is `Duplicate`), persist;
   else set `ReactionContext`, clear and rebuild `RequestContext` from the persisted delivery,
   call `ReceiveAsync` with a token linked to the activation and a per-entry source, then
-  dequeue, push id to `ReactedIds`, persist. Throw → log, arm the retry timer (1 s → 60 s
+  dequeue, push id to `ReactedIds`, persist. Throw → discard the failed attempt's staged
+  effects (the same revert the fence uses), log, arm the retry timer (1 s → 60 s
   exponential, `Interleave = false`, `KeepAlive = true`), leave the head. Activation re-arms if
   a head exists. A grain timer needs an activation, so while `Pending` is non-empty the
   neuron also holds one Orleans reminder (`retry`, period `NeuronOptions.RetryReminderPeriod`,
@@ -217,8 +218,8 @@ storage call. Azure client retry settings are not an aggregate deadline. Orleans
 
 - One kernel `IOutgoingGrainCallFilter` sets `RequestContext["db.caller"]` to
   `context.SourceId` when the call originates in an activation, else keeps the edge's value,
-  in a fresh scope per call restored in `finally`. `Deliver` and the command wrapper capture
-  caller, correlation and causation before any outbound call.
+  in a fresh scope per call restored in `finally`. The command wrapper captures caller,
+  correlation and causation before any outbound call; `Deliver` reads them from the envelope.
 - `ReactionContext` is set by `Drain` (delivery) and the wrapper (command) and restored in
   `finally`; `FireAsync` reads causation from it. A signal fired by the reaction that a
   command scheduled has causation equal to the scheduled work's id, whose record carries the
