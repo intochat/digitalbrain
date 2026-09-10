@@ -112,7 +112,8 @@ snapshot facet.
 - `Schedule(signal)` is the local form used inside commands: same checks, same enqueue, no
   flush; capacity exceeded throws `NeuronBusyException` before anything is staged. It is the
   one permitted self-delivery and creates no synapse and no outgoing entry.
-- `Drain` (one entry per call): peek head; if in `PendingCancelled` → dequeue, remove, persist;
+- `Drain` (one entry per call): peek head; if in `PendingCancelled` → dequeue, remove, push the
+  id to `ReactedIds` (a re-delivery of a cancelled id is `Duplicate`), persist;
   else set `ReactionContext`, clear and rebuild `RequestContext` from the persisted delivery,
   call `ReceiveAsync` with a token linked to the activation and a per-entry source, then
   dequeue, push id to `ReactedIds`, persist. Throw → log, arm the retry timer (1 s → 60 s
