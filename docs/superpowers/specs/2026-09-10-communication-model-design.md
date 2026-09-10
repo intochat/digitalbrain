@@ -136,6 +136,10 @@ snapshot facet.
   sees. The incoming journal is history, not schedule.
 - Reactions may await reads, signal admission and I/O, but never wait for a downstream
   reaction to complete.
+- Reactions are at-least-once and a snapshot save is not atomic with the pending queue: a
+  reaction that saved its snapshot and then lost the activation runs again on the retry and
+  must be idempotent against the state it already wrote (re-fire what has no reply yet, never
+  skip because the state says "done").
 
 ## 4. Commands
 
