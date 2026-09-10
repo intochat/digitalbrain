@@ -109,17 +109,19 @@ snapshot facet.
   `ReactedIds`; `Busy` if `Pending` is full, writing nothing; else append incoming journal,
   set latest, enqueue, persist, wake, `Accepted`. `FireAsync` awaits every target's
   `Deliver` and reports non-acceptance per target.
-- `Schedule(signal)` is the local form used inside commands: same capacity check, then the
-  delivery is buffered in memory and admitted into `Pending` immediately before the wrapper's
-  terminal persist, so effects and outcome land in one flush; capacity exceeded throws
+- `Schedule(signal)` is the local form used inside commands and reactions: same capacity
+  check, then the delivery is buffered in memory and admitted into `Pending` immediately
+  before the turn's final persist (the command wrapper's terminal persist, or the reaction's
+  `CompleteHead` persist), so a failed turn never leaves scheduled work in durable state; capacity exceeded throws
   `NeuronBusyException` before anything is staged. It is the one permitted self-delivery and
   creates no synapse and no outgoing entry.
 - `Drain` (one entry per call): peek head; if in `PendingCancelled` → dequeue, remove, push the
   id to `ReactedIds` (a re-delivery of a cancelled id is `Duplicate`), persist;
   else set `ReactionContext`, clear and rebuild `RequestContext` from the persisted delivery,
   call `ReceiveAsync` with a token linked to the activation and a per-entry source, then
-  dequeue, push id to `ReactedIds`, persist. Throw → discard the failed attempt's staged
-  effects (the same revert the fence uses), log, arm the retry timer (1 s → 60 s
+  dequeue, push id to `ReactedIds`, persist. Throw → drop the buffered work, discard the
+  failed attempt's remaining staged mutations (the same revert the fence uses), log, arm the
+  retry timer (1 s → 60 s
   exponential, `Interleave = false`, `KeepAlive = true`), leave the head. Activation re-arms if
   a head exists. A grain timer needs an activation, so while `Pending` is non-empty the
   neuron also holds one Orleans reminder (`retry`, period `NeuronOptions.RetryReminderPeriod`,
@@ -139,8 +141,9 @@ snapshot facet.
 
 Wrapper timeline; the only awaits are the two persists:
 
-1. Serialize args at the target; > 64 KiB, capacity (`Dedup` full of unresolved, or `Pending`
-   full — a saturated neuron refuses every command with `Busy`), or id reuse with different args →
+1. Serialize args at the target. Capacity first: `Pending` full or `Dedup` full of unresolved →
+   throw `NeuronBusyException` and write nothing (a saturated neuron refuses every command;
+   `Busy` is transient and leaves no record). Then > 64 KiB or id reuse with different args →
    stage `Rejected` with bounded metadata, persist, throw. Consult `Dedup`: resolved with
    matching caller, interface, method and SHA-256 of canonical args → return the stored
    result or rethrow the stored failure; `Unknown` → fall through as a new incarnation;
