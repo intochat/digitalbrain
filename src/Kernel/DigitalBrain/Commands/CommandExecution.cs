@@ -25,6 +25,20 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
             caller, cause?.CorrelationId ?? CallerContext.CurrentCorrelation() ?? CorrelationId.New(),
             cause?.SignalId ?? CallerContext.CurrentCausation(), null, null, null, clock.GetUtcNow());
         var argumentsText = JsonSerializer.Serialize(arguments, argumentsJson);
+
+        // Capacity is transient and leaves no record; the permanent reasons below stage Rejected.
+        if (!host.HasPendingRoom)
+        {
+            throw new NeuronBusyException(
+                $"Neuron '{host.Id}' already holds {PendingWork.MaxPending} pending signals. Retry after pending work finishes.");
+        }
+
+        if (dedup.IsFullOfUnresolved)
+        {
+            throw new NeuronBusyException(
+                $"Neuron '{host.Id}' already holds {CommandDedup.MaxResolved} unresolved commands. Retry after pending commands resolve.");
+        }
+
         var bytes = Encoding.UTF8.GetBytes(argumentsText);
         var hash = Convert.ToHexStringLower(SHA256.HashData(bytes));
         var existing = dedup.Find(arguments.Id);
@@ -40,26 +54,6 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
         if (replay.Applies)
         {
             return replay.Result;
-        }
-
-        if (existing is null && dedup.IsFullOfUnresolved)
-        {
-            // A full unresolved dedup cannot admit an entry to remember this rejection.
-            var error = new NeuronBusyException(
-                $"Neuron '{host.Id}' already holds {CommandDedup.MaxResolved} unresolved commands. Retry after pending commands resolve.");
-            journal.Append(record with { Error = TruncateError(error.Message) });
-            await host.PersistAsync().ConfigureAwait(true);
-            throw error;
-        }
-
-        if (!host.HasPendingRoom)
-        {
-            // Do not remember this transient rejection in dedup: pending capacity can free up.
-            var error = new NeuronBusyException(
-                $"Neuron '{host.Id}' already holds {PendingWork.MaxPending} pending signals. Retry after pending work finishes.");
-            journal.Append(record with { Error = TruncateError(error.Message) });
-            await host.PersistAsync().ConfigureAwait(true);
-            throw error;
         }
 
         record = journal.Append(record with { Phase = CommandPhase.Attempted, ArgsJson = argumentsText });
@@ -119,7 +113,7 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
             }
 
             AppendTerminalRecord(record, outcome, failure, resultText, errorText, scheduledWork);
-            host.AdmitCommandWork();
+            host.AdmitTurnWork();
             await host.PersistAsync().ConfigureAwait(true);
         }
         catch (Exception error) when (error is not NeuronPersistenceException and not NeuronRecoveringException)
@@ -129,7 +123,7 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
         }
 
         // Register after persistence so work that never committed cannot leave an orphan reminder row.
-        await host.WakeCommandWorkAsync().ConfigureAwait(true);
+        await host.WakeTurnWorkAsync().ConfigureAwait(true);
 
         if (failure is not null)
         {
@@ -201,7 +195,7 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
         CommandRejectedException error)
     {
         var existing = dedup.Find(error.Id);
-        // The reason alone identifies a rejection because each new attempt replaces the outcome without a rejection.
+        // Remember repeated permanent rejections by reason; a fresh attempt replaces the outcome and clears the rejection.
         if (existing?.RepeatsRejection(error.Reason) == true)
         {
             throw new CommandRejectedException(error.Id, existing.Rejection!.Reason, existing.Rejection.Message);

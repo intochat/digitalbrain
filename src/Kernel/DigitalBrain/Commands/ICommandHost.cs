@@ -9,6 +9,6 @@ internal interface ICommandHost
     ReactionContext? ReactionContext { get; set; }
     Task PersistAsync();
     Task DiscardStagedChangesAsync(Exception cause);
-    void AdmitCommandWork();
-    Task WakeCommandWorkAsync();
+    void AdmitTurnWork();
+    Task WakeTurnWorkAsync();
 }

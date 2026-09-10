@@ -6,7 +6,13 @@ internal sealed class NeuronActivationGuardFilter : IIncomingGrainCallFilter
     {
         if (context.Grain is Neuron neuron)
         {
-            await neuron.GuardActivationAsync().ConfigureAwait(true);
+            // Drain and ReceiveReminder already handle the fence themselves.
+            var declaringInterface = context.InterfaceMethod.DeclaringType;
+            if (declaringInterface != typeof(INeuronInbox)
+                && declaringInterface != typeof(IRemindable))
+            {
+                await neuron.GuardActivationAsync().ConfigureAwait(true);
+            }
         }
 
         await context.Invoke().ConfigureAwait(true);

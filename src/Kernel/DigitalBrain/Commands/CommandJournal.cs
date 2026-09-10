@@ -27,9 +27,9 @@ internal sealed class CommandJournal
 
     internal long CommittedSequence => _retained.CommittedSequence;
 
-    internal long CaptureCommitBoundary() => _retained.CaptureCommitBoundary();
+    internal JournalCommitBoundary CaptureCommitBoundary() => _retained.CaptureCommitBoundary();
 
-    internal void NoteCommitted(long boundarySequence) => _retained.NoteCommitted(boundarySequence);
+    internal void NoteCommitted(JournalCommitBoundary boundary) => _retained.NoteCommitted(boundary);
 
     internal void NoteReloaded() => _retained.NoteReloaded();
 

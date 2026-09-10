@@ -7,11 +7,18 @@ using Xunit;
 namespace DigitalBrain.Tests;
 
 [Binding]
-public sealed class ReactSteps(BrainSteps brain)
+public sealed class ReactSteps(BrainSteps brain, BrainWorld world)
 {
-    [When(@"""(.*)"" fires ""(\w+)"" (\{.*\}) at (echo|flaky|slow|failing|counter|plain) ""(.*)""")]
+    [When(@"""(.*)"" fires ""(\w+)"" (\{.*\}) at (echo|flaky|slow|failing|scheduling|counter|plain) ""(.*)""")]
     public Task FireAtTyped(string from, string type, string body, string grainType, string name)
         => brain.FireCore(from, type, body, BrainSteps.Id(grainType, name));
+
+    [Given(@"a scheduling ""(.*)"" whose first reaction fails after scheduling")]
+    public void GivenScheduling(string name)
+    {
+        world.Fixtures[name] = new NeuronId("scheduling", name);
+        FixtureSwitches.ReactionFailuresLeft[name] = 1;
+    }
 
     [Given(@"flaky ""(.*)"" fails its first reaction")]
     public static void GivenFlaky(string name) => FixtureSwitches.FlakyFailuresLeft[name] = 1;

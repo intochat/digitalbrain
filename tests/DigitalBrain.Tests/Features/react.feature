@@ -43,3 +43,11 @@ Feature: React
     Then the fire reached 1 neurons
     And failing "s" incoming journal contains "Ping" {"n":1}
     And "claude" incoming journal is empty
+
+  Scenario: A failed reaction's scheduled work is admitted once, on the attempt that succeeds
+    Given a running brain
+    And a scheduling "w" whose first reaction fails after scheduling
+    When "claude" fires "Start" {} at scheduling "w"
+    And "claude" waits up to 10 seconds for an incoming "Pong"
+    And "claude" waits up to 10 seconds until "w" pending count is 0
+    Then "claude" incoming "Pong" bodies are {}

@@ -2,7 +2,8 @@ using Orleans.Runtime;
 
 namespace DigitalBrain.Core;
 
-internal sealed class RetryScheduler(IGrainBase grain, Func<CancellationToken, Task> retry, TimeSpan period, Func<bool> hasPendingWork)
+internal sealed class RetryScheduler(IGrainBase grain, Func<CancellationToken, Task> retry, TimeSpan period,
+    Func<bool> hasPendingWork, CancellationToken activation) : IDisposable
 {
     internal const string ReminderName = "retry";
 
@@ -14,7 +15,7 @@ internal sealed class RetryScheduler(IGrainBase grain, Func<CancellationToken, T
 
     internal async Task EnsureReminderAsync()
     {
-        await _reminderGate.WaitAsync().ConfigureAwait(true);
+        await _reminderGate.WaitAsync(activation).ConfigureAwait(true);
         try
         {
             _reminder ??= await grain.RegisterOrUpdateReminder(ReminderName, dueTime: period, period: period).ConfigureAwait(true);
@@ -49,7 +50,7 @@ internal sealed class RetryScheduler(IGrainBase grain, Func<CancellationToken, T
         Suspend();
         _delay = TimeSpan.FromSeconds(1);
 
-        await _reminderGate.WaitAsync().ConfigureAwait(true);
+        await _reminderGate.WaitAsync(activation).ConfigureAwait(true);
         try
         {
             if (!hasPendingWork() && (_reminder is not null || _tickObserved))
@@ -91,6 +92,8 @@ internal sealed class RetryScheduler(IGrainBase grain, Func<CancellationToken, T
         _timer?.Dispose();
         _timer = null;
     }
+
+    public void Dispose() => _reminderGate.Dispose();
 
     private async Task RunAsync(CancellationToken cancellationToken)
     {

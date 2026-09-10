@@ -14,6 +14,7 @@ internal sealed class BoundedJournal<T>(
     private const int MaxRetainedEntries = 512;
     private const int MaxRetainedBytes = 512 * 1024;
     private long _retainedBytes;
+    private long _reloadGeneration;
 
     internal int Count => retained.Count;
 
@@ -29,13 +30,25 @@ internal sealed class BoundedJournal<T>(
 
     internal int FirstIndexAfter(long afterSequence) => (int)Math.Clamp(afterSequence - CommittedEarliestRetained + 1, 0, Count);
 
-    internal long CaptureCommitBoundary() => LastSequence;
+    internal JournalCommitBoundary CaptureCommitBoundary() => new(LastSequence, _reloadGeneration);
+
+    internal bool IsCurrent(JournalCommitBoundary boundary) => boundary.Generation == _reloadGeneration;
 
     // A completed write may only ever advance the committed cursor.
-    internal void NoteCommitted(long boundarySequence) => CommittedSequence = Math.Max(CommittedSequence, boundarySequence);
+    internal void NoteCommitted(JournalCommitBoundary boundary)
+    {
+        // A write captured before a reload has nothing to say about the reloaded state.
+        if (!IsCurrent(boundary))
+        {
+            return;
+        }
+
+        CommittedSequence = Math.Max(CommittedSequence, boundary.Sequence);
+    }
 
     internal void NoteReloaded()
     {
+        _reloadGeneration++;
         CommittedSequence = LastSequence;
         _retainedBytes = retained.Sum(encoded => (long)encoded.Length);
     }
@@ -68,3 +81,5 @@ internal sealed class BoundedJournal<T>(
         return entry;
     }
 }
+
+internal readonly record struct JournalCommitBoundary(long Sequence, long Generation);

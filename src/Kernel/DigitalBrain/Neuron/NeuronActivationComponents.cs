@@ -31,4 +31,4 @@ internal sealed record NeuronActivationComponents(
     }
 }
 
-internal readonly record struct NeuronCommitBoundary(NeuronJournalsBoundary Journals, long Commands);
+internal readonly record struct NeuronCommitBoundary(NeuronJournalsBoundary Journals, JournalCommitBoundary Commands);

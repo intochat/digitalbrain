@@ -135,6 +135,34 @@ internal sealed class FailingNeuron(NeuronRuntime runtime) : Neuron(runtime)
     }
 }
 
+[GrainType("scheduling")]
+internal sealed class SchedulingNeuron(NeuronRuntime runtime) : Neuron(runtime)
+{
+    protected override async Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
+    {
+        if (delivery.Signal.Type == "Start")
+        {
+            Schedule(Signal.Create("Work", JsonSerializer.Serialize(new { source = delivery.Source.ToString() })));
+            // A reaction awaiting anything lets another write flush what it staged; this stands in for that race.
+            await PersistAsync();
+            if (FixtureSwitches.ReactionFailuresLeft.TryRemove(Id.Name, out var failuresLeft) && failuresLeft > 0)
+            {
+                throw new InvalidOperationException("scheduling: first reaction fails after scheduling");
+            }
+        }
+        else if (delivery.Signal.Type == "Work")
+        {
+            using var body = JsonDocument.Parse(delivery.Signal.Body);
+            if (!NeuronId.TryParse(body.RootElement.GetProperty("source").GetString(), out var source))
+            {
+                throw new InvalidOperationException("scheduling: work is missing its original source");
+            }
+
+            await FireAsync(Signal.Create("Pong", "{}"), source, delivery.CorrelationId, cancellationToken);
+        }
+    }
+}
+
 [GenerateSerializer]
 [Alias("db.test.counter-state")]
 public sealed record CounterState([property: Id(0)] int Total);

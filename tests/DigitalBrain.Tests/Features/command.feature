@@ -58,7 +58,7 @@ Feature: Command
     When "claude" fires 256 "Counted" signals at counter "c"
     And "claude" adds 1 to counter "c" with command id "f1"
     Then it fails with "pending signals"
-    And "c" commands journal shows one Rejected record
+    And "c" commands journal is empty
     And counter "c" executed 0 times
 
   Scenario: A retry while the first attempt is still unresolved reports an unknown outcome

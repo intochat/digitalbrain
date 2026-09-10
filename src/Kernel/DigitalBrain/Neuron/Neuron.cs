@@ -29,7 +29,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     private readonly CancellationTokenSource _activation = new();
     private readonly RetryScheduler _retry;
     private (SignalId Id, CancellationTokenSource Cancellation)? _reacting;
-    private readonly List<SignalDelivery> _commandWork = [];
+    private readonly List<SignalDelivery> _turnWork = [];
 
     protected Neuron(NeuronRuntime runtime)
     {
@@ -41,7 +41,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
             () => CommandReconciliation.Reconcile(_components.Commands, _components.Dedup, TimeProvider.GetUtcNow()),
             DeactivateOnIdle, _components);
         _retry = new RetryScheduler(this, _ => ((INeuronInbox)this).Drain(), _components.Options.RetryReminderPeriod,
-            () => _components.Pending.Count > 0);
+            () => _components.Pending.Count > 0, _activation.Token);
     }
 
     public NeuronId Id => NeuronId.FromGrainId(this.GetGrainId());
@@ -76,17 +76,31 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
 
     Task ICommandHost.DiscardStagedChangesAsync(Exception cause) => _fence.DiscardStagedChangesAsync(cause);
 
-    void ICommandHost.AdmitCommandWork()
+    void ICommandHost.AdmitTurnWork() => AdmitTurnWork();
+
+    private void AdmitTurnWork()
     {
-        foreach (var delivery in _commandWork)
+        if (_turnWork.Count == 0)
+        {
+            return;
+        }
+
+        if (!_components.Pending.HasRoomFor(_turnWork.Count))
+        {
+            _turnWork.Clear();
+            throw new NeuronBusyException(
+                $"Neuron '{Id}' cannot admit this turn's scheduled work: an interleaving Deliver can fill Pending between Schedule and the final flush. Retry the whole turn after pending work finishes.");
+        }
+
+        foreach (var delivery in _turnWork)
         {
             AdmitAndStageDelivery(delivery);
         }
 
-        _commandWork.Clear();
+        _turnWork.Clear();
     }
 
-    Task ICommandHost.WakeCommandWorkAsync()
+    Task ICommandHost.WakeTurnWorkAsync()
     {
         return _components.Pending.Count == 0 ? Task.CompletedTask : EnsureReminderAndWakeAsync();
 
@@ -138,6 +152,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         }
         finally
         {
+            _retry.Dispose();
             _activation.Dispose();
         }
     }
@@ -198,26 +213,30 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         return DeliveryAdmission.Accepted;
     }
 
-    // Commands buffer work until their terminal flush; reactions stage it now and register on the queued drain turn.
+    // Commands and reactions buffer scheduled work until their final persist.
     protected SignalId Schedule(Signal signal, CorrelationId? correlation = null)
     {
         ArgumentNullException.ThrowIfNull(signal);
         signal = Signal.Create(signal.Type, signal.Body);
         RequireSignalTypeCapacity(signal.Type);
         var delivery = SignalDelivery.Create(signal, Id, _components.Journals.IncomingNextSequence, TimeProvider, (ReactionContext as DeliveryReaction)?.Delivery, correlation);
-        if (!_components.Pending.HasRoomFor(_commandWork.Count))
+        if (!_components.Pending.HasRoomFor(_turnWork.Count))
         {
             throw new NeuronBusyException($"Neuron '{Id}' already holds {PendingWork.MaxPending} pending signals. Retry after pending work finishes.");
         }
 
-        if (ReactionContext is CommandReaction commandReaction)
+        if (ReactionContext is not null)
         {
-            // Command work becomes visible only with its terminal record, never after an uncommitted attempt.
-            _commandWork.Add(delivery);
-            ReactionContext = commandReaction with { ScheduledWork = [.. commandReaction.ScheduledWork, delivery.SignalId] };
+            _turnWork.Add(delivery);
+            if (ReactionContext is CommandReaction commandReaction)
+            {
+                ReactionContext = commandReaction with { ScheduledWork = [.. commandReaction.ScheduledWork, delivery.SignalId] };
+            }
+
             return delivery.SignalId;
         }
 
+        // Without a reaction context there is no turn to flush buffered work, so admit and wake immediately.
         AdmitAndStageDelivery(delivery);
         Wake();
         return delivery.SignalId;
@@ -226,9 +245,9 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     private void AdmitAndStageDelivery(SignalDelivery delivery)
     {
         delivery = delivery with { Sequence = _components.Journals.IncomingNextSequence };
-        if (_components.Pending.Classify(delivery) != DeliveryAdmission.Accepted)
+        if (_components.Pending.Classify(delivery) == DeliveryAdmission.Duplicate)
         {
-            throw new InvalidOperationException($"Scheduled signal '{delivery.SignalId}' admission was already classified as Accepted; this state is unreachable.");
+            throw new InvalidOperationException($"Freshly minted scheduled signal id '{delivery.SignalId}' must never be a duplicate.");
         }
 
         _components.Pending.Admit(delivery);
@@ -306,6 +325,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
             try
             {
                 await ReceiveAsync(delivery, reaction.Token).ConfigureAwait(true);
+                AdmitTurnWork();
             }
             catch (OperationCanceledException) when (_activation.Token.IsCancellationRequested)
             {
@@ -339,6 +359,8 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         }
         finally
         {
+            // A failed or cancelled attempt drops whatever it scheduled.
+            _turnWork.Clear();
             ReactionContext = previous;
             _reacting = previousReacting;
         }
@@ -396,7 +418,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         }
         finally
         {
-            _commandWork.Clear();
+            _turnWork.Clear();
         }
     }
 
@@ -422,7 +444,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         cancellationToken.ThrowIfCancellationRequested();
 
         // Re-validate: a Signal deserialized from the wire may bypass Create. Keep the
-        // normalized instance â€” Create fills a blank body with "{}".
+        // normalized instance — Create fills a blank body with "{}".
         signal = Signal.Create(signal.Type, signal.Body);
 
         if (to is { } target && target == Id)

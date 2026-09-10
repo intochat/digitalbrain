@@ -89,7 +89,13 @@ internal sealed class JournalWindow
 
     internal void NoteCommitted(JournalWindowBoundary boundary)
     {
-        _retained.NoteCommitted(boundary.Sequence);
+        if (!_retained.IsCurrent(boundary.Retained))
+        {
+            return;
+        }
+
+        _retained.NoteCommitted(boundary.Retained);
+
         var promote = (int)Math.Clamp(boundary.StagedTallyCount - _committedTallyCount, 0, _stagedTallies.Count);
         for (var index = 0; index < promote; index++)
         {
@@ -129,4 +135,4 @@ internal sealed class JournalWindow
         => _tallies.TryGetValue(signalType, out var recorded) ? recorded : 0;
 }
 
-internal readonly record struct JournalWindowBoundary(long Sequence, long StagedTallyCount);
+internal readonly record struct JournalWindowBoundary(JournalCommitBoundary Retained, long StagedTallyCount);
