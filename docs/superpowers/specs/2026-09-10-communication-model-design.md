@@ -29,7 +29,7 @@ public interface INeuron : IGrainWithStringKey
     Task<FireOutcome> Fire(Signal signal, NeuronId? to, CorrelationId? correlation, CancellationToken ct = default);
     [Alias(nameof(Connect))]    Task Connect(NeuronId target, string signalType);
     [Alias(nameof(Disconnect))] Task Disconnect(NeuronId target, string signalType);
-    [Alias(nameof(Deliver)), ResponseTimeout("00:05:00")]
+    [Alias(nameof(Deliver)), AlwaysInterleave, ResponseTimeout("00:05:00")]
     Task<DeliveryAdmission> Deliver(SignalDelivery delivery, CancellationToken ct = default);
     [Alias(nameof(CancelReaction)), AlwaysInterleave]
     Task CancelReaction(SignalId pending);
@@ -44,6 +44,11 @@ public enum DeliveryAdmission { Accepted, Duplicate, Busy }
 ```
 
 Plus the internal one-way `INeuronInbox.Drain`, the only one-way call in the system.
+`Deliver` interleaves because it only accepts: all of its staging happens synchronously
+before its single persist await, and without interleaving two neurons whose reactions
+fire at each other deadlock (A's `Fire` awaits B's `Deliver` while B's reaction awaits A's
+`Deliver`). The kernel uses of `[AlwaysInterleave]` are therefore `Deliver`, `CancelReaction`,
+`ReadJournal` and `ReadCommands`.
 `ReadJournal` and `ReadCommands` interleave and serve the committed view only. `ReadState`
 and `ReadSynapses` are serialized turns.
 
