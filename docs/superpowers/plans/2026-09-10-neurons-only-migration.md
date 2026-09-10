@@ -17,7 +17,7 @@
 - Signals: type `^[A-Za-z]{1,64}$`, JSON body ≤ 64 KiB. Command args and results ≤ 64 KiB, errors ≤ 4 KiB.
 - Bounds: journal windows 512 entries / 512 KiB; `Pending` 256; `ReactedIds` 256; `Dedup` 1024 resolved; latest-per-type 256 types.
 - Commands are local and synchronous; snapshots only from reactions; reactions never wait for downstream reactions.
-- `[ReadOnly]` allowed on module methods; `[AlwaysInterleave]` kernel-only (`CancelReaction`, `ReadJournal`, `ReadCommands`).
+- `[ReadOnly]` allowed on module methods; `[AlwaysInterleave]` kernel-only (`Deliver`, `CancelReaction`, `ReadJournal`, `ReadCommands`).
 - No `/// <summary>` boilerplate. Small inline comments only where the reason is not obvious. Names must explain themselves.
 - Tests: Reqnroll feature per behaviour, one fixture neuron type per fixture. No test that restates the implementation; every scenario proves a spec invariant (1–17) or a user-visible behaviour. Target: fewer, sharper scenarios than core, not more.
 - `TreatWarningsAsErrors`, `AnalysisLevel=preview-all` stay on. `dotnet format whitespace --verify-no-changes` must pass.
