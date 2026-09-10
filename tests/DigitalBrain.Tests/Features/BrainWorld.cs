@@ -9,6 +9,8 @@ public sealed class BrainWorld
 
     public Dictionary<string, NeuronId> Fixtures { get; } = new(StringComparer.Ordinal);
 
+    internal ScriptedChatClient Scripted { get; } = new();
+
     public BrainSimulation? Simulation { get; set; }
 
     public BrainSimulation Brain => Simulation ?? throw new InvalidOperationException("Given a running brain first.");

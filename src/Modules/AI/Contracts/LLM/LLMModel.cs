@@ -38,6 +38,9 @@ public abstract class LLMModel : AiModel
 
     public static LLMModel? FindByMarkerName(string markerName)
         => All.FirstOrDefault(model => string.Equals(model.Marker.Name, markerName, StringComparison.Ordinal));
+
+    public static LLMModel? FindById(string id)
+        => All.FirstOrDefault(model => string.Equals(model.Id, id, StringComparison.Ordinal));
 }
 
 public abstract class LLMModel<TMarker> : LLMModel

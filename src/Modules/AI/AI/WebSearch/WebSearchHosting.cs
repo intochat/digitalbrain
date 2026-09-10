@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace DigitalBrain.AI.WebSearch;
 
@@ -16,6 +15,5 @@ internal static class WebSearchHosting
         }
 
         services.AddHttpClient<IWebSearch, TavilyWebSearch>();
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAgentToolSource, WebSearchToolSource>());
     }
 }

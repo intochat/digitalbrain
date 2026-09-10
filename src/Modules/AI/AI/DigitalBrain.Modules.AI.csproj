@@ -15,7 +15,10 @@
     <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Microsoft.Extensions.AI" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+    <PackageReference Include="Microsoft.Agents.AI" />
+    <PackageReference Include="Microsoft.Agents.AI.Workflows" />
     <PackageReference Include="Anthropic" />
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
     <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
     <PackageReference Include="OllamaSharp" />
     <!-- Private so Foundry native RID does not force AppHost/Aspire.Hosting to win-x64. -->
@@ -27,14 +30,10 @@
 
   <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
-    <ProjectReference Include="../Sdk/DigitalBrain.Modules.AI.Sdk.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain/DigitalBrain.csproj" />
-    <ProjectReference Include="../../../Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
-    <ProjectReference Include="../../Memory/Contracts/DigitalBrain.Modules.Memory.Contracts.csproj" />
+    <ProjectReference Include="../../../Kernel/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
-      <_Parameter1>DigitalBrain.AI.Tests</_Parameter1>
-    </AssemblyAttribute>
+    <InternalsVisibleTo Include="DigitalBrain.Tests" />
   </ItemGroup>
 </Project>

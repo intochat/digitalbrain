@@ -18,5 +18,6 @@
     <ProjectReference Include="../../src/Kernel/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
     <ProjectReference Include="../../src/Kernel/DigitalBrain/DigitalBrain.csproj" />
     <ProjectReference Include="../../src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="../../src/Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
   </ItemGroup>
 </Project>

@@ -1,12 +1,57 @@
 using Aspire.Hosting;
+using DigitalBrain.AI;
+using DigitalBrain.AI.Aspire.Hosting;
+using DigitalBrain.AI.FoundryLocal;
 using DigitalBrain.Aspire.Hosting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using OpenAIModels = DigitalBrain.AI.OpenAI;
 
 var builder = DistributedApplication.CreateBuilder(args);
+var captureGenAiContent = builder.Configuration.GetValue<bool?>("DigitalBrain:AI:Telemetry:EnableSensitiveData")
+    ?? (builder.Environment.IsDevelopment() && builder.ExecutionContext.IsRunMode);
 
-var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain);
-// Phase B: the module wiring these nine lines stand in for is in AppHost.cs at b225d085.
-// Phase B: .AddModule<AIModule>(ai => ...)
+var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
+    .AddModule<AIModule>(ai =>
+    {
+        ai.EnableSensitiveData = captureGenAiContent;
+
+        // --- OpenAI ---
+        //ai.WithLlm<OpenAIModels.IGpt56Sol>();
+        //ai.WithLlm<OpenAIModels.IGpt56Terra>();
+        ai.WithLlm<OpenAIModels.IGpt56Luna>();
+        ai.WithDefaultLlm<OpenAIModels.IGpt56Luna>();
+        ai.WithEmbedding<OpenAIModels.ITextEmbedding3Small>();
+        ai.WithDefaultEmbedding<OpenAIModels.ITextEmbedding3Small>();
+
+        // --- Anthropic ---
+        // ai.WithLlm<AnthropicModels.IFable5>();
+        // ai.WithLlm<AnthropicModels.ISonnet5>();
+        // ai.WithLlm<AnthropicModels.IHaiku45>();
+        // ai.WithDefaultLlm<AnthropicModels.IFable5>();
+
+        // --- Google ---
+        // ai.WithLlm<GoogleModels.IGemini31Pro>();
+        // ai.WithLlm<GoogleModels.IGemini36Flash>();
+        // ai.WithDefaultLlm<GoogleModels.IGemini31Pro>();
+        // ai.WithEmbedding<GoogleModels.IGeminiEmbedding>();
+        // ai.WithDefaultEmbedding<GoogleModels.IGeminiEmbedding>();
+
+        // --- xAI ---
+        // ai.WithLlm<XaiModels.IGrok46>();
+        // ai.WithDefaultLlm<XaiModels.IGrok46>();
+
+        // --- Ollama ---
+        // ai.WithLlm<OllamaModels.IGemma4>();
+        // ai.WithLlm<OllamaModels.IQwen35>();
+        // ai.WithDefaultLlm<OllamaModels.IQwen35>();
+        // ai.WithEmbedding<OllamaModels.IEmbeddingGemma>();
+        // ai.WithDefaultEmbedding<OllamaModels.IEmbeddingGemma>();
+
+        ai.WithVoiceToText<IWhisperTiny>();
+        ai.WithTavilySearch();
+    });
+// Phase B: the module wiring these eight lines stand in for is in AppHost.cs at b225d085.
 // Phase B: .AddModule<MemoryModule>(memory => memory.WithQdrant())
 // Phase B: .AddModule<TimeModule>()
 // Phase B: .AddModule<ExcelModule>()
