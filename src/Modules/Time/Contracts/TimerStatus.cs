@@ -1,5 +1,3 @@
-using DigitalBrain.Abstractions;
-
 namespace DigitalBrain.Time;
 
 [GenerateSerializer]
@@ -11,4 +9,3 @@ public enum TimerStatus
     Elapsed = 2,
     Cancelled = 3,
 }
-

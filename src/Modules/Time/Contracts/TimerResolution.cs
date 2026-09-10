@@ -1,5 +1,3 @@
-using DigitalBrain.Abstractions;
-
 namespace DigitalBrain.Time;
 
 [GenerateSerializer]
@@ -9,4 +7,3 @@ public enum TimerResolution
     OnTime = 0,
     Recovered = 1,
 }
-

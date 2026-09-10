@@ -58,12 +58,12 @@ public sealed class AdmitSteps(BrainSteps brain, BrainWorld world)
 
     [Then(@"""([^""]*)"" pending count is (\d+)")]
     public async Task ThenPendingCount(string name, int count)
-        => Assert.Equal(count, await brain.Brain.Grains.GetGrain<INeuron>(world.Fixtures[name].ToGrainId()).ReadPendingCount());
+        => Assert.Equal(count, await brain.Brain.Grains.GetGrain<INeuron>(ResolveId(name).ToGrainId()).ReadPendingCount());
 
     [When(@"""(.*)"" waits up to (\d+) seconds until ""(.*)"" pending count is (\d+)")]
     public async Task WaitPendingCount(string observer, int seconds, string name, int count)
     {
-        var pending = brain.Brain.Grains.GetGrain<INeuron>(world.Fixtures[name].ToGrainId());
+        var pending = brain.Brain.Grains.GetGrain<INeuron>(ResolveId(name).ToGrainId());
         var deadline = DateTime.UtcNow.AddSeconds(seconds);
         var observed = await pending.ReadPendingCount();
         while (observed != count && DateTime.UtcNow < deadline)
@@ -104,4 +104,7 @@ public sealed class AdmitSteps(BrainSteps brain, BrainWorld world)
     [Then(@"""(.*)"" incoming journal contains (\d+) ""(\w+)""")]
     public async Task ThenIncomingCount(string name, int count, string type)
         => Assert.Equal(count, (await brain.Journal(name, JournalKind.Incoming)).Delta.Count(d => d.Signal.Type == type));
+
+    private NeuronId ResolveId(string name)
+        => world.Fixtures.TryGetValue(name, out var id) ? id : BrainSteps.Id(name);
 }

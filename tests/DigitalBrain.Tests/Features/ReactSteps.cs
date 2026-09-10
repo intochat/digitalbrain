@@ -39,6 +39,7 @@ public sealed class ReactSteps(BrainSteps brain, BrainWorld world)
     public Task WaitOne(string neuron, int seconds, string type) => WaitMany(neuron, seconds, 1, type);
 
     [When(@"""(.*)"" waits up to (\d+) seconds for (\d+) incoming ""(\w+)""")]
+    [Then(@"""(.*)"" waits up to (\d+) seconds for (\d+) incoming ""(\w+)""")]
     public async Task WaitMany(string neuron, int seconds, int count, string type)
     {
         var deadline = DateTime.UtcNow.AddSeconds(seconds);

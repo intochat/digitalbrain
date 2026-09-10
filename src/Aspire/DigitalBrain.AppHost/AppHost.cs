@@ -4,6 +4,10 @@ using DigitalBrain.AI.Aspire.Hosting;
 using DigitalBrain.AI.FoundryLocal;
 using DigitalBrain.Aspire.Hosting;
 using Microsoft.Extensions.Configuration;
+using DigitalBrain.Excel;
+using DigitalBrain.Memory;
+using DigitalBrain.Memory.Aspire.Hosting;
+using DigitalBrain.Time;
 using Microsoft.Extensions.Hosting;
 using OpenAIModels = DigitalBrain.AI.OpenAI;
 
@@ -50,11 +54,11 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
 
         ai.WithVoiceToText<IWhisperTiny>();
         ai.WithTavilySearch();
-    });
-// Phase B: the module wiring these eight lines stand in for is in AppHost.cs at b225d085.
-// Phase B: .AddModule<MemoryModule>(memory => memory.WithQdrant())
-// Phase B: .AddModule<TimeModule>()
-// Phase B: .AddModule<ExcelModule>()
+    })
+    .AddModule<MemoryModule>(memory => memory.WithQdrant())
+    .AddModule<TimeModule>()
+    .AddModule<ExcelModule>();
+// Phase B: the module wiring these five lines stand in for is in AppHost.cs at b225d085.
 // Phase B: .AddModule<ExecutionModule>()
 // Phase B: .AddModule<GoogleModule>(google => google.WithGmail())
 // Phase B: .AddModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())

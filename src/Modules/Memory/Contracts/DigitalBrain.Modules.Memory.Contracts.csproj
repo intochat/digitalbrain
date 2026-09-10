@@ -1,9 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Memory module contracts: vector memory store, search, and remove vocabulary.</Description>
+    <Description>Memory module contracts: remember, forget and recall over a vector memory store.</Description>
     <RootNamespace>DigitalBrain.Memory</RootNamespace>
-    <NoWarn>$(NoWarn);CA1700</NoWarn>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../../Kernel/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
