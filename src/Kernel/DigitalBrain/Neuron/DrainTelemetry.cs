@@ -23,6 +23,18 @@ internal static class DrainTelemetry
             signal);
     }
 
+    internal static void AnnouncementsFailed(ILogger? logger, NeuronId neuron, Exception failure)
+    {
+        using var activity = Source.StartActivity("db.drain.announcements.failed");
+        activity?.SetTag("neuron", neuron.ToString());
+        activity?.SetTag("exception.type", failure.GetType().FullName);
+        activity?.SetStatus(ActivityStatusCode.Error, failure.Message);
+        logger?.LogWarning(
+            failure,
+            "Neuron {Neuron} failed to drain announcements; they stay stored and the retry timer will rerun them.",
+            neuron);
+    }
+
     internal static void Cancelled(ILogger? logger, NeuronId neuron, SignalId signal)
     {
         using var activity = Source.StartActivity("db.drain.cancelled");

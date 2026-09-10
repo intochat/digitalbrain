@@ -14,7 +14,7 @@ internal sealed class RepositoryNeuron(
     GitHubRepositoryBindings bindings,
     IGitHubRepositorySource source,
     GitHubSetupService setup,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<RepositoryState> state)
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<RepositoryState>> state)
     : Neuron<RepositoryState>(runtime, state), IRepository
 {
     private GitHubRepositoryBinding Binding => bindings.GetFor(Id);

@@ -21,7 +21,7 @@ internal sealed class MemoryNeuron : Neuron<MemoryState>, IMemory
 
     public MemoryNeuron(
         NeuronRuntime runtime,
-        [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<MemoryState> state)
+        [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<MemoryState>> state)
         : base(runtime, state)
     {
         _embeddings = ServiceProvider.GetService<IEmbeddingGenerator<string, Embedding<float>>>();

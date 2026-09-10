@@ -15,7 +15,7 @@ internal sealed class SalesforceNeuron(
     SalesforceTokenRefresh tokenRefresh,
     TokenHandoff handoff,
     SalesforceWriteAccess writeAccess,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SalesforceState> state)
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<SalesforceState>> state)
     : Neuron<SalesforceState>(runtime, state), ISalesforce
 {
     public Task<Accepted<SalesforceConnection>> Connect(ConnectSalesforceAccount command) => ExecuteCommandAsync(

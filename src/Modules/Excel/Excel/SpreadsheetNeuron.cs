@@ -10,7 +10,7 @@ namespace DigitalBrain.Excel;
 [GrainType("sheet")]
 internal sealed class SpreadsheetNeuron(
     NeuronRuntime runtime,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SheetState> state)
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<SheetState>> state)
     : Neuron<SheetState>(runtime, state), ISpreadsheet
 {
     public Task<Accepted<SheetVersion>> Apply(ApplySheetEdit command) => ExecuteCommandAsync(

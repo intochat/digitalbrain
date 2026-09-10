@@ -18,7 +18,7 @@ namespace DigitalBrain.UI;
 [GrainType(UIVocabulary.ChatType)]
 internal sealed class ChatNeuron(
     NeuronRuntime runtime,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ChatState> state)
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<ChatState>> state)
     : Neuron<ChatState>(runtime, state), IChat
 {
     private NeuronId Responder => State?.Agent ?? new NeuronId(AIVocabulary.AgentType, Id.Name);
@@ -205,7 +205,8 @@ internal sealed class ChatNeuron(
             {
                 Snapshot = record.Snapshot with { Status = ChatTurnStatus.Completed, Answer = answer, Author = author, SettledAt = TimeProvider.GetUtcNow() },
             };
-            await StoreAsync(record, cancellationToken, new ChatTurn(false, answer)).ConfigureAwait(true);
+            await AnnounceAsync(record, cancellationToken, new ChatTurn(false, answer)).ConfigureAwait(true);
+            return;
         }
         else if (record.SettlementFired || record.Snapshot.Status != ChatTurnStatus.Completed)
         {
@@ -259,7 +260,6 @@ internal sealed class ChatNeuron(
             {
                 Snapshot = record.Snapshot with { Status = status, Detail = detail, SettledAt = TimeProvider.GetUtcNow() },
             };
-            await StoreAsync(record, cancellationToken).ConfigureAwait(true);
         }
         else if (record.SettlementFired)
         {
@@ -269,7 +269,7 @@ internal sealed class ChatNeuron(
         await AnnounceAsync(record, cancellationToken).ConfigureAwait(true);
     }
 
-    private async Task AnnounceAsync(ChatTurnRecord record, CancellationToken cancellationToken)
+    private async Task AnnounceAsync(ChatTurnRecord record, CancellationToken cancellationToken, ChatTurn? line = null)
     {
         var snapshot = record.Snapshot;
         // A completed turn with no answer has nothing to announce, but still needs the marker or it retries forever.
@@ -292,11 +292,10 @@ internal sealed class ChatNeuron(
         if (announcement is not null)
         {
             ServiceProvider.GetService<IChatSettlementCrashPoint>()?.BeforeSettlementFire(snapshot.Turn);
-            await FireAsync(announcement, correlation: new CorrelationId(snapshot.Turn.Value),
-                cancellationToken: cancellationToken).ConfigureAwait(true);
+            Announce(announcement, correlation: new CorrelationId(snapshot.Turn.Value));
         }
 
-        await StoreAsync(record with { SettlementFired = true }, cancellationToken).ConfigureAwait(true);
+        await StoreAsync(record with { SettlementFired = true }, cancellationToken, line).ConfigureAwait(true);
     }
 
     private ChatTurnRecord? Find(SignalId turn) => State?.Turns.FirstOrDefault(record => record.Snapshot.Turn == turn);

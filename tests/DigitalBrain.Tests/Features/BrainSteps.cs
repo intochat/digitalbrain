@@ -124,6 +124,8 @@ public sealed class BrainSteps(BrainWorld world)
                 silo.Services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>, DeterministicEmbeddingGenerator>();
                 silo.Services.AddSingleton(counterFixtureState);
                 silo.Services.AddSingleton<ICommandCrashPoint, FixtureCommandCrashPoint>();
+                silo.Services.AddSingleton<IReactionCrashPoint, FixtureReactionCrashPoint>();
+                silo.AddIncomingGrainCallFilter<FixtureDeliveryFaultFilter>();
             },
         });
     }
@@ -141,7 +143,8 @@ public sealed class BrainSteps(BrainWorld world)
     internal static SignalId SignalIdFrom(string handle)
         => new(Guid.ParseExact("db" + handle.PadLeft(30, '0'), "N"));
 
-    internal INeuron Neuron(string name) => Brain.Grains.GetGrain<INeuron>(Id(name).ToGrainId());
+    internal INeuron Neuron(string name)
+        => Brain.Grains.GetGrain<INeuron>((world.Fixtures.TryGetValue(name, out var id) ? id : Id(name)).ToGrainId());
     internal Task<JournalRead> Journal(string name, JournalKind kind) => Neuron(name).ReadJournal(kind, 0);
     internal static JournalKind Kind(string text) => text == "incoming" ? JournalKind.Incoming : JournalKind.Outgoing;
 

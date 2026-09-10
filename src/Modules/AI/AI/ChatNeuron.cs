@@ -21,7 +21,7 @@ namespace DigitalBrain.AI;
 [GrainType(AIVocabulary.ChatType)]
 internal sealed class ChatNeuron(
     NeuronRuntime runtime,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ChatState> state)
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<ChatState>> state)
     : Neuron<ChatState>(runtime, state)
 {
     private const string NeedsParticipants = "Instruct this chat with at least two participants before Ask.";

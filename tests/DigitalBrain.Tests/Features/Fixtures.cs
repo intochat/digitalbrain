@@ -31,7 +31,7 @@ public interface IProfile : IGrainWithStringKey
 [GrainType("profile")]
 internal sealed class Profile(
     NeuronRuntime runtime,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ProfileState> state)
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<ProfileState>> state)
     : Neuron<ProfileState>(runtime, state), IProfile
 {
     public Task<string?> ReadBio() => Task.FromResult(State?.Bio);
@@ -62,6 +62,10 @@ internal sealed class EchoNeuron(NeuronRuntime runtime) : Neuron(runtime)
 public static class FixtureSwitches
 {
     public static ConcurrentDictionary<string, int> FlakyFailuresLeft { get; } = new(StringComparer.Ordinal);
+
+    public static ConcurrentDictionary<string, byte> HeldQueues { get; } = new(StringComparer.Ordinal);
+
+    public static ConcurrentDictionary<string, int> DeliveryFailuresLeft { get; } = new(StringComparer.Ordinal);
 
     public static ConcurrentDictionary<string, int> Reactions { get; } = new(StringComparer.Ordinal);
 
@@ -217,7 +221,7 @@ internal sealed partial class CounterJson : JsonSerializerContext;
 internal sealed class CounterNeuron(
     NeuronRuntime runtime,
     CounterFixtureState fixtureState,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<CounterState> state)
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<CounterState>> state)
     : Neuron<CounterState>(runtime, state), ICounter
 {
     public Task<Accepted<int>> Add(AddCount command) => ExecuteCommandAsync(

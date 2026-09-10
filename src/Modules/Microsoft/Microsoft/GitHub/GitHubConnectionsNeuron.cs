@@ -9,7 +9,7 @@ namespace DigitalBrain.Microsoft.GitHub;
 
 [GrainType("github")]
 internal sealed class GitHubConnectionsNeuron(NeuronRuntime runtime,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<GitHubConnectionsState> state)
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<GitHubConnectionsState>> state)
     : Neuron<GitHubConnectionsState>(runtime, state), IGitHubConnections
 {
     public Task<Accepted<GitHubConnectionRecord>> Register(RegisterGitHubConnection command) => ExecuteCommandAsync(

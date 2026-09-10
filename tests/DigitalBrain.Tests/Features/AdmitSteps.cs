@@ -45,7 +45,7 @@ public sealed class AdmitSteps(BrainSteps brain, BrainWorld world)
         }
     }
 
-    [When(@"""(.*)"" fires ""(\w+)"" at (slow|failing|counter|plain) ""(.*)""")]
+    [When(@"""(.*)"" fires ""(\w+)"" at (slow|failing|counter|plain|announcing) ""(.*)""")]
     public Task FireAtTyped(string from, string type, string grainType, string name)
         => brain.FireCore(from, type, "{}", BrainSteps.Id(grainType, name));
 
@@ -58,12 +58,12 @@ public sealed class AdmitSteps(BrainSteps brain, BrainWorld world)
 
     [Then(@"""([^""]*)"" pending count is (\d+)")]
     public async Task ThenPendingCount(string name, int count)
-        => Assert.Equal(count, await brain.Brain.Grains.GetGrain<INeuron>(ResolveId(name).ToGrainId()).ReadPendingCount());
+        => Assert.Equal(count, await brain.Neuron(name).ReadPendingCount());
 
     [When(@"""(.*)"" waits up to (\d+) seconds until ""(.*)"" pending count is (\d+)")]
     public async Task WaitPendingCount(string observer, int seconds, string name, int count)
     {
-        var pending = brain.Brain.Grains.GetGrain<INeuron>(ResolveId(name).ToGrainId());
+        var pending = brain.Neuron(name);
         var deadline = DateTime.UtcNow.AddSeconds(seconds);
         var observed = await pending.ReadPendingCount();
         while (observed != count && DateTime.UtcNow < deadline)
@@ -101,10 +101,7 @@ public sealed class AdmitSteps(BrainSteps brain, BrainWorld world)
         Assert.Equal(Enum.Parse<DeliveryAdmission>(admission), _secondAdmission);
     }
 
-    [Then(@"""(.*)"" incoming journal contains (\d+) ""(\w+)""")]
+    [Then(@"""(.*)"" incoming journal contains (?:exactly )?(\d+) ""(\w+)""")]
     public async Task ThenIncomingCount(string name, int count, string type)
         => Assert.Equal(count, (await brain.Journal(name, JournalKind.Incoming)).Delta.Count(d => d.Signal.Type == type));
-
-    private NeuronId ResolveId(string name)
-        => world.Fixtures.TryGetValue(name, out var id) ? id : BrainSteps.Id(name);
 }

@@ -10,7 +10,7 @@ namespace DigitalBrain.UI;
 [GrainType(UIVocabulary.ChartType)]
 internal sealed class ChartNeuron(
     NeuronRuntime runtime,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ChartState> state)
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<ChartState>> state)
     : Neuron<ChartState>(runtime, state), IChart
 {
     public Task<Accepted<string>> Render(RenderChart command, CancellationToken cancellationToken = default)

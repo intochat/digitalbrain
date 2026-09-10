@@ -11,7 +11,7 @@ namespace DigitalBrain.Time;
 [GrainType("timer")]
 internal sealed class TimerNeuron(
     NeuronRuntime runtime,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<TimerState> state)
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<TimerState>> state)
     : Neuron<TimerState>(runtime, state), ITimer
 {
     private const int RecoveredAfterMinutes = 1;

@@ -15,7 +15,7 @@ internal sealed class GmailNeuron(
     GmailTokenRefresh tokenRefresh,
     TokenHandoff handoff,
     GmailDraftAccess draftAccess,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<GmailState> state)
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<GmailState>> state)
     : Neuron<GmailState>(runtime, state), IGmail
 {
     public Task<Accepted<GmailConnection>> Connect(ConnectGmailAccount command) => ExecuteCommandAsync(

@@ -9,7 +9,7 @@ namespace DigitalBrain.UI;
 [GrainType(UIVocabulary.ActivitiesType)]
 internal sealed class ActivitiesNeuron(
     NeuronRuntime runtime,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ActivitiesState> state)
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<ActivitiesState>> state)
     : Neuron<ActivitiesState>(runtime, state), IActivities
 {
     [ReadOnly]

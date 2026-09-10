@@ -10,7 +10,7 @@ namespace DigitalBrain.UI;
 [GrainType(UIVocabulary.ImageType)]
 internal sealed class ImageNeuron(
     NeuronRuntime runtime,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ImageState> state)
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<ImageState>> state)
     : Neuron<ImageState>(runtime, state), IImage
 {
     public Task<Accepted<string>> Describe(DescribeImage command, CancellationToken cancellationToken = default)

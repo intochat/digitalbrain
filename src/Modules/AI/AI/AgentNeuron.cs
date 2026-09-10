@@ -23,7 +23,7 @@ namespace DigitalBrain.AI;
 [GrainType(AIVocabulary.AgentType)]
 internal sealed class AgentNeuron(
     NeuronRuntime runtime,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<AgentState> state)
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<AgentState>> state)
     : Neuron<AgentState>(runtime, state)
 {
     // Descriptors are fixed for the life of the silo, so the typed functions an Instruct.tools

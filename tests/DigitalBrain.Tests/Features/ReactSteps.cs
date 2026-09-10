@@ -9,7 +9,7 @@ namespace DigitalBrain.Tests;
 [Binding]
 public sealed class ReactSteps(BrainSteps brain, BrainWorld world)
 {
-    [When(@"""(.*)"" fires ""(\w+)"" (\{.*\}) at (echo|flaky|slow|failing|scheduling|counter|plain) ""(.*)""")]
+    [When(@"""(.*)"" fires ""(\w+)"" (\{.*\}) at (echo|flaky|slow|failing|scheduling|counter|plain|announcing) ""(.*)""")]
     public Task FireAtTyped(string from, string type, string body, string grainType, string name)
         => brain.FireCore(from, type, body, BrainSteps.Id(grainType, name));
 

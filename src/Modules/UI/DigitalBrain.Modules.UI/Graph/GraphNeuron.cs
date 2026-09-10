@@ -10,7 +10,7 @@ namespace DigitalBrain.UI;
 [GrainType(UIVocabulary.GraphType)]
 internal sealed class GraphNeuron(
     NeuronRuntime runtime,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<GraphState> state)
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<GraphState>> state)
     : Neuron<GraphState>(runtime, state), IGraph
 {
     public Task<Accepted<string>> Render(RenderGraph command, CancellationToken cancellationToken = default)

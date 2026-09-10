@@ -41,7 +41,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
             () => CommandReconciliation.Reconcile(_components.Commands, _components.Dedup, TimeProvider.GetUtcNow()),
             DeactivateOnIdle, _components);
         _retry = new RetryScheduler(this, _ => ((INeuronInbox)this).Drain(), _components.Options.RetryReminderPeriod,
-            () => _components.Pending.Count > 0, _activation.Token);
+            () => _components.Pending.Count > 0 || HasStoredAnnouncements, _activation.Token);
     }
 
     public NeuronId Id => NeuronId.FromGrainId(this.GetGrainId());
@@ -124,8 +124,8 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
 
         await OnNeuronActivatedAsync(cancellationToken).ConfigureAwait(true);
 
-        // Entries accepted before the last deactivation are still pending: resume the drain.
-        if (_components.Pending.Peek() is not null)
+        // Pending entries and stored announcements survive deactivation: resume the drain for both.
+        if (_components.Pending.Peek() is not null || HasStoredAnnouncements)
         {
             await _retry.EnsureReminderAsync().ConfigureAwait(true);
             Wake();
@@ -161,6 +161,15 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
 
     // Override to react. The default neuron does nothing: the signal is already journaled and remembered.
     protected virtual Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    // Snapshot hooks let the drain finish saved reactions and their announcements.
+    private protected virtual bool HasStoredAnnouncements => false;
+
+    private protected virtual bool IsAppliedBy(SignalId delivery) => false;
+
+    private protected virtual void DiscardBufferedAnnouncements() { }
+
+    private protected virtual Task<bool> DrainAnnouncementsAsync(CancellationToken cancellationToken) => Task.FromResult(false);
 
     // ---- INeuron ----
 
@@ -295,19 +304,19 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         RequestContext.Clear();
         if (_components.Pending.Peek() is not { } head)
         {
-            await _retry.AfterDrainAsync().ConfigureAwait(true);
+            await FinishDrainAsync().ConfigureAwait(true);
             return;
         }
 
         var delivery = head.Delivery;
         await _retry.EnsureReminderAsync().ConfigureAwait(true);
 
-        if (_components.Pending.IsCancelled(delivery.SignalId))
+        if (_components.Pending.IsCancelled(delivery.SignalId) || IsAppliedBy(delivery.SignalId))
         {
+            // Cancelled work, or a head whose snapshot already committed: finish it without reacting.
             _components.Pending.CompleteHead(head);
             await PersistAsync().ConfigureAwait(true);
-            await _retry.AfterDrainAsync().ConfigureAwait(true);
-            Wake();
+            await FinishDrainAsync().ConfigureAwait(true);
             return;
         }
 
@@ -337,32 +346,66 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
                 if (_components.Pending.IsCancelled(delivery.SignalId))
                 {
                     DrainTelemetry.Cancelled(_logger, Id, delivery.SignalId);
-                    _components.Pending.CompleteHead(head);
-                    await PersistAsync().ConfigureAwait(true);
-                    await _retry.AfterDrainAsync().ConfigureAwait(true);
-                    Wake();
                 }
                 else
                 {
                     DrainTelemetry.Failed(_logger, Id, delivery.SignalId, failure);
                     await _fence.DiscardStagedChangesAsync(failure).ConfigureAwait(true);
                     _retry.ArmTimer();
+                    return;
                 }
-
-                return;
             }
 
             _components.Pending.CompleteHead(head);
             await PersistAsync().ConfigureAwait(true);
-            await _retry.AfterDrainAsync().ConfigureAwait(true);
-            Wake();
         }
         finally
         {
             // A failed or cancelled attempt drops whatever it scheduled.
             _turnWork.Clear();
+            DiscardBufferedAnnouncements();
             ReactionContext = previous;
             _reacting = previousReacting;
+        }
+
+        await FinishDrainAsync().ConfigureAwait(true);
+    }
+
+    private async Task FinishDrainAsync()
+    {
+        var remaining = await TryDrainAnnouncementsAsync().ConfigureAwait(true);
+        if (_activation.IsCancellationRequested)
+        {
+            return;
+        }
+
+        await _retry.AfterDrainAsync().ConfigureAwait(true);
+        if (remaining)
+        {
+            _retry.ArmTimer();
+        }
+
+        // Only queued entries wake immediately; busy announcements wait for the retry timer.
+        if (_components.Pending.Peek() is not null)
+        {
+            Wake();
+        }
+    }
+
+    private async Task<bool> TryDrainAnnouncementsAsync()
+    {
+        try
+        {
+            return await DrainAnnouncementsAsync(_activation.Token).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException) when (_activation.IsCancellationRequested)
+        {
+            return false;
+        }
+        catch (Exception failure)
+        {
+            DrainTelemetry.AnnouncementsFailed(_logger, Id, failure);
+            return true;
         }
     }
 
@@ -437,8 +480,13 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         return FireCoreAsync(signal, to, correlation, cancellationToken);
     }
 
+    internal Task<FireOutcome> FireAnnouncementAsync(Announcement announcement, CancellationToken cancellationToken)
+        => FireCoreAsync(announcement.Signal, announcement.To, announcement.Correlation, cancellationToken,
+            announcement.Id, announcement.Causation);
+
     private async Task<FireOutcome> FireCoreAsync(
-        Signal signal, NeuronId? to, CorrelationId? correlation, CancellationToken cancellationToken)
+        Signal signal, NeuronId? to, CorrelationId? correlation, CancellationToken cancellationToken,
+        SignalId? fixedId = null, SignalId? fixedCausation = null)
     {
         ArgumentNullException.ThrowIfNull(signal);
         cancellationToken.ThrowIfCancellationRequested();
@@ -459,6 +507,11 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         }
 
         var delivery = SignalDelivery.Create(signal, Id, _components.Journals.OutgoingNextSequence, TimeProvider, (ReactionContext as DeliveryReaction)?.Delivery, correlation);
+        if (fixedId is { } announcementId)
+        {
+            delivery = delivery with { SignalId = announcementId, CausationId = fixedCausation };
+        }
+
         _components.Journals.AppendOutgoing(delivery);
         await PersistAsync().ConfigureAwait(true);
 

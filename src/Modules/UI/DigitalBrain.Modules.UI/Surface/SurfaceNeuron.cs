@@ -13,7 +13,7 @@ namespace DigitalBrain.UI;
 [GrainType(UIVocabulary.SurfaceType)]
 internal sealed class SurfaceNeuron(
     NeuronRuntime runtime,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SurfaceState> state)
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<SurfaceState>> state)
     : Neuron<SurfaceState>(runtime, state), ISurface
 {
     public Task<Accepted<SurfaceOpenReceipt>> Open(OpenSurface command, CancellationToken cancellationToken = default)

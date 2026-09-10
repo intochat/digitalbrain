@@ -10,7 +10,7 @@ namespace DigitalBrain.UI;
 [GrainType(UIVocabulary.TranscriptType)]
 internal sealed class TranscriptNeuron(
     NeuronRuntime runtime,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<TranscriptState> state)
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<TranscriptState>> state)
     : Neuron<TranscriptState>(runtime, state), ITranscript
 {
     public Task<Accepted<string>> Append(AppendTranscript command, CancellationToken cancellationToken = default)

@@ -12,7 +12,7 @@ namespace DigitalBrain.UI;
 [GrainType(UIVocabulary.WorkspacesType)]
 internal sealed class WorkspacesNeuron(
     NeuronRuntime runtime,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<WorkspaceIndexState> state)
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<WorkspaceIndexState>> state)
     : Neuron<WorkspaceIndexState>(runtime, state), IWorkspaces
 {
     public Task<Accepted<WorkspaceRecord>> Ensure(EnsureWorkspace command, CancellationToken cancellationToken = default)
