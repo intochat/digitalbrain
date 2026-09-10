@@ -2,19 +2,21 @@ using Aspire.Hosting;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Google;
 using DigitalBrain.Google.Aspire.Hosting;
+using DigitalBrain.Salesforce;
+using DigitalBrain.Salesforce.Aspire.Hosting;
 using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
 var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
-    .AddModule<GoogleModule>(google => google.WithGmail());
+    .AddModule<GoogleModule>(google => google.WithGmail())
+    .AddModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp());
 // Phase B: the module wiring these nine lines stand in for is in AppHost.cs at b225d085.
 // Phase B: .AddModule<AIModule>(ai => ...)
 // Phase B: .AddModule<MemoryModule>(memory => memory.WithQdrant())
 // Phase B: .AddModule<TimeModule>()
 // Phase B: .AddModule<ExcelModule>()
 // Phase B: .AddModule<ExecutionModule>()
-// Phase B: .AddModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
 // Phase B: .AddModule<MicrosoftModule>(microsoft => ...)
 // Phase B: .AddModule<UIModule>(ui => ui.WithWindowHost())
 

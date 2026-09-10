@@ -10,5 +10,6 @@
     <ProjectReference Include="../DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
     <!-- Phase B: restore from b225d085. <ProjectReference Include="../../Modules/AI/AI/DigitalBrain.Modules.AI.csproj" /> -->
     <ProjectReference Include="../../Modules/Google/Google/DigitalBrain.Modules.Google.csproj" />
+    <ProjectReference Include="../../Modules/Salesforce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
   </ItemGroup>
 </Project>

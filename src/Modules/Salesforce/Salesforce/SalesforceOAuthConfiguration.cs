@@ -1,5 +1,3 @@
-using DigitalBrain.Abstractions;
-using DigitalBrain.Abstractions.Identity;
 using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.Extensions.Configuration;
 
@@ -25,11 +23,9 @@ internal sealed class SalesforceOAuthConfiguration
             throw new InvalidOperationException("Salesforce OAuth PublicOrigin must be an HTTPS origin, or loopback HTTP for local development.");
         }
         PublicOrigin = uri;
-        Owner = new OwnerId(configuration[DigitalBrainNames.Owner] ?? DigitalBrainNames.DefaultOwner);
     }
 
     internal Uri PublicOrigin { get; }
-    internal OwnerId Owner { get; }
     internal static Uri AuthorizationEndpoint => new("https://login.salesforce.com/services/oauth2/authorize");
     internal static Uri TokenEndpoint => new("https://login.salesforce.com/services/oauth2/token");
 

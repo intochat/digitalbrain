@@ -1,4 +1,5 @@
-using DigitalBrain.Sdk;
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Core;
 using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,23 +42,37 @@ internal static class SalesforceAuthentication
                 {
                     OnCreatingTicket = async context =>
                     {
-                        var request = BrowserLoginCorrelation.VerifiedRequest(context.HttpContext)
+                        var claimedLoginRequest = BrowserLoginCorrelation.VerifiedRequest(context.HttpContext)
                             ?? throw new InvalidOperationException("Salesforce login is missing its original request.");
-                        var issuer = context.Request.Query["iss"].ToString();
-                        if (issuer.Length != 0 && issuer != "https://login.salesforce.com")
+                        try
                         {
-                            throw new InvalidOperationException("The Salesforce authorization issuer did not match.");
+                            var issuer = context.Request.Query["iss"].ToString();
+                            if (issuer.Length != 0 && issuer != "https://login.salesforce.com")
+                            {
+                                throw new InvalidOperationException("The Salesforce authorization issuer did not match.");
+                            }
+                            var response = context.TokenResponse.Response?.RootElement;
+                            if (response is null || !response.Value.TryGetProperty("instance_url", out var instance)
+                                || !Uri.TryCreate(instance.GetString(), UriKind.Absolute, out var instanceUrl)
+                                || instanceUrl.Scheme != Uri.UriSchemeHttps)
+                            {
+                                throw new InvalidOperationException("Salesforce did not issue a valid HTTPS instance URL.");
+                            }
+                            var grains = context.HttpContext.RequestServices.GetRequiredService<IGrainFactory>();
+                            await grains.GetGrain<ISalesforce>(new NeuronId("salesforce", "salesforce").ToGrainId())
+                                .Connect(new ConnectSalesforceAccount(CommandId.New(), context.AccessToken!, context.RefreshToken,
+                                    checked((int)(context.ExpiresIn?.TotalSeconds ?? 3600)), instanceUrl.AbsoluteUri)).ConfigureAwait(false);
                         }
-                        var connections = context.HttpContext.RequestServices.GetRequiredService<SalesforceConnections>();
-                        await context.HttpContext.RequestServices.GetRequiredService<SalesforceLogins>().AcceptForActorAsync(request,
-                            (turn, _, valid) => connections.StoreAsync(turn.Chat.Owner, turn.Actor.PrincipalId, context.AccessToken, context.RefreshToken,
-                                context.ExpiresIn, valid, CancellationToken.None)).ConfigureAwait(false);
+                        catch
+                        {
+                            context.HttpContext.RequestServices.GetRequiredService<SalesforceLogins>()
+                                .Reject(claimedLoginRequest);
+                            throw;
+                        }
                     },
                     OnTicketReceived = async context =>
                     {
                         context.HandleResponse(); // Do not sign in or save tokens to a browser cookie.
-                        // The login worker resumes the durable request even when the user closes
-                        // this tab before the response finishes.
                         await LoginPage.WriteAsync(context.HttpContext, "Salesforce connected",
                             "You can close this tab. DigitalBrain is continuing your request.", 200).ConfigureAwait(false);
                     },

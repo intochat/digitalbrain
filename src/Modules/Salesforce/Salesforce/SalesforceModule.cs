@@ -1,7 +1,5 @@
-using DigitalBrain.AI.Interactions;
-using DigitalBrain.AI;
+using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Core;
-using DigitalBrain.Sdk;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Salesforce;
@@ -18,39 +16,27 @@ public sealed class SalesforceModule : IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
         var services = builder.Services;
-        services.AddSingleton(new NeuronPresentation("salesforce", "Salesforce", "Salesforce", "salesforce"));
-        services.AddSingleton<IAgentToolSource>(new AgentDelegation<ISalesforce>(
-            "ask_salesforce", "Ask the Salesforce specialist to inspect the connected account and records, query Salesforce, or prepare an exact record change preview. Writes require a separate fresh user confirmation of the published preview. No delete.",
-            builder.Configuration["DigitalBrain:Salesforce:Alias"] ?? "salesforce-local"));
-        if (DigitalBrainFakes.Enabled(builder.Configuration))
-        {
-            services.AddSingleton(static services => new SalesforceTools(services.GetRequiredService<IUntrustedContentScreen>(), fake: true));
-            return;
-        }
-
-        var endpoint = ReadEndpoint(builder.Configuration);
-        if (endpoint is null)
-        {
-            services.AddSingleton(static services => new SalesforceTools(services.GetRequiredService<IUntrustedContentScreen>()));
-            return;
-        }
-
         var settings = new SalesforceOAuthConfiguration(builder.Configuration);
         services.AddSingleton(settings);
-        services.AddSingleton<SalesforceConnections>();
         services.AddSingleton<SalesforceLogins>();
-        services.AddSingleton<IUserActionSource>(static s => s.GetRequiredService<SalesforceLogins>());
-        services.AddSingleton<IHttpSurface>(static s => new BrowserLoginSurface(s.GetRequiredService<SalesforceLogins>()));
-        services.AddSingleton(s => new SalesforceMcp(endpoint, s.GetRequiredService<SalesforceConnections>()));
-        services.AddSingleton(s => new SalesforceWritePreviews(s.GetRequiredService<SalesforceMcp>(), s.GetRequiredService<IUntrustedContentScreen>()));
-        services.AddSingleton<ITrustedUserCommandHandler>(s => s.GetRequiredService<SalesforceWritePreviews>());
-        services.AddSingleton(s => new SalesforceTools(s.GetRequiredService<SalesforceMcp>(), s.GetRequiredService<SalesforceLogins>(),
-            s.GetRequiredService<SalesforceWritePreviews>(), s.GetRequiredService<IUntrustedContentScreen>()));
-        services.AddHostedService<BrowserLoginWorker<SalesforceLogins>>();
+        services.AddSingleton<IHttpSurface>(static services => new BrowserLoginSurface(services.GetRequiredService<SalesforceLogins>()));
+        var endpoint = ReadEndpoint(builder.Configuration);
+        if (DigitalBrainFakes.Enabled(builder.Configuration))
+        {
+            services.AddSingleton<ISalesforceProvider, FakeSalesforceProvider>();
+        }
+        else
+        {
+            services.AddSingleton<ISalesforceProvider>(new SalesforceMcpProvider(endpoint));
+        }
+        services.AddSingleton<SalesforceTokenRefresh>();
+        // NativeTools contributor lands after the AI module merge
+        services.AddSingleton(static services => new SalesforceNativeTools(
+            services.GetRequiredService<IGrainFactory>().GetGrain<ISalesforce>(new NeuronId("salesforce", "salesforce").ToGrainId())));
         services.AddSalesforceAuthentication(settings, SalesforceLogins.LoginDefinition);
     }
 
-    private static McpEndpoint? ReadEndpoint(Microsoft.Extensions.Configuration.IConfiguration configuration)
+    private static Uri? ReadEndpoint(Microsoft.Extensions.Configuration.IConfiguration configuration)
     {
         var value = configuration[McpEndpointConfigurationKey];
         if (string.IsNullOrWhiteSpace(value))
@@ -67,6 +53,6 @@ public sealed class SalesforceModule : IModule
                 $"Configuration '{McpEndpointConfigurationKey}' must be an HTTPS hosted MCP endpoint on api.salesforce.com.");
         }
 
-        return new McpEndpoint("salesforce", uri);
+        return uri;
     }
 }
