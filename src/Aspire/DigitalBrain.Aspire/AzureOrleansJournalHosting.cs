@@ -1,13 +1,11 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 
 namespace DigitalBrain.Aspire;
 
-/// <summary>
-/// Azure-specific Orleans journal registration for the product host.
-/// Core owns the journal model; this adapter owns how production storage is wired.
-/// </summary>
 internal static class AzureOrleansJournalHosting
 {
     internal static ISiloBuilder AddAzureBlobJournal(this ISiloBuilder builder, IConfiguration configuration)
@@ -20,10 +18,21 @@ internal static class AzureOrleansJournalHosting
                 $"Missing connection string '{DigitalBrainNames.JournalConnection}'. "
                 + "Neuron journals require Azure Blob storage in this host.");
 
-        return builder.AddAzureBlobJournalStorage(options =>
+        builder.AddAzureBlobJournalStorage(options =>
         {
             options.ContainerName = "digitalbrain-v2-journal";
             options.ConfigureBlobServiceClient(connectionString);
         });
+
+        var services = builder.Services;
+        var descriptor = services.Last(service => service.ServiceType == typeof(IJournalStorageProvider));
+        services[services.IndexOf(descriptor)] = new ServiceDescriptor(typeof(IJournalStorageProvider), provider =>
+        {
+            var inner = (IJournalStorageProvider)(descriptor.ImplementationInstance
+                ?? descriptor.ImplementationFactory?.Invoke(provider)
+                ?? ActivatorUtilities.CreateInstance(provider, descriptor.ImplementationType!));
+            return new BudgetedJournalStorageProvider(inner, provider.GetRequiredService<NeuronOptions>().StorageOperationBudget);
+        }, descriptor.Lifetime);
+        return builder;
     }
 }

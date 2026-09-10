@@ -17,9 +17,11 @@ public sealed class CommandSteps(BrainSteps brain)
     private Exception? _lastError;
     private CommandId _lastCommandId;
 
+    internal Dictionary<string, SignalId> WorkByCommand { get; } = new(StringComparer.Ordinal);
+
     [When(@"""(.*)"" adds (\d+) to counter ""(.*)"" with command id ""(.*)""")]
     public Task Add(string principal, int amount, string name, string handle)
-        => Capture(principal, CommandIdFrom(handle), id => Counter(name).Add(new AddCount(id, amount)));
+        => Capture(principal, handle, CommandIdFrom(handle), id => Counter(name).Add(new AddCount(id, amount)));
 
     [When(@"""(.*)"" adds (\d+) to counter ""(.*)"" with command id ""(.*)"" and the call fails")]
     public async Task AddAndFail(string principal, int amount, string name, string handle)
@@ -30,11 +32,15 @@ public sealed class CommandSteps(BrainSteps brain)
 
     [When(@"""(.*)"" adds a (\d+)-byte note to counter ""(.*)"" with command id ""(.*)""")]
     public Task AddNote(string principal, int bytes, string name, string handle)
-        => Capture(principal, CommandIdFrom(handle), id => Counter(name).Add(new AddCount(id, 0, new string('n', bytes))));
+        => Capture(principal, handle, CommandIdFrom(handle), id => Counter(name).Add(new AddCount(id, 0, new string('n', bytes))));
 
     [When(@"""(.*)"" invokes the misbehaving save on counter ""(.*)""")]
     public Task AddAndSave(string principal, string name)
-        => Capture(principal, CommandIdFrom("save"), id => Counter(name).AddAndSave(new AddCount(id, 3)));
+        => Capture(principal, "save", CommandIdFrom("save"), id => Counter(name).AddAndSave(new AddCount(id, 3)));
+
+    [When(@"""(.*)"" invokes the misbehaving call-out on counter ""(.*)""")]
+    public Task AddAndCallOut(string principal, string name)
+        => Capture(principal, "callout", CommandIdFrom("callout"), id => Counter(name).AddAndCallOut(new AddCount(id, 3)));
 
     // The scenario that uses this step issues only command "x9".
     [Given(@"^counter ""[^""]*"" crashes after recording Attempted$")]
@@ -75,7 +81,7 @@ public sealed class CommandSteps(BrainSteps brain)
     [Then(@"""(.*)"" waits up to (\d+) seconds until counter ""(.*)"" total is (\d+)")]
     public async Task WaitForTotal(string principal, int seconds, string name, int expected)
     {
-        RequestContext.Set(CallerContext.Key, NeuronId.Plain(principal).ToString());
+        RequestContext.Set(CallerContext.Caller, NeuronId.Plain(principal).ToString());
         var counter = Counter(name);
         var deadline = DateTime.UtcNow.AddSeconds(seconds);
         var observed = await counter.ReadTotal();
@@ -137,14 +143,16 @@ public sealed class CommandSteps(BrainSteps brain)
         FixtureCommandCrashPoint.CrashOnce.Clear();
     }
 
-    private async Task Capture(string principal, CommandId id, Func<CommandId, Task<Accepted<int>>> call)
+    private async Task Capture(string principal, string handle, CommandId id, Func<CommandId, Task<Accepted<int>>> call)
     {
         _lastError = null;
         _lastCommandId = id;
-        RequestContext.Set(CallerContext.Key, NeuronId.Plain(principal).ToString());
+        RequestContext.Set(CallerContext.Caller, NeuronId.Plain(principal).ToString());
         try
         {
-            _results.Add(await call(id));
+            var accepted = await call(id);
+            _results.Add(accepted);
+            WorkByCommand[handle] = accepted.Work;
         }
         catch (Exception error)
         {
@@ -158,7 +166,7 @@ public sealed class CommandSteps(BrainSteps brain)
     private Task<CommandJournalRead> Journal(string name)
         => brain.Brain.Grains.GetGrain<INeuron>(new NeuronId("counter", name).ToGrainId()).ReadCommands(0);
 
-    private static CommandId CommandIdFrom(string handle)
+    internal static CommandId CommandIdFrom(string handle)
         => new CommandId(new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(handle)).AsSpan(0, 16)));
 
     private static void AssertPhases(IEnumerable<CommandRecord> records, string first, string second)

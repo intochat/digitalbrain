@@ -21,7 +21,8 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
         var cause = (host.ReactionContext as DeliveryReaction)?.Delivery;
         var record = new CommandRecord(
             0, arguments.Id, 1, command.InterfaceAlias, command.MethodAlias, CommandPhase.Rejected,
-            caller, cause?.CorrelationId ?? CorrelationId.New(), cause?.SignalId, null, null, null, clock.GetUtcNow());
+            caller, cause?.CorrelationId ?? CallerContext.CurrentCorrelation() ?? CorrelationId.New(),
+            cause?.SignalId ?? CallerContext.CurrentCausation(), null, null, null, clock.GetUtcNow());
         var argumentsText = JsonSerializer.Serialize(arguments, argumentsJson);
         var bytes = Encoding.UTF8.GetBytes(argumentsText);
         if (bytes.Length > CommandLimits.MaxArgumentBytes)
@@ -72,66 +73,82 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
         dedup.Record(arguments.Id, outcome);
         await host.PersistAsync().ConfigureAwait(true);
 
-        var previous = host.ReactionContext;
-        host.ReactionContext = new CommandReaction(arguments.Id, []);
         TResult result = default!;
         Exception? failure = null;
         try
         {
-            result = execute(arguments);
-        }
-        catch (Exception error)
-        {
-            failure = error;
-        }
-        finally
-        {
-            host.ReactionContext = previous;
-        }
-
-        string? resultText = null;
-        string? errorText = null;
-        if (failure is null)
-        {
+            IReadOnlyList<SignalId>? scheduledWork = null;
+            var previous = host.ReactionContext;
+            host.ReactionContext = new CommandReaction(arguments.Id, []);
             try
             {
-                resultText = JsonSerializer.Serialize(result, resultJson);
-                if (Encoding.UTF8.GetByteCount(resultText) > CommandLimits.MaxResultBytes)
-                {
-                    resultText = null;
-                    errorText = "The result was omitted because it exceeds the 64 KB record limit.";
-                }
+                result = execute(arguments);
             }
             catch (Exception error)
             {
                 failure = error;
             }
+            finally
+            {
+                if (host.ReactionContext is CommandReaction { ScheduledWork.Count: > 0 } reaction)
+                {
+                    scheduledWork = reaction.ScheduledWork;
+                }
+
+                host.ReactionContext = previous;
+            }
+
+            string? resultText = null;
+            string? errorText = null;
+            if (failure is null)
+            {
+                try
+                {
+                    resultText = JsonSerializer.Serialize(result, resultJson);
+                    if (Encoding.UTF8.GetByteCount(resultText) > CommandLimits.MaxResultBytes)
+                    {
+                        resultText = null;
+                        errorText = "The result was omitted because it exceeds the 64 KB record limit.";
+                    }
+                }
+                catch (Exception error)
+                {
+                    failure = error;
+                }
+            }
+
+            if (failure is not null)
+            {
+                errorText = TruncateError(failure.Message);
+            }
+
+            var terminal = record with
+            {
+                Phase = failure is null ? CommandPhase.Completed : CommandPhase.Failed,
+                ArgsJson = null,
+                ResultJson = resultText,
+                Error = errorText,
+                At = clock.GetUtcNow(),
+                ScheduledWork = scheduledWork,
+            };
+            crashPoint?.BeforeTerminalRecord(arguments.Id);
+            terminal = journal.Append(terminal);
+            dedup.Record(arguments.Id, outcome with
+            {
+                Phase = terminal.Phase,
+                ResultJson = terminal.ResultJson,
+                Error = terminal.Error,
+                Sequence = terminal.Sequence,
+            });
+            host.AdmitCommandWork();
+            await host.PersistAsync().ConfigureAwait(true);
+        }
+        catch (Exception error) when (error is not NeuronPersistenceException and not NeuronRecoveringException)
+        {
+            await host.DiscardStagedChangesAsync().ConfigureAwait(true);
+            throw;
         }
 
-        if (failure is not null)
-        {
-            errorText = TruncateError(failure.Message);
-        }
-
-        var terminal = record with
-        {
-            Phase = failure is null ? CommandPhase.Completed : CommandPhase.Failed,
-            ArgsJson = null,
-            ResultJson = resultText,
-            Error = errorText,
-            At = clock.GetUtcNow(),
-        };
-        crashPoint?.BeforeTerminalRecord(arguments.Id);
-        terminal = journal.Append(terminal);
-        dedup.Record(arguments.Id, outcome with
-        {
-            Phase = terminal.Phase,
-            ResultJson = terminal.ResultJson,
-            Error = terminal.Error,
-            Sequence = terminal.Sequence,
-        });
-        host.AdmitCommandWork();
-        await host.PersistAsync().ConfigureAwait(true);
         // Register after persistence so work that never committed cannot leave an orphan reminder row.
         await host.WakeCommandWorkAsync().ConfigureAwait(true);
 

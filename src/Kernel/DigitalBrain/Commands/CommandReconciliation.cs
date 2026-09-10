@@ -5,7 +5,7 @@ namespace DigitalBrain.Core;
 
 internal static class CommandReconciliation
 {
-    // Runs on every activation (and again after in-place recovery, Task A4). An Attempted entry with
+    // Runs on every activation and again inside in-place recovery while the fence is held. An Attempted entry with
     // no terminal record in the window means the process died between the two persists: the command
     // was attempted and nothing it did committed, so it resolves as Unknown and a retry with the same
     // id re-executes as the next incarnation.

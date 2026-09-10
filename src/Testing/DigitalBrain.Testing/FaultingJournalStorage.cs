@@ -1,0 +1,87 @@
+using System.Buffers;
+using System.Collections.Concurrent;
+using Orleans.Journaling;
+
+namespace DigitalBrain.Testing;
+
+public sealed class JournalFaultPlan
+{
+    private readonly ConcurrentDictionary<string, int> _writes = new(StringComparer.Ordinal);
+    private int _nextWrite;
+    private NumberedFault? _numberedFault;
+
+    public void FailNextWrite() => Interlocked.Exchange(ref _nextWrite, (int)NextWriteFault.Refuse);
+
+    public void CancelNextWrite() => Interlocked.Exchange(ref _nextWrite, (int)NextWriteFault.Cancel);
+
+    public void FailWriteNumber(string journalIdFragment, int ordinal)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(journalIdFragment);
+        ArgumentOutOfRangeException.ThrowIfLessThan(ordinal, 1);
+        Interlocked.Exchange(ref _numberedFault, new(journalIdFragment, ordinal));
+    }
+
+    public void Clear()
+    {
+        Interlocked.Exchange(ref _nextWrite, (int)NextWriteFault.None);
+        Interlocked.Exchange(ref _numberedFault, null);
+        _writes.Clear();
+    }
+
+    internal void BeforeWrite(string journalId)
+    {
+        var ordinal = _writes.AddOrUpdate(journalId, 1, static (_, count) => count + 1);
+        var nextWrite = (NextWriteFault)Interlocked.Exchange(ref _nextWrite, (int)NextWriteFault.None);
+        var numberedFault = Volatile.Read(ref _numberedFault);
+        var failNumberedWrite = numberedFault is not null
+            && journalId.Contains(numberedFault.Fragment, StringComparison.Ordinal)
+            && ordinal == numberedFault.Ordinal
+            && ReferenceEquals(Interlocked.CompareExchange(ref _numberedFault, null, numberedFault), numberedFault);
+        if (nextWrite == NextWriteFault.Cancel)
+        {
+            throw new OperationCanceledException("faulting journal storage cancelled the write");
+        }
+
+        if (nextWrite == NextWriteFault.Refuse || failNumberedWrite)
+        {
+            throw new IOException("faulting journal storage refused the write");
+        }
+    }
+
+    private sealed record NumberedFault(string Fragment, int Ordinal);
+
+    private enum NextWriteFault
+    {
+        None,
+        Refuse,
+        Cancel,
+    }
+}
+
+internal sealed class FaultingJournalStorageProvider(IJournalStorageProvider inner, JournalFaultPlan faults) : IJournalStorageProvider
+{
+    public IJournalStorage CreateStorage(JournalId id)
+        => new FaultingJournalStorage(inner.CreateStorage(id), id.Value, faults);
+}
+
+internal sealed class FaultingJournalStorage(IJournalStorage inner, string journalId, JournalFaultPlan faults) : IJournalStorage
+{
+    public bool IsCompactionRequested => inner.IsCompactionRequested;
+
+    public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+        => inner.ReadAsync(consumer, cancellationToken);
+
+    public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+    {
+        faults.BeforeWrite(journalId);
+        return inner.AppendAsync(value, cancellationToken);
+    }
+
+    public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+    {
+        faults.BeforeWrite(journalId);
+        return inner.ReplaceAsync(value, cancellationToken);
+    }
+
+    public ValueTask DeleteAsync(CancellationToken cancellationToken) => inner.DeleteAsync(cancellationToken);
+}

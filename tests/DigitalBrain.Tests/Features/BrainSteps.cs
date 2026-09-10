@@ -17,21 +17,13 @@ public sealed class BrainSteps(BrainWorld world)
 
     [Given("a running brain")]
     public async Task GivenARunningBrain()
-        => world.Simulation = await BrainSimulation.StartAsync(new()
-        {
-            Modules = new([]),
-            ConfigureSilo = static silo => silo.Services.AddSingleton<ICommandCrashPoint, FixtureCommandCrashPoint>(),
-        });
+        => world.Simulation = await StartSimulationAsync();
 
     [Given("a running brain with durable storage")]
     [Given("a running brain with file-backed storage")]
     public async Task GivenADurableBrain()
-        => world.Simulation = await BrainSimulation.StartAsync(new()
-        {
-            Modules = new([]),
-            PersistenceDirectory = Path.Combine(Path.GetTempPath(), "digitalbrain-tests", Guid.NewGuid().ToString("N")),
-            ConfigureSilo = static silo => silo.Services.AddSingleton<ICommandCrashPoint, FixtureCommandCrashPoint>(),
-        });
+        => world.Simulation = await StartSimulationAsync(
+            Path.Combine(Path.GetTempPath(), "digitalbrain-tests", Guid.NewGuid().ToString("N")));
 
     [Given(@"""(.*)"" is connected to ""(.*)"" for ""(.*)""")]
     [When(@"""(.*)"" is connected to ""(.*)"" for ""(.*)""")]
@@ -113,7 +105,17 @@ public sealed class BrainSteps(BrainWorld world)
 
     // ---- helpers shared with later features ----
 
+    internal static Task<BrainSimulation> StartSimulationAsync(string? persistenceDirectory = null, JournalFaultPlan? journalFaults = null)
+        => BrainSimulation.StartAsync(new()
+        {
+            Modules = new([]),
+            PersistenceDirectory = persistenceDirectory,
+            JournalFaults = journalFaults,
+            ConfigureSilo = static silo => silo.Services.AddSingleton<ICommandCrashPoint, FixtureCommandCrashPoint>(),
+        });
+
     internal BrainSimulation Brain => world.Brain;
+    internal Exception? LastError => _lastError;
     internal FireOutcome? LastFire { get; private set; }
     internal static NeuronId Id(string name)
         => NeuronId.TryParse(name, out var id) ? id : NeuronId.Plain(name);

@@ -26,6 +26,8 @@ public static class DigitalBrainRuntime
         });
 
         builder.AddJournalStorage();
+        builder.AddOutgoingGrainCallFilter<CommandLocalityFilter>();
+        builder.AddOutgoingGrainCallFilter<OutgoingCallerFilter>();
         builder.AddActivityPropagation();
         builder.UseJsonJournalFormat(DurableStateJson.TypeInfoResolver);
         ModelPayloadSerialization.AddModelPayloadSerialization(builder.Services);

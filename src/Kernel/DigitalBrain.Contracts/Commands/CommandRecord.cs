@@ -17,4 +17,6 @@ public sealed record CommandRecord(
     [property: Id(9)] string? ArgsJson,
     [property: Id(10)] string? ResultJson,
     [property: Id(11)] string? Error,
-    [property: Id(12)] DateTimeOffset At);
+    [property: Id(12)] DateTimeOffset At,
+    // Invariant 11's other half: the fired signal's causation is the work id, whose command is discoverable here; SignalDelivery stays unchanged.
+    [property: Id(13)] IReadOnlyList<SignalId>? ScheduledWork = null);

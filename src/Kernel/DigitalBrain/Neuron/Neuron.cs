@@ -22,6 +22,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     public const int MaxSignalTypesPerNeuron = 256;
 
     private readonly NeuronActivationComponents _components;
+    private readonly PersistenceFence _fence;
 
     private readonly CancellationTokenSource _activation = new();
     private readonly RetryScheduler _retry;
@@ -32,6 +33,9 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     {
         ArgumentNullException.ThrowIfNull(runtime);
         _components = runtime.Bind(ServiceProvider, Id);
+        _fence = new PersistenceFence(Id, StateManager, _activation.Token,
+            () => CommandReconciliation.Reconcile(_components.Commands, _components.Dedup, TimeProvider.GetUtcNow()),
+            DeactivateOnIdle);
         _retry = new RetryScheduler(this, _ => ((INeuronInbox)this).Drain(), _components.Options.RetryReminderPeriod);
     }
 
@@ -40,7 +44,14 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     protected TimeProvider TimeProvider => _components.Clock;
 
     // A durable write belongs to the activation, so request cancellation cannot interrupt it.
-    protected Task PersistAsync() => WriteStateAsync(_activation.Token).AsTask();
+    protected Task PersistAsync() => _fence.PersistAsync();
+
+    protected new Task WriteStateAsync(CancellationToken cancellationToken = default)
+        => throw new InvalidOperationException($"Neuron '{Id}' must call PersistAsync to write through the persistence fence.");
+
+    private void Guard() => _fence.Guard();
+
+    internal bool IsExecutingCommand => ReactionContext is CommandReaction;
 
     protected ReactionContext? ReactionContext { get; private set; }
 
@@ -55,6 +66,8 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     }
 
     Task ICommandHost.PersistAsync() => PersistAsync();
+
+    Task ICommandHost.DiscardStagedChangesAsync() => _fence.DiscardStagedChangesAsync();
 
     void ICommandHost.AdmitCommandWork()
     {
@@ -120,10 +133,14 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     // ---- INeuron ----
 
     public Task<FireOutcome> Fire(Signal signal, NeuronId? to, CorrelationId? correlation, CancellationToken cancellationToken = default)
-        => FireAsync(signal, to, correlation, cancellationToken);
+    {
+        Guard();
+        return FireAsync(signal, to, correlation, cancellationToken);
+    }
 
     public async Task Connect(NeuronId target, string signalType)
     {
+        Guard();
         ArgumentException.ThrowIfNullOrWhiteSpace(signalType);
         if (_components.Synapses.Connect(target, signalType))
         {
@@ -133,6 +150,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
 
     public async Task Disconnect(NeuronId target, string signalType)
     {
+        Guard();
         ArgumentException.ThrowIfNullOrWhiteSpace(signalType);
         if (_components.Synapses.Disconnect(target, signalType))
         {
@@ -142,6 +160,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
 
     public async Task<DeliveryAdmission> Deliver(SignalDelivery delivery, CancellationToken cancellationToken = default)
     {
+        Guard();
         ArgumentNullException.ThrowIfNull(delivery);
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -204,6 +223,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
 
     public async Task CancelReaction(SignalId pending)
     {
+        Guard();
         if (!_components.Pending.Cancel(pending))
         {
             return;
@@ -232,6 +252,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     // accepts interleave with reactions and journal order is preserved.
     async Task INeuronInbox.Drain()
     {
+        Guard();
         RequestContext.Clear();
         var delivery = _components.Pending.Peek();
         if (delivery is null)
@@ -250,6 +271,10 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
             Wake();
             return;
         }
+
+        RequestContext.Set(CallerContext.Caller, delivery.Source.ToString());
+        RequestContext.Set(CallerContext.Correlation, delivery.CorrelationId.ToString());
+        RequestContext.Set(CallerContext.Causation, delivery.SignalId.ToString());
 
         var previous = ReactionContext;
         var previousReacting = _reacting;
@@ -301,18 +326,35 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     // ---- INeuron: the reads ----
 
     public Task<IReadOnlyList<SignalDelivery>> ReadState()
-        => Task.FromResult<IReadOnlyList<SignalDelivery>>(
+    {
+        Guard();
+        return Task.FromResult<IReadOnlyList<SignalDelivery>>(
             [.. _components.Latest.Values.OrderBy(d => d.Signal.Type, StringComparer.Ordinal)]);
+    }
 
-    public Task<int> ReadPendingCount() => Task.FromResult(_components.Pending.Count);
+    public Task<int> ReadPendingCount()
+    {
+        Guard();
+        return Task.FromResult(_components.Pending.Count);
+    }
 
-    public Task<IReadOnlyList<Synapse>> ReadSynapses() => Task.FromResult(_components.Synapses.All());
+    public Task<IReadOnlyList<Synapse>> ReadSynapses()
+    {
+        Guard();
+        return Task.FromResult(_components.Synapses.All());
+    }
 
     public Task<JournalRead> ReadJournal(JournalKind kind, long afterSequence)
-        => Task.FromResult(_components.Journals.Read(kind, afterSequence));
+    {
+        Guard();
+        return Task.FromResult(_components.Journals.Read(kind, afterSequence));
+    }
 
     public Task<CommandJournalRead> ReadCommands(long afterSequence)
-        => Task.FromResult(_components.Commands.Read(afterSequence));
+    {
+        Guard();
+        return Task.FromResult(_components.Commands.Read(afterSequence));
+    }
 
     // ---- for subclasses ----
 
@@ -321,6 +363,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         JsonTypeInfo<TArguments> argumentsJson, JsonTypeInfo<TResult> resultJson,
         Func<TArguments, TResult> execute) where TArguments : Command
     {
+        Guard();
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(execute);

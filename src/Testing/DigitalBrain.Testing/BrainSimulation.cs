@@ -16,6 +16,7 @@ public sealed class BrainSimulationOptions
     public required ModuleManifest Modules { get; init; }
     public Action<ISiloBuilder>? ConfigureSilo { get; init; }
     public string? PersistenceDirectory { get; init; }
+    public JournalFaultPlan? JournalFaults { get; init; }
     public IReadOnlyDictionary<string, string?>? Configuration { get; init; }
 }
 
@@ -51,7 +52,15 @@ public sealed class BrainSimulation : IAsyncDisposable
     {
         if (!string.IsNullOrWhiteSpace(options.PersistenceDirectory))
         {
-            silo.Services.AddSingleton<IJournalStorageProvider>(new FileJournalStorageProvider(options.PersistenceDirectory));
+            if (options.JournalFaults is { } faults)
+            {
+                silo.Services.AddSingleton<IJournalStorageProvider>(
+                    new FaultingJournalStorageProvider(new FileJournalStorageProvider(options.PersistenceDirectory), faults));
+            }
+            else
+            {
+                silo.Services.AddSingleton<IJournalStorageProvider>(new FileJournalStorageProvider(options.PersistenceDirectory));
+            }
             silo.AddReminders();
             silo.Services.AddSingleton<IReminderTable>(new FileReminderTable(options.PersistenceDirectory));
             silo.Services.Configure<ReminderOptions>(reminders => reminders.MinimumReminderPeriod = TimeSpan.FromSeconds(1));

@@ -159,6 +159,9 @@ public interface ICounter : INeuron
     [Alias("save")]
     Task<Accepted<int>> AddAndSave(AddCount command);
 
+    [Alias("callout")]
+    Task<Accepted<int>> AddAndCallOut(AddCount command);
+
     [ReadOnly]
     [Alias("total")]
     Task<int> ReadTotal();
@@ -176,6 +179,7 @@ internal sealed class CounterNeuron(
 {
     private static readonly CommandDescriptor AddCommand = new("test.counter", "add");
     private static readonly CommandDescriptor SaveCommand = new("test.counter", "save");
+    private static readonly CommandDescriptor CallOutCommand = new("test.counter", "callout");
 
     public Task<Accepted<int>> Add(AddCount command) => ExecuteCommandAsync(
         AddCommand, command, CounterJson.Default.AddCount, CounterJson.Default.AcceptedInt32, arguments =>
@@ -193,16 +197,25 @@ internal sealed class CounterNeuron(
             return new Accepted<int>(arguments.Amount, default);
         });
 
-    protected override Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
+    public Task<Accepted<int>> AddAndCallOut(AddCount command) => ExecuteCommandAsync(
+        CallOutCommand, command, CounterJson.Default.AddCount, CounterJson.Default.AcceptedInt32, arguments =>
+        {
+            // The fixture deliberately breaks the commands-are-local rule; the outgoing filter rejects before dispatch, so the wait never blocks.
+            GrainFactory.GetGrain<INeuron>(NeuronId.Plain("bystander").ToGrainId()).ReadState().GetAwaiter().GetResult();
+            return new Accepted<int>(arguments.Amount, default);
+        });
+
+    protected override async Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
     {
         if (delivery.Signal.Type != "Counted")
         {
-            return Task.CompletedTask;
+            return;
         }
 
         using var body = JsonDocument.Parse(delivery.Signal.Body);
         var amount = body.RootElement.GetProperty("amount").GetInt32();
-        return SaveAsync(new CounterState((State?.Total ?? 0) + amount), cancellationToken);
+        await SaveAsync(new CounterState((State?.Total ?? 0) + amount), cancellationToken);
+        await FireAsync(Signal.Create("Counted", delivery.Signal.Body), null, delivery.CorrelationId, cancellationToken);
     }
 
     public Task<int> ReadTotal() => Task.FromResult(State?.Total ?? 0);
