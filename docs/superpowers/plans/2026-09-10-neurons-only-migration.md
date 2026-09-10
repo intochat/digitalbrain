@@ -337,6 +337,25 @@ Feature: Describe
 
 Each module task follows the same shape: rewrite Contracts (interface extends `INeuron`, DTOs derive from `Command`, vocabulary class with body records + STJ context), rewrite the Module (neurons on `Neuron`/`Neuron<TState>`; commands via `ExecuteCommandAsync`; reactions for I/O), keep Aspire.Hosting projection, re-enable in `DigitalBrain.slnx`, `Silo.csproj`, `AppHost.cs`, `Container.pubxml`; one feature file per module in `tests/DigitalBrain.Tests/Features/<module>.feature`; commit `feat(<module>): port to the neuron model`.
 
+Order: B0 then B1 run serially (B2's chat fires `Turn` at B1's agent neuron). B2–B5 run in parallel, each implementer in its own git worktree on `refactor/neurons-only-b<N>`, merged back by the controller after its review; shared files (`DigitalBrain.slnx`, `Silo.csproj`, `AppHost.cs`, `Container.pubxml`, the tests csproj) are edited only in the lines the module owns. Module Contracts projects enable `GenerateDocumentationFile` and carry one-line `<summary>` on grain interface methods and command DTOs: those are the agent's tool descriptions, not boilerplate.
+
+### Task B0: Dissolve Product.Contracts and stage the module build order
+
+**Files:**
+- Delete: `src/Product/DigitalBrain.Product.Contracts/**` (11 files). Its `Identity/CommandId.cs` is superseded by the kernel's `DigitalBrain.Contracts/Identity/CommandId.cs`; `Conversations/UserMessaged.cs`, `Interactions/*` (`AgentTurnContext`, `ITrustedUserCommandHandler`, `IUntrustedContentScreen`, `IUserActionContinuation`, `IUserActionSource`, `SetupContinuation`, `SpecialistContinuation`, `UserActionRequest`) and `Presentation/NeuronPresentation.cs` are product-interaction contracts from the applications era.
+- Create: `src/Modules/UI/DigitalBrain.Modules.UI.Contracts/Interactions/UntrustedContentScreen.cs` — ONLY if a Phase B module still needs a shared "screen external content before the model sees it" seam; carry `IUntrustedContentScreen` there unchanged in shape (interface + result record). Everything else in Product.Contracts is deleted, not moved: user actions, continuations and trusted-command handlers are what commands and signals now express.
+- Modify: every module csproj that references `DigitalBrain.Product.Contracts` (AI, AI.Contracts, Excel, Google, Memory.Contracts, Salesforce, Time, Time.Contracts, UI, UI.Contracts, Execution ×2 — Execution is deleted in B6, leave its csproj untouched) → remove the reference; where a module used `IUntrustedContentScreen`, point it at the UI.Contracts copy (a ProjectReference to UI.Contracts is acceptable for AI; if it would create a cycle, the seam moves to AI.Contracts instead — decide and say which).
+- Modify: `DigitalBrain.slnx` — remove the Product block; nothing else re-enabled here.
+
+**Interfaces:**
+- Consumes: kernel `CommandId`.
+- Produces: no `Product` namespace anywhere; modules compile-time references cleaned for their own tasks.
+
+- [ ] **Step 1:** `grep -rn "DigitalBrain.Product" src tests` — list every usage; decide per file: delete the using, or repoint to the UI.Contracts seam.
+- [ ] **Step 2:** Delete the project; update csproj references and the slnx.
+- [ ] **Step 3:** `dotnet build DigitalBrain.slnx -c Release` green (modules are still commented out, so this proves only that nothing enabled referenced Product); `dotnet test tests/DigitalBrain.Tests -c Release` green.
+- [ ] **Step 4:** Commit: `refactor!: dissolve Product.Contracts; CommandId lives in the kernel`.
+
 ### Task B1: AI module (agent + chat neurons)
 
 **Files:** copy `AgentNeuron.cs`, `ChatNeuron.cs`, `AIModule.cs`, `BrainTools` (AI functions), `Providers`, `Bodies`, states, `AIVocabulary` from core's `src/Modules/AI`; port this repo's provider catalogue (OpenAI, Anthropic, Ollama, Foundry transcription) into `Providers/` behind keyed `IChatClient`; keep `Voice/*TranscriptionService` as plain services; delete `AgentRequest`, `ApplicationAgentExtensions`, `Sdk/`. Tests: `agent.feature`, `chat.feature` from core (copied, plus `AiSteps`, `ScriptedChatClient`). Agent tools = the seven kernel operations as `AIFunction`s (extend core's `BrainTools.For` with `describe`, `call`, `cancel`) plus typed functions from descriptors named in `Instruct.tools`.
