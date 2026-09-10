@@ -1,6 +1,6 @@
 namespace DigitalBrain.UI;
 
-// The UI module's vocabulary: its grain type and its signal type names. This project ships no
+// The UI module's vocabulary: its grain types and its signal type names. This project ships no
 // C# signal types - a signal is a type name plus a JSON body - so the comment above each name
 // is the documented contract for that body, and the records it points at are the shapes.
 public static class UIVocabulary
@@ -9,7 +9,23 @@ public static class UIVocabulary
 
     public const string ChatType = "uichat";
 
-    // ---- what other neurons say to the chat, and what it says back ----
+    public const string SurfaceType = "surface";
+
+    public const string ChartType = "chart";
+
+    public const string GraphType = "graph";
+
+    public const string ImageType = "image";
+
+    public const string TranscriptType = "transcript";
+
+    public const string WorkspacesType = "workspaces";
+
+    public const string ActivitiesType = "activities";
+
+    public const string DefaultSurfaceName = "desk";
+
+    // ---- what other neurons say to the UI, and what it says back ----
 
     // { "commandId": "...", "text": "...", "context": [{ "path": "...", "schemaHash": "...", "payloadJson": null, "blobRef": null }] }
     // The turn is named by this signal's own id - the work id the send returned - so it is not in the body.
@@ -30,10 +46,49 @@ public static class UIVocabulary
 
     public const string SheetChanged = "SheetChanged";
 
+    // { ...SurfaceOpened... }
+    public const string SurfaceOpened = "SurfaceOpened";
+
+    // { ...ComponentAdded... }
+    public const string ComponentAdded = "ComponentAdded";
+
+    // { ...ControlActivation... }
+    public const string ControlActivated = "ControlActivated";
+
+    // { ...ActivityExecutionChanged... }
+    public const string ActivityExecutionChanged = "ActivityExecutionChanged";
+
+    // { ...ActivityChanged... }
+    public const string ActivityChanged = "ActivityChanged";
+
     // ---- work a command schedules for its own reaction ----
-    // This never travels along a synapse: a command validates and schedules, and the reaction
+    // These never travel along a synapse: a command validates and schedules, and the reaction
     // that drains the entry is where the snapshot is written and the outward signal is fired.
 
     // { "turn": "..." }
     public const string TurnCancelling = "TurnCancelling";
+
+    // { "command": { ...OpenSurface... }, "receipt": { ...SurfaceOpenReceipt... } }
+    public const string Opening = "Opening";
+
+    // { ...ActivateControl... }
+    public const string Activating = "Activating";
+
+    // { ...RenderChart... }
+    public const string ChartRendering = "ChartRendering";
+
+    // { ...AppendChartPoint... }
+    public const string ChartAppending = "ChartAppending";
+
+    // { ...RenderGraph... }
+    public const string GraphRendering = "GraphRendering";
+
+    // { ...DescribeImage... }
+    public const string ImageDescribing = "ImageDescribing";
+
+    // { ...AppendTranscript... }
+    public const string TranscriptAppending = "TranscriptAppending";
+
+    // { ...WorkspaceRecord... }
+    public const string WorkspaceEnsuring = "WorkspaceEnsuring";
 }

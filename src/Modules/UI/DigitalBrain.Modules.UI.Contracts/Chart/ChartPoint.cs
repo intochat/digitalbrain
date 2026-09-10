@@ -1,0 +1,10 @@
+namespace DigitalBrain.UI;
+
+[GenerateSerializer]
+[Alias("ui.chart-point")]
+public sealed record ChartPoint(
+    [property: Id(0)] string Label,
+    [property: Id(1)] double Value,
+    [property: Id(2)] string? Description = null,
+    [property: Id(3)] string? SourceUri = null,
+    [property: Id(4)] string? EventId = null);
