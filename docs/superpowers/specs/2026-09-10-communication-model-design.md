@@ -202,7 +202,9 @@ throws `NeuronRecoveringException` from method entry until reactivation replays 
 The same reconciliation runs on every activation.
 
 A mutating turn holds the activation until the write settles, so no serialized read can
-observe an unflushed mutation. Snapshot saves are reaction-only; a failed `SaveAsync` is a
+observe an unflushed mutation. An interleaving read that runs during an in-flight write may
+return state the write is about to commit; invariant 17 constrains what may be served after
+a failure, and the fence guarantees that. Snapshot saves are reaction-only; a failed `SaveAsync` is a
 failed reaction, retried from the head after the facet re-reads storage.
 
 The journal storage provider is wrapped with a 120-second cancellation budget per complete
