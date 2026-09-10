@@ -1,6 +1,5 @@
 using DigitalBrain.Sdk;
 using DigitalBrain.Core;
-using DigitalBrain.Product.Interactions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Microsoft.GitHub;

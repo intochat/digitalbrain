@@ -1,8 +1,7 @@
-using DigitalBrain.Product.Interactions;
+using DigitalBrain.AI.Interactions;
 using DigitalBrain.AI;
 using DigitalBrain.Core;
 using DigitalBrain.Sdk;
-using DigitalBrain.Product.Presentation;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Salesforce;

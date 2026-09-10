@@ -1,6 +1,6 @@
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
-using DigitalBrain.Product.Interactions;
+using DigitalBrain.AI.Interactions;
 using DigitalBrain.Sdk;
 using Microsoft.Extensions.AI;
 

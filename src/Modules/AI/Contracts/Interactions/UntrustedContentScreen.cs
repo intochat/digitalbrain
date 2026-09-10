@@ -1,4 +1,4 @@
-namespace DigitalBrain.Product.Interactions;
+namespace DigitalBrain.AI.Interactions;
 
 public interface IUntrustedContentScreen
 {

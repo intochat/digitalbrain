@@ -5,7 +5,6 @@ using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Core;
-using DigitalBrain.Product.Interactions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Concurrency;

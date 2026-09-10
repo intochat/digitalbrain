@@ -1,8 +1,7 @@
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.AI;
 using DigitalBrain.Core;
-using DigitalBrain.Product.Interactions;
-using DigitalBrain.Product.Presentation;
+using DigitalBrain.AI.Interactions;
 using DigitalBrain.Microsoft.GitHub;
 using Microsoft.Extensions.DependencyInjection;
 

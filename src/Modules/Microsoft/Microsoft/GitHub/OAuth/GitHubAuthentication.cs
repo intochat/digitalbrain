@@ -1,5 +1,4 @@
 using DigitalBrain.Core;
-using DigitalBrain.Product.Interactions;
 using DigitalBrain.Sdk;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OAuth;

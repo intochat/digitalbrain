@@ -1,5 +1,5 @@
 using DigitalBrain.Abstractions.Signals;
-using DigitalBrain.Product.Identity;
+using DigitalBrain.Abstractions.Identity;
 
 namespace DigitalBrain.UI;
 

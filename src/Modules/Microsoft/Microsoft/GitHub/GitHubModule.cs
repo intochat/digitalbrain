@@ -1,5 +1,4 @@
 using DigitalBrain.Core;
-using DigitalBrain.Product.Presentation;
 using DigitalBrain.Sdk;
 using DigitalBrain.Sdk.Webhooks;
 using Microsoft.Extensions.DependencyInjection;

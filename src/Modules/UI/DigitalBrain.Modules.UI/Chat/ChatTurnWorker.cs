@@ -1,9 +1,8 @@
-using DigitalBrain.Product.Identity;
 using System.Text;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Execution;
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Product.Interactions;
+using DigitalBrain.AI.Interactions;
 using DigitalBrain.AI;
 using DigitalBrain.Chat;
 using DigitalBrain.Core;

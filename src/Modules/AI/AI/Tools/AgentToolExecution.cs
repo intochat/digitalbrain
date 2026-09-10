@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
-using DigitalBrain.Product.Interactions;
+using DigitalBrain.AI.Interactions;
 using DigitalBrain.Sdk;
 using Microsoft.Extensions.AI;
 

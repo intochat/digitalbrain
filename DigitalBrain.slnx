@@ -1,9 +1,4 @@
 <Solution>
-  <!-- Phase B: restore from b225d085.
-  <Folder Name="/Product/">
-    <Project Path="src/Product/DigitalBrain.Product.Contracts/DigitalBrain.Product.Contracts.csproj" />
-  </Folder>
-  -->
   <Folder Name="/Modules/DigitalBrain/">
     <Project Path="src/Aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
     <Project Path="src/Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />

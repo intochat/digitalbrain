@@ -3,7 +3,6 @@ using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.AI;
 using DigitalBrain.Core;
-using DigitalBrain.Product.Interactions;
 using DigitalBrain.Chat;
 using Microsoft.Extensions.AI;
 

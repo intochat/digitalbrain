@@ -1,5 +1,3 @@
-using DigitalBrain.Product.Interactions;
-using DigitalBrain.Product.Presentation;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.AI;
 using DigitalBrain.Core;

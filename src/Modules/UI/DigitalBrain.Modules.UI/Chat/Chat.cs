@@ -1,8 +1,6 @@
-using DigitalBrain.Product.Identity;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Execution;
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Product.Interactions;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Chat;

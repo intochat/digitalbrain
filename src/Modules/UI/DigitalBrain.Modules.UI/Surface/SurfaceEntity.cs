@@ -2,7 +2,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Core;
 using DigitalBrain.Abstractions.Signals;
 using Orleans.Runtime;
-using DigitalBrain.Product.Identity;
+using DigitalBrain.Abstractions.Identity;
 using System.Security.Cryptography;
 using System.Text.Json;
 

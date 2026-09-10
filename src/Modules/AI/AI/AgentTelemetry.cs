@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Product.Interactions;
 
 namespace DigitalBrain.AI;
 

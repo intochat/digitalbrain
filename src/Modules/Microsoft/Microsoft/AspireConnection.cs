@@ -1,7 +1,7 @@
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.AI;
 using DigitalBrain.Sdk;
-using DigitalBrain.Product.Interactions;
+using DigitalBrain.AI.Interactions;
 using ModelContextProtocol.Client;
 
 namespace DigitalBrain.Microsoft;

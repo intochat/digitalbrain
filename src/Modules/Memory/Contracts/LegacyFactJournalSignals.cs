@@ -1,4 +1,3 @@
-using DigitalBrain.Product.Identity;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Signals;
 

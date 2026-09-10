@@ -1,5 +1,4 @@
 using DigitalBrain.Abstractions.Signals;
-using DigitalBrain.Product.Interactions;
 
 namespace DigitalBrain.Chat;
 

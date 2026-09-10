@@ -1,4 +1,3 @@
-using DigitalBrain.Product.Interactions;
 using DigitalBrain.Sdk;
 
 namespace DigitalBrain.Google;

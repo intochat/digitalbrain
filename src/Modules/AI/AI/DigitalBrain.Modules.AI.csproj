@@ -26,7 +26,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../../Product/DigitalBrain.Product.Contracts/DigitalBrain.Product.Contracts.csproj" />
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="../Sdk/DigitalBrain.Modules.AI.Sdk.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain/DigitalBrain.csproj" />

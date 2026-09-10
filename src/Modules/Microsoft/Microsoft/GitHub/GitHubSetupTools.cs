@@ -2,7 +2,6 @@ using System.ComponentModel;
 using System.Text.Json;
 using DigitalBrain.AI;
 using DigitalBrain.Core;
-using DigitalBrain.Product.Interactions;
 using DigitalBrain.Sdk;
 using Microsoft.Extensions.AI;
 

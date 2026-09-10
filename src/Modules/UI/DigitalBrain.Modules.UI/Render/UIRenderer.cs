@@ -3,7 +3,6 @@ using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Core;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Neurons;
-using DigitalBrain.Product.Identity;
 using System.Security.Cryptography;
 using System.Text;
 

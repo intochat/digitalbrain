@@ -1,7 +1,5 @@
-using DigitalBrain.Product.Identity;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Chat;
-using DigitalBrain.Product.Interactions;
 
 using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.UI;

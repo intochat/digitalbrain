@@ -29,7 +29,7 @@ public sealed class AIModule : Core.IModule
                 new Uri(new Uri(mcpEndpoint), "/mcp"),
                 new(builder.Configuration[DigitalBrainNames.Owner] ?? DigitalBrainNames.DefaultOwner),
                 () => services.GetRequiredService<IHttpClientFactory>().CreateClient("digitalbrain-mcp"),
-                services.GetRequiredService<DigitalBrain.Product.Interactions.IUntrustedContentScreen>()));
+                services.GetRequiredService<DigitalBrain.AI.Interactions.IUntrustedContentScreen>()));
         }
 
         if (!string.IsNullOrWhiteSpace(builder.Configuration["DigitalBrain:Workspace:RepositoryPath"]))

@@ -1,6 +1,6 @@
 using DigitalBrain.Abstractions.Entities;
 using DigitalBrain.Abstractions.Signals;
-using DigitalBrain.Product.Identity;
+using DigitalBrain.Abstractions.Identity;
 namespace DigitalBrain.UI;
 
 // Deliberately no [ClientEntryPoint] here (same wall as IChart): Read() arrives through

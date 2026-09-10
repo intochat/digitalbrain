@@ -1,6 +1,5 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Signals;
-using DigitalBrain.Product.Interactions;
 using DigitalBrain.AI;
 using DigitalBrain.Core;
 using DigitalBrain.Chat;

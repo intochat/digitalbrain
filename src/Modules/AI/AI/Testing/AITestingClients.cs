@@ -1,5 +1,5 @@
 using Microsoft.Extensions.AI;
-using DigitalBrain.Product.Interactions;
+using DigitalBrain.AI.Interactions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 

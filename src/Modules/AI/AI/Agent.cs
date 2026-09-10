@@ -4,7 +4,6 @@ using System.Diagnostics;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Core;
-using DigitalBrain.Product.Interactions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 

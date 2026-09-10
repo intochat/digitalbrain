@@ -1,4 +1,3 @@
-using DigitalBrain.Product.Identity;
 using System.Globalization;
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Identity;

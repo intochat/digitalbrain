@@ -1,9 +1,8 @@
-using DigitalBrain.Product.Identity;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Product.Interactions;
+using DigitalBrain.AI.Interactions;
 using DigitalBrain.Core;
 using DigitalBrain.Sdk;
 using Microsoft.Extensions.AI;

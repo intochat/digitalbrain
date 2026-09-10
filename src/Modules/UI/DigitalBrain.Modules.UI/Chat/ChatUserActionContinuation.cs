@@ -1,5 +1,4 @@
 using DigitalBrain.Chat;
-using DigitalBrain.Product.Interactions;
 
 namespace DigitalBrain.UI;
 

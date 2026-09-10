@@ -1,6 +1,5 @@
 using DigitalBrain.Abstractions.Entities;
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Product.Identity;
 
 namespace DigitalBrain.UI;
 

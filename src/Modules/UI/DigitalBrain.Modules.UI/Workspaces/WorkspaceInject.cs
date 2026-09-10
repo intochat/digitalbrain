@@ -3,7 +3,6 @@ using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Chat;
 using DigitalBrain.Core;
-using DigitalBrain.Product.Identity;
 
 namespace DigitalBrain.UI;
 
