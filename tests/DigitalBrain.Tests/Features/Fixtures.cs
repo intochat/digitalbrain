@@ -157,6 +157,7 @@ public sealed record AddCount(
 [Alias("test.counter")]
 public interface ICounter : INeuron
 {
+    /// <summary>Adds a count and schedules the increment.</summary>
     [Alias("add")]
     Task<Accepted<int>> Add(AddCount command);
 
@@ -171,7 +172,22 @@ public interface ICounter : INeuron
     Task<int> ReadTotal();
 }
 
+[GenerateSerializer]
+[Alias("db.test.bad-arguments")]
+public sealed record BadArguments(
+    CommandId Id,
+    [property: Id(0)] Dictionary<string, string> Tags) : Command(Id);
+
+// This interface exists to prove the descriptor rules reject it.
+[Alias("test.bad")]
+public interface IBadCounter : INeuron
+{
+    [Alias("bad")]
+    Task<int> Bad(BadArguments command);
+}
+
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(BadArguments))]
 [JsonSerializable(typeof(AddCount))]
 [JsonSerializable(typeof(Accepted<int>))]
 [JsonSerializable(typeof(int))]

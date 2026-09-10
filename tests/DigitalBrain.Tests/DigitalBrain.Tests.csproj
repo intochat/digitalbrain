@@ -5,7 +5,8 @@
     <IsTestProject>true</IsTestProject>
     <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
     <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
-    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);ORLEANSEXP005;CS1591</NoWarn>
     <RootNamespace>DigitalBrain.Tests</RootNamespace>
   </PropertyGroup>
   <ItemGroup>

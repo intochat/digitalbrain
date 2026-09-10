@@ -38,7 +38,7 @@ internal sealed class JournalWindow
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
 
         var lastSequence = _retained.CommittedSequence;
-        var earliest = _retained.EarliestRetained;
+        var earliest = _retained.CommittedEarliestRetained;
         var gap = afterSequence + 1 < earliest;
 
         if (afterSequence >= lastSequence || gap)
@@ -66,7 +66,7 @@ internal sealed class JournalWindow
     internal JournalSnapshot Snapshot() => new(
         TotalRecorded: _committedTallies.Sum(tally => tally.Recorded),
         LastSequence: _retained.CommittedSequence,
-        EarliestRetainedSequence: _retained.EarliestRetained,
+        EarliestRetainedSequence: _retained.CommittedEarliestRetained,
         RetainedCount: _retained.CommittedCount,
         Tallies: _committedTallies);
 

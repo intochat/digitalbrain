@@ -20,6 +20,7 @@ public sealed class DescriptorTable
     private readonly Dictionary<GrainType, MethodDescriptor[]> _descriptors = [];
     private readonly Dictionary<GrainType, string[]> _aliases = [];
     private readonly Dictionary<(string Interface, string Method), InvocationMetadata> _methods = [];
+    private readonly Dictionary<(GrainType, string), CommandDescriptor> _commands = [];
 
     public DescriptorTable(IOptions<GrainTypeOptions> options, GrainTypeResolver grainTypes, GrainInterfaceTypeResolver interfaceTypes)
     {
@@ -54,6 +55,12 @@ public sealed class DescriptorTable
                 foreach (var method in contract.GetMethods())
                 {
                     var methodAlias = method.GetCustomAttribute<AliasAttribute>()!.Alias;
+                    if (!_commands.TryAdd((grainType, methodAlias), new(alias, methodAlias)))
+                    {
+                        var previous = _commands[(grainType, methodAlias)];
+                        throw new InvalidOperationException($"Grain type '{grainType}' has ambiguous method alias '{methodAlias}' on interfaces '{interfaces[previous.InterfaceAlias].FullName}' and '{contract.FullName}'. Choose a unique method alias.");
+                    }
+
                     var key = (alias, methodAlias);
                     if (!_methods.TryGetValue(key, out var metadata))
                     {
@@ -85,15 +92,9 @@ public sealed class DescriptorTable
     public IReadOnlyList<string> InterfaceAliasesOf(GrainType grainType) => _aliases.GetValueOrDefault(grainType) ?? [];
 
     public CommandDescriptor DescriptorFor(GrainType grainType, string methodAlias)
-    {
-        var matches = For(grainType).Where(method => method.MethodAlias == methodAlias).ToArray();
-        return matches.Length switch
-        {
-            1 => new(matches[0].InterfaceAlias, methodAlias),
-            0 => throw new InvalidOperationException($"Grain type '{grainType}' has no method alias '{methodAlias}'. Use a declared module method alias."),
-            _ => throw new InvalidOperationException($"Grain type '{grainType}' has ambiguous method alias '{methodAlias}' on interfaces {string.Join(", ", matches.Select(method => method.InterfaceAlias))}. Choose a unique method alias."),
-        };
-    }
+        => _commands.TryGetValue((grainType, methodAlias), out var descriptor)
+            ? descriptor
+            : throw new InvalidOperationException($"Grain type '{grainType}' has no method alias '{methodAlias}'. Use a declared module method alias.");
 
     internal InvocationMetadata Method(string interfaceAlias, string methodAlias)
         => _methods.TryGetValue((interfaceAlias, methodAlias), out var method)
@@ -108,17 +109,19 @@ public sealed class DescriptorTable
         {
             var context = contextType.GetProperty("Default", BindingFlags.Public | BindingFlags.Static)?.GetValue(null) as JsonSerializerContext
                 ?? throw new InvalidOperationException($"Interface '{contract.FullName}' needs JSON context '{contextType.FullName}' to expose public static Default.");
-            options = new(context.Options)
-            {
-                TypeInfoResolver = context,
-                RespectRequiredConstructorParameters = true,
-                RespectNullableAnnotations = true,
-            };
+            options = ContractOptions(context);
             contexts.Add(contextType, options);
         }
 
         return options;
     }
+
+    internal static JsonSerializerOptions ContractOptions(JsonSerializerContext context) => new(context.Options)
+    {
+        TypeInfoResolver = context,
+        RespectRequiredConstructorParameters = true,
+        RespectNullableAnnotations = true,
+    };
 
     private static JsonTypeInfo? TypeInfo(Type? type, JsonSerializerOptions options, MethodInfo method)
     {
@@ -127,14 +130,18 @@ public sealed class DescriptorTable
             return null;
         }
 
+        JsonTypeInfo typeInfo;
         try
         {
-            return options.GetTypeInfo(type);
+            typeInfo = options.GetTypeInfo(type);
         }
         catch (Exception error) when (error is NotSupportedException or InvalidOperationException)
         {
             throw new InvalidOperationException($"Interface '{method.DeclaringType!.FullName}', method '{method.Name}' needs JSON type '{type.FullName}'. Add it to the assembly's source-generated JSON context.", error);
         }
+
+        DescriptorRules.ValidateMemberTypes(method, typeInfo);
+        return typeInfo;
     }
 
     private static JsonElement? Schema(JsonTypeInfo? typeInfo)

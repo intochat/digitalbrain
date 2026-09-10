@@ -27,8 +27,6 @@ internal sealed class CommandJournal
 
     internal long CommittedSequence => _retained.CommittedSequence;
 
-    internal long EarliestRetained => _retained.EarliestRetained;
-
     internal void NoteCommitted() => _retained.NoteCommitted();
 
     internal CommandRecord Append(CommandRecord record) => _retained.Append(sequence => record with { Sequence = sequence });
@@ -36,7 +34,7 @@ internal sealed class CommandJournal
     internal CommandJournalRead Read(long afterSequence)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(afterSequence);
-        var earliest = EarliestRetained;
+        var earliest = _retained.CommittedEarliestRetained;
         var gap = afterSequence + 1 < earliest;
         List<CommandRecord> delta = [];
         if (!gap && afterSequence < CommittedSequence)
