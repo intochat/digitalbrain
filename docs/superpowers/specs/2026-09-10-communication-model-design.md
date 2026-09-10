@@ -69,7 +69,7 @@ public sealed record SendMessage(CommandId Id, string Text, IReadOnlyList<Contex
 ```
 
 `[ReadOnly]` is allowed on module methods. `[AlwaysInterleave]` is kernel-only; the
-concurrency validator allows exactly the four kernel uses above.
+concurrency validator allows exactly the five kernel uses above.
 
 ## 2. Base class
 
@@ -139,7 +139,8 @@ snapshot facet.
 
 Wrapper timeline; the only awaits are the two persists:
 
-1. Serialize args at the target; > 64 KiB, capacity, or id reuse with different args →
+1. Serialize args at the target; > 64 KiB, capacity (`Dedup` full of unresolved, or `Pending`
+   full — a saturated neuron refuses every command with `Busy`), or id reuse with different args →
    stage `Rejected` with bounded metadata, persist, throw. Consult `Dedup`: resolved with
    matching caller, interface, method and SHA-256 of canonical args → return the stored
    result or rethrow the stored failure; `Unknown` → fall through as a new incarnation;
