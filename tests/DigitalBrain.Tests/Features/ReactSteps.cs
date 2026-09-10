@@ -53,7 +53,10 @@ public sealed class ReactSteps(BrainSteps brain, BrainWorld world)
             await Task.Delay(50);
         }
 
-        Assert.Fail($"{neuron} did not receive {count} {type} within {seconds}s");
+        var journal = await brain.Journal(neuron, JournalKind.Incoming);
+        var pending = await brain.Neuron(neuron).ReadPendingCount();
+        Assert.Fail($"{neuron} did not receive {count} {type} within {seconds}s; incoming holds "
+            + $"[{string.Join(", ", journal.Delta.Select(d => d.Signal.Type))}] with {pending} pending, gap {journal.Gap}");
     }
 
     [Then(@"""(.*)"" incoming ""(\w+)"" bodies are (.*)$")]
