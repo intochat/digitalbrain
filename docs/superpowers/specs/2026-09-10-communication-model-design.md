@@ -179,7 +179,10 @@ bound (`ChatState.TurnByCommand`, 1024) or `ExpectedVersion` preconditions.
 
 Acceptance commands return `Accepted<TReceipt>` whose `Work` is the scheduled signal id.
 For chat, `TurnId` *is* that id: fresh per incarnation, used by the reaction that creates the
-turn. Modules expose no `Cancel` methods; edges call `CancelReaction(work)` directly.
+turn. A neuron's own pending reaction is cancelled only through `CancelReaction(work)`, which
+edges call directly; a module command may cancel work on another neuron and settle its own
+state (a chat cancelling the agent's reply and marking the turn cancelled) because that is
+domain state, not the kernel primitive.
 
 Audit records are append-only transitions:
 
