@@ -60,8 +60,6 @@ public static class FixtureSwitches
 
     public static ConcurrentDictionary<string, int> ThrowingFailuresLeft { get; } = new(StringComparer.Ordinal);
 
-    public static ConcurrentDictionary<string, TaskCompletionSource> Release { get; } = new(StringComparer.Ordinal);
-
     public static ConcurrentDictionary<string, TaskCompletionSource> Cancelled { get; } = new(StringComparer.Ordinal);
 }
 
@@ -102,10 +100,9 @@ internal sealed class SlowNeuron(NeuronRuntime runtime) : Neuron(runtime)
 {
     protected override async Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
     {
-        var release = FixtureSwitches.Release[Id.Name];
         try
         {
-            await release.Task.WaitAsync(cancellationToken);
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

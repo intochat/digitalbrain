@@ -2,7 +2,7 @@ Feature: MCP surface
   Five tools over the same operations. An unfamiliar model must be able to use them from
   the descriptions alone.
 
-  Scenario: The server exposes exactly fire, connect, disconnect and read
+  Scenario: The server exposes exactly fire, connect, disconnect, read and cancel
     Given a running brain
     And an MCP client for principal "claude"
     Then the tools are "cancel, connect, disconnect, fire, read"

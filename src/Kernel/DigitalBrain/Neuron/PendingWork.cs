@@ -43,8 +43,14 @@ internal sealed class PendingWork
 
     internal SignalDelivery? Peek() => _queue.TryPeek(out var delivery) ? delivery : null;
 
-    internal void Complete(SignalId id)
+    internal void CompleteHead(SignalId id)
     {
+        if (!_queue.TryPeek(out var head) || head.SignalId != id)
+        {
+            throw new InvalidOperationException(
+                $"Cannot complete signal '{id}' when the head is '{head?.SignalId.ToString() ?? "<empty>"}'; the drain completes only the head it peeked.");
+        }
+
         _queue.Dequeue();
         _cancelled.Remove(id);
         // Cancelled work is finished too; remembering its id prevents admission on redelivery.

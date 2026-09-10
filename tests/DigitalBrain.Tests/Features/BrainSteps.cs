@@ -41,16 +41,7 @@ public sealed class BrainSteps(BrainWorld world)
     public Task FireAt(string from, string type, string body, string to) => FireCore(from, type, body, to);
 
     [When("the silo restarts")]
-    public async Task Restart()
-    {
-        await Brain.RestartSiloAsync();
-        // A restarted silo activates a neuron only when called. A read delivers no signal,
-        // so the entry is still reacted to and retried without new traffic.
-        foreach (var fixture in world.Fixtures.Values)
-        {
-            await Brain.Grains.GetGrain<INeuron>(fixture.ToGrainId()).ReadPendingCount();
-        }
-    }
+    public Task Restart() => Brain.RestartSiloAsync();
 
     [Then(@"the fire reached (\d+) neurons")]
     public void ThenReached(int count)

@@ -13,7 +13,7 @@ namespace DigitalBrain.Core;
 
 // A durable actor with one receive slot. Owns its synapses, two bounded journals, and the
 // latest signal of each type it received. Fire travels along synapses; nothing else routes.
-public abstract class Neuron : DurableGrain, INeuron, INeuronInbox
+public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable
 {
     // Latest-per-type is keyed by type name, so a caller putting identity in the type would
     // grow it without bound. The cap turns that mistake into one sentence of advice.
@@ -30,7 +30,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox
     {
         ArgumentNullException.ThrowIfNull(runtime);
         _components = runtime.Bind(ServiceProvider, Id);
-        _retry = new RetryTimer(this, _ => ((INeuronInbox)this).Drain());
+        _retry = new RetryTimer(this, _ => ((INeuronInbox)this).Drain(), _components.Options.RetryReminderPeriod);
     }
 
     public NeuronId Id => NeuronId.FromGrainId(this.GetGrainId());
@@ -53,7 +53,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox
         if (_components.Pending.Peek() is not null)
         {
             Wake();
-            _retry.Arm();
+            await _retry.ArmAsync().ConfigureAwait(true);
         }
     }
 
@@ -61,7 +61,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox
     // the next activation retries the entry.
     public sealed override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
     {
-        _retry.Disarm();
+        _retry.Suspend();
         await _activation.CancelAsync().ConfigureAwait(true);
         try
         {
@@ -113,8 +113,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox
             return admission;
         }
 
-        _components.Journals.AppendIncoming(delivery);
-        _components.Latest[delivery.Signal.Type] = delivery;
+        StageAdmitted(delivery);
         await PersistAsync().ConfigureAwait(true);
 
         Wake();
@@ -132,10 +131,15 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox
             throw new NeuronBusyException($"Neuron '{Id}' already holds {PendingWork.MaxPending} pending signals. Retry after pending work finishes.");
         }
 
-        _components.Journals.AppendIncoming(delivery);
-        _components.Latest[signal.Type] = delivery;
+        StageAdmitted(delivery);
         Wake();
         return delivery.SignalId;
+    }
+
+    private void StageAdmitted(SignalDelivery delivery)
+    {
+        _components.Journals.AppendIncoming(delivery);
+        _components.Latest[delivery.Signal.Type] = delivery;
     }
 
     public async Task CancelReaction(SignalId pending)
@@ -172,13 +176,14 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox
         var delivery = _components.Pending.Peek();
         if (delivery is null)
         {
-            _retry.Disarm();
+            await _retry.DisarmAsync().ConfigureAwait(true);
             return;
         }
 
         if (_components.Pending.IsCancelled(delivery.SignalId))
         {
-            _components.Pending.Complete(delivery.SignalId);
+            await _retry.DisarmAsync().ConfigureAwait(true);
+            _components.Pending.CompleteHead(delivery.SignalId);
             await PersistAsync().ConfigureAwait(true);
             Wake();
             return;
@@ -195,26 +200,33 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox
             {
                 await ReceiveAsync(delivery, reaction.Token).ConfigureAwait(true);
             }
+            catch (OperationCanceledException) when (_activation.Token.IsCancellationRequested)
+            {
+                // Deactivation is not a reaction failure and must not re-arm the suspended retry timer.
+                return;
+            }
             catch (Exception failure)
             {
-                DrainTelemetry.Failed(Logger, Id, delivery.SignalId, failure);
                 if (_components.Pending.IsCancelled(delivery.SignalId))
                 {
-                    _components.Pending.Complete(delivery.SignalId);
+                    DrainTelemetry.Cancelled(Logger, Id, delivery.SignalId);
+                    await _retry.DisarmAsync().ConfigureAwait(true);
+                    _components.Pending.CompleteHead(delivery.SignalId);
                     await PersistAsync().ConfigureAwait(true);
                     Wake();
                 }
                 else
                 {
-                    _retry.Arm();
+                    DrainTelemetry.Failed(Logger, Id, delivery.SignalId, failure);
+                    await _retry.ArmAsync().ConfigureAwait(true);
                 }
 
                 return;
             }
 
-            _components.Pending.Complete(delivery.SignalId);
+            _components.Pending.CompleteHead(delivery.SignalId);
             await PersistAsync().ConfigureAwait(true);
-            _retry.Disarm();
+            await _retry.DisarmAsync().ConfigureAwait(true);
             Wake();
         }
         finally
@@ -307,6 +319,17 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox
     }
 
     // ---- the drain's wake-ups ----
+
+    // The reminder exists only to reactivate the neuron; the drain decides whether there is still work.
+    // The tick also proves a reminder row exists for the disarm to remove.
+    // The reminder exists only to reactivate a cold neuron; the drain decides whether there is
+    // still work. A tick is also this activation's only proof that a reminder row is out there.
+    Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
+    {
+        _retry.NoteTick();
+        Wake();
+        return Task.CompletedTask;
+    }
 
     private ILogger? Logger => ServiceProvider.GetService<ILogger<Neuron>>();
 

@@ -29,9 +29,8 @@ public sealed class CancelSteps(BrainSteps brain, BrainWorld world)
     [Then(@"""(.*)"" journal total recorded is (\d+)")]
     public async Task ThenTotalRecorded(string name, long count)
     {
-        var query = brain.Query(name);
-        var read = await query.ReadJournal(JournalKind.Incoming, 0);
-        var past = await query.ReadJournal(JournalKind.Incoming, read.ResumeSequence + 1);
-        Assert.Equal(count, past.ResetSnapshot?.TotalRecorded ?? read.ResetSnapshot?.TotalRecorded ?? read.Delta.Count);
+        // A read past the tip carries the snapshot and no delta.
+        var read = await brain.Query(name).ReadJournal(JournalKind.Incoming, long.MaxValue);
+        Assert.Equal(count, read.ResetSnapshot!.TotalRecorded);
     }
 }

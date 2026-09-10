@@ -3,6 +3,7 @@ using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Storage;
@@ -51,10 +52,16 @@ public sealed class BrainSimulation : IAsyncDisposable
         if (!string.IsNullOrWhiteSpace(options.PersistenceDirectory))
         {
             silo.Services.AddSingleton<IJournalStorageProvider>(new FileJournalStorageProvider(options.PersistenceDirectory));
+            silo.AddReminders();
+            silo.Services.AddSingleton<IReminderTable>(new FileReminderTable(options.PersistenceDirectory));
+            silo.Services.Configure<ReminderOptions>(reminders => reminders.MinimumReminderPeriod = TimeSpan.FromSeconds(1));
+            // Seconds prove a cold restart within a test's patience; Orleans skips ticks missed while the cluster is down.
+            silo.Services.AddSingleton(new NeuronOptions { RetryReminderPeriod = TimeSpan.FromSeconds(2) });
         }
         else
         {
             silo.Services.AddSingleton<IJournalStorageProvider, VolatileJournalStorageProvider>();
+            silo.UseInMemoryReminderService();
         }
         DigitalBrainRuntime.Add(silo, options.Modules);
         if (!string.IsNullOrWhiteSpace(options.PersistenceDirectory))
@@ -67,7 +74,6 @@ public sealed class BrainSimulation : IAsyncDisposable
         {
             silo.AddMemoryGrainStorage(DigitalBrainNames.DefaultGrainStorage);
         }
-        silo.UseInMemoryReminderService();
         options.ConfigureSilo?.Invoke(silo);
     }
 

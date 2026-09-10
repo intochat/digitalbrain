@@ -18,7 +18,18 @@ internal static class DrainTelemetry
         activity?.SetStatus(ActivityStatusCode.Error, failure.Message);
         logger?.LogWarning(
             failure,
-            "Neuron {Neuron} failed to react to signal {SignalId}; unless cancelled, the head stays pending and the retry timer will rerun it.",
+            "Neuron {Neuron} failed to react to signal {SignalId}; the head stays pending and the retry timer will rerun it.",
+            neuron,
+            signal);
+    }
+
+    internal static void Cancelled(ILogger? logger, NeuronId neuron, SignalId signal)
+    {
+        using var activity = Source.StartActivity("db.drain.cancelled");
+        activity?.SetTag("neuron", neuron.ToString());
+        activity?.SetTag("signal.id", signal.ToString());
+        logger?.LogInformation(
+            "Neuron {Neuron} reaction to signal {SignalId} stopped at its token; the entry is finished, not retried.",
             neuron,
             signal);
     }

@@ -19,6 +19,7 @@ public static class DigitalBrainRuntime
         builder.UseJsonJournalFormat(DurableStateJson.TypeInfoResolver);
         ModelPayloadSerialization.AddModelPayloadSerialization(builder.Services);
         builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        builder.Services.TryAddSingleton<NeuronOptions>();
         builder.Services.TryAddSingleton<NeuronRuntime>();
 
         foreach (var hook in ModuleHooksOf(modules))

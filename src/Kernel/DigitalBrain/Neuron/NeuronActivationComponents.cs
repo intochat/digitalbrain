@@ -5,6 +5,7 @@ namespace DigitalBrain.Core;
 
 internal sealed record NeuronActivationComponents(
     TimeProvider Clock,
+    NeuronOptions Options,
     NeuronJournals Journals,
     NeuronSynapses Synapses,
     IDurableDictionary<string, SignalDelivery> Latest,

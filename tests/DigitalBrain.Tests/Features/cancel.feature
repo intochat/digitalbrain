@@ -6,6 +6,7 @@ Feature: Cancel
     And a slow "s" whose reaction waits for release
     When "claude" fires "Work" at slow "s"
     And "claude" cancels the pending work on "s"
+    And "claude" waits up to 10 seconds until "s" pending count is 0
     Then "s" reaction observed cancellation
     And "s" pending count is 0
 

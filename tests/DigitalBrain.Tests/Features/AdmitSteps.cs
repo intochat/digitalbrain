@@ -17,7 +17,6 @@ public sealed class AdmitSteps(BrainSteps brain, BrainWorld world)
     public void GivenSlow(string name)
     {
         world.Fixtures[name] = new NeuronId("slow", name);
-        FixtureSwitches.Release[name] = new(TaskCreationOptions.RunContinuationsAsynchronously);
         FixtureSwitches.Cancelled[name] = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
@@ -48,11 +47,15 @@ public sealed class AdmitSteps(BrainSteps brain, BrainWorld world)
         Assert.Equal(count, brain.LastFire.Busy);
     }
 
-    [Then(@"""(.*)"" pending count is (\d+)")]
+    [Then(@"""([^""]*)"" pending count is (\d+)")]
     public async Task ThenPendingCount(string name, int count)
+        => Assert.Equal(count, await brain.Brain.Grains.GetGrain<INeuron>(world.Fixtures[name].ToGrainId()).ReadPendingCount());
+
+    [When(@"""(.*)"" waits up to (\d+) seconds until ""(.*)"" pending count is (\d+)")]
+    public async Task WaitPendingCount(string observer, int seconds, string name, int count)
     {
         var pending = brain.Brain.Grains.GetGrain<INeuron>(world.Fixtures[name].ToGrainId());
-        var deadline = DateTime.UtcNow.AddSeconds(10);
+        var deadline = DateTime.UtcNow.AddSeconds(seconds);
         var observed = await pending.ReadPendingCount();
         while (observed != count && DateTime.UtcNow < deadline)
         {
@@ -60,7 +63,10 @@ public sealed class AdmitSteps(BrainSteps brain, BrainWorld world)
             observed = await pending.ReadPendingCount();
         }
 
-        Assert.Equal(count, observed);
+        if (observed != count)
+        {
+            Assert.Fail($"{observer} waited {seconds}s for {name} pending count to be {count}, but observed {observed}");
+        }
     }
 
     [When(@"""(.*)"" delivers signal id ""(.*)"" of type ""(\w+)"" to plain ""(.*)"" twice")]
