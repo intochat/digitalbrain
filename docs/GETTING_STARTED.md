@@ -1,5 +1,7 @@
 # Use DigitalBrain from Flutter
 
+The default UI is now a direct streaming conversational agent with web search. See [Conversational agent](conversational-agent.md) for current configuration, capabilities, session lifetime, and verification. The older workspace and application-authoring description below is historical and does not describe the default shell.
+
 Start Docker, configure the AppHost's `Parameters:openai-api-key` user secret for its selected model, then run from the repository root:
 
 ```powershell

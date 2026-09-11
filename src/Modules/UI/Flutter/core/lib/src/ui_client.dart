@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
 import 'basic_credentials.dart';
+import 'agent_events.dart';
 import 'cookie_http_client.dart';
 import 'host_environment.dart';
 import 'sse_chat_frames.dart';
@@ -70,6 +71,74 @@ final class DigitalBrainUiClient {
   final Uri baseUri;
   final CookieHttpClient _http;
   final bool _ownsClient;
+
+  /// Sends only the new user message; the server owns conversation history.
+  /// Canceling the subscription aborts both pending HTTP and response streaming.
+  Stream<AgentEvent> runAgent({
+    required String threadId,
+    required String runId,
+    String? parentRunId,
+    required String text,
+  }) {
+    final abort = Completer<void>();
+    StreamSubscription<AgentEvent>? incoming;
+    late StreamController<AgentEvent> controller;
+    controller = StreamController<AgentEvent>(
+      onListen: () async {
+        try {
+          final request =
+              http.AbortableRequest(
+                  'POST',
+                  baseUri.resolve('/agent'),
+                  abortTrigger: abort.future,
+                )
+                ..headers.addAll({
+                  'accept': 'text/event-stream',
+                  'content-type': 'application/json',
+                })
+                ..body = jsonEncode({
+                  'threadId': threadId,
+                  'runId': runId,
+                  'parentRunId': ?parentRunId,
+                  'messages': [
+                    {'id': _uuid.v4(), 'role': 'user', 'content': text},
+                  ],
+                  'tools': <Object>[],
+                  'context': <Object>[],
+                  'state': <String, Object>{},
+                  'forwardedProps': <String, Object>{},
+                });
+          final response = await _http.send(request);
+          if (abort.isCompleted) {
+            await response.stream.listen(null).cancel();
+            return;
+          }
+          if (response.statusCode != 200) {
+            await response.stream.listen(null).cancel();
+            throw StateError('Agent request failed (${response.statusCode}).');
+          }
+          incoming = decodeAgentEvents(response.stream).listen(
+            controller.add,
+            onError: (Object error, StackTrace stack) {
+              if (!abort.isCompleted) controller.addError(error, stack);
+            },
+            onDone: controller.close,
+            cancelOnError: false,
+          );
+        } catch (error, stack) {
+          if (!abort.isCompleted) {
+            controller.addError(error, stack);
+            unawaited(controller.close());
+          }
+        }
+      },
+      onCancel: () async {
+        if (!abort.isCompleted) abort.complete();
+        await incoming?.cancel();
+      },
+    );
+    return controller.stream;
+  }
 
   Future<List<ChatTurnEvent>> readActivityResults({
     required String surfaceName,

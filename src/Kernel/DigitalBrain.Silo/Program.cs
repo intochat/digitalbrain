@@ -9,6 +9,7 @@ using Orleans.Dashboard;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddDigitalBrain();
+builder.AddConversationalAgent();
 builder.AddKernelCors();
 builder.Services.AddAuthentication();
 builder.Services.AddSingleton<SessionStreamOptions>();
@@ -23,15 +24,19 @@ app.UseKernelCors();
 app.UseModuleHttpSurfaces();
 app.UseAuthentication();
 app.UseBasicAuthGate();
-app.UseSessionNeuron();
 app.MapDefaultEndpoints();
 app.MapOrleansDashboard("/orleans");
-app.MapDigitalBrainMcp("/mcp");
-app.MapChatEndpoints();
-app.MapChatVoiceEndpoints();
-app.MapSurfaceEndpoints();
+app.MapConversationalAgent();
 app.MapKitEndpoints();
-app.MapActivityEndpoints();
-app.MapGraphEndpoints();
+
+// Graph capabilities are optional; ordinary chat never enters the neuron pipeline.
+if (app.Configuration.GetValue<bool>("DigitalBrain:Graph:Enabled"))
+{
+    app.UseSessionNeuron();
+    app.MapDigitalBrainMcp("/mcp");
+    app.MapSurfaceEndpoints();
+    app.MapActivityEndpoints();
+    app.MapGraphEndpoints();
+}
 
 app.Run();
