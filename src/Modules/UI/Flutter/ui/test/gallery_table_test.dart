@@ -30,7 +30,7 @@ void main() {
       expect(find.textContaining('Example: table could not'), findsNothing);
       await tester.tap(find.byKey(const Key('gallery_state_Empty')));
       await tester.pumpAndSettle();
-      expect(find.text('0 of 0 rows'), findsOneWidget);
+      expect(find.text('0 rows'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

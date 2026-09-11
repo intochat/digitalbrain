@@ -10,10 +10,14 @@ class UiDataTable extends StatelessWidget {
     required this.controller,
     this.onActivate,
     this.active = false,
+    this.showTitle = true,
+    this.toolbarActions = const [],
   });
   final UiTableController controller;
   final VoidCallback? onActivate;
   final bool active;
+  final bool showTitle;
+  final List<Widget> toolbarActions;
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
@@ -27,40 +31,39 @@ class UiDataTable extends StatelessWidget {
       final canEdit = controller.update != null && !controller.busy;
       final compact = Theme.of(context).visualDensity.vertical < 0;
       void activate() => onActivate?.call();
-      return Card(
+      final colors = Theme.of(context).colorScheme;
+      return Material(
         key: Key('ui_table_${table.id}'),
-        margin: EdgeInsets.zero,
+        color: colors.surface,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 12,
-                children: [
-                  Text(
-                    table.title,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  if (onActivate != null)
-                    TextButton.icon(
-                      onPressed: activate,
-                      icon: Icon(
-                        active
-                            ? Icons.check_circle_outline
-                            : Icons.chat_bubble_outline,
-                        size: 16,
+              if (showTitle || onActivate != null)
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 12,
+                  children: [
+                    if (showTitle)
+                      Text(
+                        table.title,
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
-                      label: Text(active ? 'Active table' : 'Use in chat'),
-                    ),
-                ],
-              ),
-              Text(
-                '${table.filteredRows} of ${table.totalRows} rows',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
+                    if (onActivate != null)
+                      TextButton.icon(
+                        onPressed: activate,
+                        icon: Icon(
+                          active
+                              ? Icons.check_circle_outline
+                              : Icons.chat_bubble_outline,
+                          size: 16,
+                        ),
+                        label: Text(active ? 'Active table' : 'Use in chat'),
+                      ),
+                  ],
+                ),
               Wrap(
                 spacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
@@ -85,25 +88,7 @@ class UiDataTable extends StatelessWidget {
                           }
                         : null,
                     icon: const Icon(Icons.filter_alt_outlined, size: 18),
-                    label: const Text('Add filter'),
-                  ),
-                  TextButton(
-                    onPressed: canEdit && table.filters.isNotEmpty
-                        ? () {
-                            activate();
-                            controller.change(filters: []);
-                          }
-                        : null,
-                    child: const Text('Clear filters'),
-                  ),
-                  TextButton(
-                    onPressed: canEdit && table.sort != null
-                        ? () {
-                            activate();
-                            controller.change(replaceSort: true);
-                          }
-                        : null,
-                    child: const Text('Clear sort'),
+                    label: const Text('Filter'),
                   ),
                   TextButton.icon(
                     onPressed: canEdit
@@ -121,6 +106,7 @@ class UiDataTable extends StatelessWidget {
                     icon: const Icon(Icons.view_column_outlined, size: 18),
                     label: const Text('Columns'),
                   ),
+                  ...toolbarActions,
                   IconButton(
                     tooltip: 'Refresh table',
                     onPressed: controller.read != null && !controller.busy
@@ -130,16 +116,46 @@ class UiDataTable extends StatelessWidget {
                   ),
                 ],
               ),
-              if (table.filters.isNotEmpty)
+              if (table.filters.isNotEmpty || table.sort != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Wrap(
                     spacing: 8,
                     runSpacing: 4,
                     children: [
+                      if (table.sort != null)
+                        InputChip(
+                          avatar: Icon(
+                            table.sort!.descending ? Icons.south : Icons.north,
+                            size: 14,
+                          ),
+                          label: Text(
+                            table.columns
+                                .firstWhere((c) => c.id == table.sort!.columnId)
+                                .label,
+                          ),
+                          deleteButtonTooltipMessage: 'Clear sort',
+                          onDeleted: canEdit
+                              ? () {
+                                  activate();
+                                  controller.change(replaceSort: true);
+                                }
+                              : null,
+                        ),
+                      if (table.filters.length > 1)
+                        TextButton(
+                          onPressed: canEdit
+                              ? () {
+                                  activate();
+                                  controller.change(filters: []);
+                                }
+                              : null,
+                          child: const Text('Clear filters'),
+                        ),
                       for (var i = 0; i < table.filters.length; i++)
                         InputChip(
                           label: Text(_filterLabel(table, table.filters[i])),
+                          deleteButtonTooltipMessage: 'Remove filter',
                           onDeleted: canEdit
                               ? () {
                                   activate();
@@ -182,6 +198,25 @@ class UiDataTable extends StatelessWidget {
                                 : 0,
                           ),
                           child: DataTable(
+                            headingRowColor: WidgetStatePropertyAll(
+                              colors.surfaceContainerLow,
+                            ),
+                            dividerThickness: .5,
+                            border: TableBorder(
+                              horizontalInside: BorderSide(
+                                color: colors.outlineVariant.withValues(
+                                  alpha: .45,
+                                ),
+                                width: .5,
+                              ),
+                            ),
+                            headingTextStyle: Theme.of(context)
+                                .textTheme
+                                .labelMedium
+                                ?.copyWith(
+                                  color: colors.onSurfaceVariant,
+                                  fontWeight: FontWeight.w600,
+                                ),
                             sortColumnIndex: sortIndex < 0 ? null : sortIndex,
                             sortAscending: !(table.sort?.descending ?? false),
                             headingRowHeight: compact ? 36 : 40,
@@ -215,6 +250,33 @@ class UiDataTable extends StatelessWidget {
                                   cells: [
                                     for (final column in columns)
                                       DataCell(
+                                        onTap: () => showDialog<void>(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: Text(column.label),
+                                            content: SizedBox(
+                                              width: 480,
+                                              child: SingleChildScrollView(
+                                                child: SelectableText(
+                                                  _cell(
+                                                    row.cells[table.columns
+                                                        .indexWhere(
+                                                          (c) =>
+                                                              c.id == column.id,
+                                                        )],
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(context),
+                                                child: const Text('Done'),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
                                         ConstrainedBox(
                                           constraints: const BoxConstraints(
                                             maxWidth: 280,
@@ -250,7 +312,7 @@ class UiDataTable extends StatelessWidget {
                   Expanded(
                     child: Text(
                       table.rows.isEmpty
-                          ? '0 rows on this page'
+                          ? '0 rows'
                           : '${table.offset + 1}–${table.offset + table.rows.length} of ${table.filteredRows}',
                     ),
                   ),

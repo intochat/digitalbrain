@@ -40,20 +40,21 @@ class WorkspaceArtifactEditor extends StatelessWidget {
           ? const Center(child: Text('Loading table…'))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      icon: const Icon(Icons.checklist, size: 18),
-                      label: Text(
-                        'Select rows for context (${(artifact.viewState['selectedRowIds'] as List? ?? []).length})',
-                      ),
-                      onPressed: () => _selectRows(context),
+              child: UiDataTable(
+                controller: tableController!,
+                active: true,
+                showTitle: false,
+                toolbarActions: [
+                  TextButton.icon(
+                    icon: const Icon(Icons.checklist, size: 18),
+                    label: Text(
+                      (artifact.viewState['selectedRowIds'] as List? ?? [])
+                              .isEmpty
+                          ? 'Select rows'
+                          : '${(artifact.viewState['selectedRowIds'] as List).length} selected',
                     ),
+                    onPressed: () => _selectRows(context),
                   ),
-                  UiDataTable(controller: tableController!, active: true),
                 ],
               ),
             ),

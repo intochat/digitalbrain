@@ -45,6 +45,13 @@ void main() {
     expect(tester.getSize(find.byType(DataTable)).width, greaterThan(900));
     final table = tester.widget<DataTable>(find.byType(DataTable));
     expect(table.dataRowMaxHeight, 36);
+    expect(find.text('Clear filters'), findsNothing);
+    expect(find.text('Clear sort'), findsNothing);
+    await tester.tap(find.text('Alice'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SelectableText), findsOneWidget);
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
 
@@ -78,7 +85,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('Add filter'));
+    await tester.tap(find.text('Filter'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     await tester.tap(find.byKey(const Key('table_filter_column')));
@@ -159,7 +166,7 @@ void main() {
             home: Scaffold(body: UiDataTable(controller: controller)),
           ),
         );
-        await tester.tap(find.text('Add filter'));
+        await tester.tap(find.text('Filter'));
         await tester.pumpAndSettle();
         if (type != 'boolean') {
           if (type == 'number' || type == 'date') {
@@ -208,7 +215,7 @@ void main() {
           'boolean' => true,
           _ => 'Alice',
         });
-        await tester.tap(find.text('Add filter'));
+        await tester.tap(find.text('Filter'));
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('operator_name')));
         await tester.pumpAndSettle();
@@ -244,7 +251,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(updates.last.sort?.columnId, 'age');
     expect(updates.last.expectedRevision, 1);
-    await tester.tap(find.text('Add filter'));
+    await tester.tap(find.text('Filter'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('table_filter_column')));
     await tester.pumpAndSettle();
@@ -254,10 +261,10 @@ void main() {
     await tester.tap(find.text('Apply'));
     await tester.pumpAndSettle();
     expect(updates.last.filters.single.value, 20);
-    await tester.tap(find.text('Clear filters'));
+    await tester.tap(find.byTooltip('Remove filter'));
     await tester.pumpAndSettle();
     expect(updates.last.filters, isEmpty);
-    expect(find.text('80 of 80 rows'), findsOneWidget);
+    expect(find.text('1–1 of 80'), findsOneWidget);
   });
 
   testWidgets(
