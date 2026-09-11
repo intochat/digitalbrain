@@ -10,10 +10,13 @@ using Xunit;
 namespace DigitalBrain.Tests;
 
 [Binding]
-public sealed class UiSteps(BrainSteps brain)
+public sealed class UiSteps(BrainSteps brain, BrainWorld world)
 {
     private WorkspaceRecord? _firstWorkspace;
     private WorkspaceRecord? _lastWorkspace;
+
+    [Given("card delivery is delayed")]
+    public void DelayCards() => world.CardDeliveryDelay = TimeSpan.FromSeconds(2);
 
     [Then(@"the latest ""(.*)"" Responded carries a rendered chart titled ""(.*)""")]
     public async Task RenderedCard(string observer, string title)

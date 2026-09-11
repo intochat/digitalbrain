@@ -17,6 +17,7 @@ Feature: ui
 
   Scenario: The responder renders a chart that rides out on Responded
     Given "uichat:desk" is connected to "alice" for "Responded"
+    And card delivery is delayed
     And the scripted model will call tool "render_chart" with {"chatName":"uichat:desk","title":"Quarterly sales","chartKind":"line","labels":["Q1"],"values":[42]} then say "here is your chart"
     When session "alice" fires "Instruct" {"tools":["render_chart"]} at "agent:desk"
     And chat "desk" sends "show sales"

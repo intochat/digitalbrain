@@ -9,6 +9,8 @@ namespace DigitalBrain.Tests;
 [Binding]
 public sealed class AnnounceSteps(BrainSteps brain, BrainWorld world)
 {
+    private string? _heldQueue;
+
     [Given(@"""(.*)"" is connected from announcing ""(.*)"" for ""(\w+)""")]
     public Task ConnectReceiver(string receiver, string source, string type)
     {
@@ -37,6 +39,7 @@ public sealed class AnnounceSteps(BrainSteps brain, BrainWorld world)
     [Given(@"session ""(.*)"" pending queue is full")]
     public async Task FillPendingQueue(string name)
     {
+        _heldQueue = name;
         FixtureSwitches.HeldQueues[name] = 0;
         for (var i = 0; i < PendingWork.MaxPending; i++)
         {
@@ -51,9 +54,28 @@ public sealed class AnnounceSteps(BrainSteps brain, BrainWorld world)
     public async Task DrainPendingQueue(string name)
     {
         FixtureSwitches.HeldQueues.TryRemove(name, out _);
-        // Repeated failures backed the retry timer off to a minute, and Deliver cannot wake a full queue, so kick the drain instead of waiting for the timer.
+        // Resume the wake-up suppressed by the fixture while the queue was held.
         await brain.Brain.Grains.GetGrain<INeuronInbox>(world.Fixtures[name].ToGrainId()).Drain();
         await ReactionWait.UntilAsync(async () => await brain.Neuron(name).ReadPendingCount() == 0);
+    }
+
+    [Then(@"""(.*)"" retains an announcement while ""(.*)"" is full")]
+    public async Task RetainedWhileBusy(string source, string receiver)
+    {
+        var announcing = brain.Brain.Grains.GetGrain<IAnnouncing>(new NeuronId("announcing", source).ToGrainId());
+        await ReactionWait.UntilAsync(async () => await announcing.ReadStoredAnnouncements() == 1);
+        Assert.Equal(PendingWork.MaxPending, await brain.Neuron(receiver).ReadPendingCount());
+        Assert.DoesNotContain((await brain.Journal(receiver, DigitalBrain.Abstractions.Journals.JournalKind.Incoming)).Delta,
+            delivery => delivery.Signal.Type == "Pong");
+    }
+
+    [AfterScenario]
+    public void ReleaseHeldQueue()
+    {
+        if (_heldQueue is { } name)
+        {
+            FixtureSwitches.HeldQueues.TryRemove(name, out _);
+        }
     }
 
     [Then(@"""(.*)"" tally is (\d+)")]

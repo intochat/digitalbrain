@@ -29,6 +29,7 @@ public sealed class UiChatSteps(BrainWorld world, BrainSteps brain)
             ConfigureSilo = silo =>
             {
                 ScriptedAi.Configure(world)(silo);
+                silo.Services.AddSingleton<IIncomingGrainCallFilter>(new DelayedUiCardFilter(world));
                 silo.Services.AddSingleton<IReactionCrashPoint, FixtureReactionCrashPoint>();
             },
         });

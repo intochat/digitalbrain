@@ -14,6 +14,8 @@ public sealed class BrainWorld
 
     internal ScriptedChatClient Scripted { get; } = new();
 
+    internal TimeSpan CardDeliveryDelay { get; set; }
+
     public BrainSimulation? Simulation { get; set; }
 
     public BrainSimulation Brain => Simulation ?? throw new InvalidOperationException("Given a running brain first.");

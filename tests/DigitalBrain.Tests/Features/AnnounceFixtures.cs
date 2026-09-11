@@ -55,19 +55,7 @@ internal sealed class AnnouncingNeuron(
 }
 
 [GrainType("holding")]
-internal sealed class HoldingNeuron(NeuronRuntime runtime) : Neuron(runtime)
-{
-    protected override Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
-    {
-        // A blocked reaction would also block the Fire the scenario makes from this same neuron.
-        if (FixtureSwitches.HeldQueues.ContainsKey(Id.Name))
-        {
-            throw new InvalidOperationException("The pending queue is held.");
-        }
-
-        return Task.CompletedTask;
-    }
-}
+internal sealed class HoldingNeuron(NeuronRuntime runtime) : Neuron(runtime);
 
 internal sealed class FixtureReactionCrashPoint : IReactionCrashPoint
 {
@@ -93,6 +81,15 @@ internal sealed class FixtureDeliveryFaultFilter : IIncomingGrainCallFilter
 {
     public async Task Invoke(IIncomingGrainCallContext context)
     {
+        // Pause processing, not persistence. Throwing inside the reaction exercises rollback
+        // and can fence the activation while the test is still filling its queue.
+        if (context.InterfaceMethod.DeclaringType == typeof(INeuronInbox)
+            && context.Grain is HoldingNeuron holding
+            && FixtureSwitches.HeldQueues.ContainsKey(holding.Id.Name))
+        {
+            return;
+        }
+
         if (context.InterfaceMethod.DeclaringType == typeof(INeuron)
             && context.InterfaceMethod.Name == nameof(INeuron.Deliver)
             && context.Grain is Neuron neuron

@@ -4,6 +4,7 @@ using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.AI;
+using DigitalBrain.Chat;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.UI;
@@ -137,10 +138,11 @@ internal sealed class UiTools(
             await invoker.InvokeAsync(neuron, "ui.graph", "render",
                 JsonSerializer.SerializeToElement(new RenderGraph(CommandId.New(), trimmedTitle, nodes, parsed),
                     UIJson.Default.RenderGraph), cancellationToken).ConfigureAwait(false);
+            await WaitForCardAsync(chat, UiCardKinds.Graph, name, cancellationToken).ConfigureAwait(false);
 
             return $"Graph '{trimmedTitle}' is now showing in the chat as card '{name}'.";
         }
-        catch (Exception error) when (!TransientFailure.Covers(error))
+        catch (Exception error) when (error is not OperationCanceledException && !TransientFailure.Covers(error))
         {
             return $"show_graph failed: {error.GetType().Name}: {error.Message}";
         }
@@ -184,10 +186,11 @@ internal sealed class UiTools(
             await invoker.InvokeAsync(neuron, "ui.chart", "render",
                 JsonSerializer.SerializeToElement(new RenderChart(CommandId.New(), trimmedTitle, kind, points),
                     UIJson.Default.RenderChart), cancellationToken).ConfigureAwait(false);
+            await WaitForCardAsync(chat, UiCardKinds.Chart, name, cancellationToken).ConfigureAwait(false);
 
             return $"Chart '{trimmedTitle}' is now showing in the chat as card '{name}'.";
         }
-        catch (Exception error) when (!TransientFailure.Covers(error))
+        catch (Exception error) when (error is not OperationCanceledException && !TransientFailure.Covers(error))
         {
             return $"render_chart failed: {error.GetType().Name}: {error.Message}";
         }
@@ -225,12 +228,39 @@ internal sealed class UiTools(
             await invoker.InvokeAsync(neuron, "ui.image", "describe",
                 JsonSerializer.SerializeToElement(new DescribeImage(CommandId.New(), trimmedPrompt, generated.Model, generated.MediaType, blobName),
                     UIJson.Default.DescribeImage), cancellationToken).ConfigureAwait(false);
+            await WaitForCardAsync(chat, UiCardKinds.Image, name, cancellationToken).ConfigureAwait(false);
 
             return $"Image for '{trimmedPrompt}' is now showing in the chat as card '{name}'.";
         }
-        catch (Exception error) when (!TransientFailure.Covers(error))
+        catch (Exception error) when (error is not OperationCanceledException && !TransientFailure.Covers(error))
         {
             return $"generate_image failed: {error.GetType().Name}: {error.Message}";
+        }
+    }
+
+    private async Task WaitForCardAsync(NeuronId chat, string kind, string name, CancellationToken cancellationToken)
+    {
+        // Render commands acknowledge admission, not completion. The responder must not
+        // settle the turn until the chat has applied the card offer to its snapshot.
+        var target = grains.GetGrain<IChat>(chat.ToGrainId());
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(30));
+        try
+        {
+            while (true)
+            {
+                var turns = await target.ReadTurns(new ReadTurns()).WaitAsync(deadline.Token).ConfigureAwait(false);
+                if (turns.Turns.Any(turn => turn.Cards?.Any(card => card.Kind == kind && card.Name == name) == true))
+                {
+                    return;
+                }
+
+                await Task.Delay(25, deadline.Token).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException($"Card '{name}' has not reached chat '{chat}' yet.");
         }
     }
 }

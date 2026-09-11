@@ -27,9 +27,11 @@ Feature: Announce
     And "claude" is connected from announcing "a" for "Pong"
     And session "claude" pending queue is full
     When "claude" fires "Ping" at announcing "a"
-    And session "claude" pending queue drains
+    Then "a" retains an announcement while "claude" is full
+    When session "claude" pending queue drains
     And "claude" waits up to 10 seconds for an incoming "Pong"
     Then "a" has no stored announcements
+    And "claude" incoming journal contains exactly 1 "Pong"
 
   Scenario: A transient delivery failure is retried, not answered
     Given a running brain
