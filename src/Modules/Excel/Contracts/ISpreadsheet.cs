@@ -4,7 +4,7 @@ using Orleans.Concurrency;
 
 namespace DigitalBrain.Excel;
 
-[Alias("sheet")]
+[Alias(ExcelVocabulary.SpreadsheetType)]
 public interface ISpreadsheet : INeuron
 {
     /// <summary>Applies a replacement grid or a cell edit; the receipt is the version it was accepted against, and the reaction assigns the next one.</summary>

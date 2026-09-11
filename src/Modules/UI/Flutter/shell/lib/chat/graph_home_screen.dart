@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 
 import 'brain_chat_screen.dart';
 import 'brain_graph_store.dart';
-import 'application_studio.dart';
 import 'chat_contracts.dart';
 import 'graph_examples_screen.dart';
 import 'activity_projection.dart';
@@ -68,11 +67,8 @@ final class GraphHomeScreen extends StatefulWidget {
     required this.chatName,
     required this.turns,
     this.onSend,
-    this.onStream,
-    this.onStreamVoice,
+    this.onSendVoice,
     this.onAttachmentTap,
-    this.onOpenSignIn,
-    this.kernelBaseUri,
     this.onCancelTurn,
     this.onReadChart,
     this.onReadImageBytes,
@@ -81,9 +77,9 @@ final class GraphHomeScreen extends StatefulWidget {
     this.sceneFactory,
     this.onReadBrain,
     this.onWatchBrain,
-    this.behaviorStudio,
     this.onSetBrainSubscription,
     this.conversation = false,
+    this.graphOnly = false,
     this.graph,
     this.surfaceRoot,
     this.surfaceKey,
@@ -94,11 +90,8 @@ final class GraphHomeScreen extends StatefulWidget {
   final String chatName;
   final List<ChatTurnEvent> turns;
   final SendMessage? onSend;
-  final StreamMessage? onStream;
-  final StreamVoice? onStreamVoice;
+  final SendVoice? onSendVoice;
   final VoidCallback? onAttachmentTap;
-  final OpenUrl? onOpenSignIn;
-  final Uri? kernelBaseUri;
   final CancelChatTurn? onCancelTurn;
   final ReadChart? onReadChart;
   final ReadImageBytes? onReadImageBytes;
@@ -107,9 +100,9 @@ final class GraphHomeScreen extends StatefulWidget {
   final GraphSceneFactory? sceneFactory;
   final ReadBrain? onReadBrain;
   final WatchBrain? onWatchBrain;
-  final ApplicationStudioApi? behaviorStudio;
   final SetBrainSubscription? onSetBrainSubscription;
   final bool conversation;
+  final bool graphOnly;
   final BrainGraphStore? graph;
   final SurfaceComponent? surfaceRoot;
   final String? surfaceKey;
@@ -131,8 +124,6 @@ final class _GraphHomeScreenState extends State<GraphHomeScreen> {
   final _chatKey = GlobalKey();
   String? _selected;
   bool _directory = false;
-  String? _editingApplication;
-  final List<String> _openApplications = [];
   bool _technical = false;
   List<ExecutionActivity> _activities = const [];
   StreamSubscription<List<ExecutionActivity>>? _activityStream;
@@ -277,13 +268,6 @@ final class _GraphHomeScreenState extends State<GraphHomeScreen> {
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              if (widget.behaviorStudio != null)
-                                LumenIconButton(
-                                  key: const Key('application_library'),
-                                  icon: const Icon(Icons.code, size: 18),
-                                  label: 'Application Studio',
-                                  onPressed: () => _studio(),
-                                ),
                               LumenIconButton(
                                 icon: const Icon(
                                   Icons.settings_ethernet,
@@ -402,7 +386,9 @@ final class _GraphHomeScreenState extends State<GraphHomeScreen> {
                             ],
                           ),
                         ),
-                      if (widget.conversation)
+                      if (widget.graphOnly)
+                        const SizedBox.shrink()
+                      else if (widget.conversation)
                         Expanded(child: _chat())
                       else
                         Padding(
@@ -459,11 +445,8 @@ final class _GraphHomeScreenState extends State<GraphHomeScreen> {
     compactReplyMaxHeight: 140,
     turns: widget.turns,
     onSend: widget.onSend,
-    onStream: widget.onStream,
-    onStreamVoice: widget.onStreamVoice,
+    onSendVoice: widget.onSendVoice,
     onAttachmentTap: widget.onAttachmentTap,
-    onOpenSignIn: widget.onOpenSignIn,
-    kernelBaseUri: widget.kernelBaseUri,
     onCancelTurn: widget.onCancelTurn,
     onReadChart: widget.onReadChart,
     onReadImageBytes: widget.onReadImageBytes,
@@ -691,17 +674,6 @@ final class _GraphHomeScreenState extends State<GraphHomeScreen> {
             .take(12))
       _activity(activity),
   ];
-
-  Future<void> _studio([String? name]) async {
-    final api = widget.behaviorStudio;
-    if (api == null) return;
-    await showDialog<void>(
-      context: context,
-      builder: (_) =>
-          ApplicationLibrary(api: api, changes: _brain, initialKey: name),
-    );
-    if (mounted) await _brain.refresh();
-  }
 
   List<Widget> _edgeDetails(BrainSynapse edge, BrainSnapshot snapshot) => [
     const Icon(Icons.route_outlined, size: 36, color: LumenPalette.accent),

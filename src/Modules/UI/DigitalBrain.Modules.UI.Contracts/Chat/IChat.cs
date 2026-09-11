@@ -14,7 +14,7 @@ public interface IChat : INeuron
 
     /// <summary>Cancels a running turn by its turn id and stops the responder working on it.</summary>
     [Alias("cancel")]
-    Task<Accepted<ChatTurnStatus>> Cancel(CancelTurn command, CancellationToken cancellationToken = default);
+    Task<Accepted<SignalId>> Cancel(CancelTurn command, CancellationToken cancellationToken = default);
 
     /// <summary>Reads the chat transcript up to the requested turn limit.</summary>
     [ReadOnly, Alias("transcript")]

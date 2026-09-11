@@ -23,7 +23,11 @@ public sealed class GmailSteps(BrainWorld world)
     public async Task Start()
         => world.Simulation = await BrainSimulation.StartAsync(new()
         {
-            ConfigureSilo = silo => silo.Services.AddSingleton<TimeProvider>(world.Clock),
+            ConfigureSilo = silo =>
+            {
+                silo.Services.AddSingleton<TimeProvider>(world.Clock);
+                silo.Services.AddSingleton<IReactionCrashPoint, FixtureReactionCrashPoint>();
+            },
             Modules = new([typeof(GoogleModule)]),
             Configuration = new Dictionary<string, string?> { ["DigitalBrain:Fakes:Enabled"] = "true" },
         });
@@ -35,8 +39,9 @@ public sealed class GmailSteps(BrainWorld world)
     {
         var nonce = world.Brain.SiloServices.GetRequiredService<TokenHandoff>()
             .Deposit(new OAuthTokens(GmailAccessToken, GmailRefreshToken));
-        await Gmail.Connect(new ConnectGmailAccount(CommandId.New(), "google-subject", email,
+        var accepted = await Gmail.Connect(new ConnectGmailAccount(CommandId.New(), "google-subject", email,
             "openid email https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.compose", lifetime, nonce));
+        Assert.Equal(accepted.Work, accepted.Receipt);
     }
 
     [Then("the Gmail connection reports {string}")]
@@ -167,7 +172,10 @@ public sealed class GmailSteps(BrainWorld world)
         var signal = Assert.Single((await Gmail.ReadJournal(JournalKind.Outgoing, 0)).Delta,
             entry => entry.Signal.Type == GmailSignals.GmailDraftCreated);
         var created = JsonSerializer.Deserialize(signal.Signal.Body, GmailJson.Default.GmailDraftCreated)!;
-        Assert.Equal(_confirmedWork, signal.CausationId);
+        var submitting = Assert.Single((await Gmail.ReadJournal(JournalKind.Incoming, 0)).Delta,
+            delivery => delivery.Signal.Type == GmailSignals.GmailDraftSubmitting);
+        Assert.Equal(_confirmedWork, submitting.CausationId);
+        Assert.Equal(submitting.SignalId, signal.CausationId);
         Assert.Equal(_preview!.PreviewId, created.PreviewId);
         using var body = JsonDocument.Parse(signal.Signal.Body);
         Assert.Equal(["previewId", "draftId"], body.RootElement.EnumerateObject().Select(property => property.Name));
@@ -181,6 +189,39 @@ public sealed class GmailSteps(BrainWorld world)
         await Assert.ThrowsAsync<GmailUnavailableException>(() => Gmail.ConfirmDraft(
             new ConfirmGmailDraft(CommandId.New(), _preview.PreviewId, _preview.ToolSchemaHash)));
         await Created();
+    }
+
+    [When("the Gmail preflight rejects the schema and its snapshot loses activation")]
+    public async Task RejectPreflight()
+    {
+        Assert.NotNull(_preview);
+        var provider = Assert.IsType<FakeGmailProvider>(world.Brain.SiloServices.GetRequiredService<IGmailProvider>());
+        provider.RejectSchema = true;
+        FixtureReactionCrashPoint.LoseActivationOnce[new NeuronId("gmail", "gmail").ToString()] = 0;
+        await Gmail.ConfirmDraft(new ConfirmGmailDraft(CommandId.New(), _preview.PreviewId, _preview.ToolSchemaHash));
+    }
+
+    [Then("the Gmail preflight reports uncertainty and a fresh preview can be prepared")]
+    public async Task RecoverPreflight()
+    {
+        await ReactionWait.UntilAsync(() => Task.FromResult(
+            !FixtureReactionCrashPoint.LoseActivationOnce.ContainsKey(new NeuronId("gmail", "gmail").ToString())));
+        await world.Brain.Grains.GetGrain<INeuronInbox>(new NeuronId("gmail", "gmail").ToGrainId()).Drain();
+        var uncertain = await WaitForSignal(GmailSignals.GmailDraftUncertain);
+        Assert.Equal(_preview!.PreviewId, JsonSerializer.Deserialize(uncertain.Signal.Body, GmailJson.Default.GmailDraftUncertain)!.PreviewId);
+        Assert.True((await Gmail.ReadConnection()).Connected);
+        Assert.Equal("INBOX", (await Gmail.ReadLabels()).Content.GetProperty("labels")[0].GetProperty("labelId").GetString());
+        var rejected = await WaitForSignal(GmailSignals.GmailConnectionRejected);
+        Assert.Equal("The provider catalog schema is incompatible.",
+            JsonSerializer.Deserialize(rejected.Signal.Body, GmailJson.Default.GmailConnectionRejected)!.Reason);
+        Assert.DoesNotContain((await Gmail.ReadJournal(JournalKind.Outgoing, 0)).Delta,
+            entry => entry.Signal.Type == GmailSignals.GmailDraftCreated);
+        await Assert.ThrowsAsync<GmailUnavailableException>(() => Gmail.ConfirmDraft(
+            new ConfirmGmailDraft(CommandId.New(), _preview.PreviewId, _preview.ToolSchemaHash)));
+        Assert.IsType<FakeGmailProvider>(world.Brain.SiloServices.GetRequiredService<IGmailProvider>()).RejectSchema = false;
+        await Prepare();
+        await ReactionWait.UntilAsync(async () => (await Gmail.ReadJournal(JournalKind.Outgoing, 0)).Delta.Any(
+            entry => entry.Signal.Type == GmailSignals.GmailDraftPrepared && entry.CausationId == _prepared!.Work));
     }
 
     private Task<SignalDelivery> WaitForSignal(string type)

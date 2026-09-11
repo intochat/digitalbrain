@@ -50,6 +50,6 @@ internal sealed class WorkspacesNeuron(
         var current = State?.Workspaces ?? [];
         await SaveAsync(new WorkspaceIndexState(current.Any(item => item.Name == record.Name)
             ? [.. current.Select(item => item.Name == record.Name ? record : item)]
-            : [.. current, record]), cancellationToken).ConfigureAwait(true);
+            : BoundedList.Append(current, record, WorkspaceIndexState.MaxWorkspaces)), cancellationToken).ConfigureAwait(true);
     }
 }

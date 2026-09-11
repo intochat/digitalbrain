@@ -11,6 +11,7 @@ public static class SalesforceSignals
     public const string SalesforceDisconnected = nameof(SalesforceDisconnected);
     public const string SalesforceWriteRequested = nameof(SalesforceWriteRequested);
     public const string SalesforceWritePrepared = nameof(SalesforceWritePrepared);
+    public const string SalesforceWriteSubmitting = nameof(SalesforceWriteSubmitting);
     public const string SalesforceWriteConfirmed = nameof(SalesforceWriteConfirmed);
     public const string RecordWritten = nameof(RecordWritten);
     public const string SalesforceWriteFailed = nameof(SalesforceWriteFailed);

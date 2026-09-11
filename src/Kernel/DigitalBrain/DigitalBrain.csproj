@@ -19,6 +19,7 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Modules.Google" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.UI" />
     <InternalsVisibleTo Include="DigitalBrain.Modules.Salesforce" />
     <InternalsVisibleTo Include="DigitalBrain.Tests" />
     <InternalsVisibleTo Include="DigitalBrain.Testing" />

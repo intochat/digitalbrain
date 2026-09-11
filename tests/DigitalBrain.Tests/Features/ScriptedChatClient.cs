@@ -17,7 +17,7 @@ internal abstract record ScriptItem
 
     internal sealed record Pause : ScriptItem;
 
-    internal sealed record TimeOut : ScriptItem;
+    internal sealed record TimeOut(Exception Failure) : ScriptItem;
 }
 
 internal sealed class ScriptedChatClient : IChatClient
@@ -60,7 +60,12 @@ internal sealed class ScriptedChatClient : IChatClient
 
     public void Pause() => _script.Enqueue(new ScriptItem.Pause());
 
-    public void TimeOut() => _script.Enqueue(new ScriptItem.TimeOut());
+    public void TimeOut(string failure) => _script.Enqueue(new ScriptItem.TimeOut(failure switch
+    {
+        nameof(TimeoutException) => new TimeoutException("The model request timed out."),
+        nameof(TaskCanceledException) => new TaskCanceledException("The model request timed out."),
+        _ => throw new ArgumentException("Name a supported model timeout exception.", nameof(failure)),
+    }));
 
     // Free only the retry: waking the dead silo's blocked request would consume the remaining script.
     public void Unpause()
@@ -89,10 +94,8 @@ internal sealed class ScriptedChatClient : IChatClient
             {
                 case ScriptItem.Say say:
                     return new ChatResponse([new ChatMessage(ChatRole.Assistant, say.Text)]);
-                case ScriptItem.TimeOut:
-                    // What an HttpClient does when a real model stops answering: a cancellation
-                    // that has nothing to do with the caller's own token.
-                    throw new TaskCanceledException("The model request timed out.");
+                case ScriptItem.TimeOut timeout:
+                    throw timeout.Failure;
                 case ScriptItem.CallTool tool:
                     var call = new FunctionCallContent(
                         Guid.NewGuid().ToString("N"),

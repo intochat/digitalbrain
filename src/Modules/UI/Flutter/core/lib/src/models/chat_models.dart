@@ -1,91 +1,3 @@
-final class SendMessageRequest {
-  const SendMessageRequest({required this.text});
-
-  final String text;
-
-  Map<String, Object?> toJson() => {'text': text};
-}
-
-/// An acceptance receipt or assistant content from the chat command stream.
-///
-/// Unknown content `$type` values are retained as [ChatDeltaPart] with raw
-/// fields so older clients do not crash when the edge starts emitting data/uri.
-
-final class ChatDelta {
-  const ChatDelta({required this.role, required this.contents})
-    : commandId = null,
-      turnId = null;
-
-  const ChatDelta.accepted({required this.commandId, required this.turnId})
-    : role = null,
-      contents = const [];
-
-  final String? role;
-  final List<ChatDeltaPart> contents;
-  final String? commandId;
-  final String? turnId;
-  bool get isAcceptance => commandId != null;
-
-  String get text => contents
-      .map((part) => part.text ?? '')
-      .where((value) => value.isNotEmpty)
-      .join();
-
-  factory ChatDelta.fromJson(Map<String, Object?> json) {
-    final rawContents = json['contents'];
-    final contents = rawContents is List
-        ? rawContents
-              .whereType<Map>()
-              .map(
-                (part) =>
-                    ChatDeltaPart.fromJson(Map<String, Object?>.from(part)),
-              )
-              .toList(growable: false)
-        : const <ChatDeltaPart>[];
-
-    return ChatDelta(role: json['role'] as String?, contents: contents);
-  }
-}
-
-final class ChatDeltaPart {
-  const ChatDeltaPart({required this.type, this.text, required this.raw});
-
-  final String type;
-  final String? text;
-  final Map<String, Object?> raw;
-
-  bool get isText => type == 'text';
-
-  factory ChatDeltaPart.fromJson(Map<String, Object?> json) {
-    final type = json[r'$type'] as String? ?? 'unknown';
-    return ChatDeltaPart(
-      type: type,
-      text: json['text'] as String?,
-      raw: Map<String, Object?>.from(json),
-    );
-  }
-}
-
-final class ChatButtonOffer {
-  const ChatButtonOffer({
-    required this.buttonId,
-    required this.label,
-    required this.action,
-  });
-
-  final String buttonId;
-  final String label;
-  final String action;
-
-  factory ChatButtonOffer.fromJson(Map<String, Object?> json) {
-    return ChatButtonOffer(
-      buttonId: json['buttonId'] as String? ?? '',
-      label: json['label'] as String? ?? '',
-      action: json['action'] as String? ?? '',
-    );
-  }
-}
-
 final class ChatChartPoint {
   const ChatChartPoint({required this.label, required this.value});
 
@@ -268,62 +180,11 @@ final class KitCardRef {
   );
 }
 
-/// Non-secret information needed to continue a turn in the system browser.
-final class ChatUserAction {
-  const ChatUserAction({
-    required this.id,
-    required this.provider,
-    required this.displayName,
-    required this.message,
-    required this.loginUrl,
-    required this.expiresAt,
-    this.resumeToolNames = const [],
-    this.stage = 'login',
-  });
+final class ChatSendReceipt {
+  const ChatSendReceipt({required this.turnId, this.commandId});
 
-  final String id;
-  final String provider;
-  final String displayName;
-  final String message;
-  final Uri loginUrl;
-  final DateTime expiresAt;
-  final List<String> resumeToolNames;
-  final String stage;
-
-  static ChatUserAction? tryParse(Object? value) {
-    if (value is! Map) return null;
-    final id = value['id'];
-    final provider = value['provider'];
-    final displayName = value['displayName'];
-    final message = value['message'];
-    final loginUrl = value['loginUrl'];
-    final expiresAt = value['expiresAt'];
-    if (id is! String ||
-        id.isEmpty ||
-        provider is! String ||
-        displayName is! String ||
-        message is! String ||
-        loginUrl is! String ||
-        expiresAt is! String) {
-      return null;
-    }
-    final uri = Uri.tryParse(loginUrl);
-    final expiry = DateTime.tryParse(expiresAt);
-    if (uri == null || expiry == null) return null;
-    final tools = value['resumeToolNames'];
-    return ChatUserAction(
-      id: id,
-      provider: provider,
-      displayName: displayName,
-      message: message,
-      loginUrl: uri,
-      expiresAt: expiry.toUtc(),
-      stage: value['stage'] as String? ?? 'login',
-      resumeToolNames: tools is List
-          ? List<String>.unmodifiable(tools.whereType<String>())
-          : const [],
-    );
-  }
+  final String turnId;
+  final String? commandId;
 }
 
 final class ChatTurnEvent {
@@ -334,16 +195,11 @@ final class ChatTurnEvent {
     required this.commandId,
     required this.signal,
     required this.neuronId,
-    required this.caller,
     required this.correlationId,
     required this.timestamp,
-    this.buttons = const [],
-    this.charts = const [],
-    this.timers = const [],
     this.cards = const [],
     this.turnId,
     this.status,
-    this.userAction,
     this.eventId,
   });
 
@@ -353,42 +209,70 @@ final class ChatTurnEvent {
   final String commandId;
   final String signal;
   final String neuronId;
-  final String caller;
   final String correlationId;
   final DateTime timestamp;
-  final List<ChatButtonOffer> buttons;
-  final List<ChatChartOffer> charts;
-  final List<ChatTimerOffer> timers;
   final List<KitCardRef> cards;
   final String? turnId;
   final String? status;
-  final ChatUserAction? userAction;
   final String? eventId;
 
+  // One ChatTurnSnapshot is an exchange: the user's turn, plus the answer or
+  // the failure once it settles. Routed through fromJson so cards and
+  // timestamps are parsed in exactly one place.
+  static List<ChatTurnEvent> replayTurns(List<Object?> snapshots) {
+    final events = <Map<String, Object?>>[];
+    for (final snapshot in snapshots) {
+      final turn = snapshot as Map;
+      final turnId = (turn['turn'] as Map)['value'] as String;
+      final status = turn['status'] as String;
+      final shared = <String, Object?>{
+        'turnId': turnId,
+        'commandId': (turn['commandId'] as Map)['value'] as String,
+        'status': status,
+        'neuronId': '',
+        'correlationId': '',
+      };
+      events.add({
+        ...shared,
+        'fromUser': true,
+        'signal': 'TurnAccepted',
+        'text': turn['text'],
+        'timestamp': turn['startedAt'],
+        'eventId': 'turn:$turnId:sent',
+      });
+      final answer = turn['answer'];
+      if (answer != null) {
+        events.add({
+          ...shared,
+          'fromUser': false,
+          'signal': 'Responded',
+          'text': answer,
+          'timestamp': turn['settledAt'] ?? turn['startedAt'],
+          'cards': turn['cards'],
+          'eventId': 'turn:$turnId:answer',
+        });
+      } else if (status == 'Failed' || status == 'Cancelled') {
+        events.add({
+          ...shared,
+          'fromUser': false,
+          'signal': 'TurnFailed',
+          'text': turn['detail'] ?? '',
+          'timestamp': turn['settledAt'] ?? turn['startedAt'],
+          'eventId': 'turn:$turnId:settled',
+        });
+      }
+    }
+    return List.generate(
+      events.length,
+      (index) => ChatTurnEvent.fromJson({
+        ...events[index],
+        'sequence': index - events.length,
+      }),
+      growable: false,
+    );
+  }
+
   factory ChatTurnEvent.fromJson(Map<String, Object?> json) {
-    final rawButtons = json['buttons'];
-    final buttons = rawButtons is List
-        ? rawButtons
-              .whereType<Map>()
-              .map(
-                (e) => ChatButtonOffer.fromJson(Map<String, Object?>.from(e)),
-              )
-              .toList(growable: false)
-        : const <ChatButtonOffer>[];
-    final rawCharts = json['charts'];
-    final charts = rawCharts is List
-        ? rawCharts
-              .whereType<Map>()
-              .map((e) => ChatChartOffer.fromJson(Map<String, Object?>.from(e)))
-              .toList(growable: false)
-        : const <ChatChartOffer>[];
-    final rawTimers = json['timers'];
-    final timers = rawTimers is List
-        ? rawTimers
-              .whereType<Map>()
-              .map((e) => ChatTimerOffer.fromJson(Map<String, Object?>.from(e)))
-              .toList(growable: false)
-        : const <ChatTimerOffer>[];
     final rawCards = json['cards'];
     final cards = rawCards is List
         ? rawCards
@@ -404,36 +288,31 @@ final class ChatTurnEvent {
       commandId: json['commandId'] as String,
       signal: json['signal'] as String,
       neuronId: json['neuronId'] as String,
-      caller: json['caller'] as String,
       correlationId: json['correlationId'] as String,
       timestamp: DateTime.parse(json['timestamp'] as String).toUtc(),
-      buttons: buttons,
-      charts: charts,
-      timers: timers,
       cards: cards,
       turnId: json['turnId'] as String?,
       status: json['status'] as String?,
-      userAction: ChatUserAction.tryParse(json['userAction']),
       eventId: json['eventId'] as String?,
     );
   }
 }
 
-final class ChatTimerOffer {
-  const ChatTimerOffer({required this.label, required this.dueAt});
+sealed class ChatStreamEvent {
+  const ChatStreamEvent();
+}
 
-  final String label;
-  final DateTime dueAt;
+final class ChatTurnObserved extends ChatStreamEvent {
+  const ChatTurnObserved({required this.turn});
 
-  factory ChatTimerOffer.fromJson(Map<String, Object?> json) {
-    final rawDueAt = json['dueAt'] as String?;
-    return ChatTimerOffer(
-      label: json['label'] as String? ?? 'Timer',
-      dueAt: rawDueAt == null
-          ? DateTime.now().toUtc()
-          : DateTime.parse(rawDueAt).toUtc(),
-    );
-  }
+  final ChatTurnEvent turn;
+}
+
+final class ChatJournalReset extends ChatStreamEvent {
+  const ChatJournalReset({required this.cursor, required this.turns});
+
+  final int cursor;
+  final List<ChatTurnEvent> turns;
 }
 
 /// State of a named surface kit entity, read from /kit/surfaces/{name}.
@@ -498,7 +377,11 @@ final class SurfaceComponent {
         kind: json['kind'] as String? ?? '',
         key: json['key'] as String?,
         properties: json['properties'] is Map
-            ? Map<String, String>.from(json['properties'] as Map)
+            ? {
+                for (final entry in (json['properties'] as Map).entries)
+                  if (entry.value != null)
+                    entry.key as String: entry.value.toString(),
+              }
             : const {},
         children: (json['children'] as List? ?? const [])
             .whereType<Map>()

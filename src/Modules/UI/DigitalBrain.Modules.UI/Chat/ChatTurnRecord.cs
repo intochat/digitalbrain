@@ -8,5 +8,4 @@ namespace DigitalBrain.UI;
 public sealed record ChatTurnRecord(
     [property: Id(0)] ChatTurnSnapshot Snapshot,
     [property: Id(1)] SignalId? ResponderWork,
-    // Terminal and announced (Responded with an answer, TurnFailed otherwise); retries distinguish already settled from settled but never announced.
-    [property: Id(2)] bool SettlementFired);
+    [property: Id(3)] NeuronId? Responder = null);

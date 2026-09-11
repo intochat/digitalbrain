@@ -1,6 +1,8 @@
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Time;
 using Orleans.Runtime;
 using Reqnroll;
@@ -13,12 +15,13 @@ namespace DigitalBrain.Tests;
 public sealed class TimeSteps(BrainWorld world)
 {
     private Exception? _lastError;
+    private Accepted<TimerGeneration>? _lastAccepted;
 
     [When(@"""(.*)"" schedules timer ""(.*)"" for (\d+) seconds with note ""(.*)""")]
-    public Task Schedule(string principal, string name, int seconds, string note)
+    public async Task Schedule(string principal, string name, int seconds, string note)
     {
         RequestContext.Set(NeuronRequestKeys.Caller, NeuronId.Plain(principal).ToString());
-        return Timer(name).Schedule(new ScheduleTimer(CommandId.New(), seconds, note));
+        _lastAccepted = await Timer(name).Schedule(new ScheduleTimer(CommandId.New(), seconds, note));
     }
 
     [When(@"""(.*)"" tries to schedule timer ""(.*)"" for (\d+) seconds with note ""(.*)"" expecting generation (\d+)")]
@@ -74,6 +77,23 @@ public sealed class TimeSteps(BrainWorld world)
     [Then(@"timer ""(.*)"" note is ""(.*)""")]
     public async Task NoteIs(string name, string note)
         => Assert.Equal(note, (await Timer(name).Read()).Note);
+
+    [Then(@"the timer command is accepted against generation (\d+)")]
+    public void CommandAccepted(long generation)
+    {
+        Assert.NotNull(_lastAccepted);
+        Assert.Equal(new TimerGeneration(generation), _lastAccepted.Receipt);
+        Assert.NotEqual(default, _lastAccepted.Work);
+    }
+
+    [Then(@"""(.*)"" receives a timer schedule refusal carrying generation (\d+)")]
+    public async Task ScheduleRefused(string principal, long generation)
+    {
+        var session = world.Brain.Grains.GetGrain<INeuron>(NeuronId.Plain(principal).ToGrainId());
+        var journal = await session.ReadJournal(JournalKind.Incoming, 0);
+        var refusal = Assert.Single(journal.Delta, delivery => delivery.Signal.Type == "TimerScheduleRefused");
+        Assert.Equal(new TimerGeneration(generation), refusal.Body(TimeJson.Default.TimerGeneration));
+    }
 
     private ITimer Timer(string name) => world.Brain.Grains.GetGrain<ITimer>(new NeuronId("timer", name).ToGrainId());
 }

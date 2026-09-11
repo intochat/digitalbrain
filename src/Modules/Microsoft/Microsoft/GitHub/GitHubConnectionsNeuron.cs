@@ -47,11 +47,17 @@ internal sealed class GitHubConnectionsNeuron(NeuronRuntime runtime,
         }
 
         var items = State?.Connections.Where(item => item.Id != record.Id).ToList() ?? [];
+        var next = State ?? new GitHubConnectionsState([]);
         if (items.Count >= 256)
         {
-            throw new InvalidOperationException("The GitHub connection capacity is full.");
+            Announce(Signal.FromJson(GitHubSignals.RepositoryRefused,
+                new RepositoryRefused("The GitHub connection capacity is full."), GitHubJson.Default.RepositoryRefused));
         }
-        items.Add(record);
-        await SaveAsync(new GitHubConnectionsState(items), cancellationToken).ConfigureAwait(true);
+        else
+        {
+            items.Add(record);
+            next = new GitHubConnectionsState(items);
+        }
+        await SaveAsync(next, cancellationToken).ConfigureAwait(true);
     }
 }

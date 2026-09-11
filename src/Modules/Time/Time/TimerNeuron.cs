@@ -27,27 +27,24 @@ internal sealed class TimerNeuron(
                 throw new CommandRejectedException(arguments.Id, "note is blank", "Provide a non-blank note for the timer.");
             }
 
-            if (arguments.ExpectedVersion is { } expected && expected != (State?.Generation ?? 0))
+            var generation = State?.Generation ?? 0;
+            if (arguments.ExpectedVersion is { } expected && expected != generation)
             {
-                throw new CommandRejectedException(arguments.Id, $"expected generation {expected} but the timer is at {State?.Generation ?? 0}",
+                throw new CommandRejectedException(arguments.Id, $"expected generation {expected} but the timer is at {generation}",
                     "Read the timer and retry with the generation it reports, or stop it first.");
             }
 
             var body = new SchedulingBody(arguments.DurationSeconds, arguments.Note);
             var work = Schedule(Signal.FromJson(TimeSignals.TimerScheduling, body, TimeJson.Default.SchedulingBody));
-            return new Accepted<TimerGeneration>(new TimerGeneration(State?.Generation ?? 0), work);
+            return new Accepted<TimerGeneration>(new TimerGeneration(generation), work);
         });
 
     public Task<Accepted<TimerGeneration>> Stop(StopTimer command) => ExecuteCommandAsync(
         Descriptor("stop"), command, TimeJson.Default.StopTimer, TimeJson.Default.AcceptedTimerGeneration, arguments =>
         {
-            if (State is not { Status: TimerStatus.Scheduled } current)
-            {
-                throw new CommandRejectedException(arguments.Id, "nothing scheduled to stop", "Schedule a timer before stopping it.");
-            }
-
+            var generation = State?.Generation ?? 0;
             var work = Schedule(Signal.Create(TimeSignals.TimerStopping, "{}"));
-            return new Accepted<TimerGeneration>(new TimerGeneration(current.Generation), work);
+            return new Accepted<TimerGeneration>(new TimerGeneration(generation), work);
         });
 
     public Task<TimerSnapshot> Read() => Task.FromResult(State is { } current
@@ -56,14 +53,17 @@ internal sealed class TimerNeuron(
 
     protected override async Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
     {
+        TimerState? next = null;
         switch (delivery.Signal.Type)
         {
             case TimeSignals.TimerScheduling:
                 {
-                    if (State is { Status: TimerStatus.Scheduled })
+                    if (State is { Status: TimerStatus.Scheduled } current)
                     {
-                        // A racing schedule is a no-op while the timer is already armed.
-                        return;
+                        next = current;
+                        Announce(Signal.FromJson(TimeSignals.TimerScheduleRefused, new TimerGeneration(current.Generation),
+                            TimeJson.Default.TimerGeneration));
+                        break;
                     }
 
                     if (Body(delivery, TimeJson.Default.SchedulingBody) is not { } body)
@@ -74,8 +74,7 @@ internal sealed class TimerNeuron(
                     var generation = (State?.Generation ?? 0) + 1;
                     var scheduledAt = TimeProvider.GetUtcNow();
                     var dueAt = scheduledAt + TimeSpan.FromSeconds(body.DurationSeconds);
-                    await SaveAsync(new TimerState(TimerStatus.Scheduled, generation, scheduledAt, dueAt,
-                        body.DurationSeconds, body.Note), cancellationToken).ConfigureAwait(true);
+                    next = new TimerState(TimerStatus.Scheduled, generation, scheduledAt, dueAt, body.DurationSeconds, body.Note);
                     await Alarm(generation).Arm(dueAt - TimeProvider.GetUtcNow()).ConfigureAwait(true);
                     break;
                 }
@@ -83,10 +82,10 @@ internal sealed class TimerNeuron(
                 {
                     if (State is not { Status: TimerStatus.Scheduled } current)
                     {
-                        return;
+                        break;
                     }
 
-                    await SaveAsync(current with { Status = TimerStatus.Cancelled }, cancellationToken).ConfigureAwait(true);
+                    next = current with { Status = TimerStatus.Cancelled };
                     await Alarm(current.Generation).Retire().ConfigureAwait(true);
                     break;
                 }
@@ -101,26 +100,32 @@ internal sealed class TimerNeuron(
                     if (State is not { Status: TimerStatus.Scheduled } current || current.Generation != generation)
                     {
                         await Alarm(generation).Retire().ConfigureAwait(true);
-                        return;
+                        break;
                     }
 
                     var observedAt = TimeProvider.GetUtcNow();
                     if (observedAt < current.DueAt)
                     {
                         await Alarm(generation).Arm(current.DueAt - observedAt).ConfigureAwait(true);
-                        return;
+                        break;
                     }
 
                     var resolution = observedAt > current.DueAt.AddMinutes(RecoveredAfterMinutes)
                         ? TimerResolution.Recovered
                         : TimerResolution.OnTime;
-                    await SaveAsync(current with { Status = TimerStatus.Elapsed }, cancellationToken).ConfigureAwait(true);
+                    next = current with { Status = TimerStatus.Elapsed };
                     var body = new TimerElapsedBody(Id, generation, current.ScheduledAt, current.DueAt, observedAt, resolution, current.Note);
-                    await FireAsync(Signal.FromJson(TimeSignals.TimerElapsed, body, TimeJson.Default.TimerElapsedBody),
-                        to: null, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
+                    Announce(Signal.FromJson(TimeSignals.TimerElapsed, body, TimeJson.Default.TimerElapsedBody));
                     await Alarm(generation).Retire().ConfigureAwait(true);
                     break;
                 }
+            default:
+                return;
+        }
+
+        if (next is not null)
+        {
+            await SaveAsync(next, cancellationToken).ConfigureAwait(true);
         }
     }
 

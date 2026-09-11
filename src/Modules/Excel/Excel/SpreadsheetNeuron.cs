@@ -6,7 +6,7 @@ using Orleans.Runtime;
 
 namespace DigitalBrain.Excel;
 
-[GrainType("sheet")]
+[GrainType(ExcelVocabulary.SpreadsheetType)]
 internal sealed class SpreadsheetNeuron(
     NeuronRuntime runtime,
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<SheetState>> state)
@@ -83,9 +83,8 @@ internal sealed class SpreadsheetNeuron(
 
         var grid = body.Replace is { } replacement ? replacement : SheetGrid.Normalize(SheetGrid.WithCell(Grid, body.Cell!));
         var version = (State?.Version ?? 0) + 1;
-        await SaveAsync(new SheetState(grid, version), cancellationToken).ConfigureAwait(true);
         var changed = new SheetChangedBody(Id.Name, grid.Title, version);
-        await FireAsync(Signal.FromJson(ExcelSignals.SheetChanged, changed, ExcelJson.Default.SheetChangedBody),
-            to: null, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
+        Announce(Signal.FromJson(ExcelSignals.SheetChanged, changed, ExcelJson.Default.SheetChangedBody));
+        await SaveAsync(new SheetState(grid, version), cancellationToken).ConfigureAwait(true);
     }
 }

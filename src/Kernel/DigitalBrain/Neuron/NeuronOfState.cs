@@ -52,6 +52,7 @@ public abstract class Neuron<TState> : Neuron where TState : class
     protected Task SaveAsync(TState value, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(value);
+        RequireBeforeReactionSave();
         if (ExecutingCommand is { } id)
         {
             throw new InvalidOperationException(
@@ -71,7 +72,7 @@ public abstract class Neuron<TState> : Neuron where TState : class
         _crashPoint?.AfterSnapshotSave(Id);
     }
 
-    protected void Announce(Signal signal, NeuronId? to = null, CorrelationId? correlation = null)
+    protected SignalId Announce(Signal signal, NeuronId? to = null, CorrelationId? correlation = null)
     {
         ArgumentNullException.ThrowIfNull(signal);
         if (ExecutingCommand is { } id)
@@ -92,8 +93,10 @@ public abstract class Neuron<TState> : Neuron where TState : class
             throw new SignalRejectedException($"Neuron '{Id}' cannot announce to itself.");
         }
 
-        _announcements.Buffer(new Announcement(SignalId.New(), signal, to,
+        var signalId = SignalId.New();
+        _announcements.Buffer(new Announcement(signalId, signal, to,
             correlation ?? reaction.Delivery.CorrelationId, reaction.Delivery.SignalId));
+        return signalId;
     }
 
     private async Task WriteEnvelopeAsync(SnapshotEnvelope<TState> envelope, CancellationToken cancellationToken)

@@ -42,16 +42,12 @@ internal sealed class ActivitiesNeuron(
         var activity = current.Activities.TryGetValue(key, out var existing) ? existing : new ActivityState();
         if (activity.Apply(fact) is { } updated)
         {
-            var activities = new Dictionary<string, ActivityState>(current.Activities, StringComparer.Ordinal)
-            {
-                [key] = updated,
-            };
-            await SaveAsync(new ActivitiesState(activities), cancellationToken).ConfigureAwait(true);
+            current = current.WithActivity(key, updated);
             activity = updated;
         }
         // An earlier delivery can have committed state before an observer failed.
         // Retrying republishes the same version without applying the fact twice.
-        await FireAsync(Signal.FromJson(UIVocabulary.ActivityChanged, new ActivityChanged(activity.View()), UIJson.Default.ActivityChanged),
-            cancellationToken: cancellationToken).ConfigureAwait(true);
+        Announce(Signal.FromJson(UIVocabulary.ActivityChanged, new ActivityChanged(activity.View()), UIJson.Default.ActivityChanged));
+        await SaveAsync(current, cancellationToken).ConfigureAwait(true);
     }
 }

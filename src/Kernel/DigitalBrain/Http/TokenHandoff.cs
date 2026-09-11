@@ -27,17 +27,25 @@ public sealed class TokenHandoff(TimeProvider clock)
         }
     }
 
-    public bool TryRedeem(string nonce, [MaybeNullWhen(false)] out OAuthTokens tokens)
+    public bool TryPeek(string nonce, [MaybeNullWhen(false)] out OAuthTokens tokens)
     {
         lock (_pending)
         {
-            if (nonce is not null && _pending.Remove(nonce, out var pending) && pending.ExpiresAt > clock.GetUtcNow())
+            if (nonce is not null && _pending.TryGetValue(nonce, out var pending) && pending.ExpiresAt > clock.GetUtcNow())
             {
                 tokens = pending.Tokens;
                 return true;
             }
             tokens = null;
             return false;
+        }
+    }
+
+    public void Consume(string nonce)
+    {
+        lock (_pending)
+        {
+            _pending.Remove(nonce);
         }
     }
 }

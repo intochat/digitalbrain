@@ -39,6 +39,18 @@ Feature: surface
     When surface "desk" activates "missing" on "home" with intent "continue"
     Then the command was refused with a message containing "Open a surface"
 
+  Scenario: An activation whose scene was replaced is refused at the session
+    Given "surface:desk" is connected to "alice" for "SurfaceOpened"
+    And "surface:desk" is connected to "alice" for "ControlRefused"
+    When surface "desk" opens "home" titled "Home" with button "go" using command "11111111-1111-1111-1111-111111111111"
+    And "alice" waits up to 10 seconds for an incoming "SurfaceOpened"
+    And surface "desk" opens "home" titled "Home" with button "next" using command "22222222-2222-2222-2222-222222222222"
+    And "alice" waits up to 10 seconds for 2 incoming "SurfaceOpened"
+    And "alice" fires "SurfaceActivating" {"id":{"value":"33333333-3333-3333-3333-333333333333"},"surfaceKey":"home","controlId":"go","intent":"continue"} at "surface:desk"
+    Then the fire reached 1 neurons
+    When "alice" waits up to 10 seconds for an incoming "ControlRefused"
+    Then "alice" incoming journal contains "ControlRefused" {"surfaceKey":"home","controlId":"go","intent":"continue","reason":"The button is no longer on the surface."}
+
   Scenario: An activity fact updates the activities snapshot and surface
     Given "activities:activities" is connected to "surface:desk" for "ActivityChanged"
     And "activities:activities" is connected to "alice" for "ActivityChanged"

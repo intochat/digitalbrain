@@ -5,6 +5,7 @@ public static class GitHubSignals
     public const string RepositoryEvent = nameof(RepositoryEvent);
     public const string PullRequestChanged = nameof(PullRequestChanged);
     public const string RepositoryAccessRevoked = nameof(RepositoryAccessRevoked);
+    public const string RepositoryRefused = nameof(RepositoryRefused);
     public const string RepositoryConnected = nameof(RepositoryConnected);
     public const string RepositoryRefreshRequested = nameof(RepositoryRefreshRequested);
     public const string GitHubConnectionRegistered = nameof(GitHubConnectionRegistered);
@@ -18,3 +19,6 @@ public sealed record PullRequestChanged([property: Id(0)] int Number, [property:
 
 [GenerateSerializer, Alias("db.github.repository-access-revoked")]
 public sealed record RepositoryAccessRevoked([property: Id(0)] string BindingId);
+
+[GenerateSerializer, Alias("db.github.repository-refused")]
+public sealed record RepositoryRefused([property: Id(0)] string Reason);

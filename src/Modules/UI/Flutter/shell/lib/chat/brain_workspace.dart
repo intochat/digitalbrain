@@ -5,8 +5,8 @@ import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
 import 'package:flutter/material.dart';
 
 import '../activity_screen.dart';
+import '../integrations/integrations_menu.dart';
 import '../onboarding/onboarding_screen.dart';
-import '../user_actions/user_action_card.dart';
 import '../windowing/windowing_screen.dart';
 
 import 'chat_contracts.dart';
@@ -14,6 +14,7 @@ import 'brain_graph_store.dart';
 import 'graph_home_screen.dart';
 import 'workspace_chrome.dart';
 import 'workspace_session.dart';
+import 'brain_chat_screen.dart';
 
 final class BrainWorkspace extends StatefulWidget {
   const BrainWorkspace({
@@ -21,8 +22,7 @@ final class BrainWorkspace extends StatefulWidget {
     required this.chatName,
     this.turns,
     this.onSend,
-    this.onStream,
-    this.onStreamVoice,
+    this.onSendVoice,
     this.onAttachmentTap,
     this.onOpenSignIn,
     this.kernelBaseUri,
@@ -34,10 +34,8 @@ final class BrainWorkspace extends StatefulWidget {
     this.onReadSurface,
     this.onReadBrain,
     this.onWatchBrain,
-    this.behaviorStudio,
     this.onSetBrainSubscription,
     this.graphSceneFactory,
-    this.userActions = const [],
     this.statusMessage,
     this.onWatchActivities,
     this.surfaceEvents,
@@ -45,10 +43,9 @@ final class BrainWorkspace extends StatefulWidget {
   });
 
   final String chatName;
-  final Stream<ChatTurnEvent>? turns;
+  final Stream<ChatStreamEvent>? turns;
   final SendMessage? onSend;
-  final StreamMessage? onStream;
-  final StreamVoice? onStreamVoice;
+  final SendVoice? onSendVoice;
   final VoidCallback? onAttachmentTap;
   final OpenUrl? onOpenSignIn;
   final Uri? kernelBaseUri;
@@ -60,13 +57,11 @@ final class BrainWorkspace extends StatefulWidget {
   final ReadSurface? onReadSurface;
   final ReadBrain? onReadBrain;
   final WatchBrain? onWatchBrain;
-  final ApplicationStudioApi? behaviorStudio;
   final SetBrainSubscription? onSetBrainSubscription;
   final GraphSceneFactory? graphSceneFactory;
-  final List<UserActionCardModel> userActions;
   final String? statusMessage;
   final WatchExecutionActivities? onWatchActivities;
-  final Stream<SceneOpenedEvent>? surfaceEvents;
+  final Stream<SurfaceStreamEvent>? surfaceEvents;
   final DigitalBrainUiClient? client;
 
   @override
@@ -75,14 +70,19 @@ final class BrainWorkspace extends StatefulWidget {
 
 final class _BrainWorkspaceState extends State<BrainWorkspace> {
   static const _compactBreakpoint = 720.0;
+  static const _scriptedHomeEnabled = bool.fromEnvironment(
+    'DIGITALBRAIN_SCRIPTED_HOME',
+    defaultValue: false,
+  );
 
   late final WorkspaceSession _session;
   BrainGraphStore? _graph;
   int _destination = graphDestinationIndex;
   KitSurfaceScene? _scene;
   String? _surfaceFailure;
-  bool _surfaceLoading = true, _settings = false, _oldUi = false;
-  StreamSubscription<SceneOpenedEvent>? _surfaceEvents;
+  bool _surfaceLoading = true, _settings = false;
+  bool _oldUi = !_scriptedHomeEnabled;
+  StreamSubscription<SurfaceStreamEvent>? _surfaceEvents;
   int _surfaceReadVersion = 0;
 
   @override
@@ -157,27 +157,59 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
   Widget _destinationPage() => IndexedStack(
     index: _destination == 0 || _destination == graphDestinationIndex ? 0 : 1,
     children: [
-      GraphHomeScreen(
-        chatName: widget.chatName,
-        turns: _session.projectedTurns,
-        conversation: _destination == 0,
-        onSend: widget.onSend,
-        onStream: widget.onStream,
-        onStreamVoice: widget.onStreamVoice,
-        onAttachmentTap: widget.onAttachmentTap,
-        onOpenSignIn: widget.onOpenSignIn,
-        kernelBaseUri: widget.kernelBaseUri,
-        onCancelTurn: widget.onCancelTurn,
-        onReadChart: widget.onReadChart,
-        onReadImageBytes: widget.onReadImageBytes,
-        onReadSpreadsheet: widget.onReadSpreadsheet,
-        onReadGraph: widget.onReadGraph,
-        onReadBrain: widget.onReadBrain,
-        onWatchBrain: widget.onWatchBrain,
-        behaviorStudio: widget.behaviorStudio,
-        onSetBrainSubscription: widget.onSetBrainSubscription,
-        sceneFactory: widget.graphSceneFactory,
-        graph: _graph,
+      LayoutBuilder(
+        builder: (context, constraints) {
+          final conversation = SizedBox.expand(
+            key: const Key('workspace_conversation'),
+            child: BrainChatScreen(
+              chatName: widget.chatName,
+              turns: _session.projectedTurns,
+              onSend: widget.onSend,
+              onSendVoice: widget.onSendVoice,
+              onAttachmentTap: widget.onAttachmentTap,
+              onCancelTurn: widget.onCancelTurn,
+              onReadChart: widget.onReadChart,
+              onReadImageBytes: widget.onReadImageBytes,
+              onReadSpreadsheet: widget.onReadSpreadsheet,
+              onReadGraph: widget.onReadGraph,
+            ),
+          );
+          final graph = SizedBox.expand(
+            key: const Key('workspace_graph'),
+            child: GraphHomeScreen(
+              chatName: widget.chatName,
+              turns: _session.projectedTurns,
+              graphOnly: true,
+              onSend: widget.onSend,
+              onSendVoice: widget.onSendVoice,
+              onAttachmentTap: widget.onAttachmentTap,
+              onCancelTurn: widget.onCancelTurn,
+              onReadChart: widget.onReadChart,
+              onReadImageBytes: widget.onReadImageBytes,
+              onReadSpreadsheet: widget.onReadSpreadsheet,
+              onReadGraph: widget.onReadGraph,
+              onReadBrain: widget.onReadBrain,
+              onWatchBrain: widget.onWatchBrain,
+              onSetBrainSubscription: widget.onSetBrainSubscription,
+              sceneFactory: widget.graphSceneFactory,
+              graph: _graph,
+            ),
+          );
+          return Flex(
+            direction: constraints.maxWidth >= 900
+                ? Axis.horizontal
+                : Axis.vertical,
+            children: [
+              Expanded(child: conversation),
+              Container(
+                width: constraints.maxWidth >= 900 ? 1 : null,
+                height: constraints.maxWidth >= 900 ? null : 1,
+                color: LumenPalette.line,
+              ),
+              Expanded(child: graph),
+            ],
+          );
+        },
       ),
       Theme(
         data: KitTheme.dark(),
@@ -189,8 +221,6 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
               turns: _session.projectedTurns,
               correlations: _graph?.snapshot?.correlations ?? const [],
               truncated: _graph?.snapshot?.truncated ?? false,
-              userActions: widget.userActions,
-              onOpenUserAction: widget.onOpenSignIn,
             ),
             kitDestinationIndex => const KitGalleryScreen(),
             windowingDestinationIndex => WindowingScreen(
@@ -211,11 +241,12 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
         final compact = constraints.maxWidth < _compactBreakpoint;
         final content = Column(
           children: [
-            TextButton.icon(
-              onPressed: () => setState(() => _oldUi = false),
-              icon: const Icon(Icons.arrow_back, size: 16),
-              label: const Text('Back to Home'),
-            ),
+            if (_scriptedHomeEnabled)
+              TextButton.icon(
+                onPressed: () => setState(() => _oldUi = false),
+                icon: const Icon(Icons.arrow_back, size: 16),
+                label: const Text('Back to Home'),
+              ),
             WorkspaceStatusBar(
               chatName: widget.chatName,
               section: workspaceSectionName(_destination),
@@ -250,6 +281,7 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
   }
 
   void _listenSurface() {
+    if (!_scriptedHomeEnabled) return;
     unawaited(_surfaceEvents?.cancel());
     _surfaceEvents = widget.surfaceEvents?.listen(
       (_) => unawaited(_readSurface()),
@@ -262,6 +294,7 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
   }
 
   Future<void> _readSurface() async {
+    if (!_scriptedHomeEnabled) return;
     final version = ++_surfaceReadVersion;
     try {
       final surface = await widget.onReadSurface?.call('desk');
@@ -403,39 +436,33 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
                               surfaceName: 'desk',
                               activityId: id,
                             ),
-                      onSend: widget.onSend,
-                      onStream: widget.client == null
-                          ? widget.onStream
-                          : (text) => widget.client!.streamMessage(
+                      onSend: widget.client == null
+                          ? widget.onSend
+                          : (text) => widget.client!.sendMessage(
                               chatName: _session.chatName,
                               text: text,
                             ),
-                      onStreamVoice: widget.client == null
-                          ? widget.onStreamVoice
+                      onSendVoice: widget.client == null
+                          ? widget.onSendVoice
                           : (bytes, {fileName = 'voice.wav'}) =>
-                                widget.client!.streamVoice(
+                                widget.client!.sendVoice(
                                   chatName: _session.chatName,
                                   audioBytes: bytes,
                                   fileName: fileName,
                                 ),
                       onAttachmentTap: widget.onAttachmentTap,
-                      onOpenSignIn: widget.onOpenSignIn,
-                      kernelBaseUri: widget.kernelBaseUri,
                       onCancelTurn: widget.client == null
                           ? widget.onCancelTurn
-                          : ({required commandId, required turnId}) =>
-                                widget.client!.cancelTurn(
-                                  chatName: _session.chatName,
-                                  commandId: commandId,
-                                  turnId: turnId,
-                                ),
+                          : ({required turnId}) => widget.client!.cancelTurn(
+                              chatName: _session.chatName,
+                              turnId: turnId,
+                            ),
                       onReadChart: widget.onReadChart,
                       onReadImageBytes: widget.onReadImageBytes,
                       onReadSpreadsheet: widget.onReadSpreadsheet,
                       onReadGraph: widget.onReadGraph,
                       onReadBrain: widget.onReadBrain,
                       onWatchBrain: widget.onWatchBrain,
-                      behaviorStudio: widget.behaviorStudio,
                       onSetBrainSubscription: widget.onSetBrainSubscription,
                       sceneFactory: widget.graphSceneFactory,
                       graph: _graph,
@@ -466,6 +493,20 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
                             ),
                           ),
                         ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(16, 20, 16, 8),
+                        child: Text(
+                          'Integrations',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: LumenPalette.muted,
+                          ),
+                        ),
+                      ),
+                      IntegrationsMenu(
+                        kernelBaseUri: widget.kernelBaseUri,
+                        onOpen: widget.onOpenSignIn,
                       ),
                       const Divider(),
                       ListTile(

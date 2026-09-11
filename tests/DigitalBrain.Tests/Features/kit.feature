@@ -4,6 +4,17 @@ Feature: kit
   Background:
     Given a running brain with AI and UI
 
+  Scenario: A transient native tool failure fails the reaction and is retried
+    Given reaction failures are observed
+    And the scripted model will call tool "busy_tool" with {} then say "retried"
+    When session "alice" fires "Instruct" {"tools":["busy_tool"]} at "agent:desk"
+    And session "alice" fires "Ask" {"text":"use the busy tool"} at "agent:desk"
+    And "alice" waits up to 10 seconds for an incoming "Reply"
+    Then reaction "agent:desk" failed with "The native tool is busy."
+    And the scripted model received no tool result containing "busy"
+    And the scripted model saw 2 conversations with 1 user message each
+    And reading "alice" shows latest "Reply" {"text":"retried"}
+
   Scenario: The responder renders a chart that rides out on Responded
     Given "uichat:desk" is connected to "alice" for "Responded"
     And the scripted model will call tool "render_chart" with {"chatName":"uichat:desk","title":"Quarterly sales","chartKind":"line","labels":["Q1"],"values":[42]} then say "here is your chart"

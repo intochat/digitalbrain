@@ -30,7 +30,7 @@ internal sealed class GmailTokenExchange(GmailOAuthConfiguration configuration) 
                         throw new GmailNotConnectedException();
                     }
                 }
-                throw new GmailUnavailableException($"Gmail token refresh failed (HTTP {(int)response.StatusCode}). Check OAuth configuration or try again later.");
+                throw new GmailUnreachableException($"Gmail token refresh failed (HTTP {(int)response.StatusCode}). Check OAuth configuration or try again later.");
             }
             using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
             var root = json.RootElement;
@@ -48,10 +48,15 @@ internal sealed class GmailTokenExchange(GmailOAuthConfiguration configuration) 
         }
         catch (GmailNotConnectedException) { throw; }
         catch (GmailUnavailableException) { throw; }
+        catch (GmailUnreachableException) { throw; }
+        catch (Exception error) when (error is JsonException or KeyNotFoundException or InvalidOperationException or FormatException or OverflowException)
+        {
+            throw new GmailUnavailableException("Gmail returned an invalid response shape.");
+        }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception)
         {
-            throw new GmailUnavailableException("Gmail token refresh is unavailable. Try again later; no new consent request was started.");
+            throw new GmailUnreachableException("Gmail token refresh is unavailable. Try again later; no new consent request was started.");
         }
     }
 

@@ -3,8 +3,10 @@ using System.Text.Json.Nodes;
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
+using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.AI;
 using DigitalBrain.Chat;
+using DigitalBrain.Core;
 using DigitalBrain.Testing;
 using DigitalBrain.UI;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,7 +20,6 @@ public sealed class UiChatSteps(BrainWorld world, BrainSteps brain)
 {
     private Accepted<SignalId>? _lastSend;
     private SignalId? _previousTurn;
-    private readonly FixtureChatSettlementCrashPoint _settlementCrashPoint = new();
 
     [Given("a running brain with AI and UI")]
     public async Task GivenAiAndUi()
@@ -28,12 +29,12 @@ public sealed class UiChatSteps(BrainWorld world, BrainSteps brain)
             ConfigureSilo = silo =>
             {
                 ScriptedAi.Configure(world)(silo);
-                silo.Services.AddSingleton<IChatSettlementCrashPoint>(_settlementCrashPoint);
+                silo.Services.AddSingleton<IReactionCrashPoint, FixtureReactionCrashPoint>();
             },
         });
 
     [Given("the chat settlement fire is lost once")]
-    public void LoseSettlementFire() => _settlementCrashPoint.CrashOnce = true;
+    public static void LoseSettlementFire() => FixtureReactionCrashPoint.LoseActivationOnce["uichat:desk"] = 1;
 
     [When(@"chat ""(.*)"" sends ""(.*)""$")]
     public async Task Send(string name, string text)
@@ -69,12 +70,12 @@ public sealed class UiChatSteps(BrainWorld world, BrainSteps brain)
         Assert.Equal($"chat.turn.{current.Turn}", current.Context[^1].Path);
     }
 
-    [When(@"chat ""(.*)"" cancels its turn")]
+    [When(@"chat ""(.*)"" schedules cancellation of its turn")]
     public async Task Cancel(string name)
     {
         Assert.NotNull(_lastSend);
         var accepted = await Chat(name).Cancel(new CancelTurn(CommandId.New(), _lastSend.Receipt));
-        Assert.Equal(ChatTurnStatus.Cancelled, accepted.Receipt);
+        Assert.Equal(accepted.Work, accepted.Receipt);
     }
 
     [When(@"chat ""(.*)"" waits up to (\d+) seconds for its turn to be ""(.*)""")]
@@ -132,6 +133,37 @@ public sealed class UiChatSteps(BrainWorld world, BrainSteps brain)
     {
         var body = (await brain.Journal(name, JournalKind.Incoming)).Delta.Last(d => d.Signal.Type == type).Signal.Body;
         Assert.DoesNotContain(fragment, JsonNode.Parse(body)?["text"]?.GetValue<string>() ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    [When(@"session ""(.*)"" sends ""(.*)"" through chat ""(.*)""")]
+    public async Task SendAsSession(string session, string text, string name)
+    {
+        using var caller = CallerScope.For(NeuronId.Plain(session));
+        await Send(name, text);
+    }
+
+    [Then(@"""(.*)"" receives the accepted turn before its response")]
+    public async Task AcceptedBeforeResponse(string session)
+    {
+        await ReactionWait.UntilAsync(async () => (await brain.Journal(session, JournalKind.Incoming)).Delta.Any(d => d.Signal.Type == UIVocabulary.Responded));
+        var entries = (await brain.Journal(session, JournalKind.Incoming)).Delta.ToList();
+        var accepted = Assert.Single(entries, d => d.Signal.Type == UIVocabulary.TurnAccepted);
+        var responded = Assert.Single(entries, d => d.Signal.Type == UIVocabulary.Responded);
+        Assert.True(entries.IndexOf(accepted) < entries.IndexOf(responded));
+        var body = JsonSerializer.Deserialize(accepted.Signal.Body, UIJson.Default.TurnAccepted)!;
+        Assert.Equal(_lastSend!.Receipt, body.Turn);
+        Assert.Equal("hello", body.Text);
+        var turn = await Chat("desk").ReadTurn(new ReadTurn(body.Turn));
+        Assert.NotNull(turn);
+        Assert.Equal(turn.CommandId, body.CommandId);
+        Assert.Equal(turn.StartedAt, body.AcceptedAt);
+    }
+
+    [Then("activities contain the completed chat turn")]
+    public async Task ActivityContainsTurn()
+    {
+        var activities = brain.Brain.Grains.GetGrain<IActivities>(new NeuronId(UIVocabulary.ActivitiesType, "activities").ToGrainId());
+        await ReactionWait.UntilAsync(async () => (await activities.Read(new ReadActivities())).Activities.Any(a => a.CorrelationId == _lastSend!.Receipt.ToString() && a.Status == "completed"));
     }
 
     private IChat Chat(string name)

@@ -9,4 +9,5 @@ internal sealed record GmailState(
     [property: Id(4)] string GrantedScopes = "",
     [property: Id(5)] DateTimeOffset? ExpiresAt = null,
     [property: Id(6)] bool CanCompose = false,
-    [property: Id(7)] GmailDraftPreview? PendingDraft = null);
+    [property: Id(7)] GmailDraftPreview? PendingDraft = null,
+    [property: Id(8)] GmailDraftPreview? SubmittingDraft = null);

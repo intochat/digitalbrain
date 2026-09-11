@@ -35,6 +35,8 @@ public sealed class KitSteps(BrainSteps brain)
     {
         var accepted = await Chart(name).Render(new RenderChart(CommandId.New(), title, "line", [new ChartPoint("Q1", 42)]));
         Assert.Equal(name, accepted.Receipt);
+        await UiWait.Until(async () => (await Chart(name).Read()).Title == title,
+            $"Chart {name} did not render title '{title}' within 10 seconds.");
     }
 
     [When(@"chart ""(.*)"" appends point ""(.*)"" valued (\d+) with event id ""(.*)"" twice")]

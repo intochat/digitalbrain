@@ -40,10 +40,15 @@ internal sealed class GmailMcpProvider : IGmailProvider
             }, cancellationToken).ConfigureAwait(false);
         }
         catch (GmailUnavailableException) { throw; }
+        catch (GmailUnreachableException) { throw; }
+        catch (Exception error) when (error is JsonException or KeyNotFoundException or InvalidOperationException or FormatException or OverflowException)
+        {
+            throw new GmailUnavailableException("Gmail returned an invalid response shape.");
+        }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception)
         {
-            throw new GmailUnavailableException("Gmail is unavailable. Check service access and try again later.");
+            throw new GmailUnreachableException("Gmail is unavailable. Check service access and try again later.");
         }
     }
 
@@ -63,10 +68,15 @@ internal sealed class GmailMcpProvider : IGmailProvider
             return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(selected.JsonSchema.GetRawText())));
         }
         catch (GmailUnavailableException) { throw; }
+        catch (GmailUnreachableException) { throw; }
+        catch (Exception error) when (error is JsonException or KeyNotFoundException or InvalidOperationException or FormatException or OverflowException)
+        {
+            throw new GmailUnavailableException("Gmail returned an invalid response shape.");
+        }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception)
         {
-            throw new GmailUnavailableException("Gmail is unavailable. Check service access and try again later.");
+            throw new GmailUnreachableException("Gmail is unavailable. Check service access and try again later.");
         }
     }
 

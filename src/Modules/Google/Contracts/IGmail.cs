@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions.Commands;
+using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
 using Orleans.Concurrency;
 
@@ -8,7 +9,7 @@ namespace DigitalBrain.Google;
 public interface IGmail : INeuron
 {
     [Alias("connect")]
-    Task<Accepted<GmailConnection>> Connect(ConnectGmailAccount command);
+    Task<Accepted<SignalId>> Connect(ConnectGmailAccount command);
 
     /// <summary>Requires a stored refresh token; wait for GmailRefreshed before retrying a read.</summary>
     [Alias("refresh")]

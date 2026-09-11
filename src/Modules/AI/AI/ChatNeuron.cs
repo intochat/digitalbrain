@@ -30,6 +30,7 @@ internal sealed class ChatNeuron(
     {
         ArgumentNullException.ThrowIfNull(delivery);
 
+        ChatState? next = null;
         try
         {
             switch (delivery.Signal.Type)
@@ -38,10 +39,10 @@ internal sealed class ChatNeuron(
                     await WireAsync(delivery.Signal.Body).ConfigureAwait(true);
                     break;
                 case AIVocabulary.Ask:
-                    await StartAsync(delivery, cancellationToken).ConfigureAwait(true);
+                    next = await StartAsync(delivery, cancellationToken).ConfigureAwait(true);
                     break;
                 case AIVocabulary.Said:
-                    await ContinueAsync(delivery, cancellationToken).ConfigureAwait(true);
+                    next = await ContinueAsync(delivery, cancellationToken).ConfigureAwait(true);
                     break;
                 default:
                     break;
@@ -59,7 +60,11 @@ internal sealed class ChatNeuron(
             }
 
             ServiceProvider.GetService<ILogger<ChatNeuron>>()?.LogError(failure, "Chat {Neuron} failed to run a turn.", Id);
-            await ApologiseAsync(delivery, failure.Message, cancellationToken).ConfigureAwait(true);
+            next = Apologise(delivery, failure.Message);
+        }
+        if (next is not null)
+        {
+            await SaveAsync(next, cancellationToken).ConfigureAwait(true);
         }
     }
 
@@ -90,31 +95,28 @@ internal sealed class ChatNeuron(
 
     // ---- Ask: open a run and invite the first speaker ----
 
-    private async Task StartAsync(SignalDelivery delivery, CancellationToken cancellationToken)
+    private async Task<ChatState> StartAsync(SignalDelivery delivery, CancellationToken cancellationToken)
     {
         var instruct = Bodies.Instruct(await LatestBodyAsync(AIVocabulary.Instruct).ConfigureAwait(true));
         var participants = Participants(instruct.Participants);
         if (participants.Count < 2)
         {
-            await FireAsync(
-                Signal.FromJson(AIVocabulary.Reply, new TextBody(NeedsParticipants), AIJson.Default.TextBody),
-                delivery.Source,
-                delivery.CorrelationId,
-                cancellationToken).ConfigureAwait(true);
-            return;
+            Announce(Signal.FromJson(AIVocabulary.Reply, new TextBody(NeedsParticipants), AIJson.Default.TextBody),
+                delivery.Source, delivery.CorrelationId);
+            return State ?? new ChatState([]);
         }
 
         var policy = new RunPolicy(
             [.. participants.Select(static p => p.ToString())],
             instruct.Rounds > 0 ? instruct.Rounds : 1,
             Turn: 0);
-        var run = new ChatRun(delivery.CorrelationId.ToString(), delivery.Source.ToString(), policy.ToJson(), PendingParticipant: null, ReplyFired: false);
-        await InviteAsync(run, policy, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
+        var run = new ChatRun(delivery.CorrelationId.ToString(), delivery.Source.ToString(), policy.ToJson(), PendingParticipant: null);
+        return await InviteAsync(run, policy, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
     }
 
     // ---- Said: one turn spoken, so either invite the next or answer the asker ----
 
-    private async Task ContinueAsync(SignalDelivery delivery, CancellationToken cancellationToken)
+    private async Task<ChatState?> ContinueAsync(SignalDelivery delivery, CancellationToken cancellationToken)
     {
         var correlation = delivery.CorrelationId.ToString();
         var run = State?.Runs.FirstOrDefault(r => string.Equals(r.Correlation, correlation, StringComparison.Ordinal));
@@ -123,68 +125,38 @@ internal sealed class ChatNeuron(
         // journaled, and that is all a bystander's line ever needs to be.
         if (run is null)
         {
-            return;
+            return null;
         }
 
         var policy = RunPolicy.Parse(run.StateJson);
         if (!string.Equals(run.PendingParticipant, delivery.Source.ToString(), StringComparison.Ordinal))
         {
-            if (run.ReplyFired || !policy.Participants.Contains(delivery.Source.ToString(), StringComparer.Ordinal))
-            {
-                return;
-            }
-
-            // Reactions are at-least-once and a snapshot is not written with the pending queue,
-            // so a redelivered Said can meet a run it has already advanced. The transcript, not
-            // the snapshot, says whether the pending participant still owes this turn a line.
-            var transcript = await ReadJournal(JournalKind.Incoming, 0).ConfigureAwait(true);
-            var turnsSpoken = transcript.Delta.Count(entry => entry.Signal.Type == AIVocabulary.Said
-                && entry.CorrelationId == delivery.CorrelationId
-                && policy.Participants.Contains(entry.Source.ToString(), StringComparer.Ordinal));
-            if (turnsSpoken > policy.Turn)
-            {
-                return;
-            }
-
-            // An unchanged policy re-selects the participant the run recorded as pending, so this
-            // re-fires the invitation that was lost. Skipping would end the conversation in silence.
-            await InviteAsync(run, policy, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
-            return;
+            return null;
         }
 
         policy = policy with { Turn = policy.Turn + 1 };
         if (policy.Turn >= policy.TotalTurns)
         {
-            await CloseAsync(run, Bodies.Text(delivery.Signal.Body), delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
-            return;
+            return Close(run, Bodies.Text(delivery.Signal.Body), delivery.CorrelationId);
         }
 
-        await InviteAsync(run, policy, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
+        return await InviteAsync(run, policy, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
     }
 
-    // Persists the turn state, then fires Turn at the speaker the manager picked. The
-    // Said that comes back is this neuron's next inbox entry: fire and read, never wait.
-    private async Task InviteAsync(ChatRun run, RunPolicy policy, CorrelationId correlation, CancellationToken cancellationToken)
+    private async Task<ChatState> InviteAsync(ChatRun run, RunPolicy policy, CorrelationId correlation, CancellationToken cancellationToken)
     {
         var next = await SelectAsync(policy, correlation, cancellationToken).ConfigureAwait(true);
-        await SaveRunAsync(run with { StateJson = policy.ToJson(), PendingParticipant = next.ToString() }, cancellationToken).ConfigureAwait(true);
-        await FireAsync(Signal.Create(AIVocabulary.Turn, "{}"), next, correlation, cancellationToken).ConfigureAwait(true);
+        Announce(Signal.Create(AIVocabulary.Turn, "{}"), next, correlation);
+        return UpdateRun(run with { StateJson = policy.ToJson(), PendingParticipant = next.ToString() });
     }
 
-    private async Task CloseAsync(ChatRun run, string text, CorrelationId correlation, CancellationToken cancellationToken)
+    private ChatState Close(ChatRun run, string text, CorrelationId correlation)
     {
         var asker = NeuronId.TryParse(run.Asker, out var parsed)
             ? parsed
             : throw new InvalidOperationException($"'{run.Asker}' is not a neuron name.");
-        // Fire before forgetting the run, so a lost activation leaves the retry something to close.
-        // The retry reads the marker, not the journal, to avoid answering the same conversation twice.
-        if (!run.ReplyFired)
-        {
-            await FireAsync(Signal.FromJson(AIVocabulary.Reply, new TextBody(text), AIJson.Default.TextBody), asker, correlation, cancellationToken).ConfigureAwait(true);
-            await SaveRunAsync(run with { ReplyFired = true }, cancellationToken).ConfigureAwait(true);
-        }
-
-        await SaveRunAsync(run, cancellationToken, remove: true).ConfigureAwait(true);
+        Announce(Signal.FromJson(AIVocabulary.Reply, new TextBody(text), AIJson.Default.TextBody), asker, correlation);
+        return UpdateRun(run, remove: true);
     }
 
     // ---- the turn policy ----
@@ -284,7 +256,7 @@ internal sealed class ChatNeuron(
         return latest.FirstOrDefault(d => d.Signal.Type == type)?.Signal.Body ?? string.Empty;
     }
 
-    private async Task SaveRunAsync(ChatRun run, CancellationToken cancellationToken, bool remove = false)
+    private ChatState UpdateRun(ChatRun run, bool remove = false)
     {
         var runs = State is { } current ? new List<ChatRun>(current.Runs) : [];
         runs.RemoveAll(r => string.Equals(r.Correlation, run.Correlation, StringComparison.Ordinal));
@@ -298,11 +270,11 @@ internal sealed class ChatNeuron(
             runs.RemoveRange(0, runs.Count - ChatState.MaxRuns);
         }
 
-        await SaveAsync(new ChatState(runs), cancellationToken).ConfigureAwait(true);
+        return new ChatState(runs);
     }
 
     // The asker hears why the chat stopped, because nothing else will tell them.
-    private async Task ApologiseAsync(SignalDelivery delivery, string text, CancellationToken cancellationToken)
+    private ChatState? Apologise(SignalDelivery delivery, string text)
     {
         var correlation = delivery.CorrelationId.ToString();
         var run = State?.Runs.FirstOrDefault(r => string.Equals(r.Correlation, correlation, StringComparison.Ordinal));
@@ -311,14 +283,9 @@ internal sealed class ChatNeuron(
             : delivery.Signal.Type == AIVocabulary.Ask ? delivery.Source : null;
         if (asker is null)
         {
-            return;
+            return null;
         }
-
-        if (run is not null)
-        {
-            await SaveRunAsync(run, cancellationToken, remove: true).ConfigureAwait(true);
-        }
-
-        await FireAsync(Signal.FromJson(AIVocabulary.Reply, new TextBody(text), AIJson.Default.TextBody), asker, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
+        Announce(Signal.FromJson(AIVocabulary.Reply, new TextBody(text), AIJson.Default.TextBody), asker, delivery.CorrelationId);
+        return run is null ? State ?? new ChatState([]) : UpdateRun(run, remove: true);
     }
 }

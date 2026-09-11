@@ -1,5 +1,24 @@
 # Aspire startup and test isolation
 
+## Kernel cannot load Foundry Local after the module refactor
+
+If `aspire logs kernel --non-interactive` reports a `FileNotFoundException` for
+`Microsoft.AI.Foundry.Local` from `FoundryLocalTranscriptionService.StartAsync`,
+check the AI module's package asset visibility. `PrivateAssets="all"` hides the
+runtime dependency from the consuming kernel, so compilation can succeed while
+the kernel's `.deps.json` omits Foundry Local. Flutter then stays in `Waiting`
+because it requires a healthy kernel.
+
+Keep `contentfiles;analyzers;build;buildTransitive` private on the Foundry Local
+reference, allowing its managed and native runtime assets to reach consumers.
+This preserves isolation from the package's transitive runtime-identifier build
+settings without removing the assemblies needed at startup.
+
+After rebuilding, verify `aspire wait kernel --non-interactive` succeeds and
+the kernel logs report `Whisper model ready`. For Flutter, `Running` initially
+means the build process has started; check its logs for a successful Windows
+build and Dart VM service before treating the desktop application as launched.
+
 ## Missing dashboard URL on 5 September 2026
 
 The normal AppHost dashboard configuration was unchanged. The failed launch was

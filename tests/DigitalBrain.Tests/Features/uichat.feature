@@ -54,9 +54,10 @@ Feature: uichat
     And the scripted model will pause before its next answer
     When chat "desk" sends "keep thinking"
     And chat "desk" waits up to 10 seconds for its turn to be "Running"
-    And chat "desk" cancels its turn
+    And chat "desk" schedules cancellation of its turn
     And chat "desk" waits up to 10 seconds for its turn to be "Cancelled"
     And "alice" waits up to 10 seconds for an incoming "TurnFailed"
+    And chat "desk" schedules cancellation of its turn
     Then "alice" received no "Responded"
 
   Scenario: Context reaches the responder with the last write for a path
@@ -82,3 +83,22 @@ Feature: uichat
     And chat "desk" waits up to 10 seconds for its turn to be "Completed"
     Then chat "desk" turn inherits the previous turn's context digests
     And the latest "agent:desk" incoming "Ask" text contains "inherited"
+
+  Scenario: A session receives a response without connecting by hand
+    Given a running brain with AI and UI
+    And the scripted model will say "welcome"
+    When session "alice" sends "hello" through chat "desk"
+    And "alice" waits up to 10 seconds for an incoming "Responded"
+
+  Scenario: A session receives its accepted turn before the response
+    Given a running brain with AI and UI
+    And the scripted model will say "welcome"
+    When session "alice" sends "hello" through chat "desk"
+    Then "alice" receives the accepted turn before its response
+
+  Scenario: A chat turn appears in activities
+    Given a running brain with AI and UI
+    And the scripted model will say "welcome"
+    When session "alice" sends "hello" through chat "desk"
+    And chat "desk" waits up to 10 seconds for its turn to be "Completed"
+    Then activities contain the completed chat turn

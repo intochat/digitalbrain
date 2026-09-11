@@ -21,8 +21,9 @@
     <PackageReference Include="Microsoft.Orleans.Sdk" />
     <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
     <PackageReference Include="OllamaSharp" />
-    <!-- Private so Foundry native RID does not force AppHost/Aspire.Hosting to win-x64. -->
-    <PackageReference Include="Microsoft.AI.Foundry.Local" PrivateAssets="all" />
+    <!-- Keep Foundry build settings private without hiding the managed/native runtime
+         dependencies required by the kernel's transcription hosted service. -->
+    <PackageReference Include="Microsoft.AI.Foundry.Local" PrivateAssets="contentfiles;analyzers;build;buildTransitive" />
     <PackageReference Include="Concentus" />
     <PackageReference Include="Concentus.Oggfile" />
     <PackageReference Include="NAudio" />

@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Commands;
+using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Core;
 using Orleans.Runtime;
@@ -16,8 +17,8 @@ internal sealed class GmailNeuron(
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<GmailState>> state)
     : Neuron<GmailState>(runtime, state), IGmail
 {
-    public Task<Accepted<GmailConnection>> Connect(ConnectGmailAccount command) => ExecuteCommandAsync(
-        Descriptor("connect"), command, GmailJson.Default.ConnectGmailAccount, GmailJson.Default.AcceptedGmailConnection, arguments =>
+    public Task<Accepted<SignalId>> Connect(ConnectGmailAccount command) => ExecuteCommandAsync(
+        Descriptor("connect"), command, GmailJson.Default.ConnectGmailAccount, GmailJson.Default.AcceptedSignalId, arguments =>
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.Subject);
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.Email);
@@ -31,10 +32,9 @@ internal sealed class GmailNeuron(
             {
                 throw new GmailUnavailableException("Google did not grant all required Gmail and identity scopes.");
             }
-            var expiry = GmailTokenRefresh.Expiry(arguments.ExpiresInSeconds, TimeProvider);
-            var receipt = new GmailConnection(true, arguments.Email, grants.Contains(GmailOAuthConfiguration.ComposeScope), expiry);
+            _ = GmailTokenRefresh.Expiry(arguments.ExpiresInSeconds, TimeProvider);
             var work = Schedule(Signal.FromJson(GmailSignals.GmailConnectionRequested, arguments, GmailJson.Default.ConnectGmailAccount));
-            return new Accepted<GmailConnection>(receipt, work);
+            return new Accepted<SignalId>(work, work);
         });
 
     public Task<Accepted<GmailConnection>> Refresh(RefreshGmailConnection command) => ExecuteCommandAsync(
@@ -119,18 +119,20 @@ internal sealed class GmailNeuron(
 
     protected override async Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
     {
+        GmailState? next = null;
+        string? consumedNonce = null;
         switch (delivery.Signal.Type)
         {
             case GmailSignals.GmailConnectionRequested:
                 if (Body(delivery, GmailJson.Default.ConnectGmailAccount) is not { } account)
                 {
-                    return;
+                    break;
                 }
-
-                if (!handoff.TryRedeem(account.Nonce, out var tokens))
+                if (!handoff.TryPeek(account.Nonce, out var tokens))
                 {
-                    await RejectConnectionAsync(new TokenHandoffExpiredException().Message, cancellationToken).ConfigureAwait(true);
-                    return;
+                    next ??= State ?? new GmailState();
+                    RejectConnection(new TokenHandoffExpiredException().Message);
+                    break;
                 }
                 try
                 {
@@ -139,147 +141,193 @@ internal sealed class GmailNeuron(
                     {
                         GmailTokenRefresh.ValidateToken(tokens.RefreshToken);
                     }
+                    next = new GmailState(account.Subject, account.Email, tokens.AccessToken,
+                        tokens.RefreshToken ?? (State?.Subject == account.Subject ? State.RefreshToken : null),
+                        account.GrantedScopes, delivery.Timestamp.AddSeconds(account.ExpiresInSeconds),
+                        GmailTokenRefresh.ParseScopes(account.GrantedScopes).Contains(GmailOAuthConfiguration.ComposeScope));
+                    Announce(Signal.FromJson(GmailSignals.GmailConnected, new GmailConnected(Connection(next)),
+                        GmailJson.Default.GmailConnected));
+                    consumedNonce = account.Nonce;
                 }
                 catch (GmailUnavailableException error)
                 {
-                    await RejectConnectionAsync(error.Message, cancellationToken).ConfigureAwait(true);
-                    return;
+                    next ??= State ?? new GmailState();
+                    RejectConnection(error.Message);
                 }
-                var grants = GmailTokenRefresh.ParseScopes(account.GrantedScopes);
-                await SaveAsync(new GmailState(account.Subject, account.Email, tokens.AccessToken,
-                    tokens.RefreshToken ?? (State?.Subject == account.Subject ? State.RefreshToken : null),
-                    account.GrantedScopes, delivery.Timestamp.AddSeconds(account.ExpiresInSeconds),
-                    grants.Contains(GmailOAuthConfiguration.ComposeScope)), cancellationToken).ConfigureAwait(true);
-                await FireAsync(Signal.FromJson(GmailSignals.GmailConnected, new GmailConnected(Connection()),
-                    GmailJson.Default.GmailConnected), cancellationToken: cancellationToken).ConfigureAwait(true);
                 break;
             case GmailSignals.GmailRefreshRequested:
-                GmailState refreshed;
                 try
                 {
-                    refreshed = await tokenRefresh.RefreshAsync(RequireConnection(), TimeProvider, cancellationToken).ConfigureAwait(true);
+                    next = await tokenRefresh.RefreshAsync(RequireConnection(), TimeProvider, cancellationToken).ConfigureAwait(true);
+                    Announce(Signal.FromJson(GmailSignals.GmailRefreshed, new GmailRefreshed(Connection(next)),
+                        GmailJson.Default.GmailRefreshed));
                 }
                 catch (GmailNotConnectedException error)
                 {
-                    await SaveAsync(new GmailState(), cancellationToken).ConfigureAwait(true);
-                    await RejectConnectionAsync(error.Message, cancellationToken).ConfigureAwait(true);
-                    return;
+                    next = new GmailState();
+                    RejectConnection(error.Message);
                 }
                 catch (GmailUnavailableException error)
                 {
-                    await RejectConnectionAsync(error.Message, cancellationToken).ConfigureAwait(true);
-                    return;
+                    next ??= State ?? new GmailState();
+                    RejectConnection(error.Message);
                 }
-                await SaveAsync(refreshed, cancellationToken).ConfigureAwait(true);
-                await FireAsync(Signal.FromJson(GmailSignals.GmailRefreshed, new GmailRefreshed(Connection()),
-                    GmailJson.Default.GmailRefreshed), cancellationToken: cancellationToken).ConfigureAwait(true);
                 break;
             case GmailSignals.GmailDisconnectionRequested:
-                await SaveAsync(new GmailState(), cancellationToken).ConfigureAwait(true);
-                await FireAsync(Signal.FromJson(GmailSignals.GmailDisconnected, new GmailDisconnected(),
-                    GmailJson.Default.GmailDisconnected), cancellationToken: cancellationToken).ConfigureAwait(true);
+                next = new GmailState();
+                Announce(Signal.FromJson(GmailSignals.GmailDisconnected, new GmailDisconnected(),
+                    GmailJson.Default.GmailDisconnected));
                 break;
             case GmailSignals.GmailDraftRequested:
                 if (Body(delivery, GmailJson.Default.GmailDraftRequested) is not { } requested)
                 {
-                    return;
+                    break;
                 }
-
-                string hash;
                 try
                 {
                     if (RequireConnection(compose: true).Subject != requested.AccountSubject)
                     {
                         throw new GmailNotConnectedException("The Gmail account changed. Prepare a fresh preview.");
                     }
-                    hash = await ReadDraftSchemaAsync(cancellationToken).ConfigureAwait(true);
+                    var schema = await ReadDraftSchemaAsync(cancellationToken).ConfigureAwait(true);
+                    next = schema.Connection;
+                    if (schema.Reason is { } reason)
+                    {
+                        RejectConnection(reason);
+                        break;
+                    }
+                    var preview = requested.Preview with { ToolSchemaHash = schema.SchemaHash! };
+                    next = next with { PendingDraft = preview };
+                    Announce(Signal.FromJson(GmailSignals.GmailDraftPrepared, new GmailDraftPrepared(preview.PreviewId, preview.ToolSchemaHash),
+                        GmailJson.Default.GmailDraftPrepared));
                 }
                 catch (Exception error) when (error is GmailNotConnectedException or GmailUnavailableException)
                 {
-                    await RejectConnectionAsync(error.Message, cancellationToken).ConfigureAwait(true);
-                    return;
+                    next ??= State ?? new GmailState();
+                    RejectConnection(error.Message);
                 }
-                var preview = requested.Preview with { ToolSchemaHash = hash };
-                await SaveAsync(State! with { PendingDraft = preview }, cancellationToken).ConfigureAwait(true);
-                await FireAsync(Signal.FromJson(GmailSignals.GmailDraftPrepared, new GmailDraftPrepared(preview.PreviewId, preview.ToolSchemaHash),
-                    GmailJson.Default.GmailDraftPrepared), cancellationToken: cancellationToken).ConfigureAwait(true);
                 break;
             case GmailSignals.GmailDraftConfirmed:
-                if (Body(delivery, GmailJson.Default.GmailDraftConfirmed) is not { } confirmed)
+                if (Body(delivery, GmailJson.Default.GmailDraftConfirmed) is { } confirmed)
                 {
-                    return;
+                    next = await ConfirmDraftAsync(confirmed, cancellationToken).ConfigureAwait(true);
                 }
-
-                await CreateDraftAsync(confirmed, cancellationToken).ConfigureAwait(true);
                 break;
+            case GmailSignals.GmailDraftSubmitting:
+                next = await SubmitDraftAsync(cancellationToken).ConfigureAwait(true);
+                break;
+        }
+        if (next is not null)
+        {
+            await SaveAsync(next, cancellationToken).ConfigureAwait(true);
+        }
+        if (consumedNonce is not null)
+        {
+            handoff.Consume(consumedNonce);
         }
     }
 
-    private async Task CreateDraftAsync(GmailDraftConfirmed confirmed, CancellationToken cancellationToken)
+    private async Task<GmailState> ConfirmDraftAsync(GmailDraftConfirmed confirmed, CancellationToken cancellationToken)
     {
-        var preview = State?.PendingDraft;
+        var next = State ?? new GmailState();
+        var preview = next.PendingDraft;
         if (preview is null || preview.PreviewId != confirmed.PreviewId || preview.ToolSchemaHash != confirmed.ToolSchemaHash)
         {
-            await FireUncertainAsync(confirmed.PreviewId, cancellationToken).ConfigureAwait(true);
-            return;
+            AnnounceUncertain(confirmed.PreviewId);
+            return next;
         }
-        // Consume durably before provider I/O so a crash cannot retry the same preview.
-        await SaveAsync(State! with { PendingDraft = null }, cancellationToken).ConfigureAwait(true);
-        string? draftId;
         try
         {
             RequireConnection(compose: true);
-            if (preview.ExpiresAt <= TimeProvider.GetUtcNow()
-                || await ReadDraftSchemaAsync(cancellationToken).ConfigureAwait(true) != preview.ToolSchemaHash)
+            if (preview.ExpiresAt <= TimeProvider.GetUtcNow())
             {
-                throw new GmailUnavailableException("The Gmail preview expired or its schema changed.");
+                throw new GmailUnavailableException("The Gmail preview expired. Prepare a fresh preview.");
             }
-            var result = await provider.InvokeAsync("create_draft",
-                DraftArguments(preview.To, preview.Cc, preview.Bcc, preview.Subject, preview.Body),
-                State!.AccessToken!, cancellationToken).ConfigureAwait(true);
-            draftId = result.GetProperty("id").GetString();
-            if (string.IsNullOrWhiteSpace(draftId))
+            var schema = await ReadDraftSchemaAsync(cancellationToken).ConfigureAwait(true);
+            next = schema.Connection;
+            if (schema.Reason is { } reason)
             {
-                throw new GmailUnavailableException("Gmail did not confirm the draft id.");
+                RejectConnection(reason);
+                AnnounceUncertain(preview.PreviewId);
+                return next with { PendingDraft = null };
             }
+            if (schema.SchemaHash != preview.ToolSchemaHash)
+            {
+                throw new GmailUnavailableException("The Gmail preview schema changed. Prepare a fresh preview.");
+            }
+            Schedule(Signal.Create(GmailSignals.GmailDraftSubmitting, "{}"));
+            return next with { PendingDraft = null, SubmittingDraft = preview };
         }
         catch (GmailNotConnectedException error)
         {
-            await RejectConnectionAsync(error.Message, cancellationToken).ConfigureAwait(true);
-            await FireUncertainAsync(preview.PreviewId, cancellationToken).ConfigureAwait(true);
-            return;
+            RejectConnection(error.Message);
+            AnnounceUncertain(preview.PreviewId);
         }
-        catch (Exception)
+        catch (GmailUnavailableException)
         {
-            await FireUncertainAsync(preview.PreviewId, cancellationToken).ConfigureAwait(true);
-            return;
+            AnnounceUncertain(preview.PreviewId);
         }
-        await FireAsync(Signal.FromJson(GmailSignals.GmailDraftCreated, new GmailDraftCreated(preview.PreviewId, draftId),
-            GmailJson.Default.GmailDraftCreated), cancellationToken: cancellationToken).ConfigureAwait(true);
+        return next with { PendingDraft = null };
     }
 
-    private Task FireUncertainAsync(string previewId, CancellationToken cancellationToken)
-        => FireAsync(Signal.FromJson(GmailSignals.GmailDraftUncertain, new GmailDraftUncertain(previewId),
-            GmailJson.Default.GmailDraftUncertain), cancellationToken: cancellationToken);
+    private async Task<GmailState> SubmitDraftAsync(CancellationToken cancellationToken)
+    {
+        var next = State ?? new GmailState();
+        if (next.SubmittingDraft is not { } preview)
+        {
+            return next;
+        }
+        try
+        {
+            RequireConnection(compose: true);
+            var result = await provider.InvokeAsync("create_draft",
+                DraftArguments(preview.To, preview.Cc, preview.Bcc, preview.Subject, preview.Body),
+                State!.AccessToken!, cancellationToken).ConfigureAwait(true);
+            if (result.ValueKind != System.Text.Json.JsonValueKind.Object
+                || !result.TryGetProperty("id", out var id) || id.ValueKind != System.Text.Json.JsonValueKind.String
+                || string.IsNullOrWhiteSpace(id.GetString()))
+            {
+                throw new GmailUnavailableException("Gmail did not confirm the draft id.");
+            }
+            var draftId = id.GetString()!;
+            Announce(Signal.FromJson(GmailSignals.GmailDraftCreated, new GmailDraftCreated(preview.PreviewId, draftId),
+                GmailJson.Default.GmailDraftCreated));
+        }
+        catch (GmailNotConnectedException error)
+        {
+            RejectConnection(error.Message);
+            AnnounceUncertain(preview.PreviewId);
+        }
+        catch (GmailUnavailableException)
+        {
+            AnnounceUncertain(preview.PreviewId);
+        }
+        return next with { SubmittingDraft = null };
+    }
 
-    private async Task<string> ReadDraftSchemaAsync(CancellationToken cancellationToken)
+    private void AnnounceUncertain(string previewId)
+        => Announce(Signal.FromJson(GmailSignals.GmailDraftUncertain, new GmailDraftUncertain(previewId),
+            GmailJson.Default.GmailDraftUncertain));
+
+    private async Task<(GmailState Connection, string? SchemaHash, string? Reason)> ReadDraftSchemaAsync(CancellationToken cancellationToken)
     {
         try
         {
-            var access = await draftAccess.ReadAsync(RequireConnection(), TimeProvider, cancellationToken).ConfigureAwait(true);
-            await SaveAsync(access.Connection, cancellationToken).ConfigureAwait(true);
-            return access.SchemaHash;
+            return await draftAccess.ReadAsync(RequireConnection(), TimeProvider, cancellationToken).ConfigureAwait(true);
         }
-        catch (GmailNotConnectedException)
+        catch (GmailNotConnectedException error)
         {
-            await SaveAsync(new GmailState(), cancellationToken).ConfigureAwait(true);
-            throw;
+            return (new GmailState(), null, error.Message);
+        }
+        catch (GmailUnavailableException error)
+        {
+            return (State ?? new GmailState(), null, error.Message);
         }
     }
 
-    private Task RejectConnectionAsync(string reason, CancellationToken cancellationToken)
-        => FireAsync(Signal.FromJson(GmailSignals.GmailConnectionRejected, new GmailConnectionRejected(reason),
-            GmailJson.Default.GmailConnectionRejected), cancellationToken: cancellationToken);
+    private void RejectConnection(string reason)
+        => Announce(Signal.FromJson(GmailSignals.GmailConnectionRejected, new GmailConnectionRejected(reason),
+            GmailJson.Default.GmailConnectionRejected));
 
     private GmailState RequireConnection(bool compose = false)
     {
@@ -294,8 +342,10 @@ internal sealed class GmailNeuron(
         return connection;
     }
 
-    private GmailConnection Connection()
-        => State is { AccessToken: not null } connection
+    private GmailConnection Connection() => Connection(State);
+
+    private static GmailConnection Connection(GmailState? state)
+        => state is { AccessToken: not null } connection
             ? new(true, connection.Email, connection.CanCompose, connection.ExpiresAt)
             : new(false, null, false, null);
 

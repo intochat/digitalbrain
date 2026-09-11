@@ -56,11 +56,11 @@ extension _BrainChatPresentation on _BrainChatScreenState {
     ),
   );
 
-  bool get _canSend => widget.onSend != null || widget.onStream != null;
+  bool get _canSend => widget.onSend != null;
 
   Builders _chatBuilders() => Builders(
     composerBuilder: (context) => BrainChatComposer(
-      canVoice: widget.onStreamVoice != null,
+      canVoice: widget.onSendVoice != null,
       onVoiceTap: () => unawaited(_toggleVoice()),
     ),
     textMessageBuilder:
@@ -99,53 +99,18 @@ extension _BrainChatPresentation on _BrainChatScreenState {
           index, {
           required bool isSentByMe,
           MessageGroupStatus? groupStatus,
-        }) {
-          if (message.metadata?['kind'] == 'user-action') {
-            final login = _loginActions[message.metadata?['actionKey']];
-            return login == null ? const SizedBox.shrink() : _loginCard(login);
-          }
-          return KitChatBuilders.customMessageBuilder(
-            context,
-            message,
-            index,
-            isSentByMe: isSentByMe,
-            groupStatus: groupStatus,
-            onReadChart: widget.onReadChart,
-            onReadImageBytes: widget.onReadImageBytes,
-            onReadSpreadsheet: widget.onReadSpreadsheet,
-            onReadGraph: widget.onReadGraph,
-          );
-        },
+        }) => KitChatBuilders.customMessageBuilder(
+          context,
+          message,
+          index,
+          isSentByMe: isSentByMe,
+          groupStatus: groupStatus,
+          onReadChart: widget.onReadChart,
+          onReadImageBytes: widget.onReadImageBytes,
+          onReadSpreadsheet: widget.onReadSpreadsheet,
+          onReadGraph: widget.onReadGraph,
+        ),
   );
-
-  Widget _loginCard(ChatLoginAction login) => switch (login.action.provider) {
-    'github' => ProviderLoginCard(
-      key: ValueKey(login.key),
-      login: login,
-      provider: 'github',
-      displayName: 'GitHub',
-      actionLabel: 'Connect GitHub',
-      kernelBaseUri: widget.kernelBaseUri,
-      onOpenSignIn: widget.onOpenSignIn,
-      onCancelTurn: widget.onCancelTurn,
-      leading: const Icon(Icons.code),
-    ),
-    'salesforce' => SalesforceLoginCard(
-      key: ValueKey(login.key),
-      login: login,
-      kernelBaseUri: widget.kernelBaseUri,
-      onOpenSignIn: widget.onOpenSignIn,
-      onCancelTurn: widget.onCancelTurn,
-    ),
-    'gmail' => GmailLoginCard(
-      key: ValueKey(login.key),
-      login: login,
-      kernelBaseUri: widget.kernelBaseUri,
-      onOpenSignIn: widget.onOpenSignIn,
-      onCancelTurn: widget.onCancelTurn,
-    ),
-    _ => const SizedBox.shrink(),
-  };
 
   Widget _buildCompactChat() => StreamBuilder<ChatOperation>(
     stream: _controller.operationsStream,
@@ -188,12 +153,6 @@ extension _BrainChatPresentation on _BrainChatScreenState {
             false,
           ),
         };
-        final activeLogins = _loginActions.values.where(
-          (login) =>
-              login.waiting ||
-              login.status == LoginActionStatus.resuming ||
-              login.status == LoginActionStatus.cancelling,
-        );
         final working =
             waiting ||
             _pendingSends.any((pending) {
@@ -210,7 +169,6 @@ extension _BrainChatPresentation on _BrainChatScreenState {
         final latestCards = _controller.messages
             .skip(latestTextIndex + 1)
             .whereType<CustomMessage>()
-            .where((message) => message.metadata?['kind'] != 'user-action')
             .toList(growable: false);
         return Column(
           key: const Key('compact_chat_surface'),
@@ -290,10 +248,6 @@ extension _BrainChatPresentation on _BrainChatScreenState {
                                 ),
                               ),
                             ),
-                            for (final login in activeLogins) ...[
-                              const SizedBox(height: 10),
-                              _loginCard(login),
-                            ],
                             if (latestCards.isNotEmpty) ...[
                               const SizedBox(height: 10),
                               Align(
@@ -321,7 +275,7 @@ extension _BrainChatPresentation on _BrainChatScreenState {
             _voiceNotice(),
             BrainChatComposer(
               embedded: true,
-              canVoice: widget.onStreamVoice != null,
+              canVoice: widget.onSendVoice != null,
               onVoiceTap: () => unawaited(_toggleVoice()),
               onSend: _canSend ? _handleSend : null,
               onAttachmentTap: widget.onAttachmentTap,

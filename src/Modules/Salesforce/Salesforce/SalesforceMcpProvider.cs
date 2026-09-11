@@ -46,10 +46,15 @@ internal sealed class SalesforceMcpProvider(Uri? endpoint) : ISalesforceProvider
             }, cancellationToken).ConfigureAwait(false);
         }
         catch (SalesforceUnavailableException) { throw; }
+        catch (SalesforceUnreachableException) { throw; }
+        catch (Exception error) when (error is JsonException or KeyNotFoundException or InvalidOperationException or FormatException or OverflowException)
+        {
+            throw new SalesforceUnavailableException("Salesforce returned an invalid response shape.");
+        }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception)
         {
-            throw new SalesforceUnavailableException("Salesforce is unavailable. Check service access and try again later.");
+            throw new SalesforceUnreachableException("Salesforce is unavailable. Check service access and try again later.");
         }
     }
 
@@ -74,10 +79,15 @@ internal sealed class SalesforceMcpProvider(Uri? endpoint) : ISalesforceProvider
                 selected.JsonSchema.GetRawText() + "\n" + selected.ReturnJsonSchema?.GetRawText())));
         }
         catch (SalesforceUnavailableException) { throw; }
+        catch (SalesforceUnreachableException) { throw; }
+        catch (Exception error) when (error is JsonException or KeyNotFoundException or InvalidOperationException or FormatException or OverflowException)
+        {
+            throw new SalesforceUnavailableException("Salesforce returned an invalid response shape.");
+        }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception)
         {
-            throw new SalesforceUnavailableException("Salesforce is unavailable. Check service access and try again later.");
+            throw new SalesforceUnreachableException("Salesforce is unavailable. Check service access and try again later.");
         }
     }
 

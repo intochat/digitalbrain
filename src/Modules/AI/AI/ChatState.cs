@@ -21,9 +21,7 @@ public sealed record ChatRun(
     [property: Id(0)] string Correlation,
     [property: Id(1)] string Asker,
     [property: Id(2)] string StateJson,
-    [property: Id(3)] string? PendingParticipant,
-    // Reply accepted; retries distinguish already answered from answered but never forgotten.
-    [property: Id(4)] bool ReplyFired);
+    [property: Id(3)] string? PendingParticipant);
 
 // The turn state the group-chat manager is rebuilt from: who is in this run, how many rounds
 // it lasts, and how many turns have been spoken. Round-robin selection is a function of the

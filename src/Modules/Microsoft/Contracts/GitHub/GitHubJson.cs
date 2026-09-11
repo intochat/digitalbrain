@@ -25,6 +25,7 @@ namespace DigitalBrain.Microsoft.GitHub;
 [JsonSerializable(typeof(RepositoryEvent))]
 [JsonSerializable(typeof(PullRequestChanged))]
 [JsonSerializable(typeof(RepositoryAccessRevoked))]
+[JsonSerializable(typeof(RepositoryRefused))]
 [JsonSerializable(typeof(Accepted<RepositoryView>))]
 [JsonSerializable(typeof(Accepted<GitHubConnectionRecord>))]
 public sealed partial class GitHubJson : JsonSerializerContext;

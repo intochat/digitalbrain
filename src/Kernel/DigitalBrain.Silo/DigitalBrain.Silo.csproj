@@ -17,4 +17,7 @@
     <ProjectReference Include="../../Modules/Microsoft/Microsoft/DigitalBrain.Modules.Microsoft.csproj" />
     <ProjectReference Include="../../Modules/UI/DigitalBrain.Modules.UI/DigitalBrain.Modules.UI.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Tests" />
+  </ItemGroup>
 </Project>

@@ -11,6 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddDigitalBrain();
 builder.AddKernelCors();
 builder.Services.AddAuthentication();
+builder.Services.AddSingleton<SessionStreamOptions>();
 builder.Services.AddDigitalBrainMcp()
     .WithHttpTransport(options => options.SessionMode = HttpServerSessionMode.Stateless);
 
@@ -22,8 +23,15 @@ app.UseKernelCors();
 app.UseModuleHttpSurfaces();
 app.UseAuthentication();
 app.UseBasicAuthGate();
+app.UseSessionNeuron();
 app.MapDefaultEndpoints();
 app.MapOrleansDashboard("/orleans");
 app.MapDigitalBrainMcp("/mcp");
+app.MapChatEndpoints();
+app.MapChatVoiceEndpoints();
+app.MapSurfaceEndpoints();
+app.MapKitEndpoints();
+app.MapActivityEndpoints();
+app.MapGraphEndpoints();
 
 app.Run();

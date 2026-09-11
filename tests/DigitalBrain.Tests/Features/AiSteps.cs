@@ -49,8 +49,8 @@ public sealed class AiSteps(BrainWorld world, BrainSteps brain)
         world.Scripted.Say(text);
     }
 
-    [Given("the scripted model will time out")]
-    public void GivenTimeOut() => world.Scripted.TimeOut();
+    [Given(@"the scripted model will time out with ""(.*)""")]
+    public void GivenTimeOut(string failure) => world.Scripted.TimeOut(failure);
 
     [Then(@"the scripted model was asked with model ""(.*)""")]
     public void ThenModelId(string model)

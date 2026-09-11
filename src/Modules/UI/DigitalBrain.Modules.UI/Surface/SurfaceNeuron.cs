@@ -50,71 +50,85 @@ internal sealed class SurfaceNeuron(
 
     protected override async Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
     {
+        SurfaceState? next = null;
         switch (delivery.Signal.Type)
         {
             case UIVocabulary.SurfaceOpening:
-                await OpenAsync(delivery, cancellationToken).ConfigureAwait(true);
+                next = OpenScene(delivery);
                 break;
             case UIVocabulary.SurfaceActivating:
                 if (Body(delivery, UIJson.Default.ActivateControl) is not { } command)
                 {
-                    return;
+                    break;
                 }
 
-                await FireAsync(Signal.FromJson(UIVocabulary.ControlActivated,
-                    new ControlActivation(command.SurfaceKey, command.ControlId, command.Intent), UIJson.Default.ControlActivation),
-                    cancellationToken: cancellationToken).ConfigureAwait(true);
+                next = State ?? new SurfaceState([]);
+                var scene = next.Scenes.FirstOrDefault(item => item.SurfaceKey == command.SurfaceKey);
+                if (!Components(scene?.Root).Any(component => component.Kind == "button" && component.Key == command.ControlId))
+                {
+                    Announce(Signal.FromJson(UIVocabulary.ControlRefused,
+                        new ControlRefused(command.SurfaceKey, command.ControlId, command.Intent, "The button is no longer on the surface."),
+                        UIJson.Default.ControlRefused));
+                    break;
+                }
+
+                Announce(Signal.FromJson(UIVocabulary.ControlActivated,
+                    new ControlActivation(command.SurfaceKey, command.ControlId, command.Intent), UIJson.Default.ControlActivation));
                 break;
             case UIVocabulary.ActivityChanged:
                 if (Body(delivery, UIJson.Default.ActivityChanged) is not { } activityBody)
                 {
-                    return;
+                    break;
                 }
 
                 var activity = activityBody.Activity;
                 var previous = State?.Activities?.FirstOrDefault(item => item.Id == activity.Id);
                 if (previous is not null && previous.Version >= activity.Version)
                 {
-                    return;
+                    break;
                 }
 
                 var current = State ?? new SurfaceState([]);
-                await SaveAsync(current with
+                next = current with
                 {
                     Activities = [.. (current.Activities ?? []).Where(item => item.Id != activity.Id)
                         .Append(activity).OrderByDescending(item => item.UpdatedAt).Take(100)],
-                }, cancellationToken).ConfigureAwait(true);
+                };
                 break;
+        }
+
+        if (next is not null)
+        {
+            await SaveAsync(next, cancellationToken).ConfigureAwait(true);
         }
     }
 
-    private async Task OpenAsync(SignalDelivery delivery, CancellationToken cancellationToken)
+    private SurfaceState? OpenScene(SignalDelivery delivery)
     {
         if (Body(delivery, UIJson.Default.OpenSurface) is not { } command)
         {
-            return;
+            return null;
         }
 
         var current = State ?? new SurfaceState([]);
         var scene = new SurfaceScene(command.SurfaceKey, command.Title, command.Root);
         var receipt = CreateReceipt(command, scene, current);
-        await SaveAsync(current with
-        {
-            Scenes = BoundedList.Append(current.Scenes.Where(item => item.SurfaceKey != command.SurfaceKey), scene, 64),
-            OpenReceipts = BoundedList.Append((current.OpenReceipts ?? []).Where(item => item.CommandId != command.Id), receipt, 64),
-        }, cancellationToken).ConfigureAwait(true);
-        await FireAsync(Signal.FromJson(UIVocabulary.SurfaceOpened,
-            new SurfaceOpened(command.Id, Id, command.SurfaceKey, command.Title, receipt), UIJson.Default.SurfaceOpened),
-            cancellationToken: cancellationToken).ConfigureAwait(true);
+        Announce(Signal.FromJson(UIVocabulary.SurfaceOpened,
+            new SurfaceOpened(command.Id, Id, command.SurfaceKey, command.Title, receipt), UIJson.Default.SurfaceOpened));
         foreach (var component in receipt.AddedComponents)
         {
             // Identical queued scenes mint the same ids so clients deduplicating by event id cannot double-add.
             var eventId = new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(
                 $"component-added:{Id}:{receipt.Fingerprint}:{command.SurfaceKey}:{component.Key}")).AsSpan(0, 16)).ToString();
-            await FireAsync(Signal.FromJson(UIVocabulary.ComponentAdded,
-                new ComponentAdded(command.Id, Id, command.SurfaceKey, component, eventId), UIJson.Default.ComponentAdded),
-                cancellationToken: cancellationToken).ConfigureAwait(true);
+            Announce(Signal.FromJson(UIVocabulary.ComponentAdded,
+                new ComponentAdded(command.Id, Id, command.SurfaceKey, component, eventId), UIJson.Default.ComponentAdded));
         }
+
+        return current with
+        {
+            Scenes = BoundedList.Append(current.Scenes.Where(item => item.SurfaceKey != command.SurfaceKey), scene, 64),
+            OpenReceipts = BoundedList.Append((current.OpenReceipts ?? []).Where(item => item.CommandId != command.Id), receipt, 64),
+        };
     }
 
     private static SurfaceOpenReceipt CreateReceipt(OpenSurface command, SurfaceScene scene, SurfaceState? current)

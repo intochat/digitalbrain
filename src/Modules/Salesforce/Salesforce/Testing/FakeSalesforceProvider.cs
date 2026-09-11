@@ -5,6 +5,8 @@ namespace DigitalBrain.Salesforce;
 
 internal sealed class FakeSalesforceProvider : ISalesforceProvider
 {
+    internal bool RejectSchema { get; set; }
+
     public Task<JsonElement> InvokeAsync(string tool, JsonElement arguments, string accessToken, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -26,6 +28,10 @@ internal sealed class FakeSalesforceProvider : ISalesforceProvider
     {
         cancellationToken.ThrowIfCancellationRequested();
         SalesforceTokenRefresh.ValidateToken(accessToken);
+        if (RejectSchema)
+        {
+            throw new SalesforceUnavailableException("The provider catalog schema is incompatible.");
+        }
         return Task.FromResult(SalesforceMcpProvider.NativeTools.Contains(tool, StringComparer.Ordinal)
             ? "fake-salesforce-schema-v1" : throw new SalesforceUnavailableException("This Salesforce operation is not allowed."));
     }

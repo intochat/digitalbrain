@@ -1,3 +1,4 @@
+using DigitalBrain.Abstractions.Neurons;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.AI;
@@ -14,8 +15,8 @@ internal sealed class TurnBoundFunction(AIFunction capability, TaskScheduler tur
                 TaskCreationOptions.DenyChildAttach,
                 turnScheduler).Unwrap().ConfigureAwait(true);
         }
-        // A rejection is advice, and the model is the one who must act on it.
-        catch (Exception error) when (error is not OperationCanceledException)
+        // A permanent rejection is advice for the model.
+        catch (Exception error) when (error is not OperationCanceledException && !TransientFailure.Covers(error))
         {
             return $"error: {error.Message}";
         }

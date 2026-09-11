@@ -89,15 +89,7 @@ extension _ActivityHome on _GraphHomeScreenState {
           _receivedActivities = true;
           _activities = items;
           _activityFailure = null;
-          if (_selectedCommand != null) {
-            for (final activity in items) {
-              if (activity.commandId == _selectedCommand) {
-                _selectedActivity = activity.id;
-                _localActivity = null;
-                _localTitle = null;
-              }
-            }
-          }
+          _focusSelectedCommand();
         });
         _pulseClear?.cancel();
         _pulseClear = Timer(const Duration(milliseconds: 1400), () {
@@ -108,6 +100,18 @@ extension _ActivityHome on _GraphHomeScreenState {
       onError: (Object error) => _activitiesDisconnected(),
       onDone: _activitiesDisconnected,
     );
+  }
+
+  void _focusSelectedCommand() {
+    if (_selectedCommand == null) return;
+    for (final activity in _activities) {
+      if (activity.commandId == _selectedCommand) {
+        _selectedActivity = activity.id;
+        _localActivity = null;
+        _localTitle = null;
+        break;
+      }
+    }
   }
 
   void _activitiesDisconnected() {
@@ -202,12 +206,6 @@ extension _ActivityHome on _GraphHomeScreenState {
           flex: ((1 - fraction) * 1000).round(),
           child: _renderComponent(component.children.last),
         );
-        if (vertical && _editingApplication != null) {
-          final chat = component.children
-              .where((child) => child.kind == 'chat')
-              .firstOrNull;
-          if (chat != null) return _renderComponent(chat);
-        }
         if (vertical) {
           return Column(
             key: const Key('activity_split'),
@@ -335,17 +333,6 @@ extension _ActivityHome on _GraphHomeScreenState {
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
-              if (widget.behaviorStudio != null)
-                IconButton(
-                  key: const Key('application_library'),
-                  tooltip: 'Applications',
-                  icon: const Icon(Icons.code, size: 18),
-                  onPressed: () => _update(() {
-                    _systemGraph = true;
-                    _directory = true;
-                    _selected = null;
-                  }),
-                ),
               IconButton(
                 tooltip: 'System graph',
                 isSelected: _systemGraph,
@@ -535,7 +522,7 @@ extension _ActivityHome on _GraphHomeScreenState {
                 ListTile(
                   dense: true,
                   title: const Text(
-                    'UserMessaged',
+                    'Sending',
                     style: TextStyle(fontSize: 10, color: LumenPalette.muted),
                   ),
                   subtitle: Text(
@@ -651,13 +638,7 @@ extension _ActivityHome on _GraphHomeScreenState {
       onActivityAccepted: (id, commandId) => _update(() {
         if (_localActivity == id) {
           _selectedCommand = commandId;
-          for (final activity in _activities) {
-            if (activity.commandId == commandId) {
-              _selectedActivity = activity.id;
-              _localActivity = null;
-              _localTitle = null;
-            }
-          }
+          _focusSelectedCommand();
           _scheduleResults();
         }
       }),
@@ -665,13 +646,10 @@ extension _ActivityHome on _GraphHomeScreenState {
           .expand((turns) => turns)
           .toList(growable: false),
       onSend: widget.onSend,
-      onStream: widget.onStream,
-      onStreamVoice: component.properties['voice'] == 'false'
+      onSendVoice: component.properties['voice'] == 'false'
           ? null
-          : widget.onStreamVoice,
+          : widget.onSendVoice,
       onAttachmentTap: widget.onAttachmentTap,
-      onOpenSignIn: widget.onOpenSignIn,
-      kernelBaseUri: widget.kernelBaseUri,
       onCancelTurn: widget.onCancelTurn,
       onReadChart: widget.onReadChart,
       onReadImageBytes: widget.onReadImageBytes,
@@ -689,90 +667,64 @@ extension _ActivityHome on _GraphHomeScreenState {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  _editingApplication == null
-                      ? 'With Ino'
-                      : _editingApplication!,
+                  'With Ino',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
-              if (_editingApplication != null)
-                TextButton(
-                  onPressed: () => _update(() => _editingApplication = null),
-                  child: const Text('Back to input'),
-                )
-              else
-                IconButton(
-                  tooltip: 'New activity',
-                  icon: const Icon(Icons.add, size: 18),
-                  onPressed: () => _update(() {
-                    _selectedActivity = null;
-                    _selectedCommand = null;
-                    _localActivity = null;
-                    _localTitle = null;
-                    _selected = null;
-                  }),
-                ),
+              IconButton(
+                tooltip: 'New activity',
+                icon: const Icon(Icons.add, size: 18),
+                onPressed: () => _update(() {
+                  _selectedActivity = null;
+                  _selectedCommand = null;
+                  _localActivity = null;
+                  _localTitle = null;
+                  _selected = null;
+                }),
+              ),
             ],
           ),
         ),
         Expanded(
-          child: IndexedStack(
-            index: _editingApplication == null
-                ? 0
-                : _openApplications.indexOf(_editingApplication!) + 1,
+          child: Column(
             children: [
-              Column(
-                children: [
-                  if (_resultsFor == _selectedActivity && _resultsLoading)
-                    const LinearProgressIndicator(minHeight: 2),
-                  if (_resultsFor == _selectedActivity && _resultsError != null)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              _resultsError!,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: LumenPalette.error,
-                              ),
-                            ),
+              if (_resultsFor == _selectedActivity && _resultsLoading)
+                const LinearProgressIndicator(minHeight: 2),
+              if (_resultsFor == _selectedActivity && _resultsError != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _resultsError!,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: LumenPalette.error,
                           ),
-                          TextButton(
-                            onPressed: () =>
-                                _update(() => _scheduleResults(force: true)),
-                            child: const Text('Retry'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  if (_selectedActivity != null &&
-                      _activityResults.containsKey(_selectedActivity) &&
-                      !_activityResults[_selectedActivity]!.any(
-                        (turn) =>
-                            !turn.fromUser && turn.signal != 'TurnLifecycle',
-                      ))
-                    const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: Text(
-                        'No output yet.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: LumenPalette.muted,
                         ),
                       ),
-                    ),
-                  Expanded(child: chat),
-                ],
-              ),
-              if (widget.behaviorStudio != null)
-                for (final name in _openApplications)
-                  ApplicationEditor(
-                    key: ValueKey(name),
-                    api: widget.behaviorStudio!,
-                    applicationKey: name,
+                      TextButton(
+                        onPressed: () =>
+                            _update(() => _scheduleResults(force: true)),
+                        child: const Text('Retry'),
+                      ),
+                    ],
                   ),
+                ),
+              if (_selectedActivity != null &&
+                  _activityResults.containsKey(_selectedActivity) &&
+                  !_activityResults[_selectedActivity]!.any(
+                    (turn) => !turn.fromUser && turn.signal != 'TurnFailed',
+                  ))
+                const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Text(
+                    'No output yet.',
+                    style: TextStyle(fontSize: 12, color: LumenPalette.muted),
+                  ),
+                ),
+              Expanded(child: chat),
             ],
           ),
         ),

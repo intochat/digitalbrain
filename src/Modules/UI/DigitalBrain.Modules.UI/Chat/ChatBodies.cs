@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Chat;
 
 namespace DigitalBrain.UI;
@@ -18,12 +19,13 @@ internal static class ChatBodies
 
     internal static string Text(string text) => new JsonObject { ["text"] = text }.ToJsonString();
 
-    internal static string Requested(SendMessage command)
+    internal static string Requested(SendMessage command, NeuronId caller)
     {
         var body = JsonSerializer.SerializeToNode(command, UIJson.Default.SendMessage)!.AsObject();
         body.Remove("id");
         body.Remove("expectedVersion");
         body["commandId"] = command.Id.ToString();
+        body["caller"] = caller.ToString();
         return body.ToJsonString();
     }
 }

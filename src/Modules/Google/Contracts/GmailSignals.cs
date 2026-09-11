@@ -11,6 +11,7 @@ public static class GmailSignals
     public const string GmailDisconnected = nameof(GmailDisconnected);
     public const string GmailDraftRequested = nameof(GmailDraftRequested);
     public const string GmailDraftPrepared = nameof(GmailDraftPrepared);
+    public const string GmailDraftSubmitting = nameof(GmailDraftSubmitting);
     public const string GmailDraftConfirmed = nameof(GmailDraftConfirmed);
     public const string GmailDraftCreated = nameof(GmailDraftCreated);
     public const string GmailDraftUncertain = nameof(GmailDraftUncertain);

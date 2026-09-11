@@ -81,9 +81,9 @@ Feature: agent
     And "claude" waits up to 10 seconds for an incoming "Reply"
     Then the scripted model was asked with model "m-two"
 
-  Scenario: A model that times out answers with a Reply and the agent keeps working
+  Scenario Outline: A model that times out answers with a Reply and the agent keeps working
     Given a running brain with AI
-    And the scripted model will time out
+    And the scripted model will time out with "<failure>"
     And the scripted model will say "after"
     When session "claude" fires "Ask" {"text":"first"} at "agent:a"
     And "claude" waits up to 10 seconds for an incoming "Reply"
@@ -91,6 +91,11 @@ Feature: agent
     When session "claude" fires "Ask" {"text":"second"} at "agent:a"
     And "claude" waits up to 10 seconds for 2 incoming "Reply"
     Then reading "claude" shows latest "Reply" {"text":"after"}
+
+    Examples:
+      | failure               |
+      | TaskCanceledException |
+      | TimeoutException      |
 
   Scenario: A second Ask on the same correlation continues the conversation
     Given a running brain with AI

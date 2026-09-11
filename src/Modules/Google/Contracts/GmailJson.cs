@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions.Commands;
+using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Google;
 
@@ -20,6 +21,7 @@ namespace DigitalBrain.Google;
 [JsonSerializable(typeof(GmailConnection))]
 [JsonSerializable(typeof(GmailDraftPreview))]
 [JsonSerializable(typeof(GmailContentRead))]
+[JsonSerializable(typeof(Accepted<SignalId>))]
 [JsonSerializable(typeof(Accepted<GmailConnection>))]
 [JsonSerializable(typeof(Accepted<GmailDraftPreview>))]
 [JsonSerializable(typeof(GmailConnected))]

@@ -4,6 +4,8 @@ namespace DigitalBrain.Google;
 
 internal sealed class FakeGmailProvider : IGmailProvider
 {
+    internal bool RejectSchema { get; set; }
+
     public Task<JsonElement> InvokeAsync(string tool, IReadOnlyDictionary<string, object?> arguments,
         string accessToken, CancellationToken cancellationToken)
     {
@@ -26,6 +28,10 @@ internal sealed class FakeGmailProvider : IGmailProvider
     {
         cancellationToken.ThrowIfCancellationRequested();
         GmailTokenRefresh.ValidateToken(accessToken);
+        if (RejectSchema)
+        {
+            throw new GmailUnavailableException("The provider catalog schema is incompatible.");
+        }
         return Task.FromResult(GmailMcpProvider.NativeTools.Contains(tool, StringComparer.Ordinal)
             ? "fake-gmail-schema-v1" : throw new GmailUnavailableException("This Gmail operation is not allowed."));
     }

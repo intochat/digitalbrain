@@ -32,21 +32,25 @@ internal sealed class AnnouncingNeuron(
 
     public Task<int> ReadStoredAnnouncements() => Task.FromResult(StoredAnnouncementCount);
 
-    protected override Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
+    protected override async Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
     {
         if (delivery.Signal.Type != "Ping")
         {
-            return Task.CompletedTask;
+            return;
         }
 
         var tally = (State?.Tally ?? 0) + 1;
         Announce(Signal.Create("Pong", "{\"n\":" + tally + "}"), correlation: delivery.CorrelationId);
         if (FixtureSwitches.ForgetAnnouncementSaveOnce.TryRemove(Id.Name, out _))
         {
-            return Task.CompletedTask;
+            return;
         }
 
-        return SaveAsync(new TallyState(tally), cancellationToken);
+        await SaveAsync(new TallyState(tally), cancellationToken);
+        if (FixtureSwitches.SaveAnnouncementTwiceOnce.TryRemove(Id.Name, out _))
+        {
+            await SaveAsync(new TallyState(tally + 1), cancellationToken);
+        }
     }
 }
 
@@ -71,6 +75,11 @@ internal sealed class FixtureReactionCrashPoint : IReactionCrashPoint
 
     public void AfterSnapshotSave(NeuronId neuron)
     {
+        if (LoseActivationOnce.TryGetValue(neuron.ToString(), out var savesToSkip) && savesToSkip > 0)
+        {
+            LoseActivationOnce[neuron.ToString()] = (byte)(savesToSkip - 1);
+            return;
+        }
         if (LoseActivationOnce.TryRemove(neuron.ToString(), out _))
         {
             // Simulates activation loss after the snapshot commits but before the pending head persists.

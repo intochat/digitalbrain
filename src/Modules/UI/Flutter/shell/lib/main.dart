@@ -33,12 +33,12 @@ Widget buildShell({
     chatName: chat,
     statusMessage: statusMessage,
     turns: edge?.watchChatTurns(chatName: chat),
-    onStream: edge == null
+    onSend: edge == null
         ? null
-        : (text) => edge.streamMessage(chatName: chat, text: text),
-    onStreamVoice: edge == null
+        : (text) => edge.sendMessage(chatName: chat, text: text),
+    onSendVoice: edge == null
         ? null
-        : (audioBytes, {fileName = 'voice.wav'}) => edge.streamVoice(
+        : (audioBytes, {fileName = 'voice.wav'}) => edge.sendVoice(
             chatName: chat,
             audioBytes: audioBytes,
             fileName: fileName,
@@ -47,23 +47,19 @@ Widget buildShell({
     kernelBaseUri: edge?.baseUri,
     onCancelTurn: edge == null
         ? null
-        : ({required commandId, required turnId}) => edge.cancelTurn(
-            chatName: chat,
-            commandId: commandId,
-            turnId: turnId,
-          ),
+        : ({required turnId}) =>
+              edge.cancelTurn(chatName: chat, turnId: turnId),
     onReadChart: edge?.readChart,
     onReadImageBytes: edge?.readImageBytes,
     onReadSpreadsheet: edge?.readSpreadsheet,
     onReadGraph: edge?.readGraph,
     onReadSurface: edge?.readSurface,
-    surfaceEvents: edge?.watchShellEvents(shellName: 'desk'),
+    surfaceEvents: edge?.watchSurfaceEvents(surfaceName: 'desk'),
     onWatchActivities: edge == null
         ? null
         : () => edge.watchActivities(surfaceName: 'desk'),
     onReadBrain: edge == null ? null : () => edge.readBrain(chatName: chat),
     onWatchBrain: edge == null ? null : () => edge.watchBrain(chatName: chat),
-    behaviorStudio: edge,
     onSetBrainSubscription: edge == null
         ? null
         : ({

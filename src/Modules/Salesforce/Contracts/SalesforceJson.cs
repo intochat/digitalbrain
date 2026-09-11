@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions.Commands;
+using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Salesforce;
 
@@ -20,6 +21,7 @@ namespace DigitalBrain.Salesforce;
 [JsonSerializable(typeof(SalesforceWritePreview))]
 [JsonSerializable(typeof(SalesforceQueryResult))]
 [JsonSerializable(typeof(SalesforceUserInfo))]
+[JsonSerializable(typeof(Accepted<SignalId>))]
 [JsonSerializable(typeof(Accepted<SalesforceConnection>))]
 [JsonSerializable(typeof(Accepted<SalesforceWritePreview>))]
 [JsonSerializable(typeof(SalesforceConnected))]

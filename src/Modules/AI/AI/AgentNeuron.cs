@@ -39,11 +39,6 @@ internal sealed class AgentNeuron(
             return;
         }
 
-        if (State?.Answered.Contains(delivery.SignalId) == true)
-        {
-            return;
-        }
-
         // A tool runs on whatever thread the function-invocation loop happens to be on. Grain
         // state may only be touched on the grain's own scheduler, so every tool that reaches the
         // graph hops back to the scheduler this turn started on.
@@ -63,6 +58,7 @@ internal sealed class AgentNeuron(
             return;
         }
 
+        AgentState next;
         try
         {
             var invoker = ServiceProvider.GetRequiredService<INeuronInvoker>();
@@ -71,8 +67,18 @@ internal sealed class AgentNeuron(
             var tools = new List<AITool>(BrainTools.For(this, operations, invoker)
                 .Concat(instruct.Tools.Where(name => !nativeTools.Contains(name)).Distinct(StringComparer.Ordinal)
                     .SelectMany(name => TypedFunctionsFor(invoker, name)))
+                .Concat(nativeTools.Resolve(instruct.Tools))
                 .Select(function => new TurnBoundFunction(function, turnScheduler)));
-            tools.AddRange(nativeTools.Resolve(instruct.Tools));
+
+            var functionClient = client.GetService<FunctionInvokingChatClient>();
+            if (functionClient is null)
+            {
+                functionClient = new FunctionInvokingChatClient(client,
+                    ServiceProvider.GetService<ILoggerFactory>(), ServiceProvider);
+                client = functionClient;
+            }
+            // Permanent rejections are already tool results; thrown failures must reach the drain.
+            functionClient.MaximumConsecutiveErrorsPerRequest = 0;
 
             var agent = new ChatClientAgent(
                 client,
@@ -95,19 +101,20 @@ internal sealed class AgentNeuron(
                 ? await TurnContextAsync(delivery).ConfigureAwait(true)
                 : Bodies.Text(delivery.Signal.Body);
 
-            var response = await agent.RunAsync(input, session, options: null, cancellationToken).ConfigureAwait(true);
+            AgentResponse response;
+            try
+            {
+                response = await agent.RunAsync(input, session, options: null, cancellationToken).ConfigureAwait(true);
+            }
+            catch (TimeoutException timeout)
+            {
+                // The function loop wraps tool failures in AggregateException, including tool timeouts.
+                throw new ModelTimeoutException(timeout);
+            }
 
             var text = response.Text ?? string.Empty;
-            var isTurn = delivery.Signal.Type == AIVocabulary.Turn;
-            await FireAsync(
-                isTurn
-                    ? Signal.FromJson(AIVocabulary.Said, new SaidBody(Id.ToString(), text), AIJson.Default.SaidBody)
-                    : Signal.FromJson(AIVocabulary.Reply, new TextBody(text), AIJson.Default.TextBody),
-                delivery.Source,
-                delivery.CorrelationId,
-                cancellationToken).ConfigureAwait(true);
-            // Write the session with the marker after the answer, so a retry after activation loss re-asks rather than going silent.
-            await SaveAnsweredTurnAsync(agent, correlation, session, delivery.SignalId, cancellationToken).ConfigureAwait(true);
+            next = await SessionStateAsync(agent, correlation, session, cancellationToken).ConfigureAwait(true);
+            AnnounceReply(delivery, text);
         }
         // A model that times out cancels with a TaskCanceledException that has nothing to do
         // with this turn's token. Letting it escape would leave the cursor in place and the
@@ -122,8 +129,10 @@ internal sealed class AgentNeuron(
             }
 
             ServiceProvider.GetService<ILogger<AgentNeuron>>()?.LogError(failure, "Agent {Neuron} failed to answer.", Id);
-            await ReplyAsync(delivery, failure.Message, cancellationToken).ConfigureAwait(true);
+            AnnounceReply(delivery, failure.Message);
+            next = State ?? new AgentState([]);
         }
+        await SaveAsync(next, cancellationToken).ConfigureAwait(true);
     }
 
     private AIFunction[] TypedFunctionsFor(INeuronInvoker invoker, string name)
@@ -144,7 +153,7 @@ internal sealed class AgentNeuron(
 
     // ---- what the tools call ----
 
-    internal async Task<string> FireSignalAsync(string type, string body, string? to, string? correlation)
+    internal Task<string> FireSignalAsync(string type, string body, string? to, string? correlation)
     {
         NeuronId? target = null;
         if (!string.IsNullOrWhiteSpace(to))
@@ -162,11 +171,8 @@ internal sealed class AgentNeuron(
                 : throw new ArgumentException($"'{correlation}' is not a correlation id.", nameof(correlation));
         }
 
-        // In-process, never a grain call to self: the agent is already inside its own turn.
-        var outcome = await FireAsync(Signal.Create(type, body), target, tie).ConfigureAwait(true);
-        return JsonSerializer.Serialize(
-            new Mcp.FireResult(outcome.SignalId.ToString(), outcome.CorrelationId.ToString(), outcome.Delivered, outcome.Busy),
-            ToolJson);
+        var signalId = Announce(Signal.Create(type, body), target, tie);
+        return Task.FromResult(JsonSerializer.Serialize(new { signalId = signalId.ToString(), status = "announced" }, ToolJson));
     }
 
     internal async Task<string> ChangeSynapseAsync(string from, string to, string type, bool connect)
@@ -201,7 +207,15 @@ internal sealed class AgentNeuron(
     }
 
     private Task ReplyAsync(SignalDelivery delivery, string text, CancellationToken cancellationToken)
-        => FireAsync(Signal.FromJson(AIVocabulary.Reply, new TextBody(text), AIJson.Default.TextBody), delivery.Source, delivery.CorrelationId, cancellationToken);
+    {
+        AnnounceReply(delivery, text);
+        return SaveAsync(State ?? new AgentState([]), cancellationToken);
+    }
+
+    private void AnnounceReply(SignalDelivery delivery, string text)
+        => Announce(delivery.Signal.Type == AIVocabulary.Turn
+            ? Signal.FromJson(AIVocabulary.Said, new SaidBody(Id.ToString(), text), AIJson.Default.SaidBody)
+            : Signal.FromJson(AIVocabulary.Reply, new TextBody(text), AIJson.Default.TextBody), delivery.Source, delivery.CorrelationId);
 
     // A turn carries no transcript: the participant reads the source's incoming journal for
     // its own correlation and speaks next.
@@ -246,7 +260,7 @@ internal sealed class AgentNeuron(
         return await agent.CreateSessionAsync(cancellationToken).ConfigureAwait(true);
     }
 
-    private async Task SaveAnsweredTurnAsync(AIAgent agent, string correlation, AgentSession session, SignalId answered, CancellationToken cancellationToken)
+    private async Task<AgentState> SessionStateAsync(AIAgent agent, string correlation, AgentSession session, CancellationToken cancellationToken)
     {
         var json = (await agent.SerializeSessionAsync(session, cancellationToken: cancellationToken).ConfigureAwait(true)).GetRawText();
         var current = State;
@@ -255,11 +269,7 @@ internal sealed class AgentNeuron(
         sessions.Add(new AgentSessionEntry(correlation, json));
         Trim(sessions, AgentState.MaxSessions);
 
-        var answeredTurns = current is null ? [] : new List<SignalId>(current.Answered);
-        answeredTurns.Add(answered);
-        Trim(answeredTurns, AgentState.MaxAnswered);
-
-        await SaveAsync(new AgentState(sessions, answeredTurns), cancellationToken).ConfigureAwait(true);
+        return new AgentState(sessions);
     }
 
     private static void Trim<T>(List<T> entries, int keep)

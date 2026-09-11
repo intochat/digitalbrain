@@ -10,12 +10,15 @@
     <RootNamespace>DigitalBrain.Tests</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="Reqnroll.xunit.v3" />
     <PackageReference Include="xunit.v3.mtp-v2" />
     <PackageReference Include="ModelContextProtocol.Core" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../../src/Kernel/DigitalBrain.Silo/DigitalBrain.Silo.csproj" />
     <ProjectReference Include="../../src/Modules/Salesforce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
     <ProjectReference Include="../../src/Modules/Salesforce/Contracts/DigitalBrain.Modules.Salesforce.Contracts.csproj" />
     <ProjectReference Include="../../src/Modules/Google/Google/DigitalBrain.Modules.Google.csproj" />

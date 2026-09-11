@@ -38,6 +38,7 @@ public static class DigitalBrainRuntime
         builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         builder.Services.TryAddSingleton<NeuronOptions>();
         builder.Services.TryAddSingleton<NeuronRuntime>();
+        builder.Services.TryAddSingleton<StreamWake>();
         builder.Services.TryAddSingleton<DescriptorTable>();
         builder.Services.TryAddSingleton<INeuronInvoker, NeuronInvoker>();
 

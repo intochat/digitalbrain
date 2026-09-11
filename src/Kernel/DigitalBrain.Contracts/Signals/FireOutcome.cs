@@ -9,4 +9,15 @@ public sealed record FireOutcome(
     [property: Id(0)] SignalId SignalId,
     [property: Id(1)] CorrelationId CorrelationId,
     [property: Id(2)] int Delivered,
-    [property: Id(3)] int Busy);
+    [property: Id(3)] int Busy)
+{
+    public FireOutcome RequireAccepted()
+    {
+        if (Busy > 0)
+        {
+            throw new NeuronBusyException($"Signal '{SignalId}' target was busy; the reaction will be retried.");
+        }
+
+        return this;
+    }
+}

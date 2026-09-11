@@ -12,16 +12,6 @@ final class StreamStateStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  void streaming(String streamId, String text) {
-    _states[streamId] = StreamStateStreaming(text);
-    notifyListeners();
-  }
-
-  void complete(String streamId, String text) {
-    _states[streamId] = StreamStateCompleted(text);
-    notifyListeners();
-  }
-
   void error(String streamId, String message) {
     _states[streamId] = StreamStateError(message);
     notifyListeners();

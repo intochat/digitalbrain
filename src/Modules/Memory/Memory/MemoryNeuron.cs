@@ -10,22 +10,16 @@ using Orleans.Runtime;
 namespace DigitalBrain.Memory;
 
 [GrainType("memory")]
-internal sealed class MemoryNeuron : Neuron<MemoryState>, IMemory
+internal sealed class MemoryNeuron(
+    NeuronRuntime runtime,
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<MemoryState>> state)
+    : Neuron<MemoryState>(runtime, state), IMemory
 {
     private const string ReservedNamespace = "digitalbrain.capabilities";
     private const int MaxRecallLimit = 32;
 
-    private readonly IEmbeddingGenerator<string, Embedding<float>>? _embeddings;
-    private readonly IVectorMemoryStore? _store;
-
-    public MemoryNeuron(
-        NeuronRuntime runtime,
-        [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<MemoryState>> state)
-        : base(runtime, state)
-    {
-        _embeddings = ServiceProvider.GetService<IEmbeddingGenerator<string, Embedding<float>>>();
-        _store = ServiceProvider.GetService<IVectorMemoryStore>();
-    }
+    private Lazy<IEmbeddingGenerator<string, Embedding<float>>?>? _embeddings;
+    private Lazy<IVectorMemoryStore?>? _store;
 
     public Task<Accepted<MemoryKey>> Remember(Remember command) => ExecuteCommandAsync(
         Descriptor("remember"), command, MemoryJson.Default.Remember, MemoryJson.Default.AcceptedMemoryKey, arguments =>
@@ -70,6 +64,7 @@ internal sealed class MemoryNeuron : Neuron<MemoryState>, IMemory
 
     protected override async Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
     {
+        MemoryState next;
         switch (delivery.Signal.Type)
         {
             case MemorySignals.MemoryRemembering:
@@ -83,11 +78,10 @@ internal sealed class MemoryNeuron : Neuron<MemoryState>, IMemory
                     var generated = await embeddings.GenerateAsync([body.Text], cancellationToken: cancellationToken).ConfigureAwait(true);
                     await store.UpsertAsync(new VectorMemoryEntry(Id.Name, body.Namespace, body.Key, body.Text, body.Tags,
                         body.Payload, generated[0].Vector.ToArray()), cancellationToken).ConfigureAwait(true);
-                    await SaveAsync(new MemoryState((State?.RememberedCount ?? 0) + 1, State?.ForgottenCount ?? 0,
-                        TimeProvider.GetUtcNow()), cancellationToken).ConfigureAwait(true);
+                    next = new MemoryState((State?.RememberedCount ?? 0) + 1, State?.ForgottenCount ?? 0,
+                        TimeProvider.GetUtcNow());
                     var key = new MemoryKey(body.Namespace, body.Key);
-                    await FireAsync(Signal.FromJson(MemorySignals.Remembered, key, MemoryJson.Default.MemoryKey),
-                        to: null, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
+                    Announce(Signal.FromJson(MemorySignals.Remembered, key, MemoryJson.Default.MemoryKey));
                     break;
                 }
             case MemorySignals.MemoryForgetting:
@@ -99,13 +93,16 @@ internal sealed class MemoryNeuron : Neuron<MemoryState>, IMemory
 
                     var (_, store) = RequireDependencies();
                     await store.RemoveAsync(Id.Name, key.Namespace, key.Key, cancellationToken).ConfigureAwait(true);
-                    await SaveAsync(new MemoryState(State?.RememberedCount ?? 0, (State?.ForgottenCount ?? 0) + 1,
-                        TimeProvider.GetUtcNow()), cancellationToken).ConfigureAwait(true);
-                    await FireAsync(Signal.FromJson(MemorySignals.Forgotten, key, MemoryJson.Default.MemoryKey),
-                        to: null, delivery.CorrelationId, cancellationToken).ConfigureAwait(true);
+                    next = new MemoryState(State?.RememberedCount ?? 0, (State?.ForgottenCount ?? 0) + 1,
+                        TimeProvider.GetUtcNow());
+                    Announce(Signal.FromJson(MemorySignals.Forgotten, key, MemoryJson.Default.MemoryKey));
                     break;
                 }
+            default:
+                return;
         }
+
+        await SaveAsync(next, cancellationToken).ConfigureAwait(true);
     }
 
     private static MemoryKey RequireWritableKey(CommandId id, string @namespace, string key)
@@ -130,13 +127,15 @@ internal sealed class MemoryNeuron : Neuron<MemoryState>, IMemory
 
     private (IEmbeddingGenerator<string, Embedding<float>> Embeddings, IVectorMemoryStore Store) RequireDependencies()
     {
-        if (_embeddings is null || _store is null)
+        var embeddings = (_embeddings ??= new(() => ServiceProvider.GetService<IEmbeddingGenerator<string, Embedding<float>>>())).Value;
+        var store = (_store ??= new(() => ServiceProvider.GetService<IVectorMemoryStore>())).Value;
+        if (embeddings is null || store is null)
         {
             throw new InvalidOperationException(
                 $"Memory neuron '{Id}' is missing an IEmbeddingGenerator or vector store; wire an IEmbeddingGenerator (an embedding model in the AppHost) and a vector store before retrying.");
         }
 
-        return (_embeddings, _store);
+        return (embeddings, store);
     }
 
     private static Dictionary<string, string> ToMetadataFilter(IReadOnlyList<MemoryTag> tags)

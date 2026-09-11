@@ -7,6 +7,7 @@ namespace DigitalBrain.Kernel;
 // UsernameConfigurationKey and PasswordConfigurationKey are configured, leaving local dev, Aspire and E2E open.
 internal static class BasicAuthGate
 {
+    public const string DefaultLogin = "owner";
     public const string UsernameConfigurationKey = "DigitalBrain:Auth:Username";
     public const string PasswordConfigurationKey = "DigitalBrain:Auth:Password";
     public const string CheckPath = "/auth/check";

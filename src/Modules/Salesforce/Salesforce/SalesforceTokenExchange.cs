@@ -18,7 +18,7 @@ internal sealed class SalesforceTokenExchange(SalesforceOAuthConfiguration confi
             {
                 if ((int)response.StatusCode >= 500 || response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                 {
-                    throw new SalesforceUnavailableException("Salesforce token refresh is temporarily unavailable. Try again shortly.");
+                    throw new SalesforceUnreachableException("Salesforce token refresh is temporarily unavailable. Try again shortly.");
                 }
                 throw new SalesforceNotConnectedException();
             }
@@ -35,16 +35,17 @@ internal sealed class SalesforceTokenExchange(SalesforceOAuthConfiguration confi
                 root.TryGetProperty("expires_in", out var expires)
                     && double.TryParse(expires.ToString(), CultureInfo.InvariantCulture, out var seconds) ? seconds : null);
         }
-        catch (JsonException)
-        {
-            throw new SalesforceNotConnectedException();
-        }
         catch (SalesforceNotConnectedException) { throw; }
         catch (SalesforceUnavailableException) { throw; }
+        catch (SalesforceUnreachableException) { throw; }
+        catch (Exception error) when (error is JsonException or KeyNotFoundException or InvalidOperationException or FormatException or OverflowException)
+        {
+            throw new SalesforceUnavailableException("Salesforce returned an invalid response shape.");
+        }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception)
         {
-            throw new SalesforceUnavailableException("Salesforce token refresh is unavailable. Try again later; no new consent request was started.");
+            throw new SalesforceUnreachableException("Salesforce token refresh is unavailable. Try again later; no new consent request was started.");
         }
     }
 

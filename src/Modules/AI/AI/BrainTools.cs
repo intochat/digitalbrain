@@ -7,8 +7,7 @@ using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.AI;
 
-// The seven brain operations are bound to one agent's identity. The descriptions are the
-// MCP server's, word for word: the same tools should read the same everywhere.
+// The seven brain operations are bound to one agent's identity.
 internal static class BrainTools
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
@@ -30,7 +29,7 @@ internal static class BrainTools
             "Fire a signal from your Session neuron. A signal is a `type` (letters only, vocabulary such as Note, Confirmed, Decision) "
             + "and a JSON `body` up to 64 KB. With `to`, it goes to exactly that neuron and creates the synapse if missing; "
             + "without `to`, it follows every synapse of that type you already have. Neurons exist as soon as they are named. "
-            + "Put identity in the neuron name (run-tests-before-commit), never in the type. Returns the signal id, correlation and how many neurons accepted it or were busy.");
+            + "Put identity in the neuron name (run-tests-before-commit), never in the type. Returns the signal id and announced status; delivery follows when this reaction saves.");
 
         yield return AIFunctionFactory.Create(
             (

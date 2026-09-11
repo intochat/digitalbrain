@@ -79,6 +79,16 @@ internal sealed class RepositoryNeuron(
 
     protected override async Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
     {
+        var next = await ObserveAsync(delivery, cancellationToken).ConfigureAwait(true);
+        if (next is not null)
+        {
+            await SaveAsync(next, cancellationToken).ConfigureAwait(true);
+        }
+    }
+
+    private async Task<RepositoryState?> ObserveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
+    {
+        var previous = State ?? new RepositoryState();
         RepositoryEvent? trigger = null;
         int? number;
         switch (delivery.Signal.Type)
@@ -86,24 +96,27 @@ internal sealed class RepositoryNeuron(
             case GitHubSignals.RepositoryConnected:
                 if (Body(delivery, GitHubJson.Default.ConnectRepository) is not { } command)
                 {
-                    return;
+                    return null;
                 }
 
                 var binding = Binding;
-                binding.RequireEnabled();
+                if (!binding.Enabled)
+                {
+                    return Refuse(previous, "The configured GitHub repository is revoked.");
+                }
                 if (command.AppId != binding.AppId || command.InstallationId != binding.InstallationId
                     || command.RepositoryId != binding.RepositoryId
                     || !string.Equals(command.RepositoryOwner, binding.RepoOwner, StringComparison.OrdinalIgnoreCase)
                     || !string.Equals(command.RepositoryName, binding.RepoName, StringComparison.OrdinalIgnoreCase))
                 {
-                    throw new GitHubAccessDeniedException("The connection does not match its authorized binding.");
+                    return Refuse(previous, "The connection does not match its authorized binding.");
                 }
                 number = null;
                 break;
             case GitHubSignals.RepositoryRefreshRequested:
                 if (Body(delivery, GitHubJson.Default.RefreshRepository) is not { } refresh)
                 {
-                    return;
+                    return null;
                 }
 
                 number = refresh.Number;
@@ -111,16 +124,15 @@ internal sealed class RepositoryNeuron(
             case GitHubSignals.RepositoryEvent:
                 if (Body(delivery, GitHubJson.Default.RepositoryEvent) is not { } repositoryEvent)
                 {
-                    return;
+                    return null;
                 }
 
                 trigger = repositoryEvent;
                 number = trigger.Number;
                 break;
             default:
-                return;
+                return null;
         }
-        var previous = State ?? new RepositoryState();
         var next = previous with
         {
             PullRequests = new(previous.PullRequests),
@@ -131,11 +143,10 @@ internal sealed class RepositoryNeuron(
         };
         if (trigger?.Action == "revoked" || !Binding.Enabled || next.Revoked)
         {
-            await SaveAsync(next with { Revoked = true }, cancellationToken).ConfigureAwait(true);
             Binding.Revoke();
-            await FireAsync(Signal.FromJson(GitHubSignals.RepositoryAccessRevoked,
-                new RepositoryAccessRevoked(Binding.Id), GitHubJson.Default.RepositoryAccessRevoked), cancellationToken: cancellationToken).ConfigureAwait(true);
-            return;
+            Announce(Signal.FromJson(GitHubSignals.RepositoryAccessRevoked,
+                new RepositoryAccessRevoked(Binding.Id), GitHubJson.Default.RepositoryAccessRevoked));
+            return next with { Revoked = true };
         }
         var facts = new List<PullRequestChanged>();
         if (trigger?.Event != "ping")
@@ -144,15 +155,23 @@ internal sealed class RepositoryNeuron(
             deadline.CancelAfter(TimeSpan.FromSeconds(90));
             foreach (var snapshot in await RefreshAsync(number, previous, deadline.Token).ConfigureAwait(true))
             {
-                Apply(next, snapshot, facts, trigger);
+                if (Apply(next, snapshot, facts, trigger) is { } reason)
+                {
+                    return Refuse(previous, reason);
+                }
             }
         }
-        await SaveAsync(next, cancellationToken).ConfigureAwait(true);
         foreach (var fact in facts)
         {
-            await FireAsync(Signal.FromJson(GitHubSignals.PullRequestChanged, fact, GitHubJson.Default.PullRequestChanged),
-                cancellationToken: cancellationToken).ConfigureAwait(true);
+            Announce(Signal.FromJson(GitHubSignals.PullRequestChanged, fact, GitHubJson.Default.PullRequestChanged));
         }
+        return next;
+    }
+
+    private RepositoryState Refuse(RepositoryState current, string reason)
+    {
+        Announce(Signal.FromJson(GitHubSignals.RepositoryRefused, new RepositoryRefused(reason), GitHubJson.Default.RepositoryRefused));
+        return current;
     }
 
     private async Task<IReadOnlyList<PullRequestSnapshot>> RefreshAsync(int? number, RepositoryState previous, CancellationToken token)
@@ -170,17 +189,20 @@ internal sealed class RepositoryNeuron(
         return all;
     }
 
-    private void Apply(RepositoryState state, PullRequestSnapshot snapshot, List<PullRequestChanged> facts, RepositoryEvent? trigger)
+    private string? Apply(RepositoryState state, PullRequestSnapshot snapshot, List<PullRequestChanged> facts, RepositoryEvent? trigger)
     {
         if (snapshot.RepositoryId != Binding.RepositoryId || snapshot.Number <= 0)
         {
-            throw new GitHubAccessDeniedException("Observed evidence belongs to a different repository.");
+            return "Observed evidence belongs to a different repository.";
         }
         var previous = state.PullRequests.GetValueOrDefault(snapshot.Number);
         if (previous is null && state.PullRequests.Count >= 512)
         {
-            var expired = state.PullRequests.Values.Where(item => !item.IsOpen).OrderBy(item => item.ObservedAt).FirstOrDefault()
-                ?? throw new InvalidOperationException("The repository observation capacity is full.");
+            var expired = state.PullRequests.Values.Where(item => !item.IsOpen).OrderBy(item => item.ObservedAt).FirstOrDefault();
+            if (expired is null)
+            {
+                return "The repository observation capacity is full.";
+            }
             state.PullRequests.Remove(expired.Number);
         }
         state.PullRequests[snapshot.Number] = snapshot;
@@ -210,6 +232,7 @@ internal sealed class RepositoryNeuron(
         {
             facts.Add(new(snapshot.Number, $"{snapshot.Revision}:{snapshot.CiRevision}", $"github:{snapshot.RepositoryId}:{snapshot.Number}"));
         }
+        return null;
     }
 
     private void RequireAvailable()

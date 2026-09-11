@@ -140,7 +140,7 @@ internal sealed class KitTools(
 
             return $"Graph '{trimmedTitle}' is now showing in the chat as card '{name}'.";
         }
-        catch (Exception error)
+        catch (Exception error) when (!TransientFailure.Covers(error))
         {
             return $"show_graph failed: {error.GetType().Name}: {error.Message}";
         }
@@ -187,7 +187,7 @@ internal sealed class KitTools(
 
             return $"Chart '{trimmedTitle}' is now showing in the chat as card '{name}'.";
         }
-        catch (Exception error)
+        catch (Exception error) when (!TransientFailure.Covers(error))
         {
             return $"render_chart failed: {error.GetType().Name}: {error.Message}";
         }
@@ -228,7 +228,7 @@ internal sealed class KitTools(
 
             return $"Image for '{trimmedPrompt}' is now showing in the chat as card '{name}'.";
         }
-        catch (Exception error)
+        catch (Exception error) when (!TransientFailure.Covers(error))
         {
             return $"generate_image failed: {error.GetType().Name}: {error.Message}";
         }

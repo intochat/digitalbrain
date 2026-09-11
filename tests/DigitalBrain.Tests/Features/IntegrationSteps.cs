@@ -18,6 +18,16 @@ public sealed class IntegrationSteps(BrainWorld world)
     private Dictionary<string, string[]>? _githubHeaders;
     private GitHubWebhookAcceptance _githubAcceptance;
 
+    [When("a GitHub connection mismatches its authorized repository binding")]
+    public async Task MismatchedGitHubConnection()
+    {
+        var id = new NeuronId("repository", "fake");
+        var binding = world.Brain.SiloServices.GetRequiredService<GitHubRepositoryBindings>().GetFor(id);
+        var repository = world.Brain.Grains.GetGrain<IRepository>(id.ToGrainId());
+        await repository.Connect(new(CommandId.New(), binding.AppId, binding.InstallationId,
+            binding.RepositoryId + 1, binding.RepoOwner, binding.RepoName));
+    }
+
     [Given("a running brain with the Microsoft module in fake mode")]
     public async Task StartMicrosoft()
         => world.Simulation = await BrainSimulation.StartAsync(new()

@@ -6,4 +6,5 @@ internal sealed record SalesforceState(
     [property: Id(1)] string? RefreshToken = null,
     [property: Id(2)] DateTimeOffset? ExpiresAt = null,
     [property: Id(3)] string? InstanceUrl = null,
-    [property: Id(4)] SalesforceWritePreview? PendingWrite = null);
+    [property: Id(4)] SalesforceWritePreview? PendingWrite = null,
+    [property: Id(5)] SalesforceWritePreview? SubmittingWrite = null);

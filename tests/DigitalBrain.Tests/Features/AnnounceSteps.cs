@@ -31,6 +31,9 @@ public sealed class AnnounceSteps(BrainSteps brain, BrainWorld world)
     [Given(@"announcing ""(.*)"" forgets to save its first reaction")]
     public static void ForgetFirstReactionSave(string name) => FixtureSwitches.ForgetAnnouncementSaveOnce[name] = 0;
 
+    [Given(@"announcing ""(.*)"" saves twice in its first reaction")]
+    public static void SaveFirstReactionTwice(string name) => FixtureSwitches.SaveAnnouncementTwiceOnce[name] = 0;
+
     [Given(@"session ""(.*)"" pending queue is full")]
     public async Task FillPendingQueue(string name)
     {

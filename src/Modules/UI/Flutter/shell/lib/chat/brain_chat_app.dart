@@ -2,7 +2,6 @@ import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
 import 'package:flutter/material.dart';
 
-import '../user_actions/user_action_card.dart';
 import 'brain_workspace.dart';
 import 'chat_contracts.dart';
 
@@ -14,8 +13,7 @@ final class BrainChatApp extends StatelessWidget {
     required this.chatName,
     this.turns,
     this.onSend,
-    this.onStream,
-    this.onStreamVoice,
+    this.onSendVoice,
     this.onAttachmentTap,
     this.onOpenSignIn,
     this.kernelBaseUri,
@@ -30,18 +28,15 @@ final class BrainChatApp extends StatelessWidget {
     this.onWatchActivities,
     this.surfaceEvents,
     this.client,
-    this.behaviorStudio,
     this.onSetBrainSubscription,
     this.graphSceneFactory,
-    this.userActions = const [],
     this.statusMessage,
   });
 
   final String chatName;
-  final Stream<ChatTurnEvent>? turns;
+  final Stream<ChatStreamEvent>? turns;
   final SendMessage? onSend;
-  final StreamMessage? onStream;
-  final StreamVoice? onStreamVoice;
+  final SendVoice? onSendVoice;
   final VoidCallback? onAttachmentTap;
   final OpenUrl? onOpenSignIn;
   final Uri? kernelBaseUri;
@@ -54,12 +49,10 @@ final class BrainChatApp extends StatelessWidget {
   final ReadBrain? onReadBrain;
   final WatchBrain? onWatchBrain;
   final WatchExecutionActivities? onWatchActivities;
-  final Stream<SceneOpenedEvent>? surfaceEvents;
+  final Stream<SurfaceStreamEvent>? surfaceEvents;
   final DigitalBrainUiClient? client;
-  final ApplicationStudioApi? behaviorStudio;
   final SetBrainSubscription? onSetBrainSubscription;
   final GraphSceneFactory? graphSceneFactory;
-  final List<UserActionCardModel> userActions;
   final String? statusMessage;
 
   @override
@@ -73,8 +66,7 @@ final class BrainChatApp extends StatelessWidget {
         chatName: chatName,
         turns: turns,
         onSend: onSend,
-        onStream: onStream,
-        onStreamVoice: onStreamVoice,
+        onSendVoice: onSendVoice,
         onAttachmentTap: onAttachmentTap,
         onOpenSignIn: onOpenSignIn,
         kernelBaseUri: kernelBaseUri,
@@ -89,10 +81,8 @@ final class BrainChatApp extends StatelessWidget {
         onWatchActivities: onWatchActivities,
         surfaceEvents: surfaceEvents,
         client: client,
-        behaviorStudio: behaviorStudio,
         onSetBrainSubscription: onSetBrainSubscription,
         graphSceneFactory: graphSceneFactory,
-        userActions: userActions,
         statusMessage: statusMessage,
       ),
     );

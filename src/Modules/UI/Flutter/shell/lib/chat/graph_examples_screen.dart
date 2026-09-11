@@ -14,11 +14,8 @@ final class GraphExamplesScreen extends StatefulWidget {
     required this.chatName,
     required this.turns,
     this.onSend,
-    this.onStream,
-    this.onStreamVoice,
+    this.onSendVoice,
     this.onAttachmentTap,
-    this.onOpenSignIn,
-    this.kernelBaseUri,
     this.onCancelTurn,
     this.onReadChart,
     this.onReadImageBytes,
@@ -30,11 +27,8 @@ final class GraphExamplesScreen extends StatefulWidget {
   final String chatName;
   final List<ChatTurnEvent> turns;
   final SendMessage? onSend;
-  final StreamMessage? onStream;
-  final StreamVoice? onStreamVoice;
+  final SendVoice? onSendVoice;
   final VoidCallback? onAttachmentTap;
-  final OpenUrl? onOpenSignIn;
-  final Uri? kernelBaseUri;
   final CancelChatTurn? onCancelTurn;
   final ReadChart? onReadChart;
   final ReadImageBytes? onReadImageBytes;
@@ -141,11 +135,8 @@ final class _GraphExamplesScreenState extends State<GraphExamplesScreen> {
             chatName: widget.chatName,
             turns: widget.turns,
             onSend: widget.onSend,
-            onStream: widget.onStream,
-            onStreamVoice: widget.onStreamVoice,
+            onSendVoice: widget.onSendVoice,
             onAttachmentTap: widget.onAttachmentTap,
-            onOpenSignIn: widget.onOpenSignIn,
-            kernelBaseUri: widget.kernelBaseUri,
             onCancelTurn: widget.onCancelTurn,
             onReadChart: widget.onReadChart,
             onReadImageBytes: widget.onReadImageBytes,

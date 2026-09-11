@@ -38,8 +38,7 @@ internal sealed class GraphNeuron(
             return;
         }
 
+        Announce(Signal.FromJson(UIVocabulary.GraphRendered, new KitCard(Id.Name, command.Title), UIJson.Default.KitCard));
         await SaveAsync(new GraphState(command.Title, command.Nodes, command.Edges), cancellationToken).ConfigureAwait(true);
-        await FireAsync(Signal.FromJson(UIVocabulary.GraphRendered, new KitCard(Id.Name, command.Title), UIJson.Default.KitCard),
-            cancellationToken: cancellationToken).ConfigureAwait(true);
     }
 }

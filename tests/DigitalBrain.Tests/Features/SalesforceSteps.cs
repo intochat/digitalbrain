@@ -29,7 +29,11 @@ public sealed class SalesforceSteps(BrainWorld world)
     public async Task StartSalesforce()
         => world.Simulation = await BrainSimulation.StartAsync(new()
         {
-            ConfigureSilo = silo => silo.Services.AddSingleton<TimeProvider>(world.Clock),
+            ConfigureSilo = silo =>
+            {
+                silo.Services.AddSingleton<TimeProvider>(world.Clock);
+                silo.Services.AddSingleton<IReactionCrashPoint, FixtureReactionCrashPoint>();
+            },
             Modules = new([typeof(SalesforceModule)]),
             Configuration = new Dictionary<string, string?>
             {
@@ -47,7 +51,8 @@ public sealed class SalesforceSteps(BrainWorld world)
     {
         var nonce = world.Brain.SiloServices.GetRequiredService<TokenHandoff>()
             .Deposit(new OAuthTokens("fake-access-token", "fake-refresh-token"));
-        await Salesforce.Connect(new ConnectSalesforceAccount(CommandId.New(), "https://fixture.my.salesforce.com", lifetime, nonce));
+        var accepted = await Salesforce.Connect(new ConnectSalesforceAccount(CommandId.New(), "https://fixture.my.salesforce.com", lifetime, nonce));
+        Assert.Equal(accepted.Work, accepted.Receipt);
     }
 
     [Then("the Salesforce connection is reported")]
@@ -184,7 +189,10 @@ public sealed class SalesforceSteps(BrainWorld world)
         var entry = Assert.Single((await Salesforce.ReadJournal(JournalKind.Outgoing, 0)).Delta,
             entry => entry.Signal.Type == SalesforceSignals.RecordWritten);
         var written = JsonSerializer.Deserialize(entry.Signal.Body, SalesforceJson.Default.RecordWritten)!.Preview;
-        Assert.Equal(_confirmedWork, entry.CausationId);
+        var submitting = Assert.Single((await Salesforce.ReadJournal(JournalKind.Incoming, 0)).Delta,
+            delivery => delivery.Signal.Type == SalesforceSignals.SalesforceWriteSubmitting);
+        Assert.Equal(_confirmedWork, submitting.CausationId);
+        Assert.Equal(submitting.SignalId, entry.CausationId);
         Assert.Equal(_preview!.PreviewId, written.PreviewId);
         Assert.Equal(Arguments, written.Arguments);
         Assert.Equal("record-intochat", written.RecordId);
@@ -196,6 +204,39 @@ public sealed class SalesforceSteps(BrainWorld world)
         Assert.NotNull(_preview);
         await Assert.ThrowsAsync<SalesforceUnavailableException>(() => Salesforce.ConfirmWrite(
             new ConfirmSalesforceWrite(CommandId.New(), _preview.PreviewId, _preview.ToolSchemaHash)));
+    }
+
+    [When("the Salesforce preflight rejects the schema and its snapshot loses activation")]
+    public async Task RejectPreflight()
+    {
+        Assert.NotNull(_preview);
+        var provider = Assert.IsType<FakeSalesforceProvider>(world.Brain.SiloServices.GetRequiredService<ISalesforceProvider>());
+        provider.RejectSchema = true;
+        FixtureReactionCrashPoint.LoseActivationOnce[new NeuronId("salesforce", "salesforce").ToString()] = 0;
+        await Salesforce.ConfirmWrite(new ConfirmSalesforceWrite(CommandId.New(), _preview.PreviewId, _preview.ToolSchemaHash));
+    }
+
+    [Then("the Salesforce preflight reports uncertainty and a fresh preview can be prepared")]
+    public async Task RecoverPreflight()
+    {
+        await ReactionWait.UntilAsync(() => Task.FromResult(
+            !FixtureReactionCrashPoint.LoseActivationOnce.ContainsKey(new NeuronId("salesforce", "salesforce").ToString())));
+        await world.Brain.Grains.GetGrain<INeuronInbox>(new NeuronId("salesforce", "salesforce").ToGrainId()).Drain();
+        var uncertain = await WaitForSignal(SalesforceSignals.SalesforceWriteUncertain);
+        Assert.Equal(_preview!.PreviewId, JsonSerializer.Deserialize(uncertain.Signal.Body, SalesforceJson.Default.SalesforceWriteUncertain)!.PreviewId);
+        Assert.True((await Salesforce.ReadConnection()).Connected);
+        Assert.Equal("Salesforce fixture", (await Salesforce.ReadUserInfo()).Content.GetProperty("user").GetString());
+        var rejected = await WaitForSignal(SalesforceSignals.SalesforceConnectionRejected);
+        Assert.Equal("The provider catalog schema is incompatible.",
+            JsonSerializer.Deserialize(rejected.Signal.Body, SalesforceJson.Default.SalesforceConnectionRejected)!.Reason);
+        Assert.DoesNotContain((await Salesforce.ReadJournal(JournalKind.Outgoing, 0)).Delta,
+            entry => entry.Signal.Type == SalesforceSignals.RecordWritten);
+        await Assert.ThrowsAsync<SalesforceUnavailableException>(() => Salesforce.ConfirmWrite(
+            new ConfirmSalesforceWrite(CommandId.New(), _preview.PreviewId, _preview.ToolSchemaHash)));
+        Assert.IsType<FakeSalesforceProvider>(world.Brain.SiloServices.GetRequiredService<ISalesforceProvider>()).RejectSchema = false;
+        await Prepare();
+        await ReactionWait.UntilAsync(async () => (await Salesforce.ReadJournal(JournalKind.Outgoing, 0)).Delta.Any(
+            entry => entry.Signal.Type == SalesforceSignals.SalesforceWritePrepared && entry.CausationId == _prepared!.Work));
     }
 
     private Task<SignalDelivery> WaitForSignal(string type)

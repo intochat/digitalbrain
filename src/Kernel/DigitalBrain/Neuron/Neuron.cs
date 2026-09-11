@@ -21,10 +21,13 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     // grow it without bound. The cap turns that mistake into one sentence of advice.
     public const int MaxSignalTypesPerNeuron = 256;
 
+    private const string ReactionSaveRule = "a reaction saves once, at the end. Anything after the first save is unreachable on a retry because the applied marker skips it.";
+
     private readonly NeuronActivationComponents _components;
     private readonly PersistenceFence _fence;
     private readonly DescriptorTable _descriptors;
     private readonly ILogger? _logger;
+    private readonly StreamWake? _streamWake;
 
     private readonly CancellationTokenSource _activation = new();
     private readonly RetryScheduler _retry;
@@ -36,6 +39,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     {
         ArgumentNullException.ThrowIfNull(runtime);
         _logger = ServiceProvider.GetService<ILogger<Neuron>>();
+        _streamWake = ServiceProvider.GetService<StreamWake>();
         _descriptors = ServiceProvider.GetRequiredService<DescriptorTable>();
         _components = runtime.Bind(ServiceProvider, Id);
         _fence = new PersistenceFence(Id, StateManager, _activation.Token,
@@ -181,6 +185,15 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
 
     private protected void NoteSnapshotSaved() => _reactionSaved = ReactionContext is DeliveryReaction;
 
+    private protected void RequireBeforeReactionSave()
+    {
+        if (_reactionSaved)
+        {
+            throw new InvalidOperationException(
+                $"Neuron '{Id}' cannot save again; {ReactionSaveRule}");
+        }
+    }
+
     private protected virtual bool IsAppliedBy(SignalId delivery) => false;
 
     private protected virtual void DiscardBufferedAnnouncements() { }
@@ -234,6 +247,8 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         // Register after persistence so work that never committed cannot leave an orphan reminder row.
         await _retry.EnsureReminderAsync().ConfigureAwait(true);
 
+        _streamWake?.Publish(Id);
+
         Wake();
         return DeliveryAdmission.Accepted;
     }
@@ -245,7 +260,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         if (_reactionSaved)
         {
             throw new InvalidOperationException(
-                $"Neuron '{Id}' must schedule and announce before the save; a reaction saves once, last.");
+                $"Neuron '{Id}' must schedule and announce before the save; {ReactionSaveRule}");
         }
 
         signal = Signal.Create(signal.Type, signal.Body);
@@ -409,6 +424,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         }
 
         await _retry.AfterDrainAsync(remaining).ConfigureAwait(true);
+        _streamWake?.Publish(Id);
         if (remaining)
         {
             _retry.ArmTimer();

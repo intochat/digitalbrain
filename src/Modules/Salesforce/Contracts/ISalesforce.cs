@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions.Commands;
+using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
 using Orleans.Concurrency;
 
@@ -8,7 +9,7 @@ namespace DigitalBrain.Salesforce;
 public interface ISalesforce : INeuron
 {
     [Alias("connect")]
-    Task<Accepted<SalesforceConnection>> Connect(ConnectSalesforceAccount command);
+    Task<Accepted<SignalId>> Connect(ConnectSalesforceAccount command);
 
     /// <summary>Requires a stored refresh token; wait for SalesforceRefreshed before retrying a read.</summary>
     [Alias("refresh")]

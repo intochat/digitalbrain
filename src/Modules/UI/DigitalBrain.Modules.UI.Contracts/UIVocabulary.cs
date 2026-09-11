@@ -22,12 +22,19 @@ public static class UIVocabulary
     public const string WorkspacesType = "workspaces";
 
     public const string ActivitiesType = "activities";
+    public const string ActivitiesInstance = "activities";
 
     // ---- what other neurons say to the UI, and what it says back ----
 
     // { "commandId": "...", "text": "...", "context": [{ "path": "...", "schemaHash": "...", "payloadJson": null, "blobRef": null }] }
     // The turn is named by this signal's own id - the work id the send returned - so it is not in the body.
     public const string TurnRequested = "TurnRequested";
+
+    // { ...TurnAccepted... }
+    public const string TurnAccepted = "TurnAccepted";
+
+    // { ...KitCardOffer... }
+    public const string CardOffered = "CardOffered";
 
     // { ...Responded... }
     public const string Responded = "Responded";
@@ -52,6 +59,9 @@ public static class UIVocabulary
 
     // { ...ControlActivation... }
     public const string ControlActivated = "ControlActivated";
+
+    // { ...ControlRefused... }
+    public const string ControlRefused = "ControlRefused";
 
     // { ...ActivityExecutionChanged... }
     public const string ActivityExecutionChanged = "ActivityExecutionChanged";

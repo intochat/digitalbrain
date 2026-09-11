@@ -23,11 +23,21 @@ Feature: Time
     When "claude" tries to schedule timer "t" for 60 seconds with note "Another tea" expecting generation 0
     Then the timer command fails with "expected generation 0"
 
-  Scenario: Scheduling again while armed changes nothing
+  Scenario: Scheduling again while armed announces refusal with the current generation
     Given a running brain with file-backed storage
     When "claude" schedules timer "t" for 60 seconds with note "Tea is ready"
     Then "claude" waits up to 5 seconds until timer "t" status is Scheduled
+    Given "timer:t" is connected to "claude" for "TimerScheduleRefused"
     When "claude" schedules timer "t" for 30 seconds with note "Another tea"
     And "claude" waits up to 5 seconds until "timer:t" pending count is 0
     Then timer "t" generation is 1
     And timer "t" note is "Tea is ready"
+    When "claude" waits up to 5 seconds for an incoming "TimerScheduleRefused"
+    Then "claude" receives a timer schedule refusal carrying generation 1
+
+  Scenario: Scheduling reports the generation it was accepted against
+    Given a running brain with file-backed storage
+    When "claude" schedules timer "t" for 60 seconds with note "Tea is ready"
+    Then the timer command is accepted against generation 0
+    And "claude" waits up to 5 seconds until timer "t" status is Scheduled
+    And timer "t" generation is 1
