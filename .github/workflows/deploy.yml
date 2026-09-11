@@ -72,8 +72,12 @@ jobs:
           # Azurite's default ports: blob 10000, queue 10001, table 10002.
           CONN="DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://digitalbrain-smoke-azurite:10000/devstoreaccount1;QueueEndpoint=http://digitalbrain-smoke-azurite:10001/devstoreaccount1;TableEndpoint=http://digitalbrain-smoke-azurite:10002/devstoreaccount1;"
 
+          # Mapping /agent constructs its model client at startup. This test makes no
+          # model calls; the placeholder belongs only to this disposable container.
           docker run -d --name digitalbrain-smoke-kernel --network digitalbrain-smoke -p 18080:8080 \
             -e DigitalBrain__Standalone=true \
+            -e DigitalBrain__AI__Default__Model=IGrok46 \
+            -e DigitalBrain__AI__XAI__ApiKey=smoke-test-placeholder \
             -e ConnectionStrings__clustering="$CONN" \
             -e ConnectionStrings__reminders="$CONN" \
             -e ConnectionStrings__grainstate="$CONN" \
@@ -145,10 +149,16 @@ jobs:
       - name: Roll the kernel to the release image
         run: |
           az extension add --name containerapp --upgrade --yes
+          # Report configuration names for startup diagnosis without logging values.
+          az containerapp show \
+            --name "${{ vars.AZURE_CONTAINERAPP_NAME }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --query 'properties.template.containers[0].env[].name' --output json
           az containerapp update \
             --name "${{ vars.AZURE_CONTAINERAPP_NAME }}" \
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
-            --image "docker.io/${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-kernel:${{ github.event.release.tag_name }}"
+            --image "docker.io/${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-kernel:${{ github.event.release.tag_name }}" \
+            --output none
 
       - name: Wait for the new revision to take traffic
         # The old revision keeps serving the public FQDN until the new one is
