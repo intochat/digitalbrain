@@ -79,6 +79,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   late final WorkspaceStore store =
       widget.store ??
       WorkspaceStore(
+        seedProject: false,
         persistence: PreferencesWorkspacePersistence(
           key: widget.persistenceKey,
         ),
@@ -462,39 +463,25 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     }
   }
 
-  Future<void> _newProject(BuildContext context) async {
-    final input = TextEditingController();
-    final title = await showDialog<String>(
+  Future<void> _newProject(
+    BuildContext context, [
+    UiSpecialist specialist = uiCoordinator,
+  ]) async {
+    final result = await showDialog<UiProjectStart>(
       context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('New project'),
-        content: TextField(
-          controller: input,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Project name'),
-          onSubmitted: (v) => Navigator.pop(c, v),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(c, input.text),
-            child: const Text('Create project'),
-          ),
-        ],
-      ),
+      builder: (_) => UiProjectStartDialog(specialist: specialist),
     );
-    // The dialog route may still be reversing its transition at this point.
-    Future<void>.delayed(const Duration(milliseconds: 400), input.dispose);
-    if (title != null && title.trim().isNotEmpty) {
-      store.createProject(title.trim());
-      setState(() {
-        _directory = false;
-        _home = true;
-      });
-    }
+    if (!mounted || result == null) return;
+    store.createProject(
+      result.name,
+      agentId: result.specialist.id,
+      draft: result.intent,
+    );
+    setState(() {
+      _directory = false;
+      _home = false;
+      _mobileWork = false;
+    });
   }
 
   Future<void> _newWork(BuildContext context, String kind) async {
@@ -656,45 +643,29 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     );
   }
 
-  Widget _projects(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(32),
-    children: [
-      Row(
-        children: [
-          const Expanded(
-            child: Text(
-              'Projects',
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w600),
-            ),
-          ),
-          FilledButton.icon(
-            onPressed: () => _newProject(context),
-            icon: const Icon(Icons.add),
-            label: const Text('New project'),
-          ),
-        ],
-      ),
-      const SizedBox(height: 24),
-      for (final p in store.projects)
-        Card(
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(20),
-            leading: const Icon(Icons.folder_outlined),
-            title: Text(p.title),
-            subtitle: Text(
-              '${p.conversations.length} conversations · ${p.artifacts.length} saved items',
-            ),
-            trailing: const Icon(Icons.arrow_forward),
-            onTap: () {
-              store.selectProject(p.id);
-              setState(() {
-                _directory = false;
-                _home = true;
-              });
-            },
-          ),
+  Widget _projects(BuildContext context) => UiProjectLibrary(
+    onStartTemplate: (specialist) => _newProject(context, specialist),
+    projects: [
+      for (final project in store.projects)
+        UiProjectSummary(
+          id: project.id,
+          title: project.title,
+          conversations: project.conversations.length,
+          savedItems: project.artifacts.length,
+          workKinds: {
+            for (final kind in project.artifacts.map((a) => a.kind).toSet())
+              kind: project.artifacts.where((a) => a.kind == kind).length,
+          },
         ),
     ],
+    onCreate: () => _newProject(context),
+    onOpen: (id) {
+      store.selectProject(id);
+      setState(() {
+        _directory = false;
+        _home = true;
+      });
+    },
   );
   Widget _projectHome(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
@@ -730,7 +701,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                         .where((a) => a.id == conversation.selectedAgentId)
                         .firstOrNull
                         ?.name ??
-                    'IntoCaht',
+                    'IntoChat',
               ),
               trailing: const Icon(Icons.chevron_right, size: 18),
               onTap: () {
@@ -934,9 +905,8 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     );
   }
 
-  Widget _pane(WorkspaceArtifact a, {bool chrome = true}) => Card(
-    margin: const EdgeInsets.all(6),
-    clipBehavior: Clip.antiAlias,
+  Widget _pane(WorkspaceArtifact a, {bool chrome = true}) => UiEditorFrame(
+    active: store.currentProject.presentation.activeArtifactId == a.id,
     child: Column(
       children: [
         if (a.data['_dirty'] == true)
@@ -1110,25 +1080,15 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
               ? _windows(visible)
               : _pane(active, chrome: false),
         ),
-        if (layout.minimizedArtifactIds.isNotEmpty)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (final a in p.artifacts.where(
-                  (a) => layout.minimizedArtifactIds.contains(a.id),
-                ))
-                  Padding(
-                    padding: const EdgeInsets.all(6),
-                    child: ActionChip(
-                      avatar: const Icon(Icons.open_in_full, size: 15),
-                      label: Text(a.title),
-                      onPressed: () => _open(a),
-                    ),
-                  ),
-              ],
-            ),
-          ),
+        UiArtifactDock(
+          items: [
+            for (final a in p.artifacts.where(
+              (a) => layout.minimizedArtifactIds.contains(a.id),
+            ))
+              UiDockItem(id: a.id, title: a.title, kind: a.kind),
+          ],
+          onRestore: (id) => _open(p.artifacts.firstWhere((a) => a.id == id)),
+        ),
       ],
     );
   }
@@ -1356,19 +1316,14 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     navigatorObservers: [_routes],
     initialRoute: '/',
     scaffoldMessengerKey: _messenger,
-    title: 'IntoCaht',
+    title: 'IntoChat',
     debugShowCheckedModeBanner: false,
-    theme: UiTheme.light().copyWith(
+    theme: UiTheme.workspace(Brightness.light).copyWith(
       visualDensity: store.settings.compactDensity
           ? VisualDensity.compact
           : VisualDensity.standard,
     ),
-    darkTheme: UiTheme.dark().copyWith(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: LumenPalette.accent,
-        brightness: Brightness.dark,
-        surface: UiPalette.surface,
-      ),
+    darkTheme: UiTheme.workspace(Brightness.dark).copyWith(
       visualDensity: store.settings.compactDensity
           ? VisualDensity.compact
           : VisualDensity.standard,
@@ -1404,26 +1359,38 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     home: Builder(
       builder: (context) => Scaffold(
         appBar: AppBar(
-          toolbarHeight: MediaQuery.sizeOf(context).width < 600 ? 100 : 56,
+          toolbarHeight: !_directory && MediaQuery.sizeOf(context).width < 600
+              ? 100
+              : 64,
           titleSpacing: 16,
           title: Wrap(
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              const Text(
-                'IntoCaht',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
-              ),
-              const SizedBox(width: 8),
-              TextButton(
-                style: TextButton.styleFrom(
-                  minimumSize: Size.zero,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 12,
+              Tooltip(
+                message: 'Go to homepage',
+                child: TextButton(
+                  onPressed: () => setState(() {
+                    _directory = true;
+                  }),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.onSurface,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 16,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                  child: const Text(
+                    'IntoChat',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 21,
+                      letterSpacing: -0.8,
+                    ),
                   ),
                 ),
-                onPressed: () => setState(() => _directory = true),
-                child: const Text('Projects'),
               ),
               if (_ready && !_directory) ...[
                 const Text('/', style: TextStyle(fontSize: 16)),
@@ -1501,8 +1468,14 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                           : 2,
                       children: [
                         _projects(context),
-                        _projectHome(context),
-                        _workspace(context),
+                        if (store.projects.isNotEmpty)
+                          _projectHome(context)
+                        else
+                          const SizedBox.shrink(),
+                        if (store.projects.isNotEmpty)
+                          _workspace(context)
+                        else
+                          const SizedBox.shrink(),
                       ],
                     ),
                   ),

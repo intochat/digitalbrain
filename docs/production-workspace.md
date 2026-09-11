@@ -4,6 +4,10 @@ The production Flutter entry point now opens the project workspace designed in `
 
 ## Interaction
 
+- All production workspaces open the combined homepage: projects on the left and an Explore template shelf on the right, stacked on narrow screens. IntoChat is the home button; there are no Projects or Explore tabs. Templates offer New IntoChat project, Salesforce Admin, Lead Researcher and Automation Builder. Empty workspaces show the same homepage without creating a placeholder project. Legacy /explore links resolve to this homepage.
+- Starting a project chooses an initial specialist, accepts a goal and an optional project name, and opens the goal as an unsent composer draft. The specialist and draft are saved with the conversation. Specialists remain changeable; choosing one does not connect a service or activate automation.
+- Minimized editors appear in a compact dock with artifact-type icons and distinct titles. Restore retains the existing editor state and window bounds and does not attach the artifact to chat.
+
 - Chat uses the shared `UiChat` / Flutter Chat UI component with streamed Markdown and compact tool receipts. Tables, images, Markdraw drawings and brain scenarios open on the right.
 - Open shows an editor. Attach adds an explicit live reference to the conversation. New conversations start with no attachments. The picker supports multiple artifacts, and table context includes filters and selected row IDs.
 - Project work supports focused, comparison and floating-window layouts, with minimize/restore and saved bounds. Phones switch between Conversation and Workspace.

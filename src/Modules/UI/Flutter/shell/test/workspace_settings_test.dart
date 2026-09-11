@@ -67,7 +67,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Salesforce Administrator'), findsOneWidget);
+    expect(find.text('Salesforce Admin'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

@@ -274,7 +274,7 @@ void main() {
       AgentEvent({'type': 'RUN_STARTED', 'threadId': 't', 'runId': 'saved'}),
     );
     await tester.pump();
-    await tester.tap(find.widgetWithText(TextButton, 'Projects'));
+    await tester.tap(find.byTooltip('Go to homepage'));
     await tester.pump();
     events.add(AgentEvent({'type': 'RUN_FINISHED'}));
     await events.close();

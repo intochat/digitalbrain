@@ -1,5 +1,7 @@
 library;
 
+export 'src/components/project/ui_project_library.dart';
+
 export 'src/chat/ui_chat.dart';
 export 'src/chat/ui_chat_builders.dart';
 export 'src/chat/ui_copyable_message.dart';
@@ -33,3 +35,6 @@ export 'src/theme/ui_theme.dart';
 export 'src/lumen/lumen_brain_graph.dart';
 export 'src/components/table/ui_data_table.dart';
 export 'src/components/table/ui_table_controller.dart';
+
+export 'src/components/project/ui_explore.dart';
+export 'src/components/project/ui_artifact_dock.dart';

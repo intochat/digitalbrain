@@ -110,6 +110,106 @@ abstract final class UiType {
 }
 
 abstract final class UiTheme {
+  /// Neutral workspace surfaces with the shared Lumen accent. Legacy graph and
+  /// chat tokens remain independent while workspace pages migrate.
+  static ThemeData workspace(Brightness brightness) {
+    final darkMode = brightness == Brightness.dark;
+    final base = darkMode ? dark() : light();
+    final scheme =
+        ColorScheme.fromSeed(
+          seedColor: LumenPalette.accent,
+          brightness: brightness,
+        ).copyWith(
+          primary: darkMode ? const Color(0xFF91D3B8) : LumenPalette.accent,
+          onPrimary: darkMode ? const Color(0xFF103B2D) : Colors.white,
+          primaryContainer: darkMode
+              ? const Color(0xFF243B34)
+              : LumenPalette.accentSoft,
+          onPrimaryContainer: darkMode
+              ? const Color(0xFFA5DCC5)
+              : LumenPalette.accent,
+          surface: darkMode ? const Color(0xFF191A1B) : LumenPalette.surface,
+          surfaceContainerLow: darkMode
+              ? const Color(0xFF202122)
+              : LumenPalette.surface,
+          surfaceContainer: darkMode
+              ? const Color(0xFF252627)
+              : LumenPalette.surfaceMuted,
+          surfaceContainerHigh: darkMode
+              ? const Color(0xFF2B2C2D)
+              : LumenPalette.surfaceMuted,
+          onSurface: darkMode ? const Color(0xFFECEBE7) : LumenPalette.ink,
+          onSurfaceVariant: darkMode
+              ? const Color(0xFFA5A6A3)
+              : LumenPalette.muted,
+          outline: darkMode ? const Color(0xFF616360) : LumenPalette.lineStrong,
+          outlineVariant: darkMode
+              ? const Color(0xFF333533)
+              : LumenPalette.line,
+        );
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: scheme.outline),
+    );
+    return base.copyWith(
+      colorScheme: scheme,
+      scaffoldBackgroundColor: darkMode
+          ? const Color(0xFF171819)
+          : LumenPalette.background,
+      textTheme:
+          ThemeData(
+            brightness: brightness,
+            fontFamily: UiType.bodyFamily,
+            fontFamilyFallback: UiType.bodyFallback,
+          ).textTheme.apply(
+            bodyColor: scheme.onSurface,
+            displayColor: scheme.onSurface,
+          ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: darkMode
+            ? const Color(0xFF171819)
+            : LumenPalette.background,
+        foregroundColor: scheme.onSurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        shape: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+      ),
+      dividerColor: scheme.outlineVariant,
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(48, 44),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: scheme.surfaceContainerLow,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+        border: border,
+        enabledBorder: border,
+        focusedBorder: border.copyWith(
+          borderSide: BorderSide(color: scheme.primary, width: 2),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: scheme.surfaceContainerLow,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(color: scheme.outlineVariant),
+        ),
+      ),
+    );
+  }
+
   // Forui + Lumen were selected for the product redesign. Keep the third-party
   // theme behind this bridge while legacy dark components migrate explicitly.
   static final _lumenForui = FThemeData(

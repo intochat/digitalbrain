@@ -165,7 +165,7 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(find.text('Projects'), findsWidgets);
+      expect(find.text('Your projects'), findsWidgets);
       expect(find.byKey(const Key('workspace_graph')), findsNothing);
       expect(transport.calls, 0);
     },

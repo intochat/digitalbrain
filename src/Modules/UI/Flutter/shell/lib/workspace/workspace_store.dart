@@ -34,17 +34,17 @@ const workspaceAgents = <WorkspaceAgent>[
   ),
   WorkspaceAgent(
     'salesforce',
-    'Salesforce Administrator',
+    'Salesforce Admin',
     'Help with CRM structure, administration and diagrams. Live Salesforce access requires a connected service.',
   ),
   WorkspaceAgent(
     'leads',
-    'Lead Generator',
+    'Lead Researcher',
     'Research and organize leads using the tools available to your session.',
   ),
   WorkspaceAgent(
     'automation',
-    'Automation Agent',
+    'Automation Builder',
     'Design and inspect connected scenarios. Drafting does not activate an automation.',
   ),
 ];
@@ -114,6 +114,7 @@ class WorkspaceConversation {
     required this.id,
     required this.title,
     this.selectedAgentId = 'intocaht',
+    this.draft = '',
     Set<String>? attachedArtifactIds,
     List<Map<String, dynamic>>? messages,
     this.threadId,
@@ -123,6 +124,7 @@ class WorkspaceConversation {
   final String id;
   String title;
   String selectedAgentId;
+  String draft;
   String? threadId;
   String? parentRunId;
   Set<String> attachedArtifactIds;
@@ -131,6 +133,7 @@ class WorkspaceConversation {
     'id': id,
     'title': title,
     'selectedAgentId': selectedAgentId,
+    'draft': draft,
     'attachedArtifactIds': attachedArtifactIds.toList(),
     'messages': messages,
     'threadId': threadId,
@@ -141,6 +144,7 @@ class WorkspaceConversation {
         id: json['id'] as String,
         title: _text(json['title'], 'New conversation'),
         selectedAgentId: _text(json['selectedAgentId'], 'intocaht'),
+        draft: _text(json['draft'], ''),
         attachedArtifactIds: _strings(json['attachedArtifactIds']).toSet(),
         messages: (json['messages'] as List? ?? []).map(_map).toList(),
         threadId: json['threadId'] as String?,
@@ -255,9 +259,9 @@ class WorkspacePreferences {
 /// Local, non-secret project state. Call save after changing a mutable record.
 /// Writes are serialized so an older snapshot cannot overwrite a newer one.
 class WorkspaceStore extends ChangeNotifier {
-  WorkspaceStore({WorkspacePersistence? persistence})
+  WorkspaceStore({WorkspacePersistence? persistence, bool seedProject = true})
     : _persistence = persistence ?? PreferencesWorkspacePersistence() {
-    _seed();
+    if (seedProject) _seed();
   }
   final WorkspacePersistence _persistence;
   final List<WorkspaceProject> projects = [];
@@ -321,12 +325,13 @@ class WorkspaceStore extends ChangeNotifier {
             project.presentation.openArtifactIds,
           );
         }
-        if (restored.isNotEmpty) {
-          projects
-            ..clear()
-            ..addAll(restored);
-        }
-        selectedProjectId = _text(json['selectedProjectId'], projects.first.id);
+        projects
+          ..clear()
+          ..addAll(restored);
+        selectedProjectId = _text(
+          json['selectedProjectId'],
+          projects.firstOrNull?.id ?? '',
+        );
         settings = WorkspacePreferences.fromJson(_map(json['settings']));
       }
     } catch (_) {
@@ -362,8 +367,19 @@ class WorkspaceStore extends ChangeNotifier {
   }
 
   Future<void> flush() => _writes;
-  WorkspaceProject createProject(String title) {
-    final c = WorkspaceConversation(id: _id(), title: 'New conversation');
+  WorkspaceProject createProject(
+    String title, {
+    String agentId = 'intocaht',
+    String draft = '',
+  }) {
+    final c = WorkspaceConversation(
+      id: _id(),
+      title: 'New conversation',
+      selectedAgentId: workspaceAgents.any((a) => a.id == agentId)
+          ? agentId
+          : 'intocaht',
+      draft: draft,
+    );
     final p = WorkspaceProject(
       id: _id(),
       title: title.trim().isEmpty ? 'Untitled project' : title.trim(),

@@ -52,14 +52,31 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
   @override
   void initState() {
     super.initState();
+    _composer.text = widget.conversation.draft;
+    _composer.addListener(_saveDraft);
     _entries.addAll(
       widget.conversation.messages.map((e) => Map<String, dynamic>.from(e)),
     );
     _sync(persist: false);
   }
 
+  void _saveDraft() {
+    widget.conversation.draft = _composer.text;
+    _draftTimer?.cancel();
+    _draftTimer = Timer(const Duration(milliseconds: 300), widget.store.save);
+  }
+
+  Timer? _draftTimer;
+
   @override
   void dispose() {
+    // Responsive layouts can remount chat before the debounce fires. Persist
+    // after this frame's disposal, when notifying the store is safe again.
+    if (_draftTimer?.isActive ?? false) {
+      scheduleMicrotask(widget.store.save);
+    }
+    _draftTimer?.cancel();
+    _composer.removeListener(_saveDraft);
     _subscription?.cancel();
     _controller.dispose();
     _composer.dispose();
