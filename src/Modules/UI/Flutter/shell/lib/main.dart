@@ -45,6 +45,7 @@ Widget buildShell({
     store: workspaceStore,
     kernelBaseUri: edge?.baseUri,
     onRun: edge?.runAgent,
+    onSalesforceConnected: edge?.salesforceConnected,
     onCreateArtifact: edge?.createWorkspaceArtifact,
     onReadArtifact: edge?.readWorkspaceArtifact,
     onUpdateArtifact: edge?.updateWorkspaceArtifact,

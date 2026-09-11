@@ -1,12 +1,44 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions.Commands;
+using DigitalBrain.Core;
 using DigitalBrain.Abstractions.Identity;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.Salesforce;
 
-public sealed class SalesforceNativeTools(ISalesforce salesforce, TimeProvider timeProvider)
+public sealed class SalesforceNativeTools(ISalesforce salesforce, TimeProvider timeProvider, BrowserLogins? logins = null)
 {
+    internal AIFunction CreateCurrentAccount() => AIFunctionFactory.Create(GetCurrentAccount,
+        "salesforce_current_account", "Check Salesforce access and return a secure sign-in card when authentication is required.");
+
+    public async Task<bool> IsConnected() => (await salesforce.ReadConnection().ConfigureAwait(false)).Connected;
+
+    public async Task<object> GetCurrentAccount()
+    {
+        try
+        {
+            var user = await GetUserInfo().ConfigureAwait(false);
+            var connection = await salesforce.ReadConnection().ConfigureAwait(false);
+            return new { kind = "connection", service = "salesforce", status = "connected", instanceUrl = connection.InstanceUrl, user = user.Content };
+        }
+        catch (SalesforceNotConnectedException)
+        {
+            return new { kind = "connection", service = "salesforce", status = "authentication_required",
+                loginUrl = logins?.Require().AbsoluteUri, message = "Sign in to Salesforce, then continue your request." };
+        }
+    }
+
+    internal AIFunction CreateSchema()
+    {
+        Task<SalesforceSchema> Invoke(
+            [Description("Salesforce object API name; omit to read the index of all queryable objects.")] string? objectName = null,
+            CancellationToken cancellationToken = default) => GetSchema(objectName, cancellationToken);
+        return AIFunctionFactory.Create(Invoke, "salesforce_schema", "Read actual Salesforce objects, fields and relationships through its hosted MCP. Start with no objectName for the index.");
+    }
+
+    public Task<SalesforceSchema> GetSchema(string? objectName = null, CancellationToken cancellationToken = default)
+        => ReadWithRefreshAsync(() => salesforce.ReadSchema(new ReadSalesforceSchema(objectName), cancellationToken), cancellationToken);
+
     internal AIFunction CreateGetUserInfo()
     {
         Task<SalesforceUserInfo> Invoke(

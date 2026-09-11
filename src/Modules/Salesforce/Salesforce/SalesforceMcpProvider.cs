@@ -9,7 +9,7 @@ namespace DigitalBrain.Salesforce;
 
 internal sealed class SalesforceMcpProvider(Uri? endpoint) : ISalesforceProvider
 {
-    internal static readonly string[] NativeTools = ["getUserInfo", "soqlQuery", "createRecord", "updateRecord"];
+    internal static readonly string[] NativeTools = ["getUserInfo", "getObjectSchema", "soqlQuery", "createRecord", "updateRecord"];
 
     public async Task<JsonElement> InvokeAsync(string tool, JsonElement arguments,
         string accessToken, CancellationToken cancellationToken)
@@ -42,7 +42,7 @@ internal sealed class SalesforceMcpProvider(Uri? endpoint) : ISalesforceProvider
                     }
                     throw new SalesforceUnavailableException("Salesforce returned a provider error.");
                 }
-                return MarkUntrusted(ReadContent(envelope));
+                return MarkUntrusted(ReadContent(envelope, tool == "getObjectSchema"));
             }, cancellationToken).ConfigureAwait(false);
         }
         catch (SalesforceUnavailableException) { throw; }
@@ -95,7 +95,7 @@ internal sealed class SalesforceMcpProvider(Uri? endpoint) : ISalesforceProvider
     {
         if (content.ValueKind != JsonValueKind.Object)
         {
-            throw new SalesforceUnavailableException("Salesforce MCP returned an invalid response shape.");
+            content = JsonSerializer.SerializeToElement(new { data = content });
         }
         var result = JsonNode.Parse(content.GetRawText())!.AsObject();
         // screened at the NativeTools boundary (AI module)
@@ -103,7 +103,7 @@ internal sealed class SalesforceMcpProvider(Uri? endpoint) : ISalesforceProvider
         return JsonSerializer.SerializeToElement(result);
     }
 
-    private static JsonElement ReadContent(JsonElement envelope)
+    private static JsonElement ReadContent(JsonElement envelope, bool allowText = false)
     {
         if (envelope.TryGetProperty("structuredContent", out var structured))
         {
@@ -115,7 +115,8 @@ internal sealed class SalesforceMcpProvider(Uri? endpoint) : ISalesforceProvider
                 .Where(static block => block.TryGetProperty("type", out var type) && type.GetString() == "text")
                 .Select(static block => block.GetProperty("text").GetString()));
             try { using var document = JsonDocument.Parse(text); return document.RootElement.Clone(); }
-            catch (JsonException) { }
+            catch (JsonException) when (allowText && !string.IsNullOrWhiteSpace(text))
+            { return JsonSerializer.SerializeToElement(new { text }); }
         }
         throw new SalesforceUnavailableException("Salesforce MCP returned an invalid response shape.");
     }

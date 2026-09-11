@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using DigitalBrain.AI.WebSearch;
+using DigitalBrain.AI;
 using DigitalBrain.Kernel;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
@@ -15,6 +16,19 @@ namespace DigitalBrain.Tests;
 
 public sealed class ConversationalAgentFacts
 {
+    [Fact]
+    public async Task Registered_salesforce_reads_are_available_in_workspace_chat()
+    {
+        using var model = new ScriptedChatClient();
+        model.CallTool("salesforce_user_info", "{}");
+        model.Say("Connected account verified.");
+        await using var app = await StartAsync(model, new SearchFixture());
+        using var client = app.GetTestClient();
+        var events = await RunAsync(client, "Show my Salesforce setup", Guid.NewGuid().ToString());
+        Assert.Contains(model.Options[0]!.Tools!, tool => tool is AIFunction f && f.Name == "salesforce_user_info");
+        Assert.Contains(events, item => Type(item) == "TOOL_CALL_RESULT" && item.ToString().Contains("Salesforce fixture", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task Search_tool_results_are_streamed_and_returned_to_the_model()
     {
@@ -127,6 +141,9 @@ public sealed class ConversationalAgentFacts
         // Production AIClients also supplies a function-invoking pipeline.
         builder.Services.AddSingleton(new ChatClientBuilder(model).UseFunctionInvocation().Build());
         builder.Services.AddSingleton(search);
+        builder.Services.AddSingleton<NativeTools>();
+        builder.Services.AddNativeTool("salesforce_user_info", _ => AIFunctionFactory.Create(
+            () => new { user = "Salesforce fixture" }, "salesforce_user_info"));
         builder.AddConversationalAgent();
         var app = builder.Build();
         app.UseBasicAuthGate();

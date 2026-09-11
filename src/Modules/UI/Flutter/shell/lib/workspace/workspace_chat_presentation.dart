@@ -73,6 +73,71 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
     final result = entry['result'];
     final map = result is Map ? result : null;
     final kind = map?['kind'];
+    if (kind == 'connection' && map?['service'] == 'salesforce') {
+      final needsLogin = map?['status'] == 'authentication_required';
+      final loginUrl = map?['loginUrl'] as String?;
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: colors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: colors.outlineVariant),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.cloud_outlined, color: colors.primary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      needsLogin
+                          ? 'Connect Salesforce'
+                          : 'Salesforce connected',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                needsLogin
+                    ? 'Sign in securely in your browser. Your request will continue automatically.'
+                    : (map?['instanceUrl'] as String? ??
+                          'Your account is ready.'),
+              ),
+              if (needsLogin) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (loginUrl != null)
+                      FilledButton.icon(
+                        onPressed: () => _open(loginUrl),
+                        icon: const Icon(Icons.open_in_new, size: 16),
+                        label: const Text('Sign in to Salesforce'),
+                      ),
+                    TextButton(
+                      onPressed: _running
+                          ? null
+                          : () {
+                              _composer.text = 'Continue my Salesforce setup review using the connected org and show its structure in the workspace.';
+                              _send();
+                            },
+                      child: const Text('Continue after sign-in'),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
     if (['table', 'diagram', 'brain', 'image', 'document'].contains(kind)) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

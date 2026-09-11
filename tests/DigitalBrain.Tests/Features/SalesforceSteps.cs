@@ -44,6 +44,29 @@ public sealed class SalesforceSteps(BrainWorld world)
             },
         });
 
+    [Then("Salesforce offers a secure sign-in card")]
+    public async Task SalesforceSignInCard()
+    {
+        var tools = world.Brain.SiloServices.GetRequiredService<SalesforceNativeTools>();
+        var card = JsonSerializer.SerializeToElement(await tools.GetCurrentAccount());
+        Assert.Equal("authentication_required", card.GetProperty("status").GetString());
+        Assert.StartsWith("http://localhost:5080/integrations/salesforce/login?request=", card.GetProperty("loginUrl").GetString());
+        await Assert.ThrowsAsync<SalesforceNotConnectedException>(() => tools.GetSchema());
+    }
+
+    [Then("Salesforce schema reads return object names and relationships")]
+    public async Task SalesforceSchemaReads()
+    {
+        var tools = world.Brain.SiloServices.GetRequiredService<SalesforceNativeTools>();
+        var index = await tools.GetSchema();
+        Assert.Equal(2, index.Content.GetProperty("objects").GetArrayLength());
+        Assert.Equal("Account", index.Content.GetProperty("relationships")[0].GetProperty("to").GetString());
+        var detail = await tools.GetSchema("Contact");
+        Assert.Equal("Contact", detail.Content.GetProperty("objectName").GetString());
+        Assert.Equal("AccountId", detail.Content.GetProperty("fields")[0].GetProperty("name").GetString());
+        Assert.True(detail.Content.GetProperty("untrustedData").GetBoolean());
+    }
+
     [When("the Salesforce account connects")]
     public Task ConnectSalesforce() => ConnectSalesforce(3600);
 

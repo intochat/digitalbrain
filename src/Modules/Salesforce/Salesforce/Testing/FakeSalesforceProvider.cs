@@ -14,6 +14,9 @@ internal sealed class FakeSalesforceProvider : ISalesforceProvider
         var payload = tool switch
         {
             "getUserInfo" => """{"mode":"fake","user":"Salesforce fixture"}""",
+            "getObjectSchema" => arguments.TryGetProperty("object-name", out var objectName)
+                ? JsonSerializer.Serialize(new { objectName = objectName.GetString(), fields = new[] { new { name = "AccountId", type = "reference", referenceTo = "Account" } } })
+                : """{"objects":[{"name":"Account"},{"name":"Contact"}],"relationships":[{"from":"Contact","to":"Account","field":"AccountId"}]}""",
             "soqlQuery" => """{"mode":"fake","records":[],"totalSize":0}""",
             "createRecord" or "updateRecord" => """{"mode":"fake","id":"record-intochat"}""",
             _ => throw new SalesforceUnavailableException("This Salesforce operation is not allowed."),

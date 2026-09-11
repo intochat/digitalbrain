@@ -17,6 +17,120 @@ class _Memory implements WorkspacePersistence {
 
 void main() {
   testWidgets(
+    'successful browser login resumes the original request once and preserves draft',
+    (tester) async {
+      final store = WorkspaceStore(persistence: _Memory());
+      store.currentConversation.draft = 'My next question';
+      store.currentConversation.messages.addAll([
+        {
+          'id': 'request',
+          'role': 'user',
+          'text': 'Draw my actual Salesforce objects',
+        },
+        {
+          'id': 'login',
+          'role': 'tool',
+          'result': {
+            'kind': 'connection',
+            'service': 'salesforce',
+            'status': 'authentication_required',
+          },
+        },
+      ]);
+      var connected = false;
+      final prompts = <String>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: WorkspaceChat(
+              conversation: store.currentConversation,
+              store: store,
+              onArtifact: (_) {},
+              onAttach: () {},
+              onSalesforceConnected: () async => connected,
+              onRun:
+                  ({
+                    required threadId,
+                    required runId,
+                    parentRunId,
+                    required text,
+                  }) {
+                    prompts.add(text);
+                    return Stream.value(AgentEvent({'type': 'RUN_FINISHED'}));
+                  },
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(seconds: 3));
+      expect(prompts, isEmpty);
+      connected = true;
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      expect(prompts.single, startsWith('Draw my actual Salesforce objects'));
+      expect(store.currentConversation.draft, 'My next question');
+      expect(find.text('Salesforce connected'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 6));
+      expect(prompts, hasLength(1));
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets(
+    'Salesforce sign-in card opens browser and continues the request',
+    (tester) async {
+      final store = WorkspaceStore(persistence: _Memory());
+      store.currentConversation.messages.add({
+        'id': 'login',
+        'role': 'tool',
+        'complete': true,
+        'name': 'salesforce_current_account',
+        'result': {
+          'kind': 'connection',
+          'service': 'salesforce',
+          'status': 'authentication_required',
+          'loginUrl': 'https://workspace.example/integrations/salesforce/login?request=fixture',
+        },
+      });
+      Uri? opened;
+      String? prompt;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: WorkspaceChat(
+              conversation: store.currentConversation,
+              store: store,
+              onArtifact: (_) {},
+              onAttach: () {},
+              onOpenUrl: (url) async {
+                opened = url;
+              },
+              onRun:
+                  ({
+                    required threadId,
+                    required runId,
+                    parentRunId,
+                    required text,
+                  }) {
+                    prompt = text;
+                    return Stream.value(AgentEvent({'type': 'RUN_FINISHED'}));
+                  },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Connect Salesforce'), findsOneWidget);
+      await tester.tap(find.text('Sign in to Salesforce'));
+      expect(opened?.path, '/integrations/salesforce/login');
+      await tester.tap(find.text('Continue after sign-in'));
+      await tester.pumpAndSettle();
+      expect(prompt, contains('Salesforce setup review'));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'Enter sends, Shift Enter keeps a draft, and stop retains partial text',
     (tester) async {
       final store = WorkspaceStore(persistence: _Memory());

@@ -25,6 +25,7 @@ class WorkspaceApp extends StatefulWidget {
     this.persistenceKey = 'intocaht.workspace.v1',
     this.onRun,
     this.onOpenUrl,
+    this.onSalesforceConnected,
     this.kernelBaseUri,
     this.statusMessage,
     this.onReadTable,
@@ -43,6 +44,7 @@ class WorkspaceApp extends StatefulWidget {
   final String persistenceKey;
   final AgentRunner? onRun;
   final Future<void> Function(Uri)? onOpenUrl;
+  final Future<bool> Function()? onSalesforceConnected;
   final Uri? kernelBaseUri;
   final String? statusMessage;
   final ReadTable? onReadTable;
@@ -1038,6 +1040,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                         store: store,
                         onRun: widget.onRun,
                         onOpenUrl: widget.onOpenUrl,
+                        onSalesforceConnected: widget.onSalesforceConnected,
                         onArtifact: (result) =>
                             _accept(result, project: project),
                         onAttach: () => _attach(context),

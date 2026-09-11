@@ -36,3 +36,21 @@ Native interaction evidence and verification limits are recorded in [workspace v
 ## Dependencies
 
 Markdraw 0.2.0 currently requires two narrow workspace overrides: `freezed_annotation 3.1.x` (Markdraw declares but does not use it; Chat Core needs 3.x) and `re_editor 0.9.0` (implements the current Flutter text-input interface while retaining the parameter names Markdraw uses). Real controller/editor tests cover the integration. Revisit these overrides when upgrading Markdraw.
+
+## Salesforce workspace access
+
+The direct `/agent` endpoint resolves the registered Salesforce read tools from `NativeTools`.
+The earlier streaming-agent switch (`7a307f30`) did not forward these integrations, so a selected
+Salesforce specialist had only web search and workspace tools. The UI role alone never connected it.
+
+`salesforce_current_account` verifies the account and returns a secure browser sign-in card when
+needed. While a Salesforce request is waiting for sign-in, the active conversation checks the authenticated backend connection status every three seconds. A successful login resumes the original request once, preserves the composer draft, and updates the connection card. Continue remains available as a manual fallback. `salesforce_schema` invokes hosted MCP
+`getObjectSchema`: omit the object name for the index, then request details to inspect fields and
+relationships. The assistant uses those observations to create a saved workspace diagram and can
+create an inventory table. These tools do not expose Salesforce mutations to workspace chat.
+
+Metadata is untrusted evidence and is limited by the authenticated user's access and the provider
+response budget. A diagram must report its observed scope rather than imply an exhaustive org audit.
+
+Verification: the endpoint tool regression, integration sign-in/schema reads, and Flutter sign-in
+card tests cover this path. Live testing confirmed an authentication-required card and, after browser login, retrieval of the connected org index (33 queryable objects).

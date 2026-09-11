@@ -23,6 +23,7 @@ class WorkspaceChat extends StatefulWidget {
     required this.store,
     this.onRun,
     this.onOpenUrl,
+    this.onSalesforceConnected,
     required this.onArtifact,
     required this.onAttach,
     this.onTranscribe,
@@ -35,6 +36,7 @@ class WorkspaceChat extends StatefulWidget {
   final bool active;
   final AgentRunner? onRun;
   final Future<void> Function(Uri)? onOpenUrl;
+  final Future<bool> Function()? onSalesforceConnected;
   final void Function(Map<String, dynamic>) onArtifact;
   final VoidCallback onAttach;
   final Future<String> Function(Uint8List, String)? onTranscribe;
@@ -61,6 +63,10 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
       widget.conversation.messages.map((e) => Map<String, dynamic>.from(e)),
     );
     _sync(persist: false);
+    _authTimer = Timer.periodic(
+      const Duration(seconds: 3),
+      (_) => _checkSalesforce(),
+    );
   }
 
   void _saveDraft() {
@@ -69,7 +75,59 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
     _draftTimer = Timer(const Duration(milliseconds: 300), widget.store.save);
   }
 
-  Timer? _draftTimer;
+  Timer? _draftTimer, _authTimer;
+  bool _checkingAuth = false;
+
+  Map<String, dynamic>? get _pendingSalesforce {
+    for (final entry in _entries.reversed) {
+      if (entry['role'] == 'user') return null;
+      final result = entry['result'];
+      if (result is Map && result['service'] == 'salesforce') {
+        return result['status'] == 'authentication_required' ? entry : null;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _checkSalesforce() async {
+    final check = widget.onSalesforceConnected;
+    final pending = _pendingSalesforce;
+    if (check == null ||
+        pending == null ||
+        _checkingAuth ||
+        _running ||
+        !widget.active ||
+        widget.onRun == null) {
+      return;
+    }
+    _checkingAuth = true;
+    try {
+      if (await check() &&
+          mounted &&
+          widget.active &&
+          !_running &&
+          identical(pending, _pendingSalesforce)) {
+        final index = _entries.indexOf(pending);
+        final original =
+            _entries
+                    .take(index)
+                    .where((e) => e['role'] == 'user')
+                    .lastOrNull?['text']
+                as String?;
+        if (original == null) return;
+        pending['result'] = {
+          ...pending['result'] as Map,
+          'status': 'connected',
+        };
+        _sync();
+        _send(resumeText: original);
+      }
+    } catch (_) {
+      // A temporary network failure must not consume the pending request.
+    } finally {
+      _checkingAuth = false;
+    }
+  }
 
   @override
   void dispose() {
@@ -78,6 +136,7 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
     if (_draftTimer?.isActive ?? false) {
       scheduleMicrotask(widget.store.save);
     }
+    _authTimer?.cancel();
     _draftTimer?.cancel();
     _composer.removeListener(_saveDraft);
     _subscription?.cancel();
@@ -108,8 +167,8 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
     }
   }
 
-  void _send() {
-    final text = _composer.text.trim();
+  void _send({String? resumeText}) {
+    final text = (resumeText ?? _composer.text).trim();
     final run = widget.onRun;
     if (text.isEmpty || _running || run == null) return;
     final c = widget.conversation;
@@ -119,7 +178,7 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
     if (_entries.length == 1) {
       c.title = text.length > 60 ? '${text.substring(0, 60)}…' : text;
     }
-    _composer.clear();
+    if (resumeText == null) _composer.clear();
     _sync();
     setState(() {
       _running = true;

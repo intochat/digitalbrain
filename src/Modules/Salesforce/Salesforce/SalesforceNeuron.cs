@@ -106,6 +106,18 @@ internal sealed class SalesforceNeuron(
         return new(result, result.GetProperty("totalSize").GetInt32());
     }
 
+    public async Task<SalesforceSchema> ReadSchema(ReadSalesforceSchema query, CancellationToken cancellationToken = default)
+    {
+        var objectName = query.ObjectName;
+        if (objectName is not null && (objectName.Length is < 1 or > 255 || !objectName.All(c => char.IsAsciiLetterOrDigit(c) || c == '_')))
+        {
+            throw new SalesforceUnavailableException("Use a Salesforce object API name.");
+        }
+        var arguments = objectName is null ? EmptyArguments()
+            : JsonSerializer.SerializeToElement(new Dictionary<string, string> { ["object-name"] = objectName });
+        return new(await ReadAsync("getObjectSchema", arguments, cancellationToken).ConfigureAwait(true));
+    }
+
     public async Task<SalesforceUserInfo> ReadUserInfo(CancellationToken cancellationToken = default)
         => new(await ReadAsync("getUserInfo", EmptyArguments(), cancellationToken).ConfigureAwait(true));
 

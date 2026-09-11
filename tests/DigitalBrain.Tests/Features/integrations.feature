@@ -86,3 +86,10 @@ Feature: Integrations
     Then the exact Salesforce preview is published without writing
     When the Salesforce preflight rejects the schema and its snapshot loses activation
     Then the Salesforce preflight reports uncertainty and a fresh preview can be prepared
+
+  Scenario: Salesforce schema reads require sign-in and return the connected org metadata
+    Given a running brain with the Salesforce module in fake mode
+    Then Salesforce offers a secure sign-in card
+    When the Salesforce account connects
+    Then the Salesforce connection is reported
+    And Salesforce schema reads return object names and relationships

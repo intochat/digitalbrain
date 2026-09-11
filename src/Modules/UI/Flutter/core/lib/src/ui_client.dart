@@ -107,6 +107,11 @@ final class DigitalBrainUiClient {
     return text;
   }
 
+  Future<bool> salesforceConnected() async =>
+      (await _tableRequest('GET', '/agent/connections/salesforce')
+          as Map)['connected'] ==
+      true;
+
   Future<Map<String, dynamic>> workspaceCapabilities() async =>
       Map<String, dynamic>.from(
         await _tableRequest('GET', '/agent/capabilities') as Map,

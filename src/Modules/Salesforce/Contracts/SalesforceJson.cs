@@ -21,6 +21,8 @@ namespace DigitalBrain.Salesforce;
 [JsonSerializable(typeof(SalesforceWritePreview))]
 [JsonSerializable(typeof(SalesforceQueryResult))]
 [JsonSerializable(typeof(SalesforceUserInfo))]
+[JsonSerializable(typeof(SalesforceSchema))]
+[JsonSerializable(typeof(ReadSalesforceSchema))]
 [JsonSerializable(typeof(Accepted<SignalId>))]
 [JsonSerializable(typeof(Accepted<SalesforceConnection>))]
 [JsonSerializable(typeof(Accepted<SalesforceWritePreview>))]

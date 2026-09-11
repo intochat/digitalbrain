@@ -32,6 +32,9 @@ public interface ISalesforce : INeuron
     [ReadOnly, Alias("query")]
     Task<SalesforceQueryResult> Query(SoqlQuery query, CancellationToken cancellationToken = default);
 
+    [ReadOnly, Alias("schema")]
+    Task<SalesforceSchema> ReadSchema(ReadSalesforceSchema query, CancellationToken cancellationToken = default);
+
     [ReadOnly, Alias("user")]
     Task<SalesforceUserInfo> ReadUserInfo(CancellationToken cancellationToken = default);
 }

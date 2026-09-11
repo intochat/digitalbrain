@@ -7,6 +7,8 @@ internal static class WorkspaceEndpoints
 {
     public static IEndpointRouteBuilder MapWorkspaceEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapGet("/agent/connections/salesforce", async (IServiceProvider services) =>
+            Results.Ok(new { connected = services.GetService<DigitalBrain.Salesforce.SalesforceNativeTools>() is { } tools && await tools.IsConnected() }));
         endpoints.MapGet("/agent/capabilities", (IServiceProvider services, IConfiguration configuration) => Results.Ok(new
         {
             webSearch = services.GetService<IWebSearch>() is not null,
