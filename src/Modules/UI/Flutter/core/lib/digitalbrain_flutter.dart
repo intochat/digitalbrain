@@ -1,4 +1,5 @@
 export 'src/ui_models.dart';
+export 'src/models/table_models.dart';
 export 'src/agent_events.dart';
 export 'src/models/brain_models.dart';
 export 'src/models/execution_activity.dart';

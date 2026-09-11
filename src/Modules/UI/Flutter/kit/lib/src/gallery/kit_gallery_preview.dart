@@ -18,6 +18,8 @@ import '../components/graph/kit_graph_navigator.dart';
 import '../components/graph/kit_graph_view.dart';
 import '../components/image/kit_image.dart';
 import '../components/sheet/kit_sheet.dart';
+import '../components/table/kit_data_table.dart';
+import '../components/table/kit_table_controller.dart';
 import '../components/view/kit_view.dart';
 import '../lumen/ino_presence.dart';
 import '../lumen/lumen_brain_graph.dart';
@@ -25,6 +27,61 @@ import '../lumen/lumen_controls.dart';
 import '../lumen/lumen_palette.dart';
 import '../models/kit_part.dart';
 import '../theme/kit_theme.dart';
+
+class _DataTablePreview extends StatefulWidget {
+  const _DataTablePreview({super.key, required this.state});
+  final String state;
+  @override
+  State<_DataTablePreview> createState() => _DataTablePreviewState();
+}
+
+class _DataTablePreviewState extends State<_DataTablePreview> {
+  late final KitTableController _controller;
+  @override
+  void initState() {
+    super.initState();
+    final snapshot = TableSnapshot(
+      id: 'gallery-table',
+      title: 'Local table fixture',
+      revision: 1,
+      columns: const [
+        TableColumn(id: 'name', label: 'Item', type: 'text'),
+        TableColumn(id: 'count', label: 'Count', type: 'number'),
+      ],
+      rows: widget.state == 'Empty'
+          ? []
+          : [
+              TableRowData(id: 'one', cells: ['Sample item', 12]),
+            ],
+      filters: [],
+      visibleColumns: ['name', 'count'],
+      totalRows: widget.state == 'Empty' ? 0 : 1,
+      filteredRows: widget.state == 'Empty' ? 0 : 1,
+      offset: 0,
+      limit: 50,
+    );
+    _controller =
+        KitTableController(
+            snapshot: snapshot,
+            read: widget.state == 'Disabled'
+                ? null
+                : (id, {offset = 0, limit = 50}) async => snapshot,
+          )
+          ..busy = widget.state == 'Loading'
+          ..error = widget.state == 'Error'
+              ? 'Example: table could not be loaded. Refresh to retry.'
+              : null;
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => KitDataTable(controller: _controller);
+}
 
 final class GalleryEntry {
   const GalleryEntry(
@@ -87,10 +144,10 @@ const galleryEntries = [
   ),
   GalleryEntry(
     'presence',
-    'Ino presence',
+    'IntoCaht presence',
     'Foundations',
     Icons.face_outlined,
-    'The shared Ino face expresses observed activity and attention.',
+    'The shared IntoCaht face expresses observed activity and attention.',
     'InoPresence(state: InoPresenceState.…)',
     'These presentation examples do not start work or record audio. The component respects reduced motion.',
     [
@@ -179,6 +236,16 @@ const galleryEntries = [
     true,
   ),
   GalleryEntry(
+    'data-table',
+    'Data table',
+    'Data & time',
+    Icons.table_view_outlined,
+    'The typed artifact table with column, filter, sorting and paging controls.',
+    'KitDataTable(controller: KitTableController(snapshot: …, read: …, update: …))',
+    'This fixture is read-only; backend view updates are not connected. Loading and Error exercise the controller’s actual feedback. Disabled omits the reader as well.',
+    ['Normal', 'Empty', 'Loading', 'Error', 'Disabled'],
+  ),
+  GalleryEntry(
     'clock',
     'Clock & countdown',
     'Data & time',
@@ -252,7 +319,7 @@ final class _GalleryPreviewState extends State<GalleryPreview> {
   String _display = '42', _lastAction = 'Select a sample to inspect it.';
   DateTime _due = DateTime.now().toUtc().add(const Duration(minutes: 1));
   static const _nodes = [
-    GraphNode(id: 'ino', label: 'Ino', kind: GraphNodeKind.hub),
+    GraphNode(id: 'ino', label: 'IntoCaht', kind: GraphNodeKind.hub),
     GraphNode(id: 'memory', label: 'Memory'),
     GraphNode(id: 'view', label: 'View'),
   ];
@@ -625,6 +692,8 @@ final class _GalleryPreviewState extends State<GalleryPreview> {
                   ],
           ),
         );
+      case 'data-table':
+        return _DataTablePreview(key: ValueKey(_state), state: _state);
       case 'view':
         return _stack([
           KitView(
@@ -655,7 +724,7 @@ final class _GalleryPreviewState extends State<GalleryPreview> {
             chatController: _chat,
             currentUserId: 'owner',
             resolveUser: (id) async =>
-                User(id: id, name: id == 'ino' ? 'Ino' : 'You'),
+                User(id: id, name: id == 'ino' ? 'IntoCaht' : 'You'),
             onMessageSend: (text) => _chat.insertMessage(
               TextMessage(
                 id: 'local-${_count++}',
@@ -696,7 +765,7 @@ final class _GalleryPreviewState extends State<GalleryPreview> {
                           id: 'ino',
                           type: 'assistant',
                           name: 'ino',
-                          label: 'Ino',
+                          label: 'IntoCaht',
                           module: 'AI',
                         ),
                         BrainNeuron(

@@ -31,3 +31,5 @@ export 'src/lumen/ino_presence.dart';
 export 'src/lumen/neuron_icon.dart';
 export 'src/theme/kit_theme.dart';
 export 'src/lumen/lumen_brain_graph.dart';
+export 'src/components/table/kit_data_table.dart';
+export 'src/components/table/kit_table_controller.dart';

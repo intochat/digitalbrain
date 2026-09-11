@@ -5,6 +5,10 @@ namespace DigitalBrain.UI;
 // is the documented contract for that body, and the records it points at are the shapes.
 public static class UIVocabulary
 {
+    public const string TableType = "table";
+    public const string TableCreating = "TableCreating";
+    public const string TableUpdating = "TableUpdating";
+    public const string TableListed = "TableListed";
     // ---- grain types ----
 
     public const string ChatType = "uichat";

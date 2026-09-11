@@ -44,6 +44,10 @@ internal sealed class BrainHttp : IAsyncDisposable
         {
             builder.Services.AddSingleton(images);
         }
+        if (brain.SiloServices.GetService<TableService>() is { } tables)
+        {
+            builder.Services.AddSingleton(tables);
+        }
         if (brain.SiloServices.GetService<IAudioTranscriptionService>() is { } transcription)
         {
             builder.Services.AddSingleton(transcription);

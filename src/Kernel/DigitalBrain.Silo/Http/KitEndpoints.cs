@@ -9,6 +9,10 @@ internal static class KitEndpoints
 {
     public static IEndpointRouteBuilder MapKitEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        if (endpoints.ServiceProvider.GetService<TableService>() is not null)
+        {
+            endpoints.MapTableEndpoints();
+        }
         MapRead<IChart, ChartState>(endpoints, "/kit/charts/{name}", UIVocabulary.ChartType,
             static neuron => neuron.Read(), static state => state);
         MapRead<IGraph, GraphState>(endpoints, "/kit/graphs/{name}", UIVocabulary.GraphType,

@@ -67,7 +67,7 @@ final class _KitGalleryScreenState extends State<KitGalleryScreen> {
                               ),
                             ),
                             Text(
-                              'The building blocks of DigitalBrain',
+                              'The building blocks of IntoCaht',
                               style: TextStyle(
                                 color: LumenPalette.muted,
                                 fontSize: 13,

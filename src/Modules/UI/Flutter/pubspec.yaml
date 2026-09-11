@@ -8,3 +8,10 @@ workspace:
   - core
   - kit
   - shell
+
+# Markdraw 0.2.0 declares the old annotation package but does not import it.
+# Chat Core uses 3.x; Markdraw editor/controller behavior is covered by tests.
+dependency_overrides:
+  freezed_annotation: ^3.1.0
+  # Earlier re_editor does not implement Flutter's current TextInputClient.
+  re_editor: 0.9.0

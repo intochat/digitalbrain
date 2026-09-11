@@ -27,16 +27,19 @@ app.UseBasicAuthGate();
 app.MapDefaultEndpoints();
 app.MapOrleansDashboard("/orleans");
 app.MapConversationalAgent();
+app.MapWorkspaceEndpoints();
 app.MapKitEndpoints();
+app.MapBrainObservationEndpoints();
 
-// Graph capabilities are optional; ordinary chat never enters the neuron pipeline.
+// Graph HTTP capabilities are optional; conversation handling stays direct.
+// Table tools use UI neurons independently of these graph routes.
 if (app.Configuration.GetValue<bool>("DigitalBrain:Graph:Enabled"))
 {
     app.UseSessionNeuron();
     app.MapDigitalBrainMcp("/mcp");
     app.MapSurfaceEndpoints();
     app.MapActivityEndpoints();
-    app.MapGraphEndpoints();
+    app.MapGraphMutationEndpoints();
 }
 
 app.Run();

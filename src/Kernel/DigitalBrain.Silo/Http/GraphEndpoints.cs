@@ -10,6 +10,12 @@ internal static class GraphEndpoints
 {
     public static IEndpointRouteBuilder MapGraphEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapBrainObservationEndpoints();
+        return endpoints.MapGraphMutationEndpoints();
+    }
+
+    public static IEndpointRouteBuilder MapBrainObservationEndpoints(this IEndpointRouteBuilder endpoints)
+    {
         endpoints.MapGet("/chats/{chatName}/brain",
             static async Task<IResult> (string chatName, IGrainFactory grains, HttpContext http, IConfiguration configuration,
                 CancellationToken cancellationToken) =>
@@ -30,6 +36,11 @@ internal static class GraphEndpoints
                     token => BrainGraphProjection.ReadAsync(grains, chat, session, token), "brain-snapshot", wake, options, cancellationToken);
             }).AddEndpointFilter(new NeuronNameFilter("chatName"));
 
+        return endpoints;
+    }
+
+    public static IEndpointRouteBuilder MapGraphMutationEndpoints(this IEndpointRouteBuilder endpoints)
+    {
         endpoints.MapPost("/chats/{chatName}/brain/subscriptions",
             static async Task<IResult> (BrainGraphSubscriptionRequest request, IGrainFactory grains,
                 CancellationToken cancellationToken) =>

@@ -14,6 +14,7 @@ public sealed class UIModule : IModule
     public void Configure(ISiloBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
+        builder.Services.TryAddSingleton<TableService>();
         // Resolved lazily so the choice does not depend on whether the host registered its blob
         // client before or after this module.
         builder.Services.TryAddSingleton<IKitImageStore>(services =>

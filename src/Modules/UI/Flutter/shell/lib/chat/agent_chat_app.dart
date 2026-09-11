@@ -22,10 +22,16 @@ class AgentChatApp extends StatelessWidget {
     this.onRun,
     this.onOpenUrl,
     this.statusMessage,
+    this.onReadTable,
+    this.onUpdateTableView,
+    this.onListTables,
   });
   final AgentRunner? onRun;
   final Future<void> Function(Uri)? onOpenUrl;
   final String? statusMessage;
+  final ReadTable? onReadTable;
+  final UpdateTableView? onUpdateTableView;
+  final ListTables? onListTables;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -36,6 +42,9 @@ class AgentChatApp extends StatelessWidget {
       onRun: onRun,
       onOpenUrl: onOpenUrl,
       statusMessage: statusMessage,
+      onReadTable: onReadTable,
+      onUpdateTableView: onUpdateTableView,
+      onListTables: onListTables,
     ),
   );
 }
@@ -52,10 +61,20 @@ class _Entry {
 }
 
 class _Conversation extends StatefulWidget {
-  const _Conversation({this.onRun, this.onOpenUrl, this.statusMessage});
+  const _Conversation({
+    this.onRun,
+    this.onOpenUrl,
+    this.statusMessage,
+    this.onReadTable,
+    this.onUpdateTableView,
+    this.onListTables,
+  });
   final AgentRunner? onRun;
   final Future<void> Function(Uri)? onOpenUrl;
   final String? statusMessage;
+  final ReadTable? onReadTable;
+  final UpdateTableView? onUpdateTableView;
+  final ListTables? onListTables;
   @override
   State<_Conversation> createState() => _ConversationState();
 }
@@ -65,6 +84,10 @@ class _ConversationState extends State<_Conversation> {
   final _composer = TextEditingController();
   final _scroll = ScrollController();
   final _entries = <_Entry>[];
+  final _tables = <String, KitTableController>{};
+  String? _activeTableId;
+  int _tableGeneration = 0;
+  bool _openingTable = false;
   StreamSubscription<AgentEvent>? _subscription;
   String _threadId = _uuid.v4();
   String? _parentRunId;
@@ -77,6 +100,10 @@ class _ConversationState extends State<_Conversation> {
   @override
   void dispose() {
     _generation++;
+    _tableGeneration++;
+    for (final table in _tables.values) {
+      table.dispose();
+    }
     unawaited(_subscription?.cancel());
     _composer.dispose();
     _scroll.dispose();
@@ -104,7 +131,9 @@ class _ConversationState extends State<_Conversation> {
             threadId: _threadId,
             runId: runId,
             parentRunId: _parentRunId,
-            text: text,
+            text: _activeTableId == null
+                ? text
+                : '$text\n\n[Active table context: ${jsonEncode(_activeTableId)}. Read current state with read_table before answering or changing this table.]',
           ).listen(
             (event) {
               if (mounted && generation == _generation) _event(event);
@@ -189,6 +218,18 @@ class _ConversationState extends State<_Conversation> {
             } on FormatException {
               entry.result = content;
             }
+            final result = entry.result;
+            if (result is Map && result['kind'] == 'table') {
+              try {
+                final table = TableSnapshot.fromJson(
+                  Map<String, dynamic>.from(result),
+                );
+                _acceptTable(table);
+                _activeTableId = table.id;
+              } catch (_) {
+                // A malformed tool result remains inspectable as ordinary JSON.
+              }
+            }
             entry.complete = true;
           }
       }
@@ -211,6 +252,13 @@ class _ConversationState extends State<_Conversation> {
 
   void _newConversation() {
     _generation++;
+    _tableGeneration++;
+    _openingTable = false;
+    for (final table in _tables.values) {
+      table.dispose();
+    }
+    _tables.clear();
+    _activeTableId = null;
     unawaited(_subscription?.cancel());
     _subscription = null;
     setState(() {
@@ -267,6 +315,49 @@ class _ConversationState extends State<_Conversation> {
   Widget _tool(_Entry entry) {
     final result = entry.result;
     final map = result is Map ? result : null;
+    if (map?['kind'] == 'tableError') {
+      return Card(
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Table request could not be completed',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                map?['message'] is String
+                    ? map!['message'] as String
+                    : 'Read the current table and try again.',
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    final table = map?['kind'] == 'table' ? _tables[map?['id']] : null;
+    if (table != null) {
+      return KitDataTable(
+        controller: table,
+        active: _activeTableId == table.snapshot.id,
+        onActivate: () => setState(() => _activeTableId = table.snapshot.id),
+      );
+    }
     final sources = map?['results'];
     final isSearch = entry.name == 'search_web' && sources is List;
     return Card(
@@ -355,6 +446,12 @@ class _ConversationState extends State<_Conversation> {
         style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
       ),
       actions: [
+        if (widget.onListTables != null && widget.onReadTable != null)
+          IconButton(
+            tooltip: 'Saved tables',
+            onPressed: _openingTable ? null : _openSavedTables,
+            icon: const Icon(Icons.table_chart_outlined),
+          ),
         IconButton(
           tooltip: 'New conversation',
           onPressed: _newConversation,
@@ -369,6 +466,26 @@ class _ConversationState extends State<_Conversation> {
           constraints: const BoxConstraints(maxWidth: 860),
           child: Column(
             children: [
+              if (_activeTableId case final activeId?)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Active table: ${_tables[activeId]?.snapshot.title ?? activeId}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Clear active table',
+                        onPressed: () => setState(() => _activeTableId = null),
+                        icon: const Icon(Icons.close, size: 18),
+                      ),
+                    ],
+                  ),
+                ),
               Expanded(
                 child: _entries.isEmpty
                     ? const Center(
@@ -510,4 +627,98 @@ class _ConversationState extends State<_Conversation> {
       ),
     ),
   );
+
+  void _acceptTable(TableSnapshot snapshot) {
+    final existing = _tables[snapshot.id];
+    if (existing != null) {
+      existing.accept(snapshot);
+    } else {
+      _tables[snapshot.id] = KitTableController(
+        snapshot: snapshot,
+        read: widget.onReadTable,
+        update: widget.onUpdateTableView,
+      );
+    }
+  }
+
+  Future<void> _openSavedTables() async {
+    final list = widget.onListTables;
+    final read = widget.onReadTable;
+    if (list == null || read == null || _openingTable) return;
+    final generation = _tableGeneration;
+    final future = list();
+    final id = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Saved tables'),
+        content: SizedBox(
+          width: 420,
+          child: FutureBuilder<List<TableSummary>>(
+            future: future,
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Text('Could not load saved tables. ${snapshot.error}');
+              }
+              if (!snapshot.hasData) {
+                return const SizedBox(
+                  height: 80,
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (snapshot.data!.isEmpty) {
+                return const Text(
+                  'No saved tables yet. Ask DigitalBrain to create one.',
+                );
+              }
+              return ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 400),
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (final table in snapshot.data!)
+                      ListTile(
+                        leading: const Icon(Icons.table_chart_outlined),
+                        title: Text(table.title),
+                        subtitle: Text(table.id),
+                        onTap: () => Navigator.pop(context, table.id),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || generation != _tableGeneration || id == null) return;
+    setState(() => _openingTable = true);
+    try {
+      final snapshot = await read(id);
+      if (!mounted || generation != _tableGeneration) return;
+      setState(() {
+        _acceptTable(snapshot);
+        _activeTableId = snapshot.id;
+        final entry = _Entry(_uuid.v4(), 'tool')
+          ..name = 'read_table'
+          ..result = snapshot.toJson()
+          ..complete = true;
+        _entries.add(entry);
+      });
+      _followOutput(force: true);
+    } catch (e) {
+      if (mounted && generation == _tableGeneration) {
+        setState(() => _notice = 'Could not open the table. $e');
+      }
+    } finally {
+      if (mounted && generation == _tableGeneration) {
+        setState(() => _openingTable = false);
+      }
+    }
+  }
 }

@@ -14,6 +14,7 @@ import 'sse_frames.dart';
 import 'ui_models.dart';
 import 'models/brain_models.dart';
 import 'models/execution_activity.dart';
+import 'models/table_models.dart';
 
 final class DigitalBrainUiClient {
   static const _uuid = Uuid();
@@ -25,7 +26,8 @@ final class DigitalBrainUiClient {
     required this.baseUri,
     http.Client? httpClient,
     BasicCredentials? credentials,
-  }) : _http = httpClient is CookieHttpClient
+  }) : workspaceIdentity = credentials?.username ?? 'local-owner',
+       _http = httpClient is CookieHttpClient
            ? httpClient
            : CookieHttpClient(
                httpClient ?? http.Client(),
@@ -69,8 +71,183 @@ final class DigitalBrainUiClient {
   }
 
   final Uri baseUri;
+
+  /// Non-secret scope for local workspace preferences; never includes credentials.
+  final String workspaceIdentity;
   final CookieHttpClient _http;
   final bool _ownsClient;
+
+  /// Transcription only: callers review the draft before starting an agent run.
+  Future<String> transcribeVoice({
+    required List<int> audioBytes,
+    String fileName = 'voice.wav',
+  }) async {
+    if (audioBytes.isEmpty) throw ArgumentError('Audio is empty.');
+    final request =
+        http.MultipartRequest(
+            'POST',
+            baseUri.replace(path: '/agent/transcribe'),
+          )
+          ..files.add(
+            http.MultipartFile.fromBytes(
+              'audio',
+              audioBytes,
+              filename: fileName,
+            ),
+          );
+    final response = await http.Response.fromStream(await _http.send(request));
+    if (response.statusCode != 200) {
+      throw StateError('Voice transcription unavailable: ${response.body}');
+    }
+    final body = jsonDecode(response.body) as Map;
+    final text = body['text'];
+    if (text is! String || text.trim().isEmpty) {
+      throw StateError('No speech was recognized.');
+    }
+    return text;
+  }
+
+  Future<Map<String, dynamic>> workspaceCapabilities() async =>
+      Map<String, dynamic>.from(
+        await _tableRequest('GET', '/agent/capabilities') as Map,
+      );
+
+  Future<List<Map<String, dynamic>>> listWorkspaceArtifacts() async =>
+      (await _tableRequest('GET', '/workspace/artifacts') as List)
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+
+  Future<Map<String, dynamic>> readWorkspaceArtifact(String id) async =>
+      Map<String, dynamic>.from(
+        await _tableRequest(
+          'GET',
+          '/workspace/artifacts/${Uri.encodeComponent(id)}',
+        ) as Map,
+      );
+
+  Future<Map<String, dynamic>> createWorkspaceArtifact({
+    required String kind,
+    required String title,
+    required Map<String, dynamic> content,
+  }) async => Map<String, dynamic>.from(
+    await _tableRequest(
+      'POST',
+      '/workspace/artifacts',
+      body: {'kind': kind, 'title': title, 'content': content},
+    ) as Map,
+  );
+
+  Future<Map<String, dynamic>> updateWorkspaceArtifact(
+    String id, {
+    required int expectedRevision,
+    required String title,
+    required Map<String, dynamic> content,
+  }) async => Map<String, dynamic>.from(
+    await _tableRequest(
+      'PUT',
+      '/workspace/artifacts/${Uri.encodeComponent(id)}',
+      body: {
+        'expectedRevision': expectedRevision,
+        'title': title,
+        'content': content,
+      },
+    ) as Map,
+  );
+
+  Future<List<TableSummary>> listTables() async {
+    final body = await _tableRequest('GET', '/kit/tables');
+    return (body as List)
+        .map(
+          (item) =>
+              TableSummary.fromJson(Map<String, dynamic>.from(item as Map)),
+        )
+        .toList();
+  }
+
+  Future<TableSnapshot> readTable(
+    String id, {
+    int offset = 0,
+    int limit = 50,
+  }) async => TableSnapshot.fromJson(
+    Map<String, dynamic>.from(
+      await _tableRequest(
+        'GET',
+        '/kit/tables/${Uri.encodeComponent(id)}?offset=$offset&limit=$limit',
+      ) as Map,
+    ),
+  );
+
+  Future<TableSnapshot> createTable({
+    required String title,
+    required List<TableColumn> columns,
+    required List<TableRowData> rows,
+  }) async => TableSnapshot.fromJson(
+    Map<String, dynamic>.from(
+      await _tableRequest(
+        'POST',
+        '/kit/tables',
+        body: {
+          'title': title,
+          'columns': columns.map((x) => x.toJson()).toList(),
+          'rows': rows.map((x) => x.toJson()).toList(),
+        },
+      ) as Map,
+    ),
+  );
+
+  Future<TableSnapshot> updateTableView(
+    String id,
+    TableViewUpdate update,
+  ) async => TableSnapshot.fromJson(
+    Map<String, dynamic>.from(
+      await _tableRequest(
+        'PUT',
+        '/kit/tables/${Uri.encodeComponent(id)}/view',
+        body: update.toJson(),
+      ) as Map,
+    ),
+  );
+
+  Future<Object?> _tableRequest(
+    String method,
+    String path, {
+    Map<String, Object?>? body,
+  }) async {
+    final abort = Completer<void>();
+    final request = http.AbortableRequest(
+      method,
+      baseUri.resolve(path),
+      abortTrigger: abort.future,
+    );
+    if (body != null) {
+      request.headers['content-type'] = 'application/json';
+      request.body = jsonEncode(body);
+    }
+    final response = await _http
+        .send(request)
+        .then(http.Response.fromStream)
+        .timeout(
+          const Duration(seconds: 40),
+          onTimeout: () {
+            abort.complete();
+            throw TimeoutException('Table request timed out.');
+          },
+        );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      var message = response.body;
+      try {
+        final error = jsonDecode(message);
+        if (error is Map) {
+          final detail = error['error'] ?? error['detail'];
+          if (detail is String) message = detail;
+        }
+      } on FormatException {
+        // Non-JSON proxy/server failures still carry their original text.
+      }
+      throw TableRequestException(response.statusCode, message);
+    }
+    return jsonDecode(response.body);
+  }
 
   /// Sends only the new user message; the server owns conversation history.
   /// Canceling the subscription aborts both pending HTTP and response streaming.

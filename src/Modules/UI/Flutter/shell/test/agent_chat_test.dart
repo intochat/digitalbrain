@@ -3,9 +3,17 @@ import 'dart:async';
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_flutter_shell/chat/agent_chat_app.dart';
 import 'package:digitalbrain_flutter_shell/main.dart';
+import 'package:digitalbrain_flutter_shell/workspace/workspace_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+
+class TestWorkspacePersistence implements WorkspacePersistence {
+  @override
+  Future<String?> read() async => null;
+  @override
+  Future<void> write(String value) async {}
+}
 
 class NoRequests extends http.BaseClient {
   int calls = 0;
@@ -141,12 +149,15 @@ void main() {
   );
 
   testWidgets(
-    'default shell starts conversation without graph or legacy streams',
+    'default shell starts project directory without graph or legacy streams',
     (tester) async {
       final transport = NoRequests();
       await tester.pumpWidget(
         buildShell(
           chat: 'main',
+          workspaceStore: WorkspaceStore(
+            persistence: TestWorkspacePersistence(),
+          ),
           edge: DigitalBrainUiClient(
             baseUri: Uri.parse('http://localhost'),
             httpClient: transport,
@@ -154,7 +165,7 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(find.text('How can I help?'), findsOneWidget);
+      expect(find.text('Projects'), findsWidgets);
       expect(find.byKey(const Key('workspace_graph')), findsNothing);
       expect(transport.calls, 0);
     },

@@ -35,14 +35,17 @@ final class _LumenBrainGraphState extends State<LumenBrainGraph> {
   final _positions = <String, Offset>{};
   bool _viewInitialized = false;
 
-  void _fit(Size viewport, Size canvas) {
+  void _fit(Size viewport, Rect bounds) {
     final scale = math
-        .min(viewport.width / canvas.width, viewport.height / canvas.height)
-        .clamp(0.15, 1.0);
+        .min(
+          (viewport.width - 32) / bounds.width,
+          (viewport.height - 32) / bounds.height,
+        )
+        .clamp(0.15, 1.25);
     _transform.value = Matrix4.identity()
       ..translateByDouble(
-        (viewport.width - canvas.width * scale) / 2,
-        (viewport.height - canvas.height * scale) / 2,
+        viewport.width / 2 - bounds.center.dx * scale,
+        viewport.height / 2 - bounds.center.dy * scale,
         0,
         1,
       )
@@ -74,7 +77,7 @@ final class _LumenBrainGraphState extends State<LumenBrainGraph> {
       );
     for (final node in ordered) {
       _positions.putIfAbsent(node.id, () {
-        if (brainNeuronIcon(node) == NeuronIconKind.assistant) {
+        if (_positions.isEmpty) {
           return const Offset(450, 300);
         }
         final index = _positions.length - 1;
@@ -95,6 +98,12 @@ final class _LumenBrainGraphState extends State<LumenBrainGraph> {
     final positions = {
       for (final node in ordered) node.id: _positions[node.id]!,
     };
+    final contentBounds =
+        positions.values.fold<Rect?>(null, (bounds, point) {
+          final tile = Rect.fromCenter(center: point, width: 180, height: 200);
+          return bounds == null ? tile : bounds.expandToInclude(tile);
+        }) ??
+        const Rect.fromLTWH(0, 0, 900, 600);
     final size = Size(
       math.max(
         900,
@@ -124,7 +133,7 @@ final class _LumenBrainGraphState extends State<LumenBrainGraph> {
     return LayoutBuilder(
       builder: (context, constraints) {
         if (!_viewInitialized) {
-          _fit(constraints.biggest, size);
+          _fit(constraints.biggest, contentBounds);
           _viewInitialized = true;
         }
         return Stack(
@@ -235,7 +244,7 @@ final class _LumenBrainGraphState extends State<LumenBrainGraph> {
               bottom: 8,
               child: IconButton.filledTonal(
                 tooltip: 'Reset graph view',
-                onPressed: () => _fit(constraints.biggest, size),
+                onPressed: () => _fit(constraints.biggest, contentBounds),
                 icon: const Icon(Icons.center_focus_strong_outlined, size: 18),
               ),
             ),
