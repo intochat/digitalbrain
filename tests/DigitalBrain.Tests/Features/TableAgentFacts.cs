@@ -58,7 +58,9 @@ public sealed class TableAgentFacts
         using var stale = await client.PutAsJsonAsync($"/ui/tables/{id}/view", new
         {
             expectedRevision = created.GetProperty("revision").GetInt64(),
-            filters = Array.Empty<object>(), sort = (object?)null, visibleColumns = new[] { "name", "price" },
+            filters = Array.Empty<object>(),
+            sort = (object?)null,
+            visibleColumns = new[] { "name", "price" },
         }, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
         model.CallTool("update_table_view", JsonSerializer.Serialize(new
@@ -85,7 +87,9 @@ public sealed class TableAgentFacts
             view = new
             {
                 expectedRevision = read.GetProperty("revision").GetInt64(),
-                filters = Array.Empty<object>(), sort = (object?)null, visibleColumns = new[] { "name", "price" },
+                filters = Array.Empty<object>(),
+                sort = (object?)null,
+                visibleColumns = new[] { "name", "price" },
             },
         }));
         model.Say("That change conflicted; I need to read the table again.");
@@ -140,9 +144,13 @@ public sealed class TableAgentFacts
     {
         using var response = await client.PostAsJsonAsync("/agent", new
         {
-            threadId = Guid.NewGuid().ToString(), runId = Guid.NewGuid().ToString(),
+            threadId = Guid.NewGuid().ToString(),
+            runId = Guid.NewGuid().ToString(),
             messages = new[] { new { id = Guid.NewGuid().ToString(), role = "user", content = text } },
-            tools = Array.Empty<object>(), context = Array.Empty<object>(), state = new { }, forwardedProps = new { },
+            tools = Array.Empty<object>(),
+            context = Array.Empty<object>(),
+            state = new { },
+            forwardedProps = new { },
         }, TestContext.Current.CancellationToken);
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.True(response.IsSuccessStatusCode, body);

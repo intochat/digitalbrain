@@ -97,9 +97,12 @@ internal static class TablePolicy
         var comparison = Compare(type, cell, filter.Value);
         return filter.Operator switch
         {
-            "eq" => comparison == 0, "neq" => comparison != 0,
-            "gt" => comparison > 0, "gte" => comparison >= 0,
-            "lt" => comparison < 0, "lte" => comparison <= 0,
+            "eq" => comparison == 0,
+            "neq" => comparison != 0,
+            "gt" => comparison > 0,
+            "gte" => comparison >= 0,
+            "lt" => comparison < 0,
+            "lte" => comparison <= 0,
             _ => false,
         };
     }

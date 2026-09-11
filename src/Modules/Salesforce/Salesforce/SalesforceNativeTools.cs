@@ -23,8 +23,14 @@ public sealed class SalesforceNativeTools(ISalesforce salesforce, TimeProvider t
         }
         catch (SalesforceNotConnectedException)
         {
-            return new { kind = "connection", service = "salesforce", status = "authentication_required",
-                loginUrl = logins?.Require().AbsoluteUri, message = "Sign in to Salesforce, then continue your request." };
+            return new
+            {
+                kind = "connection",
+                service = "salesforce",
+                status = "authentication_required",
+                loginUrl = logins?.Require().AbsoluteUri,
+                message = "Sign in to Salesforce, then continue your request."
+            };
         }
     }
 

@@ -47,7 +47,9 @@ public sealed class WorkspaceFacts
         using var client = app.GetTestClient();
         var invalid = await client.PostAsJsonAsync("/workspace/artifacts", new
         {
-            kind = "brain", title = "Invalid", content = new
+            kind = "brain",
+            title = "Invalid",
+            content = new
             {
                 nodes = new[] { new { id = "a", type = "agent", name = "a", label = "Agent" } },
                 synapses = new[] { new { id = "edge", sourceId = "a", targetId = "missing", signalType = "asks", kind = "draft" } },

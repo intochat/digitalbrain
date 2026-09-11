@@ -20,39 +20,40 @@ class MemoryWorkspace implements WorkspacePersistence {
 }
 
 void main() {
-  testWidgets('window titles fit and opening a saved item brings its editor forward', (
-    tester,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(1268, 900));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    final store = WorkspaceStore(persistence: MemoryWorkspace());
-    await store.load();
-    for (var i = 0; i < 6; i++) {
-      store.addArtifact(
-        WorkspaceArtifact(
-          id: 'tab$i',
-          title: 'A very long artifact title for project document number $i',
-          kind: 'document',
-        ),
-      );
-      store.openArtifact('tab$i');
-    }
-    await tester.pumpWidget(WorkspaceApp(store: store));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('My project'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('New conversation'));
-    await tester.pumpAndSettle();
-    final last = find.byKey(const ValueKey('window-tab5'));
-    expect(tester.getRect(last).right, lessThanOrEqualTo(1268));
-    expect(store.currentProject.presentation.activeArtifactId, 'tab5');
-    store.openArtifact('tab0');
-    await tester.pumpAndSettle();
-    final first = find.byKey(const ValueKey('window-tab0'));
-    expect(tester.getRect(first).left, greaterThanOrEqualTo(428));
-    expect(tester.getRect(first).right, lessThanOrEqualTo(1268));
-    expect(tester.takeException(), isNull);
-  });
+  testWidgets(
+    'window titles fit and opening a saved item brings its editor forward',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1268, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final store = WorkspaceStore(persistence: MemoryWorkspace());
+      await store.load();
+      for (var i = 0; i < 6; i++) {
+        store.addArtifact(
+          WorkspaceArtifact(
+            id: 'tab$i',
+            title: 'A very long artifact title for project document number $i',
+            kind: 'document',
+          ),
+        );
+        store.openArtifact('tab$i');
+      }
+      await tester.pumpWidget(WorkspaceApp(store: store));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('My project'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('New conversation'));
+      await tester.pumpAndSettle();
+      final last = find.byKey(const ValueKey('window-tab5'));
+      expect(tester.getRect(last).right, lessThanOrEqualTo(1268));
+      expect(store.currentProject.presentation.activeArtifactId, 'tab5');
+      store.openArtifact('tab0');
+      await tester.pumpAndSettle();
+      final first = find.byKey(const ValueKey('window-tab0'));
+      expect(tester.getRect(first).left, greaterThanOrEqualTo(428));
+      expect(tester.getRect(first).right, lessThanOrEqualTo(1268));
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets(
     'live graph selections remain local and never await artifact sync',
     (tester) async {
