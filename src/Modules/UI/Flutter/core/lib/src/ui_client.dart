@@ -3,19 +3,22 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:uuid/uuid.dart';
 
 import 'basic_credentials.dart';
+import 'agent_events.dart';
 import 'cookie_http_client.dart';
 import 'host_environment.dart';
-import 'sse_chat_delta_frames.dart';
 import 'sse_chat_frames.dart';
 import 'sse_frames.dart';
 import 'ui_models.dart';
 import 'models/brain_models.dart';
-import 'models/application_models.dart';
 import 'models/execution_activity.dart';
+import 'models/table_models.dart';
 
-final class DigitalBrainUiClient implements ApplicationStudioApi {
+final class DigitalBrainUiClient {
+  static const _uuid = Uuid();
+
   /// Gated on the kernel; 404 when the kernel runs ungated.
   static const authCheckPath = '/auth/check';
 
@@ -23,7 +26,8 @@ final class DigitalBrainUiClient implements ApplicationStudioApi {
     required this.baseUri,
     http.Client? httpClient,
     BasicCredentials? credentials,
-  }) : _http = httpClient is CookieHttpClient
+  }) : workspaceIdentity = credentials?.username ?? 'local-owner',
+       _http = httpClient is CookieHttpClient
            ? httpClient
            : CookieHttpClient(
                httpClient ?? http.Client(),
@@ -67,154 +71,256 @@ final class DigitalBrainUiClient implements ApplicationStudioApi {
   }
 
   final Uri baseUri;
+
+  /// Non-secret scope for local workspace preferences; never includes credentials.
+  final String workspaceIdentity;
   final CookieHttpClient _http;
   final bool _ownsClient;
 
-  @override
-  Future<List<ApplicationSummary>> listApplications() async {
-    final response = await _request(
-      'GET',
-      '/applications',
-      timeout: const Duration(seconds: 15),
-    );
-    return (jsonDecode(response.body) as List)
+  /// Transcription only: callers review the draft before starting an agent run.
+  Future<String> transcribeVoice({
+    required List<int> audioBytes,
+    String fileName = 'voice.wav',
+  }) async {
+    if (audioBytes.isEmpty) throw ArgumentError('Audio is empty.');
+    final request =
+        http.MultipartRequest(
+            'POST',
+            baseUri.replace(path: '/agent/transcribe'),
+          )
+          ..files.add(
+            http.MultipartFile.fromBytes(
+              'audio',
+              audioBytes,
+              filename: fileName,
+            ),
+          );
+    final response = await http.Response.fromStream(await _http.send(request));
+    if (response.statusCode != 200) {
+      throw StateError('Voice transcription unavailable: ${response.body}');
+    }
+    final body = jsonDecode(response.body) as Map;
+    final text = body['text'];
+    if (text is! String || text.trim().isEmpty) {
+      throw StateError('No speech was recognized.');
+    }
+    return text;
+  }
+
+  Future<bool> salesforceConnected() async =>
+      (await _tableRequest('GET', '/agent/connections/salesforce')
+          as Map)['connected'] ==
+      true;
+
+  Future<Map<String, dynamic>> workspaceCapabilities() async =>
+      Map<String, dynamic>.from(
+        await _tableRequest('GET', '/agent/capabilities') as Map,
+      );
+
+  Future<List<Map<String, dynamic>>> listWorkspaceArtifacts() async =>
+      (await _tableRequest('GET', '/workspace/artifacts') as List)
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+
+  Future<Map<String, dynamic>> readWorkspaceArtifact(String id) async =>
+      Map<String, dynamic>.from(
+        await _tableRequest(
+          'GET',
+          '/workspace/artifacts/${Uri.encodeComponent(id)}',
+        ) as Map,
+      );
+
+  Future<Map<String, dynamic>> createWorkspaceArtifact({
+    required String kind,
+    required String title,
+    required Map<String, dynamic> content,
+  }) async => Map<String, dynamic>.from(
+    await _tableRequest(
+      'POST',
+      '/workspace/artifacts',
+      body: {'kind': kind, 'title': title, 'content': content},
+    ) as Map,
+  );
+
+  Future<Map<String, dynamic>> updateWorkspaceArtifact(
+    String id, {
+    required int expectedRevision,
+    required String title,
+    required Map<String, dynamic> content,
+  }) async => Map<String, dynamic>.from(
+    await _tableRequest(
+      'PUT',
+      '/workspace/artifacts/${Uri.encodeComponent(id)}',
+      body: {
+        'expectedRevision': expectedRevision,
+        'title': title,
+        'content': content,
+      },
+    ) as Map,
+  );
+
+  Future<List<TableSummary>> listTables() async {
+    final body = await _tableRequest('GET', '/ui/tables');
+    return (body as List)
         .map(
-          (value) => ApplicationSummary.fromJson(
-            (value as Map).cast<String, dynamic>(),
-          ),
+          (item) =>
+              TableSummary.fromJson(Map<String, dynamic>.from(item as Map)),
         )
         .toList();
   }
 
-  @override
-  Future<String> applicationTemplate(String key) async {
-    final response = await _request(
-      'GET',
-      '/applications/${Uri.encodeComponent(key)}/template',
-      timeout: const Duration(seconds: 15),
-    );
-    return jsonDecode(response.body) as String;
-  }
-
-  @override
-  Future<ApplicationSource> readApplication(String key) async {
-    final response = await _request(
-      'GET',
-      '/applications/${Uri.encodeComponent(key)}',
-      timeout: const Duration(seconds: 15),
-    );
-    return ApplicationSource.fromJson(
-      jsonDecode(response.body) as Map<String, dynamic>,
-    );
-  }
-
-  @override
-  Future<List<String>> listApplicationFiles(String key) async {
-    final response = await _request(
-      'GET',
-      '/applications/${Uri.encodeComponent(key)}/files',
-    );
-    return (jsonDecode(response.body) as List).cast<String>();
-  }
-
-  @override
-  Future<ApplicationSource> readApplicationFile(String key, String path) async {
-    final uri = Uri(
-      path: '/applications/${Uri.encodeComponent(key)}/file',
-      queryParameters: {'path': path},
-    );
-    final response = await _request('GET', uri.toString());
-    return ApplicationSource.fromJson(
-      jsonDecode(response.body) as Map<String, dynamic>,
-    );
-  }
-
-  Future<Map<String, dynamic>> _applicationCommand(
-    String key,
-    String operation,
-    Map<String, Object?> body,
-  ) async {
-    final response = await _request(
-      'POST',
-      '/applications/${Uri.encodeComponent(key)}/$operation',
-      body: body,
-      timeout: const Duration(seconds: 30),
-    );
-    return jsonDecode(response.body) as Map<String, dynamic>;
-  }
-
-  @override
-  Future<ApplicationSource> saveApplication(
-    String key, {
-    required String source,
-    required String? expectedRevision,
-  }) async => ApplicationSource.fromJson(
-    await _applicationCommand(key, 'save', {
-      'source': source,
-      'expectedRevision': expectedRevision,
-    }),
+  Future<TableSnapshot> readTable(
+    String id, {
+    int offset = 0,
+    int limit = 50,
+  }) async => TableSnapshot.fromJson(
+    Map<String, dynamic>.from(
+      await _tableRequest(
+        'GET',
+        '/ui/tables/${Uri.encodeComponent(id)}?offset=$offset&limit=$limit',
+      ) as Map,
+    ),
   );
 
-  @override
-  Future<ApplicationSource> saveApplicationFile(
-    String key, {
-    required String path,
-    required String source,
-    required String expectedRevision,
-  }) async => ApplicationSource.fromJson(
-    await _applicationCommand(key, 'file', {
-      'path': path,
-      'source': source,
-      'expectedRevision': expectedRevision,
-    }),
+  Future<TableSnapshot> createTable({
+    required String title,
+    required List<TableColumn> columns,
+    required List<TableRowData> rows,
+  }) async => TableSnapshot.fromJson(
+    Map<String, dynamic>.from(
+      await _tableRequest(
+        'POST',
+        '/ui/tables',
+        body: {
+          'title': title,
+          'columns': columns.map((x) => x.toJson()).toList(),
+          'rows': rows.map((x) => x.toJson()).toList(),
+        },
+      ) as Map,
+    ),
   );
 
-  @override
-  Future<ApplicationScenarioReport?> readApplicationScenarios(
-    String key, {
-    required String expectedSourceRevision,
+  Future<TableSnapshot> updateTableView(
+    String id,
+    TableViewUpdate update,
+  ) async => TableSnapshot.fromJson(
+    Map<String, dynamic>.from(
+      await _tableRequest(
+        'PUT',
+        '/ui/tables/${Uri.encodeComponent(id)}/view',
+        body: update.toJson(),
+      ) as Map,
+    ),
+  );
+
+  Future<Object?> _tableRequest(
+    String method,
+    String path, {
+    Map<String, Object?>? body,
   }) async {
-    final uri = Uri(
-      path: '/applications/${Uri.encodeComponent(key)}/scenarios',
-      queryParameters: {'expectedSourceRevision': expectedSourceRevision},
+    final abort = Completer<void>();
+    final request = http.AbortableRequest(
+      method,
+      baseUri.resolve(path),
+      abortTrigger: abort.future,
     );
-    final response = await _request('GET', uri.toString(), allowNotFound: true);
-    if (response.statusCode == 404) return null;
-    final decoded = jsonDecode(response.body);
-    return decoded == null
-        ? null
-        : ApplicationScenarioReport.fromJson(decoded as Map<String, dynamic>);
+    if (body != null) {
+      request.headers['content-type'] = 'application/json';
+      request.body = jsonEncode(body);
+    }
+    final response = await _http
+        .send(request)
+        .then(http.Response.fromStream)
+        .timeout(
+          const Duration(seconds: 40),
+          onTimeout: () {
+            abort.complete();
+            throw TimeoutException('Table request timed out.');
+          },
+        );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      var message = response.body;
+      try {
+        final error = jsonDecode(message);
+        if (error is Map) {
+          final detail = error['error'] ?? error['detail'];
+          if (detail is String) message = detail;
+        }
+      } on FormatException {
+        // Non-JSON proxy/server failures still carry their original text.
+      }
+      throw TableRequestException(response.statusCode, message);
+    }
+    return jsonDecode(response.body);
   }
 
-  @override
-  Future<ApplicationScenarioReport> runApplicationScenarios(
-    String key, {
-    required String expectedSourceRevision,
-  }) async => ApplicationScenarioReport.fromJson(
-    await _applicationCommand(key, 'scenarios/run', {
-      'expectedSourceRevision': expectedSourceRevision,
-    }),
-  );
-
-  @override
-  Future<ApplicationValidation> validateApplication(
-    String key, {
-    required String expectedSourceRevision,
-  }) async => ApplicationValidation.fromJson(
-    await _applicationCommand(key, 'validate', {
-      'expectedSourceRevision': expectedSourceRevision,
-    }),
-  );
-
-  @override
-  Future<ApplicationActivation> activateApplication(
-    String key, {
-    required String expectedSourceRevision,
-  }) async => ApplicationActivation.fromJson(
-    await _applicationCommand(key, 'activate', {
-      'expectedSourceRevision': expectedSourceRevision,
-    }),
-  );
+  /// Sends only the new user message; the server owns conversation history.
+  /// Canceling the subscription aborts both pending HTTP and response streaming.
+  Stream<AgentEvent> runAgent({
+    required String threadId,
+    required String runId,
+    String? parentRunId,
+    required String text,
+  }) {
+    final abort = Completer<void>();
+    StreamSubscription<AgentEvent>? incoming;
+    late StreamController<AgentEvent> controller;
+    controller = StreamController<AgentEvent>(
+      onListen: () async {
+        try {
+          final request =
+              http.AbortableRequest(
+                  'POST',
+                  baseUri.resolve('/agent'),
+                  abortTrigger: abort.future,
+                )
+                ..headers.addAll({
+                  'accept': 'text/event-stream',
+                  'content-type': 'application/json',
+                })
+                ..body = jsonEncode({
+                  'threadId': threadId,
+                  'runId': runId,
+                  'parentRunId': ?parentRunId,
+                  'messages': [
+                    {'id': _uuid.v4(), 'role': 'user', 'content': text},
+                  ],
+                  'tools': <Object>[],
+                  'context': <Object>[],
+                  'state': <String, Object>{},
+                  'forwardedProps': <String, Object>{},
+                });
+          final response = await _http.send(request);
+          if (abort.isCompleted) {
+            await response.stream.listen(null).cancel();
+            return;
+          }
+          if (response.statusCode != 200) {
+            await response.stream.listen(null).cancel();
+            throw StateError('Agent request failed (${response.statusCode}).');
+          }
+          incoming = decodeAgentEvents(response.stream).listen(
+            controller.add,
+            onError: (Object error, StackTrace stack) {
+              if (!abort.isCompleted) controller.addError(error, stack);
+            },
+            onDone: controller.close,
+            cancelOnError: false,
+          );
+        } catch (error, stack) {
+          if (!abort.isCompleted) {
+            controller.addError(error, stack);
+            unawaited(controller.close());
+          }
+        }
+      },
+      onCancel: () async {
+        if (!abort.isCompleted) abort.complete();
+        await incoming?.cancel();
+      },
+    );
+    return controller.stream;
+  }
 
   Future<List<ChatTurnEvent>> readActivityResults({
     required String surfaceName,
@@ -270,13 +376,14 @@ final class DigitalBrainUiClient implements ApplicationStudioApi {
             }
             if (line.isEmpty) {
               if (data.isNotEmpty &&
-                  (event == 'snapshot' || event == 'activity')) {
+                  (event == 'reset' || event == 'activity')) {
                 final json =
                     jsonDecode(data.join('\n')) as Map<String, dynamic>;
-                if (event == 'snapshot') {
+                if (event == 'reset') {
                   items.clear();
                   for (final item
-                      in (json['activities'] as List? ?? const [])
+                      in ((json['state'] as Map)['activities'] as List? ??
+                              const [])
                           .whereType<Map>()) {
                     final activity = ExecutionActivity.fromJson(
                       Map<String, dynamic>.from(item),
@@ -407,7 +514,6 @@ final class DigitalBrainUiClient implements ApplicationStudioApi {
     String path, {
     Map<String, Object?>? body,
     Duration? timeout,
-    bool allowNotFound = false,
   }) async {
     final abort = timeout == null ? null : Completer<void>();
     final request = abort == null
@@ -433,8 +539,7 @@ final class DigitalBrainUiClient implements ApplicationStudioApi {
               throw TimeoutException('$method $path timed out', timeout);
             },
           );
-    if ((response.statusCode < 200 || response.statusCode >= 300) &&
-        !(allowNotFound && response.statusCode == 404)) {
+    if (response.statusCode < 200 || response.statusCode >= 300) {
       throw StateError(
         '$method $path failed: ${response.statusCode} ${response.body}',
       );
@@ -442,27 +547,16 @@ final class DigitalBrainUiClient implements ApplicationStudioApi {
     return response;
   }
 
-  Future<void> openScene({
-    required String shellName,
-    required String sceneKey,
+  Future<void> openSurface({
+    required String surfaceName,
+    required String surfaceKey,
     required String title,
   }) async {
-    final uri = baseUri.replace(path: '/owner/commands');
-    final request = http.Request('POST', uri)
-      ..headers['content-type'] = 'application/json'
-      ..body = jsonEncode({
-        'kind': 'surface.open',
-        'surfaceName': shellName,
-        'surfaceKey': sceneKey,
-        'title': title,
-      });
-    final streamed = await _http.send(request);
-    final response = await http.Response.fromStream(streamed);
-    if (response.statusCode != 202) {
-      throw StateError(
-        'surface.open failed: ${response.statusCode} ${response.body}',
-      );
-    }
+    await _request(
+      'POST',
+      '/surfaces/${Uri.encodeComponent(surfaceName)}/open',
+      body: {'surfaceKey': surfaceKey, 'title': title},
+    );
   }
 
   Future<void> activateControl({
@@ -477,31 +571,41 @@ final class DigitalBrainUiClient implements ApplicationStudioApi {
           '${Uri.encodeComponent(controlId)}/activate',
       body: ActivateControlRequest(
         intent: intent,
-        sceneKey: surfaceKey,
+        surfaceKey: surfaceKey,
       ).toJson(),
     );
   }
 
   Future<void> cancelTurn({
     required String chatName,
-    required String commandId,
     required String turnId,
   }) async {
     await _request(
       'POST',
-      '/owner/commands',
-      body: {
-        'kind': 'chat.cancel-turn',
-        'chatName': chatName,
-        'commandId': commandId,
-        'turnId': turnId,
-      },
+      '/chats/${Uri.encodeComponent(chatName)}/turns/${Uri.encodeComponent(turnId)}/cancel',
     );
   }
 
-  Stream<SceneOpenedEvent> watchShellEvents({
-    required String shellName,
+  Stream<SurfaceStreamEvent> watchSurfaceEvents({
+    required String surfaceName,
     int afterSequence = 0,
+  }) => _watchEvents<SurfaceStreamEvent>(
+    path: '/surfaces/${Uri.encodeComponent(surfaceName)}/events',
+    afterSequence: afterSequence,
+    newParser: SseSurfaceEventParser.new,
+    resumeCursor: (event) => switch (event) {
+      SurfaceSignalObserved(:final sequence) => sequence,
+      SurfaceStreamReset(:final cursor) => cursor,
+    },
+    failureLabel: 'surface events',
+  );
+
+  Stream<T> _watchEvents<T>({
+    required String path,
+    required int afterSequence,
+    required SseFrameParser<T> Function() newParser,
+    required int? Function(T event) resumeCursor,
+    required String failureLabel,
   }) {
     var cursor = afterSequence;
     var cancelled = false;
@@ -510,17 +614,13 @@ final class DigitalBrainUiClient implements ApplicationStudioApi {
     Completer<void>? requestAbort;
     StreamSubscription<String>? incoming;
     DateTime? connectedAt;
-    late StreamController<SceneOpenedEvent> controller;
+    late StreamController<T> controller;
     late Future<void> Function() connect;
 
-    void emit(SceneOpenedEvent event) {
+    void emit(T event) {
       if (cancelled) return;
-      // Shared composition uses zero because its journal has a separate cursor.
-      // It must replay on reconnect even after principal events advanced ours.
-      if (event.sequence > 0) {
-        if (event.sequence <= cursor) return;
-        cursor = event.sequence;
-      }
+      final nextCursor = resumeCursor(event);
+      if (nextCursor != null) cursor = nextCursor;
       controller.add(event);
     }
 
@@ -550,7 +650,7 @@ final class DigitalBrainUiClient implements ApplicationStudioApi {
         final request = http.AbortableRequest(
           'GET',
           baseUri.replace(
-            path: '/surfaces/${Uri.encodeComponent(shellName)}/events',
+            path: path,
             queryParameters: {'afterSequence': '$cursor'},
           ),
           abortTrigger: abort.future,
@@ -561,10 +661,10 @@ final class DigitalBrainUiClient implements ApplicationStudioApi {
         if (cancelled || response.statusCode != 200) {
           await response.stream.listen(null).cancel();
           if (cancelled) return;
-          throw StateError('shell events failed: ${response.statusCode}');
+          throw StateError('$failureLabel failed: ${response.statusCode}');
         }
         connectedAt = DateTime.now();
-        final parser = SseSceneOpenedParser();
+        final parser = newParser();
         incoming = response.stream
             .transform(utf8.decoder)
             .transform(const LineSplitter())
@@ -593,7 +693,7 @@ final class DigitalBrainUiClient implements ApplicationStudioApi {
         reconnect();
       }
     };
-    controller = StreamController<SceneOpenedEvent>(
+    controller = StreamController<T>(
       onListen: () => unawaited(connect()),
       onCancel: () async {
         cancelled = true;
@@ -607,148 +707,111 @@ final class DigitalBrainUiClient implements ApplicationStudioApi {
     return controller.stream;
   }
 
-  Stream<ChatDelta> streamMessage({
+  Future<ChatSendReceipt> sendMessage({
     required String chatName,
     required String text,
-  }) async* {
-    final uri = baseUri.replace(path: '/owner/commands');
-    final request = http.Request('POST', uri)
-      ..headers['content-type'] = 'application/json'
-      ..body = jsonEncode({
-        'kind': 'chat.send',
-        'chatName': chatName,
-        'text': text,
-      });
-    final response = await _http.send(request);
-    if (response.statusCode != 200) {
-      final body = await response.stream.bytesToString();
-      throw StateError('chat.send failed: ${response.statusCode} $body');
-    }
-
-    yield* _parseChatDeltas(response);
+  }) async {
+    final path = '/chats/${Uri.encodeComponent(chatName)}/send';
+    final commandId = _uuid.v4();
+    final response = await _request(
+      'POST',
+      path,
+      body: {'commandId': commandId, 'text': text},
+    );
+    return ChatSendReceipt(
+      turnId: _acceptedWorkId(response.body, path),
+      commandId: commandId,
+    );
   }
 
-  // Multipart voice note → server Whisper → same durable chat turn SSE as streamMessage.
-  Stream<ChatDelta> streamVoice({
+  Future<ChatSendReceipt> sendVoice({
     required String chatName,
     required List<int> audioBytes,
     String fileName = 'voice.wav',
-  }) async* {
+  }) async {
     if (audioBytes.isEmpty) {
       throw StateError('voice upload requires non-empty audio');
     }
 
-    final uri = baseUri.replace(path: '/chats/$chatName/voice');
-
-    Future<http.StreamedResponse> postOnce() {
-      final request = http.MultipartRequest('POST', uri)
-        ..files.add(
-          http.MultipartFile.fromBytes('audio', audioBytes, filename: fileName),
-        );
-      return _http.send(request);
-    }
-
-    final response = await postOnce();
-
+    final path = '/chats/${Uri.encodeComponent(chatName)}/voice';
+    final request = http.MultipartRequest('POST', baseUri.replace(path: path))
+      ..files.add(
+        http.MultipartFile.fromBytes('audio', audioBytes, filename: fileName),
+      );
+    final response = await http.Response.fromStream(await _http.send(request));
     if (response.statusCode == 503) {
-      final body = await response.stream.bytesToString();
-      throw StateError('voice unavailable: $body');
+      throw StateError('voice unavailable: ${response.body}');
     }
     if (response.statusCode == 422) {
-      final body = await response.stream.bytesToString();
-      throw StateError('transcription failed: $body');
+      throw StateError('transcription failed: ${response.body}');
     }
-    if (response.statusCode != 200) {
-      final body = await response.stream.bytesToString();
-      throw StateError('chat.voice failed: ${response.statusCode} $body');
-    }
-
-    yield* _parseChatDeltas(response);
-  }
-
-  Stream<ChatDelta> _parseChatDeltas(http.StreamedResponse response) async* {
-    final lines = response.stream
-        .transform(utf8.decoder)
-        .transform(const LineSplitter());
-
-    final parser = SseChatDeltaParser();
-    var receivedResponse = false;
-    await for (final line in lines) {
-      for (final delta in parser.addLine(line)) {
-        receivedResponse = receivedResponse || !delta.isAcceptance;
-        yield delta;
-      }
-    }
-    for (final delta in parser.flush()) {
-      receivedResponse = receivedResponse || !delta.isAcceptance;
-      yield delta;
-    }
-    if (!receivedResponse) {
+    if (response.statusCode != 202) {
       throw StateError(
-        'The assistant connection ended without a response. Please try again.',
+        'chat.voice failed: ${response.statusCode} ${response.body}',
       );
     }
+    // Voice mints its command id server-side and does not return it.
+    return ChatSendReceipt(turnId: _acceptedWorkId(response.body, path));
   }
 
-  Stream<ChatTurnEvent> watchChatTurns({
+  String _acceptedWorkId(String body, String path) {
+    final missingWork = 'POST $path response is missing work.value';
+    Object? decoded;
+    try {
+      decoded = jsonDecode(body);
+    } on FormatException {
+      throw StateError(missingWork);
+    }
+    final work = decoded is Map ? decoded['work'] : null;
+    final value = work is Map ? work['value'] : null;
+    if (value is! String || value.isEmpty) {
+      throw StateError(missingWork);
+    }
+    return value;
+  }
+
+  Stream<ChatStreamEvent> watchChatTurns({
     required String chatName,
     int afterSequence = 0,
-  }) async* {
-    final uri = baseUri.replace(
-      path: '/chats/$chatName/events',
-      queryParameters: {'afterSequence': '$afterSequence'},
-    );
-    final response = await _http.send(http.Request('GET', uri));
-    if (response.statusCode != 200) {
-      throw StateError('chat events failed: ${response.statusCode}');
-    }
-
-    final lines = response.stream
-        .transform(utf8.decoder)
-        .transform(const LineSplitter());
-
-    final parser = SseChatTurnParser();
-    await for (final line in lines) {
-      for (final event in parser.addLine(line)) {
-        yield event;
-      }
-    }
-    for (final event in parser.flush()) {
-      yield event;
-    }
-  }
+  }) => _watchEvents<ChatStreamEvent>(
+    path: '/chats/${Uri.encodeComponent(chatName)}/events',
+    afterSequence: afterSequence,
+    newParser: SseChatTurnParser.new,
+    resumeCursor: (event) => switch (event) {
+      ChatJournalReset(:final cursor) => cursor,
+      ChatTurnObserved(:final turn) => turn.sequence > 0 ? turn.sequence : null,
+    },
+    failureLabel: 'chat events',
+  );
 
   Future<ChatChartOffer?> readChart(String chartName) async {
-    final body = await _getKitEntity('/kit/charts/$chartName', 'kit chart');
+    final body = await _getUiEntity('/ui/charts/$chartName', 'ui chart');
     return body == null ? null : ChatChartOffer.fromJson(body);
   }
 
   Future<ChatGraphOffer?> readGraph(String graphName) async {
-    final body = await _getKitEntity('/kit/graphs/$graphName', 'kit graph');
+    final body = await _getUiEntity('/ui/graphs/$graphName', 'ui graph');
     return body == null ? null : ChatGraphOffer.fromJson(body);
   }
 
-  Future<KitSurfaceState?> readSurface(String surfaceName) async {
-    final body = await _getKitEntity(
-      '/kit/surfaces/$surfaceName',
-      'kit surface',
-    );
-    return body == null ? null : KitSurfaceState.fromJson(body);
+  Future<UiSurfaceState?> readSurface(String surfaceName) async {
+    final body = await _getUiEntity('/ui/surfaces/$surfaceName', 'ui surface');
+    return body == null ? null : UiSurfaceState.fromJson(body);
   }
 
   Future<ChatSpreadsheetOffer?> readSpreadsheet(String spreadsheetName) async {
-    final body = await _getKitEntity(
-      '/kit/spreadsheets/$spreadsheetName',
-      'kit spreadsheet',
+    final body = await _getUiEntity(
+      '/ui/spreadsheets/$spreadsheetName',
+      'ui spreadsheet',
     );
     return body == null ? null : ChatSpreadsheetOffer.fromJson(body);
   }
 
   Future<Map<String, Object?>?> readImage(String imageName) =>
-      _getKitEntity('/kit/images/$imageName', 'kit image');
+      _getUiEntity('/ui/images/$imageName', 'ui image');
 
   Future<Uint8List?> readImageBytes(String imageName) async {
-    final uri = baseUri.replace(path: '/kit/images/$imageName/content');
+    final uri = baseUri.replace(path: '/ui/images/$imageName/content');
     final streamed = await _http.send(http.Request('GET', uri));
     final response = await http.Response.fromStream(streamed);
     if (response.statusCode == 404) {
@@ -756,13 +819,13 @@ final class DigitalBrainUiClient implements ApplicationStudioApi {
     }
     if (response.statusCode != 200) {
       throw StateError(
-        'kit image content read failed: ${response.statusCode} ${response.body}',
+        'ui image content read failed: ${response.statusCode} ${response.body}',
       );
     }
     return response.bodyBytes;
   }
 
-  Future<Map<String, Object?>?> _getKitEntity(
+  Future<Map<String, Object?>?> _getUiEntity(
     String path,
     String description,
   ) async {

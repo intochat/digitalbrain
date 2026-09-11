@@ -1,6 +1,4 @@
 using DigitalBrain.Core;
-using DigitalBrain.Product.Interactions;
-using DigitalBrain.Sdk;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.AspNetCore.Http;
@@ -18,10 +16,7 @@ internal static class GitHubAuthentication
         var definition = GitHubLogins.LoginDefinition;
         services.AddSingleton(settings);
         services.AddSingleton<GitHubLogins>();
-        services.AddSingleton<IUserActionSource>(s => s.GetRequiredService<GitHubLogins>());
         services.AddSingleton<IHttpSurface>(s => new BrowserLoginSurface(s.GetRequiredService<GitHubLogins>()));
-        services.AddHostedService<BrowserLoginWorker<GitHubLogins>>();
-        services.AddSingleton<DigitalBrain.AI.IAgentToolSource, GitHubSetupTools>();
         services.AddLogging(logging =>
         {
             logging.AddFilter(typeof(GitHubOAuthHandler).FullName, LogLevel.None);
@@ -51,32 +46,29 @@ internal static class GitHubAuthentication
                     var request = BrowserLoginCorrelation.VerifiedRequest(context.HttpContext);
                     if (request is null || string.IsNullOrWhiteSpace(context.AccessToken))
                     {
-                        throw new McpOperationException("GitHub authorization did not produce a verified user token.");
+                        throw new GitHubUnavailableException("GitHub authorization did not produce a verified user token.");
                     }
                     var logins = context.HttpContext.RequestServices.GetRequiredService<GitHubLogins>();
-                    var setup = context.HttpContext.RequestServices.GetRequiredService<IGitHubSetup>();
-                    await logins.AcceptForActorAsync(request, async (actor, scope, commit) =>
+                    var setup = context.HttpContext.RequestServices.GetRequiredService<GitHubSetupService>();
+                    var scope = BrowserLoginCorrelation.Scope(context.Properties)
+                        ?? throw new GitHubUnavailableException("The repository setup intent is missing.");
+                    try
                     {
-                        if (scope is null)
-                        {
-                            throw new McpOperationException("The repository setup intent is missing.");
-                        }
                         var access = await GitHubUserAccess.ResolveAsync(context.Backchannel, context.AccessToken, settings.AppId,
                             scope, context.HttpContext.RequestAborted).ConfigureAwait(false);
-                        Task<GitHubSetupResult>? connection = null;
-                        using var verified = VerifiedActor.Enter(actor.Actor);
-                        // Start the authorized mutation only inside the correlation's
-                        // cancellation gate; publish completion after its durable ACK.
-                        commit(() => connection = setup.ConnectAsync(actor.Chat.Owner, actor.Actor.PrincipalId, access,
-                            context.HttpContext.RequestAborted));
-                        await connection!.ConfigureAwait(false);
-                    }).ConfigureAwait(false);
+                        await setup.ConnectAsync(access, context.HttpContext.RequestAborted).ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                        logins.Reject(request);
+                        throw;
+                    }
                 },
                 OnTicketReceived = async context =>
                 {
                     context.HandleResponse();
                     await LoginPage.WriteAsync(context.HttpContext, "GitHub connected",
-                        "Return to DigitalBrain. Repository access is saved. If webhook verification is still pending, the operator should send a signed GitHub App ping to the configured public URL within 10 minutes. Your original behavior draft will resume only after that proof arrives.", 200).ConfigureAwait(false);
+                        "Return to DigitalBrain. Repository access is saved. If webhook verification is still pending, the operator should send a signed GitHub App ping to the configured public URL.", 200).ConfigureAwait(false);
                 },
                 OnRemoteFailure = async context =>
                 {
@@ -92,7 +84,7 @@ internal static class GitHubAuthentication
                     context.HttpContext.RequestServices.GetRequiredService<GitHubLogins>()
                         .Reject(BrowserLoginCorrelation.VerifiedRequest(context.HttpContext));
                     await LoginPage.WriteAsync(context.HttpContext, "GitHub connection cancelled",
-                        "Your saved behavior remains available in DigitalBrain.", 200).ConfigureAwait(false);
+                        "Return to DigitalBrain to connect again.", 200).ConfigureAwait(false);
                 },
             };
         });

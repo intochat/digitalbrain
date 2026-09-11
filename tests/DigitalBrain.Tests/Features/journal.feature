@@ -1,0 +1,34 @@
+Feature: Journal
+  Two bounded windows per neuron. Envelopes only. Tallies and sequences outlive the window.
+  A read serves the committed view and reports a gap when the cursor falls behind the retained window.
+
+  Scenario: Tallies count every delivery per type and survive restart
+    Given a running brain with durable storage
+    When "elon" fires "Post" {"n":1} at "alice"
+    And "elon" fires "Post" {"n":2} at "alice"
+    And "elon" fires "Note" {"n":3} at "alice"
+    And the silo restarts
+    Then "alice" incoming tally for "Post" is 2
+    And "alice" incoming tally for "Note" is 1
+    And "alice" incoming journal has 3 entries
+
+  Scenario: The window drops the oldest entries but keeps the sequence
+    Given a running brain
+    When "elon" fires "Tick" {} at "alice" 520 times
+    Then "alice" incoming journal has 512 entries
+    And "alice" incoming last sequence is 520
+    And "alice" incoming tally for "Tick" is 520
+
+  Scenario: Reading a journal is not traffic
+    Given a running brain
+    When "elon" fires "Post" {"n":1} at "alice"
+    And "alice" incoming journal is read 3 times
+    Then "alice" incoming journal has 1 entries
+    And "alice" outgoing journal has 0 entries
+    And "elon" outgoing journal has 1 entries
+
+  Scenario: A read past the retained window reports a gap
+    Given a running brain
+    When "claude" fires 600 "Tick" signals at plain "p"
+    And "claude" reads "p" incoming journal after sequence 0
+    Then the read reports a gap and an earliest retained sequence above 1

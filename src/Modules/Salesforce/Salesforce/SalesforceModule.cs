@@ -1,9 +1,8 @@
-using DigitalBrain.Product.Interactions;
+using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.AI;
 using DigitalBrain.Core;
-using DigitalBrain.Sdk;
-using DigitalBrain.Product.Presentation;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace DigitalBrain.Salesforce;
 
@@ -19,39 +18,37 @@ public sealed class SalesforceModule : IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
         var services = builder.Services;
-        services.AddSingleton(new NeuronPresentation("salesforce", "Salesforce", "Salesforce", "salesforce"));
-        services.AddSingleton<IAgentToolSource>(new AgentDelegation<ISalesforce>(
-            "ask_salesforce", "Ask the Salesforce specialist to inspect the connected account and records, query Salesforce, or prepare an exact record change preview. Writes require a separate fresh user confirmation of the published preview. No delete.",
-            builder.Configuration["DigitalBrain:Salesforce:Alias"] ?? "salesforce-local"));
+        var settings = new SalesforceOAuthConfiguration(builder.Configuration);
+        services.TryAddSingleton<TokenHandoff>();
+        services.AddSingleton<SalesforceWriteAccess>();
+        services.AddSingleton(settings);
+        services.AddSingleton<SalesforceLogins>();
+        services.AddSingleton<IHttpSurface>(static services => new BrowserLoginSurface(services.GetRequiredService<SalesforceLogins>()));
+        var endpoint = ReadEndpoint(builder.Configuration);
         if (DigitalBrainFakes.Enabled(builder.Configuration))
         {
-            services.AddSingleton(static services => new SalesforceTools(services.GetRequiredService<IUntrustedContentScreen>(), fake: true));
-            return;
+            services.AddSingleton<ISalesforceProvider, FakeSalesforceProvider>();
+            services.AddSingleton<ISalesforceTokenExchange, FakeSalesforceTokenExchange>();
         }
-
-        var endpoint = ReadEndpoint(builder.Configuration);
-        if (endpoint is null)
+        else
         {
-            services.AddSingleton(static services => new SalesforceTools(services.GetRequiredService<IUntrustedContentScreen>()));
-            return;
+            services.AddSingleton<ISalesforceProvider>(new SalesforceMcpProvider(endpoint));
+            services.AddSingleton<ISalesforceTokenExchange, SalesforceTokenExchange>();
         }
-
-        var settings = new SalesforceOAuthConfiguration(builder.Configuration);
-        services.AddSingleton(settings);
-        services.AddSingleton<SalesforceConnections>();
-        services.AddSingleton<SalesforceLogins>();
-        services.AddSingleton<IUserActionSource>(static s => s.GetRequiredService<SalesforceLogins>());
-        services.AddSingleton<IHttpSurface>(static s => new BrowserLoginSurface(s.GetRequiredService<SalesforceLogins>()));
-        services.AddSingleton(s => new SalesforceMcp(endpoint, s.GetRequiredService<SalesforceConnections>()));
-        services.AddSingleton(s => new SalesforceWritePreviews(s.GetRequiredService<SalesforceMcp>(), s.GetRequiredService<IUntrustedContentScreen>()));
-        services.AddSingleton<ITrustedUserCommandHandler>(s => s.GetRequiredService<SalesforceWritePreviews>());
-        services.AddSingleton(s => new SalesforceTools(s.GetRequiredService<SalesforceMcp>(), s.GetRequiredService<SalesforceLogins>(),
-            s.GetRequiredService<SalesforceWritePreviews>(), s.GetRequiredService<IUntrustedContentScreen>()));
-        services.AddHostedService<BrowserLoginWorker<SalesforceLogins>>();
+        services.AddSingleton<SalesforceTokenRefresh>();
+        services.AddNativeTool("salesforce_current_account", services => services.GetRequiredService<SalesforceNativeTools>().CreateCurrentAccount());
+        services.AddNativeTool("salesforce_schema", services => services.GetRequiredService<SalesforceNativeTools>().CreateSchema());
+        services.AddNativeTool("salesforce_user_info", services => services.GetRequiredService<SalesforceNativeTools>().CreateGetUserInfo());
+        services.AddNativeTool("salesforce_query", services => services.GetRequiredService<SalesforceNativeTools>().CreateSoqlQuery());
+        services.AddNativeTool("prepare_salesforce_record", services => services.GetRequiredService<SalesforceNativeTools>().CreateRecordPreview());
+        services.AddNativeTool("prepare_salesforce_record_update", services => services.GetRequiredService<SalesforceNativeTools>().CreateRecordUpdatePreview());
+        services.AddSingleton(static services => new SalesforceNativeTools(
+            services.GetRequiredService<IGrainFactory>().GetGrain<ISalesforce>(new NeuronId("salesforce", "salesforce").ToGrainId()),
+            services.GetRequiredService<TimeProvider>(), services.GetRequiredService<SalesforceLogins>()));
         services.AddSalesforceAuthentication(settings, SalesforceLogins.LoginDefinition);
     }
 
-    private static McpEndpoint? ReadEndpoint(Microsoft.Extensions.Configuration.IConfiguration configuration)
+    private static Uri? ReadEndpoint(Microsoft.Extensions.Configuration.IConfiguration configuration)
     {
         var value = configuration[McpEndpointConfigurationKey];
         if (string.IsNullOrWhiteSpace(value))
@@ -68,6 +65,6 @@ public sealed class SalesforceModule : IModule
                 $"Configuration '{McpEndpointConfigurationKey}' must be an HTTPS hosted MCP endpoint on api.salesforce.com.");
         }
 
-        return new McpEndpoint("salesforce", uri);
+        return uri;
     }
 }

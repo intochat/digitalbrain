@@ -1,7 +1,6 @@
 using System.Net.Mail;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using DigitalBrain.Sdk;
 
 namespace DigitalBrain.Google;
 
@@ -51,11 +50,11 @@ internal static class GmailContent
             "get_thread" => ["threadId", "messageFormat"],
             "list_labels" => [],
             "create_draft" => ["to", "cc", "bcc", "subject", "body"],
-            _ => throw new McpOperationException("This Gmail operation is not allowed."),
+            _ => throw new GmailUnavailableException("This Gmail operation is not allowed."),
         };
         if (args.Keys.Any(k => !allowed.Contains(k, StringComparer.Ordinal)))
         {
-            throw new McpOperationException("Unsupported Gmail arguments.");
+            throw new GmailUnavailableException("Unsupported Gmail arguments.");
         }
 
         if (tool == "search_threads")
@@ -63,17 +62,17 @@ internal static class GmailContent
             Text(args, "query", 2048); Text(args, "pageToken", 2048, optional: true);
             if (!args.TryGetValue("pageSize", out var size) || size is not int count || count is < 1 or > 10)
             {
-                throw new McpOperationException("Gmail pageSize must be between 1 and 10.");
+                throw new GmailUnavailableException("Gmail pageSize must be between 1 and 10.");
             }
 
             if (!args.TryGetValue("view", out var view) || view is not "THREAD_VIEW_MINIMAL")
             {
-                throw new McpOperationException("Unsupported Gmail thread view.");
+                throw new GmailUnavailableException("Unsupported Gmail thread view.");
             }
 
             if (!args.TryGetValue("includeTrash", out var trash) || trash is not bool)
             {
-                throw new McpOperationException("includeTrash must be a boolean.");
+                throw new GmailUnavailableException("includeTrash must be a boolean.");
             }
         }
         else if (tool == "get_thread")
@@ -81,28 +80,28 @@ internal static class GmailContent
             Text(args, "threadId", 256, nonempty: true);
             if (!args.TryGetValue("messageFormat", out var format) || format is not ("MINIMAL" or "PLAIN_TEXT"))
             {
-                throw new McpOperationException("Only MINIMAL or PLAIN_TEXT Gmail content is allowed.");
+                throw new GmailUnavailableException("Only MINIMAL or PLAIN_TEXT Gmail content is allowed.");
             }
         }
         else if (tool == "create_draft")
         {
             var recipients = new[] { "to", "cc", "bcc" }.SelectMany(k => args.TryGetValue(k, out var value) && value is string[] emails
-                ? emails : throw new McpOperationException("Draft recipients must be plain email arrays.")).ToArray();
+                ? emails : throw new GmailUnavailableException("Draft recipients must be plain email arrays.")).ToArray();
             if (recipients.Length is < 1 or > 20 || recipients.Any(e => e.Length > 320 || e.Any(char.IsWhiteSpace)
                 || !MailAddress.TryCreate(e, out var address) || address.Address != e || address.DisplayName.Length != 0))
             {
-                throw new McpOperationException("Supply 1–20 plain email addresses without display names.");
+                throw new GmailUnavailableException("Supply 1–20 plain email addresses without display names.");
             }
 
             Text(args, "subject", 998); Text(args, "body", 12000);
             if (((string)args["subject"]!).Any(c => c is '\r' or '\n'))
             {
-                throw new McpOperationException("A draft subject must be a single line.");
+                throw new GmailUnavailableException("A draft subject must be a single line.");
             }
         }
         if (JsonSerializer.SerializeToUtf8Bytes(args).Length > 30000)
         {
-            throw new McpOperationException("Gmail arguments exceed the 30 KiB input limit.");
+            throw new GmailUnavailableException("Gmail arguments exceed the 30 KiB input limit.");
         }
     }
 
@@ -115,7 +114,7 @@ internal static class GmailContent
 
         if (!args.TryGetValue(key, out var value) || value is not string text || text.Length > max || nonempty && string.IsNullOrWhiteSpace(text))
         {
-            throw new McpOperationException($"Invalid Gmail {key}; maximum length is {max}.");
+            throw new GmailUnavailableException($"Invalid Gmail {key}; maximum length is {max}.");
         }
     }
 
@@ -124,7 +123,7 @@ internal static class GmailContent
     {
         if (root.ValueKind != JsonValueKind.Object)
         {
-            throw new McpOperationException("Gmail MCP returned an invalid response shape.");
+            throw new GmailUnavailableException("Gmail MCP returned an invalid response shape.");
         }
 
         var result = new JsonObject { ["untrustedData"] = true, ["truncated"] = false };
@@ -138,7 +137,7 @@ internal static class GmailContent
 
             if (result["id"] is null)
             {
-                throw new McpOperationException("Gmail did not return a draft id. Check Drafts before trying again.");
+                throw new GmailUnavailableException("Gmail did not return a draft id. Check Drafts before trying again.");
             }
         }
         else if (tool == "list_labels")
@@ -177,7 +176,7 @@ internal static class GmailContent
             result["truncated"] = true;
             if (!Shrink(result))
             {
-                throw new McpOperationException("Gmail response exceeds the 32 KiB output limit. Narrow the request.");
+                throw new GmailUnavailableException("Gmail response exceeds the 32 KiB output limit. Narrow the request.");
             }
         }
         return JsonSerializer.SerializeToElement(result);
@@ -203,7 +202,7 @@ internal static class GmailContent
 
                 if (values.ValueKind != JsonValueKind.Array)
                 {
-                    throw new McpOperationException("Gmail returned invalid message metadata.");
+                    throw new GmailUnavailableException("Gmail returned invalid message metadata.");
                 }
 
                 var items = new JsonArray();
@@ -226,7 +225,7 @@ internal static class GmailContent
     }
     private static JsonElement[] Array(JsonElement root, string name)
         => !root.TryGetProperty(name, out var array) ? [] : array.ValueKind == JsonValueKind.Array
-            ? array.EnumerateArray().ToArray() : throw new McpOperationException("Gmail MCP returned an invalid collection.");
+            ? array.EnumerateArray().ToArray() : throw new GmailUnavailableException("Gmail MCP returned an invalid collection.");
     private static void CopyText(JsonElement root, JsonObject result, string key, int max, ref bool truncated)
     {
         if (!root.TryGetProperty(key, out var value))
@@ -236,7 +235,7 @@ internal static class GmailContent
 
         if (value.ValueKind != JsonValueKind.String)
         {
-            throw new McpOperationException("Gmail MCP returned invalid text metadata.");
+            throw new GmailUnavailableException("Gmail MCP returned invalid text metadata.");
         }
 
         result[key] = Limit(value.GetString()!, max, ref truncated);

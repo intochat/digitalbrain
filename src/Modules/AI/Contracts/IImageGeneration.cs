@@ -1,8 +1,8 @@
 namespace DigitalBrain.AI;
 
-public sealed record GeneratedKitImage(byte[] Content, string MediaType, string Model);
+public sealed record GeneratedUiImage(byte[] Content, string MediaType, string Model);
 
 public interface IImageGeneration
 {
-    Task<GeneratedKitImage> GenerateAsync(string prompt, CancellationToken cancellationToken);
+    Task<GeneratedUiImage> GenerateAsync(string prompt, CancellationToken cancellationToken);
 }

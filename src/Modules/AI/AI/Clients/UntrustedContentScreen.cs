@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using DigitalBrain.Product.Interactions;
+using DigitalBrain.AI.Interactions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 

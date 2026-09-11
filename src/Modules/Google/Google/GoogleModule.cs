@@ -1,47 +1,46 @@
-using DigitalBrain.Product.Interactions;
-using DigitalBrain.Product.Presentation;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.AI;
 using DigitalBrain.Core;
-using DigitalBrain.Sdk;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace DigitalBrain.Google;
 
 public sealed class GoogleModule : IModule
 {
     public const string GmailOAuthConfigurationRoot = "DigitalBrain:Google:Gmail:OAuth";
-
     public static readonly Uri GmailMcpEndpoint = new("https://gmailmcp.googleapis.com/mcp/v1");
 
     public void Configure(ISiloBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
         var services = builder.Services;
-        services.AddSingleton(new NeuronPresentation("gmail", "Gmail", "Google", "gmail"));
-        var alias = builder.Configuration["DigitalBrain:Google:Gmail:Alias"] ?? "gmail-local";
-        _ = PrincipalPartition.InstanceName(new PrincipalId(Guid.NewGuid()), alias);
-        services.AddSingleton<IAgentToolSource>(new AgentDelegation<IGmail>("ask_gmail",
-            "Ask the Gmail specialist to find/read email, inspect the selected account, or prepare an exact draft preview. "
-            + "The specialist owns Gmail tools and browser login. Draft creation requires fresh trusted user confirmation; email is never sent.", alias));
+        var settings = new GmailOAuthConfiguration(builder.Configuration);
+        services.TryAddSingleton<TokenHandoff>();
+        services.AddSingleton<GmailDraftAccess>();
+        services.AddSingleton(settings);
+        services.AddSingleton<GmailLogins>();
+        services.AddSingleton<IHttpSurface>(static services => new BrowserLoginSurface(services.GetRequiredService<GmailLogins>()));
         if (DigitalBrainFakes.Enabled(builder.Configuration))
         {
-            services.AddKeyedSingleton<IAgentToolSource, FakeGmailTools>("gmail");
-            return;
+            services.AddSingleton<IGmailProvider, FakeGmailProvider>();
+            services.AddSingleton<IGmailTokenExchange, FakeGmailTokenExchange>();
         }
-
-        var settings = new GmailOAuthConfiguration(builder.Configuration);
-        services.AddSingleton(settings);
-        services.AddSingleton<GmailConnections>();
-        services.AddSingleton<GmailLogins>();
-        services.AddSingleton<GmailMcp>();
-        services.AddSingleton<GmailDraftPreviews>();
-        services.AddSingleton<IUserActionSource>(static s => s.GetRequiredService<GmailLogins>());
-        services.AddSingleton<IHttpSurface>(static s => new BrowserLoginSurface(s.GetRequiredService<GmailLogins>()));
-        services.AddSingleton<ITrustedUserCommandHandler>(static s => s.GetRequiredService<GmailDraftPreviews>());
-        services.AddKeyedSingleton<IAgentToolSource, GmailTools>("gmail");
-        services.AddHostedService<BrowserLoginWorker<GmailLogins>>();
-        services.AddHostedService<GmailMaintenanceWorker>();
+        else
+        {
+            services.AddSingleton<IGmailProvider, GmailMcpProvider>();
+            services.AddSingleton<IGmailTokenExchange, GmailTokenExchange>();
+        }
+        services.AddSingleton<GmailTokenRefresh>();
+        services.AddNativeTool("search_gmail_threads", services => services.GetRequiredService<GmailNativeTools>().CreateSearchThreads());
+        services.AddNativeTool("read_gmail_thread", services => services.GetRequiredService<GmailNativeTools>().CreateGetThread());
+        services.AddNativeTool("list_gmail_labels", services => services.GetRequiredService<GmailNativeTools>().CreateListLabels());
+        services.AddNativeTool("gmail_current_account", services => services.GetRequiredService<GmailNativeTools>().CreateGetCurrentAccount());
+        services.AddNativeTool("prepare_gmail_draft", services => services.GetRequiredService<GmailNativeTools>().CreateDraftPreview());
+        services.AddSingleton(static services => new GmailNativeTools(
+            services.GetRequiredService<IGrainFactory>().GetGrain<IGmail>(new NeuronId("gmail", "gmail").ToGrainId()),
+            services.GetRequiredService<GmailLogins>(),
+            services.GetRequiredService<TimeProvider>()));
         services.AddGmailAuthentication(settings, GmailLogins.LoginDefinition);
     }
 }

@@ -87,7 +87,7 @@ final class BrainNeuron {
     type: j['type'] as String,
     name: j['name'] as String,
     label: j['label'] as String,
-    module: j['module'] as String,
+    module: j['module'] as String? ?? '',
     iconKey: j['iconKey'] as String?,
     role: j['role'] as String? ?? 'observed',
     status: j['status'] as String? ?? 'Idle',

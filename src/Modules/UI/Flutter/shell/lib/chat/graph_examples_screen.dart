@@ -1,5 +1,5 @@
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
-import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 
 import '../brain_theme.dart';
@@ -14,11 +14,8 @@ final class GraphExamplesScreen extends StatefulWidget {
     required this.chatName,
     required this.turns,
     this.onSend,
-    this.onStream,
-    this.onStreamVoice,
+    this.onSendVoice,
     this.onAttachmentTap,
-    this.onOpenSignIn,
-    this.kernelBaseUri,
     this.onCancelTurn,
     this.onReadChart,
     this.onReadImageBytes,
@@ -30,11 +27,8 @@ final class GraphExamplesScreen extends StatefulWidget {
   final String chatName;
   final List<ChatTurnEvent> turns;
   final SendMessage? onSend;
-  final StreamMessage? onStream;
-  final StreamVoice? onStreamVoice;
+  final SendVoice? onSendVoice;
   final VoidCallback? onAttachmentTap;
-  final OpenUrl? onOpenSignIn;
-  final Uri? kernelBaseUri;
   final CancelChatTurn? onCancelTurn;
   final ReadChart? onReadChart;
   final ReadImageBytes? onReadImageBytes;
@@ -48,7 +42,7 @@ final class GraphExamplesScreen extends StatefulWidget {
 
 final class _GraphExamplesScreenState extends State<GraphExamplesScreen> {
   final _simulation = BrainGraphSimulation();
-  late final _graph = KitGraphController(
+  late final _graph = UiGraphController(
     nodes: BrainGraphSimulation.nodes,
     edges: _simulation.edges,
     camera: GraphCamera(
@@ -141,11 +135,8 @@ final class _GraphExamplesScreenState extends State<GraphExamplesScreen> {
             chatName: widget.chatName,
             turns: widget.turns,
             onSend: widget.onSend,
-            onStream: widget.onStream,
-            onStreamVoice: widget.onStreamVoice,
+            onSendVoice: widget.onSendVoice,
             onAttachmentTap: widget.onAttachmentTap,
-            onOpenSignIn: widget.onOpenSignIn,
-            kernelBaseUri: widget.kernelBaseUri,
             onCancelTurn: widget.onCancelTurn,
             onReadChart: widget.onReadChart,
             onReadImageBytes: widget.onReadImageBytes,
@@ -232,7 +223,7 @@ final class _GraphExamplesScreenState extends State<GraphExamplesScreen> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  KitGraphView(
+                  UiGraphView(
                     controller: _graph,
                     sceneFactory: widget.sceneFactory,
                     pulse: _simulation.pulse,

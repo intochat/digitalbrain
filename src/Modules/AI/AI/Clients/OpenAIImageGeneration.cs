@@ -7,7 +7,7 @@ namespace DigitalBrain.AI;
 
 internal sealed class OpenAIImageGeneration(ImageModel model, IConfiguration configuration) : IImageGeneration
 {
-    public async Task<GeneratedKitImage> GenerateAsync(string prompt, CancellationToken cancellationToken)
+    public async Task<GeneratedUiImage> GenerateAsync(string prompt, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
 
@@ -26,7 +26,7 @@ internal sealed class OpenAIImageGeneration(ImageModel model, IConfiguration con
                 $"{model.DisplayName} returned no image bytes. A model that answers with a URL must set "
                 + $"{nameof(ImageModel.AcceptsResponseFormat)} so bytes are requested explicitly.");
 
-        return new GeneratedKitImage(bytes.ToArray(), model.MediaType, model.Id);
+        return new GeneratedUiImage(bytes.ToArray(), model.MediaType, model.Id);
     }
 
     // Asking gpt-image-1 for a response format is HTTP 400 unknown_parameter: it

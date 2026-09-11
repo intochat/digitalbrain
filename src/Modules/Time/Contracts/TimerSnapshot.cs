@@ -1,5 +1,3 @@
-using DigitalBrain.Abstractions.Signals;
-
 namespace DigitalBrain.Time;
 
 [GenerateSerializer]
@@ -9,6 +7,5 @@ public sealed record TimerSnapshot(
     [property: Id(1)] long Generation,
     [property: Id(2)] DateTimeOffset? ScheduledAt,
     [property: Id(3)] DateTimeOffset? DueAt,
-    [property: Id(4)] TimeSpan? Duration,
-    [property: Id(5)] string? Note) : Signal;
-
+    [property: Id(4)] int? DurationSeconds,
+    [property: Id(5)] string? Note);

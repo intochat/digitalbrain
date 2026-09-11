@@ -8,7 +8,7 @@ public sealed class ExcelModule : Core.IModule
     public void Configure(ISiloBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        builder.Services.AddSingleton<IAgentToolSource>(
-            static sp => new ExcelToolSource(sp.GetRequiredService<IGrainFactory>()));
+        builder.Services.AddSingleton<ExcelNativeTools>();
+        builder.Services.AddNativeTool("show_spreadsheet", services => services.GetRequiredService<ExcelNativeTools>().Create());
     }
 }

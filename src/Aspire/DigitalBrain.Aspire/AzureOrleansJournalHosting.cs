@@ -1,13 +1,10 @@
 using DigitalBrain.Abstractions;
+using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
 using Orleans.Journaling;
 
 namespace DigitalBrain.Aspire;
 
-/// <summary>
-/// Azure-specific Orleans journal registration for the product host.
-/// Core owns the journal model; this adapter owns how production storage is wired.
-/// </summary>
 internal static class AzureOrleansJournalHosting
 {
     internal static ISiloBuilder AddAzureBlobJournal(this ISiloBuilder builder, IConfiguration configuration)
@@ -24,6 +21,6 @@ internal static class AzureOrleansJournalHosting
         {
             options.ContainerName = "digitalbrain-v2-journal";
             options.ConfigureBlobServiceClient(connectionString);
-        });
+        }).UseBudgetedJournalStorage();
     }
 }

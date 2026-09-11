@@ -1,0 +1,43 @@
+Feature: Time
+  Timers elapse autonomously and can be stopped before they are due.
+
+  Scenario: A scheduled timer elapses without further traffic
+    Given a running brain with file-backed storage
+    And "timer:t" is connected to "claude" for "TimerElapsed"
+    When "claude" schedules timer "t" for 2 seconds with note "Tea is ready"
+    And "claude" waits up to 30 seconds for an incoming "TimerElapsed"
+
+  Scenario: A timer stopped before it is due never elapses
+    Given a running brain with file-backed storage
+    And "timer:t" is connected to "claude" for "TimerElapsed"
+    When "claude" schedules timer "t" for 60 seconds with note "Tea is ready"
+    Then "claude" waits up to 5 seconds until timer "t" status is Scheduled
+    When "claude" stops timer "t"
+    Then "claude" waits up to 5 seconds until timer "t" status is Cancelled
+    And "claude" incoming journal is empty
+
+  Scenario: Scheduling against a stale generation is refused
+    Given a running brain with file-backed storage
+    When "claude" schedules timer "t" for 60 seconds with note "Tea is ready"
+    Then "claude" waits up to 5 seconds until timer "t" status is Scheduled
+    When "claude" tries to schedule timer "t" for 60 seconds with note "Another tea" expecting generation 0
+    Then the timer command fails with "expected generation 0"
+
+  Scenario: Scheduling again while armed announces refusal with the current generation
+    Given a running brain with file-backed storage
+    When "claude" schedules timer "t" for 60 seconds with note "Tea is ready"
+    Then "claude" waits up to 5 seconds until timer "t" status is Scheduled
+    Given "timer:t" is connected to "claude" for "TimerScheduleRefused"
+    When "claude" schedules timer "t" for 30 seconds with note "Another tea"
+    And "claude" waits up to 5 seconds until "timer:t" pending count is 0
+    Then timer "t" generation is 1
+    And timer "t" note is "Tea is ready"
+    When "claude" waits up to 5 seconds for an incoming "TimerScheduleRefused"
+    Then "claude" receives a timer schedule refusal carrying generation 1
+
+  Scenario: Scheduling reports the generation it was accepted against
+    Given a running brain with file-backed storage
+    When "claude" schedules timer "t" for 60 seconds with note "Tea is ready"
+    Then the timer command is accepted against generation 0
+    And "claude" waits up to 5 seconds until timer "t" status is Scheduled
+    And timer "t" generation is 1

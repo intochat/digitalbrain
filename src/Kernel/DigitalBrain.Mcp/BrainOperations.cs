@@ -1,0 +1,216 @@
+using System.Text.Json;
+using DigitalBrain.Abstractions.Descriptors;
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Journals;
+using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Signals;
+
+namespace DigitalBrain.Mcp;
+
+// The client. Seven operations; the MCP tools are thin wrappers over these.
+public sealed class BrainOperations(IGrainFactory grains, INeuronInvoker invoker)
+{
+    // A read is a query, not a subscription: a client that wants to wait longer polls again.
+    public const int MaxTimeoutSeconds = 60;
+
+    private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(100);
+
+    public Task<IReadOnlyList<MethodDescriptor>> DescribeAsync(DescribeRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (request is { Neuron: not null, Interface: null, Method: null })
+        {
+            return Task.FromResult(invoker.Describe(Parse(request.Neuron, nameof(request))));
+        }
+
+        if (request is { Neuron: null, Interface: not null, Method: not null })
+        {
+            return Task.FromResult<IReadOnlyList<MethodDescriptor>>([invoker.Describe(request.Interface, request.Method)]);
+        }
+
+        throw new ArgumentException("Use either neuron alone, or interface plus method, to describe callable methods.", nameof(request));
+    }
+
+    public async Task<JsonElement?> CallAsync(string session, CallRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var caller = Session(session);
+        using var _ = CallerScope.For(caller);
+        return await invoker.InvokeAsync(Parse(request.Neuron, nameof(request)), request.Interface,
+            request.Method, request.Arguments, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<FireResult> FireAsync(string session, FireRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var from = Session(session);
+        var signal = Signal.Create(request.Type, request.Body);
+        NeuronId? to = request.To is null ? null : Parse(request.To, nameof(request));
+        var correlation = ParseCorrelation(request.Correlation);
+
+        var outcome = await Neuron(from).Fire(signal, to, correlation, cancellationToken).ConfigureAwait(false);
+        return new(outcome.SignalId.ToString(), outcome.CorrelationId.ToString(), outcome.Delivered, outcome.Busy);
+    }
+
+    public Task CancelAsync(CancelRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+        var neuron = Parse(request.Neuron, nameof(request));
+        if (!Guid.TryParse(request.Signal, out var signal))
+        {
+            throw new ArgumentException($"'{request.Signal}' is not a signal id. Pass the signalId returned by an earlier fire.", nameof(request));
+        }
+
+        return Neuron(neuron).CancelReaction(new SignalId(signal));
+    }
+
+    public Task ConnectAsync(ConnectRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+        // A synapse carries a signal type, so the type must be vocabulary before the edge exists.
+        _ = Signal.Create(request.Type, "{}");
+        return Neuron(Parse(request.From, nameof(request))).Connect(Parse(request.To, nameof(request)), request.Type);
+    }
+
+    public Task DisconnectAsync(ConnectRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        cancellationToken.ThrowIfCancellationRequested();
+        return Neuron(Parse(request.From, nameof(request))).Disconnect(Parse(request.To, nameof(request)), request.Type);
+    }
+
+    public async Task<ReadResult> ReadAsync(ReadRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var id = Parse(request.Neuron, nameof(request));
+        var query = Neuron(id);
+        var view = request.What?.Trim().ToLowerInvariant() switch
+        {
+            null or "" => ReadView.AllExceptCommands,
+            "state" => ReadView.State,
+            "synapses" => ReadView.Synapses,
+            "incoming" => ReadView.Incoming,
+            "outgoing" => ReadView.Outgoing,
+            "commands" => ReadView.Commands,
+            _ => throw new ArgumentException($"'{request.What}' is not a view. Use state, synapses, incoming, outgoing or commands, or omit it for all but commands.", nameof(request)),
+        };
+
+        // One budget for the whole read: a default read must not wait it out twice.
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(Math.Clamp(request.TimeoutSeconds, 0, MaxTimeoutSeconds));
+        IReadOnlyList<StateEntry>? state = null;
+        IReadOnlyList<SynapseEntry>? synapses = null;
+        JournalView? incoming = null;
+        JournalView? outgoing = null;
+        CommandsView? commands = null;
+
+        switch (view)
+        {
+            case ReadView.AllExceptCommands:
+                state = await ReadStateAsync(query).ConfigureAwait(false);
+                synapses = await ReadSynapsesAsync(query).ConfigureAwait(false);
+                incoming = await ReadJournalAsync(query, JournalKind.Incoming, request.After, deadline, cancellationToken).ConfigureAwait(false);
+                outgoing = await ReadJournalAsync(query, JournalKind.Outgoing, request.After, deadline, cancellationToken).ConfigureAwait(false);
+                break;
+            case ReadView.State:
+                state = await ReadStateAsync(query).ConfigureAwait(false);
+                break;
+            case ReadView.Synapses:
+                synapses = await ReadSynapsesAsync(query).ConfigureAwait(false);
+                break;
+            case ReadView.Incoming:
+                incoming = await ReadJournalAsync(query, JournalKind.Incoming, request.After, deadline, cancellationToken).ConfigureAwait(false);
+                break;
+            case ReadView.Outgoing:
+                outgoing = await ReadJournalAsync(query, JournalKind.Outgoing, request.After, deadline, cancellationToken).ConfigureAwait(false);
+                break;
+            case ReadView.Commands:
+                var read = await query.ReadCommands(request.After).ConfigureAwait(false);
+                commands = new(read.ResumeSequence, read.EarliestRetained, read.Gap,
+                    [.. read.Delta.Select(record => new CommandEntryView(
+                        record.Sequence, record.Id.ToString(), record.Incarnation, record.Interface,
+                        record.Method, record.Phase.ToString(), Name(record.Caller), record.Error, record.At))]);
+                break;
+        }
+
+        return new(Name(id), state, synapses, incoming, outgoing, commands);
+    }
+
+    private enum ReadView
+    {
+        AllExceptCommands,
+        State,
+        Synapses,
+        Incoming,
+        Outgoing,
+        Commands,
+    }
+
+    private static async Task<IReadOnlyList<StateEntry>> ReadStateAsync(INeuron query)
+        => [.. (await query.ReadState().ConfigureAwait(false)).Select(d => new StateEntry(d.Signal.Type, d.Signal.Body, Name(d.Source), d.Timestamp))];
+
+    private static async Task<IReadOnlyList<SynapseEntry>> ReadSynapsesAsync(INeuron query)
+        => [.. (await query.ReadSynapses().ConfigureAwait(false)).Select(s => new SynapseEntry(Name(s.Source), Name(s.Target), s.SignalType))];
+
+    private static async Task<JournalView> ReadJournalAsync(INeuron query, JournalKind kind, long after, DateTimeOffset deadline, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            var read = await query.ReadJournal(kind, after).ConfigureAwait(false);
+            if (read.Gap || read.Delta.Count > 0 || DateTimeOffset.UtcNow >= deadline)
+            {
+                return new(read.ResumeSequence, read.EarliestRetained, read.Gap,
+                    [.. read.Delta.Select((d, index) => Entry(read, d, index))], read.TotalRecorded);
+            }
+
+            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    // The window position, not the source's own outgoing sequence that rides in the envelope.
+    private static JournalEntryView Entry(JournalRead read, SignalDelivery delivery, int index)
+        => new(
+            read.ResumeSequence - read.Delta.Count + index + 1,
+            delivery.Signal.Type,
+            delivery.Signal.Body,
+            Name(delivery.Source),
+            delivery.SignalId.ToString(),
+            delivery.CorrelationId.ToString(),
+            delivery.Timestamp);
+
+    private INeuron Neuron(NeuronId id) => grains.GetGrain<INeuron>(id.ToGrainId());
+
+    // Plain neurons are named the way callers type them; anything else keeps its "type:name".
+    private static string Name(NeuronId id) => id.Type == NeuronId.PlainType ? id.Name : id.ToString();
+
+    private static CorrelationId? ParseCorrelation(string? text)
+    {
+        if (text is null)
+        {
+            return null;
+        }
+
+        return Guid.TryParse(text, out var value)
+            ? new CorrelationId(value)
+            : throw new ArgumentException($"'{text}' is not a correlation id. Pass the GUID returned by an earlier fire, or omit it.", nameof(text));
+    }
+
+    // A principal names a plain neuron, never a typed one: the Session is an ordinary neuron.
+    private static NeuronId Session(string principal)
+    {
+        try
+        {
+            return NeuronId.Plain(principal);
+        }
+        catch (Exception error) when (error is ArgumentException or FormatException)
+        {
+            throw new ArgumentException("A principal is a bare name such as 'claude'; it names your Session neuron.", nameof(principal), error);
+        }
+    }
+
+    private static NeuronId Parse(string text, string parameter)
+        => NeuronId.TryParse(text, out var id)
+            ? id
+            : throw new ArgumentException($"'{text}' is not a neuron name. Use a bare name such as 'run-tests' or 'type:name'; no spaces.", parameter);
+}

@@ -1,26 +1,17 @@
-using DigitalBrain.Abstractions.Entities;
+using DigitalBrain.Abstractions.Commands;
+using DigitalBrain.Abstractions.Neurons;
+using Orleans.Concurrency;
 
 namespace DigitalBrain.UI;
 
 [Alias("ui.transcript")]
-public interface ITranscript : IEntity<TranscriptState>
+public interface ITranscript : INeuron
 {
-    const string GrainTypeName = "transcript";
-    const int DefaultCap = 500;
+    /// <summary>Appends an entry and returns the transcript instance name.</summary>
+    [Alias("append")]
+    Task<Accepted<string>> Append(AppendTranscript command, CancellationToken cancellationToken = default);
 
-    [Alias(nameof(Append))]
-    Task Append(TranscriptEntry entry, int cap);
+    /// <summary>Reads the retained transcript entries.</summary>
+    [ReadOnly, Alias("read")]
+    Task<TranscriptState> Read();
 }
-
-[GenerateSerializer]
-[Alias("ui.transcript-state")]
-public sealed record TranscriptState(
-    [property: Id(0)] IReadOnlyList<TranscriptEntry> Entries);
-
-[GenerateSerializer]
-[Alias("ui.transcript-entry")]
-public sealed record TranscriptEntry(
-    [property: Id(0)] bool FromUser,
-    [property: Id(1)] string Text,
-    [property: Id(2)] string CommandId,
-    [property: Id(3)] DateTimeOffset At);

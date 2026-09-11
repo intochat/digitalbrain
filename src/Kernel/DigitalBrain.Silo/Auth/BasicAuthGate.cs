@@ -1,16 +1,13 @@
 using System.Security.Cryptography;
 using System.Text;
 
-namespace DigitalBrain.Kernel.Auth;
+namespace DigitalBrain.Kernel;
 
-/// <summary>
-/// Dev-stand gate: a single owner credential carried as HTTP Basic on every request.
-/// Inactive unless both <see cref="UsernameConfigurationKey"/> and
-/// <see cref="PasswordConfigurationKey"/> are configured, so local dev, Aspire, and the
-/// E2E fixture stay open exactly as they are today.
-/// </summary>
+// Dev-stand single owner credential carried as HTTP Basic. Inactive unless both
+// UsernameConfigurationKey and PasswordConfigurationKey are configured, leaving local dev, Aspire and E2E open.
 internal static class BasicAuthGate
 {
+    public const string DefaultLogin = "owner";
     public const string UsernameConfigurationKey = "DigitalBrain:Auth:Username";
     public const string PasswordConfigurationKey = "DigitalBrain:Auth:Password";
     public const string CheckPath = "/auth/check";

@@ -1,513 +1,627 @@
-using System.Diagnostics;
-using DigitalBrain.Abstractions;
-using Orleans.Journaling;
-using Microsoft.Extensions.DependencyInjection;
-
-using DigitalBrain.Abstractions.Neurons;
+using System.Text.Json.Serialization.Metadata;
+using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Journals;
+using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Synapses;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Orleans.Concurrency;
+using Orleans.Journaling;
+using Orleans.Runtime;
+
 namespace DigitalBrain.Core;
 
-public abstract class Neuron :
-    DurableGrain,
-    INeuron,
-    INeuronGrain,
-    INeuronQuery
+// A durable actor with one receive slot. Owns its synapses, three bounded journals, and the
+// latest signal of each type it received. Fire travels along synapses; nothing else routes.
+public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable, ICommandHost
 {
+    // Latest-per-type is keyed by type name, so a caller putting identity in the type would
+    // grow it without bound. The cap turns that mistake into one sentence of advice.
+    public const int MaxSignalTypesPerNeuron = 256;
+
+    private const string ReactionSaveRule = "a reaction saves once, at the end. Anything after the first save is unreachable on a retry because the applied marker skips it.";
+
     private readonly NeuronActivationComponents _components;
-    private readonly SignalSender _sender;
-    private readonly ActivityReporter _activities;
-    private SignalDelivery? _handling;
-    private readonly IDurableDictionary<string, long> _sourceEpochs;
+    private readonly PersistenceFence _fence;
+    private readonly DescriptorTable _descriptors;
+    private readonly ILogger? _logger;
+    private readonly StreamWake? _streamWake;
+
+    private readonly CancellationTokenSource _activation = new();
+    private readonly RetryScheduler _retry;
+    private (SignalId Id, CancellationTokenSource Cancellation)? _reacting;
+    private readonly List<SignalDelivery> _turnWork = [];
+    private bool _reactionSaved;
 
     protected Neuron(NeuronRuntime runtime)
     {
         ArgumentNullException.ThrowIfNull(runtime);
+        _logger = ServiceProvider.GetService<ILogger<Neuron>>();
+        _streamWake = ServiceProvider.GetService<StreamWake>();
+        _descriptors = ServiceProvider.GetRequiredService<DescriptorTable>();
         _components = runtime.Bind(ServiceProvider, Id);
-        _activities = new ActivityReporter(Id, GrainFactory, runtime.Clock);
-        _sourceEpochs = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<string, long>>("neuron.source-epochs");
-        _sender = new SignalSender(
-            Id,
-            _components.Clock,
-            _components.Router,
-            _components.Journals,
-            _components.Synapses,
-            GrainFactory,
-            DispatchDeliveryAsync,
-            WriteStateAsync);
+        _fence = new PersistenceFence(Id, StateManager, _activation.Token,
+            () => CommandReconciliation.Reconcile(_components.Commands, _components.Dedup, TimeProvider.GetUtcNow()),
+            DeactivateOnIdle, _components);
+        _retry = new RetryScheduler(this, _ => ((INeuronInbox)this).Drain(), _components.Options.RetryReminderPeriod,
+            () => _components.Pending.Count > 0 || HasStoredAnnouncements, _activation.Token);
     }
 
-    public NeuronId Id
-        => NeuronId.FromGrainKey(
-            this.GetGrainId().Type.ToString()!,
-            this.GetPrimaryKeyString());
+    public NeuronId Id => NeuronId.FromGrainId(this.GetGrainId());
 
     protected TimeProvider TimeProvider => _components.Clock;
 
-    protected SignalDelivery? CurrentDelivery => _handling;
+    // A durable write belongs to the activation, so request cancellation cannot interrupt it.
+    protected Task PersistAsync() => _fence.PersistAsync();
 
-    /// <summary>Registers and settles durable work which continues after its input handler returns.</summary>
-    protected Task ReportActivityAsync(
-        SignalDelivery delivery, string operationId, string phase, string? detail = null)
-        => _activities.ReportAsync(delivery, operationId, phase, Id, detail);
+    protected new Task WriteStateAsync(CancellationToken cancellationToken = default)
+        => throw new InvalidOperationException($"Neuron '{Id}' must call PersistAsync to write through the persistence fence.");
+
+    internal Task GuardActivationAsync() => _fence.GuardAsync();
+
+    private protected void Guard() => _fence.Guard();
+
+    protected ReactionContext? ReactionContext { get; private set; }
+
+    internal CommandId? ExecutingCommand => (ReactionContext as CommandReaction)?.Command;
+
+    NeuronId ICommandHost.Id => Id;
+
+    bool ICommandHost.HasPendingRoom => _components.Pending.HasRoomFor(0);
+
+    ReactionContext? ICommandHost.ReactionContext
+    {
+        get => ReactionContext;
+        set => ReactionContext = value;
+    }
+
+    Task ICommandHost.PersistAsync() => PersistAsync();
+
+    Task ICommandHost.DiscardStagedChangesAsync(Exception cause) => _fence.DiscardStagedChangesAsync(cause);
+
+    void ICommandHost.AdmitTurnWork() => AdmitTurnWork();
+
+    private void AdmitTurnWork()
+    {
+        if (_turnWork.Count == 0)
+        {
+            return;
+        }
+
+        if (!_components.Pending.HasRoomFor(_turnWork.Count))
+        {
+            _turnWork.Clear();
+            throw new NeuronBusyException(
+                $"Neuron '{Id}' cannot admit this turn's scheduled work: an interleaving Deliver can fill Pending between Schedule and the final flush. Retry the whole turn after pending work finishes.");
+        }
+
+        foreach (var delivery in _turnWork)
+        {
+            AdmitAndStageDelivery(delivery);
+        }
+
+        _turnWork.Clear();
+    }
+
+    Task ICommandHost.WakeTurnWorkAsync()
+    {
+        return _components.Pending.Count == 0 ? Task.CompletedTask : EnsureReminderAndWakeAsync();
+
+        async Task EnsureReminderAndWakeAsync()
+        {
+            await _retry.EnsureReminderAsync().ConfigureAwait(true);
+            Wake();
+        }
+    }
 
     public sealed override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         NeuronConcurrency.RequireSerializedTurns(GetType());
-
-        await base.OnActivateAsync(cancellationToken)
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-        await OnNeuronActivatedAsync(cancellationToken)
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-    }
-
-    protected virtual Task OnNeuronActivatedAsync(CancellationToken cancellationToken)
-        => Task.CompletedTask;
-
-    public async Task<DeliveryOutcome> Deliver(
-        SignalDelivery delivery,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(delivery);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        return await DispatchDeliveryAsync(delivery, cancellationToken)
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-    }
-
-    public Task<JournalRead> ReadJournal(JournalKind kind, long afterSequence)
-        => Task.FromResult(_components.Journals.Read(kind, afterSequence));
-
-    public Task<IReadOnlyList<Synapse>> ReadSynapses()
-        => Task.FromResult(_components.Synapses.Active());
-
-    public async Task Watch(
-        JournalKind kind,
-        long afterSequence,
-        IJournalObserver observer)
-        => await _components.Journals.WatchAsync(kind, afterSequence, observer)
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-    public Task Unwatch(IJournalObserver observer)
-    {
-        _components.Journals.Unwatch(observer);
-        return Task.CompletedTask;
-    }
-
-    protected Task<SignalDeliveryResult> SendAsync(
-        NeuronId receiver,
-        Signal signal,
-        CancellationToken cancellationToken = default)
-        => _sender.SendAsync(receiver, signal, _handling, cancellationToken);
-
-    protected Task<SignalDeliveryResult> SendAsync(
-        NeuronId receiver,
-        Signal signal,
-        CorrelationId correlation,
-        CancellationToken cancellationToken = default)
-        => _sender.SendAsync(receiver, signal, _handling, correlation, cancellationToken);
-
-    protected Task<SignalDeliveryResult> SendAsync(
-        NeuronId receiver,
-        Signal signal,
-        SignalDelivery cause,
-        CancellationToken cancellationToken = default)
-        => _sender.SendAsync(receiver, signal, cause, cause.CorrelationId, cancellationToken);
-
-    /// <summary>
-    /// Sends from this activation and reads the exact reply from the target's outgoing
-    /// journal. It does not re-enter the owner root or wait for a reply to enter this
-    /// busy serialized activation.
-    /// </summary>
-    protected Task<TResponse> RequestAsync<TResponse>(
-        NeuronId receiver,
-        Signal<TResponse> request,
-        CancellationToken cancellationToken = default)
-        where TResponse : Signal
-        => RequestCoreAsync(receiver, request, correlation: null, cancellationToken);
-
-    protected Task<TResponse> RequestAsync<TResponse>(
-        NeuronId receiver,
-        Signal<TResponse> request,
-        CorrelationId correlation,
-        CancellationToken cancellationToken = default)
-        where TResponse : Signal
-        => RequestCoreAsync(receiver, request, correlation, cancellationToken);
-
-    private async Task<TResponse> RequestCoreAsync<TResponse>(
-        NeuronId receiver,
-        Signal<TResponse> request,
-        CorrelationId? correlation,
-        CancellationToken cancellationToken)
-        where TResponse : Signal
-    {
-        ArgumentNullException.ThrowIfNull(request);
-        RequireSameOwner(receiver);
-        if (receiver == Id)
+        await base.OnActivateAsync(cancellationToken).ConfigureAwait(true);
+        _components.NoteReloaded();
+        _fence.NoteStoredState(StorageHoldsState());
+        if (CommandReconciliation.Reconcile(_components.Commands, _components.Dedup, TimeProvider.GetUtcNow()))
         {
-            throw new InvalidOperationException("A neuron cannot request a reply from itself.");
+            await PersistAsync().ConfigureAwait(true);
         }
 
-        using var budget = SignalRequestPolicy.CreateBudget(cancellationToken);
+        await OnNeuronActivatedAsync(cancellationToken).ConfigureAwait(true);
+
+        // Pending entries and stored announcements survive deactivation: resume the drain for both.
+        if (_components.Pending.Peek() is not null || HasStoredAnnouncements)
+        {
+            await _retry.EnsureReminderAsync().ConfigureAwait(true);
+            Wake();
+        }
+    }
+
+    private bool StorageHoldsState()
+        => _components.Journals.IncomingNextSequence > 1
+            || _components.Journals.OutgoingNextSequence > 1
+            || _components.Commands.LastSequence > 0
+            || _components.Synapses.All().Count > 0
+            || _components.Pending.Count > 0
+            || _components.Latest.Count > 0;
+
+    // Shutting down cancels the reaction in flight. The pending head stays and
+    // the next activation retries the entry.
+    public sealed override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+    {
+        _retry.Suspend();
+        await _activation.CancelAsync().ConfigureAwait(true);
         try
         {
-            budget.Token.ThrowIfCancellationRequested();
-            var target = GrainFactory.GetGrain<INeuronQuery>(receiver.ToGrainId());
-            var cursor = await target.ReadJournal(JournalKind.Outgoing, long.MaxValue)
-                .WaitAsync(NeuronCallTimeouts.LookupBound, budget.Token)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            var result = correlation is { } id
-                ? await SendAsync(receiver, request, id, budget.Token)
-                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext)
-                : await SendAsync(receiver, request, budget.Token)
-                    .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-            SignalRequestPolicy.RequireHandled(receiver, request, result.Outcome);
-
-            // Replies are observed at the target. Waiting on this busy caller's
-            // incoming journal would deadlock its serialized turn.
-            var afterSequence = cursor.ResumeSequence;
-            while (true)
-            {
-                var replies = await target.ReadJournal(JournalKind.Outgoing, afterSequence)
-                    .WaitAsync(NeuronCallTimeouts.LookupBound, budget.Token).ConfigureAwait(true);
-                var retained = await SignalRequestPolicy.RecoverRetainedAsync(replies,
-                    after => target.ReadJournal(JournalKind.Outgoing, after)
-                        .WaitAsync(NeuronCallTimeouts.LookupBound, budget.Token)).ConfigureAwait(true);
-                if (SignalRequestPolicy.FindResponse(retained, receiver, result.Delivery, typeof(TResponse)) is TResponse response)
-                {
-                    return response;
-                }
-                if (request is not IDeferredReply)
-                {
-                    throw SignalRequestPolicy.MissingResponse(receiver, result.Delivery, typeof(TResponse), replies.ResetSnapshot is not null);
-                }
-                afterSequence = retained.ResumeSequence;
-                await Task.Delay(100, budget.Token).ConfigureAwait(true);
-            }
-        }
-        catch (OperationCanceledException exception) when (
-            budget.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
-        {
-            throw SignalRequestPolicy.TimedOut(receiver, request, exception);
-        }
-    }
-
-    protected Task<int> BroadcastAsync(Signal signal)
-        => _sender.BroadcastAsync(signal, _handling);
-
-    protected Task<int> BroadcastAsync(Signal signal, CorrelationId correlation)
-        => _sender.BroadcastAsync(signal, _handling, correlation);
-
-    protected Task<int> BroadcastAsync(Signal signal, SignalDelivery cause)
-        => _sender.BroadcastAsync(signal, cause, cause.CorrelationId);
-
-    public virtual Task<int> Broadcast(Signal signal, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(signal);
-        cancellationToken.ThrowIfCancellationRequested();
-        return BroadcastAsync(signal);
-    }
-
-    public virtual Task<SignalDeliveryResult> SendFrom(
-        NeuronId receiver,
-        Signal signal,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(signal);
-        cancellationToken.ThrowIfCancellationRequested();
-        return SendAsync(receiver, signal, cancellationToken);
-    }
-
-    public virtual Task<SignalDeliveryResult> SendFromWithCorrelation(
-        NeuronId receiver,
-        Signal signal,
-        CorrelationId correlation,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(signal);
-        cancellationToken.ThrowIfCancellationRequested();
-        return SendAsync(receiver, signal, correlation, cancellationToken);
-    }
-
-    protected IReadOnlyList<NeuronId> BroadcastRecipients(Signal signal)
-        => _components.Router.BroadcastRecipientsFor(signal, Id, _components.Synapses);
-
-    // Durable off-turn executors acknowledge direct requests here after handling.
-    // The caller commits this mutation with its operation acknowledgement.
-    protected void ReinforceDelivery(NeuronId receiver, string signalType)
-        => _components.Synapses.Reinforce(receiver, signalType, SynapseKind.Learned);
-
-    protected Task SubscribeToAsync<TSource, TSignal>(NeuronId source)
-        where TSource : INeuron
-        where TSignal : Signal
-        => BindFromAsync(source, typeof(TSignal).Name, typeof(TSource), correlation: null);
-
-    protected Task UnsubscribeFromAsync<TSource, TSignal>(NeuronId source)
-        where TSource : INeuron
-        where TSignal : Signal
-        => UnbindFromAsync(source, typeof(TSignal).Name, typeof(TSource), correlation: null);
-
-    protected Task ReplyAsync(Signal response)
-        => _sender.ReplyAsync(
-            response,
-            _handling
-                ?? throw new InvalidOperationException(
-                    "ReplyAsync requires an active delivery context. Reply only from a HandleAsync turn."));
-
-    protected Task<SignalDelivery> RecordOutgoingAsync(Signal signal)
-        => _sender.RecordOutgoingAsync(signal, _handling);
-
-    protected Task<SignalDelivery> RecordOutgoingAsync(Signal signal, CorrelationId correlation)
-        => _sender.RecordOutgoingAsync(signal, _handling, correlation);
-
-    // An outbox persists this envelope with its work before attempting delivery.
-    protected SignalDelivery CreateDelivery(
-        Signal signal, SignalDelivery? cause = null, SignalId? signalId = null, long? sourceEpoch = null,
-        CorrelationId? correlation = null,
-        string? sourceStream = null, long? streamGeneration = null)
-        => SignalDelivery.Create(signal, Id, _components.Journals.OutgoingNextSequence,
-            TimeProvider, cause ?? _handling, correlation,
-            principal: VerifiedActor.Current?.PrincipalId ?? cause?.Principal ?? _handling?.Principal,
-            signalId: signalId, sourceEpoch: sourceEpoch,
-            sourceStream: sourceStream, streamGeneration: streamGeneration);
-
-    protected Task<SignalDelivery> RecordOutgoingAsync(SignalDelivery delivery)
-        => _sender.RecordOutgoingAsync(delivery);
-
-    protected Task ReplyToAsync(SignalDelivery request, Signal response)
-        => _sender.ReplyAsync(response, request);
-
-    protected virtual Task<DeliveryOutcome> HandleUnmatchedAsync(
-        SignalDelivery delivery, CancellationToken cancellationToken)
-        => Task.FromResult(DeliveryOutcome.Unhandled);
-
-    protected virtual Task OnSubscriptionChangedAsync(
-        NeuronId source, string signalType, bool subscribed)
-        => Task.CompletedTask;
-
-    protected virtual Task ValidateSubscriptionAsync(
-        NeuronId source, string signalType, bool subscribed)
-        => Task.CompletedTask;
-
-    protected new IDisposable RegisterTimer(
-        Func<object, Task> callback,
-        object state,
-        TimeSpan dueTime,
-        TimeSpan period)
-        => throw new InvalidOperationException(
-            $"{nameof(RegisterTimer)} creates interleaving callbacks, but neurons require "
-            + "serialized turns.");
-
-    private async Task<DeliveryOutcome> DispatchDeliveryAsync(
-        SignalDelivery delivery,
-        CancellationToken cancellationToken)
-    {
-        if (!IsDeliveryCurrent(delivery))
-        {
-            return DeliveryOutcome.Handled;
-        }
-        using var handling = SignalTelemetry.Source.StartActivity("handle");
-
-        handling?.SetTag(SignalTelemetry.ReceiverTag, Id.ToString());
-        handling?.SetTag(SignalTelemetry.SignalTag, delivery.Signal.GetType().Name);
-        handling?.SetTag(SignalTelemetry.CorrelationTag, delivery.CorrelationId.ToString());
-
-        var previousHandling = _handling;
-        _handling = delivery;
-
-        // Re-enter the verified principal that rode the delivery so grants, graph
-        // partition, and stamps apply on the receiving turn.
-        using var principalScope = VerifiedActor.Enter(
-            delivery.Principal is { } principal
-                ? new ActorContext(principal, "_delivery")
-                : null);
-
-        try
-        {
-            await ReportActivityAsync(delivery, $"{Id}/{delivery.SignalId}/handle", "running").ConfigureAwait(true);
-            var outcome = await _components.Dispatcher.DispatchAsync(
-                    this,
-                    delivery.Signal,
-                    cancellationToken)
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-            if (outcome == DeliveryOutcome.Unhandled)
-            {
-                outcome = await HandleUnmatchedAsync(delivery, cancellationToken).ConfigureAwait(true);
-            }
-
-            _components.Journals.AppendIncoming(delivery);
-            await WriteStateAsync(cancellationToken).ConfigureAwait(true);
-            await _components.Journals.NotifyWatchersAsync()
-                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-            await ReportActivityAsync(delivery, $"{Id}/{delivery.SignalId}/handle", "completed",
-                outcome == DeliveryOutcome.Handled ? null : $"Delivery {outcome.ToString().ToLowerInvariant()}.").ConfigureAwait(true);
-
-            return outcome;
-        }
-        catch (Exception failure)
-        {
-            handling?.SetStatus(ActivityStatusCode.Error, failure.Message);
-            await ReportActivityAsync(delivery, $"{Id}/{delivery.SignalId}/handle",
-                failure is OperationCanceledException ? "cancelled" : "failed", failure.Message).ConfigureAwait(true);
-            throw;
+            await base.OnDeactivateAsync(reason, cancellationToken).ConfigureAwait(true);
         }
         finally
         {
-            _handling = previousHandling;
+            _retry.Dispose();
+            _activation.Dispose();
         }
     }
 
-    public Task HandleAsync(Subscribe signal, CancellationToken cancellationToken)
+    protected virtual Task OnNeuronActivatedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    // Override to react. The default neuron does nothing: the signal is already journaled and remembered.
+    protected virtual Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    protected T? Body<T>(SignalDelivery delivery, JsonTypeInfo<T> json) where T : class
+    {
+        var body = delivery.Body(json);
+        if (body is null)
+        {
+            DrainTelemetry.BodyUnreadable(_logger, Id, delivery.Signal.Type, delivery.SignalId);
+        }
+
+        return body;
+    }
+
+    // Snapshot hooks let the drain finish saved reactions and their announcements.
+    private protected virtual bool HasStoredAnnouncements => false;
+
+    private protected virtual bool HasBufferedAnnouncements => false;
+
+    private protected void NoteSnapshotSaved() => _reactionSaved = ReactionContext is DeliveryReaction;
+
+    private protected void RequireBeforeReactionSave()
+    {
+        if (_reactionSaved)
+        {
+            throw new InvalidOperationException(
+                $"Neuron '{Id}' cannot save again; {ReactionSaveRule}");
+        }
+    }
+
+    private protected virtual bool IsAppliedBy(SignalId delivery) => false;
+
+    private protected virtual void DiscardBufferedAnnouncements() { }
+
+    private protected virtual Task<bool> DrainAnnouncementsAsync(CancellationToken cancellationToken) => Task.FromResult(false);
+
+    // ---- INeuron ----
+
+    public Task<FireOutcome> Fire(Signal signal, NeuronId? to, CorrelationId? correlation, CancellationToken cancellationToken = default)
+    {
+        Guard();
+        return FireAsync(signal, to, correlation, cancellationToken);
+    }
+
+    public async Task Connect(NeuronId target, string signalType)
+    {
+        Guard();
+        ArgumentException.ThrowIfNullOrWhiteSpace(signalType);
+        if (_components.Synapses.Connect(target, signalType))
+        {
+            await PersistAsync().ConfigureAwait(true);
+        }
+    }
+
+    public async Task Disconnect(NeuronId target, string signalType)
+    {
+        Guard();
+        ArgumentException.ThrowIfNullOrWhiteSpace(signalType);
+        if (_components.Synapses.Disconnect(target, signalType))
+        {
+            await PersistAsync().ConfigureAwait(true);
+        }
+    }
+
+    public async Task<DeliveryAdmission> Deliver(SignalDelivery delivery, CancellationToken cancellationToken = default)
+    {
+        Guard();
+        ArgumentNullException.ThrowIfNull(delivery);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var admission = _components.Pending.Classify(delivery);
+        if (admission != DeliveryAdmission.Accepted)
+        {
+            return admission;
+        }
+
+        RequireSignalTypeCapacity(delivery.Signal.Type);
+        _components.Pending.Admit(delivery);
+        StageAdmitted(delivery);
+        await PersistAsync().ConfigureAwait(true);
+        // Register after persistence so work that never committed cannot leave an orphan reminder row.
+        await _retry.EnsureReminderAsync().ConfigureAwait(true);
+
+        _streamWake?.Publish(Id);
+
+        Wake();
+        return DeliveryAdmission.Accepted;
+    }
+
+    // Commands and reactions buffer scheduled work until their final persist.
+    protected SignalId Schedule(Signal signal, CorrelationId? correlation = null)
+    {
+        ArgumentNullException.ThrowIfNull(signal);
+        if (_reactionSaved)
+        {
+            throw new InvalidOperationException(
+                $"Neuron '{Id}' must schedule and announce before the save; {ReactionSaveRule}");
+        }
+
+        signal = Signal.Create(signal.Type, signal.Body);
+        RequireSignalTypeCapacity(signal.Type);
+        var delivery = SignalDelivery.Create(signal, Id, _components.Journals.IncomingNextSequence, TimeProvider, (ReactionContext as DeliveryReaction)?.Delivery, correlation);
+        if (!_components.Pending.HasRoomFor(_turnWork.Count))
+        {
+            throw new NeuronBusyException($"Neuron '{Id}' already holds {PendingWork.MaxPending} pending signals. Retry after pending work finishes.");
+        }
+
+        if (ReactionContext is not null)
+        {
+            _turnWork.Add(delivery);
+            if (ReactionContext is CommandReaction commandReaction)
+            {
+                ReactionContext = commandReaction with { ScheduledWork = [.. commandReaction.ScheduledWork, delivery.SignalId] };
+            }
+
+            return delivery.SignalId;
+        }
+
+        // Without a reaction context there is no turn to flush buffered work, so admit and wake immediately.
+        AdmitAndStageDelivery(delivery);
+        Wake();
+        return delivery.SignalId;
+    }
+
+    private void AdmitAndStageDelivery(SignalDelivery delivery)
+    {
+        delivery = delivery with { Sequence = _components.Journals.IncomingNextSequence };
+        if (_components.Pending.Classify(delivery) == DeliveryAdmission.Duplicate)
+        {
+            throw new InvalidOperationException($"Freshly minted scheduled signal id '{delivery.SignalId}' must never be a duplicate.");
+        }
+
+        _components.Pending.Admit(delivery);
+        StageAdmitted(delivery);
+    }
+
+    private void StageAdmitted(SignalDelivery delivery)
+    {
+        _components.Journals.AppendIncoming(delivery);
+        _components.Latest[delivery.Signal.Type] = delivery;
+    }
+
+    public async Task CancelReaction(SignalId pending)
+    {
+        Guard();
+        if (!_components.Pending.Cancel(pending))
+        {
+            return;
+        }
+
+        await PersistAsync().ConfigureAwait(true);
+        if (_reacting is { } reacting && reacting.Id == pending)
+        {
+            await reacting.Cancellation.CancelAsync().ConfigureAwait(true);
+        }
+    }
+
+    private void RequireSignalTypeCapacity(string signalType)
+    {
+        if (_components.Latest.Count >= MaxSignalTypesPerNeuron && !_components.Latest.ContainsKey(signalType))
+        {
+            throw new SignalRejectedException(
+                $"Neuron '{Id}' already remembers {MaxSignalTypesPerNeuron} signal types. "
+                + "Type names are vocabulary such as 'Note'; put identity in the neuron name.");
+        }
+    }
+
+    // ---- INeuronInbox ----
+
+    // Reacts to exactly one pending entry per call, then re-wakes if more remain, so that
+    // accepts interleave with reactions and journal order is preserved.
+    async Task INeuronInbox.Drain()
+    {
+        Guard();
+        RequestContext.Clear();
+        if (_components.Pending.Peek() is not { } head)
+        {
+            await FinishDrainAsync().ConfigureAwait(true);
+            return;
+        }
+
+        var delivery = head.Delivery;
+        await _retry.EnsureReminderAsync().ConfigureAwait(true);
+
+        if (_components.Pending.IsCancelled(delivery.SignalId) || IsAppliedBy(delivery.SignalId))
+        {
+            // Cancelled work, or a head whose snapshot already committed: finish it without reacting.
+            _components.Pending.CompleteHead(head);
+            await PersistAsync().ConfigureAwait(true);
+            await FinishDrainAsync().ConfigureAwait(true);
+            return;
+        }
+
+        RequestContext.Set(NeuronRequestKeys.Caller, delivery.Source.ToString());
+        RequestContext.Set(NeuronRequestKeys.Correlation, delivery.CorrelationId.ToString());
+        RequestContext.Set(NeuronRequestKeys.Causation, delivery.SignalId.ToString());
+
+        var previous = ReactionContext;
+        var previousReacting = _reacting;
+        using var reaction = CancellationTokenSource.CreateLinkedTokenSource(_activation.Token);
+        ReactionContext = new DeliveryReaction(delivery);
+        _reacting = (delivery.SignalId, reaction);
+        try
+        {
+            try
+            {
+                await ReceiveAsync(delivery, reaction.Token).ConfigureAwait(true);
+                if (HasBufferedAnnouncements)
+                {
+                    throw new InvalidOperationException(
+                        $"Neuron '{Id}' announced without saving: announcements are saved with the snapshot.");
+                }
+
+                AdmitTurnWork();
+            }
+            catch (OperationCanceledException) when (_activation.Token.IsCancellationRequested)
+            {
+                // Deactivation is not a reaction failure and must not re-arm the suspended retry timer.
+                return;
+            }
+            catch (Exception failure)
+            {
+                if (_components.Pending.IsCancelled(delivery.SignalId))
+                {
+                    DrainTelemetry.Cancelled(_logger, Id, delivery.SignalId);
+                }
+                else
+                {
+                    DrainTelemetry.Failed(_logger, Id, delivery.SignalId, failure);
+                    await _fence.DiscardStagedChangesAsync(failure).ConfigureAwait(true);
+                    _retry.ArmTimer();
+                    return;
+                }
+            }
+
+            _components.Pending.CompleteHead(head);
+            await PersistAsync().ConfigureAwait(true);
+        }
+        finally
+        {
+            // A failed or cancelled attempt drops whatever it scheduled.
+            _turnWork.Clear();
+            _reactionSaved = false;
+            DiscardBufferedAnnouncements();
+            ReactionContext = previous;
+            _reacting = previousReacting;
+        }
+
+        await FinishDrainAsync().ConfigureAwait(true);
+    }
+
+    private async Task FinishDrainAsync()
+    {
+        var remaining = await TryDrainAnnouncementsAsync().ConfigureAwait(true);
+        if (_activation.IsCancellationRequested)
+        {
+            return;
+        }
+
+        await _retry.AfterDrainAsync(remaining).ConfigureAwait(true);
+        _streamWake?.Publish(Id);
+        if (remaining)
+        {
+            _retry.ArmTimer();
+        }
+
+        // Only queued entries wake immediately; busy announcements wait for the retry timer.
+        if (_components.Pending.Peek() is not null)
+        {
+            Wake();
+        }
+    }
+
+    private async Task<bool> TryDrainAnnouncementsAsync()
+    {
+        try
+        {
+            return await DrainAnnouncementsAsync(_activation.Token).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException) when (_activation.IsCancellationRequested)
+        {
+            return false;
+        }
+        catch (Exception failure)
+        {
+            DrainTelemetry.AnnouncementsFailed(_logger, Id, failure);
+            return true;
+        }
+    }
+
+    // ---- INeuron: the reads ----
+
+    public Task<IReadOnlyList<SignalDelivery>> ReadState()
+    {
+        Guard();
+        return Task.FromResult<IReadOnlyList<SignalDelivery>>(
+            [.. _components.Latest.Values.OrderBy(d => d.Signal.Type, StringComparer.Ordinal)]);
+    }
+
+    public Task<int> ReadPendingCount()
+    {
+        Guard();
+        return Task.FromResult(_components.Pending.Count);
+    }
+
+    public Task<IReadOnlyList<Synapse>> ReadSynapses()
+    {
+        Guard();
+        return Task.FromResult(_components.Synapses.All());
+    }
+
+    public Task<JournalRead> ReadJournal(JournalKind kind, long afterSequence)
+    {
+        Guard();
+        return Task.FromResult(_components.Journals.Read(kind, afterSequence));
+    }
+
+    public Task<CommandJournalRead> ReadCommands(long afterSequence)
+    {
+        Guard();
+        return Task.FromResult(_components.Commands.Read(afterSequence));
+    }
+
+    // ---- for subclasses ----
+
+    protected CommandDescriptor Descriptor(string methodAlias) => _descriptors.DescriptorFor(this.GetGrainId().Type, methodAlias);
+
+    protected async Task<TResult> ExecuteCommandAsync<TArguments, TResult>(
+        CommandDescriptor command, TArguments arguments,
+        JsonTypeInfo<TArguments> argumentsJson, JsonTypeInfo<TResult> resultJson,
+        Func<TArguments, TResult> execute) where TArguments : Command
+    {
+        Guard();
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentNullException.ThrowIfNull(execute);
+        try
+        {
+            return await _components.Execution.RunAsync(this, command, arguments, argumentsJson, resultJson, execute).ConfigureAwait(true);
+        }
+        finally
+        {
+            _turnWork.Clear();
+        }
+    }
+
+    protected Task<FireOutcome> FireAsync(
+        Signal signal,
+        NeuronId? to = null,
+        CorrelationId? correlation = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (ExecutingCommand is { } id)
+        {
+            throw new InvalidOperationException(
+                $"Neuron '{Id}' cannot fire while executing command '{id}': fire from a reaction, not a command. Schedule the work instead.");
+        }
+
+        return FireCoreAsync(signal, to, correlation, cancellationToken);
+    }
+
+    internal Task<FireOutcome> FireAnnouncementAsync(Announcement announcement, CancellationToken cancellationToken)
+        => FireCoreAsync(announcement.Signal, announcement.To, announcement.Correlation, cancellationToken,
+            announcement.Id, announcement.Causation);
+
+    private async Task<FireOutcome> FireCoreAsync(
+        Signal signal, NeuronId? to, CorrelationId? correlation, CancellationToken cancellationToken,
+        SignalId? fixedId = null, SignalId? fixedCausation = null)
     {
         ArgumentNullException.ThrowIfNull(signal);
         cancellationToken.ThrowIfCancellationRequested();
-        return BindFromAsync(signal.Source, signal.SignalType, expectedSourceType: null, signal.Correlation);
-    }
 
-    public Task HandleAsync(Unsubscribe signal, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(signal);
-        cancellationToken.ThrowIfCancellationRequested();
-        return UnbindFromAsync(signal.Source, signal.SignalType, expectedSourceType: null, signal.Correlation);
-    }
+        // Re-validate: a Signal deserialized from the wire may bypass Create. Keep the
+        // normalized instance — Create fills a blank body with "{}".
+        signal = Signal.Create(signal.Type, signal.Body);
 
-    public async Task BindOutgoing(NeuronId subscriber, string signalType, CorrelationId? correlation = null)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(signalType);
-        RequireSameOwner(subscriber);
-        _components.Synapses.Bind(subscriber, signalType, correlation);
-        await WriteStateAsync().ConfigureAwait(true);
-    }
-
-    public async Task UnbindOutgoing(NeuronId subscriber, string signalType, CorrelationId? correlation = null)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(signalType);
-        RequireSameOwner(subscriber);
-        _components.Synapses.Unbind(subscriber, signalType, correlation);
-        await WriteStateAsync().ConfigureAwait(true);
-    }
-
-    public async Task FenceSourceEpoch(NeuronId source, long minimumEpoch)
-    {
-        RequireSameOwner(source);
-        ArgumentOutOfRangeException.ThrowIfNegative(minimumEpoch);
-        var key = source.ToString();
-        if (!_sourceEpochs.TryGetValue(key, out var current) || current < minimumEpoch)
+        if (to is { } target && target == Id)
         {
-            _sourceEpochs[key] = minimumEpoch;
-        }
-        await WriteStateAsync().ConfigureAwait(true);
-        await OnSourceEpochFencedAsync(source, Math.Max(current, minimumEpoch)).ConfigureAwait(true);
-    }
-
-    protected bool IsDeliveryCurrent(SignalDelivery delivery)
-        => !(delivery.SourceEpoch is { } epoch
-                && _sourceEpochs.TryGetValue(delivery.Caller.ToString(), out var minimum) && epoch < minimum)
-            && !(delivery.SourceStream is { } stream && delivery.StreamGeneration is { } generation
-                && _sourceEpochs.TryGetValue(StreamFenceKey(delivery.Caller, stream), out var minimumGeneration)
-                && generation < minimumGeneration);
-
-    protected virtual Task OnSourceEpochFencedAsync(NeuronId source, long minimumEpoch)
-        => Task.CompletedTask;
-
-    protected virtual Task OnSourceStreamFencedAsync(NeuronId source, string stream, long minimumGeneration)
-        => Task.CompletedTask;
-
-    public async Task FenceSourceStream(NeuronId source, string stream, long minimumGeneration)
-    {
-        RequireSameOwner(source);
-        ArgumentException.ThrowIfNullOrWhiteSpace(stream);
-        ArgumentOutOfRangeException.ThrowIfNegative(minimumGeneration);
-        var key = StreamFenceKey(source, stream);
-        if (!_sourceEpochs.TryGetValue(key, out var current) || current < minimumGeneration)
-        {
-            _sourceEpochs[key] = minimumGeneration;
-        }
-        await WriteStateAsync().ConfigureAwait(true);
-        await OnSourceStreamFencedAsync(source, stream, Math.Max(current, minimumGeneration)).ConfigureAwait(true);
-    }
-
-    private static string StreamFenceKey(NeuronId source, string stream)
-        => $"{source}|{stream.Length}:{stream}";
-
-    private async Task BindFromAsync(
-        NeuronId source,
-        string signalType,
-        Type? expectedSourceType,
-        CorrelationId? correlation)
-    {
-        RequireSubscription(source, signalType, expectedSourceType);
-        await ValidateSubscriptionAsync(source, signalType, subscribed: true).ConfigureAwait(true);
-        using var path = NeuronRequestPath.Enter(Id, source);
-        var binding = source == Id
-            ? BindOutgoing(Id, signalType, correlation)
-            : GrainFactory.GetGrain<INeuronGrain>(source.ToGrainId())
-                .BindOutgoing(Id, signalType, correlation)
-                .WaitAsync(NeuronCallTimeouts.LookupBound);
-        await binding
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        await OnSubscriptionChangedAsync(source, signalType, subscribed: true).ConfigureAwait(true);
-    }
-
-    private async Task UnbindFromAsync(
-        NeuronId source,
-        string signalType,
-        Type? expectedSourceType,
-        CorrelationId? correlation)
-    {
-        RequireSubscription(source, signalType, expectedSourceType);
-        await ValidateSubscriptionAsync(source, signalType, subscribed: false).ConfigureAwait(true);
-        using var path = NeuronRequestPath.Enter(Id, source);
-        var binding = source == Id
-            ? UnbindOutgoing(Id, signalType, correlation)
-            : GrainFactory.GetGrain<INeuronGrain>(source.ToGrainId())
-                .UnbindOutgoing(Id, signalType, correlation)
-                .WaitAsync(NeuronCallTimeouts.LookupBound);
-        await binding
-            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        await OnSubscriptionChangedAsync(source, signalType, subscribed: false).ConfigureAwait(true);
-    }
-
-    private void RequireSubscription(NeuronId source, string signalType, Type? expectedSourceType)
-    {
-        if (string.IsNullOrWhiteSpace(signalType))
-        {
-            throw new NeuronAuthorizationException($"Neuron '{Id}' refuses a subscription without a signal type.");
+            throw new SignalRejectedException($"Neuron '{Id}' cannot fire at itself.");
         }
 
-        RequireSameOwner(source);
-        if (expectedSourceType is not null
-            && source.Type != NeuronId.GrainTypeNameOf(expectedSourceType).ToLowerInvariant())
+        // The directed edge is created before the journal entry so anatomy and traffic agree.
+        if (to is { } single)
         {
-            throw new NeuronAuthorizationException(
-                $"Neuron '{source}' is not a '{expectedSourceType.Name}' instance.");
+            _components.Synapses.Connect(single, signal.Type);
         }
 
-        if (!CanHandle(signalType))
+        var delivery = SignalDelivery.Create(signal, Id, _components.Journals.OutgoingNextSequence, TimeProvider, (ReactionContext as DeliveryReaction)?.Delivery, correlation);
+        if (fixedId is { } announcementId)
         {
-            throw new NeuronAuthorizationException(
-                $"Neuron '{Id}' cannot subscribe to '{signalType}' because it does not IHandle it.");
+            delivery = delivery with { SignalId = announcementId, CausationId = fixedCausation };
         }
+
+        // A re-fire is the same signal, so the journal keeps one entry for it.
+        if (fixedId is null || !_components.Journals.RetainsOutgoing(delivery.SignalId))
+        {
+            _components.Journals.AppendOutgoing(delivery);
+        }
+        await PersistAsync().ConfigureAwait(true);
+
+        var targets = to is { } one
+            ? [one]
+            : _components.Synapses.ForType(signal.Type).Select(s => s.Target).Where(t => t != Id).Distinct().ToArray();
+
+        var delivered = 0;
+        var busy = 0;
+        List<Exception>? failures = null;
+        foreach (var receiver in targets)
+        {
+            try
+            {
+                var admission = await GrainFactory.GetGrain<INeuron>(receiver.ToGrainId())
+                    .Deliver(delivery, cancellationToken)
+                    .ConfigureAwait(true);
+                if (admission == DeliveryAdmission.Accepted)
+                {
+                    delivered++;
+                }
+                else if (admission == DeliveryAdmission.Busy)
+                {
+                    busy++;
+                }
+            }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                (failures ??= []).Add(error);
+            }
+        }
+
+        if (failures is not null)
+        {
+            throw new AggregateException(
+                $"Delivery of '{signal.Type}' from '{Id}' failed for {failures.Count} of {targets.Length} receivers.",
+                failures);
+        }
+
+        return new FireOutcome(delivery.SignalId, delivery.CorrelationId, delivered, busy);
     }
 
-    private void RequireSameOwner(NeuronId other)
+    // ---- the drain's wake-ups ----
+
+    // The reminder exists only to reactivate a cold neuron; the drain decides whether there is
+    // still work. A tick is also this activation's only proof that a reminder row is out there.
+    Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
     {
-        if (other.Owner != Id.Owner)
+        if (reminderName != RetryScheduler.ReminderName)
         {
-            throw new NeuronAuthorizationException(
-                $"Neuron '{Id}' refuses a foreign owner '{other.Owner}'.");
+            return Task.CompletedTask;
         }
+
+        _retry.NoteTick();
+        Wake();
+        return Task.CompletedTask;
     }
 
-    protected virtual bool CanHandle(string signalType)
-        => GetType().GetInterfaces().Any(contract =>
-            contract.IsGenericType
-            && contract.GetGenericTypeDefinition() == typeof(IHandle<>)
-            && string.Equals(contract.GetGenericArguments()[0].Name, signalType, StringComparison.Ordinal));
+    // A one-way call to ourselves: it returns immediately and is queued behind the current turn.
+    private void Wake() => GrainFactory.GetGrain<INeuronInbox>(this.GetGrainId()).Drain().Ignore();
+
+    protected new IDisposable RegisterTimer(Func<object, Task> callback, object state, TimeSpan dueTime, TimeSpan period)
+        => throw new InvalidOperationException($"{nameof(RegisterTimer)} creates interleaving callbacks, but neurons require serialized turns.");
 }

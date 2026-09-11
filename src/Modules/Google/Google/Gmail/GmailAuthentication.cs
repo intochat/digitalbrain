@@ -1,4 +1,6 @@
-using DigitalBrain.Sdk;
+using System.Globalization;
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Core;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Http;
@@ -81,7 +83,7 @@ internal static class GmailAuthentication
                 {
                     if (!string.Equals(context.TokenEndpointResponse.TokenType, "Bearer", StringComparison.OrdinalIgnoreCase))
                     {
-                        throw new McpOperationException("Google returned an unsupported token type.");
+                        throw new GmailUnavailableException("Google returned an unsupported token type.");
                     }
                     // HttpContext only. Never put access/refresh/ID tokens in tickets or AuthenticationProperties.
                     context.HttpContext.Items[TokensKey] = new Tokens(context.TokenEndpointResponse.AccessToken,
@@ -103,14 +105,20 @@ internal static class GmailAuthentication
                             || !string.Equals(principal?.FindFirst("email_verified")?.Value, "true", StringComparison.OrdinalIgnoreCase)
                             || !context.HttpContext.Items.Remove(TokensKey, out var value) || value is not Tokens tokens)
                         {
-                            throw new McpOperationException("Google identity validation was incomplete.");
+                            throw new GmailUnavailableException("Google identity validation was incomplete.");
                         }
 
-                        var connections = context.HttpContext.RequestServices.GetRequiredService<GmailConnections>();
-                        await logins.AcceptForActorAsync(request,
-                            (actor, scope, valid) => connections.AcceptAsync(actor.Chat.Owner, actor.Actor.PrincipalId, sub, email, tokens.AccessToken,
-                                tokens.RefreshToken, tokens.Scope, tokens.ExpiresIn, scope == GmailLogins.ComposeScope, valid,
-                                context.HttpContext.RequestAborted)).ConfigureAwait(false);
+                        if (!int.TryParse(tokens.ExpiresIn, CultureInfo.InvariantCulture, out var expiresIn)
+                            || BrowserLoginCorrelation.Scope(context.Properties) == GmailLogins.ComposeScope
+                            && !tokens.Scope.Split(' ', StringSplitOptions.RemoveEmptyEntries).Contains(GmailOAuthConfiguration.ComposeScope, StringComparer.Ordinal))
+                        {
+                            throw new GmailUnavailableException("Google did not grant all required Gmail scopes or a valid token lifetime.");
+                        }
+                        var nonce = context.HttpContext.RequestServices.GetRequiredService<TokenHandoff>()
+                            .Deposit(new OAuthTokens(tokens.AccessToken, tokens.RefreshToken));
+                        var grains = context.HttpContext.RequestServices.GetRequiredService<IGrainFactory>();
+                        await grains.GetGrain<IGmail>(new NeuronId("gmail", "gmail").ToGrainId())
+                            .Connect(new ConnectGmailAccount(CommandId.New(), sub, email, tokens.Scope, expiresIn, nonce)).ConfigureAwait(false);
                         await LoginPage.WriteAsync(context.HttpContext, "Gmail connected",
                             "You can close this tab and return to DigitalBrain. Login did not create a draft.", 200).ConfigureAwait(false);
                     }

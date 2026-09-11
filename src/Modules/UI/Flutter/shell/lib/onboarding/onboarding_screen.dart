@@ -1,4 +1,4 @@
-import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 
 import '../brain_theme.dart';
@@ -57,7 +57,7 @@ final class _OnboardingScreenState extends State<OnboardingScreen> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: BrainPalette.line),
           ),
-          child: KitGraph(
+          child: UiGraph(
             nodes: frame.nodes,
             edges: frame.edges,
             pulse: frame.pulse,

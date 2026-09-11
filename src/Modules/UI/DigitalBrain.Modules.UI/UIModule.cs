@@ -1,56 +1,47 @@
+using Azure.Storage.Blobs;
 using DigitalBrain.Abstractions;
-using DigitalBrain.Abstractions.Signals;
-using DigitalBrain.Product.Interactions;
+using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.AI;
 using DigitalBrain.Core;
-using DigitalBrain.Chat;
-using DigitalBrain.Abstractions.Scripting;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace DigitalBrain.UI;
 
-public sealed class UIModule : Core.IModule
+public sealed class UIModule : IModule
 {
     public void Configure(ISiloBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        builder.Services.TryAddSingleton<IUserActionContinuation, ChatUserActionContinuation>();
-        builder.Services.AddSingleton(new ApplicationNeuronEventRegistration(
-            IComposer.GrainTypeName, "user-messaged", "chat.user-messaged/v1", typeof(UserMessaged)));
-        builder.Services.AddSingleton(new ApplicationNeuronCapabilityRegistration(
-            "uirenderer", typeof(IUIRenderer), "renderer", IUIRenderer.DefaultInstanceName,
-            "src/Modules/UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj"));
-        builder.Services.AddSingleton(new ApplicationNeuronInputRegistration(
-            "uirenderer", "ui.open-surface/v1", typeof(OpenSurface), "open-surface", IsPublic: true));
-        builder.Services.AddSingleton(new ApplicationNeuronEventRegistration(
-            "uirenderer", "surface-opened", "ui.surface-opened/v1", typeof(SurfaceOpened), IsPublic: true));
-        builder.Services.AddSingleton(new ApplicationNeuronEventRegistration(
-            "uirenderer", "control-activated", "ui.control-activated/v1", typeof(ControlActivated), IsPublic: true));
-        builder.Services.AddSingleton(new ApplicationNeuronEventRegistration(
-            "uirenderer", "component-added", "ui.component-added/v1", typeof(ComponentAdded), IsPublic: true));
-        builder.Services.AddSingleton(new ApplicationNeuronInputRegistration(
-            "uirenderer", "activity.changed/v1", typeof(ActivityChanged)));
+        builder.Services.TryAddSingleton<TableService>();
+        // Resolved lazily so the choice does not depend on whether the host registered its blob
+        // client before or after this module.
+        builder.Services.TryAddSingleton<IUiImageStore>(services =>
+            CreateStore<IUiImageStore>(services, blobs => new BlobUiImageStore(blobs), () => new MemoryUiImageStore()));
+        builder.Services.TryAddSingleton<ITurnContextBlobStore>(services =>
+            CreateStore<ITurnContextBlobStore>(services, blobs => new BlobTurnContextStore(blobs), () => new MemoryTurnContextStore()));
 
-        if (string.Equals(
-                builder.Configuration[DigitalBrainNames.Mode],
-                DigitalBrainNames.TestingMode,
-                StringComparison.Ordinal))
+        // Registered through the AI module's contributor seam; each tool is built on first use.
+        builder.Services.AddNativeTool("render_chart", services => UiToolNamed(services, "render_chart"));
+        builder.Services.AddNativeTool("show_graph", services => UiToolNamed(services, "show_graph"));
+        // generate_image appears only once an image model is configured, the same gate AIClients uses.
+        if (!string.IsNullOrWhiteSpace(builder.Configuration["DigitalBrain:AI:Default:Image"]))
         {
-            builder.Services.TryAddSingleton<IKitImageStore, MemoryKitImageStore>();
+            builder.Services.AddNativeTool("generate_image", services => UiToolNamed(services, "generate_image"));
         }
-        else
-        {
-            builder.Services.TryAddSingleton<IKitImageStore, BlobKitImageStore>();
-        }
-
-        // GetService (nullable) is the honesty gate: generate_image only appears once an
-        // IImageGeneration provider is actually configured (Task 6).
-        builder.Services.AddSingleton<IAgentToolSource>(sp => new KitToolSource(
-            sp.GetRequiredService<IGrainFactory>(),
-            sp.GetService<IImageGeneration>(),
-            sp.GetRequiredService<IKitImageStore>()));
-        builder.Services.AddTransient<IWorkspaceInject, WorkspaceInject>();
-        builder.Services.AddSingleton<IApplicationScenarioDriver, WorkspaceChatScenarioDriver>();
     }
+
+    private static AIFunction UiToolNamed(IServiceProvider services, string name)
+    {
+        var tools = new UiTools(services.GetRequiredService<IGrainFactory>(),
+            services.GetRequiredService<INeuronInvoker>(), services.GetService<IImageGeneration>(),
+            services.GetRequiredService<IUiImageStore>());
+        return tools.Create().Single(tool => tool.Name == name);
+    }
+
+    private static T CreateStore<T>(IServiceProvider services, Func<BlobServiceClient, T> blobStore, Func<T> memoryStore)
+        => services.GetKeyedService<BlobServiceClient>(DigitalBrainNames.GrainState) is { } blobs
+            ? blobStore(blobs)
+            : memoryStore();
 }

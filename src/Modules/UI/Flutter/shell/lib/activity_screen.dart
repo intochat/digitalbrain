@@ -2,27 +2,22 @@ import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:flutter/material.dart';
 
 import 'brain_theme.dart';
-import 'user_actions/user_action_card.dart';
 
 final class ActivityScreen extends StatelessWidget {
   const ActivityScreen({
     super.key,
     required this.turns,
     this.correlations = const [],
-    this.userActions = const [],
-    this.onOpenUserAction,
     this.truncated = false,
   });
 
   final List<ChatTurnEvent> turns;
   final List<BrainCorrelation> correlations;
-  final List<UserActionCardModel> userActions;
-  final ValueChanged<Uri>? onOpenUserAction;
   final bool truncated;
 
   @override
   Widget build(BuildContext context) {
-    final empty = turns.isEmpty && userActions.isEmpty && correlations.isEmpty;
+    final empty = turns.isEmpty && correlations.isEmpty;
     return ColoredBox(
       key: const Key('activity_screen'),
       color: BrainPalette.surface,
@@ -45,16 +40,6 @@ final class ActivityScreen extends StatelessWidget {
                         'Older journal facts have left the window.',
                         style: BrainType.bodyMuted,
                       ),
-                    ],
-                    if (userActions.isNotEmpty) ...[
-                      const SizedBox(height: 18),
-                      for (final action in userActions)
-                        UserActionCard(
-                          model: action,
-                          onAuthorize: onOpenUserAction == null
-                              ? null
-                              : () => onOpenUserAction!(action.actionUrl),
-                        ),
                     ],
                     const SizedBox(height: 24),
                     if (correlations.isNotEmpty)

@@ -1,4 +1,3 @@
-using DigitalBrain.Abstractions;
 using DigitalBrain.Memory.Qdrant;
 
 namespace DigitalBrain.Memory;
@@ -12,43 +11,25 @@ internal sealed class QdrantVectorMemoryStore(QdrantVectorMemoryProvider provide
     {
         ArgumentNullException.ThrowIfNull(entry);
         return _provider.UpsertAsync(
-            entry.Owner,
+            entry.Name,
             entry.Namespace,
             entry.Key,
             entry.Text,
-            entry.Metadata,
+            entry.Tags.ToDictionary(static tag => tag.Name, static tag => tag.Value, StringComparer.Ordinal),
             entry.Payload,
             entry.Embedding,
             cancellationToken);
     }
 
-    public async Task<IReadOnlyList<VectorMemoryMatch>> SearchAsync(
-        string owner,
+    public Task<IReadOnlyList<RecalledMemory>> SearchAsync(
+        string name,
         string @namespace,
         float[] queryEmbedding,
         int limit,
         IReadOnlyDictionary<string, string>? metadataFilter,
         CancellationToken cancellationToken)
-    {
-        var hits = await _provider.SearchAsync(
-            owner,
-            @namespace,
-            queryEmbedding,
-            limit,
-            metadataFilter,
-            cancellationToken).ConfigureAwait(false);
+        => _provider.SearchAsync(name, @namespace, queryEmbedding, limit, metadataFilter, cancellationToken);
 
-        return hits
-            .Select(static hit => new VectorMemoryMatch(hit.Key, hit.Text, hit.Metadata, hit.Payload))
-            .ToArray();
-    }
-
-    public Task<bool> RemoveAsync(string owner, string @namespace, string key, CancellationToken cancellationToken)
-        => _provider.RemoveAsync(owner, @namespace, key, cancellationToken);
-
-    public Task<IReadOnlyList<string>> ListKeysAsync(
-        string owner,
-        string @namespace,
-        CancellationToken cancellationToken)
-        => _provider.ListKeysAsync(owner, @namespace, cancellationToken);
+    public Task<bool> RemoveAsync(string name, string @namespace, string key, CancellationToken cancellationToken)
+        => _provider.RemoveAsync(name, @namespace, key, cancellationToken);
 }

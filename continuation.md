@@ -40,7 +40,7 @@ Use Aspire state to get current endpoints. Do not reuse stale process IDs.
 The authoritative, current results are recorded in
 [the validation record](docs/programmable-behaviors-validation.md). Cleanup passed
 Substrate 109, Simulation 263, Scripting 30, E2E 43, Aspire hosting 62 and Flutter
-core/kit/shell 57/68/58 before the historical-journal correction below. The normal
+core/ui/shell 57/68/58 before the historical-journal correction below. The normal
 AppHost then started with its dashboard URL and kernel health 200. Native Studio
 retained the valid `c` draft, `github-pr-review` diagnostics and existing chat.
 

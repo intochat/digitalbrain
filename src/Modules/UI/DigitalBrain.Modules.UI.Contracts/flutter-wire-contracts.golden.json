@@ -55,7 +55,7 @@
       "methods": []
     },
     {
-      "name": "KitCardOffer",
+      "name": "UiCardOffer",
       "kind": "record",
       "alias": "ui.kit-card",
       "properties": [

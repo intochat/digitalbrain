@@ -1,46 +1,41 @@
-final class OpenSceneRequest {
-  const OpenSceneRequest({required this.sceneKey, required this.title});
-
-  final String sceneKey;
-  final String title;
-
-  Map<String, Object?> toJson() => {'sceneKey': sceneKey, 'title': title};
-}
-
 final class ActivateControlRequest {
-  const ActivateControlRequest({required this.intent, this.sceneKey});
+  const ActivateControlRequest({required this.intent, this.surfaceKey});
 
   final String intent;
-  final String? sceneKey;
+  final String? surfaceKey;
 
   Map<String, Object?> toJson() => {
     'intent': intent,
-    if (sceneKey != null) 'surfaceKey': sceneKey,
+    if (surfaceKey != null) 'surfaceKey': surfaceKey,
   };
 }
 
-final class SceneOpenedEvent {
-  const SceneOpenedEvent({
+sealed class SurfaceStreamEvent {
+  const SurfaceStreamEvent();
+}
+
+final class SurfaceSignalObserved extends SurfaceStreamEvent {
+  const SurfaceSignalObserved({
     required this.sequence,
-    required this.sceneKey,
-    required this.title,
-    required this.commandId,
-    required this.shell,
+    required this.signal,
+    required this.body,
   });
 
   final int sequence;
-  final String sceneKey;
-  final String title;
-  final String commandId;
-  final String shell;
+  final String signal;
+  final Map<String, Object?> body;
 
-  factory SceneOpenedEvent.fromJson(Map<String, Object?> json) {
-    return SceneOpenedEvent(
-      sequence: (json['sequence'] as num).toInt(),
-      sceneKey: (json['surfaceKey'] ?? json['sceneKey']) as String,
-      title: json['title'] as String,
-      commandId: json['commandId'] as String,
-      shell: (json['surface'] ?? json['shell']) as String,
-    );
-  }
+  factory SurfaceSignalObserved.fromJson(Map<String, Object?> json) =>
+      SurfaceSignalObserved(
+        sequence: (json['sequence'] as num).toInt(),
+        signal: json['signal'] as String,
+        body: Map<String, Object?>.from(json['body'] as Map? ?? const {}),
+      );
+}
+
+// Consumers re-read the surface, so only the cursor is retained from a reset.
+final class SurfaceStreamReset extends SurfaceStreamEvent {
+  const SurfaceStreamReset({required this.cursor});
+
+  final int cursor;
 }

@@ -1,8 +1,5 @@
 using System.ComponentModel;
-using DigitalBrain.Abstractions;
-using DigitalBrain.Abstractions.Neurons;
-using DigitalBrain.Abstractions.Scripting;
-using DigitalBrain.Abstractions.Signals;
+using DigitalBrain.Abstractions.Descriptors;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Journaling;
@@ -18,29 +15,32 @@ public static class DigitalBrainRuntime
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(modules);
 
+        builder.AddStartupTask(static (services, _) =>
+        {
+            if (services.GetService<Orleans.IReminderTable>() is null)
+            {
+                throw new InvalidOperationException(
+                    "Neurons hold a retry reminder for pending work. Configure UseAzureTableReminderService for a real host or UseInMemoryReminderService for a test host.");
+            }
+
+            // Building the table here turns a grain class descriptor violation into a silo-start failure.
+            services.GetRequiredService<DescriptorTable>();
+            return Task.CompletedTask;
+        });
+
         builder.AddJournalStorage();
+        builder.AddIncomingGrainCallFilter<NeuronActivationGuardFilter>();
+        builder.AddOutgoingGrainCallFilter<CommandLocalityFilter>();
+        builder.AddOutgoingGrainCallFilter<OutgoingCallerFilter>();
+        builder.AddActivityPropagation();
         builder.UseJsonJournalFormat(DurableStateJson.TypeInfoResolver);
-        // Awaited publish: a subscriber's failure surfaces to the publisher, matching the
-        // direct-call delivery semantics of Send.
-        builder.AddBroadcastChannel(
-            DigitalBrainNames.BroadcastChannelProvider,
-            options => options.FireAndForgetDelivery = false);
         ModelPayloadSerialization.AddModelPayloadSerialization(builder.Services);
         builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
-        builder.Services.TryAddSingleton(ApplicationWorkerCapabilityAuthority.Process);
-        builder.Services.TryAddSingleton<SynapseOptions>();
-        builder.Services.TryAddSingleton<SignalRouter>();
+        builder.Services.TryAddSingleton<NeuronOptions>();
         builder.Services.TryAddSingleton<NeuronRuntime>();
-        builder.Services.TryAddSingleton<IApplicationChatIngress, ApplicationChatIngress>();
-        builder.Services.TryAddSingleton<IApplicationContractIngress, ApplicationContractIngress>();
-        builder.Services.AddSingleton(new ApplicationNeuronEventRegistration(
-            IActivitySource.GrainTypeName, "execution-changed", "activity.execution-changed/v1",
-            typeof(ActivityExecutionChanged)));
-        builder.Services.AddSingleton(new ApplicationNeuronEventRegistration(
-            IActivities.GrainTypeName, "activity-changed", "activity.changed/v1", typeof(ActivityChanged)));
-        builder.Services.AddSingleton(new ApplicationNeuronInputRegistration(
-            IActivities.GrainTypeName, "activity.execution-changed/v1", typeof(ActivityExecutionChanged)));
-        builder.AddIncomingGrainCallFilter<NeuronMembraneFilter>();
+        builder.Services.TryAddSingleton<StreamWake>();
+        builder.Services.TryAddSingleton<DescriptorTable>();
+        builder.Services.TryAddSingleton<INeuronInvoker, NeuronInvoker>();
 
         foreach (var hook in ModuleHooksOf(modules))
         {

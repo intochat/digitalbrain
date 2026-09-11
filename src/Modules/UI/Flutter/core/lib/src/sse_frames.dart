@@ -2,11 +2,11 @@ import 'dart:convert';
 
 import 'ui_models.dart';
 
-final class SseSceneOpenedParser {
+abstract base class SseFrameParser<T> {
   String? _dataLine;
   String? _eventName;
 
-  Iterable<SceneOpenedEvent> addLine(String line) sync* {
+  Iterable<T> addLine(String line) sync* {
     if (line.startsWith(':')) {
       return;
     }
@@ -26,11 +26,11 @@ final class SseSceneOpenedParser {
     }
   }
 
-  Iterable<SceneOpenedEvent> flush() sync* {
+  Iterable<T> flush() sync* {
     yield* _emitBuffered();
   }
 
-  Iterable<SceneOpenedEvent> _emitBuffered() sync* {
+  Iterable<T> _emitBuffered() sync* {
     final data = _dataLine;
     final name = _eventName;
     _dataLine = null;
@@ -39,27 +39,30 @@ final class SseSceneOpenedParser {
     if (data == null) {
       return;
     }
-    if (name != 'surface-opened' && name != 'scene-opened') {
-      return;
-    }
-
-    final event = _decode(data);
-    if (event != null) {
-      yield event;
-    }
+    yield* decode(name ?? '', data);
   }
 
-  static SceneOpenedEvent? _decode(String payload) {
+  Iterable<T> decode(String eventName, String data);
+}
+
+final class SseSurfaceEventParser extends SseFrameParser<SurfaceStreamEvent> {
+  @override
+  Iterable<SurfaceStreamEvent> decode(String eventName, String data) sync* {
+    if (eventName != 'surface' && eventName != 'reset') return;
     try {
-      final decoded = jsonDecode(payload);
-      if (decoded is! Map) {
-        return null;
+      final decoded = jsonDecode(data);
+      if (decoded is! Map) return;
+      if (eventName == 'reset') {
+        yield SurfaceStreamReset(cursor: (decoded['cursor'] as num).toInt());
+      } else {
+        yield SurfaceSignalObserved.fromJson(
+          Map<String, Object?>.from(decoded),
+        );
       }
-      return SceneOpenedEvent.fromJson(Map<String, Object?>.from(decoded));
     } on FormatException {
-      return null;
+      return;
     } on TypeError {
-      return null;
+      return;
     }
   }
 }

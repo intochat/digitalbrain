@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/foundation.dart';
 
 enum BrainGraphExample {

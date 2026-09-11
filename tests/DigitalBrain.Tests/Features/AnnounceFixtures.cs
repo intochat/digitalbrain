@@ -1,0 +1,105 @@
+using System.Collections.Concurrent;
+using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Signals;
+using DigitalBrain.Core;
+using Orleans.Runtime;
+
+namespace DigitalBrain.Tests;
+
+[GenerateSerializer]
+[Alias("db.test.tally-state")]
+public sealed record TallyState([property: Id(0)] int Tally);
+
+[Alias("db.test.announcing")]
+public interface IAnnouncing : IGrainWithStringKey
+{
+    [Alias(nameof(ReadTally))]
+    Task<int> ReadTally();
+
+    [Alias(nameof(ReadStoredAnnouncements))]
+    Task<int> ReadStoredAnnouncements();
+}
+
+[GrainType("announcing")]
+internal sealed class AnnouncingNeuron(
+    NeuronRuntime runtime,
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<TallyState>> state)
+    : Neuron<TallyState>(runtime, state), IAnnouncing
+{
+    public Task<int> ReadTally() => Task.FromResult(State?.Tally ?? 0);
+
+    public Task<int> ReadStoredAnnouncements() => Task.FromResult(StoredAnnouncementCount);
+
+    protected override async Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
+    {
+        if (delivery.Signal.Type != "Ping")
+        {
+            return;
+        }
+
+        var tally = (State?.Tally ?? 0) + 1;
+        Announce(Signal.Create("Pong", "{\"n\":" + tally + "}"), correlation: delivery.CorrelationId);
+        if (FixtureSwitches.ForgetAnnouncementSaveOnce.TryRemove(Id.Name, out _))
+        {
+            return;
+        }
+
+        await SaveAsync(new TallyState(tally), cancellationToken);
+        if (FixtureSwitches.SaveAnnouncementTwiceOnce.TryRemove(Id.Name, out _))
+        {
+            await SaveAsync(new TallyState(tally + 1), cancellationToken);
+        }
+    }
+}
+
+[GrainType("holding")]
+internal sealed class HoldingNeuron(NeuronRuntime runtime) : Neuron(runtime);
+
+internal sealed class FixtureReactionCrashPoint : IReactionCrashPoint
+{
+    internal static ConcurrentDictionary<string, byte> LoseActivationOnce { get; } = new(StringComparer.Ordinal);
+
+    public void AfterSnapshotSave(NeuronId neuron)
+    {
+        if (LoseActivationOnce.TryGetValue(neuron.ToString(), out var savesToSkip) && savesToSkip > 0)
+        {
+            LoseActivationOnce[neuron.ToString()] = (byte)(savesToSkip - 1);
+            return;
+        }
+        if (LoseActivationOnce.TryRemove(neuron.ToString(), out _))
+        {
+            // Simulates activation loss after the snapshot commits but before the pending head persists.
+            throw new NeuronPersistenceException(neuron, "simulated lost activation after the snapshot save",
+                new IOException("activation lost"));
+        }
+    }
+}
+
+internal sealed class FixtureDeliveryFaultFilter : IIncomingGrainCallFilter
+{
+    public async Task Invoke(IIncomingGrainCallContext context)
+    {
+        // Pause processing, not persistence. Throwing inside the reaction exercises rollback
+        // and can fence the activation while the test is still filling its queue.
+        if (context.InterfaceMethod.DeclaringType == typeof(INeuronInbox)
+            && context.Grain is HoldingNeuron holding
+            && FixtureSwitches.HeldQueues.ContainsKey(holding.Id.Name))
+        {
+            return;
+        }
+
+        if (context.InterfaceMethod.DeclaringType == typeof(INeuron)
+            && context.InterfaceMethod.Name == nameof(INeuron.Deliver)
+            && context.Grain is Neuron neuron
+            && FixtureSwitches.DeliveryFailuresLeft.TryGetValue(neuron.Id.Name, out var left)
+            && left > 0
+            && FixtureSwitches.DeliveryFailuresLeft.AddOrUpdate(neuron.Id.Name, 0, (_, remaining) => remaining - 1) >= 0)
+        {
+            throw new TimeoutException("simulated delivery failure");
+        }
+
+        await context.Invoke();
+    }
+}

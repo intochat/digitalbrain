@@ -1,12 +1,17 @@
-using DigitalBrain.Abstractions.Entities;
+using DigitalBrain.Abstractions.Commands;
+using DigitalBrain.Abstractions.Neurons;
+using Orleans.Concurrency;
 
 namespace DigitalBrain.UI;
 
-// Same wall as IChart: Read() is the client-facing query via IEntity<TState>;
-// Describe stays a same-silo grain call (kit tools drive it).
 [Alias("ui.image")]
-public interface IImage : IEntity<ImageState>
+public interface IImage : INeuron
 {
-    [Alias(nameof(Describe))]
-    Task Describe(ImageState state);
+    /// <summary>Describes an image and returns its instance name.</summary>
+    [Alias("describe")]
+    Task<Accepted<string>> Describe(DescribeImage command, CancellationToken cancellationToken = default);
+
+    /// <summary>Reads the image description.</summary>
+    [ReadOnly, Alias("read")]
+    Task<ImageState> Read();
 }

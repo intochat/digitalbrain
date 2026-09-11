@@ -54,6 +54,62 @@ jobs:
             -p:ContainerRegistry=docker.io \
             -p:ContainerRepository=${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-kernel
 
+      # Nothing ran the published image before it was pushed in the 2026-09-09 releases, so a
+      # module-loading or config defect only surfaced after the container app rolled to it. Boot
+      # the just-published image against Azurite here and gate on /health before the next job
+      # rolls it out, so a broken image fails this job instead of production.
+      - name: Smoke-test kernel image against Azurite
+        env:
+          KERNEL_IMAGE: docker.io/${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-kernel:${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          docker pull "$KERNEL_IMAGE"
+
+          docker network create digitalbrain-smoke
+          docker run -d --name digitalbrain-smoke-azurite --network digitalbrain-smoke \
+            mcr.microsoft.com/azure-storage/azurite azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
+
+          # Azurite's default ports: blob 10000, queue 10001, table 10002.
+          CONN="DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://digitalbrain-smoke-azurite:10000/devstoreaccount1;QueueEndpoint=http://digitalbrain-smoke-azurite:10001/devstoreaccount1;TableEndpoint=http://digitalbrain-smoke-azurite:10002/devstoreaccount1;"
+
+          docker run -d --name digitalbrain-smoke-kernel --network digitalbrain-smoke -p 18080:8080 \
+            -e DigitalBrain__Standalone=true \
+            -e ConnectionStrings__clustering="$CONN" \
+            -e ConnectionStrings__reminders="$CONN" \
+            -e ConnectionStrings__grainstate="$CONN" \
+            -e ConnectionStrings__journal="$CONN" \
+            -e Orleans__ClusterId=digitalbrain-smoke \
+            -e Orleans__ServiceId=digitalbrain-smoke \
+            -e Orleans__Clustering__ProviderType=AzureTableStorage \
+            -e Orleans__Clustering__ServiceKey=clustering \
+            -e Orleans__Reminders__ProviderType=AzureTableStorage \
+            -e Orleans__Reminders__ServiceKey=reminders \
+            -e Orleans__GrainStorage__Default__ProviderType=AzureBlobStorage \
+            -e Orleans__GrainStorage__Default__ServiceKey=grainstate \
+            "$KERNEL_IMAGE"
+
+          status=000
+          for attempt in $(seq 1 18); do
+            status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:18080/health || true)
+            if [ "$status" = "200" ]; then
+              echo "kernel image is healthy after attempt ${attempt}"
+              break
+            fi
+            sleep 5
+          done
+
+          if [ "$status" != "200" ]; then
+            echo "kernel image smoke test failed: /health returned ${status}"
+            docker logs --tail 40 digitalbrain-smoke-kernel || true
+            exit 1
+          fi
+
+      - name: Clean up smoke-test containers
+        if: always()
+        run: |
+          docker rm -f digitalbrain-smoke-kernel digitalbrain-smoke-azurite 2>/dev/null || true
+          docker network rm digitalbrain-smoke 2>/dev/null || true
+
       # MCP image publication remains intentionally commented out for now.
       #
       # - name: Publish MCP image
@@ -168,17 +224,17 @@ jobs:
 
       - name: Dart format
         working-directory: src/Modules/UI/Flutter
-        run: dart format --output=none --set-exit-if-changed core kit shell
+        run: dart format --output=none --set-exit-if-changed core ui shell
 
       - name: Core package tests
         working-directory: src/Modules/UI/Flutter/core
         run: |
           if [ -d test ]; then dart test; else echo "no core tests"; fi
 
-      - name: Kit package tests
-        working-directory: src/Modules/UI/Flutter/kit
+      - name: Ui package tests
+        working-directory: src/Modules/UI/Flutter/ui
         run: |
-          if [ -d test ]; then flutter test --no-pub; else echo "no kit tests"; fi
+          if [ -d test ]; then flutter test --no-pub; else echo "no ui tests"; fi
 
       - name: Shell tests
         run: flutter test --no-pub

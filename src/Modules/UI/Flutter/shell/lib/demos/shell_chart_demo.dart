@@ -13,7 +13,7 @@ const shellBarChartData = <Map<String, Object>>[
   {'label': 'Sun', 'value': 47},
 ];
 
-const kitLineChartData = <Map<String, Object>>[
+const uiLineChartData = <Map<String, Object>>[
   {'t': 0, 'value': 12},
   {'t': 1, 'value': 18},
   {'t': 2, 'value': 15},
@@ -25,7 +25,7 @@ const kitLineChartData = <Map<String, Object>>[
 ];
 
 /// Demo BTC/USD-style closes over 24h (fixed wall times).
-final kitTimeChartData = <Map<String, Object>>[
+final uiTimeChartData = <Map<String, Object>>[
   {'time': DateTime(2026, 8, 5, 0), 'value': 64210},
   {'time': DateTime(2026, 8, 5, 1), 'value': 63880},
   {'time': DateTime(2026, 8, 5, 2), 'value': 64120},
@@ -64,7 +64,7 @@ final class ShellBarChartDemo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      key: const Key('kit_bar_chart'),
+      key: const Key('ui_bar_chart'),
       height: height,
       child: Chart(
         data: shellBarChartData,
@@ -105,18 +105,18 @@ final class ShellBarChartDemo extends StatelessWidget {
 }
 
 /// Line chart demo via graphic.
-final class KitLineChart extends StatelessWidget {
-  const KitLineChart({super.key, this.height = 220});
+final class UiLineChart extends StatelessWidget {
+  const UiLineChart({super.key, this.height = 220});
 
   final double height;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      key: const Key('kit_line_chart'),
+      key: const Key('ui_line_chart'),
       height: height,
       child: Chart(
-        data: kitLineChartData,
+        data: uiLineChartData,
         variables: {
           't': Variable(
             accessor: (Map map) => map['t'] as num,
@@ -159,8 +159,8 @@ final class KitLineChart extends StatelessWidget {
 }
 
 /// Bitcoin-style price chart: ticker header, area fill, tight price scale.
-final class KitTimeChart extends StatelessWidget {
-  const KitTimeChart({super.key, this.height});
+final class UiTimeChart extends StatelessWidget {
+  const UiTimeChart({super.key, this.height});
 
   /// Optional fixed height; when null, fills the parent (window panel body).
   final double? height;
@@ -176,7 +176,7 @@ final class KitTimeChart extends StatelessWidget {
     final accent = up ? _btcUp : _btcDown;
 
     final body = Column(
-      key: const Key('kit_time_chart'),
+      key: const Key('ui_time_chart'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
@@ -226,7 +226,7 @@ final class KitTimeChart extends StatelessWidget {
         const SizedBox(height: 6),
         Expanded(
           child: Chart(
-            data: kitTimeChartData,
+            data: uiTimeChartData,
             variables: {
               'time': Variable(
                 accessor: (Map map) => map['time'] as DateTime,
@@ -311,8 +311,8 @@ final class KitTimeChart extends StatelessWidget {
   }
 }
 
-final class KitChartCard extends StatelessWidget {
-  const KitChartCard({super.key, required this.title, required this.child});
+final class UiChartCard extends StatelessWidget {
+  const UiChartCard({super.key, required this.title, required this.child});
 
   final String title;
   final Widget child;

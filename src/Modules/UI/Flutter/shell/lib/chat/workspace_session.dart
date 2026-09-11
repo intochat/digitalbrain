@@ -8,7 +8,7 @@ import 'package:flutter/foundation.dart';
 /// Keeps durable chat session state out of the widget tree so the shell
 /// can rebuild chrome without re-owning SSE bookkeeping.
 final class WorkspaceSession extends ChangeNotifier {
-  WorkspaceSession({required this.chatName, Stream<ChatTurnEvent>? turns}) {
+  WorkspaceSession({required this.chatName, Stream<ChatStreamEvent>? turns}) {
     listenTurns(turns);
   }
 
@@ -19,7 +19,7 @@ final class WorkspaceSession extends ChangeNotifier {
   List<ChatTurnEvent> projectedTurns = const [];
   String? turnFailure;
 
-  StreamSubscription<ChatTurnEvent>? _turnSubscription;
+  StreamSubscription<ChatStreamEvent>? _turnSubscription;
 
   void updateChatName(String name) {
     if (chatName == name) {
@@ -32,16 +32,24 @@ final class WorkspaceSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  void listenTurns(Stream<ChatTurnEvent>? turns) {
+  void listenTurns(Stream<ChatStreamEvent>? turns) {
     unawaited(_turnSubscription?.cancel());
     turnFailure = null;
     _turnSubscription = turns?.listen(
-      (turn) {
-        if (!_seen.add(turn.sequence)) {
-          return;
+      (event) {
+        switch (event) {
+          case ChatTurnObserved(:final turn):
+            if (!_seen.add(turn.sequence)) return;
+            _turns.add(turn);
+            _turns.sort((a, b) => a.sequence.compareTo(b.sequence));
+          case ChatJournalReset(:final turns):
+            _turns
+              ..clear()
+              ..addAll(turns);
+            _seen
+              ..clear()
+              ..addAll(turns.map((turn) => turn.sequence));
         }
-        _turns.add(turn);
-        _turns.sort((a, b) => a.sequence.compareTo(b.sequence));
         projectedTurns = List<ChatTurnEvent>.unmodifiable(_turns);
         notifyListeners();
       },

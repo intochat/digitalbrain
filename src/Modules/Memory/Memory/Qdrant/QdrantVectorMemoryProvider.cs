@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
-using DigitalBrain.Abstractions;
 using Qdrant.Client;
 using Qdrant.Client.Grpc;
 
@@ -11,7 +10,7 @@ internal sealed class QdrantVectorMemoryProvider : IAsyncDisposable
 {
     internal const string DefaultCollectionName = "digitalbrain_vector_memory";
 
-    private const string OwnerField = "owner";
+    private const string NameField = "owner"; // Keep the stored Qdrant payload schema unchanged.
     private const string NamespaceField = "namespace";
     private const string KeyField = "key";
     private const string TextField = "text";
@@ -40,7 +39,7 @@ internal sealed class QdrantVectorMemoryProvider : IAsyncDisposable
     }
 
     public async Task UpsertAsync(
-        string owner,
+        string name,
         string @namespace,
         string key,
         string text,
@@ -49,7 +48,7 @@ internal sealed class QdrantVectorMemoryProvider : IAsyncDisposable
         float[] embedding,
         CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(@namespace);
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
@@ -66,11 +65,11 @@ internal sealed class QdrantVectorMemoryProvider : IAsyncDisposable
 
         var point = new PointStruct
         {
-            Id = ToPointId(owner, @namespace, key),
+            Id = ToPointId(name, @namespace, key),
             Vectors = embedding,
             Payload =
             {
-                [OwnerField] = owner,
+                [NameField] = name,
                 [NamespaceField] = @namespace,
                 [KeyField] = key,
                 [TextField] = text,
@@ -84,7 +83,7 @@ internal sealed class QdrantVectorMemoryProvider : IAsyncDisposable
 
         if (payload is { } protectedPayload)
         {
-            point.Payload[PayloadIdField] = protectedPayload.Id.ToString("D");
+            point.Payload[PayloadIdField] = Guid.Parse(protectedPayload.Id).ToString("D");
             if (protectedPayload.ExpiresAt is { } expiresAt)
             {
                 point.Payload[PayloadExpiresField] = expiresAt.ToString("O", CultureInfo.InvariantCulture);
@@ -110,15 +109,15 @@ internal sealed class QdrantVectorMemoryProvider : IAsyncDisposable
         }
     }
 
-    public async Task<IReadOnlyList<QdrantVectorMemoryHit>> SearchAsync(
-        string owner,
+    public async Task<IReadOnlyList<RecalledMemory>> SearchAsync(
+        string name,
         string @namespace,
         float[] queryEmbedding,
         int limit,
         IReadOnlyDictionary<string, string>? metadataFilter,
         CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(@namespace);
         ArgumentNullException.ThrowIfNull(queryEmbedding);
         ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
@@ -139,7 +138,7 @@ internal sealed class QdrantVectorMemoryProvider : IAsyncDisposable
 
         var must = new List<Condition>
         {
-            MatchKeyword(OwnerField, owner),
+            MatchKeyword(NameField, name),
             MatchKeyword(NamespaceField, @namespace),
         };
 
@@ -163,7 +162,7 @@ internal sealed class QdrantVectorMemoryProvider : IAsyncDisposable
                 .ConfigureAwait(false);
 
             return results
-                .Select(static point => ToHit(point))
+                .Select(static point => ToRecalledMemory(point))
                 .ToArray();
         }
         catch (OperationCanceledException)
@@ -177,12 +176,12 @@ internal sealed class QdrantVectorMemoryProvider : IAsyncDisposable
     }
 
     public async Task<bool> RemoveAsync(
-        string owner,
+        string name,
         string @namespace,
         string key,
         CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(@namespace);
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         cancellationToken.ThrowIfCancellationRequested();
@@ -192,7 +191,7 @@ internal sealed class QdrantVectorMemoryProvider : IAsyncDisposable
             return false;
         }
 
-        var pointId = ToPointId(owner, @namespace, key);
+        var pointId = ToPointId(name, @namespace, key);
 
         try
         {
@@ -210,7 +209,7 @@ internal sealed class QdrantVectorMemoryProvider : IAsyncDisposable
             }
 
             var payload = existing[0].Payload;
-            if (!PayloadEquals(payload, OwnerField, owner)
+            if (!PayloadEquals(payload, NameField, name)
                 || !PayloadEquals(payload, NamespaceField, @namespace)
                 || !PayloadEquals(payload, KeyField, key))
             {
@@ -232,76 +231,6 @@ internal sealed class QdrantVectorMemoryProvider : IAsyncDisposable
         catch (Exception ex)
         {
             throw new InvalidOperationException("Vector memory remove failed.", ex);
-        }
-    }
-
-    public async Task<IReadOnlyList<string>> ListKeysAsync(
-        string owner,
-        string @namespace,
-        CancellationToken cancellationToken)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
-        ArgumentException.ThrowIfNullOrWhiteSpace(@namespace);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        if (!await CollectionExistsAsync(cancellationToken).ConfigureAwait(false))
-        {
-            return [];
-        }
-
-        var keys = new List<string>();
-        PointId? offset = null;
-        var filter = new Filter
-        {
-            Must =
-            {
-                MatchKeyword(OwnerField, owner),
-                MatchKeyword(NamespaceField, @namespace),
-            },
-        };
-
-        try
-        {
-            while (true)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var page = await _client.ScrollAsync(
-                        _collectionName,
-                        filter: filter,
-                        limit: 256,
-                        offset: offset,
-                        payloadSelector: true,
-                        vectorsSelector: false,
-                        cancellationToken: cancellationToken)
-                    .ConfigureAwait(false);
-
-                foreach (var point in page.Result)
-                {
-                    var key = ReadString(point.Payload, KeyField);
-                    if (key.Length > 0)
-                    {
-                        keys.Add(key);
-                    }
-                }
-
-                if (page.NextPageOffset is null || page.Result.Count == 0)
-                {
-                    break;
-                }
-
-                offset = page.NextPageOffset;
-            }
-
-            keys.Sort(StringComparer.Ordinal);
-            return keys;
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException("Vector memory list keys failed.", ex);
         }
     }
 
@@ -418,7 +347,7 @@ internal sealed class QdrantVectorMemoryProvider : IAsyncDisposable
             },
         };
 
-    private static QdrantVectorMemoryHit ToHit(ScoredPoint point)
+    private static RecalledMemory ToRecalledMemory(ScoredPoint point)
     {
         var payload = point.Payload;
         var key = ReadString(payload, KeyField);
@@ -448,10 +377,10 @@ internal sealed class QdrantVectorMemoryProvider : IAsyncDisposable
                 expiresAt = parsedExpires;
             }
 
-            protectedPayload = new ProtectedPayloadReference(payloadId, expiresAt);
+            protectedPayload = new ProtectedPayloadReference(payloadId.ToString("D"), expiresAt);
         }
 
-        return new QdrantVectorMemoryHit(key, text, metadata, protectedPayload);
+        return new RecalledMemory(key, text, metadata.Select(static pair => new MemoryTag(pair.Key, pair.Value)).ToArray(), protectedPayload);
     }
 
     private static string ReadString(Google.Protobuf.Collections.MapField<string, Value> payload, string field)
@@ -461,15 +390,9 @@ internal sealed class QdrantVectorMemoryProvider : IAsyncDisposable
         => payload.TryGetValue(field, out var value)
             && string.Equals(value.StringValue, expected, StringComparison.Ordinal);
 
-    private static PointId ToPointId(string owner, string @namespace, string key)
+    private static PointId ToPointId(string name, string @namespace, string key)
     {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(owner + "\0" + @namespace + "\0" + key));
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(name + "\0" + @namespace + "\0" + key));
         return new PointId { Uuid = new Guid(bytes.AsSpan(0, 16)).ToString("D") };
     }
 }
-
-internal sealed record QdrantVectorMemoryHit(
-    string Key,
-    string Text,
-    IReadOnlyDictionary<string, string> Metadata,
-    ProtectedPayloadReference? Payload);

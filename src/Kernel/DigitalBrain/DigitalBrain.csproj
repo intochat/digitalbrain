@@ -1,21 +1,28 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>The DigitalBrain neuron substrate: journaled neurons, the weighted synapse graph, and typed signal routing on Orleans.</Description>
+    <Description>The DigitalBrain neuron substrate: journaled neurons, the synapse graph, and typed signal routing on Orleans.</Description>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" />
-    <PackageReference Include="Microsoft.Orleans.BroadcastChannel" />
+    <PackageReference Include="ModelContextProtocol.Core" />
     <PackageReference Include="Microsoft.Orleans.Journaling" />
     <PackageReference Include="Microsoft.Orleans.Reminders" />
     <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
     <PackageReference Include="Microsoft.Orleans.Server" />
   </ItemGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Substrate.Tests" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Google" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.UI" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Salesforce" />
+    <InternalsVisibleTo Include="DigitalBrain.Tests" />
+    <InternalsVisibleTo Include="DigitalBrain.Testing" />
+    <InternalsVisibleTo Include="DigitalBrain.Mcp" />
   </ItemGroup>
 </Project>

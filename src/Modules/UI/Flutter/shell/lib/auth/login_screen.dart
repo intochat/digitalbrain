@@ -82,7 +82,7 @@ final class _LoginScreenState extends State<LoginScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('DigitalBrain', style: BrainType.title),
+                Text('IntoCaht', style: BrainType.title),
                 const SizedBox(height: 8),
                 Text(
                   'Sign in to reach the kernel.',

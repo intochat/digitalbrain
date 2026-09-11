@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:flutter/material.dart';
 
 import 'auth/brain_session_gate.dart';
-import 'chat_screen.dart';
+import 'workspace/workspace_app.dart';
+import 'workspace/workspace_store.dart';
 import 'open_url_io.dart'
     if (dart.library.html) 'open_url_web.dart'
     as open_url;
@@ -27,57 +30,38 @@ Widget buildShell({
   required String chat,
   required DigitalBrainUiClient? edge,
   String? statusMessage,
+  WorkspaceStore? workspaceStore,
 }) {
-  return BrainChatApp(
-    client: edge,
-    chatName: chat,
-    statusMessage: statusMessage,
-    turns: edge?.watchChatTurns(chatName: chat),
-    onStream: edge == null
-        ? null
-        : (text) => edge.streamMessage(chatName: chat, text: text),
-    onStreamVoice: edge == null
-        ? null
-        : (audioBytes, {fileName = 'voice.wav'}) => edge.streamVoice(
-            chatName: chat,
-            audioBytes: audioBytes,
-            fileName: fileName,
-          ),
-    onOpenSignIn: openExternalUrl,
+  final scope = base64Url.encode(
+    utf8.encode(
+      edge == null
+          ? 'offline'
+          : '${edge.baseUri.origin}|${edge.workspaceIdentity}',
+    ),
+  );
+  return WorkspaceApp(
+    key: ValueKey(scope),
+    persistenceKey: 'intocaht.workspace.v1.$scope',
+    store: workspaceStore,
     kernelBaseUri: edge?.baseUri,
-    onCancelTurn: edge == null
-        ? null
-        : ({required commandId, required turnId}) => edge.cancelTurn(
-            chatName: chat,
-            commandId: commandId,
-            turnId: turnId,
-          ),
-    onReadChart: edge?.readChart,
-    onReadImageBytes: edge?.readImageBytes,
-    onReadSpreadsheet: edge?.readSpreadsheet,
-    onReadGraph: edge?.readGraph,
-    onReadSurface: edge?.readSurface,
-    surfaceEvents: edge?.watchShellEvents(shellName: 'desk'),
-    onWatchActivities: edge == null
-        ? null
-        : () => edge.watchActivities(surfaceName: 'desk'),
+    onRun: edge?.runAgent,
+    onSalesforceConnected: edge?.salesforceConnected,
+    onCreateArtifact: edge?.createWorkspaceArtifact,
+    onReadArtifact: edge?.readWorkspaceArtifact,
+    onUpdateArtifact: edge?.updateWorkspaceArtifact,
+    onListArtifacts: edge?.listWorkspaceArtifacts,
+    onCreateTable: edge?.createTable,
     onReadBrain: edge == null ? null : () => edge.readBrain(chatName: chat),
     onWatchBrain: edge == null ? null : () => edge.watchBrain(chatName: chat),
-    behaviorStudio: edge,
-    onSetBrainSubscription: edge == null
+    onTranscribe: edge == null
         ? null
-        : ({
-            required sourceId,
-            required targetId,
-            required signalType,
-            required subscribed,
-          }) => edge.setBrainSubscription(
-            chatName: chat,
-            sourceId: sourceId,
-            targetId: targetId,
-            signalType: signalType,
-            subscribed: subscribed,
-          ),
+        : (bytes, fileName) =>
+              edge.transcribeVoice(audioBytes: bytes, fileName: fileName),
+    onReadTable: edge?.readTable,
+    onUpdateTableView: edge?.updateTableView,
+    onListTables: edge?.listTables,
+    statusMessage: statusMessage,
+    onOpenUrl: openExternalUrl,
   );
 }
 

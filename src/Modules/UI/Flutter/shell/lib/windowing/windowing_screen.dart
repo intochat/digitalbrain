@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 
 import '../brain_theme.dart';
@@ -8,7 +8,7 @@ import '../chat/chat_contracts.dart';
 import '../demos/shell_chart_demo.dart';
 import 'panel_manager.dart';
 
-/// Desk windows from ISurface scenes (`GET /kit/surfaces/desk`). Demo panels if empty.
+/// Desk windows from ISurface scenes (`GET /ui/surfaces/desk`). Demo panels if empty.
 final class WindowingScreen extends StatefulWidget {
   const WindowingScreen({super.key, this.onReadSurface});
 
@@ -395,7 +395,7 @@ final class _PanelBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return switch (kind) {
       WindowPanelKind.clock => const Center(
-        child: SizedBox(width: 150, height: 150, child: KitClock()),
+        child: SizedBox(width: 150, height: 150, child: UiClock()),
       ),
       WindowPanelKind.metrics => const _MetricsBody(),
       WindowPanelKind.notes => const _NotesBody(),
@@ -404,7 +404,7 @@ final class _PanelBody extends StatelessWidget {
       WindowPanelKind.chart => const ShellBarChartDemo(height: 200),
       WindowPanelKind.timeChart => const Padding(
         padding: EdgeInsets.symmetric(horizontal: 4),
-        child: KitTimeChart(),
+        child: UiTimeChart(),
       ),
     };
   }
