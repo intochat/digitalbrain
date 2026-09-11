@@ -1,18 +1,20 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'workspace_voice.dart';
 
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:uuid/uuid.dart';
 
 import '../chat/agent_chat_app.dart';
 import 'workspace_store.dart';
+
+part 'workspace_chat_presentation.dart';
 
 class WorkspaceChat extends StatefulWidget {
   const WorkspaceChat({
@@ -45,6 +47,7 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
       widget.project ?? widget.store.currentProject;
   final _controller = InMemoryChatController();
   final _composer = TextEditingController();
+  final _composerFocus = FocusNode();
   final _entries = <Map<String, dynamic>>[];
   StreamSubscription<AgentEvent>? _subscription;
   bool _running = false, _finished = false;
@@ -80,6 +83,7 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
     _subscription?.cancel();
     _controller.dispose();
     _composer.dispose();
+    _composerFocus.dispose();
     super.dispose();
   }
 
@@ -291,214 +295,6 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
     }
   }
 
-  Widget _message(Map<String, dynamic> e) {
-    if (e['role'] != 'tool') {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              e['role'] == 'user' ? 'You' : 'IntoCaht',
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            SelectionArea(
-              child: GptMarkdown(
-                e['text'] as String? ?? '',
-                onLinkTap: (url, _) => _open(url),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    final result = e['result'];
-    final map = result is Map ? result : null;
-    if (map != null &&
-        [
-          'table',
-          'diagram',
-          'brain',
-          'image',
-          'document',
-        ].contains(map['kind'])) {
-      return Card(
-        child: ListTile(
-          dense: true,
-          leading: const Icon(Icons.insert_drive_file_outlined),
-          title: Text(map['title'] as String? ?? 'Saved artifact'),
-          subtitle: const Text('Open editor'),
-          trailing: const Icon(Icons.open_in_new, size: 18),
-          onTap: () => widget.onArtifact(Map<String, dynamic>.from(map)),
-        ),
-      );
-    }
-    return Card(
-      child: ExpansionTile(
-        title: Text(
-          e['name'] == 'search_web'
-              ? 'Web search${e['complete'] == true ? ' complete' : '…'}'
-              : e['name'] as String? ?? 'Tool',
-        ),
-        children: [
-          if (map?['results'] is List)
-            for (final s in (map!['results'] as List).whereType<Map>())
-              ListTile(
-                title: Text(s['title'] as String? ?? 'Source'),
-                subtitle: Text(s['url'] as String? ?? ''),
-                onTap: () => _open(s['url'] as String? ?? ''),
-              )
-          else
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: SelectableText(
-                result == null
-                    ? 'Working…'
-                    : result is String
-                    ? result
-                    : const JsonEncoder.withIndent('  ').convert(result),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
   @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Expanded(
-        child: UiChat(
-          chatController: _controller,
-          currentUserId: 'user',
-          resolveUser: (id) async =>
-              User(id: id, name: id == 'user' ? 'You' : 'IntoCaht'),
-          builders: Builders(
-            composerBuilder: (_) => const SizedBox.shrink(),
-            emptyChatListBuilder: (_) =>
-                const Center(child: Text('Start a conversation')),
-            customMessageBuilder: (
-              context,
-              message,
-              index, {
-              required isSentByMe,
-              groupStatus,
-            }) => _message(message.metadata ?? {}),
-          ),
-        ),
-      ),
-      if (_notice != null)
-        Padding(
-          padding: const EdgeInsets.all(8),
-          child: Text(
-            _notice!,
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
-          ),
-        ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
-        child: Wrap(
-          spacing: 6,
-          runSpacing: 4,
-          children: [
-            for (final id in widget.conversation.attachedArtifactIds)
-              InputChip(
-                label: Text(
-                  _project.artifacts
-                          .where((a) => a.id == id)
-                          .firstOrNull
-                          ?.title ??
-                      id,
-                ),
-                onPressed: () => widget.store.openArtifact(id),
-                onDeleted: () => widget.store.detachArtifact(id),
-              ),
-          ],
-        ),
-      ),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        child: Row(
-          children: [
-            IconButton(
-              tooltip: 'Attach project work',
-              onPressed: widget.onAttach,
-              icon: const Icon(Icons.attach_file),
-            ),
-            Expanded(
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  isExpanded: true,
-                  value: widget.conversation.selectedAgentId,
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'intocaht',
-                      child: Text('IntoCaht'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'salesforce',
-                      child: Text('Salesforce Administrator'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'leads',
-                      child: Text('Lead Generator'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'automation',
-                      child: Text('Automation Agent'),
-                    ),
-                  ],
-                  onChanged: (v) {
-                    if (v != null) widget.store.setAgent(v);
-                  },
-                ),
-              ),
-            ),
-            WorkspaceVoiceButton(
-              onTranscribe: widget.onTranscribe,
-              onDraft: (draft) {
-                _composer.text = draft;
-              },
-              enabled: !_running && widget.active,
-            ),
-          ],
-        ),
-      ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(14, 4, 14, 16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _composer,
-                minLines: 1,
-                maxLines: 5,
-                onSubmitted: (_) => _send(),
-                decoration: InputDecoration(
-                  hintText: widget.onRun == null
-                      ? 'Connect to start a conversation'
-                      : 'Message IntoCaht',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 6),
-            IconButton.filled(
-              tooltip: _running ? 'Stop response' : 'Send message',
-              onPressed: _running
-                  ? () => _finish('Response stopped.')
-                  : widget.onRun == null
-                  ? null
-                  : _send,
-              icon: Icon(_running ? Icons.stop : Icons.arrow_upward),
-            ),
-          ],
-        ),
-      ),
-    ],
-  );
+  Widget build(BuildContext context) => _chatSurface(context);
 }

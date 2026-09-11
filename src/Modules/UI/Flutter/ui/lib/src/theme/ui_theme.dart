@@ -349,6 +349,32 @@ final class UiThemeScope extends StatelessWidget {
 }
 
 abstract final class UiChatTheme {
+  static ChatTheme workspace(ThemeData theme) {
+    final c = theme.colorScheme;
+    return ChatTheme(
+      colors: ChatColors(
+        primary: c.primary,
+        onPrimary: c.onPrimary,
+        surface: theme.scaffoldBackgroundColor,
+        onSurface: c.onSurface,
+        surfaceContainer: c.surfaceContainer,
+        surfaceContainerLow: c.surfaceContainerLow,
+        surfaceContainerHigh: c.surfaceContainerHigh,
+      ),
+      typography: ChatTypography.standard(fontFamily: UiType.bodyFamily)
+          .copyWith(
+            bodyMedium: TextStyle(
+              fontSize: 15,
+              height: 1.65,
+              color: c.onSurface,
+            ),
+            bodySmall: TextStyle(fontSize: 12, color: c.onSurfaceVariant),
+            labelSmall: TextStyle(fontSize: 11, color: c.onSurfaceVariant),
+          ),
+      shape: BorderRadius.circular(12),
+    );
+  }
+
   static ChatTheme light() => ChatTheme(
     colors: const ChatColors(
       primary: LumenPalette.accent,

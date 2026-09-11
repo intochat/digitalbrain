@@ -27,6 +27,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Design studio'));
     await tester.pumpAndSettle();
+    expect(find.byTooltip('Switch conversation'), findsOneWidget);
+    expect(find.byTooltip('Attach project work'), findsOneWidget);
     await tester.tap(find.byTooltip('Go to homepage'));
     await tester.pumpAndSettle();
     expect(find.text('Your projects'), findsOneWidget);

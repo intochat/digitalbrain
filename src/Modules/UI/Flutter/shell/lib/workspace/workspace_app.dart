@@ -11,6 +11,7 @@ import '../chat/agent_chat_app.dart';
 import '../chat/brain_graph_store.dart';
 import 'workspace_table_import.dart';
 import 'workspace_store.dart';
+import 'workspace_desktop.dart';
 import 'workspace_settings.dart';
 import 'workspace_routes.dart';
 import 'workspace_brain_observation.dart';
@@ -129,7 +130,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   final _saveTimers = <String, Timer>{};
   final _saving = <String>{};
   final _saveErrors = <String, String>{};
-  bool _ready = false, _directory = true, _home = false, _mobileWork = false;
+  bool _ready = false, _directory = true, _mobileWork = false;
   String _query = '';
   @override
   void initState() {
@@ -218,7 +219,6 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
           store.projects.any((project) => project.id == id)) {
         store.selectProject(id);
         _directory = false;
-        _home = segments.length < 3 || segments[2] != 'workspace';
       } else {
         _directory = true;
       }
@@ -479,7 +479,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     );
     setState(() {
       _directory = false;
-      _home = false;
+
       _mobileWork = false;
     });
   }
@@ -494,7 +494,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         );
         if (table != null && mounted) {
           _accept(table.toJson(), project: destination);
-          setState(() => _home = false);
+          setState(() => _mobileWork = true);
         }
       }
       return;
@@ -512,7 +512,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       );
       store.openArtifact(id);
       _publishLiveObservation();
-      setState(() => _home = false);
+      setState(() => _mobileWork = true);
       return;
     }
     final create = widget.onCreateArtifact;
@@ -554,7 +554,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       if (mounted) {
         _accept(result, project: destination);
         if (store.currentProject.id == destination.id) {
-          setState(() => _home = false);
+          setState(() => _mobileWork = true);
         }
       }
     } catch (e) {
@@ -585,17 +585,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
           child: Text(entry.value),
         ),
     ],
-    child: const Padding(
-      padding: EdgeInsets.all(12),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.add, size: 18),
-          SizedBox(width: 5),
-          Text('New work'),
-        ],
-      ),
-    ),
+    icon: const Icon(Icons.add, size: 20),
   );
 
   void _attach(BuildContext context) {
@@ -663,134 +653,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       store.selectProject(id);
       setState(() {
         _directory = false;
-        _home = true;
       });
-    },
-  );
-  Widget _projectHome(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final conversations = Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Conversations',
-                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
-                ),
-              ),
-              TextButton.icon(
-                onPressed: () {
-                  store.createConversation();
-                  setState(() => _home = false);
-                },
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('New conversation'),
-              ),
-            ],
-          ),
-          const Divider(height: 24),
-          for (final conversation in store.currentProject.conversations)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.chat_bubble_outline, size: 20),
-              title: Text(conversation.title),
-              subtitle: Text(
-                workspaceAgents
-                        .where((a) => a.id == conversation.selectedAgentId)
-                        .firstOrNull
-                        ?.name ??
-                    'IntoChat',
-              ),
-              trailing: const Icon(Icons.chevron_right, size: 18),
-              onTap: () {
-                store.selectConversation(conversation.id);
-                setState(() => _home = false);
-              },
-            ),
-        ],
-      );
-      final work = Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Work',
-                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
-                ),
-              ),
-              _newWorkMenu(context),
-              if (widget.onListTables != null)
-                IconButton(
-                  tooltip: 'Import saved work',
-                  onPressed: () => _import(context),
-                  icon: const Icon(Icons.download_outlined, size: 19),
-                ),
-            ],
-          ),
-          const Divider(height: 24),
-          for (final artifact in store.currentProject.artifacts)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(_icon(artifact.kind), size: 20),
-              title: Text(artifact.title),
-              subtitle: Text(artifact.kind),
-              trailing: IconButton(
-                tooltip: 'Attach to conversation',
-                onPressed: () => store.attachArtifact(artifact.id),
-                icon: const Icon(Icons.attach_file, size: 18),
-              ),
-              onTap: () {
-                _open(artifact);
-                setState(() => _home = false);
-              },
-            ),
-          if (store.currentProject.artifacts.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
-              child: Text('Work created in conversations appears here.'),
-            ),
-        ],
-      );
-      return SingleChildScrollView(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1150),
-            child: Padding(
-              padding: EdgeInsets.all(constraints.maxWidth < 700 ? 20 : 40),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    store.currentProject.title,
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 36),
-                  if (constraints.maxWidth < 800) ...[
-                    conversations,
-                    const SizedBox(height: 32),
-                    work,
-                  ] else
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: conversations),
-                        const SizedBox(width: 56),
-                        Expanded(child: work),
-                      ],
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
     },
   );
   Future<void> _import(BuildContext context) async {
@@ -905,185 +768,179 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     );
   }
 
-  Widget _pane(WorkspaceArtifact a, {bool chrome = true}) => UiEditorFrame(
-    active: store.currentProject.presentation.activeArtifactId == a.id,
-    child: Column(
-      children: [
-        if (a.data['_dirty'] == true)
-          MaterialBanner(
-            content: Text(
-              _saveErrors[a.id] ??
-                  (_saving.contains(a.id)
-                      ? 'Saving changes…'
-                      : 'Changes saved locally · awaiting sync'),
+  Widget _pane(WorkspaceArtifact a) => Column(
+    children: [
+      if (a.data['_dirty'] == true)
+        MaterialBanner(
+          content: Text(
+            _saveErrors[a.id] ??
+                (_saving.contains(a.id)
+                    ? 'Saving changes…'
+                    : 'Changes saved locally · awaiting sync'),
+          ),
+          actions: [
+            if (_saveErrors.containsKey(a.id) &&
+                widget.onReadArtifact != null) ...[
+              TextButton(
+                onPressed: () => _resolveSave(a, keepLocal: false),
+                child: const Text('Reload server version'),
+              ),
+              TextButton(
+                onPressed: () => _resolveSave(a, keepLocal: true),
+                child: const Text('Save my version'),
+              ),
+            ] else
+              TextButton(
+                onPressed: () => _saveArtifact(a),
+                child: const Text('Retry save'),
+              ),
+          ],
+        ),
+      Expanded(child: _editor(a)),
+    ],
+  );
+  Future<void> _projectFiles(BuildContext context) async {
+    final project = store.currentProject;
+    final choice = await showDialog<(String, String)>(
+      context: context,
+      builder: (dialogContext) {
+        var query = '';
+        return StatefulBuilder(
+          builder: (context, update) => AlertDialog(
+            title: const Text('Project files'),
+            content: SizedBox(
+              width: 560,
+              height: 400,
+              child: Column(
+                children: [
+                  TextField(
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      hintText: 'Find a table, document or image',
+                      prefixIcon: Icon(Icons.search),
+                    ),
+                    onChanged: (value) =>
+                        update(() => query = value.toLowerCase()),
+                  ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: ListView(
+                      children: [
+                        if (project.artifacts.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Text('Your saved work will appear here.'),
+                          ),
+                        for (final a in project.artifacts.where(
+                          (a) => a.title.toLowerCase().contains(query),
+                        ))
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(_icon(a.kind), size: 22),
+                            title: Text(
+                              a.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(a.kind),
+                            onTap: () =>
+                                Navigator.pop(dialogContext, (a.id, 'open')),
+                            trailing: PopupMenuButton<String>(
+                              tooltip: 'Open options',
+                              onSelected: (mode) =>
+                                  Navigator.pop(dialogContext, (a.id, mode)),
+                              itemBuilder: (_) => const [
+                                PopupMenuItem(
+                                  value: 'beside',
+                                  child: Text('Open beside'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'floating',
+                                  child: Text('Open as window'),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
             actions: [
-              if (_saveErrors.containsKey(a.id) &&
-                  widget.onReadArtifact != null) ...[
-                TextButton(
-                  onPressed: () => _resolveSave(a, keepLocal: false),
-                  child: const Text('Reload server version'),
-                ),
-                TextButton(
-                  onPressed: () => _resolveSave(a, keepLocal: true),
-                  child: const Text('Save my version'),
-                ),
-              ] else
-                TextButton(
-                  onPressed: () => _saveArtifact(a),
-                  child: const Text('Retry save'),
-                ),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Done'),
+              ),
             ],
           ),
-        if (chrome)
-          SizedBox(
-            height: 44,
-            child: Row(
-              children: [
-                const SizedBox(width: 12),
-                Icon(_icon(a.kind), size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    a.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Minimize editor',
-                  onPressed: () => store.minimizeArtifact(a.id),
-                  icon: const Icon(Icons.minimize, size: 18),
-                ),
-                IconButton(
-                  tooltip: 'Close editor',
-                  onPressed: () => store.closeArtifact(a.id),
-                  icon: const Icon(Icons.close, size: 18),
-                ),
-              ],
-            ),
-          ),
-        Expanded(child: _editor(a)),
-      ],
-    ),
-  );
+        );
+      },
+    );
+    if (!mounted || choice == null || store.currentProject.id != project.id) {
+      return;
+    }
+    if (choice.$2 == 'beside') {
+      store.openBeside(choice.$1);
+    } else if (choice.$2 == 'floating') {
+      store.openArtifact(choice.$1, placement: 'floating');
+    }
+    await _open(project.artifacts.firstWhere((a) => a.id == choice.$1));
+  }
+
   Widget _work(BuildContext context) {
     final p = store.currentProject;
-    final layout = p.presentation;
-    final visible = p.artifacts
-        .where(
-          (a) =>
-              layout.openArtifactIds.contains(a.id) &&
-              !layout.minimizedArtifactIds.contains(a.id),
-        )
-        .toList();
-    final active =
-        visible.where((a) => a.id == layout.activeArtifactId).firstOrNull ??
-        visible.firstOrNull;
     return Column(
       children: [
         SizedBox(
           height: 48,
           child: Row(
             children: [
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  active?.title ?? 'Workspace',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+              const SizedBox(width: 8),
+              Tooltip(
+                message: 'Open project work',
+                child: TextButton.icon(
+                  onPressed: () => _projectFiles(context),
+                  icon: const Icon(Icons.folder_open_outlined, size: 19),
+                  label: const Text('Project files'),
                 ),
               ),
               _newWorkMenu(context),
-              PopupMenuButton<String>(
-                tooltip: 'Open project work',
-                icon: const Icon(Icons.folder_open_outlined),
-                onSelected: (id) =>
-                    _open(p.artifacts.firstWhere((a) => a.id == id)),
-                itemBuilder: (_) => [
-                  for (final a in p.artifacts)
-                    PopupMenuItem(value: a.id, child: Text(a.title)),
-                ],
-              ),
-              PopupMenuButton<String>(
-                tooltip: 'Workspace layout',
-                icon: const Icon(Icons.view_quilt_outlined),
-                onSelected: store.setLayout,
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'quiet', child: Text('Focused')),
-                  PopupMenuItem(value: 'compare', child: Text('Compare')),
-                  PopupMenuItem(
-                    value: 'windows',
-                    child: Text('Floating windows'),
-                  ),
-                ],
-              ),
-              if (active != null)
-                PopupMenuButton<String>(
-                  tooltip: 'Editor actions',
-                  icon: const Icon(Icons.more_horiz),
-                  onSelected: (action) {
-                    if (action == 'minimize') {
-                      store.minimizeArtifact(active.id);
-                    } else if (action == 'close') {
-                      store.closeArtifact(active.id);
-                    } else {
-                      store.attachArtifact(active.id);
-                    }
-                  },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(
-                      value: 'attach',
-                      child: Text('Attach to conversation'),
-                    ),
-                    PopupMenuItem(
-                      value: 'minimize',
-                      child: Text('Minimize editor'),
-                    ),
-                    PopupMenuItem(value: 'close', child: Text('Close editor')),
-                  ],
+              if (widget.onListTables != null || widget.onListArtifacts != null)
+                IconButton(
+                  tooltip: 'Import saved work',
+                  onPressed: () => _import(context),
+                  icon: const Icon(Icons.download_outlined, size: 19),
                 ),
+              const Spacer(),
+              if (MediaQuery.sizeOf(context).width >= 760)
+                IconButton(
+                  tooltip: p.presentation.chatCollapsed
+                      ? 'Show chat'
+                      : 'Hide chat',
+                  onPressed: store.toggleChat,
+                  icon: Icon(
+                    p.presentation.chatCollapsed
+                        ? Icons.chat_bubble_outline
+                        : Icons.view_sidebar_outlined,
+                    size: 19,
+                  ),
+                ),
+              const SizedBox(width: 8),
             ],
           ),
         ),
-        if (visible.length > 1 &&
-            layout.layout != 'compare' &&
-            layout.layout != 'windows')
-          _ArtifactTabs(
-            artifacts: visible,
-            activeId: active?.id,
-            onOpen: store.openArtifact,
-          ),
         Expanded(
-          child: active == null
-              ? const Center(
-                  child: Text('Open project work or create something in chat.'),
-                )
-              : layout.layout == 'compare'
-              ? LayoutBuilder(
-                  builder: (context, c) => c.maxWidth < 600
-                      ? ListView(
-                          children: [
-                            for (final a in visible.take(2))
-                              SizedBox(height: 450, child: _pane(a)),
-                          ],
-                        )
-                      : Row(
-                          children: [
-                            for (final a in visible.take(2))
-                              Expanded(child: _pane(a)),
-                          ],
-                        ),
-                )
-              : layout.layout == 'windows'
-              ? _windows(visible)
-              : _pane(active, chrome: false),
+          child: WorkspaceDesktop(
+            key: ValueKey('desktop-${p.id}'),
+            store: store,
+            editorBuilder: _pane,
+          ),
         ),
         UiArtifactDock(
           items: [
             for (final a in p.artifacts.where(
-              (a) => layout.minimizedArtifactIds.contains(a.id),
+              (a) => p.presentation.minimizedArtifactIds.contains(a.id),
             ))
               UiDockItem(id: a.id, title: a.title, kind: a.kind),
           ],
@@ -1093,144 +950,71 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     );
   }
 
-  Widget _windows(List<WorkspaceArtifact> artifacts) => LayoutBuilder(
-    builder: (context, c) {
-      if (c.maxWidth < 600) {
-        return ListView(
-          children: [
-            for (final a in artifacts) SizedBox(height: 460, child: _pane(a)),
-          ],
-        );
-      }
-      return Stack(
-        children: [
-          for (final (i, a) in artifacts.indexed)
-            Builder(
-              builder: (context) {
-                final bounds =
-                    store.currentProject.presentation.windowBounds[a.id] ??
-                    [
-                      20.0 + i * 28,
-                      20.0 + i * 28,
-                      (c.maxWidth * .75).clamp(320.0, c.maxWidth),
-                      (c.maxHeight * .75).clamp(240.0, c.maxHeight),
-                    ];
-                return Positioned(
-                  key: ValueKey('window-${a.id}'),
-                  left: bounds[0].clamp(
-                    0.0,
-                    (c.maxWidth - 100).clamp(0.0, c.maxWidth),
-                  ),
-                  top: bounds[1].clamp(
-                    0.0,
-                    (c.maxHeight - 80).clamp(0.0, c.maxHeight),
-                  ),
-                  width: bounds[2].clamp(280.0, c.maxWidth),
-                  height: bounds[3].clamp(220.0, c.maxHeight),
-                  child: Stack(
-                    children: [
-                      Positioned.fill(child: _pane(a)),
-                      Positioned(
-                        top: 6,
-                        left: 8,
-                        right: 88,
-                        height: 42,
-                        child: MouseRegion(
-                          cursor: SystemMouseCursors.move,
-                          child: GestureDetector(
-                            key: ValueKey('window-drag-${a.id}'),
-                            behavior: HitTestBehavior.opaque,
-                            onPanUpdate: (d) {
-                              final current =
-                                  store
-                                      .currentProject
-                                      .presentation
-                                      .windowBounds[a.id] ??
-                                  bounds;
-                              store.setWindowBounds(a.id, [
-                                (current[0] + d.delta.dx).clamp(
-                                  0.0,
-                                  c.maxWidth - 100,
-                                ),
-                                (current[1] + d.delta.dy).clamp(
-                                  0.0,
-                                  c.maxHeight - 80,
-                                ),
-                                current[2],
-                                current[3],
-                              ]);
-                            },
-                            child: const SizedBox.expand(),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 8,
-                        right: 8,
-                        child: MouseRegion(
-                          cursor: SystemMouseCursors.resizeUpLeftDownRight,
-                          child: GestureDetector(
-                            key: ValueKey('window-resize-${a.id}'),
-                            behavior: HitTestBehavior.opaque,
-                            onPanUpdate: (d) {
-                              final current =
-                                  store
-                                      .currentProject
-                                      .presentation
-                                      .windowBounds[a.id] ??
-                                  bounds;
-                              store.setWindowBounds(a.id, [
-                                current[0],
-                                current[1],
-                                (current[2] + d.delta.dx).clamp(
-                                  280.0,
-                                  c.maxWidth,
-                                ),
-                                (current[3] + d.delta.dy).clamp(
-                                  220.0,
-                                  c.maxHeight,
-                                ),
-                              ]);
-                            },
-                            child: const SizedBox(
-                              width: 28,
-                              height: 28,
-                              child: Icon(Icons.drag_handle, size: 22),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-        ],
-      );
-    },
-  );
   Widget _workspace(BuildContext context) => LayoutBuilder(
     builder: (context, c) {
       final mobile = c.maxWidth < 760;
-      final chat = Card(
-        margin: const EdgeInsets.all(8),
-        clipBehavior: Clip.antiAlias,
+      final chat = Material(
+        color: Theme.of(context).scaffoldBackgroundColor,
         child: Column(
           children: [
-            ListTile(
-              dense: true,
-              title: Text(
-                store.currentConversation.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              trailing: IconButton(
-                tooltip: 'New conversation',
-                onPressed: () => store.createConversation(),
-                icon: const Icon(Icons.edit_square),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: PopupMenuButton<String>(
+                      tooltip: 'Switch conversation',
+                      onSelected: store.selectConversation,
+                      itemBuilder: (_) => [
+                        for (final conversation
+                            in store.currentProject.conversations)
+                          CheckedPopupMenuItem(
+                            value: conversation.id,
+                            checked:
+                                conversation.id == store.currentConversation.id,
+                            child: Text(
+                              conversation.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                store.currentConversation.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(
+                              Icons.keyboard_arrow_down,
+                              size: 17,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'New conversation',
+                    onPressed: () => store.createConversation(),
+                    icon: const Icon(Icons.edit_square, size: 19),
+                  ),
+                ],
               ),
             ),
-            const Divider(height: 1),
             Expanded(
               child: IndexedStack(
                 index: [
@@ -1248,8 +1032,8 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                         active:
                             (ModalRoute.of(context)?.isCurrent ?? true) &&
                             !(mobile && _mobileWork) &&
+                            !store.currentProject.presentation.chatCollapsed &&
                             !_directory &&
-                            !_home &&
                             conversation.id == store.currentConversation.id,
                         store: store,
                         onRun: widget.onRun,
@@ -1291,20 +1075,24 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       );
       return Row(
         children: [
-          SizedBox(width: width, child: chat),
-          MouseRegion(
-            cursor: SystemMouseCursors.resizeColumn,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onHorizontalDragUpdate: (d) => store.setChatWidth(
-                (width + d.delta.dx).clamp(300.0, c.maxWidth * .6),
-              ),
-              child: const SizedBox(
-                width: 8,
-                child: Center(child: Icon(Icons.drag_indicator, size: 14)),
+          Offstage(
+            offstage: store.currentProject.presentation.chatCollapsed,
+            child: SizedBox(width: width, child: chat),
+          ),
+          if (!store.currentProject.presentation.chatCollapsed)
+            MouseRegion(
+              cursor: SystemMouseCursors.resizeColumn,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onHorizontalDragUpdate: (d) => store.setChatWidth(
+                  (width + d.delta.dx).clamp(300.0, c.maxWidth * .6),
+                ),
+                child: const SizedBox(
+                  width: 8,
+                  child: Center(child: Icon(Icons.drag_indicator, size: 14)),
+                ),
               ),
             ),
-          ),
           Expanded(child: _work(context)),
         ],
       );
@@ -1336,7 +1124,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         _routes.sync(
           _directory
               ? '/projects'
-              : '/projects/${store.currentProject.id}${_home ? '' : '/workspace'}',
+              : '/projects/${store.currentProject.id}/workspace',
         );
       }
       return MediaQuery(
@@ -1404,7 +1192,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                         vertical: 12,
                       ),
                     ),
-                    onPressed: () => setState(() => _home = true),
+                    onPressed: () => setState(() => _mobileWork = false),
                     child: Text(
                       store.currentProject.title,
                       maxLines: 1,
@@ -1461,17 +1249,9 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                     ),
                   Expanded(
                     child: IndexedStack(
-                      index: _directory
-                          ? 0
-                          : _home
-                          ? 1
-                          : 2,
+                      index: _directory ? 0 : 1,
                       children: [
                         _projects(context),
-                        if (store.projects.isNotEmpty)
-                          _projectHome(context)
-                        else
-                          const SizedBox.shrink(),
                         if (store.projects.isNotEmpty)
                           _workspace(context)
                         else
@@ -1509,7 +1289,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                     onTap: () {
                       Navigator.pop(c);
                       _open(a);
-                      setState(() => _home = false);
+                      setState(() => _mobileWork = true);
                     },
                   ),
               ],
@@ -1519,75 +1299,4 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       ),
     );
   }
-}
-
-class _ArtifactTabs extends StatefulWidget {
-  const _ArtifactTabs({
-    required this.artifacts,
-    required this.activeId,
-    required this.onOpen,
-  });
-  final List<WorkspaceArtifact> artifacts;
-  final String? activeId;
-  final ValueChanged<String> onOpen;
-  @override
-  State<_ArtifactTabs> createState() => _ArtifactTabsState();
-}
-
-class _ArtifactTabsState extends State<_ArtifactTabs> {
-  final _anchors = <String, GlobalKey>{};
-  @override
-  void initState() {
-    super.initState();
-    _revealActive();
-  }
-
-  @override
-  void didUpdateWidget(covariant _ArtifactTabs oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.activeId != widget.activeId ||
-        oldWidget.artifacts.length != widget.artifacts.length) {
-      _revealActive();
-    }
-  }
-
-  void _revealActive() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final target = _anchors[widget.activeId]?.currentContext;
-      if (target != null) {
-        Scrollable.ensureVisible(target, alignment: .5);
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-    scrollDirection: Axis.horizontal,
-    child: Row(
-      children: [
-        for (final artifact in widget.artifacts)
-          Padding(
-            key: _anchors.putIfAbsent(artifact.id, () => GlobalKey()),
-            padding: const EdgeInsets.all(3),
-            child: Tooltip(
-              message: artifact.title,
-              child: ChoiceChip(
-                key: ValueKey('artifact-tab-${artifact.id}'),
-                label: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 180),
-                  child: Text(
-                    artifact.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                selected: artifact.id == widget.activeId,
-                onSelected: (_) => widget.onOpen(artifact.id),
-              ),
-            ),
-          ),
-      ],
-    ),
-  );
 }

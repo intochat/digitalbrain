@@ -38,7 +38,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('My project'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('New work').first);
+      await tester.tap(find.byTooltip('New work'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Drawing'));
       await tester.pumpAndSettle();
@@ -96,8 +96,6 @@ void main() {
       await tester.pumpWidget(WorkspaceApp(store: store));
       await tester.pumpAndSettle();
       await tester.tap(find.text('My project'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Research approval'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       final node = find.byKey(const ValueKey('neuron_research-agent'));

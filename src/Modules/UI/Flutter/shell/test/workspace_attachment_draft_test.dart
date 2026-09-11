@@ -85,6 +85,7 @@ void main() {
         find.byType(TextField),
         'Review my latest drawing',
       );
+      await tester.pump();
       await tester.tap(find.byTooltip('Send message'));
       await tester.pumpAndSettle();
       expect(sent, contains('New unsaved contact'));

@@ -20,7 +20,7 @@ class MemoryWorkspace implements WorkspacePersistence {
 }
 
 void main() {
-  testWidgets('focused tabs cap long labels and reveal the active editor', (
+  testWidgets('window titles fit and opening a saved item brings its editor forward', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1268, 900));
@@ -41,14 +41,14 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('My project'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('New conversation').first);
+    await tester.tap(find.byTooltip('New conversation'));
     await tester.pumpAndSettle();
-    final last = find.byKey(const ValueKey('artifact-tab-tab5'));
+    final last = find.byKey(const ValueKey('window-tab5'));
     expect(tester.getRect(last).right, lessThanOrEqualTo(1268));
-    expect(tester.getSize(last).width, lessThanOrEqualTo(240));
+    expect(store.currentProject.presentation.activeArtifactId, 'tab5');
     store.openArtifact('tab0');
     await tester.pumpAndSettle();
-    final first = find.byKey(const ValueKey('artifact-tab-tab0'));
+    final first = find.byKey(const ValueKey('window-tab0'));
     expect(tester.getRect(first).left, greaterThanOrEqualTo(428));
     expect(tester.getRect(first).right, lessThanOrEqualTo(1268));
     expect(tester.takeException(), isNull);
@@ -99,8 +99,6 @@ void main() {
       );
       await tester.tap(find.text('My project'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Live brain'));
-      await tester.pumpAndSettle();
       final editor = tester.widget<WorkspaceArtifactEditor>(
         find.byType(WorkspaceArtifactEditor),
       );
@@ -138,8 +136,6 @@ void main() {
     await tester.pumpWidget(WorkspaceApp(store: store));
     await tester.pumpAndSettle();
     await tester.tap(find.text('My project'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Floating note'));
     await tester.pumpAndSettle();
     final title = find.byKey(const ValueKey('window-drag-floating'));
     await tester.drag(title, const Offset(80, 50));
@@ -213,8 +209,6 @@ void main() {
       expect(reads, 1);
       await tester.tap(find.text('My project'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('People'));
-      await tester.pumpAndSettle();
       expect(find.byType(UiDataTable), findsOneWidget);
       final chat = tester.widget<WorkspaceChat>(find.byType(WorkspaceChat));
       chat.onArtifact(snapshot(1, 'Old').toJson());
@@ -238,7 +232,7 @@ void main() {
     await tester.tap(find.text('My project'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    await tester.tap(find.widgetWithText(TextButton, 'New conversation'));
+    await tester.tap(find.byTooltip('New conversation'));
     await tester.pumpAndSettle();
     expect(find.text('Conversation'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -265,10 +259,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('My project'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, 'New conversation'));
+    await tester.tap(find.byTooltip('New conversation'));
     await tester.pumpAndSettle();
     final conversation = store.currentConversation;
     await tester.enterText(find.byType(TextField), 'Keep running');
+    await tester.pump();
     await tester.tap(find.byTooltip('Send message'));
     events.add(
       AgentEvent({'type': 'RUN_STARTED', 'threadId': 't', 'runId': 'saved'}),
@@ -296,6 +291,8 @@ void main() {
     await tester.pumpWidget(WorkspaceApp(store: store));
     await tester.pumpAndSettle();
     await tester.tap(find.text('My project'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Open project work'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Notes'));
     await tester.pumpAndSettle();
@@ -344,6 +341,7 @@ void main() {
       ),
     );
     await tester.enterText(find.byType(TextField), 'Hello');
+    await tester.pump();
     await tester.tap(find.byTooltip('Send message'));
     events.add(
       AgentEvent({
@@ -368,6 +366,7 @@ void main() {
     expect(store.currentConversation.messages.last['text'], 'Answer');
     events = StreamController<AgentEvent>();
     await tester.enterText(find.byType(TextField), 'Continue');
+    await tester.pump();
     await tester.tap(find.byTooltip('Send message'));
     expect(parents, [null, 'first']);
     await events.close();

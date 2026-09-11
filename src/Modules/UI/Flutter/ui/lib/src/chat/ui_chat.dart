@@ -18,8 +18,10 @@ final class UiChat extends StatelessWidget {
     this.builders,
     this.onMessageSend,
     this.onAttachmentTap,
+    this.workspaceTheme = false,
   });
 
+  final bool workspaceTheme;
   final ChatController chatController;
   final UserID currentUserId;
   final ResolveUserCallback resolveUser;
@@ -35,7 +37,9 @@ final class UiChat extends StatelessWidget {
     builders: UiChatBuilders.withCopy(builders),
     onMessageSend: onMessageSend,
     onAttachmentTap: onAttachmentTap,
-    theme: Theme.of(context).brightness == Brightness.light
+    theme: workspaceTheme
+        ? UiChatTheme.workspace(Theme.of(context))
+        : Theme.of(context).brightness == Brightness.light
         ? UiChatTheme.light()
         : UiChatTheme.dark(),
   );

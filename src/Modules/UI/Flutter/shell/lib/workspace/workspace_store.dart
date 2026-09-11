@@ -29,7 +29,7 @@ class WorkspaceAgent {
 const workspaceAgents = <WorkspaceAgent>[
   WorkspaceAgent(
     'intocaht',
-    'IntoCaht',
+    'IntoChat',
     'General assistance across your project and attached work.',
   ),
   WorkspaceAgent(
@@ -156,7 +156,25 @@ class WorkspacePresentation {
   List<String> openArtifactIds = [];
   Set<String> minimizedArtifactIds = {};
   String? activeArtifactId;
-  String layout = 'quiet';
+  String layout = 'quiet'; // Legacy layout, retained for older saved projects.
+  Map<String, String> windowModes = {};
+  Map<String, String> restoreModes = {};
+  bool chatCollapsed = false;
+  String modeOf(String id) =>
+      windowModes[id] ??
+      (layout == 'windows'
+          ? 'floating'
+          : layout == 'compare'
+          ? (openArtifactIds.indexOf(id) == 0 ? 'left' : 'right')
+          : id == activeArtifactId
+          ? 'maximized'
+          : 'floating');
+  void materializeWindowModes() {
+    for (final id in openArtifactIds) {
+      windowModes.putIfAbsent(id, () => modeOf(id));
+    }
+  }
+
   Map<String, List<double>> windowBounds = {};
   double chatWidth = 420;
   Map<String, dynamic> toJson() => {
@@ -165,6 +183,9 @@ class WorkspacePresentation {
     'activeArtifactId': activeArtifactId,
     'layout': layout,
     'windowBounds': windowBounds,
+    'windowModes': windowModes,
+    'restoreModes': restoreModes,
+    'chatCollapsed': chatCollapsed,
     'chatWidth': chatWidth,
   };
   WorkspacePresentation();
@@ -174,6 +195,17 @@ class WorkspacePresentation {
     value.minimizedArtifactIds = _strings(json['minimizedArtifactIds']).toSet();
     value.activeArtifactId = json['activeArtifactId'] as String?;
     value.layout = _text(json['layout'], 'quiet');
+    value.chatCollapsed = json['chatCollapsed'] == true;
+    for (final entry in _map(json['windowModes']).entries) {
+      if (['floating', 'maximized', 'left', 'right'].contains(entry.value)) {
+        value.windowModes[entry.key] = entry.value as String;
+      }
+    }
+    for (final entry in _map(json['restoreModes']).entries) {
+      if (['floating', 'left', 'right'].contains(entry.value)) {
+        value.restoreModes[entry.key] = entry.value as String;
+      }
+    }
     value.chatWidth = (json['chatWidth'] as num? ?? 420).toDouble().clamp(
       280,
       700,
@@ -187,6 +219,7 @@ class WorkspacePresentation {
             .toList();
       }
     }
+    value.materializeWindowModes();
     return value;
   }
 }
@@ -466,40 +499,126 @@ class WorkspaceStore extends ChangeNotifier {
     save();
   }
 
-  void openArtifact(String id) {
+  void openArtifact(String id, {String? placement}) {
     if (!currentProject.artifacts.any((a) => a.id == id)) return;
     final p = currentProject.presentation;
-    if (!p.openArtifactIds.contains(id)) p.openArtifactIds.add(id);
+    p.materializeWindowModes();
+    final others = p.openArtifactIds
+        .where(
+          (other) => other != id && !p.minimizedArtifactIds.contains(other),
+        )
+        .toList();
+    if (!p.openArtifactIds.contains(id)) {
+      p.windowModes[id] =
+          placement ?? (others.isEmpty ? 'maximized' : 'floating');
+    } else if (placement != null) {
+      p.windowModes[id] = placement;
+    }
+    // Revealing another window must not leave it behind a maximized editor.
+    for (final other in others) {
+      if (p.modeOf(other) == 'maximized') {
+        p.windowModes[other] = p.restoreModes[other] ?? 'floating';
+      }
+    }
+    p.openArtifactIds.remove(id);
+    p.openArtifactIds.add(id);
     p.minimizedArtifactIds.remove(id);
     p.activeArtifactId = id;
     save();
   }
 
+  void focusWindow(String id) {
+    final p = currentProject.presentation;
+    p.materializeWindowModes();
+    if (!p.openArtifactIds.contains(id) ||
+        (p.activeArtifactId == id && p.openArtifactIds.last == id)) {
+      return;
+    }
+    p.openArtifactIds.remove(id);
+    p.openArtifactIds.add(id);
+    p.activeArtifactId = id;
+    save();
+  }
+
+  void maximizeWindow(String id) {
+    final p = currentProject.presentation;
+    p.materializeWindowModes();
+    if (p.modeOf(id) != 'maximized') p.restoreModes[id] = p.modeOf(id);
+    for (final other in p.openArtifactIds.where((other) => other != id)) {
+      if (p.modeOf(other) == 'maximized') {
+        p.windowModes[other] = p.restoreModes[other] ?? 'floating';
+      }
+    }
+    p.windowModes[id] = 'maximized';
+    focusWindow(id);
+    save();
+  }
+
+  void restoreWindow(String id) {
+    final p = currentProject.presentation;
+    p.materializeWindowModes();
+    p.windowModes[id] = p.restoreModes[id] ?? 'floating';
+    focusWindow(id);
+    save();
+  }
+
+  void snapWindow(String id, String side) {
+    if (!['left', 'right', 'floating'].contains(side)) return;
+    currentProject.presentation.windowModes[id] = side;
+    focusWindow(id);
+    save();
+  }
+
+  void openBeside(String id) {
+    final p = currentProject.presentation;
+    p.materializeWindowModes();
+    final other = p.activeArtifactId;
+    if (other != null && other != id) p.windowModes[other] = 'left';
+    openArtifact(id, placement: 'right');
+  }
+
+  void toggleChat() {
+    currentProject.presentation.chatCollapsed =
+        !currentProject.presentation.chatCollapsed;
+    save();
+  }
+
   void closeArtifact(String id) {
     final p = currentProject.presentation;
+    p.materializeWindowModes();
     p.openArtifactIds.remove(id);
     p.minimizedArtifactIds.remove(id);
     if (p.activeArtifactId == id) {
       p.activeArtifactId = p.openArtifactIds
           .where((id) => !p.minimizedArtifactIds.contains(id))
-          .firstOrNull;
+          .lastOrNull;
     }
     save();
   }
 
   void minimizeArtifact(String id) {
     final p = currentProject.presentation;
+    p.materializeWindowModes();
     if (p.openArtifactIds.contains(id)) p.minimizedArtifactIds.add(id);
     if (p.activeArtifactId == id) {
       p.activeArtifactId = p.openArtifactIds
           .where((id) => !p.minimizedArtifactIds.contains(id))
-          .firstOrNull;
+          .lastOrNull;
     }
     save();
   }
 
   void setLayout(String value) {
-    currentProject.presentation.layout = value;
+    final p = currentProject.presentation;
+    p.materializeWindowModes();
+    p.layout = value;
+    for (final (index, id) in p.openArtifactIds.indexed) {
+      p.windowModes[id] = value == 'windows'
+          ? 'floating'
+          : value == 'compare'
+          ? (index == 0 ? 'left' : 'right')
+          : 'maximized';
+    }
     save();
   }
 

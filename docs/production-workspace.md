@@ -4,13 +4,18 @@ The production Flutter entry point now opens the project workspace designed in `
 
 ## Interaction
 
+- Opening a project goes directly to its workspace. The chat header switches between project conversations and creates new ones; saved work is available from the searchable Project files browser. Legacy project URLs also open the workspace.
+- Chat uses a unified composer with attached context, a specialist menu, voice drafts and send/stop. Enter sends; Shift+Enter inserts a newline. User messages use a quiet surface, assistant responses use selectable Markdown, and tool details stay collapsed until opened.
+
 - All production workspaces open the combined homepage: projects on the left and an Explore template shelf on the right, stacked on narrow screens. IntoChat is the home button; there are no Projects or Explore tabs. Templates offer New IntoChat project, Salesforce Admin, Lead Researcher and Automation Builder. Empty workspaces show the same homepage without creating a placeholder project. Legacy /explore links resolve to this homepage.
 - Starting a project chooses an initial specialist, accepts a goal and an optional project name, and opens the goal as an unsent composer draft. The specialist and draft are saved with the conversation. Specialists remain changeable; choosing one does not connect a service or activate automation.
 - Minimized editors appear in a compact dock with artifact-type icons and distinct titles. Restore retains the existing editor state and window bounds and does not attach the artifact to chat.
 
 - Chat uses the shared `UiChat` / Flutter Chat UI component with streamed Markdown and compact tool receipts. Tables, images, Markdraw drawings and brain scenarios open on the right.
 - Open shows an editor. Attach adds an explicit live reference to the conversation. New conversations start with no attachments. The picker supports multiple artifacts, and table context includes filters and selected row IDs.
-- Project work supports focused, comparison and floating-window layouts, with minimize/restore and saved bounds. Phones switch between Conversation and Workspace.
+- The first open item fills the workspace beside chat. Restore makes it a movable, resizable window; double-clicking its title maximizes or restores it. Dragging to the left, right or top edge previews snapping. Project files offers Open beside for comparison and Open as window.
+- Window controls provide minimize, maximize/restore and close. Closing leaves the saved artifact in Project files. Window placement, floating bounds and minimized state persist per project. The bottom dock restores minimized items without losing editor state.
+- Chat can collapse to give the workspace more room while preserving the conversation draft. Narrow workspaces show one active editor; phones switch between Conversation and Workspace.
 - Settings is a full page with Profile, Appearance, Connections, Agents and Developer tools. The developer gallery renders real ui components including the table. Profile fields are device preferences; connection setup uses the existing service authorization flows.
 - Voice records a draft, transcribes through `/agent/transcribe`, and waits for an explicit Send. Cancel, navigation and app lifecycle changes stop recording. Recordings are bounded to two minutes.
 
