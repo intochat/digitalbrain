@@ -224,17 +224,17 @@ jobs:
 
       - name: Dart format
         working-directory: src/Modules/UI/Flutter
-        run: dart format --output=none --set-exit-if-changed core kit shell
+        run: dart format --output=none --set-exit-if-changed core ui shell
 
       - name: Core package tests
         working-directory: src/Modules/UI/Flutter/core
         run: |
           if [ -d test ]; then dart test; else echo "no core tests"; fi
 
-      - name: Kit package tests
-        working-directory: src/Modules/UI/Flutter/kit
+      - name: Ui package tests
+        working-directory: src/Modules/UI/Flutter/ui
         run: |
-          if [ -d test ]; then flutter test --no-pub; else echo "no kit tests"; fi
+          if [ -d test ]; then flutter test --no-pub; else echo "no ui tests"; fi
 
       - name: Shell tests
         run: flutter test --no-pub

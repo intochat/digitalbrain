@@ -2,8 +2,8 @@ part of 'brain_chat_screen.dart';
 
 extension _BrainChatPresentation on _BrainChatScreenState {
   Widget _buildPresentation(BuildContext context) => Theme(
-    data: KitTheme.light(),
-    child: KitThemeScope(
+    data: UiTheme.light(),
+    child: UiThemeScope(
       child: MultiProvider(
         providers: [
           ChangeNotifierProvider.value(value: _streamStates),
@@ -12,7 +12,7 @@ extension _BrainChatPresentation on _BrainChatScreenState {
         child: OverlayPortal(
           controller: _historyPortal,
           overlayChildBuilder: _buildHistoryOverlay,
-          child: KitStreamCopy(
+          child: UiStreamCopy(
             notifier: _streamStates,
             textFor: (streamId) => switch (_streamStates.stateFor(streamId)) {
               StreamStateLoading() => '',
@@ -37,7 +37,7 @@ extension _BrainChatPresentation on _BrainChatScreenState {
       children: [
         _voiceNotice(),
         Expanded(
-          child: KitChat(
+          child: UiChat(
             key: const Key('chat_surface'),
             chatController: _controller,
             currentUserId: ownerUserId,
@@ -99,7 +99,7 @@ extension _BrainChatPresentation on _BrainChatScreenState {
           index, {
           required bool isSentByMe,
           MessageGroupStatus? groupStatus,
-        }) => KitChatBuilders.customMessageBuilder(
+        }) => UiChatBuilders.customMessageBuilder(
           context,
           message,
           index,
@@ -237,9 +237,9 @@ extension _BrainChatPresentation on _BrainChatScreenState {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            KitCopyableMessage(
+                            UiCopyableMessage(
                               copyText: (_) => text,
-                              child: KitMarkdown(
+                              child: UiMarkdown(
                                 text,
                                 style: const TextStyle(
                                   color: LumenPalette.ink,

@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
-import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 
 import '../activity_screen.dart';
@@ -78,7 +78,7 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
   late final WorkspaceSession _session;
   BrainGraphStore? _graph;
   int _destination = graphDestinationIndex;
-  KitSurfaceScene? _scene;
+  UiSurfaceScene? _scene;
   String? _surfaceFailure;
   bool _surfaceLoading = true, _settings = false;
   bool _oldUi = !_scriptedHomeEnabled;
@@ -212,9 +212,9 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
         },
       ),
       Theme(
-        data: KitTheme.dark(),
+        data: UiTheme.dark(),
         child: ColoredBox(
-          color: KitPalette.surface,
+          color: UiPalette.surface,
           child: switch (_destination) {
             onboardingDestinationIndex => const OnboardingScreen(),
             activityDestinationIndex => ActivityScreen(
@@ -222,7 +222,7 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
               correlations: _graph?.snapshot?.correlations ?? const [],
               truncated: _graph?.snapshot?.truncated ?? false,
             ),
-            kitDestinationIndex => const KitGalleryScreen(),
+            uiDestinationIndex => const UiGalleryScreen(),
             windowingDestinationIndex => WindowingScreen(
               onReadSurface: widget.onReadSurface,
             ),
@@ -479,17 +479,19 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
                       ),
                       const SizedBox(height: 24),
                       ListTile(
-                        key: const Key('settings_ui_kit'),
+                        key: const Key('settings_ui_ui'),
                         leading: const Icon(Icons.widgets_outlined),
-                        title: const Text('UI kit'),
+                        title: const Text('UI components'),
                         subtitle: const Text(
                           'Components, examples, and states',
                         ),
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute<void>(
                             builder: (_) => Scaffold(
-                              appBar: AppBar(title: const Text('UI kit')),
-                              body: const KitGalleryScreen(),
+                              appBar: AppBar(
+                                title: const Text('UI components'),
+                              ),
+                              body: const UiGalleryScreen(),
                             ),
                           ),
                         ),

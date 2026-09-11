@@ -98,7 +98,7 @@ final class ChatGraphEdge {
   );
 }
 
-/// State of a named graph kit entity, read from /kit/graphs/{name}.
+/// State of a named graph ui entity, read from /ui/graphs/{name}.
 final class ChatGraphOffer {
   const ChatGraphOffer({
     required this.title,
@@ -162,8 +162,8 @@ final class ChatChartOffer {
   }
 }
 
-final class KitCardRef {
-  const KitCardRef({
+final class UiCardRef {
+  const UiCardRef({
     required this.kind,
     required this.name,
     required this.caption,
@@ -173,7 +173,7 @@ final class KitCardRef {
   final String name;
   final String caption;
 
-  factory KitCardRef.fromJson(Map<String, Object?> json) => KitCardRef(
+  factory UiCardRef.fromJson(Map<String, Object?> json) => UiCardRef(
     kind: json['kind'] as String? ?? '',
     name: json['name'] as String? ?? '',
     caption: json['caption'] as String? ?? '',
@@ -211,7 +211,7 @@ final class ChatTurnEvent {
   final String neuronId;
   final String correlationId;
   final DateTime timestamp;
-  final List<KitCardRef> cards;
+  final List<UiCardRef> cards;
   final String? turnId;
   final String? status;
   final String? eventId;
@@ -277,9 +277,9 @@ final class ChatTurnEvent {
     final cards = rawCards is List
         ? rawCards
               .whereType<Map>()
-              .map((e) => KitCardRef.fromJson(Map<String, Object?>.from(e)))
+              .map((e) => UiCardRef.fromJson(Map<String, Object?>.from(e)))
               .toList(growable: false)
-        : const <KitCardRef>[];
+        : const <UiCardRef>[];
 
     return ChatTurnEvent(
       sequence: (json['sequence'] as num).toInt(),
@@ -315,29 +315,29 @@ final class ChatJournalReset extends ChatStreamEvent {
   final List<ChatTurnEvent> turns;
 }
 
-/// State of a named surface kit entity, read from /kit/surfaces/{name}.
-final class KitSurfaceState {
-  const KitSurfaceState({required this.scenes});
+/// State of a named surface ui entity, read from /ui/surfaces/{name}.
+final class UiSurfaceState {
+  const UiSurfaceState({required this.scenes});
 
-  final List<KitSurfaceScene> scenes;
+  final List<UiSurfaceScene> scenes;
 
-  factory KitSurfaceState.fromJson(Map<String, Object?> json) {
+  factory UiSurfaceState.fromJson(Map<String, Object?> json) {
     final raw = json['scenes'];
-    return KitSurfaceState(
+    return UiSurfaceState(
       scenes: raw is List
           ? raw
                 .whereType<Map>()
                 .map(
-                  (e) => KitSurfaceScene.fromJson(Map<String, Object?>.from(e)),
+                  (e) => UiSurfaceScene.fromJson(Map<String, Object?>.from(e)),
                 )
                 .toList(growable: false)
-          : const <KitSurfaceScene>[],
+          : const <UiSurfaceScene>[],
     );
   }
 }
 
-final class KitSurfaceScene {
-  const KitSurfaceScene({
+final class UiSurfaceScene {
+  const UiSurfaceScene({
     required this.surfaceKey,
     required this.title,
     this.root,
@@ -347,16 +347,15 @@ final class KitSurfaceScene {
   final String title;
   final SurfaceComponent? root;
 
-  factory KitSurfaceScene.fromJson(Map<String, Object?> json) =>
-      KitSurfaceScene(
-        surfaceKey: json['surfaceKey'] as String? ?? '',
-        title: json['title'] as String? ?? '',
-        root: json['root'] is Map
-            ? SurfaceComponent.fromJson(
-                Map<String, Object?>.from(json['root'] as Map),
-              )
-            : null,
-      );
+  factory UiSurfaceScene.fromJson(Map<String, Object?> json) => UiSurfaceScene(
+    surfaceKey: json['surfaceKey'] as String? ?? '',
+    title: json['title'] as String? ?? '',
+    root: json['root'] is Map
+        ? SurfaceComponent.fromJson(
+            Map<String, Object?>.from(json['root'] as Map),
+          )
+        : null,
+  );
 }
 
 /// A persistent component tree authored by a UI script, never a client route.

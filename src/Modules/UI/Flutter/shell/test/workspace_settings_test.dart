@@ -1,6 +1,6 @@
 import 'package:digitalbrain_flutter_shell/workspace/workspace_settings.dart';
 import 'package:digitalbrain_flutter_shell/workspace/workspace_store.dart';
-import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -45,9 +45,9 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('UI kit gallery'));
+    await tester.tap(find.text('UI components gallery'));
     await tester.pumpAndSettle();
-    expect(find.byType(KitGalleryScreen), findsOneWidget);
+    expect(find.byType(UiGalleryScreen), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

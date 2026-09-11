@@ -51,7 +51,8 @@ class WorkspaceRouteBridge extends NavigatorObserver
     RouteInformation routeInformation,
   ) async {
     final uri = routeInformation.uri;
-    if (!uri.path.startsWith('/projects') && !uri.path.startsWith('/settings')) {
+    if (!uri.path.startsWith('/projects') &&
+        !uri.path.startsWith('/settings')) {
       return false;
     }
     _receiving = true;

@@ -22,11 +22,11 @@ second, English-language runtime.
 1. Flutter → `Get<IChat>().RequestAsync(SendMessage)` → durable turn → `ChatTurnWorker`.
 2. Worker → `IAssistant` → a Microsoft.Extensions.AI `IChatClient` (the
    configured default model or an explicit marker) with an AI toolset.
-3. Every UI-kit component registers an AI tool (`render_chart`,
+3. Every UI components component registers an AI tool (`render_chart`,
    `generate_image`, …) via `TurnBoundFunction`. A tool call creates/updates an
    `Entity<TState>` and posts a **reference card** `{componentKind, entityId,
    caption}` into the transcript — never a snapshot.
-4. SSE pushes the card; Flutter mounts the matching kit widget, which reads the
+4. SSE pushes the card; Flutter mounts the matching ui widget, which reads the
    entity via its `[ClientEntryPoint]` contract. The same entity renders
    full-size on a Surface — one live state, two mounts.
 5. Interactive components (Button, Form, Todo) fire their command signal back
@@ -34,7 +34,7 @@ second, English-language runtime.
 6. Every component state record lands in `flutter-wire-contracts.golden.json`;
    a conformance test fails on C#↔Dart drift.
 
-## UI kit — 13 components, one wave
+## UI components — 13 components, one wave
 
 All follow the identical template: `Entity<TState>` + `[ClientEntryPoint]`
 contract + Flutter widget + golden wire contract. Binary payloads (Image, File)
@@ -44,8 +44,8 @@ MarkdownCard, Chart, Image (multi-provider generation), Button, Table, Form,
 TodoList, CodeCard, ProgressCard, TimerCard, Browser (embedded webview),
 FileCard, Diagram.
 
-The existing `digitalbrain_ui_kit` Dart package (KitChartPart, KitButtonPart,
-KitGalleryScreen) is the starting point for the widget side.
+The existing `digitalbrain_ui` Dart package (UiChartPart, UiButtonPart,
+UiGalleryScreen) is the starting point for the widget side.
 
 ## AI module
 
@@ -156,7 +156,7 @@ provide labels and icon keys for observed neurons; they never create graph topol
 
 1. AI providers (IAW port, no tiers) — shipped 2026-08-22.
 2. Auth (UserAccountEntity, cookie + token) — multiuser boundary.
-3. UI kit, all 13 components on the template. (template + Chart + Image shipped 2026-08-23)
+3. UI components, all 13 components on the template. (template + Chart + Image shipped 2026-08-23)
 4. Self-knowledge catalog — historical; not in the current product path.
 5. Durable authored applications with immutable file artifacts and supervised worker processes.
 6. Google + Salesforce specialist neurons through the inherited generic agent request contract.

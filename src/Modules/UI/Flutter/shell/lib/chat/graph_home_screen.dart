@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:async';
 
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
-import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 
 import 'brain_chat_screen.dart';
@@ -1052,7 +1052,7 @@ final class _GraphHomeScreenState extends State<GraphHomeScreen> {
   void _examples() => Navigator.of(context).push(
     MaterialPageRoute<void>(
       builder: (context) => Theme(
-        data: KitTheme.dark(),
+        data: UiTheme.dark(),
         child: Scaffold(
           appBar: AppBar(title: const Text('Graph examples · simulation')),
           body: GraphExamplesScreen(

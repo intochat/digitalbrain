@@ -155,7 +155,7 @@ final class DigitalBrainUiClient {
   );
 
   Future<List<TableSummary>> listTables() async {
-    final body = await _tableRequest('GET', '/kit/tables');
+    final body = await _tableRequest('GET', '/ui/tables');
     return (body as List)
         .map(
           (item) =>
@@ -172,7 +172,7 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'GET',
-        '/kit/tables/${Uri.encodeComponent(id)}?offset=$offset&limit=$limit',
+        '/ui/tables/${Uri.encodeComponent(id)}?offset=$offset&limit=$limit',
       ) as Map,
     ),
   );
@@ -185,7 +185,7 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'POST',
-        '/kit/tables',
+        '/ui/tables',
         body: {
           'title': title,
           'columns': columns.map((x) => x.toJson()).toList(),
@@ -202,7 +202,7 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'PUT',
-        '/kit/tables/${Uri.encodeComponent(id)}/view',
+        '/ui/tables/${Uri.encodeComponent(id)}/view',
         body: update.toJson(),
       ) as Map,
     ),
@@ -780,36 +780,33 @@ final class DigitalBrainUiClient {
   );
 
   Future<ChatChartOffer?> readChart(String chartName) async {
-    final body = await _getKitEntity('/kit/charts/$chartName', 'kit chart');
+    final body = await _getUiEntity('/ui/charts/$chartName', 'ui chart');
     return body == null ? null : ChatChartOffer.fromJson(body);
   }
 
   Future<ChatGraphOffer?> readGraph(String graphName) async {
-    final body = await _getKitEntity('/kit/graphs/$graphName', 'kit graph');
+    final body = await _getUiEntity('/ui/graphs/$graphName', 'ui graph');
     return body == null ? null : ChatGraphOffer.fromJson(body);
   }
 
-  Future<KitSurfaceState?> readSurface(String surfaceName) async {
-    final body = await _getKitEntity(
-      '/kit/surfaces/$surfaceName',
-      'kit surface',
-    );
-    return body == null ? null : KitSurfaceState.fromJson(body);
+  Future<UiSurfaceState?> readSurface(String surfaceName) async {
+    final body = await _getUiEntity('/ui/surfaces/$surfaceName', 'ui surface');
+    return body == null ? null : UiSurfaceState.fromJson(body);
   }
 
   Future<ChatSpreadsheetOffer?> readSpreadsheet(String spreadsheetName) async {
-    final body = await _getKitEntity(
-      '/kit/spreadsheets/$spreadsheetName',
-      'kit spreadsheet',
+    final body = await _getUiEntity(
+      '/ui/spreadsheets/$spreadsheetName',
+      'ui spreadsheet',
     );
     return body == null ? null : ChatSpreadsheetOffer.fromJson(body);
   }
 
   Future<Map<String, Object?>?> readImage(String imageName) =>
-      _getKitEntity('/kit/images/$imageName', 'kit image');
+      _getUiEntity('/ui/images/$imageName', 'ui image');
 
   Future<Uint8List?> readImageBytes(String imageName) async {
-    final uri = baseUri.replace(path: '/kit/images/$imageName/content');
+    final uri = baseUri.replace(path: '/ui/images/$imageName/content');
     final streamed = await _http.send(http.Request('GET', uri));
     final response = await http.Response.fromStream(streamed);
     if (response.statusCode == 404) {
@@ -817,13 +814,13 @@ final class DigitalBrainUiClient {
     }
     if (response.statusCode != 200) {
       throw StateError(
-        'kit image content read failed: ${response.statusCode} ${response.body}',
+        'ui image content read failed: ${response.statusCode} ${response.body}',
       );
     }
     return response.bodyBytes;
   }
 
-  Future<Map<String, Object?>?> _getKitEntity(
+  Future<Map<String, Object?>?> _getUiEntity(
     String path,
     String description,
   ) async {

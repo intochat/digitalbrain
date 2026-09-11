@@ -1,4 +1,4 @@
-import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 
 const _destinations = <(String, IconData, String)>[
@@ -6,7 +6,7 @@ const _destinations = <(String, IconData, String)>[
   ('Getting started', Icons.auto_stories_outlined, 'onboarding'),
   ('My brain', Icons.hub_outlined, 'graph'),
   ('Activity', Icons.timeline_rounded, 'activity'),
-  ('UI kit', Icons.widgets_outlined, 'kit'),
+  ('UI components', Icons.widgets_outlined, 'ui'),
   ('Workspace', Icons.desktop_windows_outlined, 'windowing'),
 ];
 

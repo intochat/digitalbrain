@@ -40,7 +40,7 @@ internal sealed class BrainHttp : IAsyncDisposable
         // A 30 s poll means any scenario that sees a stream frame promptly was woken by StreamWake, not by the poll.
         builder.Services.AddSingleton(new SessionStreamOptions { PollInterval = TimeSpan.FromSeconds(30) });
         builder.Services.AddSingleton(brain.SiloServices.GetRequiredService<StreamWake>());
-        if (brain.SiloServices.GetService<IKitImageStore>() is { } images)
+        if (brain.SiloServices.GetService<IUiImageStore>() is { } images)
         {
             builder.Services.AddSingleton(images);
         }
@@ -61,7 +61,7 @@ internal sealed class BrainHttp : IAsyncDisposable
             app.MapChatEndpoints();
             app.MapChatVoiceEndpoints();
             app.MapSurfaceEndpoints();
-            app.MapKitEndpoints();
+            app.MapUiEndpoints();
             app.MapActivityEndpoints();
             app.MapGraphEndpoints();
             await app.StartAsync();

@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
-import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_chat_core/flutter_chat_core.dart';
@@ -184,7 +184,7 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
     final visibleTurns = turns.where(_turnVisible).toList();
     final messages = <Message>[
       for (final turn in visibleTurns) ...[
-        ...KitMessageFactory.messagesForTurn(
+        ...UiMessageFactory.messagesForTurn(
           sequence: widget.activityMode
               ? _renderSequences.putIfAbsent(
                   _turnIdentity(turn),
@@ -198,7 +198,7 @@ final class _BrainChatScreenState extends State<BrainChatScreen> {
                     : 'Request failed. See Activity for details.'
               : turn.text,
           createdAt: turn.timestamp,
-          parts: turn.kitParts,
+          parts: turn.uiParts,
         ),
       ],
     ];

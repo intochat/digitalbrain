@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_flutter_shell/chat/agent_chat_app.dart';
-import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -99,7 +99,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('People'));
       await tester.pumpAndSettle();
-      expect(find.byType(KitDataTable), findsOneWidget);
+      expect(find.byType(UiDataTable), findsOneWidget);
       expect(reads, 1);
       await tester.enterText(find.byType(TextField), 'How many?');
       await tester.tap(find.byTooltip('Send message'));
@@ -120,7 +120,7 @@ void main() {
   );
 
   testWidgets(
-    'tool results render table kit and share newer snapshots by stable ID',
+    'tool results render table ui and share newer snapshots by stable ID',
     (tester) async {
       final events = StreamController<AgentEvent>();
       await tester.pumpWidget(
@@ -143,9 +143,9 @@ void main() {
         }),
       );
       await tester.pump();
-      expect(find.byType(KitDataTable), findsOneWidget);
+      expect(find.byType(UiDataTable), findsOneWidget);
       final first = tester
-          .widget<KitDataTable>(find.byType(KitDataTable))
+          .widget<UiDataTable>(find.byType(UiDataTable))
           .controller;
       events.add(
         AgentEvent({
@@ -156,7 +156,7 @@ void main() {
       );
       await tester.pump();
       final tables = tester
-          .widgetList<KitDataTable>(find.byType(KitDataTable))
+          .widgetList<UiDataTable>(find.byType(UiDataTable))
           .toList();
       expect(tables.every((t) => identical(t.controller, first)), isTrue);
       expect(first.snapshot.rows.single.cells.single, 'Bob');

@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'workspace_voice.dart';
 
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
-import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
@@ -352,7 +352,7 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
   Widget build(BuildContext context) => Column(
     children: [
       Expanded(
-        child: KitChat(
+        child: UiChat(
           chatController: _controller,
           currentUserId: 'user',
           resolveUser: (id) async =>

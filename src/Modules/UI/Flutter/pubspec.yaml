@@ -6,7 +6,7 @@ environment:
 
 workspace:
   - core
-  - kit
+  - ui
   - shell
 
 # Markdraw 0.2.0 declares the old annotation package but does not import it.

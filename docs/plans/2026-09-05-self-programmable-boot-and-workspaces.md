@@ -68,7 +68,7 @@ Walk rules that matter later: Bound synapses live on the **source**. Discover-fr
 
 ### What chat does today (the orchestrator to unwind)
 
-`IChat` (`src/Modules/UI/DigitalBrain.Modules.UI.Contracts/Chat/IChat.cs`) handles `SendMessage`, `CancelTurn`, `ReadTranscriptRequest`, turn snapshots, execution focus, `CompleteUserAction`, notes, kit cards.
+`IChat` (`src/Modules/UI/DigitalBrain.Modules.UI.Contracts/Chat/IChat.cs`) handles `SendMessage`, `CancelTurn`, `ReadTranscriptRequest`, turn snapshots, execution focus, `CompleteUserAction`, notes, ui cards.
 
 On activate, `Chat.OnNeuronActivatedAsync` **binds** a Bound synapse from this chat to a principal-partitioned `IUserMessages` named `"default"` (`BindOutgoing(inbox, nameof(UserMessaged))`). `EnqueueTurnAsync` then:
 
@@ -136,7 +136,7 @@ The owner cannot program “what calls what” from first activation. Studio’s
 | `IUserMessages` + bind-on-chat-activate | `Chat.OnNeuronActivatedAsync` | Works, but Chat is the wrong source |
 | MCP graph tools | `GraphTools.cs` | `kind: usermessages` is principal-prefixed today |
 | Behaviors: draft/activate, out-of-silo handlers, durable subscribe | `BehaviorNeuron`, `BehaviorExecutionWorker` | Composition is not replayed on handler edit |
-| Entities: Chart, Surface, Memory, Image, … | `IEntity<TState>.Read()`, kit HTTP | UI already mounts kit state |
+| Entities: Chart, Surface, Memory, Image, … | `IEntity<TState>.Read()`, ui HTTP | UI already mounts ui state |
 | Session as client membrane | `IBrainNeuron` grain type `sessionneuron` | `isInfrastructure` + `studioCanvas` hide it |
 | `IAgentKernel.AskStreaming` | **on the Assistant neuron** | In-silo stream; owners/scripts use `IAgent` + `RequestAsync` |
 
@@ -391,9 +391,9 @@ sequenceDiagram
 | Type | Stays | Why |
 |---|---|---|
 | `UserMessaged` | **Move** to `DigitalBrain.Product.Contracts` | Only type `IAssistant : IHandle<>` needs. `CommandId` / `NeuronId` / `ActorContext` already Product/Abstractions |
-| `Responded` | **UI.Contracts** | References `KitCardOffer` (`DigitalBrain.UI`). Cannot enter Product without a cycle |
+| `Responded` | **UI.Contracts** | References `UiCardOffer` (`DigitalBrain.UI`). Cannot enter Product without a cycle |
 | `TurnLifecycle` | **UI.Contracts** | `ChatTurnStatus`, `TurnId`, `NeuronId Chat` are Chat/UI types |
-| `KitCardOffer`, `ChatTurnStatus` | **UI.Contracts** | Kit / turn machine |
+| `UiCardOffer`, `ChatTurnStatus` | **UI.Contracts** | Ui / turn machine |
 
 `IAssistantTurn.RecordTurnFact(Signal fact, CorrelationId correlation)` takes Abstractions `Signal`. The **worker** (UI module) constructs `Responded` / `TurnLifecycle`; Ino’s grain implementation `RecordOutgoingAsync(fact, correlation)` without AI.Contracts referencing UI. If `Responded` must become product-level later, split the card payload out first — not in this series.
 
@@ -468,9 +468,9 @@ await Brain.GetEntity<ISurface>("desk").Open(
     cap: 8);
 ```
 
-Flutter `WindowingScreen` drops `PanelManager.seedDemoPanels()`. It `Read()`s `ISurface` `"desk"` via `GET /kit/surfaces/{name}`, keeps scenes whose key contains `:{currentWorkspace}:`, mounts `chart:*` via `onReadChart`. Drag/resize/minimize stay client chrome.
+Flutter `WindowingScreen` drops `PanelManager.seedDemoPanels()`. It `Read()`s `ISurface` `"desk"` via `GET /ui/surfaces/{name}`, keeps scenes whose key contains `:{currentWorkspace}:`, mounts `chart:*` via `onReadChart`. Drag/resize/minimize stay client chrome.
 
-Windowing does **not** depend on `ITranscript`. Kit surface GET can follow PR-2 in parallel with transcript work.
+Windowing does **not** depend on `ITranscript`. Ui surface GET can follow PR-2 in parallel with transcript work.
 
 ### 10. What happens to `IChat`
 
@@ -573,8 +573,8 @@ public static Task SubscribeToAsync<TSource, TSignal>(
 | `POST /owner/commands` `chat.send` → `IChat.RequestAsync(SendMessage)` | `IWorkspaceInject.InjectUserMessage` |
 | `GET /chats/{chatName}/events` watches `IChat` outgoing | Inbox + **Ino** outgoing, filter stored correlation for `{chatName}` |
 | `GET /chats/{chatName}/brain` seeds `IChat` | Seed Ino; discover inbox; filter activity by index Guid |
-| no surface kit read | `GET /kit/surfaces/{name}` → `ISurface.Read()` (windowing PR) |
-| `GET /kit/charts/{chartName}` | Unchanged |
+| no surface ui read | `GET /ui/surfaces/{name}` → `ISurface.Read()` (windowing PR) |
+| `GET /ui/charts/{chartName}` | Unchanged |
 
 `NeuronReference.PublishAsync` stays Send until a **follow-on contracts PR** after cutover. `IDigitalBrain.PublishAsync` remains behavior-only Broadcast.
 
@@ -647,10 +647,10 @@ Scene keys include workspace name; windowing filters. Avoids N surface entities 
 | Threat | Severity | Mitigation |
 |---|---|---|
 | UI/HTTP `BindOutgoing` | High | HTTP only `IWorkspaceInject` / entity GET. Graph `SetSubscriptionAsync` still rebuilds scope and checks `IHandle` |
-| Cross-principal inject into owner-global inbox | High | Inject helper: `Actor` must equal `HttpActor.Current`. Cutover: composer Handle refuses mismatched `Actor` when `VerifiedActor` is present (test). Index/transcript/surface/chart names stay `ScopeName` under HTTP (`MapKitEntities` pattern) |
+| Cross-principal inject into owner-global inbox | High | Inject helper: `Actor` must equal `HttpActor.Current`. Cutover: composer Handle refuses mismatched `Actor` when `VerifiedActor` is present (test). Index/transcript/surface/chart names stay `ScopeName` under HTTP (`MapUiEntities` pattern) |
 | Wrong grain (`{principal}.inbox`) | High | GetReference allowlist + MCP must not prefix inbox/assistant. Simulation id equality test |
 | LLM offload as a hidden graph backdoor | Medium | Kernel and worker are not `INeuron`; no synapses; correlation required; `AgentActivity` / `Responded` recorded on **Ino** |
-| Transcript leakage | Medium | Kit HTTP `IEntity.Read()` + principal-scoped entity names. Graph `Summarize(UserMessaged)` is character count only. There is no `[ClientEntryPoint]` attribute in this tree |
+| Transcript leakage | Medium | Ui HTTP `IEntity.Read()` + principal-scoped entity names. Graph `Summarize(UserMessaged)` is character count only. There is no `[ClientEntryPoint]` attribute in this tree |
 | Startup script as RCE | Existing | Host-shipped `start.cs`, same `ScriptOptions` allowlist. Owner programs `IBehavior`s, not the OS file |
 
 Session neuron remains the authenticated client membrane. Never a default-canvas citizen.
@@ -700,7 +700,7 @@ Session neuron remains the authenticated client membrane. Never a default-canvas
 
 1. **`start.cs` is the OS and is `StartupScriptWorker` only** — never an `IBehavior`. Graph projection and Chat activation must not plant conversational wiring. SurfaceBoot Home-open stays until a follow-on after windowing.
 2. **`IComposer` is the UI injection neuron.** Put **`const GrainTypeName = "usermessages"`** on `IComposer` (what `GrainTypeNames.Of` / `NeuronId.For` honor; Orleans `[GrainType]` is class-only) **and** `[Alias("usermessages")]` for Orleans. Exact id: `NeuronId.For<IComposer>(owner, "inbox").Type == "usermessages"`. Instance `"inbox"`; **one per owner**. `IUserMessages` is obsolete **without** a duplicate Alias or GrainType. Do not rely on `[Alias]` for DigitalBrain identity.
-3. **`IAssistant : IAgent, IHandle<UserMessaged>`.** Move **only** `UserMessaged` to `DigitalBrain.Product.Contracts` (keep Alias `chat.user-messaged` and field ids). `Responded` / `TurnLifecycle` / `KitCardOffer` stay in UI.Contracts. AI.Contracts references Product.Contracts, not UI.Contracts. `RecordTurnFact` takes `Signal`.
+3. **`IAssistant : IAgent, IHandle<UserMessaged>`.** Move **only** `UserMessaged` to `DigitalBrain.Product.Contracts` (keep Alias `chat.user-messaged` and field ids). `Responded` / `TurnLifecycle` / `UiCardOffer` stay in UI.Contracts. AI.Contracts references Product.Contracts, not UI.Contracts. `RecordTurnFact` takes `Signal`.
 4. **Extract `IAgentKernel` to grain type `agent-kernel` (not `assistant`, not `INeuron`).** Conversational `UserMessaged` Handle **never awaits** Ask/AskStreaming; it only enqueues `IAgentTurnWorker`. The tool/delegation loop runs inside kernel `AskStreaming`, with **short RPCs to Ino** for PrepareTools, Send/Request, and `RecordTurnFact`. `AgentRequest` Handle **does** await kernel `Ask` then `ReplyAsync` (directed RPC exception). Overlapping `UserMessaged` during AskStreaming **enqueues**. Durable `_completedRequests` stays on Ino.
 5. **PR-1 Handle is accept + journal + return.** No enqueue, no `ChatTurnWorker`, no `start.cs` Subscribe.
 6. **`start.cs` Subscribe happens in the same production switch that cuts Chat bind/broadcast and HTTP.** One LLM attempt per owner submit.
@@ -757,15 +757,15 @@ Independently reviewable. Tests in the **same** PR. Production dual-path is forb
 ### PR-4 — `ITranscript` + copy-forward
 
 - **Title:** Transcript entity is the UI store
-- **Files / components:** `ITranscript`, entity, kit read if Flutter history should not parse journals; copy-forward Chat list for `"main"`; Flutter history `Read()`; tests: new workspace empty transcript, synapse count unchanged, `start.cs` not replayed
+- **Files / components:** `ITranscript`, entity, ui read if Flutter history should not parse journals; copy-forward Chat list for `"main"`; Flutter history `Read()`; tests: new workspace empty transcript, synapse count unchanged, `start.cs` not replayed
 - **Depends on:** PR-3
 - **Description:** Worker Append on enqueue/Responded.
 
 ### PR-5 — Windowing reads `ISurface` / `IChart` (parallel with PR-4)
 
 - **Title:** Windowing mounts live Surface scenes
-- **Files / components:** `windowing_screen.dart`; `MapKitEntities` + `HttpSurfacePaths` surface GET; scene filter `{kind}:{workspace}:`; `workspace_test.dart`
-- **Depends on:** PR-2 (index + kit pattern). **Does not depend on** PR-4
+- **Files / components:** `windowing_screen.dart`; `MapUiEntities` + `HttpSurfacePaths` surface GET; scene filter `{kind}:{workspace}:`; `workspace_test.dart`
+- **Depends on:** PR-2 (index + ui pattern). **Does not depend on** PR-4
 - **Description:** Client chrome stays Flutter-only.
 
 ### Follow-on (not this series)
@@ -817,6 +817,6 @@ Addressed review 2026-09-05 (issues 1–17): no dual-fire in PR-1; extract `IAge
 **Second pass (GrainType / Responded cycle / kernel await / correlation filter):**
 
 - `IComposer.GrainTypeName == "usermessages"`; `NeuronId.For<IComposer>(owner,"inbox").Type == "usermessages"` (Alias is not DigitalBrain identity). `GrainTypeNames.Of` reads that const (Orleans `[GrainType]` cannot be on interfaces).
-- Move only `UserMessaged` (keep `chat.user-messaged`); `Responded`/`TurnLifecycle` stay in UI.Contracts (`KitCardOffer` cycle).
+- Move only `UserMessaged` (keep `chat.user-messaged`); `Responded`/`TurnLifecycle` stay in UI.Contracts (`UiCardOffer` cycle).
 - Kernel grain type `agent-kernel`, never `IAssistant.ToGrainId()`. `UserMessaged` Handle never awaits Ask/AskStreaming; tool loop on kernel with short RPCs to Ino. `AgentRequest` Handle awaits `Ask` then `ReplyAsync`.
 - Graph filter by signal type, not empty `CorrelationId`.

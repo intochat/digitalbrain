@@ -206,7 +206,7 @@ public static class ShellHostingExtensions
             return
             [
                 Path.Combine(workingDirectory, "lib"),
-                Path.Combine(family, "kit", "lib"),
+                Path.Combine(family, "ui", "lib"),
                 Path.Combine(family, "core", "lib"),
             ];
         }

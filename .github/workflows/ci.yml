@@ -71,7 +71,7 @@ jobs:
 
       - name: Dart format
         working-directory: src/Modules/UI/Flutter
-        run: dart format --output=none --set-exit-if-changed core kit shell
+        run: dart format --output=none --set-exit-if-changed core ui shell
 
       - name: Web release build
         run: flutter build web --release --base-href "/" --no-tree-shake-icons --no-pub

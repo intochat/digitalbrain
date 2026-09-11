@@ -6,14 +6,14 @@ internal static class TableEndpoints
 {
     public static IEndpointRouteBuilder MapTableEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/kit/tables", (TableService tables, CancellationToken cancellationToken) =>
+        endpoints.MapGet("/ui/tables", (TableService tables, CancellationToken cancellationToken) =>
             RespondAsync(async () => Results.Ok(await tables.ListAsync(cancellationToken))));
-        endpoints.MapPost("/kit/tables", (CreateTable table, TableService tables, CancellationToken cancellationToken) =>
+        endpoints.MapPost("/ui/tables", (CreateTable table, TableService tables, CancellationToken cancellationToken) =>
             RespondAsync(async () => Results.Ok(await tables.CreateAsync(table, cancellationToken))));
-        endpoints.MapGet("/kit/tables/{id}", (string id, int? offset, int? limit, TableService tables, CancellationToken cancellationToken) =>
+        endpoints.MapGet("/ui/tables/{id}", (string id, int? offset, int? limit, TableService tables, CancellationToken cancellationToken) =>
             RespondAsync(async () => Results.Ok(await tables.ReadAsync(id, offset ?? 0, limit ?? 50, cancellationToken))))
             .AddEndpointFilter(new NeuronNameFilter("id"));
-        endpoints.MapPut("/kit/tables/{id}/view", (string id, UpdateTableView view, TableService tables, CancellationToken cancellationToken) =>
+        endpoints.MapPut("/ui/tables/{id}/view", (string id, UpdateTableView view, TableService tables, CancellationToken cancellationToken) =>
             RespondAsync(async () => Results.Ok(await tables.UpdateAsync(id, view, cancellationToken))))
             .AddEndpointFilter(new NeuronNameFilter("id"));
         return endpoints;

@@ -6,7 +6,7 @@ import 'package:digitalbrain_flutter_shell/workspace/workspace_chat.dart';
 import 'package:digitalbrain_flutter_shell/workspace/workspace_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:digitalbrain_flutter_shell/workspace/artifact_editors.dart';
 
 class MemoryWorkspace implements WorkspacePersistence {
@@ -89,9 +89,14 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(reads, 1);
-      final observation=BrainSnapshot.fromJson(store.currentProject.artifacts.single.data);
-      expect(observation.rootId,'root');
-      expect(store.currentProject.artifacts.single.data['_observationStale'],false);
+      final observation = BrainSnapshot.fromJson(
+        store.currentProject.artifacts.single.data,
+      );
+      expect(observation.rootId, 'root');
+      expect(
+        store.currentProject.artifacts.single.data['_observationStale'],
+        false,
+      );
       await tester.tap(find.text('My project'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Live brain'));
@@ -210,7 +215,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('People'));
       await tester.pumpAndSettle();
-      expect(find.byType(KitDataTable), findsOneWidget);
+      expect(find.byType(UiDataTable), findsOneWidget);
       final chat = tester.widget<WorkspaceChat>(find.byType(WorkspaceChat));
       chat.onArtifact(snapshot(1, 'Old').toJson());
       await tester.pumpAndSettle();
@@ -309,7 +314,7 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     expect(tester.takeException(), isNull);
   });
-  testWidgets('KitChat continuation waits for EOF and retains transcript', (
+  testWidgets('UiChat continuation waits for EOF and retains transcript', (
     tester,
   ) async {
     final store = WorkspaceStore(persistence: MemoryWorkspace());

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
-import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:uuid/uuid.dart';
@@ -37,7 +37,7 @@ class AgentChatApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     title: 'DigitalBrain',
     debugShowCheckedModeBanner: false,
-    theme: KitTheme.light(),
+    theme: UiTheme.light(),
     home: _Conversation(
       onRun: onRun,
       onOpenUrl: onOpenUrl,
@@ -84,7 +84,7 @@ class _ConversationState extends State<_Conversation> {
   final _composer = TextEditingController();
   final _scroll = ScrollController();
   final _entries = <_Entry>[];
-  final _tables = <String, KitTableController>{};
+  final _tables = <String, UiTableController>{};
   String? _activeTableId;
   int _tableGeneration = 0;
   bool _openingTable = false;
@@ -352,7 +352,7 @@ class _ConversationState extends State<_Conversation> {
     }
     final table = map?['kind'] == 'table' ? _tables[map?['id']] : null;
     if (table != null) {
-      return KitDataTable(
+      return UiDataTable(
         controller: table,
         active: _activeTableId == table.snapshot.id,
         onActivate: () => setState(() => _activeTableId = table.snapshot.id),
@@ -633,7 +633,7 @@ class _ConversationState extends State<_Conversation> {
     if (existing != null) {
       existing.accept(snapshot);
     } else {
-      _tables[snapshot.id] = KitTableController(
+      _tables[snapshot.id] = UiTableController(
         snapshot: snapshot,
         read: widget.onReadTable,
         update: widget.onUpdateTableView,

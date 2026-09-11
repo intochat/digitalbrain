@@ -13,7 +13,7 @@ The default Flutter shell talks directly to a single Microsoft Agent Framework a
 - Persistent interactive UI tables with shared human/agent filtering, sorting, column visibility, and paging.
 - A saved-table picker for reopening tables independently of the current conversation.
 
-The production project workspace adds CSV/TSV/XLSX import, voice drafts, drawings, images and brain scenarios. Chat uses the shared KitChat component with Markdown content; artifact receipts open editors in the working area. See [IntoCaht workspace](production-workspace.md) for persistence, interactions and current limits. Cell editing and arbitrary file operations are not exposed.
+The production project workspace adds CSV/TSV/XLSX import, voice drafts, drawings, images and brain scenarios. Chat uses the shared UiChat component with Markdown content; artifact receipts open editors in the working area. See [IntoCaht workspace](production-workspace.md) for persistence, interactions and current limits. Cell editing and arbitrary file operations are not exposed.
 
 ## Interactive tables
 
@@ -29,7 +29,7 @@ The UI and `update_table_view` tool use the same table service and must provide 
 
 Available tools are `create_table`, `read_table`, `update_table_view`, and `list_tables`. Successful table tools return `kind: "table"`, an ID, revision, schema, view state, counts, and a bounded row page. Expected failures return `kind: "tableError"` with a code and explanation; they are not successful mutations.
 
-The existing owner authentication gate protects `GET/POST /kit/tables`, `GET /kit/tables/{id}`, and `PUT /kit/tables/{id}/view`. Table data and view state use the neuron persistence configured for the host. With durable storage, they survive restarts and are discoverable without chat history; an explicitly in-memory development host remains volatile. Chat still streams directly through the agent, while table tools invoke data neurons without enabling graph HTTP capabilities or legacy chat turns.
+The existing owner authentication gate protects `GET/POST /ui/tables`, `GET /ui/tables/{id}`, and `PUT /ui/tables/{id}/view`. Table data and view state use the neuron persistence configured for the host. With durable storage, they survive restarts and are discoverable without chat history; an explicitly in-memory development host remains volatile. Chat still streams directly through the agent, while table tools invoke data neurons without enabling graph HTTP capabilities or legacy chat turns.
 
 ## Configuration
 

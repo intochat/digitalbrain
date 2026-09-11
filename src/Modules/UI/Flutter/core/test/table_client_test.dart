@@ -38,7 +38,7 @@ void main() {
           requests.add(request);
           return http.Response(
             jsonEncode(
-              request.url.path == '/kit/tables'
+              request.url.path == '/ui/tables'
                   ? [
                       {'id': 'table:one', 'title': 'People', 'revision': 2},
                     ]

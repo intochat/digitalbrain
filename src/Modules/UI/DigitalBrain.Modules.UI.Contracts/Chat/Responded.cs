@@ -10,4 +10,4 @@ public sealed record Responded(
     [property: Id(2)] NeuronId Chat,
     [property: Id(3)] string Text,
     [property: Id(4)] string Author = "",
-    [property: Id(5)] IReadOnlyList<KitCardOffer>? Cards = null);
+    [property: Id(5)] IReadOnlyList<UiCardOffer>? Cards = null);

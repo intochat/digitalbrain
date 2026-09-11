@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
-import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 
@@ -83,7 +83,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
           key: widget.persistenceKey,
         ),
       );
-  final _tables = <String, KitTableController>{};
+  final _tables = <String, UiTableController>{};
   final _hydratingTables = <String>{};
   final _tableErrors = <String, String>{};
   BrainGraphStore? _graph;
@@ -195,8 +195,8 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                 name: '/settings/developer/gallery',
               ),
               builder: (_) => Scaffold(
-                appBar: AppBar(title: const Text('UI kit gallery')),
-                body: const KitGalleryScreen(),
+                appBar: AppBar(title: const Text('UI components gallery')),
+                body: const UiGalleryScreen(),
               ),
             ),
           );
@@ -252,7 +252,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         final snapshot = TableSnapshot.fromJson(result);
         final existing = _tables[id];
         if (existing == null) {
-          _tables[id] = KitTableController(
+          _tables[id] = UiTableController(
             snapshot: snapshot,
             read: widget.onReadTable,
             update: widget.onUpdateTableView,
@@ -1358,16 +1358,16 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     scaffoldMessengerKey: _messenger,
     title: 'IntoCaht',
     debugShowCheckedModeBanner: false,
-    theme: KitTheme.light().copyWith(
+    theme: UiTheme.light().copyWith(
       visualDensity: store.settings.compactDensity
           ? VisualDensity.compact
           : VisualDensity.standard,
     ),
-    darkTheme: KitTheme.dark().copyWith(
+    darkTheme: UiTheme.dark().copyWith(
       colorScheme: ColorScheme.fromSeed(
         seedColor: LumenPalette.accent,
         brightness: Brightness.dark,
-        surface: KitPalette.surface,
+        surface: UiPalette.surface,
       ),
       visualDensity: store.settings.compactDensity
           ? VisualDensity.compact
@@ -1390,7 +1390,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
               store.settings.reducedMotion ||
               MediaQuery.of(context).disableAnimations,
         ),
-        child: KitThemeScope(
+        child: UiThemeScope(
           brightness: Theme.of(context).brightness,
           child: Theme(data: Theme.of(context), child: child!),
         ),

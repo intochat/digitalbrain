@@ -1,5 +1,5 @@
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
-import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 
 import 'brain_workspace.dart';
@@ -60,8 +60,8 @@ final class BrainChatApp extends StatelessWidget {
     return MaterialApp(
       title: 'DigitalBrain',
       debugShowCheckedModeBanner: false,
-      theme: KitTheme.light(),
-      builder: (context, child) => KitThemeScope(child: child!),
+      theme: UiTheme.light(),
+      builder: (context, child) => UiThemeScope(child: child!),
       home: BrainWorkspace(
         chatName: chatName,
         turns: turns,

@@ -65,7 +65,7 @@ internal sealed class ChartNeuron(
         }
 
         next = next with { Points = [.. next.Points.TakeLast(ChartState.MaxPoints)] };
-        Announce(Signal.FromJson(UIVocabulary.ChartRendered, new KitCard(Id.Name, next.Title), UIJson.Default.KitCard));
+        Announce(Signal.FromJson(UIVocabulary.ChartRendered, new UiCard(Id.Name, next.Title), UIJson.Default.UiCard));
         await SaveAsync(next, cancellationToken).ConfigureAwait(true);
     }
 }

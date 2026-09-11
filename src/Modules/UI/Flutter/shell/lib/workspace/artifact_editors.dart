@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
-import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:markdraw/markdraw.dart' as markdraw;
@@ -30,7 +30,7 @@ class WorkspaceArtifactEditor extends StatelessWidget {
   });
   final WorkspaceArtifact artifact;
   final ValueChanged<WorkspaceArtifact> onChanged;
-  final KitTableController? tableController;
+  final UiTableController? tableController;
   final BrainGraphStore? graph;
 
   @override
@@ -53,7 +53,7 @@ class WorkspaceArtifactEditor extends StatelessWidget {
                       onPressed: () => _selectRows(context),
                     ),
                   ),
-                  KitDataTable(controller: tableController!, active: true),
+                  UiDataTable(controller: tableController!, active: true),
                 ],
               ),
             ),

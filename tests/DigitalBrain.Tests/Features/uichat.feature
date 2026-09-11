@@ -39,7 +39,7 @@ Feature: uichat
     Then chat "desk" turn was answered by "agent:chosen"
     And the latest "agent:chosen" incoming "Ask" text contains "hello"
 
-  Scenario: A kit signal during a turn rides out as a card
+  Scenario: A ui signal during a turn rides out as a card
     Given a running brain with AI and UI
     And "uichat:desk" is connected to "alice" for "Responded"
     And the scripted model will call tool "fire" with {"type":"ChartRendered","body":"{\"name\":\"sales\",\"title\":\"Quarterly sales\"}","to":"uichat:desk"} then say "here is your chart"

@@ -5,7 +5,7 @@ using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.Kernel;
 
-/// <summary>Direct table tools share the same application service as the kit HTTP controls.</summary>
+/// <summary>Direct table tools share the same application service as the ui HTTP controls.</summary>
 internal sealed class TableAgentTools(TableService tables)
 {
     private static readonly JsonSerializerOptions WireJson = new(JsonSerializerDefaults.Web);

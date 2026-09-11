@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_flutter_shell/chat/brain_chat_screen.dart';
 import 'package:digitalbrain_flutter_shell/chat/workspace_session.dart';
-import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -65,7 +65,7 @@ void main() {
           ),
         );
         await tester.pumpWidget(screen(const []));
-        final chat = tester.widget<KitChat>(find.byType(KitChat));
+        final chat = tester.widget<UiChat>(find.byType(UiChat));
         chat.onMessageSend!('  Hello  ');
         await tester.pump();
         expect(
@@ -132,7 +132,7 @@ void main() {
     );
     await tester.pumpWidget(screen('Old transcript'));
     await tester.pumpWidget(screen('Replacement transcript'));
-    final chat = tester.widget<KitChat>(find.byType(KitChat));
+    final chat = tester.widget<UiChat>(find.byType(UiChat));
     expect(
       chat.chatController.messages.whereType<TextMessage>().single.text,
       'Replacement transcript',

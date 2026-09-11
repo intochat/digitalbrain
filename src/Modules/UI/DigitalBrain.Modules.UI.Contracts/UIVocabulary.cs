@@ -37,7 +37,7 @@ public static class UIVocabulary
     // { ...TurnAccepted... }
     public const string TurnAccepted = "TurnAccepted";
 
-    // { ...KitCardOffer... }
+    // { ...UiCardOffer... }
     public const string CardOffered = "CardOffered";
 
     // { ...Responded... }
@@ -46,7 +46,7 @@ public static class UIVocabulary
     // { "turn": "...", "commandId": "...", "detail": "..." }
     public const string TurnFailed = "TurnFailed";
 
-    // The four kit signals share the body { "name": "...", "title": "..." } and become a card on the running turn.
+    // The four ui signals share the body { "name": "...", "title": "..." } and become a card on the running turn.
     public const string ChartRendered = "ChartRendered";
 
     public const string GraphRendered = "GraphRendered";

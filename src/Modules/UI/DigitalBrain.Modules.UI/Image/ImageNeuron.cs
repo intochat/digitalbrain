@@ -39,7 +39,7 @@ internal sealed class ImageNeuron(
             return;
         }
 
-        Announce(Signal.FromJson(UIVocabulary.ImageDescribed, new KitCard(Id.Name, command.Prompt), UIJson.Default.KitCard));
+        Announce(Signal.FromJson(UIVocabulary.ImageDescribed, new UiCard(Id.Name, command.Prompt), UIJson.Default.UiCard));
         await SaveAsync(new ImageState(command.Prompt, command.Model, command.MediaType, command.BlobName), cancellationToken).ConfigureAwait(true);
     }
 }

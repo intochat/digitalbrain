@@ -1,4 +1,4 @@
-import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 
 import '../chat/chat_contracts.dart';
@@ -301,12 +301,12 @@ class _WorkspaceSettingsState extends State<WorkspaceSettings> {
           children: [
             _heading(
               'Developer tools',
-              'Inspect the actual IntoCaht UI kit and its interactive component states.',
+              'Inspect IntoCaht UI components and their interactive states.',
             ),
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.widgets_outlined),
-              title: const Text('UI kit gallery'),
+              title: const Text('UI components gallery'),
               subtitle: const Text(
                 'Components with normal, loading, error and disabled states.',
               ),
@@ -317,8 +317,8 @@ class _WorkspaceSettingsState extends State<WorkspaceSettings> {
                     name: '/settings/developer/gallery',
                   ),
                   builder: (context) => Scaffold(
-                    appBar: AppBar(title: const Text('UI kit gallery')),
-                    body: const KitGalleryScreen(),
+                    appBar: AppBar(title: const Text('UI components gallery')),
+                    body: const UiGalleryScreen(),
                   ),
                 ),
               ),

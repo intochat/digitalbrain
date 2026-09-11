@@ -31,7 +31,7 @@
 - [x] Add protocol tests for split SSE frames, text/tool/run events, errors, and cancellation.
 - [x] Implement authenticated POST /agent through the existing HTTP client.
 - [x] Replace default shell chat with a direct conversational screen, streamed text, tool status/results, new conversation, and Stop.
-- [x] Retain typed UI kit components for structured results; render search sources as usable links.
+- [x] Retain typed UI components components for structured results; render search sources as usable links.
 - [x] Test the screen with a controlled stream and verify no legacy graph/chat subscriptions start.
 
 ## Task 3: Integration and verification

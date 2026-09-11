@@ -58,12 +58,12 @@ Feature: http
     And POST the cancel of the accepted work on chat "desk"
     Then the stream carries a "chat-turn" with status "Cancelled" within 10 seconds
 
-  Scenario: A kit read is not found before the chart exists and found after
+  Scenario: A ui read is not found before the chart exists and found after
     Given a running brain with AI and UI behind HTTP
-    When GET "/kit/charts/sales"
+    When GET "/ui/charts/sales"
     Then the response status is 404
     When chart "sales" renders "Quarterly sales"
-    And GET "/kit/charts/sales"
+    And GET "/ui/charts/sales"
     Then the response status is 200
     And the response body has "title" of "Quarterly sales"
 

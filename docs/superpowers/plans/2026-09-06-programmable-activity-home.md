@@ -6,7 +6,7 @@
 
 **Tech stack:** .NET/Orleans, Roslyn C# scripting, HTTP/SSE and MCP, Flutter/Forui.
 
-**Spec:** User's approved instructions in this task, September 6, 2026. Graph on the left, rich input on the right; graph-contained task manager; selected/all activity scopes; shared behavior debugger/editor; voice input; Settings contains UI Kit and OldUI.
+**Spec:** User's approved instructions in this task, September 6, 2026. Graph on the left, rich input on the right; graph-contained task manager; selected/all activity scopes; shared behavior debugger/editor; voice input; Settings contains UI Ui and OldUI.
 
 **Global constraints:** Preserve existing user data and palette. No conversation navigation. Distinguish observed execution from proven completion. Protect principal data. UI subscription must actually control updates. No external communications during tests.
 
@@ -27,7 +27,7 @@ Tests cover two independent message activities, inherited causal chains, princip
 - The first live startup exposed an awaited cycle when the renderer observed its own OpenSurface execution. Durable deferred activity delivery fixes this without excluding UI operations from the activity model.
 - MCP had a duplicate ingress implementation retaining workspace-wide correlation; it now uses the same input micro-API as the native UI.
 - Legacy chat journal watches do not contain the new Composer/Assistant path. Selected activity results now have their own principal-filtered journal projection, stable event IDs, and reconnect loading.
-- The UI Kit is a searchable catalog of 16 component entries and 43 supported states; legacy kit colors are shown as existing component behavior.
+- The UI Ui is a searchable catalog of 16 component entries and 43 supported states; legacy ui colors are shown as existing component behavior.
 - Surface streams use `surface-opened` wire names. The client accepts these and the legacy scene names, reconnects with bounded backoff, and rejects stale scene reads. Shared scene notifications never advance the principal journal cursor.
 
 ## Verified implementation

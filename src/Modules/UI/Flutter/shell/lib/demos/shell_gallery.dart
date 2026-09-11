@@ -1,2 +1,1 @@
-export 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart'
-    show KitGalleryScreen;
+export 'package:digitalbrain_ui/digitalbrain_ui.dart' show UiGalleryScreen;

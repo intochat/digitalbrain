@@ -121,7 +121,7 @@ public sealed class UiChatSteps(BrainWorld world, BrainSteps brain)
         var response = JsonSerializer.Deserialize(body, UIJson.Default.Responded);
         Assert.NotNull(response);
         Assert.NotNull(response.Cards);
-        Assert.Contains(new KitCardOffer(kind, cardName, title), response.Cards);
+        Assert.Contains(new UiCardOffer(kind, cardName, title), response.Cards);
     }
 
     [Then(@"""(.*)"" received no ""(\w+)""")]

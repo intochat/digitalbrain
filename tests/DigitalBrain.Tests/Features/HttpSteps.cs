@@ -13,7 +13,7 @@ using Xunit;
 namespace DigitalBrain.Tests;
 
 [Binding]
-public sealed class HttpSteps(BrainWorld world, UiChatSteps uiChat, KitSteps kit) : IAsyncDisposable
+public sealed class HttpSteps(BrainWorld world, UiChatSteps uiChat, UiSteps ui) : IAsyncDisposable
 {
     private BrainHttp? _http;
     private HttpResponseMessage? _response;
@@ -250,7 +250,7 @@ public sealed class HttpSteps(BrainWorld world, UiChatSteps uiChat, KitSteps kit
     }
 
     [Given(@"chart ""(.*)"" renders ""(.*)""")]
-    public Task RenderChart(string name, string title) => kit.Render(name, title);
+    public Task RenderChart(string name, string title) => ui.Render(name, title);
 
     [Given(@"surface ""(.*)"" has opened ""(.*)"" with button ""(.*)""")]
     public async Task OpenSurface(string name, string key, string button)

@@ -4,10 +4,10 @@ The production Flutter entry point now opens the project workspace designed in `
 
 ## Interaction
 
-- Chat uses the shared `KitChat` / Flutter Chat UI component with streamed Markdown and compact tool receipts. Tables, images, Markdraw drawings and brain scenarios open on the right.
+- Chat uses the shared `UiChat` / Flutter Chat UI component with streamed Markdown and compact tool receipts. Tables, images, Markdraw drawings and brain scenarios open on the right.
 - Open shows an editor. Attach adds an explicit live reference to the conversation. New conversations start with no attachments. The picker supports multiple artifacts, and table context includes filters and selected row IDs.
 - Project work supports focused, comparison and floating-window layouts, with minimize/restore and saved bounds. Phones switch between Conversation and Workspace.
-- Settings is a full page with Profile, Appearance, Connections, Agents and Developer tools. The developer gallery renders real kit components including the table. Profile fields are device preferences; connection setup uses the existing service authorization flows.
+- Settings is a full page with Profile, Appearance, Connections, Agents and Developer tools. The developer gallery renders real ui components including the table. Profile fields are device preferences; connection setup uses the existing service authorization flows.
 - Voice records a draft, transcribes through `/agent/transcribe`, and waits for an explicit Send. Cancel, navigation and app lifecycle changes stop recording. Recordings are bounded to two minutes.
 
 ## Data and tools

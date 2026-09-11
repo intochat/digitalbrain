@@ -18,7 +18,7 @@ Keep primary navigation small: Workspace, Saved work, Conversations; Activity, C
 
 ## What the old UI contained
 
-Inspected commit `a88ee317`, before conversational-agent commit `7a307f30`. It had KitChat, responsive navigation, conversation/graph splitting, integration login entries, a history overlay and Activity. Settings links were in the optional scripted-home branch, not a completed global preferences system. The windowing demo supported dragging, resizing, raising, minimizing, restoring, closing and Tidy. Its sample bodies were not persistent, arbitrary artifact editors.
+Inspected commit `a88ee317`, before conversational-agent commit `7a307f30`. It had UiChat, responsive navigation, conversation/graph splitting, integration login entries, a history overlay and Activity. Settings links were in the optional scripted-home branch, not a completed global preferences system. The windowing demo supported dragging, resizing, raising, minimizing, restoring, closing and Tidy. Its sample bodies were not persistent, arbitrary artifact editors.
 
 The presentation can be recovered while retaining the simpler streaming agent. Do not recover the old turn/journal transport merely to recover its appearance. Exact source evidence and limitations: [historical inspection](../../research/2026-09-11-workspace-ui-history.md).
 
@@ -26,15 +26,15 @@ The presentation can be recovered while retaining the simpler streaming agent. D
 
 These packages serve different layers, so there is no useful winner between them for the whole chat.
 
-| Concern | flutter_chat_ui / KitChat | gpt_markdown |
+| Concern | flutter_chat_ui / UiChat | gpt_markdown |
 | --- | --- | --- |
 | Conversation structure | Message list, controller integration, composer and custom builders | No conversation shell |
 | Formatted content | Optional Flyer text and streaming renderers support Markdown | Dedicated Markdown widget with code, tables, links, images and math |
 | Streaming | Flyer streaming message component | Host updates rendered content; not a conversation transport |
 | Artifact references | Custom message builder can render compact reference cards | A Markdown table is still rendered text, not a stateful table editor |
-| Visual control | Customize builders, theme, spacing and composer through KitChat | Customize the appearance inside a message |
+| Visual control | Customize builders, theme, spacing and composer through UiChat | Customize the appearance inside a message |
 
-**Recommendation:** restore KitChat (`flutter_chat_ui`) around AG-UI events. Start with the Flyer text/stream renderer; retain GptMarkdown inside a message builder if its math or content customizations are needed. Use typed UI-kit editors for persistent tables and images on the right. Settings and window management belong to the app shell, independent of both packages. Editorial message styling is my preferred minimal direction; Settings in the prototype also demonstrates soft bubbles.
+**Recommendation:** restore UiChat (`flutter_chat_ui`) around AG-UI events. Start with the Flyer text/stream renderer; retain GptMarkdown inside a message builder if its math or content customizations are needed. Use typed UI components editors for persistent tables and images on the right. Settings and window management belong to the app shell, independent of both packages. Editorial message styling is my preferred minimal direction; Settings in the prototype also demonstrates soft bubbles.
 
 Repository lockfile versions inspected: `flutter_chat_ui 2.11.1`, `gpt_markdown 1.2.1`; these are installed versions, not a claim about the newest release. Current documentation was checked with Context7 for `/flyerhq/flutter_chat_ui` and `/infinitix-llc/gpt_markdown`, and primary repositories: [Flutter Chat UI](https://github.com/flyerhq/flutter_chat_ui), [GPT Markdown](https://github.com/Infinitix-LLC/gpt_markdown). The HTML studies illustrate our proposed styling; they are not screenshots or runtime benchmarks of the Flutter packages.
 
@@ -54,7 +54,7 @@ All data is fictional and local. Try filtering with the Price control and Apply,
 
 The chat is deterministic: try `filter under $40`, `compare tables`, `open image`, or `brighten image`. There is no model invocation, web search, file upload or live account connection in this design study. Settings, data view state and layout are stored per concept in browser localStorage. Reset demo resets only the selected concept. Production services and Flutter files were not modified for this study.
 
-Assets: existing repository artwork from `src/Assets/nuget/icon.png`; official Material Icons glyphs from the installed Flutter SDK. UI palettes draw on the existing Lumen and kit theme colors.
+Assets: existing repository artwork from `src/Assets/nuget/icon.png`; official Material Icons glyphs from the installed Flutter SDK. UI palettes draw on the existing Lumen and ui theme colors.
 
 ## Verification
 
@@ -65,7 +65,7 @@ JavaScript syntax checked with Node. Visually inspected all five concepts in Chr
 
 All five concepts now use **IntoCaht** as the product and assistant name, matching the requested spelling. This rename is scoped to the HTML design study; internal production identifiers and Flutter sources remain unchanged.
 
-Settings → Developer tools → UI kit gallery restores the intended discovery path. It includes HTML previews and a complete inventory of the 16 entries in the current Flutter gallery. Production should route to the existing `KitGalleryScreen`, retaining its actual widgets and normal/loading/error/disabled state controls; include the new `KitDataTable` there as well.
+Settings → Developer tools → UI components gallery restores the intended discovery path. It includes HTML previews and a complete inventory of the 16 entries in the current Flutter gallery. Production should route to the existing `UiGalleryScreen`, retaining its actual widgets and normal/loading/error/disabled state controls; include the new `UiDataTable` there as well.
 
 Agent marketplace offers IntoCaht, Salesforce Administrator, Lead Generator and Automation Agent. Each specialist has its own locally saved conversation, editor state and layout per concept. The header identifies the specialist, while IntoCaht remains the assistant identity. These are product previews, not installed or connected agents.
 
@@ -105,7 +105,7 @@ Only the design study files changed. Production Flutter components, services and
 
 The new default removes the permanent feature rail. A compact header has three labeled destinations: **Conversations**, **Saved work**, and **Explore**. Conversations and Saved work open temporary drawers; the editor stays in place behind them. Explore contains specialist discovery. Search remains in the header with its existing keyboard shortcut.
 
-The active specialist is selected beside the composer, where users decide who they are asking. Switching still opens that specialist’s own workspace and preserves its state. The conversation header displays the work’s name rather than repeating product and specialist names. Account → Settings, Connections, Activity and developer UI-kit gallery gathers secondary destinations without filling navigation with features.
+The active specialist is selected beside the composer, where users decide who they are asking. Switching still opens that specialist’s own workspace and preserves its state. The conversation header displays the work’s name rather than repeating product and specialist names. Account → Settings, Connections, Activity and developer UI components gallery gathers secondary destinations without filling navigation with features.
 
 Outlined Material icons from the installed Flutter SDK distinguish navigation and artifact types. The conversation sits in a quiet inset panel, and the editor uses the width recovered from the rail. Mobile uses a compact two-row header and retains the Conversation/Workspace switch, without a permanent side menu.
 

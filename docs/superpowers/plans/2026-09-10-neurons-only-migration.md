@@ -55,7 +55,7 @@ src/Kernel/DigitalBrain.Mcp/                client + MCP tools
   {BrainOperations,BrainTools,Requests,SessionPrincipal,DigitalBrainMcpHosting}.cs
 src/Kernel/DigitalBrain.Silo/               ASP.NET host + HTTP adapters
   Program.cs, DigitalBrainHost.cs, KernelCors.cs, Auth/BasicAuthGate.cs
-  Http/{ChatEndpoints,SurfaceEndpoints,KitEndpoints,GraphEndpoints,SessionStream,StreamWake}.cs
+  Http/{ChatEndpoints,SurfaceEndpoints,UiEndpoints,GraphEndpoints,SessionStream,StreamWake}.cs
 src/Testing/DigitalBrain.Testing/           BrainSimulation, FileJournalStorage, RestartableGrainStorage, FaultingJournalStorage
 tests/DigitalBrain.Tests/                   the single test project (Features/*.feature + steps)
 ```
@@ -364,7 +364,7 @@ Order: B0 then B1 run serially (B2's chat fires `Turn` at B1's agent neuron). B2
 
 **Files:** `Contracts/Chat/IChat.cs` (`[Alias("ui.chat")]`: `Send(SendMessage) → Accepted<TurnId>`, `[ReadOnly] ReadTranscript(ReadTranscript) → ChatTranscript`, `[ReadOnly] ReadTurn(ReadTurn) → TurnView`), `UIVocabulary` (`TurnRequested`, `Responded`, `TurnFailed`, `ActivityChanged`, `SurfaceChanged`), `Chat/ChatNeuron.cs : Neuron<ChatState>` (reaction to `TurnRequested` creates the turn, imports `TurnContext` per spec §10, fires `Turn` at the configured agent neuron, reacts to `Said`/`Reply` by appending the transcript, saving, and firing `Responded` along synapses), `Chat/TurnContext.cs` (ported from Execution: path, digest with the existing recipe from `ExecutionContextEntity.cs:100`, schema hash, payload/blob ref, precedence, related turns; last 32 inline). Delete `UserMessagesNeuron`, `IComposer`, `ChatTurnWorker`, `AgentTurnWorker`, `ChatExecutionFocus`, `IChatKernel`, `WorkspaceChatScenarioDriver`, `ApplicationChatPorts`. Feature: `uichat.feature` (send → transcript shows user turn; agent reply lands in transcript and `Responded` reaches the session; cancel via work id stops a slow scripted agent).
 
-### Task B3: UI module — surfaces, renderer, kit entities
+### Task B3: UI module — surfaces, renderer, ui entities
 
 **Files:** `SurfaceNeuron : Neuron<SurfaceState>, ISurface` (`Open(OpenSurface)`, `Activate(ActivateControl)`, `[ReadOnly] Read()`), `ChartNeuron`, `GraphNeuron`, `ImageNeuron`, `TranscriptNeuron`, `WorkspaceIndexNeuron` each `Neuron<TState>` with `Put(...)` command and `[ReadOnly] Read()`; `UIRenderer` folded into `SurfaceNeuron` reactions; `ActivitiesNeuron` + `ActivitySourceNeuron` moved from the kernel into the UI module as `Neuron<ActivityState>`; delete `Entity<TState>`, `IEntity`, `EntityId`, `[ApplicationJsonContract]`. Feature: `surface.feature`.
 
@@ -390,7 +390,7 @@ Order: B0 then B1 run serially (B2's chat fires `Turn` at B1's agent neuron). B2
 
 ### Task C1: HTTP adapters
 
-**Files:** `Silo/Http/ChatEndpoints.cs` (`POST /chats/{name}/send` → `IChat.Send`; `POST /chats/{name}/turns/{work}/cancel` → `CancelReaction`; `GET /chats/{name}/transcript`), `SurfaceEndpoints.cs`, `KitEndpoints.cs` (the six kit GETs over typed reads), `GraphEndpoints.cs` (brain graph over `ReadSynapses` + journals), `SessionStream.cs` (`GET /sessions/{login}/events`: long-poll over `ReadJournal(Incoming, after)`, `reset` event with the typed projection when `Gap`), `StreamWake.cs` (Orleans broadcast channel published after each `Deliver` persist; consumed by `SessionStream` to end a long-poll early), `Auth/BasicAuthGate.cs` (kept; maps the login to `NeuronId.Plain(login)`), `MapChatVoice` kept over the AI transcription service. `Program.cs` maps these plus `/mcp`, `/health`, `/orleans`. Tests: `http.feature` using `WebApplicationFactory` (send, transcript, stream reset, cancel).
+**Files:** `Silo/Http/ChatEndpoints.cs` (`POST /chats/{name}/send` → `IChat.Send`; `POST /chats/{name}/turns/{work}/cancel` → `CancelReaction`; `GET /chats/{name}/transcript`), `SurfaceEndpoints.cs`, `UiEndpoints.cs` (the six ui GETs over typed reads), `GraphEndpoints.cs` (brain graph over `ReadSynapses` + journals), `SessionStream.cs` (`GET /sessions/{login}/events`: long-poll over `ReadJournal(Incoming, after)`, `reset` event with the typed projection when `Gap`), `StreamWake.cs` (Orleans broadcast channel published after each `Deliver` persist; consumed by `SessionStream` to end a long-poll early), `Auth/BasicAuthGate.cs` (kept; maps the login to `NeuronId.Plain(login)`), `MapChatVoice` kept over the AI transcription service. `Program.cs` maps these plus `/mcp`, `/health`, `/orleans`. Tests: `http.feature` using `WebApplicationFactory` (send, transcript, stream reset, cancel).
 
 ### Task C2: Flutter shell
 

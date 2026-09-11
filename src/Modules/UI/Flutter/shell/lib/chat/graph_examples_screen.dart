@@ -1,5 +1,5 @@
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
-import 'package:digitalbrain_ui_kit/digitalbrain_ui_kit.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 
 import '../brain_theme.dart';
@@ -42,7 +42,7 @@ final class GraphExamplesScreen extends StatefulWidget {
 
 final class _GraphExamplesScreenState extends State<GraphExamplesScreen> {
   final _simulation = BrainGraphSimulation();
-  late final _graph = KitGraphController(
+  late final _graph = UiGraphController(
     nodes: BrainGraphSimulation.nodes,
     edges: _simulation.edges,
     camera: GraphCamera(
@@ -223,7 +223,7 @@ final class _GraphExamplesScreenState extends State<GraphExamplesScreen> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  KitGraphView(
+                  UiGraphView(
                     controller: _graph,
                     sceneFactory: widget.sceneFactory,
                     pulse: _simulation.pulse,

@@ -35,7 +35,7 @@ public sealed class TableAgentFacts
         Assert.Equal(3, created.GetProperty("totalRows").GetInt32());
         var id = created.GetProperty("id").GetString()!;
 
-        using var update = await client.PutAsJsonAsync($"/kit/tables/{id}/view", new
+        using var update = await client.PutAsJsonAsync($"/ui/tables/{id}/view", new
         {
             expectedRevision = created.GetProperty("revision").GetInt64(),
             filters = new[] { new { columnId = "price", @operator = "lt", value = 20 } },
@@ -55,7 +55,7 @@ public sealed class TableAgentFacts
         Assert.Contains(model.Calls.Last().SelectMany(message => message.Contents), content =>
             content is FunctionResultContent result && JsonSerializer.Serialize(result.Result).Contains("filteredRows", StringComparison.Ordinal));
 
-        using var stale = await client.PutAsJsonAsync($"/kit/tables/{id}/view", new
+        using var stale = await client.PutAsJsonAsync($"/ui/tables/{id}/view", new
         {
             expectedRevision = created.GetProperty("revision").GetInt64(),
             filters = Array.Empty<object>(), sort = (object?)null, visibleColumns = new[] { "name", "price" },
@@ -93,7 +93,7 @@ public sealed class TableAgentFacts
         Assert.Equal("tableError", conflict.GetProperty("kind").GetString());
         Assert.Equal("revision_conflict", conflict.GetProperty("code").GetString());
 
-        var saved = await client.GetFromJsonAsync<JsonElement>("/kit/tables", TestContext.Current.CancellationToken);
+        var saved = await client.GetFromJsonAsync<JsonElement>("/ui/tables", TestContext.Current.CancellationToken);
         Assert.Contains(saved.EnumerateArray(), table => table.GetProperty("id").GetString() == id);
     }
 
@@ -104,12 +104,12 @@ public sealed class TableAgentFacts
         using var model = new ScriptedChatClient();
         await using var app = await StartAsync(brain, model, gated: true);
         using var client = app.GetTestClient();
-        using var unauthorized = await client.GetAsync("/kit/tables", TestContext.Current.CancellationToken);
+        using var unauthorized = await client.GetAsync("/ui/tables", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
         client.DefaultRequestHeaders.Authorization = new("Basic", Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("owner:test-password")));
-        using var missing = await client.GetAsync("/kit/tables/missing", TestContext.Current.CancellationToken);
+        using var missing = await client.GetAsync("/ui/tables/missing", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
-        using var bad = await client.PostAsJsonAsync("/kit/tables", new { title = "Bad", columns = Array.Empty<object>(), rows = Array.Empty<object>() }, TestContext.Current.CancellationToken);
+        using var bad = await client.PostAsJsonAsync("/ui/tables", new { title = "Bad", columns = Array.Empty<object>(), rows = Array.Empty<object>() }, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
     }
 

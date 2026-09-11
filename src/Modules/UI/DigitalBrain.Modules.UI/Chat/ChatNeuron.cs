@@ -178,13 +178,13 @@ internal sealed class ChatNeuron(
 
         var kind = delivery.Signal.Type switch
         {
-            UIVocabulary.ChartRendered => KitCardKinds.Chart,
-            UIVocabulary.GraphRendered => KitCardKinds.Graph,
-            UIVocabulary.ImageDescribed => KitCardKinds.Image,
-            _ => KitCardKinds.Spreadsheet,
+            UIVocabulary.ChartRendered => UiCardKinds.Chart,
+            UIVocabulary.GraphRendered => UiCardKinds.Graph,
+            UIVocabulary.ImageDescribed => UiCardKinds.Image,
+            _ => UiCardKinds.Spreadsheet,
         };
-        var card = new KitCardOffer(kind, ChatBodies.String(body, "name") ?? string.Empty, ChatBodies.String(body, "title") ?? string.Empty);
-        Announce(Signal.FromJson(UIVocabulary.CardOffered, card, UIJson.Default.KitCardOffer), correlation: new CorrelationId(record.Snapshot.Turn.Value));
+        var card = new UiCardOffer(kind, ChatBodies.String(body, "name") ?? string.Empty, ChatBodies.String(body, "title") ?? string.Empty);
+        Announce(Signal.FromJson(UIVocabulary.CardOffered, card, UIJson.Default.UiCardOffer), correlation: new CorrelationId(record.Snapshot.Turn.Value));
         await StoreAsync(record with { Snapshot = record.Snapshot with { Cards = [.. record.Snapshot.Cards ?? [], card] } }, cancellationToken).ConfigureAwait(true);
     }
 

@@ -13,5 +13,5 @@ internal sealed record ChatTurnEvent(
     DateTimeOffset Timestamp,
     string? TurnId = null,
     string? Status = null,
-    IReadOnlyList<KitCardOffer>? Cards = null,
+    IReadOnlyList<UiCardOffer>? Cards = null,
     string? EventId = null);

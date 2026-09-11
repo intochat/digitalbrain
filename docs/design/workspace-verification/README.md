@@ -12,7 +12,7 @@ Verified on 11 September 2026 against the native Windows Flutter app managed by 
 - Compared table and brain side by side. Switched to floating windows, dragged, resized, minimized and restored editors.
 - Imported the authored CSV fixture through the native file picker. Imported the repository's Flutter icon as an image fixture, rotated it, and confirmed the rotation after restart.
 - Created a Markdraw document, drew a rectangle and reopened it after restart. Attached it alongside the table, switched to Salesforce Administrator without losing context, and asked the agent to read it. The agent described the saved rectangle and its dimensions.
-- Opened full-page Settings and the actual UI kit gallery. Tested project navigation and restored saved work.
+- Opened full-page Settings and the actual UI components gallery. Tested project navigation and restored saved work.
 - Started and cancelled actual microphone recording. Cancel returned to the idle microphone without sending a message or changing the draft.
 
 ## Repairs found through interaction
@@ -23,7 +23,7 @@ Automated regressions additionally cover project/context isolation, EOF continua
 
 ## Final checks
 
-- `flutter test core/test kit/test shell/test`: 83 passed.
+- `flutter test core/test ui/test shell/test`: 83 passed.
 - `flutter analyze`: no issues.
 - Focused .NET workspace, conversational-agent, table-agent, table-neuron and table-policy tests: 44 passed.
 - Native Windows debug build and release web build succeeded. Web compilation reports the existing Cupertino font-family and WASM compatibility warnings; the JavaScript web target builds.
@@ -36,7 +36,7 @@ Automated regressions additionally cover project/context isolation, EOF continua
 | Real web search and table | [Search table](01-search-table.png) |
 | Filter restored after restart | [Restored filter](02-restored-filter.png) |
 | Full-page settings | [Settings](03-settings.png) |
-| Actual component gallery | [UI kit](04-kit-gallery.png) |
+| Actual component gallery | [UI components](04-ui-gallery.png) |
 | Generated brain scenario | [Brain](05-brain.png) |
 | Side-by-side work | [Compare](06-compare.png) |
 | Native CSV import | [Imported table](07-csv-import.png) |
