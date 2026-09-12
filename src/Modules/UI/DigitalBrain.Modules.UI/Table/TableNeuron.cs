@@ -32,6 +32,10 @@ internal sealed class TableNeuron(NeuronRuntime runtime,
     public Task<TableOperationResult?> ReadOperation(ReadTableOperation query)
         => Task.FromResult(State?.Operations.LastOrDefault(operation => operation.CommandId == query.CommandId));
 
+    [ReadOnly]
+    public Task<TableSummary?> ReadSummary()
+        => Task.FromResult(State?.Source is { } source ? new TableSummary(source.Id, source.Title, source.Revision) : null);
+
     protected override async Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
     {
         var current = State ?? new TableState(null, []);

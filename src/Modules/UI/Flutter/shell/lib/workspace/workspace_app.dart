@@ -246,6 +246,11 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     super.dispose();
   }
 
+  /// Tables and charts arrive complete in the tool result: there is no saved
+  /// artifact to re-read on open or to write back on edit.
+  static bool _servedByResult(String kind) =>
+      kind == 'table' || kind == 'chart';
+
   void _accept(Map<String, dynamic> result, {WorkspaceProject? project}) {
     final destination = project ?? store.currentProject;
     final id = result['id'] as String?;
@@ -301,7 +306,8 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       data: {
         ...content,
         if (result['revision'] != null) '_revision': result['revision'],
-        if (result['kind'] != 'table') '_remote': true,
+        if (!_servedByResult(result['kind'] as String? ?? 'document'))
+          '_remote': true,
       },
       editorState: content['editorState'] is Map
           ? Map<String, dynamic>.from(content['editorState'] as Map)
@@ -433,7 +439,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   Future<void> _open(WorkspaceArtifact a) async {
     final destination = store.currentProject;
     store.openArtifact(a.id);
-    if (a.kind != 'table' &&
+    if (!_servedByResult(a.kind) &&
         a.data['_live'] != true &&
         a.data['_dirty'] != true &&
         widget.onReadArtifact != null) {
@@ -712,6 +718,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
 
   IconData _icon(String kind) => switch (kind) {
     'table' => Icons.table_chart_outlined,
+    'chart' => Icons.bar_chart_rounded,
     'image' => Icons.image_outlined,
     'brain' => Icons.hub_outlined,
     'diagram' => Icons.draw_outlined,

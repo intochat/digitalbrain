@@ -47,6 +47,14 @@ Feature: uichat
     And "alice" waits up to 10 seconds for an incoming "Responded"
     Then the latest "alice" Responded offers "chart" card "sales" titled "Quarterly sales"
 
+  Scenario: A live table signal during a turn rides out as a table card
+    Given a running brain with AI and UI
+    And "uichat:desk" is connected to "alice" for "Responded"
+    And the scripted model will call tool "fire" with {"type":"TableRendered","body":"{\"name\":\"chtable-leads\",\"title\":\"UK construction\"}","to":"uichat:desk"} then say "here is your table"
+    When chat "desk" sends "show uk construction companies"
+    And "alice" waits up to 10 seconds for an incoming "Responded"
+    Then the latest "alice" Responded offers "table" card "chtable-leads" titled "UK construction"
+
   Scenario: Cancelling a running turn produces no response
     Given a running brain with AI and UI
     And "uichat:desk" is connected to "alice" for "Responded"

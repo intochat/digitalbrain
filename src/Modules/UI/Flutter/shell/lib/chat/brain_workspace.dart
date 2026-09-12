@@ -31,6 +31,8 @@ final class BrainWorkspace extends StatefulWidget {
     this.onReadImageBytes,
     this.onReadSpreadsheet,
     this.onReadGraph,
+    this.onReadTable,
+    this.onUpdateTableView,
     this.onReadSurface,
     this.onReadBrain,
     this.onWatchBrain,
@@ -54,6 +56,8 @@ final class BrainWorkspace extends StatefulWidget {
   final ReadImageBytes? onReadImageBytes;
   final ReadSpreadsheet? onReadSpreadsheet;
   final ReadGraph? onReadGraph;
+  final ReadTable? onReadTable;
+  final UpdateTableView? onUpdateTableView;
   final ReadSurface? onReadSurface;
   final ReadBrain? onReadBrain;
   final WatchBrain? onWatchBrain;
@@ -172,6 +176,8 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
               onReadImageBytes: widget.onReadImageBytes,
               onReadSpreadsheet: widget.onReadSpreadsheet,
               onReadGraph: widget.onReadGraph,
+              onReadTable: widget.onReadTable,
+              onUpdateTableView: widget.onUpdateTableView,
             ),
           );
           final graph = SizedBox.expand(
@@ -188,6 +194,8 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
               onReadImageBytes: widget.onReadImageBytes,
               onReadSpreadsheet: widget.onReadSpreadsheet,
               onReadGraph: widget.onReadGraph,
+              onReadTable: widget.onReadTable,
+              onUpdateTableView: widget.onUpdateTableView,
               onReadBrain: widget.onReadBrain,
               onWatchBrain: widget.onWatchBrain,
               onSetBrainSubscription: widget.onSetBrainSubscription,
@@ -461,6 +469,8 @@ final class _BrainWorkspaceState extends State<BrainWorkspace> {
                       onReadImageBytes: widget.onReadImageBytes,
                       onReadSpreadsheet: widget.onReadSpreadsheet,
                       onReadGraph: widget.onReadGraph,
+                      onReadTable: widget.onReadTable,
+                      onUpdateTableView: widget.onUpdateTableView,
                       onReadBrain: widget.onReadBrain,
                       onWatchBrain: widget.onWatchBrain,
                       onSetBrainSubscription: widget.onSetBrainSubscription,

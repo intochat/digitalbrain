@@ -40,6 +40,11 @@
     <Project Path="src/Modules/Salesforce/Contracts/DigitalBrain.Modules.Salesforce.Contracts.csproj" />
     <Project Path="src/Modules/Salesforce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
   </Folder>
+  <Folder Name="/Modules/ClickHouse/">
+    <Project Path="src/Modules/ClickHouse/Aspire.Hosting/DigitalBrain.Modules.ClickHouse.Aspire.Hosting.csproj" />
+    <Project Path="src/Modules/ClickHouse/ClickHouse/DigitalBrain.Modules.ClickHouse.csproj" />
+    <Project Path="src/Modules/ClickHouse/Contracts/DigitalBrain.Modules.ClickHouse.Contracts.csproj" />
+  </Folder>
   <Folder Name="/Modules/Microsoft/">
     <Project Path="src/Modules/Microsoft/Aspire.Hosting/DigitalBrain.Modules.Microsoft.Aspire.Hosting.csproj" />
     <Project Path="src/Modules/Microsoft/Contracts/DigitalBrain.Modules.Microsoft.Contracts.csproj" />

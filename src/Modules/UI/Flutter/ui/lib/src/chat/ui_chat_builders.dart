@@ -16,6 +16,8 @@ import '../components/graph/ui_graph_view.dart';
 import '../components/clock/ui_clock.dart';
 import '../components/image/ui_image.dart';
 import '../components/sheet/ui_sheet.dart';
+import '../components/table/ui_data_table.dart';
+import '../components/table/ui_table_controller.dart';
 import '../models/ui_part.dart';
 import '../theme/ui_theme.dart';
 import 'ui_copyable_message.dart';
@@ -43,6 +45,8 @@ abstract final class UiChatBuilders {
     UiImageRefReader? onReadImageBytes,
     UiSheetRefReader? onReadSpreadsheet,
     UiGraphRefReader? onReadGraph,
+    ReadTable? onReadTable,
+    UpdateTableView? onUpdateTableView,
     GraphSceneFactory? graphSceneFactory,
   }) {
     final part = UiPart.tryParse(
@@ -97,6 +101,12 @@ abstract final class UiChatBuilders {
             caption: caption,
             reader: onReadGraph,
             sceneFactory: graphSceneFactory,
+          ),
+          UiTableRefPart(:final name, :final caption) => _UiTableRefLoader(
+            name: name,
+            caption: caption,
+            read: onReadTable,
+            update: onUpdateTableView,
           ),
         },
       ),
@@ -200,6 +210,8 @@ abstract final class UiChatBuilders {
     UiImageRefReader? onReadImageBytes,
     UiSheetRefReader? onReadSpreadsheet,
     UiGraphRefReader? onReadGraph,
+    ReadTable? onReadTable,
+    UpdateTableView? onUpdateTableView,
   }) {
     return Builders(
       customMessageBuilder:
@@ -220,6 +232,8 @@ abstract final class UiChatBuilders {
             onReadImageBytes: onReadImageBytes,
             onReadSpreadsheet: onReadSpreadsheet,
             onReadGraph: onReadGraph,
+            onReadTable: onReadTable,
+            onUpdateTableView: onUpdateTableView,
           ),
     );
   }
@@ -549,6 +563,115 @@ final class _UiGraphRefLoaderState extends State<_UiGraphRefLoader> {
             ],
           ),
         );
+      },
+    );
+  }
+}
+
+/// Reads a named table on display and renders it as the same server-paged
+/// [UiDataTable] the workspace uses, so filters, sort and paging round-trip
+/// through /ui/tables/{name}. A later offer for the same name re-reads it.
+final class _UiTableRefLoader extends StatefulWidget {
+  const _UiTableRefLoader({
+    required this.name,
+    required this.caption,
+    required this.read,
+    required this.update,
+  });
+
+  final String name;
+  final String caption;
+  final ReadTable? read;
+  final UpdateTableView? update;
+
+  @override
+  State<_UiTableRefLoader> createState() => _UiTableRefLoaderState();
+}
+
+final class _UiTableRefLoaderState extends State<_UiTableRefLoader> {
+  Future<TableSnapshot?>? _fetch;
+  UiTableController? _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _UiTableRefLoader oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.name != widget.name) {
+      _controller?.dispose();
+      _controller = null;
+      _load();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  void _load() {
+    final reader = widget.read;
+    if (reader != null) {
+      _fetch = _read(reader);
+    }
+  }
+
+  // A re-read (a later offer for the same name) refreshes the live controller here, once, when
+  // it completes. Building must not feed the first snapshot back in: accept() takes an equal
+  // revision, and paging keeps the revision, so a rebuild would snap the card back to page one.
+  Future<TableSnapshot?> _read(ReadTable reader) async {
+    try {
+      final snapshot = await reader(widget.name);
+      if (mounted) _controller?.accept(snapshot);
+      return snapshot;
+    } on TableRequestException {
+      return null;
+    }
+  }
+
+  UiTableController _controllerFor(TableSnapshot snapshot) =>
+      _controller ??= UiTableController(
+        snapshot: snapshot,
+        read: widget.read,
+        update: widget.update,
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.read == null) {
+      return Text(
+        widget.caption,
+        key: Key('ui_table_ref_offline_${widget.name}'),
+        style: UiType.bodyMuted,
+      );
+    }
+
+    return FutureBuilder<TableSnapshot?>(
+      future: _fetch,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Padding(
+            key: Key('ui_table_ref_loading'),
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          );
+        }
+
+        final table = snapshot.data;
+        if (table == null) {
+          return Text(
+            widget.caption,
+            key: Key('ui_table_ref_missing_${widget.name}'),
+            style: UiType.bodyMuted,
+          );
+        }
+
+        return UiDataTable(controller: _controllerFor(table), showTitle: true);
       },
     );
   }

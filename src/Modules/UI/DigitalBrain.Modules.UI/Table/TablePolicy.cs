@@ -57,10 +57,20 @@ internal static class TablePolicy
             Require(filter.Operator is not ("gt" or "gte" or "lt" or "lte") || type is "number" or "date", "Ordered comparisons require a number or date column.");
             ValidateValue(type, filter.Value, filter.Operator is "eq" or "neq");
         }
-        return input with
+        return Normalize(input);
+    }
+
+    // A filter posted without a value carries an undefined JsonElement, which cannot be serialised
+    // into a command; it means null, so it becomes one before the view travels. Missing lists and
+    // null filters stay as they are: the neuron's ValidateView refuses them with the same message
+    // it always has, rather than this step quietly turning "no filters given" into "clear filters".
+    internal static UpdateTableView Normalize(UpdateTableView input)
+    {
+        Require(input is not null, "View is required.");
+        return input! with
         {
-            Filters = input.Filters.Select(filter => filter with { Value = filter.Value.ValueKind == JsonValueKind.Undefined ? Null : filter.Value.Clone() }).ToArray(),
-            VisibleColumns = input.VisibleColumns.ToArray(),
+            Filters = input.Filters?.Select(filter => filter is null ? filter : filter with { Value = filter.Value.ValueKind == JsonValueKind.Undefined ? Null : filter.Value.Clone() }).ToArray()!,
+            VisibleColumns = input.VisibleColumns?.ToArray()!,
         };
     }
 
@@ -70,6 +80,13 @@ internal static class TablePolicy
     internal static TableSnapshot Query(TableSnapshot source, int offset, int limit)
     {
         ValidatePage(offset, limit);
+        var filtered = Apply(source);
+        return source with { Rows = filtered.Skip(offset).Take(limit).ToArray(), FilteredRows = filtered.Count, Offset = offset, Limit = limit };
+    }
+
+    // The single definition of filter and sort semantics; other row sources reuse it for parity.
+    internal static IReadOnlyList<TableRow> Apply(TableSnapshot source)
+    {
         var columns = source.Columns.Select((column, index) => (column, index)).ToDictionary(item => item.column.Id, StringComparer.Ordinal);
         IEnumerable<TableRow> rows = source.Rows;
         foreach (var filter in source.Filters)
@@ -83,8 +100,7 @@ internal static class TablePolicy
             var comparer = Comparer<JsonElement>.Create((left, right) => Compare(column.Type, left, right));
             rows = sort.Descending ? rows.OrderByDescending(row => row.Cells[index], comparer) : rows.OrderBy(row => row.Cells[index], comparer);
         }
-        var filtered = rows.ToArray();
-        return source with { Rows = filtered.Skip(offset).Take(limit).ToArray(), FilteredRows = filtered.Length, Offset = offset, Limit = limit };
+        return rows.ToArray();
     }
 
     private static bool Matches(string type, JsonElement cell, TableFilter filter)

@@ -46,7 +46,7 @@ public static class UIVocabulary
     // { "turn": "...", "commandId": "...", "detail": "..." }
     public const string TurnFailed = "TurnFailed";
 
-    // The four ui signals share the body { "name": "...", "title": "..." } and become a card on the running turn.
+    // The five ui signals share the body { "name": "...", "title": "..." } and become a card on the running turn.
     public const string ChartRendered = "ChartRendered";
 
     public const string GraphRendered = "GraphRendered";
@@ -54,6 +54,9 @@ public static class UIVocabulary
     public const string ImageDescribed = "ImageDescribed";
 
     public const string SheetChanged = "SheetChanged";
+
+    // Fired by any ITable neuron whose rows the chat should show live; the name is the table id.
+    public const string TableRendered = "TableRendered";
 
     // { ...SurfaceOpened... }
     public const string SurfaceOpened = "SurfaceOpened";

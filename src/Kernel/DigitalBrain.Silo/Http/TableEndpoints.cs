@@ -37,6 +37,10 @@ internal static class TableEndpoints
         {
             return Results.BadRequest(new { error = error.Message });
         }
+        catch (TableSourceException error)
+        {
+            return Results.Problem(error.Message, statusCode: StatusCodes.Status502BadGateway);
+        }
         catch (TimeoutException)
         {
             return Results.Problem("The table operation has not completed. Reload the saved table before retrying.", statusCode: StatusCodes.Status503ServiceUnavailable);

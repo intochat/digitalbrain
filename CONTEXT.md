@@ -83,6 +83,9 @@ Google, Salesforce, and Microsoft own connection policy and static presentation
 metadata. The SDK owns MCP sessions/discovery; the shared AI tool boundary owns
 screened evidence. Provider operation schemas remain MCP-owned.
 
+`IClickHouse` is the read-only door into ClickHouse: its query table neuron owns a saved SELECT,
+serves pages live, and fires `TableRendered` along its synapse to the chat, which shows the table card.
+
 `AgentActivity` records diagnostic journal evidence, not subscriber delivery.
 Unsubscribe removes the current edge; a later explicit handled send can establish
 a Learned edge that is again eligible for broadcast. Journals remain bounded.

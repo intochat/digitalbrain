@@ -12,7 +12,7 @@ internal sealed class DelayedUiCardFilter(BrainWorld world) : IIncomingGrainCall
         if (world.CardDeliveryDelay > TimeSpan.Zero
             && context.InterfaceMethod.Name == nameof(INeuron.Deliver)
             && context.Request.GetArgument(0) is SignalDelivery delivery
-            && delivery.Signal.Type is UIVocabulary.ChartRendered or UIVocabulary.GraphRendered or UIVocabulary.ImageDescribed)
+            && delivery.Signal.Type is UIVocabulary.ChartRendered or UIVocabulary.GraphRendered or UIVocabulary.ImageDescribed or UIVocabulary.TableRendered)
         {
             await Task.Delay(world.CardDeliveryDelay);
         }

@@ -111,6 +111,7 @@ public static class ServiceDefaultsExtensions
                 .AddSource("Microsoft.Extensions.AI")
                 .AddSource("Microsoft.Extensions.AI.*")
                 .AddSource("Microsoft.Orleans.Application")
+                .AddSource("ClickHouse.Driver")
                 .AddAspNetCoreInstrumentation(options =>
                     options.Filter = context =>
                         !context.Request.Path.StartsWithSegments(HealthPath, StringComparison.OrdinalIgnoreCase)

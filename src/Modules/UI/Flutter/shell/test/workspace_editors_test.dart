@@ -4,6 +4,7 @@ import 'package:archive/archive.dart';
 import 'package:digitalbrain_flutter_shell/workspace/artifact_editors.dart';
 import 'package:digitalbrain_flutter_shell/workspace/workspace_store.dart';
 import 'package:digitalbrain_flutter_shell/workspace/workspace_table_import.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:markdraw/markdraw.dart' as markdraw;
@@ -85,6 +86,43 @@ void main() {
     expect(restored.viewState['quarterTurns'], 1);
     expect(workspaceBrightnessMatrix(.5)[4], 127.5);
     expect(workspaceBrightnessMatrix(0)[4], 0);
+  });
+
+  testWidgets('chart artifacts draw with the shared chart control', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: WorkspaceArtifactEditor(
+            artifact: WorkspaceArtifact(
+              id: 'chart-by-country',
+              title: 'Companies by country',
+              kind: 'chart',
+              data: {
+                'kind': 'chart',
+                'id': 'chart-by-country',
+                'title': 'Companies by country',
+                'chartKind': 'bar',
+                'points': [
+                  {'label': 'GB', 'value': 6},
+                  {'label': 'DE', 'value': 3},
+                ],
+                'message': 'Chart saved.',
+              },
+            ),
+            onChanged: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    final chart = tester.widget<UiChart>(find.byType(UiChart));
+    expect(chart.part.title, 'Companies by country');
+    expect(chart.part.chartKind, 'bar');
+    expect(chart.part.points.map((p) => p.label), ['GB', 'DE']);
+    expect(find.text('This artifact type cannot be edited yet.'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('image rotate and reset emit persistent view state', (

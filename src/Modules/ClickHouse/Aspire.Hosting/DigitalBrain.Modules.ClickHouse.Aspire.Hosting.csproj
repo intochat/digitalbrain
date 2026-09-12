@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Aspire AppHost integration for the DigitalBrain ClickHouse module.</Description>
+    <RootNamespace>DigitalBrain.ClickHouse.Aspire.Hosting</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.ClickHouse" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Seeds/*.sql" LogicalName="Seeds/%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ClickHouse/DigitalBrain.Modules.ClickHouse.csproj" />
+    <ProjectReference Include="../../../Aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
+  </ItemGroup>
+</Project>

@@ -222,6 +222,45 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+  testWidgets('chart results open in the working area without a remote read', (
+    tester,
+  ) async {
+    final store = WorkspaceStore(persistence: MemoryWorkspace());
+    await store.load();
+    var artifactReads = 0;
+    await tester.pumpWidget(
+      WorkspaceApp(
+        store: store,
+        onReadArtifact: (id) async {
+          artifactReads++;
+          return {};
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('My project'));
+    await tester.pumpAndSettle();
+    final chat = tester.widget<WorkspaceChat>(find.byType(WorkspaceChat));
+    chat.onArtifact({
+      'kind': 'chart',
+      'id': 'chart-by-country',
+      'title': 'Companies by country',
+      'chartKind': 'bar',
+      'points': [
+        {'label': 'GB', 'value': 6},
+        {'label': 'DE', 'value': 3},
+      ],
+      'message': 'Chart saved.',
+    });
+    await tester.pumpAndSettle();
+    final artifact = store.currentProject.artifacts.single;
+    expect(artifact.kind, 'chart');
+    expect(artifact.data['_remote'], isNull);
+    expect(store.currentProject.presentation.openArtifactIds, [artifact.id]);
+    expect(find.byType(UiChart), findsOneWidget);
+    expect(artifactReads, 0);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('phone home and workspace fit without horizontal overflow', (
     tester,
   ) async {

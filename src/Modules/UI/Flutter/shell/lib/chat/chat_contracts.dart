@@ -37,6 +37,7 @@ extension ChatTurnUiParts on ChatTurnEvent {
           UiSheetRefPart(name: card.name, caption: card.caption),
         ],
         'graph' => [UiGraphRefPart(name: card.name, caption: card.caption)],
+        'table' => [UiTableRefPart(name: card.name, caption: card.caption)],
         _ => const <UiPart>[],
       },
   ];

@@ -15,17 +15,19 @@ internal sealed class UiTools(
     IImageGeneration? imageGeneration,
     IUiImageStore imageStore)
 {
-    private const string InvalidChat = "chatName must be a uichat neuron. Copy the current chat exactly from the Chat: line in the conversation context (for example, uichat:desk).";
+    private static readonly JsonSerializerOptions WireJson = new(JsonSerializerDefaults.Web);
+
+    internal const string InvalidChat = "chatName must be a uichat neuron. Copy the current chat exactly from the Chat: line in the conversation context (for example, uichat:desk).";
 
     internal IReadOnlyList<AIFunction> Create()
     {
-        Task<string> RenderChart(
-            [Description("The current chat, exactly as stated in the conversation context")] string chatName,
+        Task<JsonElement> RenderChart(
             [Description("Short chart title")] string title,
             [Description("bar or line")] string chartKind,
             [Description("Point labels, one per value")] string[] labels,
             [Description("Point values, one per label")] double[] values,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            [Description("The current chat, exactly as stated in the conversation context; omit when the context names none")] string? chatName = null)
             => RenderChartAsync(chatName, title, chartKind, labels, values, cancellationToken);
 
         Task<string> ShowGraph(
@@ -42,8 +44,9 @@ internal sealed class UiTools(
             AIFunctionFactory.Create(RenderChart, new AIFunctionFactoryOptions
             {
                 Name = "render_chart",
-                Description = "Render a chart. It appears as a live card in the chat and can be shown on "
-                    + "surfaces later. Use it whenever the person asks to see data as a chart.",
+                Description = "Render a bar or line chart from labels and values. It appears as a live card "
+                    + "in the chat when a chat is named and opens in the workspace otherwise. Use it whenever "
+                    + "the person asks to see data as a chart.",
             }),
             AIFunctionFactory.Create(ShowGraph, new AIFunctionFactoryOptions
             {
@@ -148,8 +151,8 @@ internal sealed class UiTools(
         }
     }
 
-    private async Task<string> RenderChartAsync(
-        string chatName,
+    private async Task<JsonElement> RenderChartAsync(
+        string? chatName,
         string title,
         string chartKind,
         string[] labels,
@@ -158,21 +161,27 @@ internal sealed class UiTools(
     {
         try
         {
-            if (!NeuronId.TryParse(chatName, out var chat) || chat.Type != UIVocabulary.ChatType)
+            NeuronId? chat = null;
+            if (!string.IsNullOrWhiteSpace(chatName))
             {
-                return InvalidChat;
+                if (!NeuronId.TryParse(chatName, out var named) || named.Type != UIVocabulary.ChatType)
+                {
+                    return Text(InvalidChat);
+                }
+
+                chat = named;
             }
 
             if (string.IsNullOrWhiteSpace(title))
             {
-                return "title must not be blank.";
+                return Text("title must not be blank.");
             }
 
             labels ??= [];
             values ??= [];
             if (labels.Length == 0 || labels.Length != values.Length)
             {
-                return "labels and values must be non-empty and the same length.";
+                return Text("labels and values must be non-empty and the same length.");
             }
 
             var trimmedTitle = title.Trim();
@@ -181,20 +190,41 @@ internal sealed class UiTools(
             var neuron = new NeuronId(UIVocabulary.ChartType, name);
             var points = labels.Zip(values, static (label, value) => new ChartPoint(label, value)).ToList();
 
-            // Connect first: the reaction fires the card signal and needs a chat listener.
-            await grains.GetGrain<INeuron>(neuron.ToGrainId()).Connect(chat, UIVocabulary.ChartRendered).ConfigureAwait(false);
+            if (chat is { } listener)
+            {
+                // Connect first: the reaction fires the card signal and needs a chat listener.
+                await grains.GetGrain<INeuron>(neuron.ToGrainId()).Connect(listener, UIVocabulary.ChartRendered).ConfigureAwait(false);
+            }
+
             await invoker.InvokeAsync(neuron, "ui.chart", "render",
                 JsonSerializer.SerializeToElement(new RenderChart(CommandId.New(), trimmedTitle, kind, points),
                     UIJson.Default.RenderChart), cancellationToken).ConfigureAwait(false);
-            await WaitForCardAsync(chat, UiCardKinds.Chart, name, cancellationToken).ConfigureAwait(false);
 
-            return $"Chart '{trimmedTitle}' is now showing in the chat as card '{name}'.";
+            if (chat is { } target)
+            {
+                await WaitForCardAsync(target, UiCardKinds.Chart, name, cancellationToken).ConfigureAwait(false);
+            }
+
+            // The chart data rides along so a chat without cards (the workspace) can draw it from this result.
+            return JsonSerializer.SerializeToElement(new
+            {
+                kind = UiCardKinds.Chart,
+                id = name,
+                title = trimmedTitle,
+                chartKind = kind,
+                points = points.Select(static point => new { point.Label, point.Value }),
+                message = chat is null
+                    ? $"Chart '{trimmedTitle}' is saved as '{name}'; the workspace opens it from this result."
+                    : $"Chart '{trimmedTitle}' is now showing in the chat as card '{name}'.",
+            }, WireJson);
         }
         catch (Exception error) when (error is not OperationCanceledException && !TransientFailure.Covers(error))
         {
-            return $"render_chart failed: {error.GetType().Name}: {error.Message}";
+            return Text($"render_chart failed: {error.GetType().Name}: {error.Message}");
         }
     }
+
+    private static JsonElement Text(string message) => JsonSerializer.SerializeToElement(message, WireJson);
 
     private async Task<string> GenerateImageAsync(
         IImageGeneration generator,

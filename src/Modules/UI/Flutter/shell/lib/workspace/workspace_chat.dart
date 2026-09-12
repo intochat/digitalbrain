@@ -314,6 +314,7 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
           if (value is Map &&
               [
                 'table',
+                'chart',
                 'diagram',
                 'brain',
                 'image',

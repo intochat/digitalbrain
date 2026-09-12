@@ -76,6 +76,55 @@ void main() {
     },
   );
 
+  testWidgets('chart tool results offer to open in the workspace', (
+    tester,
+  ) async {
+    final store = WorkspaceStore(persistence: _Memory());
+    store.currentConversation.messages.add({
+      'id': 'chart',
+      'role': 'tool',
+      'complete': true,
+      'name': 'render_chart',
+      'result': {
+        'kind': 'chart',
+        'id': 'chart-by-country',
+        'title': 'Companies by country',
+        'chartKind': 'bar',
+        'points': [
+          {'label': 'GB', 'value': 6},
+          {'label': 'DE', 'value': 3},
+        ],
+        'message': 'Chart saved.',
+      },
+    });
+    Map<String, dynamic>? opened;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: WorkspaceChat(
+            conversation: store.currentConversation,
+            store: store,
+            onArtifact: (value) => opened = value,
+            onAttach: () {},
+            onRun: ({
+              required threadId,
+              required runId,
+              parentRunId,
+              required text,
+            }) => Stream.value(AgentEvent({'type': 'RUN_FINISHED'})),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Companies by country'), findsOneWidget);
+    await tester.tap(find.text('Open in workspace'));
+    await tester.pump();
+    expect(opened?['kind'], 'chart');
+    expect(opened?['id'], 'chart-by-country');
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets(
     'Salesforce sign-in card opens browser and continues the request',
     (tester) async {

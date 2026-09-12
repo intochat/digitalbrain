@@ -88,6 +88,7 @@ internal sealed class ChatNeuron(
             case UIVocabulary.GraphRendered:
             case UIVocabulary.ImageDescribed:
             case UIVocabulary.SheetChanged:
+            case UIVocabulary.TableRendered:
                 await OfferAsync(delivery, body, cancellationToken).ConfigureAwait(true);
                 break;
             case UIVocabulary.TurnCancelling:
@@ -181,11 +182,18 @@ internal sealed class ChatNeuron(
             UIVocabulary.ChartRendered => UiCardKinds.Chart,
             UIVocabulary.GraphRendered => UiCardKinds.Graph,
             UIVocabulary.ImageDescribed => UiCardKinds.Image,
+            UIVocabulary.TableRendered => UiCardKinds.Table,
             _ => UiCardKinds.Spreadsheet,
         };
         var card = new UiCardOffer(kind, ChatBodies.String(body, "name") ?? string.Empty, ChatBodies.String(body, "title") ?? string.Empty);
         Announce(Signal.FromJson(UIVocabulary.CardOffered, card, UIJson.Default.UiCardOffer), correlation: new CorrelationId(record.Snapshot.Turn.Value));
-        await StoreAsync(record with { Snapshot = record.Snapshot with { Cards = [.. record.Snapshot.Cards ?? [], card] } }, cancellationToken).ConfigureAwait(true);
+        // A neuron that announces the same card again (a chart point appended, a table view changed)
+        // refreshes the card it already has on the turn instead of adding a second copy.
+        var cards = record.Snapshot.Cards ?? [];
+        var refreshed = cards.Any(existing => existing.Kind == card.Kind && existing.Name == card.Name)
+            ? cards.Select(existing => existing.Kind == card.Kind && existing.Name == card.Name ? card : existing).ToArray()
+            : [.. cards, card];
+        await StoreAsync(record with { Snapshot = record.Snapshot with { Cards = refreshed } }, cancellationToken).ConfigureAwait(true);
     }
 
     private async Task CancelAsync(SignalId turn, SignalDelivery delivery, CancellationToken cancellationToken)

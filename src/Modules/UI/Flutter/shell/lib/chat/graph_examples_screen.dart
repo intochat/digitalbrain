@@ -21,6 +21,8 @@ final class GraphExamplesScreen extends StatefulWidget {
     this.onReadImageBytes,
     this.onReadSpreadsheet,
     this.onReadGraph,
+    this.onReadTable,
+    this.onUpdateTableView,
     this.sceneFactory,
   });
 
@@ -34,6 +36,8 @@ final class GraphExamplesScreen extends StatefulWidget {
   final ReadImageBytes? onReadImageBytes;
   final ReadSpreadsheet? onReadSpreadsheet;
   final ReadGraph? onReadGraph;
+  final ReadTable? onReadTable;
+  final UpdateTableView? onUpdateTableView;
   final GraphSceneFactory? sceneFactory;
 
   @override
@@ -142,6 +146,8 @@ final class _GraphExamplesScreenState extends State<GraphExamplesScreen> {
             onReadImageBytes: widget.onReadImageBytes,
             onReadSpreadsheet: widget.onReadSpreadsheet,
             onReadGraph: widget.onReadGraph,
+            onReadTable: widget.onReadTable,
+            onUpdateTableView: widget.onUpdateTableView,
           ),
         ),
       ],

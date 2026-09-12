@@ -30,6 +30,7 @@ class UiEditorFrame extends StatelessWidget {
 
 IconData uiArtifactIcon(String kind) => switch (kind) {
   'table' => Icons.table_chart_outlined,
+  'chart' => Icons.bar_chart_rounded,
   'diagram' => Icons.draw_outlined,
   'image' => Icons.image_outlined,
   'brain' => Icons.hub_outlined,

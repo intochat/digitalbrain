@@ -3,6 +3,8 @@ using DigitalBrain.AI;
 using DigitalBrain.AI.Aspire.Hosting;
 using DigitalBrain.AI.FoundryLocal;
 using DigitalBrain.Aspire.Hosting;
+using DigitalBrain.ClickHouse;
+using DigitalBrain.ClickHouse.Aspire.Hosting;
 using DigitalBrain.Excel;
 using DigitalBrain.Google.Aspire.Hosting;
 using DigitalBrain.Google;
@@ -64,6 +66,7 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
         ai.WithTavilySearch();
     })
     .AddModule<MemoryModule>(memory => memory.WithQdrant())
+    .AddModule<ClickHouseModule>(clickhouse => clickhouse.WithClickHouse(options => options.WithSeed("leads")))
     .AddModule<TimeModule>()
     .AddModule<ExcelModule>()
     .AddModule<GoogleModule>(google => google.WithGmail())

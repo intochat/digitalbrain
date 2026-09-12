@@ -18,17 +18,20 @@
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.10.0" />
     <PackageVersion Include="Reqnroll" Version="3.3.4" />
     <PackageVersion Include="Reqnroll.xunit.v3" Version="3.3.4" />
+    <PackageVersion Include="Testcontainers.ClickHouse" Version="4.14.0" />
   </ItemGroup>
   <ItemGroup>
     <PackageVersion Include="Aspire.Hosting" Version="13.5.3" />
     <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.5.3" />
     <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.5.3" />
     <PackageVersion Include="Aspire.Hosting.Qdrant" Version="13.5.3" />
+    <PackageVersion Include="Aspire.Hosting.ClickHouse" Version="13.5.3" />
     <PackageVersion Include="Aspire.Hosting.Testing" Version="13.5.3" />
     <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.5.3" />
     <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.5.3" />
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.29.2" />
     <PackageVersion Include="Qdrant.Client" Version="1.19.0" />
+    <PackageVersion Include="ClickHouse.Driver" Version="1.4.0" />
     <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Ollama" Version="13.5.1-beta.748" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="11.0.0-rc.1.26425.128" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="11.0.0-rc.1.26425.128" />
