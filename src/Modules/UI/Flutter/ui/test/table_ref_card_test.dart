@@ -89,6 +89,54 @@ void main() {
     expect(find.text('1–2 of 12'), findsOneWidget);
   });
 
+  testWidgets('paging a table-ref card survives a parent rebuild', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1000, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    Widget tree() => MaterialApp(
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: Builder(
+            builder: (context) => UiChatBuilders.customMessageBuilder(
+              context,
+              tableCard('m1'),
+              0,
+              isSentByMe: false,
+              onReadTable: (id, {offset = 0, limit = 50}) async {
+                final page = leads();
+                return TableSnapshot.fromJson({
+                  ...page.toJson(),
+                  'offset': offset,
+                  'limit': 2,
+                  'rows': offset == 0
+                      ? page.toJson()['rows']
+                      : [
+                          {
+                            'id': 'row-2',
+                            'cells': ['Severn Groundworks', 88],
+                          },
+                        ],
+                });
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpWidget(tree());
+    await tester.pumpAndSettle();
+    expect(find.text('1–2 of 12'), findsOneWidget);
+    await tester.tap(find.byTooltip('Next page'));
+    await tester.pumpAndSettle();
+    expect(find.text('3–3 of 12'), findsOneWidget);
+    await tester.pumpWidget(tree());
+    await tester.pumpAndSettle();
+    expect(find.text('3–3 of 12'), findsOneWidget);
+    expect(find.text('Severn Groundworks'), findsOneWidget);
+  });
+
   testWidgets('a table-ref card without a reader shows its caption', (
     tester,
   ) async {

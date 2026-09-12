@@ -24,6 +24,13 @@ public sealed class UIModule : IModule
             CreateStore<ITurnContextBlobStore>(services, blobs => new BlobTurnContextStore(blobs), () => new MemoryTurnContextStore()));
 
         // Registered through the AI module's contributor seam; each tool is built on first use.
+        // The table tools are the same ones the workspace agent gets directly, so a uichat agent
+        // instructed with them can refine a table the way that agent does.
+        foreach (var tool in new[] { "create_table", "read_table", "update_table_view", "list_tables" })
+        {
+            builder.Services.AddNativeTool(tool, services => TableToolNamed(services, tool));
+        }
+
         builder.Services.AddNativeTool("render_chart", services => UiToolNamed(services, "render_chart"));
         builder.Services.AddNativeTool("show_graph", services => UiToolNamed(services, "show_graph"));
         // generate_image appears only once an image model is configured, the same gate AIClients uses.
@@ -32,6 +39,9 @@ public sealed class UIModule : IModule
             builder.Services.AddNativeTool("generate_image", services => UiToolNamed(services, "generate_image"));
         }
     }
+
+    private static AIFunction TableToolNamed(IServiceProvider services, string name)
+        => new TableAgentTools(services.GetRequiredService<TableService>()).Create().OfType<AIFunction>().Single(tool => tool.Name == name);
 
     private static AIFunction UiToolNamed(IServiceProvider services, string name)
     {

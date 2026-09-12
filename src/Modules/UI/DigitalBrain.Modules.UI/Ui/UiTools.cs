@@ -15,7 +15,7 @@ internal sealed class UiTools(
     IImageGeneration? imageGeneration,
     IUiImageStore imageStore)
 {
-    private const string InvalidChat = "chatName must be a uichat neuron. Copy the current chat exactly from the Chat: line in the conversation context (for example, uichat:desk).";
+    internal const string InvalidChat = "chatName must be a uichat neuron. Copy the current chat exactly from the Chat: line in the conversation context (for example, uichat:desk).";
 
     internal IReadOnlyList<AIFunction> Create()
     {

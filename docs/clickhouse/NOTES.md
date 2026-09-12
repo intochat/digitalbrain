@@ -74,9 +74,11 @@ DIGITALBRAIN_CLICKHOUSE_TESTS=1 dotnet test tests/DigitalBrain.Tests/DigitalBrai
    those columns by `TablePolicy.ValidateView`, and the ClickHouse type is needed to decide which
    columns can serve as `ORDER BY` tiebreakers.
 6. `QueryPage` is `(Rows, Total, Filtered)`; the columns are already known to the caller.
-7. Compiled pages always end with every orderable column as an `ORDER BY` tiebreaker (`ASC NULLS FIRST`
-   / `DESC NULLS LAST` on the sort column). Without it LIMIT/OFFSET pages over an unsorted or
-   duplicate-keyed result can overlap or skip rows between requests.
+7. When the view has a sort, every other orderable column joins the `ORDER BY` as a tiebreaker
+   (`ASC NULLS FIRST` / `DESC NULLS LAST` on the sort column) so LIMIT/OFFSET pages never overlap
+   or skip rows on duplicate keys. Without a view sort no outer `ORDER BY` is added: the base
+   query's own `ORDER BY` flows through the wrapper (verified on the live server), so "top 10 by
+   revenue" pages in revenue order.
 8. The guard additionally rejects `EXCHANGE`, `MOVE` and the table functions that reach outside the
    database (`url`, `s3`, `file`, `remote`, `mysql`, `postgresql`, …): `readonly=2` alone does not stop
    a SELECT from fetching an arbitrary URL.
@@ -195,3 +197,50 @@ for categorical columns, and the workspace agent is told to omit `chatName` and 
 19. `show_query_table` waits for the chat card only while the named chat has a running turn, treats a
     missed card as "saved, not carded" instead of failing, and maps any `TimeoutException` to a `pending`
     result; the workspace agent's instructions tell it to omit `chatName`.
+
+## Changes from the code review (before the PR)
+
+Ten review angles ran over the branch; the confirmed findings and what changed:
+
+20. **Listing never touches a data source.** `ITable` gained `[ReadOnly] ReadSummary()` (id, title,
+    revision from saved state); `TableService.ListAsync` uses it, so a `chtable-` whose ClickHouse is
+    down or whose query is refused still lists and cannot hide the in-memory tables (before, one such
+    table turned `list_tables` into `source_failed` and `GET /ui/tables` into 502). `RegisterAsync` now
+    refuses a neuron whose id prefix does not match its grain type (listed-but-unreadable split).
+21. **`TableService.UpdateAsync` no longer reads the live page before the command**; the neuron
+    validates the view and answers `invalid`/`conflict`/`missing`. `TablePolicy.Normalize` keeps the
+    undefined-value-to-null normalisation the command serialiser needs.
+22. **A re-announced card refreshes in place.** `ChatNeuron.OfferAsync` replaces a card with the same
+    kind and name on the turn instead of appending a duplicate (every table view change and chart
+    append re-announces).
+23. **Guard hardening.** `$` outside quotes is rejected (dollar-quoted `$tag$...$tag$` strings would
+    have desynchronised the masker and hidden `url(`); keywords followed by `(` are functions, so
+    `format('{}', x)` passes; the table-function list gained `oss`, `cosn`, `hive`, `ytsaurus`,
+    `arrowFlight`, `timeSeries`, `loop`, `fuzzQuery`, `dictionary` and the `S3/Azure/HDFS/Local/Cluster`
+    suffix variants. Verified on the live server that `url()` runs under `readonly=2`, so this list is
+    part of the safety model until the dedicated read-only user lands (README TODO).
+24. **Schema sampling is concurrent and isolated**: one categorical column that cannot be sampled
+    within the caps gets `SampleValues = null` instead of failing the whole read; `IsCategorical` no
+    longer treats `Array(LowCardinality(String))` as a category; the fake applies the same 24/12 caps.
+25. **Page reads run the page and its counts concurrently**, so a page costs the slowest of three
+    statements instead of their sum and stays inside Orleans' 30 s response timeout.
+26. **`Float32` cells** use the float's own shortest representation before rounding (`4.6f` was
+    rendering as `4.59999990463257`); **`DateTime` text cells** use ClickHouse's `toString()` spelling
+    (`2026-09-12 19:37:50`) so an `eq` filter typed from the cell matches server-side.
+27. **The fake provider** mirrors the server more closely: table names and raw SQL predicates are
+    case-sensitive, mixed-case `AND` no longer drops a predicate, and SQL it cannot interpret raises
+    `ClickHouseQueryException` (an `invalid` create) instead of `NotSupportedException`, which the
+    kernel would have retried forever.
+28. **`show_query_table`** registers the table in the catalog only after the server accepted the
+    query (a refused query left a dangling catalog link before), reuses `TableService.WaitAppliedAsync`
+    and `UiTools.InvalidChat`, and reports a `TimeoutException` as a `timeout` result instead of letting
+    it retry the whole turn. An unreachable server during create is a terminal `invalid` result rather
+    than an indefinite retry that would attach the card to a later, unrelated turn.
+29. **The table tools are native tools too.** `TableAgentTools` moved from the kernel into the UI
+    module and `UIModule` registers `create_table`, `read_table`, `update_table_view` and
+    `list_tables` through `AddNativeTool`, so a uichat agent instructed with them can refine a query
+    table the way the workspace agent does (before, only the workspace agent had them). The ClickHouse
+    module registers `TableService` itself, so composing AI + ClickHouse without UI cannot poison the
+    native tool registry.
+30. **The Flutter table card** creates its controller once and feeds a later re-read into it; the
+    build no longer re-accepts the first snapshot, which reset paging on every parent rebuild.

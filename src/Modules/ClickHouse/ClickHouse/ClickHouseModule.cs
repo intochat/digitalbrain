@@ -55,6 +55,8 @@ public sealed class ClickHouseModule : IModule
         }
 
         services.AddSingleton<ITableSource>(new TableSource(ClickHouseNames.TableIdPrefix, ClickHouseNames.TableType));
+        // The tools need TableService whether or not the UI module is composed; both register it TryAdd-style.
+        services.TryAddSingleton<TableService>();
         services.AddSingleton<ClickHouseNativeTools>();
         services.AddNativeTool("clickhouse_schema", static services => services.GetRequiredService<ClickHouseNativeTools>().CreateSchema());
         services.AddNativeTool("clickhouse_query", static services => services.GetRequiredService<ClickHouseNativeTools>().CreateQuery());

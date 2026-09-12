@@ -57,12 +57,17 @@ internal static class TablePolicy
             Require(filter.Operator is not ("gt" or "gte" or "lt" or "lte") || type is "number" or "date", "Ordered comparisons require a number or date column.");
             ValidateValue(type, filter.Value, filter.Operator is "eq" or "neq");
         }
-        return input with
-        {
-            Filters = input.Filters.Select(filter => filter with { Value = filter.Value.ValueKind == JsonValueKind.Undefined ? Null : filter.Value.Clone() }).ToArray(),
-            VisibleColumns = input.VisibleColumns.ToArray(),
-        };
+        return Normalize(input);
     }
+
+    // A filter posted without a value carries an undefined JsonElement, which cannot be serialised
+    // into a command; it means null, so it becomes one before the view travels.
+    internal static UpdateTableView Normalize(UpdateTableView input)
+        => input with
+        {
+            Filters = (input.Filters ?? []).Select(filter => filter with { Value = filter.Value.ValueKind == JsonValueKind.Undefined ? Null : filter.Value.Clone() }).ToArray(),
+            VisibleColumns = (input.VisibleColumns ?? []).ToArray(),
+        };
 
     internal static void ValidatePage(int offset, int limit)
         => Require(offset >= 0 && limit is > 0 and <= 200, "Offset must be nonnegative and limit must be between 1 and 200.");

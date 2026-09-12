@@ -4,12 +4,9 @@ using System.Text.Json;
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.ClickHouse;
-using DigitalBrain.Kernel;
 using DigitalBrain.Testing;
 using DigitalBrain.UI;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -23,20 +20,14 @@ public sealed class ClickHouseTableAgentFacts
     {
         await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([typeof(UIModule), typeof(ClickHouseModule)]) });
         var tables = brain.SiloServices.GetRequiredService<TableService>();
-        var id = $"{ClickHouseNames.TableIdPrefix}{Guid.NewGuid():N}";
-        var neuron = new NeuronId(ClickHouseNames.TableType, id);
-        await tables.RegisterAsync(neuron, TestContext.Current.CancellationToken);
-        var command = new CreateQueryTableCommand(CommandId.New(), new CreateQueryTable("All companies", "SELECT * FROM companies_current"));
-        var table = brain.Grains.GetGrain<IClickHouseTable>(neuron.ToGrainId());
-        await table.CreateFromQuery(command, TestContext.Current.CancellationToken);
-        await ReactionWait.UntilAsync(async () => (await table.ReadOperation(new ReadTableOperation(command.Id)))?.Status == "applied", TestContext.Current.CancellationToken);
+        var id = await CreateQueryTableAsync(brain, tables, "All companies", "SELECT * FROM companies_current");
 
         using var model = new ScriptedChatClient();
         model.CallTool("read_table", JsonSerializer.Serialize(new { id, offset = 0, limit = 5 }));
         model.Say("Twelve companies.");
-        await using var app = await StartAsync(brain, model);
+        await using var app = await TableAgentFacts.StartAsync(brain, model);
         using var client = app.GetTestClient();
-        var read = ToolResult(await RunAsync(client, $"What is in table {id}?"));
+        var read = TableAgentFacts.ToolResult(await TableAgentFacts.RunAsync(client, $"What is in table {id}?"));
         Assert.Equal("table", read.GetProperty("kind").GetString());
         Assert.Equal(12, read.GetProperty("totalRows").GetInt32());
         Assert.Equal(5, read.GetProperty("rows").GetArrayLength());
@@ -54,7 +45,7 @@ public sealed class ClickHouseTableAgentFacts
             },
         }));
         model.Say("Five companies have at least 50 employees.");
-        var filtered = ToolResult(await RunAsync(client, "From these, which have more than 50 employees?"));
+        var filtered = TableAgentFacts.ToolResult(await TableAgentFacts.RunAsync(client, "From these, which have more than 50 employees?"));
         Assert.Equal(5, filtered.GetProperty("filteredRows").GetInt32());
         Assert.Equal(12, filtered.GetProperty("totalRows").GetInt32());
         Assert.Equal("gte", filtered.GetProperty("filters")[0].GetProperty("operator").GetString());
@@ -75,41 +66,35 @@ public sealed class ClickHouseTableAgentFacts
         Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
     }
 
-    private static async Task<WebApplication> StartAsync(BrainSimulation brain, IChatClient model)
+    [Fact]
+    public async Task A_table_whose_source_fails_still_lists_and_reports_the_failure_on_read()
     {
-        var builder = WebApplication.CreateBuilder();
-        builder.WebHost.UseTestServer();
-        builder.Services.AddSingleton(brain.SiloServices.GetRequiredService<TableService>());
-        builder.Services.AddSingleton(new ChatClientBuilder(model).UseFunctionInvocation().Build());
-        builder.AddConversationalAgent();
-        var app = builder.Build();
-        app.UseBasicAuthGate();
-        app.MapConversationalAgent();
-        app.MapTableEndpoints();
-        await app.StartAsync(TestContext.Current.CancellationToken);
-        return app;
+        await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([typeof(UIModule), typeof(ClickHouseModule)]) });
+        var tables = brain.SiloServices.GetRequiredService<TableService>();
+        var id = await CreateQueryTableAsync(brain, tables, "Employees", "SELECT * FROM employees");
+        var inMemory = await tables.CreateAsync(new("Scores", [new("name", "Name", "text")], [new("a", [JsonSerializer.SerializeToElement("Ada")])]), TestContext.Current.CancellationToken);
+        var provider = brain.SiloServices.GetRequiredService<FakeClickHouseProvider>();
+
+        provider.FailNext(new ClickHouseUnavailableException("ClickHouse is unreachable: connection refused"));
+        var listed = await tables.ListAsync(TestContext.Current.CancellationToken);
+        Assert.Equal([id, inMemory.Id], listed.Select(table => table.Id));
+        var failure = await Assert.ThrowsAsync<TableSourceException>(() => tables.ReadAsync(id, cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Contains("unreachable", failure.Message, StringComparison.Ordinal);
+        Assert.Equal(4, (await tables.ReadAsync(id, cancellationToken: TestContext.Current.CancellationToken)).TotalRows);
+
+        var wrongType = new NeuronId(ClickHouseNames.TableType, "leads");
+        await Assert.ThrowsAsync<TableValidationException>(() => tables.RegisterAsync(wrongType, TestContext.Current.CancellationToken));
     }
 
-    private static async Task<List<JsonElement>> RunAsync(HttpClient client, string text)
+    private static async Task<string> CreateQueryTableAsync(BrainSimulation brain, TableService tables, string title, string sql)
     {
-        using var response = await client.PostAsJsonAsync("/agent", new
-        {
-            threadId = Guid.NewGuid().ToString(),
-            runId = Guid.NewGuid().ToString(),
-            messages = new[] { new { id = Guid.NewGuid().ToString(), role = "user", content = text } },
-            tools = Array.Empty<object>(),
-            context = Array.Empty<object>(),
-            state = new { },
-            forwardedProps = new { },
-        }, TestContext.Current.CancellationToken);
-        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
-        Assert.True(response.IsSuccessStatusCode, body);
-        var events = body.Split('\n').Where(line => line.StartsWith("data:", StringComparison.Ordinal))
-            .Select(line => JsonSerializer.Deserialize<JsonElement>(line[5..])).ToList();
-        Assert.Equal("RUN_FINISHED", events[^1].GetProperty("type").GetString());
-        return events;
+        var id = $"{ClickHouseNames.TableIdPrefix}{Guid.NewGuid():N}";
+        var neuron = new NeuronId(ClickHouseNames.TableType, id);
+        var command = new CreateQueryTableCommand(CommandId.New(), new CreateQueryTable(title, sql));
+        var table = brain.Grains.GetGrain<IClickHouseTable>(neuron.ToGrainId());
+        await table.CreateFromQuery(command, TestContext.Current.CancellationToken);
+        await ReactionWait.UntilAsync(async () => (await table.ReadOperation(new ReadTableOperation(command.Id)))?.Status == "applied", TestContext.Current.CancellationToken);
+        await tables.RegisterAsync(neuron, TestContext.Current.CancellationToken);
+        return id;
     }
-
-    private static JsonElement ToolResult(List<JsonElement> events) => JsonSerializer.Deserialize<JsonElement>(
-        events.Single(item => item.GetProperty("type").GetString() == "TOOL_CALL_RESULT").GetProperty("content").GetString()!);
 }

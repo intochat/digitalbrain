@@ -621,26 +621,25 @@ final class _UiTableRefLoaderState extends State<_UiTableRefLoader> {
     }
   }
 
+  // A re-read (a later offer for the same name) refreshes the live controller here, once, when
+  // it completes. Building must not feed the first snapshot back in: accept() takes an equal
+  // revision, and paging keeps the revision, so a rebuild would snap the card back to page one.
   Future<TableSnapshot?> _read(ReadTable reader) async {
     try {
-      return await reader(widget.name);
+      final snapshot = await reader(widget.name);
+      if (mounted) _controller?.accept(snapshot);
+      return snapshot;
     } on TableRequestException {
       return null;
     }
   }
 
-  UiTableController _controllerFor(TableSnapshot snapshot) {
-    final existing = _controller;
-    if (existing != null) {
-      existing.accept(snapshot);
-      return existing;
-    }
-    return _controller = UiTableController(
-      snapshot: snapshot,
-      read: widget.read,
-      update: widget.update,
-    );
-  }
+  UiTableController _controllerFor(TableSnapshot snapshot) =>
+      _controller ??= UiTableController(
+        snapshot: snapshot,
+        read: widget.read,
+        update: widget.update,
+      );
 
   @override
   Widget build(BuildContext context) {

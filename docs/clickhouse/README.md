@@ -25,7 +25,9 @@ projection that hosts the server.
 
 `TableService` routes ids by prefix through `ITableSource`: `table-` stays in memory, `chtable-`
 goes to this module. The `/ui/tables` endpoints, the `read_table` / `update_table_view` /
-`list_tables` tools and the Flutter `UiDataTable` therefore work on both kinds unchanged.
+`list_tables` tools and the Flutter `UiDataTable` therefore work on both kinds unchanged. Listing
+reads each table's saved summary, never its rows, so a table whose ClickHouse is down still lists;
+reading it reports the failure as a `TableSourceException` (HTTP 502, tool `source_failed`).
 
 ## Native tools
 
@@ -41,9 +43,10 @@ is `clickhouse_query` with a `GROUP BY` followed by `render_chart` (`bar` or `li
 
 Two chats exist today and they see different tool sets. The workspace chat (AG-UI `/agent`) has
 the table tools and the three ClickHouse tools; it renders `show_query_table`'s `kind: "table"` result
-as a live table. A `uichat` agent gets whatever its `Instruct` lists (for example `render_chart` and
-`show_query_table` with the chat name) and shows `table` and `chart` cards. The smoke transcript in
-`NOTES.md` covers both.
+as a live table. A `uichat` agent gets whatever its `Instruct` lists: the table tools, `render_chart`
+and the ClickHouse tools are all native tools, so listing `read_table`, `update_table_view`,
+`show_query_table` and `render_chart` gives it the full flow with `table` and `chart` cards. The
+smoke transcript in `NOTES.md` covers both.
 
 ## AppHost
 
@@ -87,9 +90,15 @@ outside the database (`url`, `s3`, `file`, `remote`, `mysql`, …). The agent's 
 tool, in the neuron and again in the provider.
 
 View filters never touch SQL text: `QueryPlanCompiler` binds column names as `{cN:Identifier}` and
-values as typed parameters (`String`, `Float64`, `Date`, `Bool`), mirrors `TablePolicy` semantics
-(case-insensitive text, `neq` keeps nulls, nulls first ascending) and appends every orderable column
-as a tiebreaker so pages never overlap. Schema reads are pinned to `WHERE database = {db:String}`.
+values as typed parameters (`String`, `Float64`, `Date`, `Bool`) and mirrors `TablePolicy` semantics
+(case-insensitive text, `neq` keeps nulls, nulls first ascending). A view sort adds every other
+orderable column as a tiebreaker so pages never overlap; without one the base query's own
+`ORDER BY` decides the page order. Schema reads are pinned to `WHERE database = {db:String}`.
+
+The table-function denylist is a real part of the safety model, not decoration: `readonly=2`
+still lets a SELECT call `url()`, `s3()` or `remote()`. Until the dedicated read-only user lands
+(TODO below), a new ClickHouse table function that reaches outside the server has to be added to
+`ClickHouseQueryGuard`.
 
 ## Adding a schema or seed
 

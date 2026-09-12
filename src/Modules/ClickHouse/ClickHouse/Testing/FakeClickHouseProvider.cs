@@ -6,15 +6,16 @@ using DigitalBrain.UI;
 namespace DigitalBrain.ClickHouse;
 
 // In-memory stand-in selected by DigitalBrainFakes or by an unset provider. It runs the simple
-// SELECT shape the tools and scenarios use over seeded tables, applies view filters with the
-// same TablePolicy engine as the in-memory table, and refuses anything it cannot interpret
-// unless a test scripted that exact SQL.
+// SELECT shape the tools and scenarios use over seeded tables with ClickHouse's own case-sensitive
+// semantics, applies view filters with the same TablePolicy engine as the in-memory table, and
+// refuses anything it cannot interpret the way a server refuses bad SQL, unless a test scripted
+// that exact SQL.
 internal sealed partial class FakeClickHouseProvider : IClickHouseProvider
 {
     public const string Name = "Fake";
 
     private readonly Lock _gate = new();
-    private readonly Dictionary<string, FakeTable> _tables = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, FakeTable> _tables = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ClickHouseQueryResult> _scripted = new(StringComparer.Ordinal);
     private Exception? _failNext;
 
@@ -88,12 +89,13 @@ internal sealed partial class FakeClickHouseProvider : IClickHouseProvider
         ThrowPending();
         lock (_gate)
         {
+            var sampled = 0;
             var tables = _tables.Values
-                .Where(entry => table is null || string.Equals(entry.Name, table, StringComparison.OrdinalIgnoreCase))
+                .Where(entry => table is null || string.Equals(entry.Name, table, StringComparison.Ordinal))
                 .OrderBy(entry => entry.Name, StringComparer.Ordinal)
                 .Select(entry => new ClickHouseTableInfo(entry.Name, entry.Engine, entry.Rows.Count, entry.Columns
-                    .Select((column, index) => ClickHouseTypeMap.IsCategorical(column.ClickHouseType)
-                        ? column with { SampleValues = entry.Rows.Select(row => row[index].ToString()).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).Take(12).ToArray() }
+                    .Select((column, index) => ClickHouseTypeMap.IsCategorical(column.ClickHouseType) && sampled++ < ClickHouseSchemaSampling.MaxColumns
+                        ? column with { SampleValues = entry.Rows.Select(row => row[index].ToString()).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).Take(ClickHouseSchemaSampling.MaxValues).ToArray() }
                         : column)
                     .ToArray()))
                 .ToArray();
@@ -134,7 +136,7 @@ internal sealed partial class FakeClickHouseProvider : IClickHouseProvider
             var match = SimpleSelect().Match(sql);
             if (!match.Success)
             {
-                throw new NotSupportedException($"The fake ClickHouse provider cannot interpret '{sql}'. Register its result with Script(sql, result).");
+                throw new ClickHouseQueryException($"The fake ClickHouse provider cannot interpret '{sql}'. Use SELECT columns FROM table [WHERE column op literal AND …] [ORDER BY column] [LIMIT n], or register the result with Script(sql, result). (SYNTAX_ERROR)");
             }
 
             var tableName = match.Groups["table"].Value;
@@ -144,67 +146,99 @@ internal sealed partial class FakeClickHouseProvider : IClickHouseProvider
             }
 
             var projection = Projection(table, match.Groups["cols"].Value);
-            var tableColumns = table.Columns.Select(column => new TableColumn(column.Name, column.Name, column.TableType)).ToArray();
-            var filters = match.Groups["where"].Success ? Filters(table, match.Groups["where"].Value) : [];
-            TableSort? sort = match.Groups["order"].Success
-                ? new(RequireColumn(table, match.Groups["order"].Value).Name, match.Groups["dir"].Value.Equals("DESC", StringComparison.OrdinalIgnoreCase))
-                : null;
-            var source = new TableSnapshot("fake", "fake", 1, tableColumns,
-                table.Rows.Select((cells, index) => new TableRow($"row-{index}", cells)).ToArray(),
-                filters, sort, tableColumns.Select(column => column.Id).ToArray(), table.Rows.Count, table.Rows.Count, 0, 50);
-            IEnumerable<TableRow> rows = TablePolicy.Apply(source);
+            IEnumerable<IReadOnlyList<JsonElement>> rows = table.Rows;
+            if (match.Groups["where"].Success)
+            {
+                foreach (var predicate in Predicates(table, match.Groups["where"].Value))
+                {
+                    rows = rows.Where(predicate);
+                }
+            }
+
+            if (match.Groups["order"].Success)
+            {
+                var sortColumn = ColumnIndex(table, match.Groups["order"].Value);
+                var comparer = Comparer<JsonElement>.Create((left, right) => CompareCells(table.Columns[sortColumn].TableType, left, right));
+                rows = match.Groups["dir"].Value.Equals("DESC", StringComparison.OrdinalIgnoreCase)
+                    ? rows.OrderByDescending(row => row[sortColumn], comparer)
+                    : rows.OrderBy(row => row[sortColumn], comparer);
+            }
+
             if (match.Groups["limit"].Success)
             {
                 rows = rows.Take(int.Parse(match.Groups["limit"].Value, CultureInfo.InvariantCulture));
             }
 
-            var projected = rows.Select(row => new TableRow(row.Id, projection.Select(index => row.Cells[index]).ToArray())).ToArray();
-            return (projection.Select(index => table.Columns[index]).ToArray(), projected);
+            var projected = rows.Select((row, index) => new TableRow($"row-{index}", projection.Select(column => row[column]).ToArray())).ToArray();
+            return (projection.Select(column => table.Columns[column]).ToArray(), projected);
         }
     }
 
     private static int[] Projection(FakeTable table, string columns)
+        => columns.Trim() == "*"
+            ? Enumerable.Range(0, table.Columns.Count).ToArray()
+            : columns.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Select(name => ColumnIndex(table, name)).ToArray();
+
+    private static int ColumnIndex(FakeTable table, string name)
     {
-        if (columns.Trim() == "*")
+        for (var index = 0; index < table.Columns.Count; index++)
         {
-            return Enumerable.Range(0, table.Columns.Count).ToArray();
+            if (string.Equals(table.Columns[index].Name, name, StringComparison.Ordinal))
+            {
+                return index;
+            }
         }
 
-        return columns.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .Select(name => table.Columns.ToList().FindIndex(column => string.Equals(column.Name, RequireColumn(table, name).Name, StringComparison.Ordinal)))
-            .ToArray();
+        throw new ClickHouseQueryException($"Missing columns: '{name}' while processing query. (UNKNOWN_IDENTIFIER)");
     }
 
-    private static ClickHouseColumn RequireColumn(FakeTable table, string name)
-        => table.Columns.FirstOrDefault(column => string.Equals(column.Name, name, StringComparison.Ordinal))
-            ?? throw new ClickHouseQueryException($"Missing columns: '{name}' while processing query. (UNKNOWN_IDENTIFIER)");
-
-    private static TableFilter[] Filters(FakeTable table, string where)
-        => where.Split(" AND ", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .Concat(where.Contains(" and ", StringComparison.Ordinal) ? where.Split(" and ", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries) : [])
-            .Where(clause => !clause.Contains(" AND ", StringComparison.Ordinal) && !clause.Contains(" and ", StringComparison.Ordinal))
-            .Distinct(StringComparer.Ordinal)
-            .Select(clause =>
+    // Raw SQL predicates compare the way ClickHouse does: case-sensitive strings, numeric numbers.
+    private static IEnumerable<Func<IReadOnlyList<JsonElement>, bool>> Predicates(FakeTable table, string where)
+    {
+        foreach (var clause in AndSeparator().Split(where))
+        {
+            var predicate = SimplePredicate().Match(clause.Trim());
+            if (!predicate.Success)
             {
-                var predicate = SimplePredicate().Match(clause);
-                if (!predicate.Success)
+                throw new ClickHouseQueryException($"The fake ClickHouse provider cannot interpret the predicate '{clause.Trim()}'. Use column op literal, or register the result with Script(sql, result). (SYNTAX_ERROR)");
+            }
+
+            var column = ColumnIndex(table, predicate.Groups["col"].Value);
+            var operand = Literal(table.Columns[column].TableType, predicate.Groups["val"].Value);
+            var @operator = predicate.Groups["op"].Value;
+            yield return row =>
+            {
+                var cell = row[column];
+                if (cell.ValueKind == JsonValueKind.Null)
                 {
-                    throw new NotSupportedException($"The fake ClickHouse provider cannot interpret the predicate '{clause}'. Register the result with Script(sql, result).");
+                    return false;
                 }
 
-                var column = RequireColumn(table, predicate.Groups["col"].Value);
-                var @operator = predicate.Groups["op"].Value switch
+                var comparison = CompareCells(table.Columns[column].TableType, cell, operand);
+                return @operator switch
                 {
-                    "=" => "eq",
-                    "!=" or "<>" => "neq",
-                    ">" => "gt",
-                    ">=" => "gte",
-                    "<" => "lt",
-                    _ => "lte",
+                    "=" => comparison == 0,
+                    "!=" or "<>" => comparison != 0,
+                    ">" => comparison > 0,
+                    ">=" => comparison >= 0,
+                    "<" => comparison < 0,
+                    _ => comparison <= 0,
                 };
-                return new TableFilter(column.Name, @operator, Literal(column.TableType, predicate.Groups["val"].Value));
-            })
-            .ToArray();
+            };
+        }
+    }
+
+    private static int CompareCells(string tableType, JsonElement left, JsonElement right)
+    {
+        if (left.ValueKind == JsonValueKind.Null) { return right.ValueKind == JsonValueKind.Null ? 0 : -1; }
+        if (right.ValueKind == JsonValueKind.Null) { return 1; }
+        return tableType switch
+        {
+            ClickHouseTypeMap.Number => left.GetDecimal().CompareTo(right.GetDecimal()),
+            ClickHouseTypeMap.Boolean => left.GetBoolean().CompareTo(right.GetBoolean()),
+            _ => string.CompareOrdinal(left.GetString(), right.GetString()),
+        };
+    }
 
     private static JsonElement Literal(string tableType, string literal)
     {
@@ -228,6 +262,9 @@ internal sealed partial class FakeClickHouseProvider : IClickHouseProvider
 
     [GeneratedRegex(@"\s+")]
     private static partial Regex Whitespace();
+
+    [GeneratedRegex(@"\s+AND\s+", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex AndSeparator();
 
     [GeneratedRegex(@"\A\s*SELECT\s+(?<cols>\*|[A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*)\s+FROM\s+(?:[A-Za-z_][A-Za-z0-9_]*\.)?(?<table>[A-Za-z_][A-Za-z0-9_]*)(?:\s+WHERE\s+(?<where>.+?))?(?:\s+ORDER\s+BY\s+(?<order>[A-Za-z_][A-Za-z0-9_]*)(?:\s+(?<dir>ASC|DESC))?)?(?:\s+LIMIT\s+(?<limit>\d+))?\s*\z",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Singleline)]

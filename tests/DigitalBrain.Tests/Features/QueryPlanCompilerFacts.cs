@@ -78,17 +78,23 @@ public sealed class QueryPlanCompilerFacts
     }
 
     [Fact]
-    public void An_unsorted_unfiltered_plan_still_orders_every_orderable_column_for_stable_pages()
+    public void An_unsorted_plan_keeps_the_base_query_order_and_adds_no_order_by()
     {
-        var compiled = QueryPlanCompiler.Compile(new QueryPlan(BaseSql, Columns, [], null, 0, 50));
+        var compiled = QueryPlanCompiler.Compile(new QueryPlan("SELECT name, revenue_eur FROM companies_current ORDER BY revenue_eur DESC", Columns, [], null, 0, 50));
         Assert.Equal(
-            "SELECT * FROM (SELECT * FROM companies_current) AS q"
-            + " ORDER BY {t0:Identifier}, {t1:Identifier}, {t2:Identifier}, {t3:Identifier}"
+            "SELECT * FROM (SELECT name, revenue_eur FROM companies_current ORDER BY revenue_eur DESC) AS q"
             + " LIMIT {limit:UInt64} OFFSET {offset:UInt64}",
             compiled.PageSql);
         Assert.Equal(compiled.TotalCountSql, compiled.FilteredCountSql);
-        Assert.Equal(["name", "employee_count", "founded_on", "is_active"],
-            new[] { "t0", "t1", "t2", "t3" }.Select(name => compiled.Parameters[name]));
+        Assert.Equal(["limit", "offset"], compiled.Parameters.Keys.Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void A_sorted_plan_breaks_ties_with_every_other_orderable_column()
+    {
+        var compiled = QueryPlanCompiler.Compile(new QueryPlan(BaseSql, Columns, [], new("founded_on"), 0, 50));
+        Assert.EndsWith(" ORDER BY {sort:Identifier} ASC NULLS FIRST, {t0:Identifier}, {t1:Identifier}, {t2:Identifier} LIMIT {limit:UInt64} OFFSET {offset:UInt64}", compiled.PageSql, StringComparison.Ordinal);
+        Assert.Equal(["name", "employee_count", "is_active"], new[] { "t0", "t1", "t2" }.Select(name => compiled.Parameters[name]));
         Assert.DoesNotContain("attributes", compiled.Parameters.Values.OfType<string>());
     }
 

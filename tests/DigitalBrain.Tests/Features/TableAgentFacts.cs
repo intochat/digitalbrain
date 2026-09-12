@@ -117,7 +117,7 @@ public sealed class TableAgentFacts
         Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
     }
 
-    private static async Task<WebApplication> StartAsync(BrainSimulation brain, IChatClient model, bool gated = false)
+    internal static async Task<WebApplication> StartAsync(BrainSimulation brain, IChatClient model, bool gated = false)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -140,7 +140,7 @@ public sealed class TableAgentFacts
         return app;
     }
 
-    private static async Task<List<JsonElement>> RunAsync(HttpClient client, string text)
+    internal static async Task<List<JsonElement>> RunAsync(HttpClient client, string text)
     {
         using var response = await client.PostAsJsonAsync("/agent", new
         {
@@ -160,6 +160,6 @@ public sealed class TableAgentFacts
         return events;
     }
 
-    private static JsonElement ToolResult(List<JsonElement> events) => JsonSerializer.Deserialize<JsonElement>(
+    internal static JsonElement ToolResult(List<JsonElement> events) => JsonSerializer.Deserialize<JsonElement>(
         events.Single(item => item.GetProperty("type").GetString() == "TOOL_CALL_RESULT").GetProperty("content").GetString()!);
 }

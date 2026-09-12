@@ -1,12 +1,11 @@
 using System.ComponentModel;
 using System.Text.Json;
-using DigitalBrain.UI;
 using Microsoft.Extensions.AI;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.UI;
 
 /// <summary>Direct table tools share the same application service as the ui HTTP controls.</summary>
-internal sealed class TableAgentTools(TableService tables)
+public sealed class TableAgentTools(TableService tables)
 {
     private static readonly JsonSerializerOptions WireJson = new(JsonSerializerDefaults.Web);
 
@@ -37,27 +36,27 @@ internal sealed class TableAgentTools(TableService tables)
     private async Task<JsonElement> CreateTableAsync(
         [Description("The table title, columns, and rows. Cells use native JSON numbers/booleans, ISO date strings, text, or null.")] CreateTable table,
         CancellationToken cancellationToken = default)
-        => await ResultAsync(() => tables.CreateAsync(table, cancellationToken));
+        => await ResultAsync(() => tables.CreateAsync(table, cancellationToken)).ConfigureAwait(false);
 
     private async Task<JsonElement> ReadTableAsync(
         [Description("The table ID returned by create_table or list_tables.")] string id,
         int offset = 0, int limit = 50, CancellationToken cancellationToken = default)
-        => await ResultAsync(() => tables.ReadAsync(id, offset, limit, cancellationToken));
+        => await ResultAsync(() => tables.ReadAsync(id, offset, limit, cancellationToken)).ConfigureAwait(false);
 
     private async Task<JsonElement> UpdateViewAsync(
         [Description("The table ID.")] string id,
         [Description("Complete replacement view, including expectedRevision from the latest read, filters, sort and visibleColumns.")] UpdateTableView view,
         CancellationToken cancellationToken = default)
-        => await ResultAsync(() => tables.UpdateAsync(id, view, cancellationToken));
+        => await ResultAsync(() => tables.UpdateAsync(id, view, cancellationToken)).ConfigureAwait(false);
 
     private async Task<JsonElement> ListTablesAsync(CancellationToken cancellationToken = default)
-        => await ResultAsync(() => tables.ListAsync(cancellationToken));
+        => await ResultAsync(() => tables.ListAsync(cancellationToken)).ConfigureAwait(false);
 
     private static async Task<JsonElement> ResultAsync<T>(Func<Task<T>> action)
     {
         try
         {
-            return JsonSerializer.SerializeToElement(await action(), WireJson);
+            return JsonSerializer.SerializeToElement(await action().ConfigureAwait(false), WireJson);
         }
         catch (TableRevisionConflictException error)
         {

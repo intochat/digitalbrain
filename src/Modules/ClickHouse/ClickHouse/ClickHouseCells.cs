@@ -36,7 +36,8 @@ internal static class ClickHouseCells
     private static JsonElement NumberCell(object value)
         => value switch
         {
-            float single => FloatingCell(single),
+            // Widening 4.6f to double carries its binary noise; the float's own shortest form does not.
+            float single => FloatingCell(double.Parse(single.ToString("R", CultureInfo.InvariantCulture), CultureInfo.InvariantCulture)),
             double floating => FloatingCell(floating),
             decimal exact => DecimalCell(exact),
             byte or sbyte or short or ushort or int or uint or long => DecimalCell(Convert.ToDecimal(value, CultureInfo.InvariantCulture)),
@@ -87,8 +88,9 @@ internal static class ClickHouseCells
         var text = value switch
         {
             string plain => plain,
-            DateTime moment => moment.ToString(moment.Kind == DateTimeKind.Utc ? "yyyy-MM-dd'T'HH:mm:ss.FFFFFFF'Z'" : "yyyy-MM-dd'T'HH:mm:ss.FFFFFFF", CultureInfo.InvariantCulture),
-            DateTimeOffset moment => moment.ToString("yyyy-MM-dd'T'HH:mm:ss.FFFFFFFzzz", CultureInfo.InvariantCulture),
+            // The same spelling ClickHouse's toString() yields, so an eq filter typed from the cell matches server-side.
+            DateTime moment => moment.ToString("yyyy-MM-dd HH:mm:ss.FFFFFFF", CultureInfo.InvariantCulture),
+            DateTimeOffset moment => moment.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss.FFFFFFF", CultureInfo.InvariantCulture),
             DateOnly date => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             TimeOnly time => time.ToString("HH:mm:ss.FFFFFFF", CultureInfo.InvariantCulture),
             Guid guid => guid.ToString("D"),

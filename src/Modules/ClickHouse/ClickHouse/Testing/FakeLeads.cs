@@ -85,7 +85,7 @@ internal static class FakeLeads
         ]);
     }
 
-    private const string UpdatedAt = "2026-09-12T00:00:00";
+    private const string UpdatedAt = "2026-09-12 00:00:00";
 
     private static JsonElement[] Company(string id, string name, string country, string city, string industry, string[] tags,
         int? employees, double? revenue, int? foundedYear, string? foundedOn, bool active, string attributes)

@@ -93,6 +93,10 @@ internal sealed class ClickHouseTableNeuron(
     public Task<TableOperationResult?> ReadOperation(ReadTableOperation query)
         => Task.FromResult(State?.Operations.LastOrDefault(operation => operation.CommandId == query.CommandId));
 
+    [ReadOnly]
+    public Task<TableSummary?> ReadSummary()
+        => Task.FromResult(State?.View is { } view ? new TableSummary(view.Id, view.Title, view.Revision) : null);
+
     protected override async Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
     {
         var current = State ?? new ClickHouseTableState(null, null, [], []);
@@ -129,6 +133,12 @@ internal sealed class ClickHouseTableNeuron(
                 catch (TableValidationException error)
                 {
                     result = new(create.Id, "invalid", error.Message);
+                }
+                catch (ClickHouseUnavailableException error)
+                {
+                    // Retrying here would create the table minutes later and hang its card on whatever
+                    // turn is running then; the person asked now, so the answer is "not now".
+                    result = new(create.Id, "invalid", error.Message + " Try again once ClickHouse is reachable.");
                 }
 
                 break;

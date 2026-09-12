@@ -14,7 +14,6 @@ namespace DigitalBrain.ClickHouse;
 // read_table, update_table_view, list_tables and render_chart tools on the table this creates.
 internal sealed class ClickHouseNativeTools(IGrainFactory grains, INeuronInvoker invoker, TableService tables)
 {
-    private const string InvalidChat = "chatName must be a uichat neuron. Copy the current chat exactly from the Chat: line in the conversation context (for example, uichat:desk).";
     private static readonly JsonSerializerOptions WireJson = new(JsonSerializerDefaults.Web);
 
     internal AIFunction CreateSchema()
@@ -78,7 +77,7 @@ internal sealed class ClickHouseNativeTools(IGrainFactory grains, INeuronInvoker
         {
             if (!NeuronId.TryParse(chatName, out var parsed) || parsed.Type != UIVocabulary.ChatType)
             {
-                return Error("invalid_chat", InvalidChat);
+                return Error("invalid_chat", UiTools.InvalidChat);
             }
 
             chat = parsed;
@@ -111,10 +110,11 @@ internal sealed class ClickHouseNativeTools(IGrainFactory grains, INeuronInvoker
                 await grains.GetGrain<INeuron>(neuron.ToGrainId()).Connect(listener, UIVocabulary.TableRendered).ConfigureAwait(false);
             }
 
-            await tables.RegisterAsync(neuron, cancellationToken).ConfigureAwait(false);
             await invoker.InvokeAsync(neuron, "clickhouse.table", "create-query",
                 JsonSerializer.SerializeToElement(command, ClickHouseJson.Default.CreateQueryTableCommand), cancellationToken).ConfigureAwait(false);
-            await WaitAppliedAsync(neuron, command.Id, cancellationToken).ConfigureAwait(false);
+            await TableService.WaitAppliedAsync(grains.GetGrain<IClickHouseTable>(neuron.ToGrainId()), name, command.Id, cancellationToken).ConfigureAwait(false);
+            // The server has accepted the query by now; a refused query never reaches the catalog.
+            await tables.RegisterAsync(neuron, cancellationToken).ConfigureAwait(false);
             var carded = chat is { } target && await WaitForCardAsync(target, name, cancellationToken).ConfigureAwait(false);
 
             var snapshot = await tables.ReadAsync(name, cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -143,6 +143,14 @@ internal sealed class ClickHouseNativeTools(IGrainFactory grains, INeuronInvoker
         {
             return Error("query_refused", error.Message);
         }
+        catch (TableRevisionConflictException error)
+        {
+            return Error("failed", error.Message);
+        }
+        catch (TableNotFoundException error)
+        {
+            return Error("failed", error.Message);
+        }
         catch (TableSourceException error)
         {
             return Error("source_failed", error.Message);
@@ -154,34 +162,6 @@ internal sealed class ClickHouseNativeTools(IGrainFactory grains, INeuronInvoker
         catch (Exception error) when (error is not OperationCanceledException && !TransientFailure.Covers(error))
         {
             return Error("failed", $"show_query_table failed: {error.GetType().Name}: {error.Message}");
-        }
-    }
-
-    private async Task WaitAppliedAsync(NeuronId neuron, CommandId command, CancellationToken cancellationToken)
-    {
-        var table = grains.GetGrain<IClickHouseTable>(neuron.ToGrainId());
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        deadline.CancelAfter(TimeSpan.FromSeconds(30));
-        try
-        {
-            while (true)
-            {
-                var result = await table.ReadOperation(new(command)).WaitAsync(deadline.Token).ConfigureAwait(false);
-                switch (result?.Status)
-                {
-                    case "applied":
-                        return;
-                    case "invalid":
-                    case "conflict":
-                        throw new TableValidationException(result.Message ?? "The query could not be turned into a table.");
-                }
-
-                await Task.Delay(25, deadline.Token).ConfigureAwait(false);
-            }
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            throw new TimeoutException($"Table '{neuron.Name}' has not been created yet. List tables before retrying.");
         }
     }
 
@@ -217,6 +197,7 @@ internal sealed class ClickHouseNativeTools(IGrainFactory grains, INeuronInvoker
         }
     }
 
+    // A slow query is an answer for the model, not a transient fault to retry the whole turn on.
     private static async Task<JsonElement> ResultAsync<T>(Func<Task<T>> read, string tool)
     {
         try
@@ -230,6 +211,10 @@ internal sealed class ClickHouseNativeTools(IGrainFactory grains, INeuronInvoker
         catch (ClickHouseUnavailableException error)
         {
             return Error("unavailable", error.Message);
+        }
+        catch (TimeoutException error)
+        {
+            return Error("timeout", $"{tool} did not finish in time: {error.Message} Narrow the query with WHERE or LIMIT and try again.");
         }
         catch (Exception error) when (error is not OperationCanceledException && !TransientFailure.Covers(error))
         {

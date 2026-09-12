@@ -47,6 +47,17 @@ public sealed class ClickHouseTypeMapFacts
     public void Knows_which_types_can_order_a_page(string clickHouseType, bool orderable)
         => Assert.Equal(orderable, ClickHouseTypeMap.IsOrderable(clickHouseType));
 
+    [Theory]
+    [InlineData("LowCardinality(String)", true)]
+    [InlineData("Nullable(LowCardinality(String))", true)]
+    [InlineData("Enum8('a' = 1, 'b' = 2)", true)]
+    [InlineData("String", false)]
+    [InlineData("Array(LowCardinality(String))", false)]
+    [InlineData("Map(String, LowCardinality(String))", false)]
+    [InlineData("LowCardinality(UInt8)", false)]
+    public void Knows_which_columns_are_worth_sampling(string clickHouseType, bool categorical)
+        => Assert.Equal(categorical, ClickHouseTypeMap.IsCategorical(clickHouseType));
+
     [Fact]
     public void Number_cells_follow_the_table_policy_rule()
     {
@@ -55,6 +66,8 @@ public sealed class ClickHouseTypeMapFacts
         Assert.Equal("8200000", ClickHouseCells.ToCell(8200000L, "number").GetRawText());
         Assert.Equal("64", ClickHouseCells.ToCell((uint)64, "number").GetRawText());
         Assert.Equal("4.6", ClickHouseCells.ToCell(4.6d, "number").GetRawText());
+        Assert.Equal("4.6", ClickHouseCells.ToCell(4.6f, "number").GetRawText());
+        Assert.Equal("0.1", ClickHouseCells.ToCell(0.1f, "number").GetRawText());
         Assert.Equal("0.333333333333333", ClickHouseCells.ToCell(1d / 3d, "number").GetRawText());
         Assert.Equal("12.50", ClickHouseCells.ToCell(12.50m, "number").GetRawText());
         Assert.Equal(JsonValueKind.String, ClickHouseCells.ToCell(ulong.MaxValue, "number").ValueKind);
@@ -72,7 +85,8 @@ public sealed class ClickHouseTypeMapFacts
         Assert.Equal("1998-04-12", ClickHouseCells.ToCell(new DateTime(1998, 4, 12, 0, 0, 0, DateTimeKind.Utc), "date").GetString());
         Assert.Equal("1998-04-12", ClickHouseCells.ToCell(new DateOnly(1998, 4, 12), "date").GetString());
         Assert.True(ClickHouseCells.ToCell(true, "boolean").GetBoolean());
-        Assert.Equal("2026-09-12T10:30:00Z", ClickHouseCells.ToCell(new DateTime(2026, 9, 12, 10, 30, 0, DateTimeKind.Utc), "text").GetString());
+        Assert.Equal("2026-09-12 10:30:00", ClickHouseCells.ToCell(new DateTime(2026, 9, 12, 10, 30, 0, DateTimeKind.Utc), "text").GetString());
+        Assert.Equal("2026-09-12 10:30:00.5", ClickHouseCells.ToCell(new DateTime(2026, 9, 12, 10, 30, 0, 500, DateTimeKind.Unspecified), "text").GetString());
         Assert.Equal("[\"construction\",\"roofing\"]", ClickHouseCells.ToCell(new[] { "construction", "roofing" }, "text").GetString());
         Assert.Equal("{\"vat\":\"GB1\"}", ClickHouseCells.ToCell(new Dictionary<string, object> { ["vat"] = "GB1" }, "text").GetString());
         Assert.Equal("42", ClickHouseCells.ToCell(42, "text").GetString());

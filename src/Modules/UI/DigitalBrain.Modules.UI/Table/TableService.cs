@@ -29,9 +29,19 @@ public sealed class TableService(IGrainFactory grains, IEnumerable<ITableSource>
         return await ReadAsync(id, cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
-    // Lists a table that another module's ITableSource serves, so list_tables and /ui/tables find it.
+    // Lists a table another module serves. Listing keys on the grain type and reading on the id
+    // prefix, so a registration has to satisfy both or the table would be listed but unreadable.
     public Task RegisterAsync(NeuronId table, CancellationToken cancellationToken = default)
-        => grains.GetGrain<INeuron>(CatalogId.ToGrainId()).Connect(table, UIVocabulary.TableListed).WaitAsync(cancellationToken);
+    {
+        var source = SourceOf(table.Name);
+        if (!string.Equals(source.GrainType, table.Type, StringComparison.Ordinal))
+        {
+            throw new TableValidationException(
+                $"Table '{table.Name}' cannot be listed as '{table.Type}': ids starting with '{source.IdPrefix}' are served by '{source.GrainType}'.");
+        }
+
+        return grains.GetGrain<INeuron>(CatalogId.ToGrainId()).Connect(table, UIVocabulary.TableListed).WaitAsync(cancellationToken);
+    }
 
     public async Task<TableSnapshot> ReadAsync(string id, int offset = 0, int limit = 50, CancellationToken cancellationToken = default)
     {
@@ -39,25 +49,27 @@ public sealed class TableService(IGrainFactory grains, IEnumerable<ITableSource>
         return await Table(id).Read(new(offset, limit)).WaitAsync(cancellationToken).ConfigureAwait(false) ?? throw new TableNotFoundException(id);
     }
 
+    // The neuron validates the view against its own columns and answers applied, invalid, conflict
+    // or missing, so no live page is read before the command; only the resulting snapshot is.
     public async Task<TableSnapshot> UpdateAsync(string id, UpdateTableView input, CancellationToken cancellationToken = default)
     {
-        var source = await ReadAsync(id, cancellationToken: cancellationToken).ConfigureAwait(false);
-        var view = TablePolicy.ValidateView(source, input);
         var table = Table(id);
-        var command = new UpdateTableCommand(CommandId.New(), view);
+        var command = new UpdateTableCommand(CommandId.New(), TablePolicy.Normalize(input));
         await table.Update(command, cancellationToken).WaitAsync(cancellationToken).ConfigureAwait(false);
         await WaitAppliedAsync(table, id, command.Id, cancellationToken).ConfigureAwait(false);
         return await ReadAsync(id, cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
+    // Summaries come from each neuron's saved state, never from its data source, so a table whose
+    // source is down or refuses its query still lists and never hides the others.
     public async Task<IReadOnlyList<TableSummary>> ListAsync(CancellationToken cancellationToken = default)
     {
         var links = await grains.GetGrain<INeuron>(CatalogId.ToGrainId()).ReadSynapses().WaitAsync(cancellationToken).ConfigureAwait(false);
         var result = new List<TableSummary>();
         foreach (var link in links.Where(link => link.SignalType == UIVocabulary.TableListed && ServesTables(link.Target.Type)))
         {
-            var saved = await grains.GetGrain<ITable>(link.Target.ToGrainId()).Read(new(0, 1)).WaitAsync(cancellationToken).ConfigureAwait(false);
-            if (saved is not null) { result.Add(new(saved.Id, saved.Title, saved.Revision)); }
+            var summary = await grains.GetGrain<ITable>(link.Target.ToGrainId()).ReadSummary().WaitAsync(cancellationToken).ConfigureAwait(false);
+            if (summary is not null) { result.Add(summary); }
         }
         return result.OrderBy(table => table.Title, StringComparer.OrdinalIgnoreCase).ThenBy(table => table.Id, StringComparer.Ordinal).ToArray();
     }
@@ -74,7 +86,7 @@ public sealed class TableService(IGrainFactory grains, IEnumerable<ITableSource>
         catch (ArgumentException) { throw new TableValidationException("Table ID is invalid."); }
     }
 
-    private static async Task WaitAppliedAsync(ITable table, string id, CommandId command, CancellationToken cancellationToken)
+    internal static async Task WaitAppliedAsync(ITable table, string id, CommandId command, CancellationToken cancellationToken)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(TimeSpan.FromSeconds(30));

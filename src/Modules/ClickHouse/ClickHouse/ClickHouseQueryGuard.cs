@@ -5,7 +5,8 @@ namespace DigitalBrain.ClickHouse;
 
 // Client-side defence in depth in front of the server's readonly and resource caps: one SELECT
 // (or WITH … SELECT), no comments, no second statement, no FORMAT/SETTINGS clause, no write
-// verbs and no table functions that reach outside the database.
+// verbs and no table functions that reach outside the database. readonly=2 does not stop a
+// SELECT from fetching an arbitrary URL, so the table-function list is part of the safety model.
 internal static partial class ClickHouseQueryGuard
 {
     public const string Reason = "Use one read-only SELECT (or WITH … SELECT). Comments, multiple statements, FORMAT/SETTINGS clauses and writes are not allowed.";
@@ -31,7 +32,8 @@ internal static partial class ClickHouseQueryGuard
     }
 
     // Replaces the content of every string literal and quoted identifier with a placeholder so the
-    // token checks never fire on text, and rejects statement separators and comments outside them.
+    // token checks never fire on text, and rejects statement separators, comments and dollar-quoted
+    // strings ($tag$…$tag$ would let a quote inside desynchronise this scan from the server's) outside them.
     private static string MaskQuoted(string sql)
     {
         var syntax = new StringBuilder(sql.Length);
@@ -68,7 +70,7 @@ internal static partial class ClickHouseQueryGuard
                     quote = character;
                     syntax.Append(character).Append('?');
                     break;
-                case ';' or '#':
+                case ';' or '#' or '$':
                     throw Invalid();
                 case '-' when index + 1 < sql.Length && sql[index + 1] == '-':
                 case '/' when index + 1 < sql.Length && sql[index + 1] == '*':
@@ -92,11 +94,13 @@ internal static partial class ClickHouseQueryGuard
     [GeneratedRegex(@"\A\s*(?:SELECT|WITH)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ReadStatement();
 
-    [GeneratedRegex(@"\b(?:INSERT|UPDATE|DELETE|ALTER|DROP|CREATE|TRUNCATE|RENAME|ATTACH|DETACH|OPTIMIZE|SYSTEM|KILL|GRANT|REVOKE|SET|SETTINGS|FORMAT|EXCHANGE|MOVE)\b|\bINTO\s+OUTFILE\b",
+    // Keywords followed by "(" are functions such as format('{}', x), not clauses.
+    [GeneratedRegex(@"\b(?:INSERT|UPDATE|DELETE|ALTER|DROP|CREATE|TRUNCATE|RENAME|ATTACH|DETACH|OPTIMIZE|SYSTEM|KILL|GRANT|REVOKE|SET|SETTINGS|FORMAT|EXCHANGE|MOVE)\b(?!\s*\()|\bINTO\s+OUTFILE\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex WriteOrControl();
 
-    [GeneratedRegex(@"\b(?:url|urlCluster|s3|s3Cluster|gcs|azureBlobStorage|file|fileCluster|remote|remoteSecure|cluster|clusterAllReplicas|mysql|postgresql|mongodb|redis|sqlite|jdbc|odbc|hdfs|hdfsCluster|input|executable|deltaLake|iceberg|hudi)\s*\(",
+    // Base names plus the S3/Azure/HDFS/Local/Cluster variants ClickHouse derives from them.
+    [GeneratedRegex(@"\b(?:url|s3|oss|cosn|gcs|azureBlobStorage|file|remote|remoteSecure|cluster|clusterAllReplicas|mysql|postgresql|mongodb|redis|sqlite|jdbc|odbc|hdfs|hive|input|executable|deltaLake|iceberg|hudi|ytsaurus|arrowFlight|timeSeries|loop|fuzzQuery|dictionary)(?:S3|Azure|HDFS|Local|Cluster)*\s*\(",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ExternalTableFunction();
 }

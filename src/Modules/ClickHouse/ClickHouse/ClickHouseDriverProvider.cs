@@ -15,8 +15,6 @@ internal sealed class ClickHouseDriverProvider(ClickHouseClient client, string d
     private static readonly TimeSpan QueryTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan PingTimeout = TimeSpan.FromSeconds(3);
     private const long MaxRowsToRead = 50_000_000;
-    private const int MaxSampledColumns = 24;
-    private const int MaxSampleValues = 12;
     private const long MaxMemoryBytes = 2_000_000_000;
 
     public string ProviderName => ClickHouseModule.DriverProviderName;
@@ -25,8 +23,7 @@ internal sealed class ClickHouseDriverProvider(ClickHouseClient client, string d
     {
         ClickHouseQueryGuard.Validate(sql);
         var started = Stopwatch.GetTimestamp();
-        var parameters = new ClickHouseParameterCollection();
-        parameters.Add(Parameter("limit", (ulong)maxRows + 1));
+        var parameters = new ClickHouseParameterCollection { Parameter("limit", (ulong)maxRows + 1) };
         // One row past the cap tells truncation apart from a result that exactly fills it.
         var (columns, rows) = await ReadAsync($"SELECT * FROM ({sql}) AS q LIMIT {{limit:UInt64}}", parameters, maxRows + 1, cancellationToken).ConfigureAwait(false);
         var truncated = rows.Count > maxRows;
@@ -34,21 +31,18 @@ internal sealed class ClickHouseDriverProvider(ClickHouseClient client, string d
         return new(columns, page, page.Length, truncated, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
     }
 
+    // The page and its counts are independent statements, so they run concurrently and the
+    // slowest one bounds the latency instead of their sum.
     public async Task<QueryPage> ExecutePlanAsync(QueryPlan plan, CancellationToken cancellationToken)
     {
         ClickHouseQueryGuard.Validate(plan.BaseSql);
         var compiled = QueryPlanCompiler.Compile(plan);
-        var parameters = new ClickHouseParameterCollection();
-        foreach (var (name, value) in compiled.Parameters)
-        {
-            parameters.Add(Parameter(name, value));
-        }
-
-        var (_, rows) = await ReadAsync(compiled.PageSql, parameters, plan.Limit, cancellationToken).ConfigureAwait(false);
-        var filtered = await CountAsync(compiled.FilteredCountSql, parameters, cancellationToken).ConfigureAwait(false);
-        var total = plan.Filters.Count == 0 ? filtered : await CountAsync(compiled.TotalCountSql, parameters, cancellationToken).ConfigureAwait(false);
-        var page = rows.Select((cells, index) => new TableRow($"row-{plan.Offset + index}", cells)).ToArray();
-        return new(page, total, filtered);
+        var pageRead = ReadAsync(compiled.PageSql, Parameters(compiled.Parameters), plan.Limit, cancellationToken);
+        var filteredCount = CountAsync(compiled.FilteredCountSql, Parameters(compiled.Parameters), cancellationToken);
+        var totalCount = plan.Filters.Count == 0 ? filteredCount : CountAsync(compiled.TotalCountSql, Parameters(compiled.Parameters), cancellationToken);
+        await Task.WhenAll(pageRead, filteredCount, totalCount).ConfigureAwait(false);
+        var page = pageRead.Result.Rows.Select((cells, index) => new TableRow($"row-{plan.Offset + index}", cells)).ToArray();
+        return new(page, totalCount.Result, filteredCount.Result);
     }
 
     public async Task<IReadOnlyList<ClickHouseColumn>> DescribeAsync(string sql, CancellationToken cancellationToken)
@@ -60,13 +54,10 @@ internal sealed class ClickHouseDriverProvider(ClickHouseClient client, string d
 
     public async Task<ClickHouseSchema> ReadSchemaAsync(string? table, CancellationToken cancellationToken)
     {
-        var parameters = new ClickHouseParameterCollection();
-        parameters.Add(Parameter("db", database));
         var tableNameFilter = string.Empty;
         var tableColumnFilter = string.Empty;
         if (table is not null)
         {
-            parameters.Add(Parameter("t", table));
             tableNameFilter = " AND name = {t:String}";
             tableColumnFilter = " AND table = {t:String}";
         }
@@ -74,57 +65,45 @@ internal sealed class ClickHouseDriverProvider(ClickHouseClient client, string d
         // Both reads are pinned to the configured database, so system.* and other databases stay invisible.
         var (_, tableRows) = await ReadAsync(
             "SELECT name, engine, total_rows FROM system.tables WHERE database = {db:String}" + tableNameFilter + " ORDER BY name",
-            parameters, 10_000, cancellationToken).ConfigureAwait(false);
+            SchemaParameters(table), 10_000, cancellationToken).ConfigureAwait(false);
         var (_, columnRows) = await ReadAsync(
             "SELECT table, name, type FROM system.columns WHERE database = {db:String}" + tableColumnFilter + " ORDER BY table, position",
-            parameters, 100_000, cancellationToken).ConfigureAwait(false);
-        var columnsByTable = new Dictionary<string, IReadOnlyList<ClickHouseColumn>>(StringComparer.Ordinal);
-        var sampled = 0;
-        foreach (var group in columnRows.GroupBy(row => row[0].GetString()!, StringComparer.Ordinal))
-        {
-            var columns = new List<ClickHouseColumn>();
-            foreach (var row in group)
-            {
-                var name = row[1].GetString()!;
-                var type = row[2].GetString()!;
-                IReadOnlyList<string>? samples = null;
-                if (ClickHouseTypeMap.IsCategorical(type) && sampled < MaxSampledColumns)
-                {
-                    sampled++;
-                    samples = await SampleValuesAsync(group.Key, name, cancellationToken).ConfigureAwait(false);
-                }
+            SchemaParameters(table), 100_000, cancellationToken).ConfigureAwait(false);
 
-                columns.Add(new(name, type, ClickHouseTypeMap.ToTableType(type), samples));
+        var sampled = 0;
+        var columnsByTable = new Dictionary<string, List<(ClickHouseColumn Column, Task<IReadOnlyList<string>?>? Samples)>>(StringComparer.Ordinal);
+        foreach (var row in columnRows)
+        {
+            var tableName = row[0].GetString()!;
+            var name = row[1].GetString()!;
+            var type = row[2].GetString()!;
+            Task<IReadOnlyList<string>?>? samples = null;
+            if (ClickHouseTypeMap.IsCategorical(type) && sampled < ClickHouseSchemaSampling.MaxColumns)
+            {
+                sampled++;
+                samples = SampleValuesAsync(tableName, name, cancellationToken);
             }
 
-            columnsByTable[group.Key] = columns;
+            if (!columnsByTable.TryGetValue(tableName, out var columns))
+            {
+                columnsByTable[tableName] = columns = [];
+            }
+
+            columns.Add((new(name, type, ClickHouseTypeMap.ToTableType(type)), samples));
         }
 
-        var tables = tableRows.Select(row => new ClickHouseTableInfo(
-            row[0].GetString()!,
-            row[1].GetString()!,
-            row[2].ValueKind == JsonValueKind.Number ? row[2].GetInt64() : null,
-            columnsByTable.GetValueOrDefault(row[0].GetString()!) ?? [])).ToArray();
+        await Task.WhenAll(columnsByTable.Values.SelectMany(columns => columns).Select(entry => entry.Samples).OfType<Task>()).ConfigureAwait(false);
+        var tables = tableRows.Select(row =>
+        {
+            var name = row[0].GetString()!;
+            var columns = columnsByTable.GetValueOrDefault(name) ?? [];
+            return new ClickHouseTableInfo(
+                name,
+                row[1].GetString()!,
+                row[2].ValueKind == JsonValueKind.Number ? row[2].GetInt64() : null,
+                columns.Select(entry => entry.Samples is { } samples ? entry.Column with { SampleValues = samples.Result } : entry.Column).ToArray());
+        }).ToArray();
         return new(database, tables);
-    }
-
-    // A handful of real values for a categorical column, so the agent writes country = 'GB', not 'UK'.
-    private async Task<IReadOnlyList<string>> SampleValuesAsync(string table, string column, CancellationToken cancellationToken)
-    {
-        var parameters = new ClickHouseParameterCollection();
-        parameters.Add(Parameter("db", database));
-        parameters.Add(Parameter("t", table));
-        parameters.Add(Parameter("c", column));
-        var (_, rows) = await ReadAsync(
-            "SELECT DISTINCT toString({c:Identifier}) AS v FROM {db:Identifier}.{t:Identifier} ORDER BY v LIMIT {n:UInt64}",
-            Append(parameters, Parameter("n", (ulong)MaxSampleValues)), MaxSampleValues, cancellationToken).ConfigureAwait(false);
-        return rows.Select(row => row[0].GetString() ?? string.Empty).ToArray();
-    }
-
-    private static ClickHouseParameterCollection Append(ClickHouseParameterCollection parameters, ClickHouseDbParameter parameter)
-    {
-        parameters.Add(parameter);
-        return parameters;
     }
 
     public async Task<ClickHouseConnection> PingAsync(CancellationToken cancellationToken)
@@ -140,6 +119,42 @@ internal sealed class ClickHouseDriverProvider(ClickHouseClient client, string d
         {
             return new(false, database, null, ProviderName);
         }
+    }
+
+    // A handful of real values for a categorical column, so the agent writes country = 'GB', not
+    // 'UK'. A column that cannot be sampled within the caps simply has no samples; it never fails
+    // the schema read.
+    private async Task<IReadOnlyList<string>?> SampleValuesAsync(string table, string column, CancellationToken cancellationToken)
+    {
+        var parameters = new ClickHouseParameterCollection
+        {
+            Parameter("db", database),
+            Parameter("t", table),
+            Parameter("c", column),
+            Parameter("n", (ulong)ClickHouseSchemaSampling.MaxValues),
+        };
+        try
+        {
+            var (_, rows) = await ReadAsync(
+                "SELECT DISTINCT toString({c:Identifier}) AS v FROM {db:Identifier}.{t:Identifier} ORDER BY v LIMIT {n:UInt64}",
+                parameters, ClickHouseSchemaSampling.MaxValues, cancellationToken).ConfigureAwait(false);
+            return rows.Select(row => row[0].GetString() ?? string.Empty).ToArray();
+        }
+        catch (ClickHouseQueryException)
+        {
+            return null;
+        }
+    }
+
+    private ClickHouseParameterCollection SchemaParameters(string? table)
+    {
+        var parameters = new ClickHouseParameterCollection { Parameter("db", database) };
+        if (table is not null)
+        {
+            parameters.Add(Parameter("t", table));
+        }
+
+        return parameters;
     }
 
     private async Task<long> CountAsync(string sql, ClickHouseParameterCollection parameters, CancellationToken cancellationToken)
@@ -189,6 +204,18 @@ internal sealed class ClickHouseDriverProvider(ClickHouseClient client, string d
         }
     }
 
+    // Each concurrent statement gets its own collection; the driver reads it while building the request.
+    private static ClickHouseParameterCollection Parameters(IReadOnlyDictionary<string, object> values)
+    {
+        var parameters = new ClickHouseParameterCollection();
+        foreach (var (name, value) in values)
+        {
+            parameters.Add(Parameter(name, value));
+        }
+
+        return parameters;
+    }
+
     private static ClickHouseDbParameter Parameter(string name, object value) => new() { ParameterName = name, Value = value };
 
     private static QueryOptions Options(int maxResultRows) => new()
@@ -210,4 +237,12 @@ internal sealed class ClickHouseDriverProvider(ClickHouseClient client, string d
         var settings = new ClickHouseConnectionStringBuilder(connectionString);
         return string.IsNullOrWhiteSpace(settings.Database) ? "default" : settings.Database;
     }
+}
+
+// Schema reads sample this many categorical columns with this many distinct values each; the fake
+// applies the same caps so scenarios see what the driver would return.
+internal static class ClickHouseSchemaSampling
+{
+    public const int MaxColumns = 24;
+    public const int MaxValues = 12;
 }

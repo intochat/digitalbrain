@@ -40,4 +40,8 @@ public interface ITable : INeuron
 
     [ReadOnly, Alias("operation")]
     Task<TableOperationResult?> ReadOperation(ReadTableOperation query);
+
+    /// <summary>Reads id, title and revision from saved state without touching the table's rows or their source.</summary>
+    [ReadOnly, Alias("summary")]
+    Task<TableSummary?> ReadSummary();
 }

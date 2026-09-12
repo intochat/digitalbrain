@@ -102,26 +102,27 @@ internal static class QueryPlanCompiler
         }
     }
 
-    // Every orderable column joins the sort as a tiebreaker so LIMIT/OFFSET pages never overlap
-    // or skip rows when the sort key has duplicates or there is no sort at all.
+    // Without a view sort the base query's own ORDER BY flows through the wrapper untouched. With
+    // one, every other orderable column joins as a tiebreaker so LIMIT/OFFSET pages never overlap
+    // or skip rows when the sort key has duplicates.
     private static string OrderBy(QueryPlan plan, Dictionary<string, ClickHouseColumn> columns, Dictionary<string, object> parameters)
     {
-        var terms = new List<string>();
-        if (plan.Sort is { } sort)
+        if (plan.Sort is not { } sort)
         {
-            if (!columns.ContainsKey(sort.ColumnId))
-            {
-                throw new TableValidationException($"Sort column '{sort.ColumnId}' does not exist.");
-            }
-
-            parameters["sort"] = sort.ColumnId;
-            terms.Add(sort.Descending ? "{sort:Identifier} DESC NULLS LAST" : "{sort:Identifier} ASC NULLS FIRST");
+            return string.Empty;
         }
 
+        if (!columns.ContainsKey(sort.ColumnId))
+        {
+            throw new TableValidationException($"Sort column '{sort.ColumnId}' does not exist.");
+        }
+
+        parameters["sort"] = sort.ColumnId;
+        var terms = new List<string> { sort.Descending ? "{sort:Identifier} DESC NULLS LAST" : "{sort:Identifier} ASC NULLS FIRST" };
         var tiebreakers = 0;
         foreach (var column in plan.Columns)
         {
-            if (column.Name == plan.Sort?.ColumnId || !ClickHouseTypeMap.IsOrderable(column.ClickHouseType))
+            if (column.Name == sort.ColumnId || !ClickHouseTypeMap.IsOrderable(column.ClickHouseType))
             {
                 continue;
             }
@@ -131,6 +132,6 @@ internal static class QueryPlanCompiler
             tiebreakers++;
         }
 
-        return terms.Count == 0 ? string.Empty : " ORDER BY " + string.Join(", ", terms);
+        return " ORDER BY " + string.Join(", ", terms);
     }
 }
