@@ -39,6 +39,11 @@ internal static class ClickHouseTypeMap
         return type;
     }
 
+    // Low-cardinality strings and enums hold a small set of values worth showing to the agent.
+    public static bool IsCategorical(string clickHouseType)
+        => clickHouseType.Contains("LowCardinality(", StringComparison.Ordinal)
+            || Unwrap(clickHouseType).StartsWith("Enum", StringComparison.Ordinal);
+
     // ORDER BY is not defined for these, so they never serve as paging tiebreakers.
     public static bool IsOrderable(string clickHouseType)
     {

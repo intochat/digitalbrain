@@ -27,8 +27,9 @@ internal sealed class ClickHouseNativeTools(IGrainFactory grains, INeuronInvoker
         return AIFunctionFactory.Create(Invoke, new AIFunctionFactoryOptions
         {
             Name = "clickhouse_schema",
-            Description = "Read the ClickHouse database schema (tables, engines, columns, types). Start with no table for the index. "
-                + "Always read the schema before writing SQL; column names must match exactly.",
+            Description = "Read the ClickHouse database schema (tables, engines, columns, types, and sample values of categorical "
+                + "columns). Start with no table for the index. Always read the schema before writing SQL; column names must "
+                + "match exactly and filters on categorical columns must use the sample values as spelled.",
         });
     }
 
@@ -55,7 +56,7 @@ internal sealed class ClickHouseNativeTools(IGrainFactory grains, INeuronInvoker
         Task<JsonElement> Invoke(
             [Description("Short table title")] string title,
             [Description("The read-only SELECT whose rows the table shows live; alias every column with a unique name")] string sql,
-            [Description("The current chat, exactly as stated in the conversation context (for example uichat:desk); omit when the context names no chat")] string? chatName = null,
+            [Description("Only when the conversation context has a 'Chat:' line: that uichat name, exactly as stated. Otherwise omit it.")] string? chatName = null,
             CancellationToken cancellationToken = default)
             => ShowQueryTableAsync(chatName, title, sql, cancellationToken);
 
@@ -114,10 +115,7 @@ internal sealed class ClickHouseNativeTools(IGrainFactory grains, INeuronInvoker
             await invoker.InvokeAsync(neuron, "clickhouse.table", "create-query",
                 JsonSerializer.SerializeToElement(command, ClickHouseJson.Default.CreateQueryTableCommand), cancellationToken).ConfigureAwait(false);
             await WaitAppliedAsync(neuron, command.Id, cancellationToken).ConfigureAwait(false);
-            if (chat is { } target)
-            {
-                await WaitForCardAsync(target, name, cancellationToken).ConfigureAwait(false);
-            }
+            var carded = chat is { } target && await WaitForCardAsync(target, name, cancellationToken).ConfigureAwait(false);
 
             var snapshot = await tables.ReadAsync(name, cancellationToken: cancellationToken).ConfigureAwait(false);
             return JsonSerializer.SerializeToElement(new
@@ -135,9 +133,9 @@ internal sealed class ClickHouseNativeTools(IGrainFactory grains, INeuronInvoker
                 snapshot.FilteredRows,
                 snapshot.Offset,
                 snapshot.Limit,
-                message = (chat is null
-                    ? $"Table '{snapshot.Title}' is saved as {name} and opens in the workspace. "
-                    : $"Table '{snapshot.Title}' is now showing in the chat as card '{name}' (id {name}). ")
+                message = (carded
+                    ? $"Table '{snapshot.Title}' is now showing in the chat as card '{name}' (id {name}). "
+                    : $"Table '{snapshot.Title}' is saved as {name}; the workspace opens it from this result. ")
                     + "Refine it with update_table_view (filters are AND-combined); read a page with read_table.",
             }, WireJson);
         }
@@ -148,6 +146,10 @@ internal sealed class ClickHouseNativeTools(IGrainFactory grains, INeuronInvoker
         catch (TableSourceException error)
         {
             return Error("source_failed", error.Message);
+        }
+        catch (TimeoutException error)
+        {
+            return Error("pending", error.Message + " List tables before retrying; do not claim success.");
         }
         catch (Exception error) when (error is not OperationCanceledException && !TransientFailure.Covers(error))
         {
@@ -183,9 +185,11 @@ internal sealed class ClickHouseNativeTools(IGrainFactory grains, INeuronInvoker
         }
     }
 
-    private async Task WaitForCardAsync(NeuronId chat, string name, CancellationToken cancellationToken)
+    // The command acknowledges admission, not completion; a uichat turn must not settle before the
+    // chat holds the card. A chat with no running turn (the workspace agent names none) gets no card,
+    // and the table is already created and listed, so waiting is best effort and never fails the tool.
+    private async Task<bool> WaitForCardAsync(NeuronId chat, string name, CancellationToken cancellationToken)
     {
-        // The command acknowledges admission, not completion; do not settle before the chat holds the card.
         var target = grains.GetGrain<IChat>(chat.ToGrainId());
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(TimeSpan.FromSeconds(30));
@@ -196,7 +200,12 @@ internal sealed class ClickHouseNativeTools(IGrainFactory grains, INeuronInvoker
                 var turns = await target.ReadTurns(new ReadTurns()).WaitAsync(deadline.Token).ConfigureAwait(false);
                 if (turns.Turns.Any(turn => turn.Cards?.Any(card => card.Kind == UiCardKinds.Table && card.Name == name) == true))
                 {
-                    return;
+                    return true;
+                }
+
+                if (!turns.Turns.Any(turn => turn.Status == ChatTurnStatus.Running))
+                {
+                    return false;
                 }
 
                 await Task.Delay(25, deadline.Token).ConfigureAwait(false);
@@ -204,7 +213,7 @@ internal sealed class ClickHouseNativeTools(IGrainFactory grains, INeuronInvoker
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new TimeoutException($"Card '{name}' has not reached chat '{chat}' yet.");
+            return false;
         }
     }
 

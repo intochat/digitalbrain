@@ -41,6 +41,14 @@ public sealed class ClickHouseSteps(BrainWorld world)
         Assert.Equal(tableType, Assert.Single(listed.Columns, entry => entry.Name == column).TableType);
     }
 
+    [Then(@"the ClickHouse schema column ""(.*)"" of ""(.*)"" offers the sample values ""(.*)""")]
+    public void SchemaOffersSampleValues(string column, string table, string values)
+    {
+        Assert.NotNull(_schema);
+        var listed = Assert.Single(_schema.Tables, entry => entry.Name == table);
+        Assert.Equal(values.Split(", "), Assert.Single(listed.Columns, entry => entry.Name == column).SampleValues);
+    }
+
     [When(@"""(.*)"" runs the ClickHouse query ""(.*)""")]
     public async Task RunQuery(string principal, string sql)
     {

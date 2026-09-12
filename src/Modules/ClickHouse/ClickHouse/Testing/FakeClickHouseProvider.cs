@@ -91,7 +91,11 @@ internal sealed partial class FakeClickHouseProvider : IClickHouseProvider
             var tables = _tables.Values
                 .Where(entry => table is null || string.Equals(entry.Name, table, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(entry => entry.Name, StringComparer.Ordinal)
-                .Select(entry => new ClickHouseTableInfo(entry.Name, entry.Engine, entry.Rows.Count, entry.Columns))
+                .Select(entry => new ClickHouseTableInfo(entry.Name, entry.Engine, entry.Rows.Count, entry.Columns
+                    .Select((column, index) => ClickHouseTypeMap.IsCategorical(column.ClickHouseType)
+                        ? column with { SampleValues = entry.Rows.Select(row => row[index].ToString()).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).Take(12).ToArray() }
+                        : column)
+                    .ToArray()))
                 .ToArray();
             return Task.FromResult(new ClickHouseSchema(Database, tables));
         }

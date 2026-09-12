@@ -5,6 +5,7 @@ Feature: ClickHouse
     Given a running brain with the ClickHouse module
     When "claude" reads the ClickHouse schema
     Then the ClickHouse schema lists table "companies_current" with column "employee_count" of type "number"
+    And the ClickHouse schema column "country" of "companies_current" offers the sample values "CZ, DE, GB"
 
   Scenario: A read-only query returns typed rows
     Given a running brain with the ClickHouse module
