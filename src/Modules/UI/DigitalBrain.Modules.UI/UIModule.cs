@@ -15,6 +15,7 @@ public sealed class UIModule : IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.TryAddSingleton<TableService>();
+        builder.Services.AddSingleton<ITableSource>(new TableSource("table-", UIVocabulary.TableType));
         // Resolved lazily so the choice does not depend on whether the host registered its blob
         // client before or after this module.
         builder.Services.TryAddSingleton<IUiImageStore>(services =>

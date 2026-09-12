@@ -70,6 +70,13 @@ internal static class TablePolicy
     internal static TableSnapshot Query(TableSnapshot source, int offset, int limit)
     {
         ValidatePage(offset, limit);
+        var filtered = Apply(source);
+        return source with { Rows = filtered.Skip(offset).Take(limit).ToArray(), FilteredRows = filtered.Count, Offset = offset, Limit = limit };
+    }
+
+    // The single definition of filter and sort semantics; other row sources reuse it for parity.
+    internal static IReadOnlyList<TableRow> Apply(TableSnapshot source)
+    {
         var columns = source.Columns.Select((column, index) => (column, index)).ToDictionary(item => item.column.Id, StringComparer.Ordinal);
         IEnumerable<TableRow> rows = source.Rows;
         foreach (var filter in source.Filters)
@@ -83,8 +90,7 @@ internal static class TablePolicy
             var comparer = Comparer<JsonElement>.Create((left, right) => Compare(column.Type, left, right));
             rows = sort.Descending ? rows.OrderByDescending(row => row.Cells[index], comparer) : rows.OrderBy(row => row.Cells[index], comparer);
         }
-        var filtered = rows.ToArray();
-        return source with { Rows = filtered.Skip(offset).Take(limit).ToArray(), FilteredRows = filtered.Length, Offset = offset, Limit = limit };
+        return rows.ToArray();
     }
 
     private static bool Matches(string type, JsonElement cell, TableFilter filter)

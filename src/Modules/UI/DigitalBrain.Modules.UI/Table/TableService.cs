@@ -4,9 +4,15 @@ using DigitalBrain.Abstractions.Neurons;
 namespace DigitalBrain.UI;
 
 /// <summary>Shared authoritative table API for humans and agent tools.</summary>
-public sealed class TableService(IGrainFactory grains)
+public sealed class TableService(IGrainFactory grains, IEnumerable<ITableSource>? sources = null)
 {
     private static readonly NeuronId CatalogId = NeuronId.Plain("ui-table-catalog");
+    private static readonly TableSource InMemorySource = new("table-", UIVocabulary.TableType);
+
+    // Longest prefix wins so a module prefix such as "chtable-" can never be shadowed by "table-".
+    private readonly ITableSource[] _sources = [.. (sources ?? []).Append(InMemorySource)
+        .DistinctBy(source => source.IdPrefix, StringComparer.Ordinal)
+        .OrderByDescending(source => source.IdPrefix.Length)];
 
     public async Task<TableSnapshot> CreateAsync(CreateTable input, CancellationToken cancellationToken = default)
     {
@@ -15,13 +21,17 @@ public sealed class TableService(IGrainFactory grains)
         var neuronId = new NeuronId(UIVocabulary.TableType, id);
         // Use the kernel's durable synapse index. Reserve before creation: process loss can leave
         // an empty reservation (ignored by List), but cannot orphan an applied table.
-        await grains.GetGrain<INeuron>(CatalogId.ToGrainId()).Connect(neuronId, UIVocabulary.TableListed).WaitAsync(cancellationToken).ConfigureAwait(false);
+        await RegisterAsync(neuronId, cancellationToken).ConfigureAwait(false);
         var table = grains.GetGrain<ITable>(neuronId.ToGrainId());
         var command = new CreateTableCommand(CommandId.New(), input);
         await table.Create(command, cancellationToken).WaitAsync(cancellationToken).ConfigureAwait(false);
         await WaitAppliedAsync(table, id, command.Id, cancellationToken).ConfigureAwait(false);
         return await ReadAsync(id, cancellationToken: cancellationToken).ConfigureAwait(false);
     }
+
+    // Lists a table that another module's ITableSource serves, so list_tables and /ui/tables find it.
+    public Task RegisterAsync(NeuronId table, CancellationToken cancellationToken = default)
+        => grains.GetGrain<INeuron>(CatalogId.ToGrainId()).Connect(table, UIVocabulary.TableListed).WaitAsync(cancellationToken);
 
     public async Task<TableSnapshot> ReadAsync(string id, int offset = 0, int limit = 50, CancellationToken cancellationToken = default)
     {
@@ -44,7 +54,7 @@ public sealed class TableService(IGrainFactory grains)
     {
         var links = await grains.GetGrain<INeuron>(CatalogId.ToGrainId()).ReadSynapses().WaitAsync(cancellationToken).ConfigureAwait(false);
         var result = new List<TableSummary>();
-        foreach (var link in links.Where(link => link.SignalType == UIVocabulary.TableListed && link.Target.Type == UIVocabulary.TableType))
+        foreach (var link in links.Where(link => link.SignalType == UIVocabulary.TableListed && ServesTables(link.Target.Type)))
         {
             var saved = await grains.GetGrain<ITable>(link.Target.ToGrainId()).Read(new(0, 1)).WaitAsync(cancellationToken).ConfigureAwait(false);
             if (saved is not null) { result.Add(new(saved.Id, saved.Title, saved.Revision)); }
@@ -52,9 +62,15 @@ public sealed class TableService(IGrainFactory grains)
         return result.OrderBy(table => table.Title, StringComparer.OrdinalIgnoreCase).ThenBy(table => table.Id, StringComparer.Ordinal).ToArray();
     }
 
+    internal ITableSource SourceOf(string id)
+        => _sources.FirstOrDefault(source => id.StartsWith(source.IdPrefix, StringComparison.Ordinal)) ?? InMemorySource;
+
+    private bool ServesTables(string grainType)
+        => _sources.Any(source => string.Equals(source.GrainType, grainType, StringComparison.Ordinal));
+
     private ITable Table(string id)
     {
-        try { return grains.GetGrain<ITable>(new NeuronId(UIVocabulary.TableType, id).ToGrainId()); }
+        try { return grains.GetGrain<ITable>(new NeuronId(SourceOf(id).GrainType, id).ToGrainId()); }
         catch (ArgumentException) { throw new TableValidationException("Table ID is invalid."); }
     }
 

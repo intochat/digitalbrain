@@ -71,6 +71,10 @@ internal sealed class TableAgentTools(TableService tables)
         {
             return Error("invalid_table", error.Message);
         }
+        catch (TableSourceException error)
+        {
+            return Error("source_failed", error.Message + " Fix the query behind the table or create it again.");
+        }
         catch (TimeoutException)
         {
             return Error("pending", "The operation has not completed. List and read saved tables before retrying; do not claim success.");
