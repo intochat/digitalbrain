@@ -42,11 +42,14 @@ becomes `update_table_view` with an added `employee_count gte 50` filter; "chart
 is `clickhouse_query` with a `GROUP BY` followed by `render_chart` (`bar` or `line`).
 
 Two chats exist today and they see different tool sets. The workspace chat (AG-UI `/agent`) has
-the table tools and the three ClickHouse tools; it renders `show_query_table`'s `kind: "table"` result
-as a live table. A `uichat` agent gets whatever its `Instruct` lists: the table tools, `render_chart`
-and the ClickHouse tools are all native tools, so listing `read_table`, `update_table_view`,
-`show_query_table` and `render_chart` gives it the full flow with `table` and `chart` cards. The
-smoke transcript in `NOTES.md` covers both.
+the table tools, the three ClickHouse tools and `render_chart`; it renders `show_query_table`'s
+`kind: "table"` result as a live table and `render_chart`'s `kind: "chart"` result as a chart in the
+working area (both carry their data, so the workspace never re-reads them from the server). A
+`uichat` agent gets whatever its `Instruct` lists: the table tools, `render_chart` and the ClickHouse
+tools are all native tools, so listing `read_table`, `update_table_view`, `show_query_table` and
+`render_chart` gives it the full flow with `table` and `chart` cards. `render_chart` takes an optional
+`chatName`: with a uichat it connects the chart neuron to the chat and waits for the card, without one
+it only renders the neuron and hands the points back. The smoke transcripts in `NOTES.md` cover both.
 
 ## AppHost
 

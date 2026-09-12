@@ -58,6 +58,17 @@ class WorkspaceArtifactEditor extends StatelessWidget {
                 ],
               ),
             ),
+    'chart' => LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        padding: const EdgeInsets.all(12),
+        child: UiChart(
+          part: UiChartPart.fromMetadata(artifact.data),
+          height: constraints.hasBoundedHeight
+              ? (constraints.maxHeight - 104).clamp(200.0, 720.0)
+              : 320,
+        ),
+      ),
+    ),
     'diagram' => _DiagramEditor(
       key: ValueKey(artifact.id),
       artifact: artifact,

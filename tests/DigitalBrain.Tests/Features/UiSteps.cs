@@ -4,6 +4,7 @@ using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Chat;
 using DigitalBrain.UI;
+using Microsoft.Extensions.AI;
 using Reqnroll;
 using Xunit;
 
@@ -21,16 +22,46 @@ public sealed class UiSteps(BrainSteps brain, BrainWorld world)
     [Then(@"the latest ""(.*)"" Responded carries a rendered chart titled ""(.*)""")]
     public async Task RenderedCard(string observer, string title)
     {
-        var body = (await brain.Journal(observer, JournalKind.Incoming)).Delta
-            .Last(delivery => delivery.Signal.Type == UIVocabulary.Responded).Signal.Body;
-        var response = JsonSerializer.Deserialize(body, UIJson.Default.Responded);
-        Assert.NotNull(response);
-        Assert.Equal("here is your chart", response.Text);
+        var response = await LatestResponded(observer);
         Assert.NotNull(response.Cards);
         var card = Assert.Single(response.Cards);
         Assert.Equal(UiCardKinds.Chart, card.Kind);
         Assert.Equal(title, card.Caption);
         await ChartSnapshot(card.Name, title, "Q1", 42);
+    }
+
+    [Then(@"the latest ""(.*)"" Responded carries no cards")]
+    public async Task NoCards(string observer)
+    {
+        var response = await LatestResponded(observer);
+        Assert.True(response.Cards is null or { Count: 0 });
+    }
+
+    [Then(@"the scripted model received a chart result for ""(.*)"" with point ""(.*)"" valued (\d+)")]
+    public async Task ChartResult(string title, string label, int value)
+    {
+        var result = world.Scripted.Calls
+            .SelectMany(call => call)
+            .SelectMany(message => message.Contents.OfType<FunctionResultContent>())
+            .Select(content => content.Result)
+            .OfType<JsonElement>()
+            .Single(element => element.ValueKind == JsonValueKind.Object
+                && element.GetProperty("kind").GetString() == UiCardKinds.Chart);
+        Assert.Equal(title, result.GetProperty("title").GetString());
+        var point = Assert.Single(result.GetProperty("points").EnumerateArray());
+        Assert.Equal(label, point.GetProperty("label").GetString());
+        Assert.Equal(value, point.GetProperty("value").GetInt32());
+        await ChartSnapshot(result.GetProperty("id").GetString()!, title, label, value);
+    }
+
+    private async Task<Responded> LatestResponded(string observer)
+    {
+        var body = (await brain.Journal(observer, JournalKind.Incoming)).Delta
+            .Last(delivery => delivery.Signal.Type == UIVocabulary.Responded).Signal.Body;
+        var response = JsonSerializer.Deserialize(body, UIJson.Default.Responded);
+        Assert.NotNull(response);
+        Assert.Equal("here is your chart", response.Text);
+        return response;
     }
 
     [When(@"chart ""(.*)"" renders ""(.*)""")]

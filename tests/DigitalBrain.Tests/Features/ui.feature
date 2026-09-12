@@ -26,6 +26,16 @@ Feature: ui
     And the scripted model received a tool result containing "is now showing in the chat as card"
     And the latest "alice" Responded carries a rendered chart titled "Quarterly sales"
 
+  Scenario: The responder renders a chart without a chat and gets its data back for the workspace
+    Given "uichat:desk" is connected to "alice" for "Responded"
+    And the scripted model will call tool "render_chart" with {"title":"Quarterly sales","chartKind":"line","labels":["Q1"],"values":[42]} then say "here is your chart"
+    When session "alice" fires "Instruct" {"tools":["render_chart"]} at "agent:desk"
+    And chat "desk" sends "show sales"
+    And "alice" waits up to 10 seconds for an incoming "Responded"
+    Then the scripted model received a tool result containing "the workspace opens it from this result"
+    And the scripted model received a chart result for "Quarterly sales" with point "Q1" valued 42
+    And the latest "alice" Responded carries no cards
+
   Scenario: A rendered chart is readable and reaches a connected chat as a card
     Given "chart:sales" is connected to "uichat:desk" for "ChartRendered"
     And the scripted model will pause before its next answer

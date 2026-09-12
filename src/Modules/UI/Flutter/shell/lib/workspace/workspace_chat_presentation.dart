@@ -138,7 +138,14 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
         ),
       );
     }
-    if (['table', 'diagram', 'brain', 'image', 'document'].contains(kind)) {
+    if ([
+      'table',
+      'chart',
+      'diagram',
+      'brain',
+      'image',
+      'document',
+    ].contains(kind)) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Material(
@@ -152,6 +159,7 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
             leading: Icon(
               switch (kind) {
                 'table' => Icons.table_chart_outlined,
+                'chart' => Icons.bar_chart_rounded,
                 'image' => Icons.image_outlined,
                 'brain' => Icons.hub_outlined,
                 'diagram' => Icons.draw_outlined,

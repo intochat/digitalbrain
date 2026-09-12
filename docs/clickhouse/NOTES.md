@@ -183,6 +183,38 @@ Tool results are abbreviated to their first characters; the workspace transcript
   [Completed] Done — the line chart is now showing in the chat.
 ```
 
+### Workspace chat (AG-UI `/agent`), charts after deviation 31
+
+Captured after the AppHost restart with the final build; the model aggregates with `clickhouse_query`
+and calls `render_chart` without `chatName`, and the `kind: "chart"` result is what the Flutter
+workspace opens as a chart.
+
+```text
+> How many companies do we have per country? Show it as a chart.
+  [tool call] clickhouse_schema {}
+  [tool result] {"database": "digitalbrain", "tables": [{"name": "companies_current", "engine": "ReplacingMergeTree", "totalRows": 30, "columns": [{"name": "company_id", "clickHouseType": "String", "tableType": "text", "sampleValues": null}, {"name": "name", "clickHouseType": "String", "tableType": "text", "sampleValues": null}, {"name": "country", "clickHouseType": "LowCardinality(String)", "tableType": "text", "sampleValues": ["CZ", "DE", "GB"]}, {"name": "city", "clickHouseType": "String", "tableType": "text", "sampleValues": null}, {"name": "website", "clickHouseType": "String", "tableType": "text", "sampleValues": null}, {"name": "industry", "clickHouseType": "LowCardinality(String)", "
+  [tool call] clickhouse_query {"sql":"SELECT country AS country, count() AS company_count FROM companies_current GROUP BY country ORDER BY company_count DESC, country ASC","maxRows":100}
+  [tool result] {"columns": [{"name": "country", "clickHouseType": "LowCardinality(String)", "tableType": "text", "sampleValues": null}, {"name": "company_count", "clickHouseType": "UInt64", "tableType": "number", "sampleValues": null}], "rows": [["GB", 11], ["DE", 10], ["CZ", 9]], "rowCount": 3, "truncated": false, "elapsedMs": 7.4261}
+  [tool call] render_chart {"title":"Companies by country","chartKind":"bar","labels":["GB","DE","CZ"],"values":[11,10,9]}
+  [tool result] {"kind": "chart", "id": "chart-74961654", "title": "Companies by country", "chartKind": "bar", "points": [{"label": "GB", "value": 11}, {"label": "DE", "value": 10}, {"label": "CZ", "value": 9}], "message": "Chart 'Companies by country' is saved as 'chart-74961654'; the workspace opens it from this result."}
+  [assistant] There are **30 companies across 3 countries**:
+              
+              - **GB:** 11
+              - **DE:** 10
+              - **CZ:** 9
+              
+              The chart is now available in the workspace.
+
+> Now chart the UK construction companies by employee count, as a bar chart.
+  [tool call] clickhouse_schema {"table":"companies_current"}
+  [tool result] {"database": "digitalbrain", "tables": [{"name": "companies_current", "engine": "ReplacingMergeTree", "totalRows": 30, "columns": [{"name": "company_id", "clickHouseType": "String", "tableType": "text", "sampleValues": null}, {"name": "name", "clickHouseType": "String", "tableType": "text", "sampleValues": null}, {"name": "country", "clickHouseType": "LowCardinality(String)", "tableType": "text", "sampleValues": ["CZ", "DE", "GB"]}, {"name": "city", "clickHouseType": "String", "tableType": "text", "sampleValues": null}, {"name": "website", "clickHouseType": "String", "tableType": "text", "sampleValues": null}, {"name": "industry", "clickHouseType": "LowCardinality(String)", "
+  [tool call] clickhouse_query {"sql":"SELECT name AS company_name, employee_count AS employee_count FROM companies_current WHERE country = 'GB' AND industry = 'Construction' AND employee_count IS NOT NULL ORDER BY employee_count DESC, company_name ASC","maxRows":100}
+  [tool result] {"columns": [{"name": "company_name", "clickHouseType": "String", "tableType": "text", "sampleValues": null}, {"name": "employee_count", "clickHouseType": "Nullable(UInt32)", "tableType": "number", "sampleValues": null}], "rows": [["Northgate Builders", 120], ["Severn Groundworks", 88], ["Thames Roofing Ltd", 64], ["Bristol Scaffold Co", 42], ["Highland Timber Frames", 27], ["Pennine Slate & Tile", 18], ["Mersey Flat Roofing", 9]], "rowCount": 7, "truncated": false, "elapsedMs": 6.9567}
+  [tool call] render_chart {"title":"UK construction companies by employee count","chartKind":"bar","labels":["Northgate Builders","Severn Groundworks","Thames Roofing Ltd","Bristol Scaffold Co","Highland Timber Frames","Pennine Slate & Tile","Mersey Flat Roofing"],"values":[120,88,64,42,27,18,9]}
+  [tool result] {"kind": "chart", "id": "chart-964d8aba", "title": "UK construction companies by employee count", "chartKind": "bar", "points": [{"label": "Northgate Builders", "value": 120}, {"label": "Severn Groundworks", "value": 88}, {"label": "Thames Roofing Ltd", "value": 64}, {"label": "Bristol Scaffold Co", "value": 42}, {"label": "Highland Timber Frames", "value": 27}, {"label": "Pennine Slate & Tile", "value": 18}, {"label": "Mersey Flat Roofing", "value": 9}], "message": "Chart 'UK construction companies by employee count' is saved as 'chart-964d8aba'; the workspace opens it from this result."}
+  [assistant] The bar chart for **UK construction companies by employee count** is now available in the workspace. It includes 7 companies with employee counts ranging from **9 to 120**.
+```
+
 The first run of the workspace transcript (before the fixes in the `clickhouse: run findings` commit) failed twice:
 the model passed `chatName: "uichat:desk"` although that workspace has no chat, so the tool waited 30 s for a card
 that could not arrive and surfaced as "Function failed"; and it filtered `country = 'UK'` where the data says `GB`.
@@ -198,6 +230,16 @@ for categorical columns, and the workspace agent is told to omit `chatName` and 
 19. `show_query_table` waits for the chat card only while the named chat has a running turn, treats a
     missed card as "saved, not carded" instead of failing, and maps any `TimeoutException` to a `pending`
     result; the workspace agent's instructions tell it to omit `chatName`.
+31. **Charts in the workspace chat.** The owner asked for charts to show up in the lead-gen workspace
+    "like a datatable"; before this only a uichat could show one (`render_chart` required a uichat
+    `chatName`, returned a sentence, and the AG-UI agent did not have it). `render_chart` now takes
+    `chatName` last and optional, connects and waits for the card only when a chat is named, and
+    returns `{ kind: "chart", id, title, chartKind, points, message }` (the message still says "is now
+    showing in the chat as card" when carded). The workspace agent allowlists `render_chart` and is told
+    to aggregate first and omit `chatName`. The Flutter shell treats `chart` like `table`: the chat
+    shows the "Open in workspace" tile and opens it automatically, the artifact keeps its points in
+    `data` and is never re-read from or saved to the artifact store (`_servedByResult`), and the
+    editor draws it with the shared `UiChart`. Dock, sidebar and tile icons gained the chart kind.
 
 ## Changes from the code review (before the PR)
 
