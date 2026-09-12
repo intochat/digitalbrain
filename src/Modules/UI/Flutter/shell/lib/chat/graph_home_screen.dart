@@ -74,6 +74,8 @@ final class GraphHomeScreen extends StatefulWidget {
     this.onReadImageBytes,
     this.onReadSpreadsheet,
     this.onReadGraph,
+    this.onReadTable,
+    this.onUpdateTableView,
     this.sceneFactory,
     this.onReadBrain,
     this.onWatchBrain,
@@ -97,6 +99,8 @@ final class GraphHomeScreen extends StatefulWidget {
   final ReadImageBytes? onReadImageBytes;
   final ReadSpreadsheet? onReadSpreadsheet;
   final ReadGraph? onReadGraph;
+  final ReadTable? onReadTable;
+  final UpdateTableView? onUpdateTableView;
   final GraphSceneFactory? sceneFactory;
   final ReadBrain? onReadBrain;
   final WatchBrain? onWatchBrain;
@@ -452,6 +456,8 @@ final class _GraphHomeScreenState extends State<GraphHomeScreen> {
     onReadImageBytes: widget.onReadImageBytes,
     onReadSpreadsheet: widget.onReadSpreadsheet,
     onReadGraph: widget.onReadGraph,
+    onReadTable: widget.onReadTable,
+    onUpdateTableView: widget.onUpdateTableView,
   );
 
   Widget _emptyGraph() => Center(

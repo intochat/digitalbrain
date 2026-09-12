@@ -88,6 +88,7 @@ internal sealed class ChatNeuron(
             case UIVocabulary.GraphRendered:
             case UIVocabulary.ImageDescribed:
             case UIVocabulary.SheetChanged:
+            case UIVocabulary.TableRendered:
                 await OfferAsync(delivery, body, cancellationToken).ConfigureAwait(true);
                 break;
             case UIVocabulary.TurnCancelling:
@@ -181,6 +182,7 @@ internal sealed class ChatNeuron(
             UIVocabulary.ChartRendered => UiCardKinds.Chart,
             UIVocabulary.GraphRendered => UiCardKinds.Graph,
             UIVocabulary.ImageDescribed => UiCardKinds.Image,
+            UIVocabulary.TableRendered => UiCardKinds.Table,
             _ => UiCardKinds.Spreadsheet,
         };
         var card = new UiCardOffer(kind, ChatBodies.String(body, "name") ?? string.Empty, ChatBodies.String(body, "title") ?? string.Empty);

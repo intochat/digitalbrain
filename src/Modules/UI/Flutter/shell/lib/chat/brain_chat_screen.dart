@@ -56,6 +56,8 @@ final class BrainChatScreen extends StatefulWidget {
     this.onReadImageBytes,
     this.onReadSpreadsheet,
     this.onReadGraph,
+    this.onReadTable,
+    this.onUpdateTableView,
     this.presentation = BrainChatPresentation.full,
     this.compactReplyMaxHeight = 180,
     this.activityMode = false,
@@ -77,6 +79,8 @@ final class BrainChatScreen extends StatefulWidget {
   final ReadImageBytes? onReadImageBytes;
   final ReadSpreadsheet? onReadSpreadsheet;
   final ReadGraph? onReadGraph;
+  final ReadTable? onReadTable;
+  final UpdateTableView? onUpdateTableView;
   final BrainChatPresentation presentation;
   final double compactReplyMaxHeight;
   final bool activityMode;

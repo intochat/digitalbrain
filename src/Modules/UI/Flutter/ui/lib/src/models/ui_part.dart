@@ -25,6 +25,7 @@ sealed class UiPart {
       UiSheetPart.kindName => UiSheetPart.fromMetadata(metadata),
       UiSheetRefPart.kindName => UiSheetRefPart.fromMetadata(metadata),
       UiGraphRefPart.kindName => UiGraphRefPart.fromMetadata(metadata),
+      UiTableRefPart.kindName => UiTableRefPart.fromMetadata(metadata),
       _ => null,
     };
   }
@@ -391,6 +392,36 @@ final class UiGraphRefPart extends UiPart {
 
   factory UiGraphRefPart.fromMetadata(Map<String, dynamic> metadata) {
     return UiGraphRefPart(
+      name: metadata['name'] as String? ?? '',
+      caption: metadata['caption'] as String? ?? '',
+    );
+  }
+
+  @override
+  Map<String, Object?> toMetadata() => {
+    'kind': kindName,
+    'name': name,
+    'caption': caption,
+  };
+}
+
+/// A live table card: the rows are read from /ui/tables/{name} on display.
+final class UiTableRefPart extends UiPart {
+  const UiTableRefPart({required this.name, required this.caption});
+
+  static const kindName = 'table-ref';
+
+  final String name;
+  final String caption;
+
+  @override
+  String get kind => kindName;
+
+  @override
+  String get copyText => caption;
+
+  factory UiTableRefPart.fromMetadata(Map<String, dynamic> metadata) {
+    return UiTableRefPart(
       name: metadata['name'] as String? ?? '',
       caption: metadata['caption'] as String? ?? '',
     );

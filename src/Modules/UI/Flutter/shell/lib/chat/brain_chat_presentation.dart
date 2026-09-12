@@ -109,6 +109,8 @@ extension _BrainChatPresentation on _BrainChatScreenState {
           onReadImageBytes: widget.onReadImageBytes,
           onReadSpreadsheet: widget.onReadSpreadsheet,
           onReadGraph: widget.onReadGraph,
+          onReadTable: widget.onReadTable,
+          onUpdateTableView: widget.onUpdateTableView,
         ),
   );
 

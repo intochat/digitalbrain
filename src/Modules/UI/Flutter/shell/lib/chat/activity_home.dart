@@ -655,6 +655,8 @@ extension _ActivityHome on _GraphHomeScreenState {
       onReadImageBytes: widget.onReadImageBytes,
       onReadSpreadsheet: widget.onReadSpreadsheet,
       onReadGraph: widget.onReadGraph,
+      onReadTable: widget.onReadTable,
+      onUpdateTableView: widget.onUpdateTableView,
     );
     return Column(
       key: const Key('graph_chat_panel'),
