@@ -37,10 +37,21 @@ internal sealed class ClickHouseDriverProvider(ClickHouseClient client, string d
     {
         ClickHouseQueryGuard.Validate(plan.BaseSql);
         var compiled = QueryPlanCompiler.Compile(plan);
-        var pageRead = ReadAsync(compiled.PageSql, Parameters(compiled.Parameters), plan.Limit, cancellationToken);
-        var filteredCount = CountAsync(compiled.FilteredCountSql, Parameters(compiled.Parameters), cancellationToken);
-        var totalCount = plan.Filters.Count == 0 ? filteredCount : CountAsync(compiled.TotalCountSql, Parameters(compiled.Parameters), cancellationToken);
-        await Task.WhenAll(pageRead, filteredCount, totalCount).ConfigureAwait(false);
+        using var siblings = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var pageRead = ReadAsync(compiled.PageSql, Parameters(compiled.Parameters), plan.Limit, siblings.Token);
+        var filteredCount = CountAsync(compiled.FilteredCountSql, Parameters(compiled.Parameters), siblings.Token);
+        var totalCount = plan.Filters.Count == 0 ? filteredCount : CountAsync(compiled.TotalCountSql, Parameters(compiled.Parameters), siblings.Token);
+        try
+        {
+            await Task.WhenAll(pageRead, filteredCount, totalCount).ConfigureAwait(false);
+        }
+        catch
+        {
+            // One refused statement ends the others instead of letting them run to their own cap.
+            await siblings.CancelAsync().ConfigureAwait(false);
+            throw;
+        }
+
         var page = pageRead.Result.Rows.Select((cells, index) => new TableRow($"row-{plan.Offset + index}", cells)).ToArray();
         return new(page, totalCount.Result, filteredCount.Result);
     }
@@ -182,7 +193,7 @@ internal sealed class ClickHouseDriverProvider(ClickHouseClient client, string d
                 var cells = new JsonElement[columns.Length];
                 for (var index = 0; index < cells.Length; index++)
                 {
-                    cells[index] = ClickHouseCells.ToCell(reader.IsDBNull(index) ? null : reader.GetValue(index), columns[index].TableType);
+                    cells[index] = ClickHouseCells.ToCell(reader.IsDBNull(index) ? null : reader.GetValue(index), columns[index].TableType, columns[index].ClickHouseType);
                 }
 
                 rows.Add(cells);

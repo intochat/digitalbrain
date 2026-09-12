@@ -1,6 +1,7 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Core;
 using DigitalBrain.UI;
@@ -139,6 +140,11 @@ internal sealed class ClickHouseTableNeuron(
                     // Retrying here would create the table minutes later and hang its card on whatever
                     // turn is running then; the person asked now, so the answer is "not now".
                     result = new(create.Id, "invalid", error.Message + " Try again once ClickHouse is reachable.");
+                }
+                catch (Exception error) when (!TransientFailure.Covers(error))
+                {
+                    // A provider bug or an unmapped driver error must not become an endless retry loop.
+                    result = new(create.Id, "invalid", $"The query could not be described: {error.GetType().Name}: {error.Message}");
                 }
 
                 break;

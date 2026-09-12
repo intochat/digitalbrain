@@ -90,6 +90,20 @@ public sealed class QueryPlanCompilerFacts
     }
 
     [Fact]
+    public void An_unsorted_plan_over_an_unordered_base_query_orders_every_orderable_column_for_stable_pages()
+    {
+        var compiled = QueryPlanCompiler.Compile(new QueryPlan(BaseSql, Columns, [], null, 0, 50));
+        Assert.Equal(
+            "SELECT * FROM (SELECT * FROM companies_current) AS q"
+            + " ORDER BY {t0:Identifier}, {t1:Identifier}, {t2:Identifier}, {t3:Identifier}"
+            + " LIMIT {limit:UInt64} OFFSET {offset:UInt64}",
+            compiled.PageSql);
+        Assert.Equal(["name", "employee_count", "founded_on", "is_active"], new[] { "t0", "t1", "t2", "t3" }.Select(name => compiled.Parameters[name]));
+        var quotedOnly = QueryPlanCompiler.Compile(new QueryPlan("SELECT name FROM companies_current WHERE note = 'order by nothing'", Columns, [], null, 0, 50));
+        Assert.Contains(" ORDER BY {t0:Identifier}", quotedOnly.PageSql, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void A_sorted_plan_breaks_ties_with_every_other_orderable_column()
     {
         var compiled = QueryPlanCompiler.Compile(new QueryPlan(BaseSql, Columns, [], new("founded_on"), 0, 50));

@@ -34,7 +34,7 @@ internal static partial class ClickHouseQueryGuard
     // Replaces the content of every string literal and quoted identifier with a placeholder so the
     // token checks never fire on text, and rejects statement separators, comments and dollar-quoted
     // strings ($tag$…$tag$ would let a quote inside desynchronise this scan from the server's) outside them.
-    private static string MaskQuoted(string sql)
+    internal static string MaskQuoted(string sql)
     {
         var syntax = new StringBuilder(sql.Length);
         char? quote = null;

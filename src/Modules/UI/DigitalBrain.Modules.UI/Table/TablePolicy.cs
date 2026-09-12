@@ -61,13 +61,18 @@ internal static class TablePolicy
     }
 
     // A filter posted without a value carries an undefined JsonElement, which cannot be serialised
-    // into a command; it means null, so it becomes one before the view travels.
+    // into a command; it means null, so it becomes one before the view travels. Missing lists and
+    // null filters stay as they are: the neuron's ValidateView refuses them with the same message
+    // it always has, rather than this step quietly turning "no filters given" into "clear filters".
     internal static UpdateTableView Normalize(UpdateTableView input)
-        => input with
+    {
+        Require(input is not null, "View is required.");
+        return input! with
         {
-            Filters = (input.Filters ?? []).Select(filter => filter with { Value = filter.Value.ValueKind == JsonValueKind.Undefined ? Null : filter.Value.Clone() }).ToArray(),
-            VisibleColumns = (input.VisibleColumns ?? []).ToArray(),
+            Filters = input.Filters?.Select(filter => filter is null ? filter : filter with { Value = filter.Value.ValueKind == JsonValueKind.Undefined ? Null : filter.Value.Clone() }).ToArray()!,
+            VisibleColumns = input.VisibleColumns?.ToArray()!,
         };
+    }
 
     internal static void ValidatePage(int offset, int limit)
         => Require(offset >= 0 && limit is > 0 and <= 200, "Offset must be nonnegative and limit must be between 1 and 200.");

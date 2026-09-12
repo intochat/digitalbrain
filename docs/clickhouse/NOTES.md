@@ -76,9 +76,10 @@ DIGITALBRAIN_CLICKHOUSE_TESTS=1 dotnet test tests/DigitalBrain.Tests/DigitalBrai
 6. `QueryPage` is `(Rows, Total, Filtered)`; the columns are already known to the caller.
 7. When the view has a sort, every other orderable column joins the `ORDER BY` as a tiebreaker
    (`ASC NULLS FIRST` / `DESC NULLS LAST` on the sort column) so LIMIT/OFFSET pages never overlap
-   or skip rows on duplicate keys. Without a view sort no outer `ORDER BY` is added: the base
-   query's own `ORDER BY` flows through the wrapper (verified on the live server), so "top 10 by
-   revenue" pages in revenue order.
+   or skip rows on duplicate keys. Without a view sort, a base query that has an `ORDER BY` of its
+   own flows through the wrapper untouched (verified on the live server), so "top 10 by revenue"
+   pages in revenue order; a base query without one gets the tiebreakers alone so its pages stay
+   stable across requests.
 8. The guard additionally rejects `EXCHANGE`, `MOVE` and the table functions that reach outside the
    database (`url`, `s3`, `file`, `remote`, `mysql`, `postgresql`, …): `readonly=2` alone does not stop
    a SELECT from fetching an arbitrary URL.
@@ -210,9 +211,11 @@ Ten review angles ran over the branch; the confirmed findings and what changed:
 21. **`TableService.UpdateAsync` no longer reads the live page before the command**; the neuron
     validates the view and answers `invalid`/`conflict`/`missing`. `TablePolicy.Normalize` keeps the
     undefined-value-to-null normalisation the command serialiser needs.
-22. **A re-announced card refreshes in place.** `ChatNeuron.OfferAsync` replaces a card with the same
-    kind and name on the turn instead of appending a duplicate (every table view change and chart
-    append re-announces).
+22. **A re-announced card no longer duplicates.** `ChatNeuron.OfferAsync` replaces a card with the same
+    kind and name on the turn instead of appending a second copy (every table view change and chart
+    append re-announces). The Flutter shell does not re-read a card whose name did not change, so
+    the card shows fresh rows when it is displayed, paged or refreshed, not automatically on the
+    re-offer; wiring that resync is a shell follow-up.
 23. **Guard hardening.** `$` outside quotes is rejected (dollar-quoted `$tag$...$tag$` strings would
     have desynchronised the masker and hidden `url(`); keywords followed by `(` are functions, so
     `format('{}', x)` passes; the table-function list gained `oss`, `cosn`, `hive`, `ytsaurus`,
@@ -244,3 +247,17 @@ Ten review angles ran over the branch; the confirmed findings and what changed:
     native tool registry.
 30. **The Flutter table card** creates its controller once and feeds a later re-read into it; the
     build no longer re-accepts the first snapshot, which reset paging on every parent rebuild.
+
+A second sweep over the fixes caught and closed four regressions: `TablePolicy.Normalize` no longer
+substitutes an empty list for a missing `filters` (which would have cleared a view silently) and
+tolerates a null filter element (the neuron refuses it); the fake coerces literals to the column type
+or refuses them as the server would (`is_active = 1` works, `employee_count = 'many'` is
+`CANNOT_PARSE_TEXT`), and the create reaction turns any non-transient describe failure into an
+`invalid` result instead of an endless retry; `DateTime64(N)` text keeps exactly N fraction digits;
+and `show_query_table` still catalogues a create that timed out, because it may apply later.
+
+Known limits recorded by the sweep: in a uichat the table tools are native tools and therefore pass
+the AI module's untrusted-content screen like every native tool (results above the screen's size
+limit are refused there; the workspace agent calls the same tools unscreened), and
+`docs/clickhouse/clickhouse-module-plan.md` still names `TableAgentTools` under the kernel path it
+moved from.

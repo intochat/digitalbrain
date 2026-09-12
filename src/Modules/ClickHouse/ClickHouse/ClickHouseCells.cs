@@ -17,7 +17,7 @@ internal static class ClickHouseCells
     private static readonly JsonElement Null = JsonSerializer.SerializeToElement<object?>(null);
     private static readonly JsonSerializerOptions StructuredJson = new(JsonSerializerDefaults.General);
 
-    public static JsonElement ToCell(object? value, string tableType)
+    public static JsonElement ToCell(object? value, string tableType, string? clickHouseType = null)
     {
         if (value is null or DBNull)
         {
@@ -27,9 +27,9 @@ internal static class ClickHouseCells
         return tableType switch
         {
             ClickHouseTypeMap.Number => NumberCell(value),
-            ClickHouseTypeMap.Boolean => value is bool flag ? JsonSerializer.SerializeToElement(flag) : TextCell(value),
+            ClickHouseTypeMap.Boolean => value is bool flag ? JsonSerializer.SerializeToElement(flag) : TextCell(value, clickHouseType),
             ClickHouseTypeMap.Date => DateCell(value),
-            _ => TextCell(value),
+            _ => TextCell(value, clickHouseType),
         };
     }
 
@@ -83,14 +83,15 @@ internal static class ClickHouseCells
             _ => TextCell(value),
         };
 
-    private static JsonElement TextCell(object value)
+    private static JsonElement TextCell(object value, string? clickHouseType = null)
     {
         var text = value switch
         {
             string plain => plain,
-            // The same spelling ClickHouse's toString() yields, so an eq filter typed from the cell matches server-side.
-            DateTime moment => moment.ToString("yyyy-MM-dd HH:mm:ss.FFFFFFF", CultureInfo.InvariantCulture),
-            DateTimeOffset moment => moment.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss.FFFFFFF", CultureInfo.InvariantCulture),
+            // The same spelling ClickHouse's toString() yields (DateTime64(N) prints exactly N digits), so an
+            // eq filter typed from the cell matches server-side.
+            DateTime moment => moment.ToString(DateTimeFormat(clickHouseType), CultureInfo.InvariantCulture),
+            DateTimeOffset moment => moment.DateTime.ToString(DateTimeFormat(clickHouseType), CultureInfo.InvariantCulture),
             DateOnly date => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             TimeOnly time => time.ToString("HH:mm:ss.FFFFFFF", CultureInfo.InvariantCulture),
             Guid guid => guid.ToString("D"),
@@ -109,6 +110,13 @@ internal static class ClickHouseCells
         }
 
         return JsonSerializer.SerializeToElement(text);
+    }
+
+    private static string DateTimeFormat(string? clickHouseType)
+    {
+        var core = clickHouseType is null ? string.Empty : ClickHouseTypeMap.Unwrap(clickHouseType);
+        var scale = core.StartsWith("DateTime64(", StringComparison.Ordinal) && core.Length > 11 && char.IsAsciiDigit(core[11]) ? core[11] - '0' : 0;
+        return scale == 0 ? "yyyy-MM-dd HH:mm:ss" : "yyyy-MM-dd HH:mm:ss." + new string('f', scale);
     }
 
     private static string Structured(IEnumerable value)

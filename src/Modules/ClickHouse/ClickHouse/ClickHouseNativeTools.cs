@@ -112,8 +112,18 @@ internal sealed class ClickHouseNativeTools(IGrainFactory grains, INeuronInvoker
 
             await invoker.InvokeAsync(neuron, "clickhouse.table", "create-query",
                 JsonSerializer.SerializeToElement(command, ClickHouseJson.Default.CreateQueryTableCommand), cancellationToken).ConfigureAwait(false);
-            await TableService.WaitAppliedAsync(grains.GetGrain<IClickHouseTable>(neuron.ToGrainId()), name, command.Id, cancellationToken).ConfigureAwait(false);
-            // The server has accepted the query by now; a refused query never reaches the catalog.
+            try
+            {
+                await TableService.WaitAppliedAsync(grains.GetGrain<IClickHouseTable>(neuron.ToGrainId()), name, command.Id, cancellationToken).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                // Still pending, so it may apply later: list it now rather than orphan it. A refused
+                // query throws TableValidationException instead and never reaches the catalog.
+                await tables.RegisterAsync(neuron, cancellationToken).ConfigureAwait(false);
+                throw;
+            }
+
             await tables.RegisterAsync(neuron, cancellationToken).ConfigureAwait(false);
             var carded = chat is { } target && await WaitForCardAsync(target, name, cancellationToken).ConfigureAwait(false);
 

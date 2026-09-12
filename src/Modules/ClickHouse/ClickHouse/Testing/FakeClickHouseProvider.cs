@@ -240,22 +240,21 @@ internal sealed partial class FakeClickHouseProvider : IClickHouseProvider
         };
     }
 
+    // The literal takes the column's type the way ClickHouse would coerce it (is_active = 1, count = '50'),
+    // and refuses what the server refuses instead of leaking a conversion exception.
     private static JsonElement Literal(string tableType, string literal)
     {
-        if (literal.StartsWith('\''))
+        var text = literal.StartsWith('\'') ? literal[1..^1].Replace("''", "'", StringComparison.Ordinal) : literal;
+        return tableType switch
         {
-            return JsonSerializer.SerializeToElement(literal[1..^1].Replace("''", "'", StringComparison.Ordinal));
-        }
-
-        if (bool.TryParse(literal, out var flag))
-        {
-            return JsonSerializer.SerializeToElement(flag);
-        }
-
-        var number = decimal.Parse(literal, CultureInfo.InvariantCulture);
-        return tableType == ClickHouseTypeMap.Number
-            ? JsonSerializer.SerializeToElement(number)
-            : JsonSerializer.SerializeToElement(literal);
+            ClickHouseTypeMap.Number => decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var number)
+                ? JsonSerializer.SerializeToElement(number)
+                : throw new ClickHouseQueryException($"Cannot parse '{text}' as a number. (CANNOT_PARSE_TEXT)"),
+            ClickHouseTypeMap.Boolean => text is "1" or "0" || bool.TryParse(text, out _)
+                ? JsonSerializer.SerializeToElement(text == "1" || (bool.TryParse(text, out var flag) && flag))
+                : throw new ClickHouseQueryException($"Cannot parse '{text}' as Bool. (CANNOT_PARSE_BOOL)"),
+            _ => JsonSerializer.SerializeToElement(text),
+        };
     }
 
     private static string Normalize(string sql) => Whitespace().Replace(sql.Trim().TrimEnd(';'), " ");

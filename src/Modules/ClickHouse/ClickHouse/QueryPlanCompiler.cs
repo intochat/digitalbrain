@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using DigitalBrain.UI;
 
 namespace DigitalBrain.ClickHouse;
@@ -13,7 +14,7 @@ internal sealed record CompiledQuery(
 // parameters and values as typed parameters, so no user text is ever spliced into the SQL.
 // Predicates mirror TablePolicy: text compares case-insensitively, neq keeps nulls, ordered
 // comparisons drop them, and sorting puts nulls first ascending and last descending.
-internal static class QueryPlanCompiler
+internal static partial class QueryPlanCompiler
 {
     public static CompiledQuery Compile(QueryPlan plan)
     {
@@ -102,27 +103,32 @@ internal static class QueryPlanCompiler
         }
     }
 
-    // Without a view sort the base query's own ORDER BY flows through the wrapper untouched. With
-    // one, every other orderable column joins as a tiebreaker so LIMIT/OFFSET pages never overlap
-    // or skip rows when the sort key has duplicates.
+    // A view sort leads the ORDER BY and every other orderable column follows as a tiebreaker, so
+    // LIMIT/OFFSET pages never overlap or skip rows on duplicate keys. Without a view sort a base
+    // query that orders itself flows through the wrapper untouched (a plain wrapper keeps subquery
+    // order), and one that does not gets the tiebreakers alone so its pages are stable too.
     private static string OrderBy(QueryPlan plan, Dictionary<string, ClickHouseColumn> columns, Dictionary<string, object> parameters)
     {
-        if (plan.Sort is not { } sort)
+        var terms = new List<string>();
+        if (plan.Sort is { } sort)
+        {
+            if (!columns.ContainsKey(sort.ColumnId))
+            {
+                throw new TableValidationException($"Sort column '{sort.ColumnId}' does not exist.");
+            }
+
+            parameters["sort"] = sort.ColumnId;
+            terms.Add(sort.Descending ? "{sort:Identifier} DESC NULLS LAST" : "{sort:Identifier} ASC NULLS FIRST");
+        }
+        else if (OrderByClause().IsMatch(ClickHouseQueryGuard.MaskQuoted(plan.BaseSql)))
         {
             return string.Empty;
         }
 
-        if (!columns.ContainsKey(sort.ColumnId))
-        {
-            throw new TableValidationException($"Sort column '{sort.ColumnId}' does not exist.");
-        }
-
-        parameters["sort"] = sort.ColumnId;
-        var terms = new List<string> { sort.Descending ? "{sort:Identifier} DESC NULLS LAST" : "{sort:Identifier} ASC NULLS FIRST" };
         var tiebreakers = 0;
         foreach (var column in plan.Columns)
         {
-            if (column.Name == sort.ColumnId || !ClickHouseTypeMap.IsOrderable(column.ClickHouseType))
+            if (column.Name == plan.Sort?.ColumnId || !ClickHouseTypeMap.IsOrderable(column.ClickHouseType))
             {
                 continue;
             }
@@ -132,6 +138,9 @@ internal static class QueryPlanCompiler
             tiebreakers++;
         }
 
-        return " ORDER BY " + string.Join(", ", terms);
+        return terms.Count == 0 ? string.Empty : " ORDER BY " + string.Join(", ", terms);
     }
+
+    [GeneratedRegex(@"\bORDER\s+BY\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex OrderByClause();
 }

@@ -86,7 +86,9 @@ public sealed class ClickHouseTypeMapFacts
         Assert.Equal("1998-04-12", ClickHouseCells.ToCell(new DateOnly(1998, 4, 12), "date").GetString());
         Assert.True(ClickHouseCells.ToCell(true, "boolean").GetBoolean());
         Assert.Equal("2026-09-12 10:30:00", ClickHouseCells.ToCell(new DateTime(2026, 9, 12, 10, 30, 0, DateTimeKind.Utc), "text").GetString());
-        Assert.Equal("2026-09-12 10:30:00.5", ClickHouseCells.ToCell(new DateTime(2026, 9, 12, 10, 30, 0, 500, DateTimeKind.Unspecified), "text").GetString());
+        Assert.Equal("2026-09-12 10:30:00", ClickHouseCells.ToCell(new DateTime(2026, 9, 12, 10, 30, 0, 500, DateTimeKind.Unspecified), "text", "DateTime").GetString());
+        Assert.Equal("2026-09-12 10:30:00.500", ClickHouseCells.ToCell(new DateTime(2026, 9, 12, 10, 30, 0, 500, DateTimeKind.Unspecified), "text", "Nullable(DateTime64(3))").GetString());
+        Assert.Equal("2026-09-12 10:30:00.000000", ClickHouseCells.ToCell(new DateTime(2026, 9, 12, 10, 30, 0, DateTimeKind.Utc), "text", "DateTime64(6, 'UTC')").GetString());
         Assert.Equal("[\"construction\",\"roofing\"]", ClickHouseCells.ToCell(new[] { "construction", "roofing" }, "text").GetString());
         Assert.Equal("{\"vat\":\"GB1\"}", ClickHouseCells.ToCell(new Dictionary<string, object> { ["vat"] = "GB1" }, "text").GetString());
         Assert.Equal("42", ClickHouseCells.ToCell(42, "text").GetString());

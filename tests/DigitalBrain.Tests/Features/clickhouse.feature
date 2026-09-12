@@ -13,6 +13,13 @@ Feature: ClickHouse
     Then the ClickHouse query returns 6 rows and is not truncated
     And the ClickHouse query column "employee_count" has type "number"
 
+  Scenario: A literal that does not fit its column is refused like the server would
+    Given a running brain with the ClickHouse module
+    When "claude" runs the ClickHouse query "SELECT name FROM companies_current WHERE is_active = 1"
+    Then the ClickHouse query returns 11 rows and is not truncated
+    When "claude" runs the ClickHouse query "SELECT name FROM companies_current WHERE employee_count = 'many'"
+    Then the ClickHouse query was refused with a message containing "CANNOT_PARSE_TEXT"
+
   Scenario: A write is refused before it reaches the server
     Given a running brain with the ClickHouse module
     When "claude" runs the ClickHouse query "INSERT INTO companies_current (company_id) VALUES ('x')"
