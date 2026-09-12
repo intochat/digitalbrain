@@ -113,7 +113,8 @@ internal static class ClickHouseCells
     {
         try
         {
-            return JsonSerializer.Serialize(value, StructuredJson);
+            // Serialise by runtime type: a dictionary must become an object, not a list of pairs.
+            return JsonSerializer.Serialize<object>(value, StructuredJson);
         }
         catch (NotSupportedException)
         {

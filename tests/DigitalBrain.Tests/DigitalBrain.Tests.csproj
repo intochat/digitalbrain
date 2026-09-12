@@ -16,6 +16,7 @@
     <PackageReference Include="Reqnroll.xunit.v3" />
     <PackageReference Include="xunit.v3.mtp-v2" />
     <PackageReference Include="ModelContextProtocol.Core" />
+    <PackageReference Include="Testcontainers.ClickHouse" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Kernel/DigitalBrain.Silo/DigitalBrain.Silo.csproj" />
@@ -28,6 +29,8 @@
     <ProjectReference Include="../../src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
     <ProjectReference Include="../../src/Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
     <ProjectReference Include="../../src/Modules/Memory/Memory/DigitalBrain.Modules.Memory.csproj" />
+    <ProjectReference Include="../../src/Modules/ClickHouse/ClickHouse/DigitalBrain.Modules.ClickHouse.csproj" />
+    <ProjectReference Include="../../src/Modules/ClickHouse/Contracts/DigitalBrain.Modules.ClickHouse.Contracts.csproj" />
     <ProjectReference Include="../../src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
     <ProjectReference Include="../../src/Modules/Excel/Excel/DigitalBrain.Modules.Excel.csproj" />
     <ProjectReference Include="../../src/Modules/Microsoft/Microsoft/DigitalBrain.Modules.Microsoft.csproj" />
