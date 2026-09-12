@@ -16,8 +16,8 @@ public static class ShellNames
     public const string DefaultDeviceTarget = "windows";
     // web-server is Flutter's headless web device: it serves the app over HTTP without driving
     // a browser of its own, so the fixed FlutterWebPort below is a real, addressable endpoint.
-    // The "chrome" device never prints or exposes a served URL (it drives its own tool-launched
-    // Chrome instance), which made WithWebHost unreachable for automation; see task-4-report.md.
+    // The "chrome" device never prints or exposes a served URL, which made WithWebHost
+    // unreachable for automation.
     public const string DefaultWebDeviceTarget = "web-server";
     public const string WebPlatformDirectoryName = "web";
     public const string HttpEndpointName = "http";
