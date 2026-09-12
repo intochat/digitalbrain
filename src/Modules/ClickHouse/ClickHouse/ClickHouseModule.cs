@@ -1,4 +1,5 @@
 using ClickHouse.Driver;
+using DigitalBrain.AI;
 using DigitalBrain.Core;
 using DigitalBrain.UI;
 using Microsoft.Extensions.Configuration;
@@ -54,6 +55,10 @@ public sealed class ClickHouseModule : IModule
         }
 
         services.AddSingleton<ITableSource>(new TableSource(ClickHouseNames.TableIdPrefix, ClickHouseNames.TableType));
+        services.AddSingleton<ClickHouseNativeTools>();
+        services.AddNativeTool("clickhouse_schema", static services => services.GetRequiredService<ClickHouseNativeTools>().CreateSchema());
+        services.AddNativeTool("clickhouse_query", static services => services.GetRequiredService<ClickHouseNativeTools>().CreateQuery());
+        services.AddNativeTool("show_query_table", static services => services.GetRequiredService<ClickHouseNativeTools>().CreateShowQueryTable());
     }
 
     private static string ResolveConnectionName(IConfiguration configuration)

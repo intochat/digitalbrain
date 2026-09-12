@@ -1,0 +1,233 @@
+using System.ComponentModel;
+using System.Text.Json;
+using DigitalBrain.Abstractions.Commands;
+using DigitalBrain.Abstractions.Descriptors;
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Chat;
+using DigitalBrain.UI;
+using Microsoft.Extensions.AI;
+
+namespace DigitalBrain.ClickHouse;
+
+// The agent's three doors into ClickHouse. Refinement, paging and charts reuse the existing
+// read_table, update_table_view, list_tables and render_chart tools on the table this creates.
+internal sealed class ClickHouseNativeTools(IGrainFactory grains, INeuronInvoker invoker, TableService tables)
+{
+    private const string InvalidChat = "chatName must be a uichat neuron. Copy the current chat exactly from the Chat: line in the conversation context (for example, uichat:desk).";
+    private static readonly JsonSerializerOptions WireJson = new(JsonSerializerDefaults.Web);
+
+    internal AIFunction CreateSchema()
+    {
+        Task<JsonElement> Invoke(
+            [Description("Table name; omit to read the index of every table in the database.")] string? table = null,
+            CancellationToken cancellationToken = default)
+            => ResultAsync(() => ClickHouse.ReadSchema(new ReadClickHouseSchema(table), cancellationToken), "clickhouse_schema");
+
+        return AIFunctionFactory.Create(Invoke, new AIFunctionFactoryOptions
+        {
+            Name = "clickhouse_schema",
+            Description = "Read the ClickHouse database schema (tables, engines, columns, types). Start with no table for the index. "
+                + "Always read the schema before writing SQL; column names must match exactly.",
+        });
+    }
+
+    internal AIFunction CreateQuery()
+    {
+        Task<JsonElement> Invoke(
+            [Description("One read-only ClickHouse SELECT (or WITH … SELECT) without FORMAT or SETTINGS")] string sql,
+            [Description("Row cap, 1–1000")] int maxRows = ClickHouseQuery.DefaultMaxRows,
+            CancellationToken cancellationToken = default)
+            => ResultAsync(() => ClickHouse.Query(new ClickHouseQuery(sql, maxRows), cancellationToken), "clickhouse_query");
+
+        return AIFunctionFactory.Create(Invoke, new AIFunctionFactoryOptions
+        {
+            Name = "clickhouse_query",
+            Description = "Run one read-only ClickHouse SELECT and return typed rows (max 1000). Use ClickHouse SQL "
+                + "(count(), groupArray, has(tags,'x'), hasAny, positionCaseInsensitiveUTF8, LIMIT). For results the person "
+                + "should see or refine, call show_query_table instead of pasting rows. On failure the server's error text "
+                + "is returned so the query can be corrected.",
+        });
+    }
+
+    internal AIFunction CreateShowQueryTable()
+    {
+        Task<JsonElement> Invoke(
+            [Description("Short table title")] string title,
+            [Description("The read-only SELECT whose rows the table shows live; alias every column with a unique name")] string sql,
+            [Description("The current chat, exactly as stated in the conversation context (for example uichat:desk); omit when the context names no chat")] string? chatName = null,
+            CancellationToken cancellationToken = default)
+            => ShowQueryTableAsync(chatName, title, sql, cancellationToken);
+
+        return AIFunctionFactory.Create(Invoke, new AIFunctionFactoryOptions
+        {
+            Name = "show_query_table",
+            Description = "Show the rows of a ClickHouse SELECT as a live, pageable table the person can filter and sort. "
+                + "The table keeps the query; refine it later with update_table_view (filters are AND-combined) and page it "
+                + "with read_table. Use it whenever the person wants to see, filter or work with query results.",
+        });
+    }
+
+    private IClickHouse ClickHouse => grains.GetGrain<IClickHouse>(new NeuronId(ClickHouseNames.NeuronType, ClickHouseNames.DefaultNeuron).ToGrainId());
+
+    private async Task<JsonElement> ShowQueryTableAsync(string? chatName, string title, string sql, CancellationToken cancellationToken)
+    {
+        NeuronId? chat = null;
+        if (!string.IsNullOrWhiteSpace(chatName))
+        {
+            if (!NeuronId.TryParse(chatName, out var parsed) || parsed.Type != UIVocabulary.ChatType)
+            {
+                return Error("invalid_chat", InvalidChat);
+            }
+
+            chat = parsed;
+        }
+
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            return Error("invalid_title", "title must not be blank.");
+        }
+
+        try
+        {
+            ClickHouseQueryGuard.Validate(sql);
+        }
+        catch (ArgumentException error)
+        {
+            return Error("query_refused", error.Message);
+        }
+
+        try
+        {
+            var name = $"{ClickHouseNames.TableIdPrefix}{Guid.NewGuid():N}";
+            var neuron = new NeuronId(ClickHouseNames.TableType, name);
+            var command = new CreateQueryTableCommand(CommandId.New(), new CreateQueryTable(title.Trim(), sql));
+
+            // Connect first: the reaction fires the card signal and needs a chat listener. Without a chat
+            // the table still exists and is listed; the workspace opens it from the tool result.
+            if (chat is { } listener)
+            {
+                await grains.GetGrain<INeuron>(neuron.ToGrainId()).Connect(listener, UIVocabulary.TableRendered).ConfigureAwait(false);
+            }
+
+            await tables.RegisterAsync(neuron, cancellationToken).ConfigureAwait(false);
+            await invoker.InvokeAsync(neuron, "clickhouse.table", "create-query",
+                JsonSerializer.SerializeToElement(command, ClickHouseJson.Default.CreateQueryTableCommand), cancellationToken).ConfigureAwait(false);
+            await WaitAppliedAsync(neuron, command.Id, cancellationToken).ConfigureAwait(false);
+            if (chat is { } target)
+            {
+                await WaitForCardAsync(target, name, cancellationToken).ConfigureAwait(false);
+            }
+
+            var snapshot = await tables.ReadAsync(name, cancellationToken: cancellationToken).ConfigureAwait(false);
+            return JsonSerializer.SerializeToElement(new
+            {
+                kind = snapshot.Kind,
+                snapshot.Id,
+                snapshot.Title,
+                snapshot.Revision,
+                snapshot.Columns,
+                snapshot.Rows,
+                snapshot.Filters,
+                snapshot.Sort,
+                snapshot.VisibleColumns,
+                snapshot.TotalRows,
+                snapshot.FilteredRows,
+                snapshot.Offset,
+                snapshot.Limit,
+                message = (chat is null
+                    ? $"Table '{snapshot.Title}' is saved as {name} and opens in the workspace. "
+                    : $"Table '{snapshot.Title}' is now showing in the chat as card '{name}' (id {name}). ")
+                    + "Refine it with update_table_view (filters are AND-combined); read a page with read_table.",
+            }, WireJson);
+        }
+        catch (TableValidationException error)
+        {
+            return Error("query_refused", error.Message);
+        }
+        catch (TableSourceException error)
+        {
+            return Error("source_failed", error.Message);
+        }
+        catch (Exception error) when (error is not OperationCanceledException && !TransientFailure.Covers(error))
+        {
+            return Error("failed", $"show_query_table failed: {error.GetType().Name}: {error.Message}");
+        }
+    }
+
+    private async Task WaitAppliedAsync(NeuronId neuron, CommandId command, CancellationToken cancellationToken)
+    {
+        var table = grains.GetGrain<IClickHouseTable>(neuron.ToGrainId());
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(30));
+        try
+        {
+            while (true)
+            {
+                var result = await table.ReadOperation(new(command)).WaitAsync(deadline.Token).ConfigureAwait(false);
+                switch (result?.Status)
+                {
+                    case "applied":
+                        return;
+                    case "invalid":
+                    case "conflict":
+                        throw new TableValidationException(result.Message ?? "The query could not be turned into a table.");
+                }
+
+                await Task.Delay(25, deadline.Token).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException($"Table '{neuron.Name}' has not been created yet. List tables before retrying.");
+        }
+    }
+
+    private async Task WaitForCardAsync(NeuronId chat, string name, CancellationToken cancellationToken)
+    {
+        // The command acknowledges admission, not completion; do not settle before the chat holds the card.
+        var target = grains.GetGrain<IChat>(chat.ToGrainId());
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(30));
+        try
+        {
+            while (true)
+            {
+                var turns = await target.ReadTurns(new ReadTurns()).WaitAsync(deadline.Token).ConfigureAwait(false);
+                if (turns.Turns.Any(turn => turn.Cards?.Any(card => card.Kind == UiCardKinds.Table && card.Name == name) == true))
+                {
+                    return;
+                }
+
+                await Task.Delay(25, deadline.Token).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException($"Card '{name}' has not reached chat '{chat}' yet.");
+        }
+    }
+
+    private static async Task<JsonElement> ResultAsync<T>(Func<Task<T>> read, string tool)
+    {
+        try
+        {
+            return JsonSerializer.SerializeToElement(await read().ConfigureAwait(false), WireJson);
+        }
+        catch (ClickHouseQueryException error)
+        {
+            return Error("query_failed", error.Message);
+        }
+        catch (ClickHouseUnavailableException error)
+        {
+            return Error("unavailable", error.Message);
+        }
+        catch (Exception error) when (error is not OperationCanceledException && !TransientFailure.Covers(error))
+        {
+            return Error("failed", $"{tool} failed: {error.GetType().Name}: {error.Message}");
+        }
+    }
+
+    private static JsonElement Error(string code, string message)
+        => JsonSerializer.SerializeToElement(new { kind = "clickhouseError", code, message }, WireJson);
+}
