@@ -271,3 +271,53 @@ Both are under `docs/superpowers/` and unrelated to the Coding module.
 Implementer commits carry the implementer model's own `Co-Authored-By` trailer, set by the subagent
 harness for each dispatch rather than by a single fixed instruction; the trailer text therefore
 varies commit to commit across this branch's history. This is left as-is; history is not rewritten.
+
+## Whole-branch review and fix wave (2026-09-14)
+
+The branch review ran with the code-review skill at high effort (eight finder angles, one verifier
+per correctness candidate) with the programme's focus: naming, dead code, comment noise, analyzer
+cleanliness and silent failures. Ten findings were reported; nine were fixed in one wave
+(`8f397b42`, "coding: apply the phase 0 branch review") and re-reviewed clean:
+
+- `reload` works after a warmup-only start: the command rejects only when nothing is open anywhere,
+  and the reaction records the live path in the grain's state (new fact
+  `Reload_after_a_warmed_start_records_the_solution`).
+- The design's bounded query gate (two semantic queries at a time, design 4.2) now exists as a
+  `SemaphoreSlim(2, 2)` inside the query lease (new fact `At_most_two_queries_run_at_once`, which
+  proves completion and the restored slot count; the throttle itself is not observable on the
+  in-memory fixture).
+- `DiagnosticsResult` carries `TotalCount` (`Id(4)`), so every list result has the
+  `{ items, totalCount, truncated }` envelope of design section 2.
+- Dispose during a load disposes the lifetime token source on the late-load and cancelled paths, and a
+  cancelled load no longer overwrites the "the workspace was disposed" detail (new fact
+  `Dispose_during_a_cancelled_load_keeps_the_disposed_status`).
+- `CodingNativeTools` builds its four functions once and exposes `Named(string)`; the module
+  registers through it.
+- Dead surface removed: `SolutionWorkspace.ReadyAt`, `Current` and the `TimeProvider` constructor
+  parameter that only fed `ReadyAt`.
+- `SolutionQueries`: one `ClampLimit`, `nameof(...)` enum comparisons, a plain two-key comparator,
+  document text fetched once per document in `references`; `CodingNativeTools` keeps one advice catch.
+
+One finding was skipped by ruling: a `workspace` grain whose persisted path differs from the
+configured one answers from the singleton's solution after a restart. That is the one-singleton-per-silo
+limit phase 5 (multiple workspaces) removes.
+
+Parked minors from the re-review of the fix wave (real, not load-bearing, left for phase 1 which
+reshapes `SolutionWorkspace`): the semaphore is disposed on the `_leases == 0` signal, which has a
+window between the gate wait and the lease count where a concurrent `Dispose` could dispose a gate
+with a permit outstanding (simplest fix: never dispose the gate); a query issued after `Dispose`
+surfaces `ObjectDisposedException` from the gate instead of the disposed advice; the generic
+`catch (Exception)` path in `OpenCoreAsync` still leaves the lifetime token source undisposed when
+`Dispose` ran during that load; the new cancelled-load fact sits between the helper classes; the
+reload fact's poll loop fails by timeout rather than by a named assertion; `CodingNativeTools.Functions`
+is public with no external caller.
+
+### Final gates
+
+- .NET: `dotnet format whitespace DigitalBrain.slnx --verify-no-changes && dotnet build DigitalBrain.slnx -c Release && dotnet test DigitalBrain.slnx -c Release --no-build`
+  at `8f397b42`: 0 warnings, 333 total, 328 passed, 5 skipped (4 Docker + 1 coding self-test), 0 failed.
+- Gated self-test at `8f397b42`: `DIGITALBRAIN_CODING_SELF_TESTS=1 dotnet test tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj -c Release -- --filter-class DigitalBrain.Tests.Coding.CodingSelfTestFacts`
+  passed (1/1).
+- Flutter (from `src/Modules/UI/Flutter`): `dart format --output=none --set-exit-if-changed core ui shell/lib shell/test`
+  87 files, 0 changed; `flutter analyze` no issues in `ui` and `shell`; `flutter test` 22 passed in `ui`,
+  49 passed in `shell`.

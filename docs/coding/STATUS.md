@@ -7,16 +7,16 @@ Read this file and `NOTES.md` first after a context reset; resume from the curre
 | Current phase | 0 (workspace and map) |
 | Current branch | `feature/coding-phase0-workspace` (from `master` at `1e4b395d`) |
 | Plan | `docs/coding/plans/2026-09-13-coding-phase0-workspace.md` |
-| Current task | Task 9: module docs, notes, final gate and PR (in progress); Tasks 1-8 complete, live exit criteria met |
-| Last green gate | Task 8 live-fix commit `0df056ec`: .NET format + build (0 warnings) + `dotnet test DigitalBrain.slnx` 325 passed, 5 skips; Flutter gate at `d56cc04b`: dart format clean (source), analyze clean, ui 22/22, shell 49/49 (2026-09-13) |
-| Last commit | `0df056ec` coding: the workspace snapshot reports the live phase for a warmed solution |
+| Current task | Phase 0 complete: all nine tasks done, branch review applied, final gates green; PR being opened |
+| Last green gate | `8f397b42` (2026-09-14): format + build 0 warnings + `dotnet test DigitalBrain.slnx` 333 total, 328 passed, 5 skipped, 0 failed; gated self-test passed on the real solution; Flutter: dart format 0 changed, analyze clean, ui 22/22, shell 49/49 |
+| Last commit | `8f397b42` coding: apply the phase 0 branch review (reload after warmup, query gate, envelope, dead surface) |
 | Open PRs | none |
 
 ## Phase ledger
 
 | Phase | Branch | Status | PR |
 |---|---|---|---|
-| 0 workspace and map | `feature/coding-phase0-workspace` | in progress (task 9 of 9) | — |
+| 0 workspace and map | `feature/coding-phase0-workspace` | complete, PR open | — |
 | 1 edits as transactions | — | not started | — |
 | 2 slots | — | not started | — |
 | 3 swarm | — | not started | — |
