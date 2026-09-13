@@ -21,7 +21,7 @@ public sealed class CodingModule : IModule
         builder.Services.AddSingleton<CodingNativeTools>();
         foreach (var tool in new[] { "code_find_symbols", "code_references", "code_diagnostics", "code_map" })
         {
-            builder.Services.AddNativeTool(tool, services => services.GetRequiredService<CodingNativeTools>().Create().Single(function => function.Name == tool));
+            builder.Services.AddNativeTool(tool, services => services.GetRequiredService<CodingNativeTools>().Named(tool));
         }
     }
 }

@@ -87,6 +87,29 @@ public sealed class CodeWorkspaceNeuronFacts
     }
 
     [Fact]
+    public async Task Reload_after_a_warmed_start_records_the_solution()
+    {
+        await using var brain = await BrainSimulation.StartAsync(new()
+        {
+            Modules = new([typeof(CodingModule)]),
+            ConfigureSilo = silo => silo.Services.AddSingleton<ISolutionLoader>(new AdhocSolutionLoader(FixtureSolutions.TwoProjects)),
+            Configuration = new Dictionary<string, string?> { [CodingModule.SolutionPathKey] = "E:/fixture/Fixture.slnx" },
+        });
+        await brain.SiloServices.GetRequiredService<SolutionWorkspace>().WhenReadyAsync(TestContext.Current.CancellationToken);
+        var workspace = brain.Grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType, "fixture").ToGrainId());
+        await workspace.Reload(new ReloadWorkspace(CommandId.New()));
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        WorkspaceSnapshot snapshot;
+        do
+        {
+            await Task.Delay(25, timeout.Token);
+            snapshot = await workspace.Read();
+        } while (snapshot.Generation != 1 || snapshot.Phase != WorkspacePhase.Ready);
+        Assert.Equal(Path.GetFullPath("E:/fixture/Fixture.slnx"), snapshot.SolutionPath);
+    }
+
+    [Fact]
     public async Task Open_is_accepted_and_the_workspace_becomes_ready()
     {
         await using var brain = await StartAsync();

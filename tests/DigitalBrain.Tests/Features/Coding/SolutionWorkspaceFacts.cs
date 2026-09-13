@@ -12,7 +12,7 @@ public sealed class SolutionWorkspaceFacts
 {
     private static async Task<SolutionWorkspace> ReadyAsync()
     {
-        var workspace = new SolutionWorkspace(new AdhocSolutionLoader(FixtureSolutions.TwoProjects), TimeProvider.System, NullLogger<SolutionWorkspace>.Instance);
+        var workspace = new SolutionWorkspace(new AdhocSolutionLoader(FixtureSolutions.TwoProjects), NullLogger<SolutionWorkspace>.Instance);
         await workspace.BeginOpenAsync("E:/fixture/Fixture.slnx");
         await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
         return workspace;
@@ -44,7 +44,7 @@ public sealed class SolutionWorkspaceFacts
     [Fact]
     public void A_fresh_workspace_is_not_opened()
     {
-        using var workspace = new SolutionWorkspace(new AdhocSolutionLoader(FixtureSolutions.TwoProjects), TimeProvider.System, NullLogger<SolutionWorkspace>.Instance);
+        using var workspace = new SolutionWorkspace(new AdhocSolutionLoader(FixtureSolutions.TwoProjects), NullLogger<SolutionWorkspace>.Instance);
         Assert.Equal(WorkspacePhase.NotOpened, workspace.Status.Phase);
         Assert.Throws<WorkspaceNotReadyException>(() => workspace.FindSymbolsAsync(new("Greeter"), CancellationToken.None).GetAwaiter().GetResult());
     }
@@ -63,7 +63,7 @@ public sealed class SolutionWorkspaceFacts
     public async Task Load_failures_stay_visible_on_a_ready_workspace()
     {
         var loader = new FailingAdhocLoader(FixtureSolutions.TwoProjects, ["Alpha.csproj: reference Missing.dll not found"]);
-        using var workspace = new SolutionWorkspace(loader, TimeProvider.System, NullLogger<SolutionWorkspace>.Instance);
+        using var workspace = new SolutionWorkspace(loader, NullLogger<SolutionWorkspace>.Instance);
         await workspace.BeginOpenAsync("E:/fixture/Fixture.slnx");
         await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
         Assert.Equal(WorkspacePhase.Ready, workspace.Status.Phase);
@@ -132,6 +132,7 @@ public sealed class SolutionWorkspaceFacts
         Assert.Equal("Error", hit.Severity);
         Assert.Equal(5, hit.Line);
         Assert.Equal(1, result.ErrorCount);
+        Assert.Equal(1, result.TotalCount);
     }
 
     [Fact]
@@ -146,7 +147,7 @@ public sealed class SolutionWorkspaceFacts
     [Fact]
     public async Task Diagnostics_without_a_source_location_are_reported_against_the_project()
     {
-        using var workspace = new SolutionWorkspace(new AdhocSolutionLoader(FixtureSolutions.ConsoleWithoutMain), TimeProvider.System, NullLogger<SolutionWorkspace>.Instance);
+        using var workspace = new SolutionWorkspace(new AdhocSolutionLoader(FixtureSolutions.ConsoleWithoutMain), NullLogger<SolutionWorkspace>.Instance);
         await workspace.BeginOpenAsync("E:/fixture/Fixture.slnx");
         await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
         var result = await workspace.DiagnosticsAsync(new(Project: "Gamma"), TestContext.Current.CancellationToken);
@@ -170,11 +171,25 @@ public sealed class SolutionWorkspaceFacts
         Assert.Equal(("Beta", "Alpha"), (edge.From, edge.To));
     }
 
+    // The gate bounds concurrent semantic queries to two (design 4.2). The fixture query resolves too
+    // fast to deterministically observe the cap in effect, so this only pins completion and that the
+    // gate's slots are fully restored afterward.
+    [Fact]
+    public async Task At_most_two_queries_run_at_once()
+    {
+        using var workspace = await ReadyAsync();
+        var first = workspace.FindSymbolsAsync(new("greet"), TestContext.Current.CancellationToken);
+        var second = workspace.FindSymbolsAsync(new("greet"), TestContext.Current.CancellationToken);
+        var third = workspace.FindSymbolsAsync(new("greet"), TestContext.Current.CancellationToken);
+        await Task.WhenAll(first, second, third);
+        Assert.Equal(2, workspace.AvailableQuerySlots);
+    }
+
     [Fact]
     public async Task Reload_opens_again_and_bumps_nothing_durable()
     {
         var loader = new AdhocSolutionLoader(FixtureSolutions.TwoProjects);
-        using var workspace = new SolutionWorkspace(loader, TimeProvider.System, NullLogger<SolutionWorkspace>.Instance);
+        using var workspace = new SolutionWorkspace(loader, NullLogger<SolutionWorkspace>.Instance);
         await workspace.BeginOpenAsync("E:/fixture/Fixture.slnx");
         await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
         await workspace.BeginReloadAsync();
@@ -187,7 +202,7 @@ public sealed class SolutionWorkspaceFacts
     public async Task Dispose_during_a_load_disposes_the_late_workspace()
     {
         var loader = new GatedLoader();
-        var workspace = new SolutionWorkspace(loader, TimeProvider.System, NullLogger<SolutionWorkspace>.Instance);
+        var workspace = new SolutionWorkspace(loader, NullLogger<SolutionWorkspace>.Instance);
         var opening = workspace.BeginOpenAsync("E:/fixture/Fixture.slnx");
         workspace.Dispose();
         var tracking = new DisposalTrackingWorkspace();
@@ -220,9 +235,37 @@ public sealed class SolutionWorkspaceFacts
     }
 
     [Fact]
+    public async Task Dispose_during_a_cancelled_load_keeps_the_disposed_status()
+    {
+        var loader = new CancellingLoader();
+        var workspace = new SolutionWorkspace(loader, NullLogger<SolutionWorkspace>.Instance);
+        var opening = workspace.BeginOpenAsync("E:/fixture/Fixture.slnx");
+        workspace.Dispose();
+        loader.Release();
+        await opening;
+        Assert.Equal(WorkspacePhase.Failed, workspace.Status.Phase);
+        Assert.Equal("the workspace was disposed", workspace.Status.Detail);
+    }
+
+    private sealed class CancellingLoader : ISolutionLoader
+    {
+        private readonly TaskCompletionSource _source = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public void Release() => _source.SetResult();
+
+        public async Task<LoadedSolution> OpenAsync(string solutionPath, IProgress<string> progress, CancellationToken cancellationToken)
+        {
+            await _source.Task.ConfigureAwait(false);
+            // Dispose() has already cancelled _lifetime by the time Release() lets this continue.
+            cancellationToken.ThrowIfCancellationRequested();
+            throw new InvalidOperationException("CancellingLoader always observes cancellation first.");
+        }
+    }
+
+    [Fact]
     public async Task A_loader_failure_becomes_a_failed_status_with_advice()
     {
-        using var workspace = new SolutionWorkspace(new ThrowingLoader(), TimeProvider.System, NullLogger<SolutionWorkspace>.Instance);
+        using var workspace = new SolutionWorkspace(new ThrowingLoader(), NullLogger<SolutionWorkspace>.Instance);
         await workspace.BeginOpenAsync("E:/fixture/Fixture.slnx");
         Assert.Equal(WorkspacePhase.Failed, workspace.Status.Phase);
         Assert.Equal("disk on fire", workspace.Status.Detail);

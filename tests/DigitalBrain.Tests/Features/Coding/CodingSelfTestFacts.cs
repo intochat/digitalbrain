@@ -17,7 +17,7 @@ public sealed class CodingSelfTestFacts
     [Fact(Skip = Skip, SkipUnless = nameof(SelfTestsEnabled))]
     public async Task The_real_solution_opens_and_answers_a_known_reference()
     {
-        using var workspace = new SolutionWorkspace(new MSBuildSolutionLoader(), TimeProvider.System, NullLogger<SolutionWorkspace>.Instance);
+        using var workspace = new SolutionWorkspace(new MSBuildSolutionLoader(), NullLogger<SolutionWorkspace>.Instance);
         await workspace.BeginOpenAsync(SolutionPath);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         timeout.CancelAfter(TimeSpan.FromMinutes(5));

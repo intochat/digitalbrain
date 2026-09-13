@@ -7,11 +7,19 @@ using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.Coding;
 
-public sealed class CodingNativeTools(SolutionWorkspace workspace)
+public sealed class CodingNativeTools
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    public IReadOnlyList<AIFunction> Create()
+    private readonly Lazy<IReadOnlyList<AIFunction>> _functions;
+
+    public CodingNativeTools(SolutionWorkspace workspace) => _functions = new Lazy<IReadOnlyList<AIFunction>>(() => Build(workspace));
+
+    public IReadOnlyList<AIFunction> Functions => _functions.Value;
+
+    public AIFunction Named(string name) => Functions.Single(function => function.Name == name);
+
+    private static IReadOnlyList<AIFunction> Build(SolutionWorkspace workspace)
     {
         Task<JsonElement> FindSymbols(
             [Description("Part of a symbol name, case-insensitive")] string query,
@@ -34,7 +42,15 @@ public sealed class CodingNativeTools(SolutionWorkspace workspace)
         Task<JsonElement> Map(
             [Description("Title for the map card")] string title = "Solution map",
             CancellationToken cancellationToken = default)
-            => MapAsync(title, cancellationToken);
+            => GuardedAsync(async () =>
+            {
+                var map = await workspace.MapAsync(new MapQuery(), cancellationToken).ConfigureAwait(false);
+                var nodes = map.Projects.Select(project => new GraphNodeState(project.Name, project.Name, GraphNodeKinds.Module, project.Cluster)).ToArray();
+                var edges = map.References.Select(edge => new GraphEdgeState($"{edge.From}-{edge.To}", edge.From, edge.To)).ToArray();
+                // One artifact per solution: the shell keys artifacts by id, so a second map replaces the first.
+                var id = "map-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(map.SolutionPath)))[..8];
+                return new { kind = "graph", id, name = id, title, nodes, edges };
+            });
 
         return
         [
@@ -60,23 +76,6 @@ public sealed class CodingNativeTools(SolutionWorkspace workspace)
                     + "Use it whenever the person asks to see or map the solution, its projects, or their dependencies.",
             }),
         ];
-    }
-
-    private async Task<JsonElement> MapAsync(string title, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var map = await workspace.MapAsync(new MapQuery(), cancellationToken).ConfigureAwait(false);
-            var nodes = map.Projects.Select(project => new GraphNodeState(project.Name, project.Name, GraphNodeKinds.Module, project.Cluster)).ToArray();
-            var edges = map.References.Select(edge => new GraphEdgeState($"{edge.From}-{edge.To}", edge.From, edge.To)).ToArray();
-            // One artifact per solution: the shell keys artifacts by id, so a second map replaces the first.
-            var id = "map-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(map.SolutionPath)))[..8];
-            return JsonSerializer.SerializeToElement(new { kind = "graph", id, name = id, title, nodes, edges }, Json);
-        }
-        catch (Exception error) when (error is not OperationCanceledException)
-        {
-            return Advice(error);
-        }
     }
 
     private static async Task<JsonElement> GuardedAsync<T>(Func<Task<T>> query)

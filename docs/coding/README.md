@@ -24,13 +24,13 @@ methods:
 | `read` | none | `WorkspaceSnapshot(SolutionPath, Phase, ProjectCount, DocumentCount, Detail, Generation)` | Reports the live `SolutionWorkspace` status (phase, counts, detail) together with the grain's own path and generation. |
 | `find-symbols` | `SymbolSearch(Query, Limit=20)` | `SymbolSearchResult(Items, TotalCount, Truncated)` | Case-insensitive substring match over type and member declarations; `NamedType` hits sort first. |
 | `references` | `ReferenceSearch(SymbolId, Limit=50)` | `ReferenceSearchResult(SymbolId, Items, TotalCount, Truncated)` | Every location that references a symbol id, with the trimmed source line. |
-| `diagnostics` | `DiagnosticsQuery(Path?, Project?, Limit=50)` | `DiagnosticsResult(Items, ErrorCount, WarningCount, Truncated)` | Compiler diagnostics of warning severity or above, for one file, one project, or the whole solution. |
+| `diagnostics` | `DiagnosticsQuery(Path?, Project?, Limit=50)` | `DiagnosticsResult(Items, ErrorCount, WarningCount, Truncated, TotalCount)` | Compiler diagnostics of warning severity or above, for one file, one project, or the whole solution. |
 | `map` | `MapQuery(IncludeDocumentCounts=true)` | `SolutionMap(SolutionPath, Projects, References)` | The project dependency graph, projects clustered by solution folder. |
 
 Notes on the shapes above:
 
 - `find-symbols` and `references` share the envelope `{ items, totalCount, truncated }`;
-  `diagnostics` reports `{ items, errorCount, warningCount, truncated }` instead.
+  `diagnostics` reports `{ items, errorCount, warningCount, truncated, totalCount }` instead.
 - Symbol ids are documentation-comment ids, the same format Roslyn uses in XML doc comments
   (`T:DigitalBrain.Time.ITimer`, `M:...`).
 - A diagnostic with no source location (a project that fails to compile at all, such as a missing

@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FindSymbols;
+using Microsoft.CodeAnalysis.Text;
 
 namespace DigitalBrain.Coding;
 
@@ -7,16 +8,18 @@ internal static class SolutionQueries
 {
     private const int MaxLimit = 200;
 
+    private static int ClampLimit(int limit) => Math.Clamp(limit, 1, MaxLimit);
+
     internal static async Task<SymbolSearchResult> FindSymbolsAsync(Solution solution, SymbolSearch query, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query.Query);
-        var limit = Math.Clamp(query.Limit, 1, MaxLimit);
+        var limit = ClampLimit(query.Limit);
         var declarations = await SymbolFinder.FindSourceDeclarationsAsync(solution,
             name => name.Contains(query.Query, StringComparison.OrdinalIgnoreCase), SymbolFilter.TypeAndMember, cancellationToken).ConfigureAwait(false);
         var hits = declarations
             .Select(symbol => Hit(solution, symbol))
             .OfType<SymbolHit>()
-            .OrderBy(static hit => hit.Kind == "NamedType" ? 0 : 1)
+            .OrderBy(static hit => hit.Kind == nameof(SymbolKind.NamedType) ? 0 : 1)
             .ThenBy(static hit => hit.Name, StringComparer.Ordinal)
             .ToArray();
         return new SymbolSearchResult([.. hits.Take(limit)], hits.Length, hits.Length > limit);
@@ -25,26 +28,36 @@ internal static class SolutionQueries
     internal static async Task<ReferenceSearchResult> ReferencesAsync(Solution solution, ReferenceSearch query, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query.SymbolId);
-        var limit = Math.Clamp(query.Limit, 1, MaxLimit);
+        var limit = ClampLimit(query.Limit);
         var symbol = await ResolveAsync(solution, query.SymbolId, cancellationToken).ConfigureAwait(false);
         var referenced = await SymbolFinder.FindReferencesAsync(symbol, solution, cancellationToken).ConfigureAwait(false);
         var hits = new List<ReferenceHit>();
+        var textByDocument = new Dictionary<DocumentId, SourceText>();
         foreach (var location in referenced.SelectMany(static reference => reference.Locations))
         {
             var document = location.Document;
             var span = location.Location.GetLineSpan();
-            var text = await document.GetTextAsync(cancellationToken).ConfigureAwait(false);
+            if (!textByDocument.TryGetValue(document.Id, out var text))
+            {
+                text = await document.GetTextAsync(cancellationToken).ConfigureAwait(false);
+                textByDocument[document.Id] = text;
+            }
+
             var line = span.StartLinePosition.Line;
             hits.Add(new ReferenceHit(document.FilePath ?? document.Name, line + 1, document.Project.Name, text.Lines[line].ToString().Trim()));
         }
 
-        hits.Sort(static (left, right) => string.CompareOrdinal(left.Path, right.Path) is var byPath && byPath != 0 ? byPath : left.Line.CompareTo(right.Line));
+        hits.Sort(static (left, right) =>
+        {
+            var byPath = string.CompareOrdinal(left.Path, right.Path);
+            return byPath != 0 ? byPath : left.Line.CompareTo(right.Line);
+        });
         return new ReferenceSearchResult(query.SymbolId, [.. hits.Take(limit)], hits.Count, hits.Count > limit);
     }
 
     internal static async Task<DiagnosticsResult> DiagnosticsAsync(Solution solution, DiagnosticsQuery query, CancellationToken cancellationToken)
     {
-        var limit = Math.Clamp(query.Limit, 1, MaxLimit);
+        var limit = ClampLimit(query.Limit);
         List<(Diagnostic Diagnostic, string FallbackPath)> diagnostics;
         if (!string.IsNullOrWhiteSpace(query.Path))
         {
@@ -73,12 +86,14 @@ internal static class SolutionQueries
         var hits = diagnostics
             .Where(static entry => entry.Diagnostic.Severity >= DiagnosticSeverity.Warning)
             .Select(static entry => DiagnosticHitFrom(entry.Diagnostic, entry.FallbackPath))
-            .OrderBy(static hit => hit.Severity == "Error" ? 0 : 1)
+            .OrderBy(static hit => hit.Severity == nameof(DiagnosticSeverity.Error) ? 0 : 1)
             .ThenBy(static hit => hit.Path, StringComparer.Ordinal)
             .ThenBy(static hit => hit.Line)
             .ToArray();
         return new DiagnosticsResult([.. hits.Take(limit)],
-            hits.Count(static hit => hit.Severity == "Error"), hits.Count(static hit => hit.Severity == "Warning"), hits.Length > limit);
+            hits.Count(static hit => hit.Severity == nameof(DiagnosticSeverity.Error)),
+            hits.Count(static hit => hit.Severity == nameof(DiagnosticSeverity.Warning)),
+            hits.Length > limit, hits.Length);
     }
 
     internal static Task<SolutionMap> MapAsync(Solution solution, string solutionPath, MapQuery query, CancellationToken cancellationToken)

@@ -36,13 +36,13 @@ internal sealed class WorkspaceNeuron(
     public Task<Accepted<WorkspaceReceipt>> Reload(ReloadWorkspace command) => ExecuteCommandAsync(
         Descriptor("reload"), command, CodingJson.Default.ReloadWorkspace, CodingJson.Default.AcceptedWorkspaceReceipt, arguments =>
         {
-            if (State is null)
+            if (State is null && workspace.Status.Phase == WorkspacePhase.NotOpened)
             {
                 throw new CommandRejectedException(arguments.Id, "no solution has been opened", "Open a solution before reloading.");
             }
 
             var work = Schedule(Signal.Create(CodingVocabulary.WorkspaceReloading, "{}"));
-            return new Accepted<WorkspaceReceipt>(new WorkspaceReceipt(Id.Name, State.Generation), work);
+            return new Accepted<WorkspaceReceipt>(new WorkspaceReceipt(Id.Name, State?.Generation ?? 0), work);
         });
 
     [ReadOnly]
@@ -86,13 +86,14 @@ internal sealed class WorkspaceNeuron(
                 }
             case CodingVocabulary.WorkspaceReloading:
                 {
-                    if (State is not { } current)
+                    var path = State?.SolutionPath ?? workspace.Status.SolutionPath;
+                    if (path is null)
                     {
                         return;
                     }
 
-                    _ = workspace.Status.Phase == WorkspacePhase.NotOpened ? workspace.BeginOpenAsync(current.SolutionPath) : workspace.BeginReloadAsync();
-                    await SaveAsync(current with { Generation = current.Generation + 1, RequestedAt = TimeProvider.GetUtcNow() }, cancellationToken).ConfigureAwait(true);
+                    _ = workspace.Status.Phase == WorkspacePhase.NotOpened ? workspace.BeginOpenAsync(path) : workspace.BeginReloadAsync();
+                    await SaveAsync(new WorkspaceState(path, (State?.Generation ?? 0) + 1, TimeProvider.GetUtcNow()), cancellationToken).ConfigureAwait(true);
                     break;
                 }
             default:
