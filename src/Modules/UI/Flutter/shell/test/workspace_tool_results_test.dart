@@ -61,6 +61,7 @@ Future<void> finish(
   events.add(AgentEvent({'type': 'RUN_FINISHED'}));
   await events.close();
   await tester.pumpAndSettle();
+  await tester.pump(const Duration(seconds: 1));
 }
 
 void main() {
