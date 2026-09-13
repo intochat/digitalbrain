@@ -380,3 +380,118 @@ recorded here with its disposition.
 | 10 | major | A `uichat` participant cannot answer a `Turn`; re-instructing does not update the active run's roster | Owner is an observer and approver; explicit roster transition (4.5) |
 | 11 | major | Journal window reset empties the transcript; sessions re-send it whole | Transcript checkpoint and cursor; unseen messages only (4.5) |
 | 12 | blocker | The graph result lacked the `id` the shell requires and one of two opening lists | Stable `id`, both lists, end-to-end widget test (4.3, phase 0 plan) |
+
+## 9. Phase specifications for plan writing
+
+Phase 0 has its plan. Each later phase gets its own plan written from this section and the architecture
+sections it cites, with the writing-plans skill, before any code. A phase is one branch, one PR, `coding:`
+commits, `docs/coding/NOTES.md` extended with its observations, and the whole suite green at the end.
+Where a spike is listed it runs first and its result is recorded in NOTES before the plan is written.
+
+### 9.1 Phase 1: edits as transactions (design 4.2, 4.8, 4.9, D10)
+
+- **Contract** `IChangeSet` (`[Alias("changeset")]`, grain `changeset`, name = change id):
+  `propose(ProposeEdit)`, `check(CheckChangeSet)`, `commit(CommitChangeSet)`, `discard(DiscardChangeSet)`,
+  `[ReadOnly] read()` returning `ChangeSetSnapshot(Status, Edits, Diagnostics, Diff, Generation)` with
+  `ChangeSetStatus { Draft, Checked, Committed, Discarded }`. `ProposeEdit` carries one `EditRequest` with
+  `Kind { ReplaceMember, InsertMember, AddUsing, ReplaceRange, Rename, ApplyCodeFix }` and the fields each
+  kind needs (`SymbolId`, `Path`, `Source`, `NewName`, `StartLine`, `EndLine`, `Namespace`, `DiagnosticId`,
+  `FixTitle`).
+- **Workspace additions**: `skeleton(SkeletonQuery{Path})` (types and member signatures, no bodies),
+  `member(MemberQuery{SymbolId})` (one declaration with body), `callers(CallersQuery{SymbolId, Limit})`,
+  `implementations(ImplementationsQuery{SymbolId})`, `derived(DerivedQuery{SymbolId})`; the durable map
+  cache in `WorkspaceState`; a `FileSystemWatcher` folding `.cs` saves with `WithDocumentText` and marking
+  project-file changes as reload needed.
+- **Services**: `ChangeSetEditor` (edits applied to one snapshot with `DocumentEditor`, `SyntaxGenerator`,
+  `Renamer`, and `CodeFixProvider`s from the `Features` packages; `check` diagnoses only the projects that
+  changed and their dependents), `DotnetRunner` (`dotnet build` and `dotnet test` with parsed errors,
+  failures and durations; supports `-p:ArtifactsPath`), `GitRunner` (status, branch, commit; refuses on a
+  dirty tree outside the changeset's files).
+- **Tools**: `code_skeleton`, `code_member`, `code_callers`, `code_implementations`, `code_propose_edit`,
+  `code_check`, `code_commit`, `code_build`, `code_test`.
+- **Tests**: adhoc facts for every edit kind including a rename that crosses the project boundary; `check`
+  refuses a snapshot with errors and names the responsible edit; `commit` writes only the changed files
+  and records the generation; the watcher folds an external edit; a gated fact runs `DotnetRunner` on the
+  real solution. Scripted chat: "rename X to Y" drives propose, check, commit, build, test.
+- **Exit**: "rename `TimerNeuron.Alarm` to `AlarmFor` and run the tests" lands as a commit on a
+  `coding/<id>` branch with the suite green, driven from the chat.
+
+### 9.2 Phase 2: slots (design 4.4, D2, D3, R5)
+
+- **Spikes** (half a day each, results in NOTES): S1 two Aspire resources from one silo project with
+  distinct `ArtifactsPath` outputs (`AddProject` twice versus `AddExecutable` over a prebuilt `dll`);
+  S2 whether `WithEnvironment` callbacks re-evaluate on restart, and the silo minting its own ClusterId when
+  the variable is empty; S3 a compare-and-swap lease row in the Azurite clustering table; S4 a YARP gateway
+  proxying `/agent` (SSE) and `/mcp` (streamable HTTP) with a runtime switch and no dropped bytes.
+- **Deliverables**: `src/Gateway/DigitalBrain.Gateway` (YARP `LoadFromMemory`, `POST /switch/{slot}`,
+  `GET /active`, health passthrough), AppHost `kernel-a` and `kernel-b` (`WithExplicitStart` on b, slot
+  and artifacts environment) behind the gateway on 5080, `ActiveSlotLease` in the kernel (lease row, fence
+  in the grain-call filter and the reminder handler, "standby slot" refusal text), `ISlot`
+  (`[Alias("slot")]`, grain `slot`, name `a` or `b`): `build(BuildSlot{Generation})`,
+  `promote(PromoteSlot)`, `retire(RetireSlot)`, `[ReadOnly] read()` returning
+  `SlotSnapshot(Slot, Phase, Generation, ArtifactsPath, Healthy, HoldsLease)`; `SlotBuilder`;
+  `AspireConnection` allowlist widened to `execute_resource_command` with `start|stop|restart`; shell SSE
+  reconnect by run id and cursor (the session stream gains both); tool `code_promote`.
+- **Tests**: lease CAS facts on a fake table; the fence refuses a command and ignores a reminder tick on a
+  standby silo (BrainSimulation with the lease held by another name); `SlotBuilder` parses build errors
+  into `DiagnosticHit`s; gated: a slot build of the real solution into `artifacts/slot-b`; live (recorded
+  in NOTES, not automated): promote, chat continues after one reconnect, rollback.
+- **Exit**: "rebuild" from the chat promotes the standby with at most one reconnect, and a deliberately
+  broken build leaves the live slot untouched with the errors in a card.
+
+### 9.3 Phase 3: the swarm (design 4.5, 4.7, D4, D5, D6, D12, R4)
+
+- **Prerequisites**: bump `Microsoft.Agents.AI` and `Microsoft.Agents.AI.Workflows` to the latest stable
+  (1.21.0 at the time of writing); read the `GroupChatManager` base class in that version and record its
+  selection signature in NOTES.
+- **AI module changes**: manager `chair` for `chat` (exactly one model call per completed turn over a
+  bounded summary and the unresolved-needs list; every selection and termination persisted in the run's
+  policy state; replay reads them); a `roster` transition that updates the active run's participants;
+  transcript reading that handles a journal window reset and hands each participant only unseen messages.
+- **Contract** `IRefactoring` (`[Alias("refactoring")]`, grain `refactoring`, name = task id):
+  `start(StartRefactoring{Request, Workspace, MaxFiles, Models})`, `approve(ApprovePlan)`,
+  `revise(RevisePlan{Feedback})`, `cancel(CancelRefactoring)`, `[ReadOnly] read()` returning
+  `RefactoringSnapshot(Phase, Scope, Plan, ChangeSetId, Chat, Report)` with `RefactoringPhase { Scoping,
+  Convening, Discussing, AwaitingPlanApproval, Editing, Verifying, AwaitingLanding, Landing, Done, Failed }`.
+- **Services**: `ImpactAnalyzer` (seed symbols from the request, then references, callers, implementations
+  and derived types, then documents grouped by project with reasons; cap from `MaxFiles`, default 24,
+  then per type or per project); a file-agent instruction builder (role, skeleton, reasons, conventions,
+  model per role from `DigitalBrain:Coding:Models`); a stance parser (`involved`, `why`, `changes`,
+  `risks`, `needs`); plan card and landing card; edit fan-out into one `changeset`; a verify loop with three
+  attempts per file agent, then the chair; a report builder.
+- **Tool**: `code_refactor(request)`.
+- **Tests**: a scripted swarm on the adhoc fixture with `ScriptedChatClient` for the chair and two file
+  agents: scope, stances (one says `involved: no` and receives no edit turn), plan, approval, edits,
+  check, commit; a silo restart during Discussing resumes at the saved turn; a stance that names another
+  file expands the roster through the `roster` transition; a model timeout in a file agent ends that turn
+  with a reply and the chair proceeds.
+- **Exit**: "add a `Pause` command to timers" convenes the swarm, the plan card lists `ITimer`,
+  `TimerNeuron`, `TimeJson` and the timer feature file with reasons, approval leads to a green suite, and
+  the landing card promotes the standby.
+
+### 9.4 Phase 4: learning (design 4.6, D11)
+
+- **Deliverables**: memory namespace `coding.<workspace>` on the `IMemory` neuron with tags `convention`,
+  `decision`, `correction`, `file:<path>`, `symbol:<id>`; tools `code_remember`, `code_recall`; the chair
+  records a `correction` when the owner revises a plan or rejects an edit with a reason; every landed
+  refactoring records a `decision`; the instruction builders inject the top conventions for the workspace
+  and the file's tags; "remember: ..." in the workspace chat stores a convention.
+- **Tests**: facts with the in-memory vector store: remember and recall by tag and namespace; a file
+  agent's instructions contain a stored convention; a revise with feedback produces a `correction`; a
+  landed refactoring produces a `decision` tagged with its files.
+- **Exit**: "never add `/// <summary>` comments" stored in one task is present in the next task's agent
+  instructions and cited in its report.
+
+### 9.5 Phase 5: pretty map and depth (design 4.3, D7, R6.6)
+
+- **Deliverables**: layered positions computed in C# from the project DAG (longest-path layer, stable
+  order within a layer), carried on the graph part (after UI phase 1's `UiPart` contract lands, or as an
+  optional `Position` on `GraphNodeState` before it); a force layout for symbol neighborhoods through the
+  `graphview` 1.5.1 algorithms feeding the existing painter; blast-radius dimming from a `refactoring`
+  scope; `code_neighborhood(symbolId)`; `code_tests_for(symbolId)`; package edges in the map; more than
+  one workspace per silo (the service keyed by workspace name); a model-routing card; the graph
+  *reference* path (a `uichat` card reading `/ui/graphs/{name}` through a core-client route).
+- **Tests**: layout facts (layers and order are deterministic), Dart tests for the layered and force
+  renderers, a fact that a scope dims every node outside it.
+- **Exit**: the map shows projects in layers, highlights the scope of the current refactoring, and a node
+  click opens `references` for that project's public types.
