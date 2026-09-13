@@ -128,7 +128,7 @@ public sealed class SolutionWorkspaceFacts
 Run: `dotnet build tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj -c Release`
 Expected: error CS0246 `CodingModule` not found.
 
-- [ ] **Step 3: Add the package versions and the copy-check switch**
+- [ ] **Step 3: Add the package versions**
 
 `Directory.Packages.props`, inside the existing `<ItemGroup>` in alphabetical position:
 
@@ -138,12 +138,10 @@ Expected: error CS0246 `CodingModule` not found.
     <PackageVersion Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.9.0" />
 ```
 
-`Directory.Build.props`, in the first `<PropertyGroup>`:
-
-```xml
-    <!-- Microsoft.CodeAnalysis.Workspaces.MSBuild copies Microsoft.Build.* next to the silo; the SDK refuses that by default. -->
-    <DisableMSBuildAssemblyCopyCheck>true</DisableMSBuildAssemblyCopyCheck>
-```
+The SDK refuses to copy `Microsoft.Build.*` assemblies into an output by default. The switch that allows it
+goes on the three projects that carry them (module, silo, tests) in Steps 4 and 6, never in
+`Directory.Build.props`: a global suppression would hide a future conflict in an unrelated project
+(design section 8, finding 4).
 
 - [ ] **Step 4: Create the three projects**
 
@@ -173,6 +171,8 @@ Expected: error CS0246 `CodingModule` not found.
     <Description>Coding module: a Roslyn workspace neuron and the code_* tools.</Description>
     <RootNamespace>DigitalBrain.Coding</RootNamespace>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+    <!-- Microsoft.CodeAnalysis.Workspaces.MSBuild carries Microsoft.Build.Framework; the SDK refuses to copy it by default. -->
+    <DisableMSBuildAssemblyCopyCheck>true</DisableMSBuildAssemblyCopyCheck>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Coding.Contracts.csproj" />
@@ -248,23 +248,25 @@ public sealed class CodingModule : IModule
 `src/Kernel/DigitalBrain.Silo/DigitalBrain.Silo.csproj`: add
 `<ProjectReference Include="../../Modules/Coding/Coding/DigitalBrain.Modules.Coding.csproj" />` next to the
 other module references (the silo resolves modules with `Type.GetType`; without this line the kernel cannot
-load the module).
+load the module), and `<DisableMSBuildAssemblyCopyCheck>true</DisableMSBuildAssemblyCopyCheck>` in its
+`<PropertyGroup>` with the same one-line comment as the module project.
 
 `tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj`: add references to
 `../../src/Modules/Coding/Coding/DigitalBrain.Modules.Coding.csproj` and
-`../../src/Modules/Coding/Contracts/DigitalBrain.Modules.Coding.Contracts.csproj`.
+`../../src/Modules/Coding/Contracts/DigitalBrain.Modules.Coding.Contracts.csproj`, and the same
+`DisableMSBuildAssemblyCopyCheck` property.
 
 - [ ] **Step 7: Run the fact**
 
 Run: `dotnet test tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj -c Release -- --filter-class DigitalBrain.Tests.Coding.SolutionWorkspaceFacts`
-Expected: PASS. If the build reports MSB errors about `Microsoft.Build` assemblies, the
-`DisableMSBuildAssemblyCopyCheck` property did not apply; check it sits in `Directory.Build.props` before
-the SDK targets import (it does when it is in the first property group).
+Expected: PASS. If the build reports an MSB error about `Microsoft.Build` assemblies in the output of a
+project other than the three above, that project also receives the property; record which one in
+`NOTES.md`.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add Directory.Packages.props Directory.Build.props DigitalBrain.slnx src/Modules/Coding src/Kernel/DigitalBrain.Silo/DigitalBrain.Silo.csproj tests/DigitalBrain.Tests
+git add Directory.Packages.props DigitalBrain.slnx src/Modules/Coding src/Kernel/DigitalBrain.Silo/DigitalBrain.Silo.csproj tests/DigitalBrain.Tests
 git commit -m "coding: scaffold the Coding module with Roslyn packages"
 ```
 
@@ -640,8 +642,10 @@ git commit -m "coding: workspace contract, queries and JSON context"
 **Interfaces:**
 - Consumes: the DTOs from Task 2.
 - Produces:
-  - `public interface ISolutionLoader { Task<Workspace> OpenAsync(string solutionPath, IProgress<string> progress, CancellationToken cancellationToken); }`
-  - `public sealed record WorkspaceStatus(WorkspacePhase Phase, string? SolutionPath, int ProjectCount, int DocumentCount, string? Detail)`
+  - `public sealed record LoadedSolution(Workspace Workspace, IReadOnlyList<string> Failures)`
+  - `public interface ISolutionLoader { Task<LoadedSolution> OpenAsync(string solutionPath, IProgress<string> progress, CancellationToken cancellationToken); }`
+  - `public sealed record WorkspaceStatus(WorkspacePhase Phase, string? SolutionPath, int ProjectCount, int DocumentCount, string? Detail)`;
+    a `Ready` status carries `Detail = "N load failures; first: ..."` when the loader reported any, else null
   - `public sealed class SolutionWorkspace` with `WorkspaceStatus Status`, `Solution? Current`,
     `Task BeginOpenAsync(string solutionPath)`, `Task BeginReloadAsync()`, `Task WhenReadyAsync(CancellationToken)`,
     `Task<SymbolSearchResult> FindSymbolsAsync(SymbolSearch, CancellationToken)`,
@@ -733,11 +737,11 @@ internal sealed class AdhocSolutionLoader(Func<Workspace> open) : ISolutionLoade
 {
     public int Opens { get; private set; }
 
-    public Task<Workspace> OpenAsync(string solutionPath, IProgress<string> progress, CancellationToken cancellationToken)
+    public Task<LoadedSolution> OpenAsync(string solutionPath, IProgress<string> progress, CancellationToken cancellationToken)
     {
         Opens++;
         progress.Report($"opened {solutionPath}");
-        return Task.FromResult(open());
+        return Task.FromResult(new LoadedSolution(open(), []));
     }
 }
 ```
@@ -786,6 +790,24 @@ public sealed class SolutionWorkspaceFacts
         Assert.Equal(WorkspacePhase.Ready, workspace.Status.Phase);
         Assert.Equal(2, workspace.Status.ProjectCount);
         Assert.Equal(3, workspace.Status.DocumentCount);
+        Assert.Null(workspace.Status.Detail);
+    }
+
+    [Fact]
+    public async Task Load_failures_stay_visible_on_a_ready_workspace()
+    {
+        var loader = new FailingAdhocLoader(FixtureSolutions.TwoProjects, ["Alpha.csproj: reference Missing.dll not found"]);
+        using var workspace = new SolutionWorkspace(loader, TimeProvider.System, NullLogger<SolutionWorkspace>.Instance);
+        await workspace.BeginOpenAsync("E:/fixture/Fixture.slnx");
+        await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(WorkspacePhase.Ready, workspace.Status.Phase);
+        Assert.Equal("1 load failures; first: Alpha.csproj: reference Missing.dll not found", workspace.Status.Detail);
+    }
+
+    private sealed class FailingAdhocLoader(Func<Workspace> open, IReadOnlyList<string> failures) : ISolutionLoader
+    {
+        public Task<LoadedSolution> OpenAsync(string solutionPath, IProgress<string> progress, CancellationToken cancellationToken)
+            => Task.FromResult(new LoadedSolution(open(), failures));
     }
 
     [Fact]
@@ -895,9 +917,13 @@ using Microsoft.CodeAnalysis;
 
 namespace DigitalBrain.Coding;
 
+// Failures are the workspace diagnostics a loader saw while opening (a project that did not evaluate,
+// a reference that did not resolve); the solution still opened, so they travel next to it.
+public sealed record LoadedSolution(Workspace Workspace, IReadOnlyList<string> Failures);
+
 public interface ISolutionLoader
 {
-    Task<Workspace> OpenAsync(string solutionPath, IProgress<string> progress, CancellationToken cancellationToken);
+    Task<LoadedSolution> OpenAsync(string solutionPath, IProgress<string> progress, CancellationToken cancellationToken);
 }
 ```
 
@@ -1050,14 +1076,15 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, TimeProvider clock
         Workspace? previous;
         try
         {
-            var opened = await loader.OpenAsync(solutionPath, progress, cancellationToken).ConfigureAwait(false);
-            var solution = opened.CurrentSolution;
+            var loaded = await loader.OpenAsync(solutionPath, progress, cancellationToken).ConfigureAwait(false);
+            var solution = loaded.Workspace.CurrentSolution;
             var documents = solution.Projects.Sum(static project => project.DocumentIds.Count);
+            var detail = loaded.Failures.Count == 0 ? null : $"{loaded.Failures.Count} load failures; first: {loaded.Failures[0]}";
             lock (_gate)
             {
                 previous = _workspace;
-                _workspace = opened;
-                _status = new WorkspaceStatus(WorkspacePhase.Ready, solutionPath, solution.ProjectIds.Count, documents, null);
+                _workspace = loaded.Workspace;
+                _status = new WorkspaceStatus(WorkspacePhase.Ready, solutionPath, solution.ProjectIds.Count, documents, detail);
                 ReadyAt = clock.GetUtcNow();
             }
         }
@@ -1306,6 +1333,8 @@ public sealed class CodingSelfTestFacts
         timeout.CancelAfter(TimeSpan.FromMinutes(5));
         await workspace.WhenReadyAsync(timeout.Token);
         Assert.True(workspace.Status.ProjectCount >= 30, workspace.Status.Detail);
+        // A partial load must never pass as ready on our own solution (design section 8, finding 5).
+        Assert.Null(workspace.Status.Detail);
 
         var symbols = await workspace.FindSymbolsAsync(new("ITimer"), timeout.Token);
         var contract = Assert.Single(symbols.Items, hit => hit.Id == "T:DigitalBrain.Time.ITimer");
@@ -1350,7 +1379,7 @@ public sealed class MSBuildSolutionLoader : ISolutionLoader
 {
     private static readonly Lock RegistrationGate = new();
 
-    public Task<Workspace> OpenAsync(string solutionPath, IProgress<string> progress, CancellationToken cancellationToken)
+    public Task<LoadedSolution> OpenAsync(string solutionPath, IProgress<string> progress, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(solutionPath);
         ArgumentNullException.ThrowIfNull(progress);
@@ -1363,8 +1392,10 @@ public sealed class MSBuildSolutionLoader : ISolutionLoader
         return OpenCoreAsync(solutionPath, progress, cancellationToken);
     }
 
-    // The locator must run before any Microsoft.Build type is JIT-compiled, so nothing in this method
-    // or its callers up to here references one; OpenCoreAsync is kept out of line for the same reason.
+    // The silo registers the locator as its first statement (Program.cs); this guard is for the test
+    // process, which has no such entry point. It must run before any Microsoft.Build type is
+    // JIT-compiled, so nothing in this method or its callers references one; OpenCoreAsync is kept out
+    // of line for the same reason.
     private static void EnsureLocatorRegistered()
     {
         lock (RegistrationGate)
@@ -1377,7 +1408,7 @@ public sealed class MSBuildSolutionLoader : ISolutionLoader
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static async Task<Workspace> OpenCoreAsync(string solutionPath, IProgress<string> progress, CancellationToken cancellationToken)
+    private static async Task<LoadedSolution> OpenCoreAsync(string solutionPath, IProgress<string> progress, CancellationToken cancellationToken)
     {
         var workspace = MSBuildWorkspace.Create();
         var failures = new List<string>();
@@ -1405,13 +1436,24 @@ public sealed class MSBuildSolutionLoader : ISolutionLoader
             throw new InvalidOperationException($"Solution '{solutionPath}' loaded no projects: {reason}");
         }
 
-        return workspace;
+        return new LoadedSolution(workspace, failures);
     }
 }
 ```
 
 If `RegisterWorkspaceFailedHandler` returns a registration object in 5.9.0, keep it alive by storing it in a
 field of a small holder disposed with the workspace; the compiler tells you at this step.
+
+`src/Kernel/DigitalBrain.Silo/Program.cs`: make the locator registration the **first statement** of the
+file, before `WebApplication.CreateBuilder`, exactly as IAW does (research R2.1), so no other module can
+load a `Microsoft.Build` assembly first:
+
+```csharp
+Microsoft.Build.Locator.MSBuildLocator.RegisterDefaults();
+```
+
+The silo project already references the module, which carries the package. If the analyzers flag the
+fully qualified call, add `using Microsoft.Build.Locator;` at the top and call `MSBuildLocator.RegisterDefaults();`.
 
 - [ ] **Step 4: Write the warmup and register both**
 
@@ -1459,7 +1501,7 @@ Then run the whole suite once without the variable and confirm the fact is repor
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/Modules/Coding tests/DigitalBrain.Tests/Features/Coding/CodingSelfTestFacts.cs
+git add src/Modules/Coding src/Kernel/DigitalBrain.Silo/Program.cs tests/DigitalBrain.Tests/Features/Coding/CodingSelfTestFacts.cs
 git commit -m "coding: MSBuild loader, silo warmup and the gated self-test on the real solution"
 ```
 
@@ -1738,7 +1780,9 @@ git commit -m "coding: workspace neuron with open, reload and typed queries"
 - Consumes: `SolutionWorkspace`, `NativeTools.Resolve(names)` from `DigitalBrain.AI`, `GraphNodeState`/`GraphEdgeState` from `DigitalBrain.UI`.
 - Produces: native tools `code_find_symbols`, `code_references`, `code_diagnostics`, `code_map`;
   `GraphNodeKinds.Module = "module"`, `GraphNodeKinds.Entity = "entity"`; the map result JSON
-  `{ kind: "graph", name, title, nodes: [{id,label,kind,cluster}], edges: [{id,sourceId,targetId,dotted}] }`.
+  `{ kind: "graph", id, name, title, nodes: [{id,label,kind,cluster}], edges: [{id,sourceId,targetId,dotted}] }`
+  where `id` and `name` are the same stable string `map-<8 hex chars of the solution path's SHA-256>`;
+  the shell drops any tool result without an `id` (design section 8, finding 12).
 
 - [ ] **Step 1: Write the failing tool facts**
 
@@ -1818,7 +1862,12 @@ public sealed class CodingNativeToolFacts
         await using var _ = brain;
         var result = await InvokeAsync(tools, "code_map", new() { ["title"] = "Fixture" });
         Assert.Equal("graph", result.GetProperty("kind").GetString());
-        Assert.StartsWith("map-", result.GetProperty("name").GetString(), StringComparison.Ordinal);
+        var id = result.GetProperty("id").GetString();
+        Assert.StartsWith("map-", id, StringComparison.Ordinal);
+        Assert.Equal(12, id!.Length);
+        Assert.Equal(id, result.GetProperty("name").GetString());
+        var again = await InvokeAsync(tools, "code_map", new() { ["title"] = "Fixture" });
+        Assert.Equal(id, again.GetProperty("id").GetString());
         var nodes = result.GetProperty("nodes").EnumerateArray().ToArray();
         Assert.Equal(2, nodes.Length);
         Assert.All(nodes, node => Assert.Equal("module", node.GetProperty("kind").GetString()));
@@ -1856,6 +1905,8 @@ public static class GraphNodeKinds
 ```csharp
 // src/Modules/Coding/Coding/CodingNativeTools.cs
 using System.ComponentModel;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using DigitalBrain.UI;
 using Microsoft.Extensions.AI;
@@ -1924,8 +1975,9 @@ public sealed class CodingNativeTools(SolutionWorkspace workspace)
             var map = await workspace.MapAsync(new MapQuery(), cancellationToken).ConfigureAwait(false);
             var nodes = map.Projects.Select(project => new GraphNodeState(project.Name, project.Name, GraphNodeKinds.Module, project.Cluster)).ToArray();
             var edges = map.References.Select(edge => new GraphEdgeState($"{edge.From}-{edge.To}", edge.From, edge.To)).ToArray();
-            var name = $"map-{Guid.NewGuid():N}"[..12];
-            return JsonSerializer.SerializeToElement(new { kind = "graph", name, title, nodes, edges }, Json);
+            // One artifact per solution: the shell keys artifacts by id, so a second map replaces the first.
+            var id = "map-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(map.SolutionPath)))[..8];
+            return JsonSerializer.SerializeToElement(new { kind = "graph", id, name = id, title, nodes, edges }, Json);
         }
         catch (Exception error) when (error is not OperationCanceledException)
         {
@@ -1994,8 +2046,10 @@ git commit -m "coding: code_find_symbols, code_references, code_diagnostics and 
 - Create: `src/Modules/UI/Flutter/shell/lib/workspace/graph_artifact.dart`,
   `src/Modules/UI/Flutter/shell/test/workspace/graph_artifact_test.dart`
 - Modify: `shell/lib/workspace/artifact_editors.dart` (add the `'graph'` case),
-  `shell/lib/workspace/workspace_chat_presentation.dart:141` (add `'graph'`),
-  `shell/lib/workspace/workspace_app.dart:250-260` (`_servedByResult` includes `'graph'`)
+  `shell/lib/workspace/workspace_chat.dart:316` (the auto-open kind list),
+  `shell/lib/workspace/workspace_chat_presentation.dart:141` (the "open in workspace" kind list),
+  `shell/lib/workspace/workspace_app.dart:250-260` (`_servedByResult` includes `'graph'`),
+  `shell/test/workspace_tool_results_test.dart` (end-to-end case)
 
 **Interfaces:**
 - Consumes: the `code_map` result JSON from Task 6; `GraphNode`, `GraphEdge`, `GraphNodeKind`, `UiGraph` from `digitalbrain_ui`.
@@ -2122,17 +2176,73 @@ Check that `digitalbrain_ui.dart` exports `graph_models.dart` and `ui_graph.dart
 
 with `import 'graph_artifact.dart';`.
 
+`workspace_chat.dart:316`: add `'graph'` to the list of kinds that call `widget.onArtifact` when a
+`TOOL_CALL_RESULT` arrives (this is the list that actually opens the artifact; the presentation list only
+renders the tile).
+
 `workspace_chat_presentation.dart:141`: add `'graph'` to the list of kinds that render "Open in workspace".
 
 `workspace_app.dart` `_servedByResult`: `kind == 'table' || kind == 'chart' || kind == 'graph'`; update the
-comment above it to name graphs alongside tables and charts.
+comment above it to name graphs alongside tables and charts. `_accept` keeps its `id` guard; the map
+result carries one (Task 6).
 
-- [ ] **Step 5: Run the Flutter gate**
+- [ ] **Step 5: Write the end-to-end widget test**
+
+Append to `shell/test/workspace_tool_results_test.dart`, inside `main()`, reusing its `sendFirstMessage`
+and `finish` helpers:
+
+```dart
+  testWidgets('a graph tool result opens as a graph artifact in the working area', (
+    tester,
+  ) async {
+    final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
+    final events = await sendFirstMessage(tester, store);
+    events.add(
+      AgentEvent({
+        'type': 'TOOL_CALL_START',
+        'toolCallId': 'map',
+        'toolCallName': 'code_map',
+      }),
+    );
+    events.add(
+      AgentEvent({
+        'type': 'TOOL_CALL_RESULT',
+        'toolCallId': 'map',
+        'content': {
+          'kind': 'graph',
+          'id': 'map-0123abcd',
+          'name': 'map-0123abcd',
+          'title': 'Fixture',
+          'nodes': [
+            {'id': 'Alpha', 'label': 'Alpha', 'kind': 'module', 'cluster': 'Alpha'},
+            {'id': 'Beta', 'label': 'Beta', 'kind': 'module', 'cluster': 'Beta'},
+          ],
+          'edges': [
+            {'id': 'Beta-Alpha', 'sourceId': 'Beta', 'targetId': 'Alpha', 'dotted': false},
+          ],
+        },
+      }),
+    );
+    await tester.pumpAndSettle();
+    expect(store.currentProject.artifacts.single.kind, 'graph');
+    expect(store.currentProject.artifacts.single.id, 'map-0123abcd');
+    expect(find.byType(UiGraph), findsOneWidget);
+    expect(tester.widget<UiGraph>(find.byType(UiGraph)).nodes.length, 2);
+    await finish(tester, events);
+  });
+```
+
+Run (in `shell`): `flutter test test/workspace_tool_results_test.dart`
+Expected: the new case passes; if `UiGraph` is not found, the artifact was accepted but the editor did not
+open it: check the `artifact_editors.dart` case and that the working area shows the newest artifact the
+way it does for charts.
+
+- [ ] **Step 6: Run the Flutter gate**
 
 Run (in `src/Modules/UI/Flutter`): `dart format --set-exit-if-changed core ui shell && (cd ui && flutter analyze && flutter test) && (cd shell && flutter analyze && flutter test)`
 Expected: clean. If a widget test in the shell pins the served-by-result kinds, extend its expectation.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add src/Modules/UI/Flutter/shell
@@ -2285,6 +2395,11 @@ Add to the PR body the design's exit criteria for phase 0 and a link to `docs/co
 - **Placeholders.** None: every step has its code or its exact command and expected output.
 - **Type consistency.** `SymbolSearch(Query, Limit)`, `ReferenceSearch(SymbolId, Limit)`,
   `DiagnosticsQuery(Path, Project, Limit)`, `MapQuery(IncludeDocumentCounts)` are used with the same
-  positional and named arguments in Tasks 3, 5 and 6; `WorkspaceStatus.Phase` is the contract's
+  positional and named arguments in Tasks 3, 5 and 6; `ISolutionLoader.OpenAsync` returns `LoadedSolution`
+  in Tasks 3 and 4 and both loaders in the tests; `WorkspaceStatus.Phase` is the contract's
   `WorkspacePhase`; `CodingModule.SolutionPathKey` is read by `WorkspaceWarmup` and set by the projection
-  through `EnvironmentKeys.For(ConfigurationRoot, "SolutionPath")`, which yields the same key.
+  through `EnvironmentKeys.For(ConfigurationRoot, "SolutionPath")`, which yields the same key; the map
+  result's `id` produced in Task 6 is what Task 7's widget test feeds through `TOOL_CALL_RESULT`.
+- **Review findings applied.** Finding 4 (locator first in `Program.cs`, copy-check scoped) in Tasks 1
+  and 4; finding 5 (failures visible, self-test requires none) in Tasks 3 and 4; finding 12 (stable `id`,
+  both opening lists, end-to-end widget test) in Tasks 6 and 7.

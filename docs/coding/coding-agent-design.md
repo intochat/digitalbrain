@@ -49,6 +49,10 @@ Definition of done for the whole programme:
 - **Neurons first.** Long-lived things are neurons with typed methods (`workspace`, `changeset`, `slot`,
   `refactoring`); the swarm's agents and chats are the existing `agent` and `chat` neurons; Roslyn itself is a
   singleton service behind the `workspace` neuron, the way `TableService` sits behind tables (R6.2, R6.3).
+- **No waiting inside a reaction.** A neuron never awaits another neuron's answer inside its own turn:
+  `Announce` only buffers until the reaction saves, and reactions are serialized, so a synchronous wait for
+  a peer's reply can never be answered (review finding 9). Every "ask and wait" is a saved phase
+  ("waiting for X") completed by a later correlated reaction; every tool returns a receipt at once.
 - **One result envelope.** Every list result is `{items, totalCount, truncated}` with a caller-set limit
   (R1.4). Nothing unbounded reaches a prompt.
 - **Symbols have ids.** A symbol is addressed by its documentation-comment id (`T:DigitalBrain.Time.ITimer`),
@@ -122,6 +126,17 @@ Queries run on the immutable `CurrentSolution` and never block the neuron's turn
 - Phase 1 adds `Skeleton(path)` (types and member signatures without bodies), `Member(symbolId)` (one body),
   `Callers`, `Implementations`, `Derived`, and the edit primitives.
 
+Ordering and readiness (review findings 4 and 5): `MSBuildLocator.RegisterDefaults()` is the first
+statement of the silo's `Program.cs`, before host composition, as IAW does (R2.1); the loader keeps a
+guarded registration only as a fallback for test processes. The loader returns the workspace **and** the
+list of workspace failures; `Ready` with failures carries them in the status detail, and the gated
+self-test requires zero failures on this solution. The `DisableMSBuildAssemblyCopyCheck` property is set
+only on the three projects that carry the Roslyn assemblies (module, silo, tests), never globally.
+
+Memory and concurrency (review finding 6): semantic queries run through a bounded gate (two at a time),
+every result is capped, and if the silo's working set under load proves unacceptable, D1's sidecar is the
+recorded fallback; nothing in the neuron contract changes for that move.
+
 Freshness: phase 1 adds a `FileSystemWatcher` over the solution root that folds `.cs` saves into the snapshot
 with `WithDocumentText` and marks `.csproj`/`.props`/`.targets` changes as "reload needed" (R1.4 lessons).
 
@@ -130,12 +145,16 @@ Durable cache: the `workspace` neuron's state keeps the last solution path, the 
 
 ### 4.3 The solution map
 
-`code_map` returns `{ kind: "graph", name, title, nodes, edges }` exactly as `render_chart` returns
-`kind: "chart"`, and the shell opens it from the tool result (R6.3). Nodes are projects (`kind: "module"`,
-`cluster` = the module or kernel folder) with the graph's existing `GraphNodeState`/`GraphEdgeState`
-shapes; when a `uichat` chat is named, the same map renders through `IGraph.Render` and arrives as a
-`graph` card (R6.4). The shell gains the missing `graph` editor case that renders `UiGraph` from the
-artifact data (R6.4).
+`code_map` returns `{ kind: "graph", id, name, title, nodes, edges }` exactly as `render_chart` returns
+`kind: "chart"`, and the shell opens it from the tool result (R6.3). The `id` is stable per solution
+(`map-` plus a hash of the solution path) because the shell's artifact acceptance drops any result without
+one (review finding 12), and both opening paths in the shell (`workspace_chat.dart`'s auto-open list and
+`workspace_chat_presentation.dart`'s "open in workspace" list) learn the `graph` kind. Nodes are projects
+(`kind: "module"`, `cluster` = the module or kernel folder) with the graph's existing
+`GraphNodeState`/`GraphEdgeState` shapes. Phase 0 ships the inline snapshot only; a graph *reference*
+(the `uichat` card path through `IGraph.Render`) needs a core-client read route for `/ui/graphs/{name}`
+and arrives in phase 5. The shell gains the missing `graph` editor case that renders `UiGraph` from the
+artifact data (R6.4), verified end to end from a `TOOL_CALL_RESULT` event to the rendered widget.
 
 Pretty comes in phase 5, after the UI phase 1 part contract lands: layered positions computed in C# from
 the project DAG (longest-path layer, stable order within a layer), a force layout for symbol neighborhoods
@@ -152,16 +171,31 @@ already exists), and click-through from a node to `references`.
 - **Gateway.** A small `DigitalBrain.Gateway` project (YARP `LoadFromMemory`, R5.5) listens on 5080 and
   reassigns every request to the active slot's cluster; `POST /switch/{slot}` flips the active slot; it
   proxies SSE and streamable HTTP unchanged. The shell and every MCP client keep talking to 5080.
+- **The active-slot fence** (review findings 1 and 2). Two silos sharing a `ServiceId` share reminder
+  rows and grain storage, so a standby that merely starts would already run reminders and activate the same
+  neurons. A single `ActiveSlot` lease row (compare-and-swap in the clustering table) names the owner.
+  A silo whose slot does not hold the lease starts in standby: its reminder ticks are ignored, its
+  reactions are not drained, and its commands refuse with "standby slot" (one check in the kernel's
+  existing grain-call filter and reminder handler). Promotion is: flip the lease to the new slot, switch the
+  gateway, let the old slot drain in-flight HTTP for a grace period, then stop it. Activations never run in
+  two slots at once because only the lease holder reacts.
 - **The `slot` neuron** runs `build` (through `SlotBuilder`: `dotnet build DigitalBrain.slnx
-  -p:ArtifactsPath=...`, errors parsed into `DiagnosticHit`s), asks Aspire to start the slot resource,
-  waits for `/health` and a scripted smoke turn, calls the gateway switch, and asks Aspire to stop the old
-  slot after a grace period. Aspire commands go through the Microsoft module's `AspireConnection` with its
-  allowlist widened to `execute_resource_command` for `start|stop|restart` (R5.2).
-- **Rollback** is `POST /switch/{previous}` while the old slot still runs; the old slot is stopped only after
-  the new one has answered a smoke turn.
+  -p:ArtifactsPath=...`, errors parsed into `DiagnosticHit`s), asks Aspire to start the standby resource,
+  waits for `/health` and a read-only smoke check (no mutation, the standby is fenced), then promotes.
+  Aspire commands go through the Microsoft module's `AspireConnection` with its allowlist widened to
+  `execute_resource_command` for `start|stop|restart` (R5.2).
+- **The swap is a durable follow-up, never part of a turn** (review finding 3). The turn that decides to
+  land ends by saving `Landing`; a later reaction performs the promotion. No model run and no tool call is
+  in flight in the old slot when the lease flips, so nothing is repeated in the new slot. The shell's SSE
+  client reconnects by run id and journal cursor (phase 2 adds both to the session stream); an interrupted
+  stream replays from the cursor.
+- **Rollback** is flipping the lease and the gateway back while the old slot still runs, and it is allowed
+  only for landings whose changeset touched no `[GenerateSerializer]` state type: a change to persisted
+  state shapes is landed as forward-only, with the old slot stopped before any state is written by the new
+  one (Orleans versions interfaces, not state, R5.3).
 - **The agent survives its own swap** because everything it is doing is neuron state: the `refactoring`
   neuron's phase, the `changeset`, the chat transcript in journals, the agents' sessions. The new slot's
-  `refactoring` activation continues from `Landing`. The shell's SSE client reconnects on stream end.
+  `refactoring` activation continues from `Landing`.
 
 ### 4.5 The swarm
 
@@ -175,14 +209,20 @@ A refactoring is a `refactoring` neuron driving these phases, each a saved state
 2. **Convene.** For each scoped document an `agent:file/<relative path>` neuron is `Instruct`ed with a role
    prompt, the file's skeleton, the reasons it is in scope, the owner's conventions (4.6), the file-agent
    model (4.7), and tools scoped to its document (`code_member`, `code_references` from this file,
-   `code_propose_edit`). A `chat:refactoring/<id>` neuron is `Instruct`ed with the file agents, the chair
-   `agent:chair/<id>` (strong model) and the owner's `uichat` as participants, manager `chair` (D4).
+   `code_propose_edit`). A `chat:refactoring/<id>` neuron is `Instruct`ed with the file agents and the chair
+   `agent:chair/<id>` (strong model) as participants, manager `chair` (D4). The owner is **not** a
+   participant (a `uichat` cannot answer a `Turn`, review finding 10): the owner watches the transcript as
+   a card and acts through the sign-off commands. Adding files later is an explicit `roster` transition on
+   the active run (the AI module's `RunPolicy.Participants` is updated, not only the synapses).
 3. **Discuss.** The chair opens with the request. Each file agent answers a structured stance:
    `{ involved: yes|no, why, changes: [...], risks: [...], needs: [other files] }`. "Not my responsibility"
    is `involved: no` with a reason. The chair pulls in files named under `needs` (scope expansion re-runs
    step 2 for them), asks follow-ups, and ends with a plan: per-file change list, order, verification.
-   The `chair` manager picks the next speaker with a model call over the transcript and terminates when the
-   plan is posted or the round budget is spent.
+   The `chair` manager makes **exactly one** model call per completed turn over a bounded summary plus the
+   unresolved-needs list, and persists every selection and termination decision in the run's policy state;
+   replay reads the persisted choices instead of re-deciding (review finding 8). The `refactoring` neuron
+   keeps its own transcript checkpoint (summary, cursor) so a journal window reset never erases the request,
+   and each file agent receives only the messages it has not seen (review finding 11).
 4. **Sign-off.** The plan is a card with Approve and Revise; `revise(feedback)` reopens step 3.
 5. **Edit.** Each file agent proposes edits into the `changeset` (member replacement, insertion, using
    directives, or a rename by symbol id). `changeset.check` applies them to one snapshot and returns
@@ -229,6 +269,9 @@ phase 4 `code_remember`, `code_recall`. Every neuron method is reachable through
 - Workspace not ready: reads return the status as advice ("opening, 12 of 35 projects; try again").
 - Load failure: `Failed` with the first workspace diagnostic; `reload` retries; the durable map still answers.
 - A `changeset.check` with errors never reaches disk; `commit` refuses with the diagnostics.
+- `commit` is not atomic over several files (review finding 7): it writes the documents in order, then
+  records the git generation; a crash between the two is reconciled at the next `workspace` activation by
+  comparing the tree with the last recorded generation and reloading.
 - A failed slot build leaves the live slot untouched; a failed smoke turn switches back and reports.
 - Model timeouts inside a file agent's turn end that turn with a `Reply` rather than escaping the reaction
   (R3.2); the chair treats silence as "no stance" after one retry.
@@ -252,8 +295,8 @@ Three tiers, matching the repo (R6.5):
 | # | Question | Default | Alternative |
 |---|---|---|---|
 | D1 | Where Roslyn runs | In the kernel silo as a module singleton (4.2) | A sidecar process with an RPC seam; only if the BuildHost or Locator misbehaves inside the silo (phase 0 proves it) |
-| D2 | Live rebuild shape | Two kernel slots behind a gateway (4.4) | A single kernel restarted by Aspire (downtime per landing) or a separate forge silo (approach B) |
-| D3 | Slot outputs | `ArtifactsPath` per slot, one working tree | A git worktree per slot |
+| D2 | Live rebuild shape | Two kernel slots behind a gateway with the active-slot fence (4.4) | A single kernel restarted by Aspire (downtime per landing) or a separate forge silo (approach B) |
+| D3 | Slot outputs | `ArtifactsPath` per slot, one working tree, the slot built from a recorded git generation | A git worktree per slot |
 | D4 | Discussion engine | `chat` neuron with a new `chair` manager; `refactoring` neuron drives phases (4.5) | MAF Magentic workflow with `RequirePlanSignoff` inside the `refactoring` reaction, checkpointed to blob storage |
 | D5 | Agent granularity | One agent per document, cap 24, then per type or project | One agent per project |
 | D6 | Model routing | Config per role with the defaults in 4.7 | Fixed models |
@@ -312,3 +355,28 @@ Each phase is one PR with `coding:` commits and leaves the suite green.
 - Native tool results pass the untrusted-content screen (R6.2); source code excerpts may trip it. Phase 0
   observes this on the live kernel and, if it does, the `code_*` tools are registered outside the screen
   with the reason recorded in `NOTES.md`.
+- The shell accepts a tool result as an artifact only when it carries an `id`, and the auto-open kinds are
+  listed in two files (`workspace_chat.dart` and `workspace_chat_presentation.dart`); a graph result must
+  satisfy both (review finding 12).
+- Two silos with one `ServiceId` share reminders and activations; a standby that is not fenced runs work
+  before it is promoted (review finding 1).
+
+## 8. Review findings (Codex, 2026-09-13)
+
+An adversarial pass over sections 4.2 to 4.5 produced twelve findings; each is folded in above and
+recorded here with its disposition.
+
+| # | Severity | Finding | Disposition |
+|---|---|---|---|
+| 1 | blocker | A standby silo with the same `ServiceId` runs shared reminders before promotion | Active-slot lease and fence in 4.4 |
+| 2 | blocker | Shared journals do not transfer activation ownership; rollback can expose older state | Fence (only the lease holder reacts); rollback only for changes to no persisted state type; old slot stopped after drain (4.4) |
+| 3 | blocker | A reconnecting SSE stream cannot resume a MAF run that was in flight during the swap | The swap is a durable follow-up after the turn commits; reconnect by run id and cursor (4.4, phase 2) |
+| 4 | major | Registering the locator from a hosted service is too late; a global copy-check suppression hides conflicts | Locator first in `Program.cs`; property scoped to three projects (4.2, phase 0 plan) |
+| 5 | major | Locator success does not prove BuildHost works; a partial load became `Ready` | Loader returns failures; self-test requires zero (4.2, phase 0 plan) |
+| 6 | major | Roslyn memory pressure can take down the silo | Bounded query gate, capped results, sidecar as the recorded fallback (4.2, D1) |
+| 7 | major | Isolated outputs do not give a coherent source snapshot; `TryApplyChanges` is not atomic over files | Slot built from a recorded git generation (D3); ordered writes plus generation marker and reconciliation (4.9) |
+| 8 | major | An LLM-driven manager replayed per turn re-decides history and multiplies cost | One persisted selection per completed turn (4.5) |
+| 9 | blocker | Awaiting a peer's reply inside a reaction can never be answered | Principle "no waiting inside a reaction" (section 2) |
+| 10 | major | A `uichat` participant cannot answer a `Turn`; re-instructing does not update the active run's roster | Owner is an observer and approver; explicit roster transition (4.5) |
+| 11 | major | Journal window reset empties the transcript; sessions re-send it whole | Transcript checkpoint and cursor; unseen messages only (4.5) |
+| 12 | blocker | The graph result lacked the `id` the shell requires and one of two opening lists | Stable `id`, both lists, end-to-end widget test (4.3, phase 0 plan) |
