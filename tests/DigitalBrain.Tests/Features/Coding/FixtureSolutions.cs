@@ -63,4 +63,24 @@ internal static class FixtureSolutions
 
         return workspace;
     }
+
+    // A console project with no entry point: the missing Main is a compilation-level diagnostic (Location.None).
+    internal static Workspace ConsoleWithoutMain()
+    {
+        var workspace = new AdhocWorkspace();
+        var gamma = ProjectId.CreateNewId("Gamma");
+        var options = new CSharpCompilationOptions(OutputKind.ConsoleApplication);
+        var solution = workspace.CurrentSolution
+            .AddProject(ProjectInfo.Create(gamma, VersionStamp.Create(), "Gamma", "Gamma", LanguageNames.CSharp,
+                filePath: Root + "/Gamma/Gamma.csproj", compilationOptions: options, metadataReferences: Runtime))
+            .AddDocument(DocumentId.CreateNewId(gamma), "Empty.cs", SourceText.From("""
+                namespace Gamma;
+                """), filePath: Root + "/Gamma/Empty.cs");
+        if (!workspace.TryApplyChanges(solution))
+        {
+            throw new InvalidOperationException("The adhoc fixture did not apply.");
+        }
+
+        return workspace;
+    }
 }

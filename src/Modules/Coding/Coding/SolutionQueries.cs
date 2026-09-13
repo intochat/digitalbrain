@@ -45,35 +45,34 @@ internal static class SolutionQueries
     internal static async Task<DiagnosticsResult> DiagnosticsAsync(Solution solution, DiagnosticsQuery query, CancellationToken cancellationToken)
     {
         var limit = Math.Clamp(query.Limit, 1, MaxLimit);
-        IEnumerable<Diagnostic> diagnostics;
+        List<(Diagnostic Diagnostic, string FallbackPath)> diagnostics;
         if (!string.IsNullOrWhiteSpace(query.Path))
         {
-            var id = solution.GetDocumentIdsWithFilePath(query.Path).FirstOrDefault()
-                ?? throw new InvalidOperationException($"No document at '{query.Path}' is in the solution. Use a path from find-symbols.");
+            var path = query.Path;
+            var id = solution.GetDocumentIdsWithFilePath(path).FirstOrDefault()
+                ?? throw new InvalidOperationException($"No document at '{path}' is in the solution. Use a path from find-symbols.");
             var model = await solution.GetDocument(id)!.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false)
-                ?? throw new InvalidOperationException($"'{query.Path}' has no semantic model.");
-            diagnostics = model.GetDiagnostics(cancellationToken: cancellationToken);
+                ?? throw new InvalidOperationException($"'{path}' has no semantic model.");
+            diagnostics = [.. model.GetDiagnostics(cancellationToken: cancellationToken).Select(diagnostic => (diagnostic, path))];
         }
         else
         {
             var projects = string.IsNullOrWhiteSpace(query.Project)
                 ? solution.Projects
                 : solution.Projects.Where(project => string.Equals(project.Name, query.Project, StringComparison.OrdinalIgnoreCase));
-            var collected = new List<Diagnostic>();
+            diagnostics = [];
             foreach (var project in projects)
             {
                 var compilation = await project.GetCompilationAsync(cancellationToken).ConfigureAwait(false)
                     ?? throw new InvalidOperationException($"Project '{project.Name}' has no compilation.");
-                collected.AddRange(compilation.GetDiagnostics(cancellationToken));
+                var fallbackPath = project.FilePath ?? project.Name;
+                diagnostics.AddRange(compilation.GetDiagnostics(cancellationToken).Select(diagnostic => (diagnostic, fallbackPath)));
             }
-
-            diagnostics = collected;
         }
 
         var hits = diagnostics
-            .Where(static diagnostic => diagnostic.Severity >= DiagnosticSeverity.Warning && diagnostic.Location.IsInSource)
-            .Select(static diagnostic => new DiagnosticHit(diagnostic.Id, diagnostic.Severity.ToString(), diagnostic.GetMessage(),
-                diagnostic.Location.SourceTree!.FilePath, diagnostic.Location.GetLineSpan().StartLinePosition.Line + 1))
+            .Where(static entry => entry.Diagnostic.Severity >= DiagnosticSeverity.Warning)
+            .Select(static entry => DiagnosticHitFrom(entry.Diagnostic, entry.FallbackPath))
             .OrderBy(static hit => hit.Severity == "Error" ? 0 : 1)
             .ThenBy(static hit => hit.Path, StringComparer.Ordinal)
             .ThenBy(static hit => hit.Line)
@@ -137,6 +136,12 @@ internal static class SolutionQueries
             symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat), document?.Project.Name ?? string.Empty,
             location.SourceTree!.FilePath, location.GetLineSpan().StartLinePosition.Line + 1);
     }
+
+    private static DiagnosticHit DiagnosticHitFrom(Diagnostic diagnostic, string fallbackPath)
+        => diagnostic.Location.IsInSource
+            ? new DiagnosticHit(diagnostic.Id, diagnostic.Severity.ToString(), diagnostic.GetMessage(),
+                diagnostic.Location.SourceTree!.FilePath, diagnostic.Location.GetLineSpan().StartLinePosition.Line + 1)
+            : new DiagnosticHit(diagnostic.Id, diagnostic.Severity.ToString(), diagnostic.GetMessage(), fallbackPath, 0);
 
     private static async Task<ISymbol> ResolveAsync(Solution solution, string symbolId, CancellationToken cancellationToken)
     {

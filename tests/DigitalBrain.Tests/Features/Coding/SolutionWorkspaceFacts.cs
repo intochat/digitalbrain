@@ -1,6 +1,7 @@
 using DigitalBrain.Coding;
 using DigitalBrain.Testing;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -131,6 +132,21 @@ public sealed class SolutionWorkspaceFacts
     }
 
     [Fact]
+    public async Task Diagnostics_without_a_source_location_are_reported_against_the_project()
+    {
+        using var workspace = new SolutionWorkspace(new AdhocSolutionLoader(FixtureSolutions.ConsoleWithoutMain), TimeProvider.System, NullLogger<SolutionWorkspace>.Instance);
+        await workspace.BeginOpenAsync("E:/fixture/Fixture.slnx");
+        await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
+        var result = await workspace.DiagnosticsAsync(new(Project: "Gamma"), TestContext.Current.CancellationToken);
+        var hit = Assert.Single(result.Items);
+        Assert.Equal("CS5001", hit.Id);
+        Assert.Equal("Error", hit.Severity);
+        Assert.Equal("E:/fixture/Gamma/Gamma.csproj", hit.Path);
+        Assert.Equal(0, hit.Line);
+        Assert.Equal(1, result.ErrorCount);
+    }
+
+    [Fact]
     public async Task The_map_lists_projects_clusters_and_references()
     {
         using var workspace = await ReadyAsync();
@@ -153,5 +169,59 @@ public sealed class SolutionWorkspaceFacts
         await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
         Assert.Equal(2, loader.Opens);
         Assert.Equal(WorkspacePhase.Ready, workspace.Status.Phase);
+    }
+
+    [Fact]
+    public async Task Dispose_during_a_load_disposes_the_late_workspace()
+    {
+        var loader = new GatedLoader();
+        var workspace = new SolutionWorkspace(loader, TimeProvider.System, NullLogger<SolutionWorkspace>.Instance);
+        var opening = workspace.BeginOpenAsync("E:/fixture/Fixture.slnx");
+        workspace.Dispose();
+        var tracking = new DisposalTrackingWorkspace();
+        loader.Complete(new LoadedSolution(tracking, []));
+        await opening;
+        Assert.True(tracking.Disposed);
+        Assert.Equal(WorkspacePhase.Failed, workspace.Status.Phase);
+    }
+
+    private sealed class GatedLoader : ISolutionLoader
+    {
+        private readonly TaskCompletionSource<LoadedSolution> _source = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public void Complete(LoadedSolution loaded) => _source.SetResult(loaded);
+
+        public Task<LoadedSolution> OpenAsync(string solutionPath, IProgress<string> progress, CancellationToken cancellationToken)
+            => _source.Task;
+    }
+
+    private sealed class DisposalTrackingWorkspace() : Workspace(MefHostServices.DefaultHost, "Tracking")
+    {
+        public bool Disposed { get; private set; }
+
+        protected override void Dispose(bool finalize)
+        {
+            Disposed = true;
+            base.Dispose(finalize);
+        }
+    }
+
+    [Fact]
+    public async Task A_loader_failure_becomes_a_failed_status_with_advice()
+    {
+        using var workspace = new SolutionWorkspace(new ThrowingLoader(), TimeProvider.System, NullLogger<SolutionWorkspace>.Instance);
+        await workspace.BeginOpenAsync("E:/fixture/Fixture.slnx");
+        Assert.Equal(WorkspacePhase.Failed, workspace.Status.Phase);
+        Assert.Equal("disk on fire", workspace.Status.Detail);
+        Assert.Contains("failed to open: disk on fire", workspace.Status.Advice, StringComparison.Ordinal);
+        var error = await Assert.ThrowsAsync<WorkspaceNotReadyException>(() => workspace.WhenReadyAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(workspace.Status.Advice, error.Message);
+        await Assert.ThrowsAsync<WorkspaceNotReadyException>(() => workspace.FindSymbolsAsync(new("Greeter"), TestContext.Current.CancellationToken));
+    }
+
+    private sealed class ThrowingLoader : ISolutionLoader
+    {
+        public Task<LoadedSolution> OpenAsync(string solutionPath, IProgress<string> progress, CancellationToken cancellationToken)
+            => throw new IOException("disk on fire");
     }
 }

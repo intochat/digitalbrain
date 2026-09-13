@@ -7,10 +7,13 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, TimeProvider clock
 {
     private readonly Lock _gate = new();
     private readonly CancellationTokenSource _lifetime = new();
+    private readonly List<Workspace> _retired = [];
     private Workspace? _workspace;
     private Task _pending = Task.CompletedTask;
     private WorkspaceStatus _status = WorkspaceStatus.NotOpened;
     private string? _solutionPath;
+    private int _leases;
+    private bool _disposed;
 
     public WorkspaceStatus Status
     {
@@ -23,7 +26,16 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, TimeProvider clock
         }
     }
 
-    public Solution? Current => _workspace?.CurrentSolution;
+    public Solution? Current
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _workspace?.CurrentSolution;
+            }
+        }
+    }
 
     public DateTimeOffset? ReadyAt { get; private set; }
 
@@ -47,9 +59,9 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, TimeProvider clock
 
     public Task BeginReloadAsync()
     {
-        var path = _solutionPath ?? throw new WorkspaceNotReadyException(Status);
         lock (_gate)
         {
+            var path = _solutionPath ?? throw new WorkspaceNotReadyException(_status);
             _status = new WorkspaceStatus(WorkspacePhase.Opening, path, 0, 0, "reloading");
             _pending = OpenCoreAsync(path, _lifetime.Token);
             return _pending;
@@ -71,31 +83,96 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, TimeProvider clock
         }
     }
 
-    public Task<SymbolSearchResult> FindSymbolsAsync(SymbolSearch query, CancellationToken cancellationToken)
-        => SolutionQueries.FindSymbolsAsync(Ready(), query, cancellationToken);
+    public async Task<SymbolSearchResult> FindSymbolsAsync(SymbolSearch query, CancellationToken cancellationToken)
+    {
+        using var lease = Acquire();
+        return await SolutionQueries.FindSymbolsAsync(lease.Solution, query, cancellationToken).ConfigureAwait(false);
+    }
 
-    public Task<ReferenceSearchResult> ReferencesAsync(ReferenceSearch query, CancellationToken cancellationToken)
-        => SolutionQueries.ReferencesAsync(Ready(), query, cancellationToken);
+    public async Task<ReferenceSearchResult> ReferencesAsync(ReferenceSearch query, CancellationToken cancellationToken)
+    {
+        using var lease = Acquire();
+        return await SolutionQueries.ReferencesAsync(lease.Solution, query, cancellationToken).ConfigureAwait(false);
+    }
 
-    public Task<DiagnosticsResult> DiagnosticsAsync(DiagnosticsQuery query, CancellationToken cancellationToken)
-        => SolutionQueries.DiagnosticsAsync(Ready(), query, cancellationToken);
+    public async Task<DiagnosticsResult> DiagnosticsAsync(DiagnosticsQuery query, CancellationToken cancellationToken)
+    {
+        using var lease = Acquire();
+        return await SolutionQueries.DiagnosticsAsync(lease.Solution, query, cancellationToken).ConfigureAwait(false);
+    }
 
-    public Task<SolutionMap> MapAsync(MapQuery query, CancellationToken cancellationToken)
-        => SolutionQueries.MapAsync(Ready(), _solutionPath ?? string.Empty, query, cancellationToken);
+    public async Task<SolutionMap> MapAsync(MapQuery query, CancellationToken cancellationToken)
+    {
+        using var lease = Acquire();
+        return await SolutionQueries.MapAsync(lease.Solution, lease.SolutionPath ?? string.Empty, query, cancellationToken).ConfigureAwait(false);
+    }
 
     public void Dispose()
     {
+        Workspace? current;
+        List<Workspace> retired;
+        bool pendingCompleted;
+        lock (_gate)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            current = _workspace;
+            _workspace = null;
+            retired = [.. _retired];
+            _retired.Clear();
+            pendingCompleted = _pending.IsCompleted;
+        }
+
         _lifetime.Cancel();
-        _workspace?.Dispose();
-        _lifetime.Dispose();
+        current?.Dispose();
+        foreach (var workspace in retired)
+        {
+            workspace.Dispose();
+        }
+
+        if (pendingCompleted)
+        {
+            _lifetime.Dispose();
+        }
     }
 
-    private Solution Ready()
+    // Hands a query a stable Solution snapshot and keeps the workspace it came from alive until the query returns,
+    // even if a reload swaps _workspace out from under it in the meantime.
+    private Lease Acquire()
     {
-        var status = Status;
-        return status.Phase == WorkspacePhase.Ready && _workspace is { } workspace
-            ? workspace.CurrentSolution
-            : throw new WorkspaceNotReadyException(status);
+        lock (_gate)
+        {
+            if (_status.Phase != WorkspacePhase.Ready || _workspace is not { } workspace)
+            {
+                throw new WorkspaceNotReadyException(_status);
+            }
+
+            _leases++;
+            return new Lease(this, workspace.CurrentSolution, _solutionPath);
+        }
+    }
+
+    private void Release()
+    {
+        lock (_gate)
+        {
+            _leases--;
+            if (_leases != 0)
+            {
+                return;
+            }
+
+            foreach (var workspace in _retired)
+            {
+                workspace.Dispose();
+            }
+
+            _retired.Clear();
+        }
     }
 
     private async Task OpenCoreAsync(string solutionPath, CancellationToken cancellationToken)
@@ -112,7 +189,7 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, TimeProvider clock
                 }
             }
         });
-        Workspace? previous;
+        Workspace? disposeNow = null;
         try
         {
             var loaded = await loader.OpenAsync(solutionPath, progress, cancellationToken).ConfigureAwait(false);
@@ -121,24 +198,58 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, TimeProvider clock
             var detail = loaded.Failures.Count == 0 ? null : $"{loaded.Failures.Count} load failures; first: {loaded.Failures[0]}";
             lock (_gate)
             {
-                previous = _workspace;
-                _workspace = loaded.Workspace;
-                _status = new WorkspaceStatus(WorkspacePhase.Ready, solutionPath, solution.ProjectIds.Count, documents, detail);
-                ReadyAt = clock.GetUtcNow();
+                if (_disposed)
+                {
+                    loaded.Workspace.Dispose();
+                    _status = new WorkspaceStatus(WorkspacePhase.Failed, solutionPath, 0, 0, "the workspace was disposed");
+                }
+                else
+                {
+                    var previous = _workspace;
+                    _workspace = loaded.Workspace;
+                    _status = new WorkspaceStatus(WorkspacePhase.Ready, solutionPath, solution.ProjectIds.Count, documents, detail);
+                    ReadyAt = clock.GetUtcNow();
+                    if (previous is not null)
+                    {
+                        if (_leases == 0)
+                        {
+                            disposeNow = previous;
+                        }
+                        else
+                        {
+                            _retired.Add(previous);
+                        }
+                    }
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            lock (_gate)
+            {
+                _status = new WorkspaceStatus(WorkspacePhase.Failed, solutionPath, 0, 0, "the load was cancelled");
             }
         }
 #pragma warning disable CA1031 // A load failure becomes the Failed status, not a crash; every exception is caught deliberately here.
-        catch (Exception error) when (error is not OperationCanceledException)
+        catch (Exception error)
 #pragma warning restore CA1031
         {
             logger.LogError(error, "Opening {SolutionPath} failed.", solutionPath);
             lock (_gate)
             {
-                previous = null;
                 _status = new WorkspaceStatus(WorkspacePhase.Failed, solutionPath, 0, 0, error.Message);
             }
         }
 
-        previous?.Dispose();
+        disposeNow?.Dispose();
+    }
+
+    private readonly struct Lease(SolutionWorkspace owner, Solution solution, string? solutionPath) : IDisposable
+    {
+        public Solution Solution { get; } = solution;
+
+        public string? SolutionPath { get; } = solutionPath;
+
+        public void Dispose() => owner.Release();
     }
 }
