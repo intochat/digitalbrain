@@ -72,6 +72,8 @@ public static class ConversationalAgent
                         and call render_chart with one label and one value per point; its result opens as a
                         chart in the working area. Omit chatName on show_query_table and render_chart here:
                         this workspace has no chat neuron.
+                        For questions about the code base (where a type or method is used, what a file's errors
+                        are, how projects depend on each other) use the code_* tools; never guess from memory.
                         Use create_artifact for diagrams and brain scenarios so they open in the working area.
                         For diagrams supply content.source in Markdraw format with a ```sketch block, for example:
                         rect "Account" id=account at 100,100 size 180x90 fill=#e4eee5 rounded
@@ -86,7 +88,7 @@ public static class ConversationalAgent
                         Do not claim to have modified external files or run graph workflows. Confirm changes only
                         after a successful tool result, and describe errors honestly.
                         """,
-                    Tools = [.. services.GetService<NativeTools>()?.Resolve(["salesforce_current_account", "salesforce_user_info", "salesforce_schema", "salesforce_query", "clickhouse_schema", "clickhouse_query", "show_query_table", "render_chart"]) ?? [], .. search is null ? [] : new AITool[] { WebSearchFunction.Create(search) }, .. additionalTools ?? []],
+                    Tools = [.. services.GetService<NativeTools>()?.Resolve(["salesforce_current_account", "salesforce_user_info", "salesforce_schema", "salesforce_query", "clickhouse_schema", "clickhouse_query", "show_query_table", "render_chart", "code_find_symbols", "code_references", "code_diagnostics", "code_map"]) ?? [], .. search is null ? [] : new AITool[] { WebSearchFunction.Create(search) }, .. additionalTools ?? []],
                 },
             },
             services.GetService<ILoggerFactory>(),
