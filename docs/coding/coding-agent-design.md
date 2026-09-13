@@ -130,8 +130,10 @@ Ordering and readiness (review findings 4 and 5): `MSBuildLocator.RegisterDefaul
 statement of the silo's `Program.cs`, before host composition, as IAW does (R2.1); the loader keeps a
 guarded registration only as a fallback for test processes. The loader returns the workspace **and** the
 list of workspace failures; `Ready` with failures carries them in the status detail, and the gated
-self-test requires zero failures on this solution. The `DisableMSBuildAssemblyCopyCheck` property is set
-only on the three projects that carry the Roslyn assemblies (module, silo, tests), never globally.
+self-test requires zero failures on this solution. The `DisableMSBuildAssemblyCopyCheck` property is
+set on every project whose output carries the Roslyn or MSBuild assemblies (the module, the silo,
+the tests, the module's Aspire.Hosting project and the AppHost; phase 0 found MSBL001 on the last
+two), never globally.
 
 Memory and concurrency (review finding 6): semantic queries run through a bounded gate (two at a time),
 every result is capped, and if the silo's working set under load proves unacceptable, D1's sidecar is the
@@ -402,6 +404,9 @@ Where a spike is listed it runs first and its result is recorded in NOTES before
   `implementations(ImplementationsQuery{SymbolId})`, `derived(DerivedQuery{SymbolId})`; the durable map
   cache in `WorkspaceState`; a `FileSystemWatcher` folding `.cs` saves with `WithDocumentText` and marking
   project-file changes as reload needed.
+- **Query hygiene** (phase 0 live run): `find-symbols` ranks exact name matches first and marks or
+  drops declarations in generated documents (`obj/**/*.g.cs`, Orleans codegen); `references` marks hits
+  in generated documents.
 - **Services**: `ChangeSetEditor` (edits applied to one snapshot with `DocumentEditor`, `SyntaxGenerator`,
   `Renamer`, and `CodeFixProvider`s from the `Features` packages; `check` diagnoses only the projects that
   changed and their dependents), `DotnetRunner` (`dotnet build` and `dotnet test` with parsed errors,
