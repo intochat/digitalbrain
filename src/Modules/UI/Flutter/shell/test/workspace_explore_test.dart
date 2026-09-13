@@ -3,21 +3,16 @@ import 'package:digitalbrain_flutter_shell/workspace/workspace_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-class Memory implements WorkspacePersistence {
-  String? value;
-  @override
-  Future<String?> read() async => value;
-  @override
-  Future<void> write(String data) async {
-    value = data;
-  }
-}
+import 'support/memory_workspace.dart';
 
 void main() {
   testWidgets('brand returns home from a project and from empty Explore', (
     tester,
   ) async {
-    final store = WorkspaceStore(persistence: Memory(), seedProject: false);
+    final store = WorkspaceStore(
+      persistence: MemoryWorkspacePersistence(),
+      seedProject: false,
+    );
     await tester.pumpWidget(WorkspaceApp(store: store));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Go to homepage'));
@@ -39,7 +34,7 @@ void main() {
   testWidgets(
     'empty homepage offers templates and creates an explicit specialist draft',
     (tester) async {
-      final persistence = Memory();
+      final persistence = MemoryWorkspacePersistence();
       final store = WorkspaceStore(
         persistence: persistence,
         seedProject: false,
@@ -95,7 +90,7 @@ void main() {
   test(
     'empty saved workspace remains empty and legacy projects survive',
     () async {
-      final persistence = Memory();
+      final persistence = MemoryWorkspacePersistence();
       final empty = WorkspaceStore(
         persistence: persistence,
         seedProject: false,

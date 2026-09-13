@@ -9,6 +9,14 @@ final class AgentEvent {
       data[key] is String ? data[key] as String : null;
 }
 
+/// One AG-UI run: the shell asks for it and consumes the event stream.
+typedef AgentRunner = Stream<AgentEvent> Function({
+  required String threadId,
+  required String runId,
+  String? parentRunId,
+  required String text,
+});
+
 /// Parses SSE independently of network chunk boundaries, including UTF-8 and
 /// multiline data. Malformed frames fail visibly instead of losing agent output.
 Stream<AgentEvent> decodeAgentEvents(Stream<List<int>> bytes) async* {

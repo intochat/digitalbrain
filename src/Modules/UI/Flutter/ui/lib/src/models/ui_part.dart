@@ -20,12 +20,7 @@ sealed class UiPart {
       UiChartPart.kindName => UiChartPart.fromMetadata(metadata),
       UiCardPart.kindName => UiCardPart.fromMetadata(metadata),
       UiTimerPart.kindName => UiTimerPart.fromMetadata(metadata),
-      UiChartRefPart.kindName => UiChartRefPart.fromMetadata(metadata),
-      UiImageRefPart.kindName => UiImageRefPart.fromMetadata(metadata),
       UiSheetPart.kindName => UiSheetPart.fromMetadata(metadata),
-      UiSheetRefPart.kindName => UiSheetRefPart.fromMetadata(metadata),
-      UiGraphRefPart.kindName => UiGraphRefPart.fromMetadata(metadata),
-      UiTableRefPart.kindName => UiTableRefPart.fromMetadata(metadata),
       _ => null,
     };
   }
@@ -222,64 +217,6 @@ final class UiCardPart extends UiPart {
   };
 }
 
-final class UiChartRefPart extends UiPart {
-  const UiChartRefPart({required this.name, required this.caption});
-
-  static const kindName = 'chart-ref';
-
-  final String name;
-  final String caption;
-
-  @override
-  String get kind => kindName;
-
-  @override
-  String get copyText => caption;
-
-  factory UiChartRefPart.fromMetadata(Map<String, dynamic> metadata) {
-    return UiChartRefPart(
-      name: metadata['name'] as String? ?? '',
-      caption: metadata['caption'] as String? ?? '',
-    );
-  }
-
-  @override
-  Map<String, Object?> toMetadata() => {
-    'kind': kindName,
-    'name': name,
-    'caption': caption,
-  };
-}
-
-final class UiImageRefPart extends UiPart {
-  const UiImageRefPart({required this.name, required this.caption});
-
-  static const kindName = 'image-ref';
-
-  final String name;
-  final String caption;
-
-  @override
-  String get kind => kindName;
-
-  @override
-  String get copyText => caption;
-
-  factory UiImageRefPart.fromMetadata(Map<String, dynamic> metadata) {
-    return UiImageRefPart(
-      name: metadata['name'] as String? ?? '',
-      caption: metadata['caption'] as String? ?? '',
-    );
-  }
-
-  @override
-  Map<String, Object?> toMetadata() => {
-    'kind': kindName,
-    'name': name,
-    'caption': caption,
-  };
-}
-
 final class UiSheetPart extends UiPart {
   const UiSheetPart({
     required this.title,
@@ -344,93 +281,5 @@ final class UiSheetPart extends UiPart {
     'rows': [
       for (final row in rows) {'cells': row},
     ],
-  };
-}
-
-final class UiSheetRefPart extends UiPart {
-  const UiSheetRefPart({required this.name, required this.caption});
-
-  static const kindName = 'spreadsheet-ref';
-
-  final String name;
-  final String caption;
-
-  @override
-  String get kind => kindName;
-
-  @override
-  String get copyText => caption;
-
-  factory UiSheetRefPart.fromMetadata(Map<String, dynamic> metadata) {
-    return UiSheetRefPart(
-      name: metadata['name'] as String? ?? '',
-      caption: metadata['caption'] as String? ?? '',
-    );
-  }
-
-  @override
-  Map<String, Object?> toMetadata() => {
-    'kind': kindName,
-    'name': name,
-    'caption': caption,
-  };
-}
-
-final class UiGraphRefPart extends UiPart {
-  const UiGraphRefPart({required this.name, required this.caption});
-
-  static const kindName = 'graph-ref';
-
-  final String name;
-  final String caption;
-
-  @override
-  String get kind => kindName;
-
-  @override
-  String get copyText => caption;
-
-  factory UiGraphRefPart.fromMetadata(Map<String, dynamic> metadata) {
-    return UiGraphRefPart(
-      name: metadata['name'] as String? ?? '',
-      caption: metadata['caption'] as String? ?? '',
-    );
-  }
-
-  @override
-  Map<String, Object?> toMetadata() => {
-    'kind': kindName,
-    'name': name,
-    'caption': caption,
-  };
-}
-
-/// A live table card: the rows are read from /ui/tables/{name} on display.
-final class UiTableRefPart extends UiPart {
-  const UiTableRefPart({required this.name, required this.caption});
-
-  static const kindName = 'table-ref';
-
-  final String name;
-  final String caption;
-
-  @override
-  String get kind => kindName;
-
-  @override
-  String get copyText => caption;
-
-  factory UiTableRefPart.fromMetadata(Map<String, dynamic> metadata) {
-    return UiTableRefPart(
-      name: metadata['name'] as String? ?? '',
-      caption: metadata['caption'] as String? ?? '',
-    );
-  }
-
-  @override
-  Map<String, Object?> toMetadata() => {
-    'kind': kindName,
-    'name': name,
-    'caption': caption,
   };
 }

@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
-import '../chat/voice_file_io.dart'
-    if (dart.library.js_interop) '../chat/voice_file_web.dart'
+import 'voice_file_io.dart'
+    if (dart.library.js_interop) 'voice_file_web.dart'
     as voice_file;
 
 /// Recording produces a draft. Only the conversation's Send action submits it.

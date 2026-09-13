@@ -3,7 +3,6 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
-  flutter_angle
   irondash_engine_context
   record_windows
   super_native_extensions

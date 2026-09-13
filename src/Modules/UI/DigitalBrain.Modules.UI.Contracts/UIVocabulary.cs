@@ -21,8 +21,6 @@ public static class UIVocabulary
 
     public const string ImageType = "image";
 
-    public const string TranscriptType = "transcript";
-
     public const string WorkspacesType = "workspaces";
 
     public const string ActivitiesType = "activities";
@@ -100,9 +98,6 @@ public static class UIVocabulary
 
     // { ...DescribeImage... }
     public const string ImageDescribing = "ImageDescribing";
-
-    // { ...AppendTranscript... }
-    public const string TranscriptAppending = "TranscriptAppending";
 
     // { ...WorkspaceRecord... }
     public const string WorkspaceEnsuring = "WorkspaceEnsuring";

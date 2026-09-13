@@ -9,15 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:digitalbrain_flutter_shell/workspace/artifact_editors.dart';
 
-class MemoryWorkspace implements WorkspacePersistence {
-  String? value;
-  @override
-  Future<String?> read() async => value;
-  @override
-  Future<void> write(String data) async {
-    value = data;
-  }
-}
+import 'support/memory_workspace.dart';
 
 void main() {
   testWidgets(
@@ -25,7 +17,7 @@ void main() {
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(1268, 900));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      final store = WorkspaceStore(persistence: MemoryWorkspace());
+      final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
       await store.load();
       for (var i = 0; i < 6; i++) {
         store.addArtifact(
@@ -57,7 +49,7 @@ void main() {
   testWidgets(
     'live graph selections remain local and never await artifact sync',
     (tester) async {
-      final store = WorkspaceStore(persistence: MemoryWorkspace());
+      final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
       await store.load();
       store.addArtifact(
         WorkspaceArtifact(
@@ -122,7 +114,7 @@ void main() {
   ) async {
     await tester.binding.setSurfaceSize(const Size(1600, 1000));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    final store = WorkspaceStore(persistence: MemoryWorkspace());
+    final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
     await store.load();
     store.addArtifact(
       WorkspaceArtifact(
@@ -170,7 +162,7 @@ void main() {
   testWidgets(
     'restored editors hydrate and old receipts cannot revert the saved table',
     (tester) async {
-      final store = WorkspaceStore(persistence: MemoryWorkspace());
+      final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
       await store.load();
       TableSnapshot snapshot(int revision, String name) => TableSnapshot(
         id: 'table',
@@ -225,7 +217,7 @@ void main() {
   testWidgets('chart results open in the working area without a remote read', (
     tester,
   ) async {
-    final store = WorkspaceStore(persistence: MemoryWorkspace());
+    final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
     await store.load();
     var artifactReads = 0;
     await tester.pumpWidget(
@@ -266,7 +258,7 @@ void main() {
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    final store = WorkspaceStore(persistence: MemoryWorkspace());
+    final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
     await tester.pumpWidget(WorkspaceApp(store: store));
     await tester.pumpAndSettle();
     await tester.tap(find.text('My project'));
@@ -283,7 +275,7 @@ void main() {
   testWidgets('navigation keeps an agent stream alive until saved EOF', (
     tester,
   ) async {
-    final store = WorkspaceStore(persistence: MemoryWorkspace());
+    final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
     final events = StreamController<AgentEvent>();
     await tester.pumpWidget(
       WorkspaceApp(
@@ -323,7 +315,7 @@ void main() {
   ) async {
     await tester.binding.setSurfaceSize(const Size(1300, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    final store = WorkspaceStore(persistence: MemoryWorkspace());
+    final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
     await store.load();
     store.addArtifact(
       WorkspaceArtifact(id: 'one', title: 'Notes', kind: 'document'),
@@ -354,7 +346,7 @@ void main() {
   testWidgets('UiChat continuation waits for EOF and retains transcript', (
     tester,
   ) async {
-    final store = WorkspaceStore(persistence: MemoryWorkspace());
+    final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
     await store.load();
     var events = StreamController<AgentEvent>();
     final parents = <String?>[];

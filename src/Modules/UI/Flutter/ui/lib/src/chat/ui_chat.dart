@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 
+import '../models/ui_part.dart';
 import '../theme/ui_theme.dart';
-import 'ui_chat_builders.dart';
+import 'ui_copyable_message.dart';
 
 /// The shared chat surface for full pages and embedded assistant panels.
 ///
@@ -34,7 +35,7 @@ final class UiChat extends StatelessWidget {
     chatController: chatController,
     currentUserId: currentUserId,
     resolveUser: resolveUser,
-    builders: UiChatBuilders.withCopy(builders),
+    builders: _withCopy(builders),
     onMessageSend: onMessageSend,
     onAttachmentTap: onAttachmentTap,
     theme: workspaceTheme
@@ -43,4 +44,91 @@ final class UiChat extends StatelessWidget {
         ? UiChatTheme.light()
         : UiChatTheme.dark(),
   );
+}
+
+/// Wraps text, stream, and custom bubbles with selection + copy.
+Builders _withCopy(Builders? host) {
+  final base = host ?? const Builders();
+  final text = base.textMessageBuilder;
+  final stream = base.textStreamMessageBuilder;
+  final custom = base.customMessageBuilder;
+  var builders = base.copyWith(
+    textMessageBuilder:
+        (
+          context,
+          message,
+          index, {
+          required bool isSentByMe,
+          MessageGroupStatus? groupStatus,
+        }) {
+          final child =
+              text?.call(
+                context,
+                message,
+                index,
+                isSentByMe: isSentByMe,
+                groupStatus: groupStatus,
+              ) ??
+              SimpleTextMessage(message: message, index: index);
+          return UiCopyableMessage(copyText: (_) => message.text, child: child);
+        },
+  );
+  if (stream != null) {
+    builders = builders.copyWith(
+      textStreamMessageBuilder:
+          (
+            context,
+            message,
+            index, {
+            required bool isSentByMe,
+            MessageGroupStatus? groupStatus,
+          }) {
+            return UiCopyableMessage(
+              copyText: (context) =>
+                  UiStreamCopy.streamText(context, message.streamId),
+              child: stream(
+                context,
+                message,
+                index,
+                isSentByMe: isSentByMe,
+                groupStatus: groupStatus,
+              ),
+            );
+          },
+    );
+  }
+  if (custom != null) {
+    builders = builders.copyWith(
+      customMessageBuilder:
+          (
+            context,
+            message,
+            index, {
+            required bool isSentByMe,
+            MessageGroupStatus? groupStatus,
+          }) {
+            final child = custom(
+              context,
+              message,
+              index,
+              isSentByMe: isSentByMe,
+              groupStatus: groupStatus,
+            );
+            if (child is UiCopyableMessage) {
+              return child;
+            }
+            final part = UiPart.tryParse(
+              message.metadata == null
+                  ? null
+                  : Map<String, dynamic>.from(message.metadata!),
+            );
+            final copy = part?.copyText ?? '';
+            if (copy.trim().isEmpty) {
+              return child;
+            }
+            return UiCopyableMessage(copyText: (_) => copy, child: child);
+          },
+    );
+  }
+  return builders;
 }

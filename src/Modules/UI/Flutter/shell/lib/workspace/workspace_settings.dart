@@ -1,7 +1,6 @@
 import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 
-import '../chat/chat_contracts.dart';
 import '../integrations/integrations_menu.dart';
 import 'workspace_store.dart';
 

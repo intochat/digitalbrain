@@ -1,6 +1,5 @@
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
-
-import '../brain_theme.dart';
 
 /// Credential prompt shown when the kernel answers 401.
 ///
@@ -72,7 +71,7 @@ final class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: BrainPalette.surface,
+      backgroundColor: UiPalette.surface,
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -82,12 +81,9 @@ final class _LoginScreenState extends State<LoginScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('IntoCaht', style: BrainType.title),
+                Text('IntoChat', style: UiType.title),
                 const SizedBox(height: 8),
-                Text(
-                  'Sign in to reach the kernel.',
-                  style: BrainType.bodyMuted,
-                ),
+                Text('Sign in to reach the kernel.', style: UiType.bodyMuted),
                 const SizedBox(height: 24),
                 TextField(
                   key: const Key('login-username'),
@@ -126,7 +122,7 @@ final class _LoginScreenState extends State<LoginScreen> {
                   Text(
                     error,
                     key: const Key('login-error'),
-                    style: BrainType.body.copyWith(color: BrainPalette.signal),
+                    style: UiType.body.copyWith(color: UiPalette.signal),
                   ),
                 ],
               ],

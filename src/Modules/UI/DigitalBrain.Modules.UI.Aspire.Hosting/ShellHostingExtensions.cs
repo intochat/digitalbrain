@@ -10,22 +10,6 @@ namespace DigitalBrain.UI.Aspire.Hosting;
 
 public static class ShellHostingExtensions
 {
-    public const string DefaultFlutterResourceName = ShellNames.DefaultFlutterResourceName;
-    public const string UIBaseEnvironmentVariable = ShellNames.UIBaseEnvironmentVariable;
-    public const string ShellEnvironmentVariable = ShellNames.ShellEnvironmentVariable;
-    public const string ChatEnvironmentVariable = ShellNames.ChatEnvironmentVariable;
-    public const string OwnerEnvironmentVariable = ShellNames.OwnerEnvironmentVariable;
-    public const string FlutterCommandEnvironmentVariable = ShellNames.FlutterCommandEnvironmentVariable;
-    public const string DartCommandEnvironmentVariable = ShellNames.DartCommandEnvironmentVariable;
-    public const string HeadlessHostEntry = ShellNames.HeadlessHostEntry;
-    public const string DefaultShellName = ShellNames.DefaultShellName;
-    public const string DefaultChatName = ShellNames.DefaultChatName;
-    public const string DefaultOwner = ShellNames.DefaultOwner;
-    public const string DefaultDeviceTarget = ShellNames.DefaultDeviceTarget;
-    public const string DefaultWebDeviceTarget = ShellNames.DefaultWebDeviceTarget;
-    public const string WebPlatformDirectoryName = ShellNames.WebPlatformDirectoryName;
-    public const string HttpEndpointName = ShellNames.HttpEndpointName;
-
     public static DigitalBrainModuleBuilder<UIModule> WithHeadlessHost(
         this DigitalBrainModuleBuilder<UIModule> module,
         Action<FlutterHostOptions>? configure = null)
@@ -51,7 +35,7 @@ public static class ShellHostingExtensions
         var options = new FlutterHostOptions();
         if (kind == FlutterHostKind.Web)
         {
-            options.DeviceTarget = DefaultWebDeviceTarget;
+            options.DeviceTarget = ShellNames.DefaultWebDeviceTarget;
         }
 
         configure?.Invoke(options);
@@ -99,19 +83,19 @@ public static class ShellHostingExtensions
 
             var launch = FlutterHostLaunch.Resolve(kind, packageRoot, options, appHost.Configuration);
             var resourceName = string.IsNullOrWhiteSpace(options.ResourceName)
-                ? DefaultFlutterResourceName
+                ? ShellNames.DefaultFlutterResourceName
                 : options.ResourceName;
             var shell = string.IsNullOrWhiteSpace(options.ShellName)
-                ? DefaultShellName
+                ? ShellNames.DefaultShellName
                 : options.ShellName;
             var chat = string.IsNullOrWhiteSpace(options.ChatName)
-                ? DefaultChatName
+                ? ShellNames.DefaultChatName
                 : options.ChatName;
 
             var host = appHost
                 .AddExecutable(resourceName, launch.Command, launch.WorkingDirectory, launch.Args)
-                .WithEnvironment(ShellEnvironmentVariable, shell)
-                .WithEnvironment(ChatEnvironmentVariable, chat)
+                .WithEnvironment(ShellNames.ShellEnvironmentVariable, shell)
+                .WithEnvironment(ShellNames.ChatEnvironmentVariable, chat)
                 .WithParentRelationship(brain.Resource);
 
             if (kind == FlutterHostKind.Web)
@@ -125,10 +109,10 @@ public static class ShellHostingExtensions
                 host
                     .WithHttpEndpoint(
                         port: ShellNames.FlutterWebPort,
-                        name: HttpEndpointName,
+                        name: ShellNames.HttpEndpointName,
                         isProxied: false)
                     .WithEndpoint(
-                        HttpEndpointName,
+                        ShellNames.HttpEndpointName,
                         static endpoint => endpoint.TargetHost = ShellNames.FlutterWebHostname,
                         createIfNotExists: false)
                     .WithHttpHealthCheck("/");
@@ -211,8 +195,8 @@ public static class ShellHostingExtensions
             ];
         }
 
-        private string _pendingShell = DefaultShellName;
-        private string _pendingChat = DefaultChatName;
+        private string _pendingShell = ShellNames.DefaultShellName;
+        private string _pendingChat = ShellNames.DefaultChatName;
 
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {
@@ -223,18 +207,18 @@ public static class ShellHostingExtensions
                 return;
             }
 
-            var uiEndpoint = builder.GetEndpoint(HttpEndpointName);
+            var uiEndpoint = builder.GetEndpoint(ShellNames.HttpEndpointName);
             // Flutter executable waits until the kernel HTTP surface is healthy.
             _flutterHost
-                .WithEnvironment(UIBaseEnvironmentVariable, uiEndpoint)
+                .WithEnvironment(ShellNames.UIBaseEnvironmentVariable, uiEndpoint)
                 .WithAnnotation(new WaitAnnotation(builder.Resource, WaitType.WaitUntilHealthy, exitCode: 0));
 
             if (_flutterKind == FlutterHostKind.Web)
             {
                 _flutterHost.WithArgs(
-                    ReferenceExpression.Create($"--dart-define={UIBaseEnvironmentVariable}={uiEndpoint}"),
-                    $"--dart-define={ShellEnvironmentVariable}={_pendingShell}",
-                    $"--dart-define={ChatEnvironmentVariable}={_pendingChat}");
+                    ReferenceExpression.Create($"--dart-define={ShellNames.UIBaseEnvironmentVariable}={uiEndpoint}"),
+                    $"--dart-define={ShellNames.ShellEnvironmentVariable}={_pendingShell}",
+                    $"--dart-define={ShellNames.ChatEnvironmentVariable}={_pendingChat}");
             }
 
             _uiBaseBound = true;

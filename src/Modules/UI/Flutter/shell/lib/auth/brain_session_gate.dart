@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 
-import '../brain_theme.dart';
 import 'credential_store_io.dart'
     if (dart.library.html) 'credential_store_web.dart'
     as store;
@@ -134,9 +134,9 @@ final class _BrainSessionGateState extends State<BrainSessionGate> {
     }
 
     return MaterialApp(
-      title: 'IntoCaht',
+      title: 'IntoChat',
       debugShowCheckedModeBanner: false,
-      theme: BrainTheme.dark(),
+      theme: UiTheme.dark(),
       home: _phase == _Phase.login
           ? LoginScreen(
               onSubmit: _signIn,
@@ -144,7 +144,7 @@ final class _BrainSessionGateState extends State<BrainSessionGate> {
               errorMessage: _loginError,
             )
           : const ColoredBox(
-              color: BrainPalette.surface,
+              color: UiPalette.surface,
               child: Center(child: CircularProgressIndicator()),
             ),
     );

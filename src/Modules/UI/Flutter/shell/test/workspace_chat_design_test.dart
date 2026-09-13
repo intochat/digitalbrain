@@ -8,18 +8,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-class _Memory implements WorkspacePersistence {
-  @override
-  Future<String?> read() async => null;
-  @override
-  Future<void> write(String data) async {}
-}
+import 'support/memory_workspace.dart';
 
 void main() {
   testWidgets(
     'successful browser login resumes the original request once and preserves draft',
     (tester) async {
-      final store = WorkspaceStore(persistence: _Memory());
+      final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
       store.currentConversation.draft = 'My next question';
       store.currentConversation.messages.addAll([
         {
@@ -79,7 +74,7 @@ void main() {
   testWidgets('chart tool results offer to open in the workspace', (
     tester,
   ) async {
-    final store = WorkspaceStore(persistence: _Memory());
+    final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
     store.currentConversation.messages.add({
       'id': 'chart',
       'role': 'tool',
@@ -128,7 +123,7 @@ void main() {
   testWidgets(
     'Salesforce sign-in card opens browser and continues the request',
     (tester) async {
-      final store = WorkspaceStore(persistence: _Memory());
+      final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
       store.currentConversation.messages.add({
         'id': 'login',
         'role': 'tool',
@@ -182,7 +177,7 @@ void main() {
   testWidgets(
     'Enter sends, Shift Enter keeps a draft, and stop retains partial text',
     (tester) async {
-      final store = WorkspaceStore(persistence: _Memory());
+      final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
       final events = StreamController<AgentEvent>();
       addTearDown(() {
         unawaited(events.close());
@@ -245,7 +240,7 @@ void main() {
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(360, 780));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      final store = WorkspaceStore(persistence: _Memory());
+      final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
       store.setAgent('automation');
       await tester.pumpWidget(
         MaterialApp(

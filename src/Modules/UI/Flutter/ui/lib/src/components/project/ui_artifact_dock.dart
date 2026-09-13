@@ -1,33 +1,5 @@
 import 'package:flutter/material.dart';
 
-class UiEditorFrame extends StatelessWidget {
-  const UiEditorFrame({super.key, required this.child, this.active = false});
-  final Widget child;
-  final bool active;
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.all(6),
-      child: Material(
-        color: colors.surfaceContainerLow,
-        elevation: active ? 5 : 1,
-        shadowColor: colors.shadow.withValues(alpha: .22),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(
-            color: active
-                ? colors.primary.withValues(alpha: .6)
-                : colors.outlineVariant,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: child,
-      ),
-    );
-  }
-}
-
 IconData uiArtifactIcon(String kind) => switch (kind) {
   'table' => Icons.table_chart_outlined,
   'chart' => Icons.bar_chart_rounded,

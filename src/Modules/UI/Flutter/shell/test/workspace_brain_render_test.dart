@@ -4,12 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:markdraw/markdraw.dart' as markdraw;
 
-class _Memory implements WorkspacePersistence {
-  @override
-  Future<String?> read() async => null;
-  @override
-  Future<void> write(String value) async {}
-}
+import 'support/memory_workspace.dart';
 
 void main() {
   testWidgets(
@@ -17,7 +12,7 @@ void main() {
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(1440, 1000));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      final store = WorkspaceStore(persistence: _Memory());
+      final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
       Map<String, dynamic>? submitted;
       await tester.pumpWidget(
         WorkspaceApp(
@@ -59,7 +54,7 @@ void main() {
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(1440, 1000));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      final store = WorkspaceStore(persistence: _Memory());
+      final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
       await store.load();
       store.addArtifact(
         WorkspaceArtifact(
