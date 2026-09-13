@@ -109,8 +109,8 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, TimeProvider clock
 
     public void Dispose()
     {
-        Workspace? current;
-        List<Workspace> retired;
+        Workspace? disposeNow = null;
+        List<Workspace> retiredNow = [];
         bool pendingCompleted;
         lock (_gate)
         {
@@ -120,16 +120,27 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, TimeProvider clock
             }
 
             _disposed = true;
-            current = _workspace;
+            var current = _workspace;
             _workspace = null;
-            retired = [.. _retired];
-            _retired.Clear();
+            if (_leases == 0)
+            {
+                disposeNow = current;
+                retiredNow = [.. _retired];
+                _retired.Clear();
+            }
+            else if (current is not null)
+            {
+                // A query is still reading the current workspace; Release() disposes the retired list once it drops to zero.
+                _retired.Add(current);
+            }
+
+            _status = new WorkspaceStatus(WorkspacePhase.Failed, _solutionPath, 0, 0, "the workspace was disposed");
             pendingCompleted = _pending.IsCompleted;
         }
 
         _lifetime.Cancel();
-        current?.Dispose();
-        foreach (var workspace in retired)
+        disposeNow?.Dispose();
+        foreach (var workspace in retiredNow)
         {
             workspace.Dispose();
         }

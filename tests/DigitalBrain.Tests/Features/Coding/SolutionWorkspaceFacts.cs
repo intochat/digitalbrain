@@ -183,6 +183,7 @@ public sealed class SolutionWorkspaceFacts
         await opening;
         Assert.True(tracking.Disposed);
         Assert.Equal(WorkspacePhase.Failed, workspace.Status.Phase);
+        Assert.Equal("the workspace was disposed", workspace.Status.Detail);
     }
 
     private sealed class GatedLoader : ISolutionLoader
