@@ -321,3 +321,15 @@ is public with no external caller.
 - Flutter (from `src/Modules/UI/Flutter`): `dart format --output=none --set-exit-if-changed core ui shell/lib shell/test`
   87 files, 0 changed; `flutter analyze` no issues in `ui` and `shell`; `flutter test` 22 passed in `ui`,
   49 passed in `shell`.
+
+## Phase 1 spikes (2026-09-14)
+
+Design 9.1 lists no spikes for phase 1. Before the plan was written the APIs it relies on were checked
+against current documentation (Context7, /dotnet/roslyn): `Renamer.RenameSymbolAsync(Solution, ISymbol,
+SymbolRenameOptions, string, CancellationToken)`, `DocumentEditor`, `Solution.WithDocumentText`,
+`SymbolFinder.FindCallersAsync`, `FindImplementationsAsync`, `FindDerivedClassesAsync`,
+`CodeFixContext(Document, Diagnostic, Action<CodeAction, ImmutableArray<Diagnostic>>, CancellationToken)`,
+`CodeAction.GetOperationsAsync` and `ApplyChangesOperation.ChangedSolution`. `Microsoft.CodeAnalysis.CSharp.Features`
+5.9.0 is the latest stable on nuget.org. The C# code fixers are MEF exports; the plan discovers the ones with a
+parameterless constructor by reflection, which is the part most likely to surprise (recorded here so the
+outcome lands next to it). Plan: `plans/2026-09-14-coding-phase1-changesets.md`.
