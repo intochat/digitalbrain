@@ -211,6 +211,7 @@ internal static class SolutionQueries
     {
         var limit = ClampLimit(requestedLimit);
         var hits = symbols.Select(symbol => Hit(solution, symbol)).OfType<SymbolHit>()
+            .DistinctBy(static hit => hit.Id)
             .OrderBy(static hit => hit.Name, StringComparer.Ordinal)
             .ThenBy(static hit => hit.Id, StringComparer.Ordinal)
             .ToArray();

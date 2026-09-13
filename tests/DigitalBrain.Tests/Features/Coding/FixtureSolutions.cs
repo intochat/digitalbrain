@@ -68,7 +68,9 @@ internal static class FixtureSolutions
 
         public sealed class Shouter : Greeter
         {
-            public string Shout(string name) => name.ToUpperInvariant();
+            private const string Suffix = "!";
+
+            public string Shout(string name) => name.ToUpperInvariant() + Suffix;
         }
         """;
 

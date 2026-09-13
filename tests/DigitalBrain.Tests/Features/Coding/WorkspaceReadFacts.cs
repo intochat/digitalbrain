@@ -79,6 +79,30 @@ public sealed class WorkspaceReadFacts
     }
 
     [Fact]
+    public async Task A_skeleton_lists_fields_by_their_variables()
+    {
+        using var workspace = await ReadyAsync();
+        var skeleton = await workspace.SkeletonAsync(new(FixtureSolutions.ShouterPath), TestContext.Current.CancellationToken);
+        Assert.Equal(["T:Beta.Shouter", "F:Beta.Shouter.Suffix", "M:Beta.Shouter.Shout(System.String)"], skeleton.Members.Select(member => member.Id));
+        var field = skeleton.Members[1];
+        Assert.Equal("Field", field.Kind);
+        Assert.Equal("private const string Suffix = \"!\"", field.Signature);
+        Assert.Equal(7, field.Line);
+        Assert.Equal(1, field.Depth);
+    }
+
+    [Fact]
+    public async Task A_field_member_returns_the_whole_declaration()
+    {
+        using var workspace = await ReadyAsync();
+        var member = await workspace.MemberAsync(new("F:Beta.Shouter.Suffix"), TestContext.Current.CancellationToken);
+        Assert.Equal("""private const string Suffix = "!";""", member.Source);
+        Assert.Equal(7, member.StartLine);
+        Assert.Equal(7, member.EndLine);
+        Assert.Equal(FixtureSolutions.ShouterPath, member.Path);
+    }
+
+    [Fact]
     public async Task An_unknown_path_is_advice()
     {
         using var workspace = await ReadyAsync();
