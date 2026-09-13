@@ -7,16 +7,16 @@ Read this file and `NOTES.md` first after a context reset; resume from the curre
 | Current phase | 0 (workspace and map) |
 | Current branch | `feature/coding-phase0-workspace` (from `master` at `1e4b395d`) |
 | Plan | `docs/coding/plans/2026-09-13-coding-phase0-workspace.md` |
-| Current task | Task 3: the Roslyn service on an adhoc fixture (in progress); Tasks 1-2 complete |
-| Last green gate | Task 2 commit `78479d63`: format + build (0 warnings) + `dotnet test DigitalBrain.slnx` 298 passed, 4 Docker skips (2026-09-13) |
-| Last commit | `78479d63` coding: workspace contract, queries and JSON context |
+| Current task | Task 4: MSBuild loader, warmup and the gated self-test (in progress); Tasks 1-3 complete |
+| Last green gate | Task 3 commit `afd05bec`: format + build (0 warnings) + `dotnet test DigitalBrain.slnx` 312 passed, 4 Docker skips (2026-09-13) |
+| Last commit | `afd05bec` coding: disposal of the Roslyn service waits for in-flight queries |
 | Open PRs | none |
 
 ## Phase ledger
 
 | Phase | Branch | Status | PR |
 |---|---|---|---|
-| 0 workspace and map | `feature/coding-phase0-workspace` | in progress (task 3 of 9) | — |
+| 0 workspace and map | `feature/coding-phase0-workspace` | in progress (task 4 of 9) | — |
 | 1 edits as transactions | — | not started | — |
 | 2 slots | — | not started | — |
 | 3 swarm | — | not started | — |
