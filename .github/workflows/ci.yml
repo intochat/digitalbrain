@@ -50,7 +50,7 @@ jobs:
         run: dotnet test DigitalBrain.slnx -c Release --no-build --no-restore --verbosity minimal
 
   flutter-web-build:
-    name: Flutter web build
+    name: Flutter analyze, test and web build
     runs-on: ubuntu-latest
     timeout-minutes: 25
     defaults:
@@ -72,6 +72,25 @@ jobs:
       - name: Dart format
         working-directory: src/Modules/UI/Flutter
         run: dart format --output=none --set-exit-if-changed core ui shell
+
+      - name: Analyze core, ui and shell
+        working-directory: src/Modules/UI/Flutter
+        run: |
+          (cd core && dart analyze --fatal-infos)
+          (cd ui && flutter analyze --no-pub)
+          (cd shell && flutter analyze --no-pub)
+
+      - name: Core tests
+        working-directory: src/Modules/UI/Flutter/core
+        run: dart test
+
+      - name: Ui tests
+        working-directory: src/Modules/UI/Flutter/ui
+        run: flutter test --no-pub
+
+      - name: Shell tests
+        working-directory: src/Modules/UI/Flutter/shell
+        run: flutter test --no-pub
 
       - name: Web release build
         run: flutter build web --release --base-href "/" --no-tree-shake-icons --no-pub
