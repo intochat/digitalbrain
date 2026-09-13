@@ -12,5 +12,7 @@ public sealed class CodingModule : IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.TryAddSingleton<CodingModule>();
+        builder.Services.TryAddSingleton(TimeProvider.System);
+        builder.Services.TryAddSingleton<SolutionWorkspace>();
     }
 }
