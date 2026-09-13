@@ -11,9 +11,11 @@ final class GraphArtifactData {
   factory GraphArtifactData.fromMap(Map<String, dynamic> data) {
     final nodes = <GraphNode>[
       for (final raw in (data['nodes'] as List? ?? const []))
-        if (raw is Map)
+        if (raw is Map &&
+            raw['id'] is String &&
+            (raw['id'] as String).isNotEmpty)
           GraphNode(
-            id: '${raw['id']}',
+            id: raw['id'] as String,
             label: '${raw['label'] ?? raw['id']}',
             kind: _kind('${raw['kind'] ?? 'leaf'}'),
             cluster: raw['cluster'] as String?,
@@ -21,11 +23,15 @@ final class GraphArtifactData {
     ];
     final edges = <GraphEdge>[
       for (final raw in (data['edges'] as List? ?? const []))
-        if (raw is Map)
+        if (raw is Map &&
+            raw['sourceId'] is String &&
+            (raw['sourceId'] as String).isNotEmpty &&
+            raw['targetId'] is String &&
+            (raw['targetId'] as String).isNotEmpty)
           GraphEdge(
             id: '${raw['id'] ?? '${raw['sourceId']}-${raw['targetId']}'}',
-            sourceId: '${raw['sourceId']}',
-            targetId: '${raw['targetId']}',
+            sourceId: raw['sourceId'] as String,
+            targetId: raw['targetId'] as String,
             dotted: raw['dotted'] == true,
           ),
     ];

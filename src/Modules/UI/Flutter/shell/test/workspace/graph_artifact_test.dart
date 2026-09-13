@@ -38,4 +38,21 @@ void main() {
     expect(data.nodes.single.kind, GraphNodeKind.leaf);
     expect(data.edges, isEmpty);
   });
+
+  test('nodes and edges without ids are skipped', () {
+    final data = GraphArtifactData.fromMap({
+      'title': 'x',
+      'nodes': [
+        {'id': 'a', 'label': 'A'},
+        {'label': 'no id'},
+        {'id': '', 'label': 'blank id'},
+      ],
+      'edges': [
+        {'sourceId': 'a', 'targetId': 'a'},
+        {'id': 'x', 'targetId': 'a'},
+      ],
+    });
+    expect(data.nodes.map((n) => n.id), ['a']);
+    expect(data.edges.map((e) => e.id), ['a-a']);
+  });
 }
