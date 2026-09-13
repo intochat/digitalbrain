@@ -1,4 +1,5 @@
 using DigitalBrain.Core;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace DigitalBrain.Coding;
@@ -13,5 +14,7 @@ public sealed class CodingModule : IModule
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.TryAddSingleton<CodingModule>();
         builder.Services.TryAddSingleton<SolutionWorkspace>();
+        builder.Services.TryAddSingleton<ISolutionLoader, MSBuildSolutionLoader>();
+        builder.Services.AddHostedService<WorkspaceWarmup>();
     }
 }

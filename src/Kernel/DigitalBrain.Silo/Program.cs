@@ -3,8 +3,12 @@ using DigitalBrain.Core;
 using DigitalBrain.Kernel;
 using DigitalBrain.Mcp;
 using DigitalBrain.ServiceDefaults;
+using Microsoft.Build.Locator;
 using ModelContextProtocol.AspNetCore;
 using Orleans.Dashboard;
+
+// No other module may load a Microsoft.Build assembly before the locator registers the real MSBuild.
+MSBuildLocator.RegisterDefaults();
 
 var builder = WebApplication.CreateBuilder(args);
 
