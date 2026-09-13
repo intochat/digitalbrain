@@ -32,4 +32,24 @@ public interface ICodeWorkspace : INeuron
     [ReadOnly]
     [Alias("map")]
     Task<SolutionMap> Map(MapQuery query, CancellationToken cancellationToken = default);
+
+    [ReadOnly]
+    [Alias("skeleton")]
+    Task<Skeleton> Skeleton(SkeletonQuery query, CancellationToken cancellationToken = default);
+
+    [ReadOnly]
+    [Alias("member")]
+    Task<MemberSource> Member(MemberQuery query, CancellationToken cancellationToken = default);
+
+    [ReadOnly]
+    [Alias("callers")]
+    Task<CallersResult> Callers(CallersQuery query, CancellationToken cancellationToken = default);
+
+    [ReadOnly]
+    [Alias("implementations")]
+    Task<SymbolSearchResult> Implementations(ImplementationsQuery query, CancellationToken cancellationToken = default);
+
+    [ReadOnly]
+    [Alias("derived")]
+    Task<SymbolSearchResult> Derived(DerivedQuery query, CancellationToken cancellationToken = default);
 }

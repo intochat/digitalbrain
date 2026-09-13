@@ -33,29 +33,27 @@ public sealed class CodeWorkspaceNeuronFacts
         }
     }
 
-    [Fact]
-    public void Every_contract_method_uses_section_7_types()
+    [Theory]
+    [InlineData(typeof(ICodeWorkspace), 12)]
+    [InlineData(typeof(IChangeSet), 5)]
+    public void Every_contract_method_uses_section_7_types(Type contract, int expectedMethods)
     {
         var options = DescriptorTable.ContractOptions(CodingJson.Default);
-        var methods = typeof(ICodeWorkspace).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+        var methods = contract.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
 
         foreach (var method in methods)
         {
-            var parameterTypes = method.GetParameters()
+            var argumentTypes = method.GetParameters()
                 .Where(parameter => parameter.ParameterType != typeof(CancellationToken))
-                .Select(parameter => parameter.ParameterType)
-                .ToArray();
-
-            if (parameterTypes.Length == 1)
+                .Select(parameter => parameter.ParameterType);
+            var resultType = method.ReturnType.GetGenericArguments()[0];
+            foreach (var type in argumentTypes.Append(resultType))
             {
-                DescriptorRules.ValidateMemberTypes(method, options.GetTypeInfo(parameterTypes[0]));
+                DescriptorRules.ValidateMemberTypes(method, options.GetTypeInfo(type));
             }
-
-            var returnType = method.ReturnType.GetGenericArguments()[0];
-            DescriptorRules.ValidateMemberTypes(method, options.GetTypeInfo(returnType));
         }
 
-        Assert.True(methods.Length >= 7, $"Expected at least seven declared methods on {nameof(ICodeWorkspace)}, found {methods.Length}.");
+        Assert.Equal(expectedMethods, methods.Length);
     }
 
     [Fact]

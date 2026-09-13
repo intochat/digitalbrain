@@ -98,6 +98,21 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
         return await SolutionQueries.MapAsync(lease.Solution, lease.SolutionPath ?? string.Empty, query, cancellationToken).ConfigureAwait(false);
     }
 
+    public Task<Skeleton> SkeletonAsync(SkeletonQuery query, CancellationToken cancellationToken)
+        => throw new NotSupportedException("phase 1 task 2");
+
+    public Task<MemberSource> MemberAsync(MemberQuery query, CancellationToken cancellationToken)
+        => throw new NotSupportedException("phase 1 task 2");
+
+    public Task<CallersResult> CallersAsync(CallersQuery query, CancellationToken cancellationToken)
+        => throw new NotSupportedException("phase 1 task 2");
+
+    public Task<SymbolSearchResult> ImplementationsAsync(ImplementationsQuery query, CancellationToken cancellationToken)
+        => throw new NotSupportedException("phase 1 task 2");
+
+    public Task<SymbolSearchResult> DerivedAsync(DerivedQuery query, CancellationToken cancellationToken)
+        => throw new NotSupportedException("phase 1 task 2");
+
     public void Dispose()
     {
         Workspace? disposeNow = null;

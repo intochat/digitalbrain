@@ -49,7 +49,7 @@ internal sealed class WorkspaceNeuron(
     public Task<WorkspaceSnapshot> Read()
     {
         var live = workspace.Status;
-        return Task.FromResult(new WorkspaceSnapshot(State?.SolutionPath ?? live.SolutionPath, live.Phase, live.ProjectCount, live.DocumentCount, live.Detail, State?.Generation ?? 0));
+        return Task.FromResult(new WorkspaceSnapshot(State?.SolutionPath ?? live.SolutionPath, live.Phase, live.ProjectCount, live.DocumentCount, live.Detail, State?.Generation ?? 0, ReloadNeeded: false));
     }
 
     [ReadOnly]
@@ -67,6 +67,26 @@ internal sealed class WorkspaceNeuron(
     [ReadOnly]
     public Task<SolutionMap> Map(MapQuery query, CancellationToken cancellationToken = default)
         => workspace.MapAsync(query, cancellationToken);
+
+    [ReadOnly]
+    public Task<Skeleton> Skeleton(SkeletonQuery query, CancellationToken cancellationToken = default)
+        => workspace.SkeletonAsync(query, cancellationToken);
+
+    [ReadOnly]
+    public Task<MemberSource> Member(MemberQuery query, CancellationToken cancellationToken = default)
+        => workspace.MemberAsync(query, cancellationToken);
+
+    [ReadOnly]
+    public Task<CallersResult> Callers(CallersQuery query, CancellationToken cancellationToken = default)
+        => workspace.CallersAsync(query, cancellationToken);
+
+    [ReadOnly]
+    public Task<SymbolSearchResult> Implementations(ImplementationsQuery query, CancellationToken cancellationToken = default)
+        => workspace.ImplementationsAsync(query, cancellationToken);
+
+    [ReadOnly]
+    public Task<SymbolSearchResult> Derived(DerivedQuery query, CancellationToken cancellationToken = default)
+        => workspace.DerivedAsync(query, cancellationToken);
 
     protected override async Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
     {
