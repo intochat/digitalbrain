@@ -1,8 +1,8 @@
 # Coding agent design (proposal, 2026-09-13)
 
-Status: **proposal awaiting ratification**. Nothing is implemented. The evidence behind every claim is in
-`coding-agent-research.md` (cited as R1.2, R6.3 and so on). Decision points in section 5 carry a default;
-"go" ratifies every default.
+Status: **ratified 2026-09-13 with every default in section 5** (the owner asked for the implementation
+prompt); nothing is implemented yet. The evidence behind every claim is in `coding-agent-research.md`
+(cited as R1.2, R6.3 and so on). Phase 0 starts from `plans/2026-09-13-coding-phase0-workspace.md`.
 
 ## 1. What this is for
 
