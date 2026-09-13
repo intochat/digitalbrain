@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Aspire hosting configuration for Coding-module specialist neurons.</Description>
+    <RootNamespace>DigitalBrain.Coding.Aspire.Hosting</RootNamespace>
+    <!-- Microsoft.CodeAnalysis.Workspaces.MSBuild carries Microsoft.Build.Framework; the SDK refuses to copy it by default. -->
+    <DisableMSBuildAssemblyCopyCheck>true</DisableMSBuildAssemblyCopyCheck>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Coding/DigitalBrain.Modules.Coding.csproj" />
+    <ProjectReference Include="../../../Aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
+  </ItemGroup>
+</Project>

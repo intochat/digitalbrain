@@ -8,6 +8,8 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);ORLEANSEXP005;CS1591</NoWarn>
     <RootNamespace>DigitalBrain.Tests</RootNamespace>
+    <!-- Microsoft.CodeAnalysis.Workspaces.MSBuild carries Microsoft.Build.Framework; the SDK refuses to copy it by default. -->
+    <DisableMSBuildAssemblyCopyCheck>true</DisableMSBuildAssemblyCopyCheck>
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
@@ -31,6 +33,8 @@
     <ProjectReference Include="../../src/Modules/Memory/Memory/DigitalBrain.Modules.Memory.csproj" />
     <ProjectReference Include="../../src/Modules/ClickHouse/ClickHouse/DigitalBrain.Modules.ClickHouse.csproj" />
     <ProjectReference Include="../../src/Modules/ClickHouse/Contracts/DigitalBrain.Modules.ClickHouse.Contracts.csproj" />
+    <ProjectReference Include="../../src/Modules/Coding/Coding/DigitalBrain.Modules.Coding.csproj" />
+    <ProjectReference Include="../../src/Modules/Coding/Contracts/DigitalBrain.Modules.Coding.Contracts.csproj" />
     <ProjectReference Include="../../src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
     <ProjectReference Include="../../src/Modules/Excel/Excel/DigitalBrain.Modules.Excel.csproj" />
     <ProjectReference Include="../../src/Modules/Microsoft/Microsoft/DigitalBrain.Modules.Microsoft.csproj" />
