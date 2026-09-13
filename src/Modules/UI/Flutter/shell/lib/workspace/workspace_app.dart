@@ -7,8 +7,7 @@ import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 
-import '../chat/agent_chat_app.dart';
-import '../chat/brain_graph_store.dart';
+import 'brain_graph_store.dart';
 import 'workspace_table_import.dart';
 import 'workspace_store.dart';
 import 'workspace_desktop.dart';

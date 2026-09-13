@@ -7,7 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:markdraw/markdraw.dart' as markdraw;
 
-import '../chat/brain_graph_store.dart';
+import 'brain_graph_store.dart';
 import 'workspace_store.dart';
 
 /// Use the editor's own serializer for new documents as well as saved edits.

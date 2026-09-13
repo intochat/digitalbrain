@@ -309,22 +309,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  flyer_chat_text_message:
-    dependency: transitive
-    description:
-      name: flyer_chat_text_message
-      sha256: "34caece3a4f83404c3a88e146b31d458f4f60c4d43aee1fb4b02853af9843044"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.6.0"
-  flyer_chat_text_stream_message:
-    dependency: transitive
-    description:
-      name: flyer_chat_text_stream_message
-      sha256: "16eeea1e3edcbef3664d5aa731f9aa4b264ea5e6ce2511d77a9a7d2cde6fee9b"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.3.0"
   forui:
     dependency: transitive
     description:
@@ -994,14 +978,6 @@ packages:
     description:
       name: shelf_web_socket
       sha256: "3632775c8e90d6c9712f883e633716432a27758216dfb61bd86a8321c0580925"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.0.0"
-  shimmer:
-    dependency: transitive
-    description:
-      name: shimmer
-      sha256: "5f88c883a22e9f9f299e5ba0e4f7e6054857224976a5d9f839d4ebdc94a14ac9"
       url: "https://pub.dev"
     source: hosted
     version: "3.0.0"

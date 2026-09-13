@@ -11,7 +11,6 @@ import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:uuid/uuid.dart';
 
-import '../chat/agent_chat_app.dart';
 import 'workspace_store.dart';
 
 part 'workspace_chat_presentation.dart';

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../chat/chat_contracts.dart';
+typedef OpenUrl = Future<void> Function(Uri url);
 
 const _providers = [
   ('gmail', 'Gmail', Icons.mail_outline),
