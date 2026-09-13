@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 
@@ -99,9 +100,18 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
         ArgumentNullException.ThrowIfNull(change);
         using var lease = await AcquireAsync(cancellationToken).ConfigureAwait(false);
         var changed = await change(lease.Solution, cancellationToken).ConfigureAwait(false);
-        var documents = changed.GetChanges(lease.Solution).GetProjectChanges()
+        var projectChanges = changed.GetChanges(lease.Solution).GetProjectChanges().ToArray();
+        if (projectChanges.Any(static projectChange => projectChange.GetAddedDocuments().Any() || projectChange.GetRemovedDocuments().Any()))
+        {
+            throw new InvalidOperationException("This change set adds or removes documents; phase 1 commits only edits to existing files.");
+        }
+
+        // Every document's path is resolved before TryApplyChanges runs, so a document with no file path
+        // refuses the whole commit before anything is applied or written, not partway through.
+        var documents = projectChanges
             .SelectMany(project => project.GetChangedDocuments().Select(id => changed.GetDocument(id)!))
             .OrderBy(static document => document.FilePath, StringComparer.Ordinal)
+            .Select(document => (Document: document, Path: document.FilePath ?? throw new InvalidOperationException($"Document '{document.Name}' has no file path to write to.")))
             .ToArray();
         if (!lease.Workspace.TryApplyChanges(changed))
         {
@@ -109,16 +119,16 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
         }
 
         var written = new List<string>();
-        foreach (var document in documents)
+        foreach (var (document, path) in documents)
         {
-            var path = document.FilePath ?? throw new InvalidOperationException($"Document '{document.Name}' has no file path to write to.");
-            var text = (await document.GetTextAsync(cancellationToken).ConfigureAwait(false)).ToString();
-            if (!File.Exists(path) || !string.Equals(await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false), text, StringComparison.Ordinal))
+            var text = await document.GetTextAsync(cancellationToken).ConfigureAwait(false);
+            var content = text.ToString();
+            if (!File.Exists(path) || !string.Equals(await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false), content, StringComparison.Ordinal))
             {
-                await File.WriteAllTextAsync(path, text, cancellationToken).ConfigureAwait(false);
+                var encoding = text.Encoding ?? new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+                await File.WriteAllTextAsync(path, content, encoding, cancellationToken).ConfigureAwait(false);
+                written.Add(path);
             }
-
-            written.Add(path);
         }
 
         return new CommitOutcome(written, Interlocked.Increment(ref _generation));

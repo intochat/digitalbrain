@@ -28,25 +28,34 @@ public sealed class ChangeSetEditor
             }
             catch (Exception error) when (error is InvalidOperationException or ArgumentException)
             {
-                return new EditOutcome(solution, [], await DiffAsync(original, solution, cancellationToken).ConfigureAwait(false),
-                    ChangedPaths(original, solution), index, Describe(index, edits[index], error.Message));
+                var failedIds = ChangedDocumentIds(original, solution);
+                return new EditOutcome(solution, [], await DiffAsync(original, solution, failedIds, cancellationToken).ConfigureAwait(false),
+                    ChangedPaths(solution, failedIds), index, Describe(index, edits[index], error.Message));
             }
         }
 
-        solution = await FormatAsync(original, solution, cancellationToken).ConfigureAwait(false);
-        var diagnostics = await DiagnoseAsync(original, solution, cancellationToken).ConfigureAwait(false);
+        var changedIds = ChangedDocumentIds(original, solution);
+        if (changedIds.Count == 0)
+        {
+            // Nothing differs from the original snapshot (an empty edit list, or edits that were all no-ops):
+            // there is nothing to format, diagnose or attribute an error to.
+            return new EditOutcome(solution, [], string.Empty, [], null, null);
+        }
+
+        solution = await FormatAsync(solution, changedIds, cancellationToken).ConfigureAwait(false);
+        var diagnostics = await DiagnoseAsync(original, solution, changedIds, cancellationToken).ConfigureAwait(false);
         int? failing = null;
         string? detail = null;
         if (diagnostics.Items.FirstOrDefault(static hit => hit.Severity == nameof(DiagnosticSeverity.Error)) is { } firstError)
         {
             // The last edit that touched the failing file is the likely cause; else the last edit overall.
             var responsible = touched.LastOrDefault(entry => string.Equals(entry.Path, firstError.Path, StringComparison.OrdinalIgnoreCase));
-            failing = touched.Count == 0 ? 0 : responsible.Path is null ? touched[^1].Edit : responsible.Edit;
+            failing = responsible.Path is null ? touched[^1].Edit : responsible.Edit;
             detail = Describe(failing.Value, edits[failing.Value], $"left {diagnostics.ErrorCount} error(s); first: {firstError.Id} {firstError.Path}:{firstError.Line} {firstError.Message}");
         }
 
-        return new EditOutcome(solution, diagnostics.Items, await DiffAsync(original, solution, cancellationToken).ConfigureAwait(false),
-            ChangedPaths(original, solution), failing, detail);
+        return new EditOutcome(solution, diagnostics.Items, await DiffAsync(original, solution, changedIds, cancellationToken).ConfigureAwait(false),
+            ChangedPaths(solution, changedIds), failing, detail);
     }
 
     private static async Task<(Solution Solution, string Path)> ApplyOneAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
@@ -148,9 +157,9 @@ public sealed class ChangeSetEditor
     private static string Describe(int index, EditRequest edit, string message)
         => $"edit {index + 1} ({edit.Kind} {edit.SymbolId ?? edit.Path ?? "?"}) {message}";
 
-    private static async Task<Solution> FormatAsync(Solution original, Solution solution, CancellationToken cancellationToken)
+    private static async Task<Solution> FormatAsync(Solution solution, IReadOnlyList<DocumentId> changedIds, CancellationToken cancellationToken)
     {
-        foreach (var id in ChangedDocumentIds(original, solution))
+        foreach (var id in changedIds)
         {
             var formatted = await Formatter.FormatAsync(solution.GetDocument(id)!, Formatter.Annotation, cancellationToken: cancellationToken).ConfigureAwait(false);
             solution = formatted.Project.Solution;
@@ -159,30 +168,52 @@ public sealed class ChangeSetEditor
         return solution;
     }
 
-    // A dependent project can carry diagnostics that predate this change set entirely (another file's unrelated
-    // error); diagnosing it against the pre-edit baseline and keeping only what is new attributes errors to the
-    // edit that actually caused them, not to whatever else was already broken in the solution.
-    private static async Task<DiagnosticsResult> DiagnoseAsync(Solution original, Solution solution, CancellationToken cancellationToken)
+    // A dependent project can carry diagnostics that predate this change set entirely: another file's unrelated
+    // error, or the very same diagnostic merely shifted to a different line by an earlier edit in this file.
+    // Matching the pre-edit baseline on (Id, Severity, Message, Path) rather than the full hit (which includes
+    // Line) and subtracting it as a multiset - one baseline occurrence cancels one matching after-edit occurrence,
+    // in order - keeps a second, genuinely new instance of the same diagnostic from being swallowed by the first.
+    private static async Task<DiagnosticsResult> DiagnoseAsync(Solution original, Solution solution, IReadOnlyList<DocumentId> changedIds, CancellationToken cancellationToken)
     {
-        var projects = ChangedAndDependents(original, solution);
+        var projects = ChangedAndDependents(solution, changedIds);
         var before = await SolutionQueries.ProjectDiagnosticsAsync(original, projects, DiagnosticLimit, cancellationToken).ConfigureAwait(false);
         var after = await SolutionQueries.ProjectDiagnosticsAsync(solution, projects, DiagnosticLimit, cancellationToken).ConfigureAwait(false);
-        var preexisting = new HashSet<DiagnosticHit>(before.Items);
-        var introduced = after.Items.Where(hit => !preexisting.Contains(hit)).ToArray();
-        return new DiagnosticsResult(introduced,
+        var preexisting = new Dictionary<(string Id, string Severity, string Message, string Path), int>();
+        foreach (var hit in before.Items)
+        {
+            var key = (hit.Id, hit.Severity, hit.Message, hit.Path);
+            preexisting[key] = preexisting.GetValueOrDefault(key) + 1;
+        }
+
+        var introduced = new List<DiagnosticHit>();
+        foreach (var hit in after.Items)
+        {
+            var key = (hit.Id, hit.Severity, hit.Message, hit.Path);
+            if (preexisting.TryGetValue(key, out var count) && count > 0)
+            {
+                preexisting[key] = count - 1;
+            }
+            else
+            {
+                introduced.Add(hit);
+            }
+        }
+
+        var items = introduced.Take(DiagnosticLimit).ToArray();
+        return new DiagnosticsResult(items,
             introduced.Count(static hit => hit.Severity == nameof(DiagnosticSeverity.Error)),
             introduced.Count(static hit => hit.Severity == nameof(DiagnosticSeverity.Warning)),
-            after.Truncated, introduced.Length);
+            introduced.Count > DiagnosticLimit, introduced.Count);
     }
 
-    private static IReadOnlyCollection<ProjectId> ChangedAndDependents(Solution original, Solution solution)
+    private static IReadOnlyCollection<ProjectId> ChangedAndDependents(Solution solution, IReadOnlyList<DocumentId> changedIds)
     {
         var graph = solution.GetProjectDependencyGraph();
         var projects = new HashSet<ProjectId>();
-        foreach (var change in solution.GetChanges(original).GetProjectChanges())
+        foreach (var projectId in changedIds.Select(static id => id.ProjectId).Distinct())
         {
-            projects.Add(change.ProjectId);
-            projects.UnionWith(graph.GetProjectsThatTransitivelyDependOnThisProject(change.ProjectId));
+            projects.Add(projectId);
+            projects.UnionWith(graph.GetProjectsThatTransitivelyDependOnThisProject(projectId));
         }
 
         return projects;
@@ -191,13 +222,13 @@ public sealed class ChangeSetEditor
     private static IReadOnlyList<DocumentId> ChangedDocumentIds(Solution original, Solution solution)
         => [.. solution.GetChanges(original).GetProjectChanges().SelectMany(static change => change.GetChangedDocuments())];
 
-    private static IReadOnlyList<string> ChangedPaths(Solution original, Solution solution)
-        => [.. ChangedDocumentIds(original, solution).Select(id => solution.GetDocument(id)!.FilePath ?? id.ToString()).Order(StringComparer.Ordinal)];
+    private static IReadOnlyList<string> ChangedPaths(Solution solution, IReadOnlyList<DocumentId> changedIds)
+        => [.. changedIds.Select(id => solution.GetDocument(id)!.FilePath ?? id.ToString()).Order(StringComparer.Ordinal)];
 
-    private static async Task<string> DiffAsync(Solution original, Solution solution, CancellationToken cancellationToken)
+    private static async Task<string> DiffAsync(Solution original, Solution solution, IReadOnlyList<DocumentId> changedIds, CancellationToken cancellationToken)
     {
         var diff = new StringBuilder();
-        foreach (var id in ChangedDocumentIds(original, solution))
+        foreach (var id in changedIds)
         {
             var before = await original.GetDocument(id)!.GetTextAsync(cancellationToken).ConfigureAwait(false);
             var after = await solution.GetDocument(id)!.GetTextAsync(cancellationToken).ConfigureAwait(false);

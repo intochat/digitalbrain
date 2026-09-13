@@ -118,4 +118,15 @@ public sealed class ChangeSetEditorFacts
         Assert.Equal(0, outcome.FailingEdit);
         Assert.Contains("member declaration", outcome.Detail, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task Pre_existing_diagnostics_that_merely_shift_are_not_introduced()
+    {
+        var outcome = await Editor.ApplyAsync(Snapshot(),
+            [new EditRequest(EditKind.ReplaceRange, Path: FixtureSolutions.UnusedPath, StartLine: 1, EndLine: 1,
+                Source: "namespace Beta;\n\n// a comment above the class")],
+            TestContext.Current.CancellationToken);
+        Assert.False(outcome.HasErrors);
+        Assert.Empty(outcome.Diagnostics);
+    }
 }

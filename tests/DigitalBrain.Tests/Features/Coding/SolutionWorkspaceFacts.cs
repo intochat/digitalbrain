@@ -61,6 +61,77 @@ public sealed class SolutionWorkspaceFacts
     }
 
     [Fact]
+    public async Task Commit_applies_the_snapshot_and_writes_only_the_changed_files()
+    {
+        using var fixture = DiskFixture.Create();
+        using var workspace = new SolutionWorkspace(new AdhocSolutionLoader(fixture.Open), NullLogger<SolutionWorkspace>.Instance);
+        await workspace.BeginOpenAsync(fixture.SolutionPath);
+        await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
+        var programBefore = File.GetLastWriteTimeUtc(fixture.ProgramPath);
+        var editor = new ChangeSetEditor();
+
+        var outcome = await workspace.CommitAsync(async (solution, token) =>
+        {
+            var applied = await editor.ApplyAsync(solution,
+                [new EditRequest(EditKind.ReplaceMember, SymbolId: "M:Alpha.Greeter.Greet(System.String)", Source: """public string Greet(string name) => $"Hi, {name}";""")], token);
+            return applied.Changed;
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal([fixture.GreeterPath], outcome.WrittenPaths);
+        Assert.Equal(1, outcome.Generation);
+        Assert.Equal(1, workspace.Generation);
+        Assert.Contains("Hi, {name}", await File.ReadAllTextAsync(fixture.GreeterPath, TestContext.Current.CancellationToken), StringComparison.Ordinal);
+        Assert.Equal(programBefore, File.GetLastWriteTimeUtc(fixture.ProgramPath));
+        var member = await workspace.MemberAsync(new("M:Alpha.Greeter.Greet(System.String)"), TestContext.Current.CancellationToken);
+        Assert.Contains("Hi, {name}", member.Source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Commit_of_unchanged_text_writes_nothing()
+    {
+        using var fixture = DiskFixture.Create();
+        using var workspace = new SolutionWorkspace(new AdhocSolutionLoader(fixture.Open), NullLogger<SolutionWorkspace>.Instance);
+        await workspace.BeginOpenAsync(fixture.SolutionPath);
+        await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
+        var editor = new ChangeSetEditor();
+        await workspace.CommitAsync(async (solution, token) =>
+        {
+            var applied = await editor.ApplyAsync(solution,
+                [new EditRequest(EditKind.ReplaceMember, SymbolId: "M:Alpha.Greeter.Greet(System.String)", Source: """public string Greet(string name) => $"Hi, {name}";""")], token);
+            return applied.Changed;
+        }, TestContext.Current.CancellationToken);
+
+        var writeTimeBefore = File.GetLastWriteTimeUtc(fixture.GreeterPath);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+        var currentText = await File.ReadAllTextAsync(fixture.GreeterPath, TestContext.Current.CancellationToken);
+
+        var outcome = await workspace.CommitAsync((solution, _) => Task.FromResult(solution.WithDocumentText(
+            solution.GetDocumentIdsWithFilePath(fixture.GreeterPath).Single(), SourceText.From(currentText))), TestContext.Current.CancellationToken);
+
+        Assert.Empty(outcome.WrittenPaths);
+        Assert.Equal(2, outcome.Generation);
+        Assert.Equal(2, workspace.Generation);
+        Assert.Equal(writeTimeBefore, File.GetLastWriteTimeUtc(fixture.GreeterPath));
+    }
+
+    [Fact]
+    public async Task Commit_refuses_a_snapshot_the_workspace_has_moved_past()
+    {
+        using var fixture = DiskFixture.Create();
+        using var workspace = new SolutionWorkspace(new AdhocSolutionLoader(fixture.Open), NullLogger<SolutionWorkspace>.Instance);
+        await workspace.BeginOpenAsync(fixture.SolutionPath);
+        await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
+        var stale = await workspace.QueryAsync((solution, _) => Task.FromResult(solution), TestContext.Current.CancellationToken);
+        await workspace.CommitAsync((solution, _) => Task.FromResult(solution.WithDocumentText(
+            solution.GetDocumentIdsWithFilePath(fixture.GreeterPath).Single(), SourceText.From(FixtureSolutions.GreeterSource + "\n// touched\n"))), TestContext.Current.CancellationToken);
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => workspace.CommitAsync((_, _) => Task.FromResult(stale.WithDocumentText(
+            stale.GetDocumentIdsWithFilePath(fixture.GreeterPath).Single(), SourceText.From("namespace Alpha;"))), TestContext.Current.CancellationToken));
+        Assert.Contains("Check it again", error.Message, StringComparison.Ordinal);
+        Assert.Contains("// touched", await File.ReadAllTextAsync(fixture.GreeterPath, TestContext.Current.CancellationToken), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Load_failures_stay_visible_on_a_ready_workspace()
     {
         var loader = new FailingAdhocLoader(FixtureSolutions.TwoProjects, ["Alpha.csproj: reference Missing.dll not found"]);
@@ -280,47 +351,5 @@ public sealed class SolutionWorkspaceFacts
     {
         public Task<LoadedSolution> OpenAsync(string solutionPath, IProgress<string> progress, CancellationToken cancellationToken)
             => throw new IOException("disk on fire");
-    }
-
-    [Fact]
-    public async Task Commit_applies_the_snapshot_and_writes_only_the_changed_files()
-    {
-        using var fixture = DiskFixture.Create();
-        using var workspace = new SolutionWorkspace(new AdhocSolutionLoader(fixture.Open), NullLogger<SolutionWorkspace>.Instance);
-        await workspace.BeginOpenAsync(fixture.SolutionPath);
-        await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
-        var programBefore = File.GetLastWriteTimeUtc(fixture.ProgramPath);
-        var editor = new ChangeSetEditor();
-
-        var outcome = await workspace.CommitAsync(async (solution, token) =>
-        {
-            var applied = await editor.ApplyAsync(solution,
-                [new EditRequest(EditKind.ReplaceMember, SymbolId: "M:Alpha.Greeter.Greet(System.String)", Source: """public string Greet(string name) => $"Hi, {name}";""")], token);
-            return applied.Changed;
-        }, TestContext.Current.CancellationToken);
-
-        Assert.Equal([fixture.GreeterPath], outcome.WrittenPaths);
-        Assert.Equal(1, outcome.Generation);
-        Assert.Equal(1, workspace.Generation);
-        Assert.Contains("Hi, {name}", await File.ReadAllTextAsync(fixture.GreeterPath, TestContext.Current.CancellationToken), StringComparison.Ordinal);
-        Assert.Equal(programBefore, File.GetLastWriteTimeUtc(fixture.ProgramPath));
-        var member = await workspace.MemberAsync(new("M:Alpha.Greeter.Greet(System.String)"), TestContext.Current.CancellationToken);
-        Assert.Contains("Hi, {name}", member.Source, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task Commit_refuses_a_snapshot_the_workspace_has_moved_past()
-    {
-        using var fixture = DiskFixture.Create();
-        using var workspace = new SolutionWorkspace(new AdhocSolutionLoader(fixture.Open), NullLogger<SolutionWorkspace>.Instance);
-        await workspace.BeginOpenAsync(fixture.SolutionPath);
-        await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
-        var stale = await workspace.QueryAsync((solution, _) => Task.FromResult(solution), TestContext.Current.CancellationToken);
-        await workspace.CommitAsync((solution, _) => Task.FromResult(solution.WithDocumentText(
-            solution.GetDocumentIdsWithFilePath(fixture.GreeterPath).Single(), SourceText.From(FixtureSolutions.GreeterSource + "\n// touched\n"))), TestContext.Current.CancellationToken);
-
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => workspace.CommitAsync((_, _) => Task.FromResult(stale.WithDocumentText(
-            stale.GetDocumentIdsWithFilePath(fixture.GreeterPath).Single(), SourceText.From("namespace Alpha;"))), TestContext.Current.CancellationToken));
-        Assert.Contains("Check it again", error.Message, StringComparison.Ordinal);
     }
 }
