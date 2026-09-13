@@ -4,15 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:digitalbrain_flutter_shell/workspace/workspace_desktop.dart';
 import 'package:digitalbrain_flutter_shell/workspace/workspace_app.dart';
 
-class MemoryWindows implements WorkspacePersistence {
-  String? data;
-  @override
-  Future<String?> read() async => data;
-  @override
-  Future<void> write(String value) async {
-    data = value;
-  }
-}
+import 'support/memory_workspace.dart';
 
 void main() {
   testWidgets('drag previews snapping and maximizing preserves editor state', (
@@ -20,7 +12,7 @@ void main() {
   ) async {
     await tester.binding.setSurfaceSize(const Size(1000, 700));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    final store = WorkspaceStore(persistence: MemoryWindows());
+    final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
     store.addArtifact(
       WorkspaceArtifact(id: 'a', title: 'Table A', kind: 'document'),
     );
@@ -91,7 +83,7 @@ void main() {
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(1400, 900));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      final store = WorkspaceStore(persistence: MemoryWindows());
+      final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
       store.addArtifact(
         WorkspaceArtifact(id: 'a', title: 'My table', kind: 'document'),
       );
@@ -148,7 +140,7 @@ void main() {
   test(
     'window placement, focus and minimize survive restoring a project',
     () async {
-      final memory = MemoryWindows();
+      final memory = MemoryWorkspacePersistence();
       final store = WorkspaceStore(persistence: memory);
       await store.load();
       for (final id in ['a', 'b']) {

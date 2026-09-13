@@ -4,12 +4,7 @@ import 'package:digitalbrain_flutter_shell/workspace/workspace_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-class _Storage implements WorkspacePersistence {
-  @override
-  Future<String?> read() async => null;
-  @override
-  Future<void> write(String value) async {}
-}
+import 'support/memory_workspace.dart';
 
 void main() {
   testWidgets(
@@ -18,7 +13,7 @@ void main() {
       tester.view.physicalSize = const Size(1440, 960);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
-      final store = WorkspaceStore(persistence: _Storage());
+      final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
       await store.load();
       final first = store.currentProject.id;
       final second = store.createProject('Second');
