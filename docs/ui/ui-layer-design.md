@@ -365,7 +365,8 @@ plans once the contract exists.
    subtree, demos, windowing, onboarding, dead kit symbols, dead client methods and packages, the
    Transcript family, the chat HTTP routes (decision point 1). Tests that only covered deleted code
    go with it; the persistence fake is consolidated. Exit gate: suites green, `main.dart`
-   unchanged in behaviour, line counts in the research note updated.
+   unchanged in behaviour, line counts in the research note updated. Done on 2026-09-13 (branch
+   feature/ui-phase0-remove-unreachable, commits a5fb62b2..8b22bab1 plus the outcome note).
 1. **The contract.** C# `UiPart` records, `UiPartRef`, `UiToolError`, polymorphic JSON, tool
    results as parts, `IUiPartSource` and `/ui/parts`, cards as refs, the fixture fact and the
    fixture files. Dart core: the `UiPart` hierarchy, typed `AgentEvent`, one `SseDecoder`, the

@@ -527,3 +527,19 @@ onReadArtifact:, …)`, the `TOOL_CALL_RESULT` branch in `workspace_chat.dart`, 
 `ARCHITECTURE.md` and about twenty other documents. The ClickHouse plan is the only written
 statement of the testing strategy (no Docker in unit tests, fakes behind `DigitalBrainFakes`, the
 four CI commands).
+
+## 5. Phase 0 outcome (2026-09-13)
+
+Deleted by the reachability rule on `feature/ui-phase0-remove-unreachable`: the Transcript neuron
+family, the chat and voice HTTP routes with six `http.feature` scenarios, the shell `chat/`,
+`demos/`, `windowing/` and `onboarding/` folders plus `activity_screen.dart`, `chat_screen.dart`,
+`brain_theme.dart` and two assets, the kit's onboarding folder, `UiView`, the chat builders and
+message factory, the five reference parts, the 3D graph scene and `three_js`, and the core client's
+surface, activity, chat and entity-reader methods with their models. `AgentRunner` lives in core,
+`OpenUrl` next to the integrations menu, `BrainGraphStore` and the voice file helpers under
+`workspace/`. Tests: five shell files and two core files deleted, the persistence fake consolidated
+into `test/support/memory_workspace.dart`, the startup and table tool-result tests ported onto
+`WorkspaceApp`, and `ci.yml` now analyzes and tests the three Dart packages on every pull request.
+
+Line counts after phase 0: C# Contracts 909 / Module 1938 / Aspire.Hosting 1034; Dart core 1176
+(tests 318), ui 6564 (tests 629), shell 5613 (tests 2008).
