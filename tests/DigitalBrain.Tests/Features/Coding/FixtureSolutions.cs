@@ -11,6 +11,9 @@ internal static class FixtureSolutions
     internal const string GreeterPath = Root + "/Alpha/Greeter.cs";
     internal const string ProgramPath = Root + "/Beta/Program.cs";
     internal const string BrokenPath = Root + "/Beta/Broken.cs";
+    internal const string WelcomePath = Root + "/Alpha/IWelcome.cs";
+    internal const string ShouterPath = Root + "/Beta/Shouter.cs";
+    internal const string UnusedPath = Root + "/Beta/Unused.cs";
 
     private static readonly IReadOnlyList<MetadataReference> Runtime = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
         .Split(Path.PathSeparator)
@@ -18,7 +21,82 @@ internal static class FixtureSolutions
         .Select(static path => (MetadataReference)MetadataReference.CreateFromFile(path))
         .ToArray();
 
-    internal static Workspace TwoProjects()
+    internal const string GreeterSource = """
+        namespace Alpha;
+
+        public class Greeter : IWelcome
+        {
+            public string Greet(string name) => $"Hello, {name}";
+
+            public string Welcome(string name) => "Welcome, " + name;
+        }
+        """;
+
+    internal const string WelcomeSource = """
+        namespace Alpha;
+
+        public interface IWelcome
+        {
+            string Welcome(string name);
+        }
+        """;
+
+    internal const string ProgramSource = """
+        using Alpha;
+
+        namespace Beta;
+
+        public static class Program
+        {
+            public static string Run() => new Greeter().Greet("world");
+        }
+        """;
+
+    internal const string BrokenSource = """
+        namespace Beta;
+
+        public static class Broken
+        {
+            public static int Count() => "not a number";
+        }
+        """;
+
+    internal const string ShouterSource = """
+        using Alpha;
+
+        namespace Beta;
+
+        public sealed class Shouter : Greeter
+        {
+            public string Shout(string name) => name.ToUpperInvariant();
+        }
+        """;
+
+    internal const string UnusedSource = """
+        namespace Beta;
+
+        public static class Unused
+        {
+            public static void Run()
+            {
+                int count = 1;
+            }
+        }
+        """;
+
+    internal static IReadOnlyList<(string Path, string Source)> Documents(string root) =>
+    [
+        (root + "/Alpha/Greeter.cs", GreeterSource),
+        (root + "/Alpha/IWelcome.cs", WelcomeSource),
+        (root + "/Beta/Program.cs", ProgramSource),
+        (root + "/Beta/Broken.cs", BrokenSource),
+        (root + "/Beta/Shouter.cs", ShouterSource),
+        (root + "/Beta/Unused.cs", UnusedSource),
+    ];
+
+    internal static Workspace TwoProjects() => Build(Root);
+
+    internal static Workspace Build(string root)
     {
         var workspace = new AdhocWorkspace();
         var alpha = ProjectId.CreateNewId("Alpha");
@@ -26,36 +104,16 @@ internal static class FixtureSolutions
         var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary);
         var solution = workspace.CurrentSolution
             .AddProject(ProjectInfo.Create(alpha, VersionStamp.Create(), "Alpha", "Alpha", LanguageNames.CSharp,
-                filePath: Root + "/Alpha/Alpha.csproj", compilationOptions: options, metadataReferences: Runtime))
+                filePath: root + "/Alpha/Alpha.csproj", compilationOptions: options, metadataReferences: Runtime))
             .AddProject(ProjectInfo.Create(beta, VersionStamp.Create(), "Beta", "Beta", LanguageNames.CSharp,
-                filePath: Root + "/Beta/Beta.csproj", compilationOptions: options, metadataReferences: Runtime,
-                projectReferences: [new ProjectReference(alpha)]))
-            .AddDocument(DocumentId.CreateNewId(alpha), "Greeter.cs", SourceText.From("""
-                namespace Alpha;
+                filePath: root + "/Beta/Beta.csproj", compilationOptions: options, metadataReferences: Runtime,
+                projectReferences: [new ProjectReference(alpha)]));
+        foreach (var (path, source) in Documents(root))
+        {
+            var project = path.Contains("/Alpha/", StringComparison.Ordinal) ? alpha : beta;
+            solution = solution.AddDocument(DocumentId.CreateNewId(project), System.IO.Path.GetFileName(path), SourceText.From(source), filePath: path);
+        }
 
-                public sealed class Greeter
-                {
-                    public string Greet(string name) => $"Hello, {name}";
-                }
-                """), filePath: GreeterPath)
-            .AddDocument(DocumentId.CreateNewId(beta), "Program.cs", SourceText.From("""
-                using Alpha;
-
-                namespace Beta;
-
-                public static class Program
-                {
-                    public static string Run() => new Greeter().Greet("world");
-                }
-                """), filePath: ProgramPath)
-            .AddDocument(DocumentId.CreateNewId(beta), "Broken.cs", SourceText.From("""
-                namespace Beta;
-
-                public static class Broken
-                {
-                    public static int Count() => "not a number";
-                }
-                """), filePath: BrokenPath);
         if (!workspace.TryApplyChanges(solution))
         {
             throw new InvalidOperationException("The adhoc fixture did not apply.");

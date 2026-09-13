@@ -55,7 +55,7 @@ public sealed class SolutionWorkspaceFacts
         using var workspace = await ReadyAsync();
         Assert.Equal(WorkspacePhase.Ready, workspace.Status.Phase);
         Assert.Equal(2, workspace.Status.ProjectCount);
-        Assert.Equal(3, workspace.Status.DocumentCount);
+        Assert.Equal(6, workspace.Status.DocumentCount);
         Assert.Null(workspace.Status.Detail);
     }
 
@@ -166,7 +166,7 @@ public sealed class SolutionWorkspaceFacts
         var map = await workspace.MapAsync(new(), TestContext.Current.CancellationToken);
         Assert.Equal(["Alpha", "Beta"], map.Projects.Select(project => project.Name).Order());
         Assert.Equal("Alpha", Assert.Single(map.Projects, project => project.Name == "Alpha").Cluster);
-        Assert.Equal(2, Assert.Single(map.Projects, project => project.Name == "Beta").DocumentCount);
+        Assert.Equal(4, Assert.Single(map.Projects, project => project.Name == "Beta").DocumentCount);
         var edge = Assert.Single(map.References);
         Assert.Equal(("Beta", "Alpha"), (edge.From, edge.To));
     }

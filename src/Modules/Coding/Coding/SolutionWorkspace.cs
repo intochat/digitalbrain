@@ -74,44 +74,46 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
         }
     }
 
-    public async Task<SymbolSearchResult> FindSymbolsAsync(SymbolSearch query, CancellationToken cancellationToken)
+    public async Task<T> QueryAsync<T>(Func<Solution, CancellationToken, Task<T>> query, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(query);
         using var lease = await AcquireAsync(cancellationToken).ConfigureAwait(false);
-        return await SolutionQueries.FindSymbolsAsync(lease.Solution, query, cancellationToken).ConfigureAwait(false);
+        return await query(lease.Solution, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<ReferenceSearchResult> ReferencesAsync(ReferenceSearch query, CancellationToken cancellationToken)
+    public async Task<T> QueryAsync<T>(Func<Solution, string, CancellationToken, Task<T>> query, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(query);
         using var lease = await AcquireAsync(cancellationToken).ConfigureAwait(false);
-        return await SolutionQueries.ReferencesAsync(lease.Solution, query, cancellationToken).ConfigureAwait(false);
+        return await query(lease.Solution, lease.SolutionPath ?? string.Empty, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<DiagnosticsResult> DiagnosticsAsync(DiagnosticsQuery query, CancellationToken cancellationToken)
-    {
-        using var lease = await AcquireAsync(cancellationToken).ConfigureAwait(false);
-        return await SolutionQueries.DiagnosticsAsync(lease.Solution, query, cancellationToken).ConfigureAwait(false);
-    }
+    public Task<SymbolSearchResult> FindSymbolsAsync(SymbolSearch query, CancellationToken cancellationToken)
+        => QueryAsync((solution, token) => SolutionQueries.FindSymbolsAsync(solution, query, token), cancellationToken);
 
-    public async Task<SolutionMap> MapAsync(MapQuery query, CancellationToken cancellationToken)
-    {
-        using var lease = await AcquireAsync(cancellationToken).ConfigureAwait(false);
-        return await SolutionQueries.MapAsync(lease.Solution, lease.SolutionPath ?? string.Empty, query, cancellationToken).ConfigureAwait(false);
-    }
+    public Task<ReferenceSearchResult> ReferencesAsync(ReferenceSearch query, CancellationToken cancellationToken)
+        => QueryAsync((solution, token) => SolutionQueries.ReferencesAsync(solution, query, token), cancellationToken);
+
+    public Task<DiagnosticsResult> DiagnosticsAsync(DiagnosticsQuery query, CancellationToken cancellationToken)
+        => QueryAsync((solution, token) => SolutionQueries.DiagnosticsAsync(solution, query, token), cancellationToken);
+
+    public Task<SolutionMap> MapAsync(MapQuery query, CancellationToken cancellationToken)
+        => QueryAsync((solution, solutionPath, token) => SolutionQueries.MapAsync(solution, solutionPath, query, token), cancellationToken);
 
     public Task<Skeleton> SkeletonAsync(SkeletonQuery query, CancellationToken cancellationToken)
-        => throw new NotSupportedException("phase 1 task 2");
+        => QueryAsync((solution, token) => SolutionQueries.SkeletonAsync(solution, query, token), cancellationToken);
 
     public Task<MemberSource> MemberAsync(MemberQuery query, CancellationToken cancellationToken)
-        => throw new NotSupportedException("phase 1 task 2");
+        => QueryAsync((solution, token) => SolutionQueries.MemberAsync(solution, query, token), cancellationToken);
 
     public Task<CallersResult> CallersAsync(CallersQuery query, CancellationToken cancellationToken)
-        => throw new NotSupportedException("phase 1 task 2");
+        => QueryAsync((solution, token) => SolutionQueries.CallersAsync(solution, query, token), cancellationToken);
 
     public Task<SymbolSearchResult> ImplementationsAsync(ImplementationsQuery query, CancellationToken cancellationToken)
-        => throw new NotSupportedException("phase 1 task 2");
+        => QueryAsync((solution, token) => SolutionQueries.ImplementationsAsync(solution, query, token), cancellationToken);
 
     public Task<SymbolSearchResult> DerivedAsync(DerivedQuery query, CancellationToken cancellationToken)
-        => throw new NotSupportedException("phase 1 task 2");
+        => QueryAsync((solution, token) => SolutionQueries.DerivedAsync(solution, query, token), cancellationToken);
 
     public void Dispose()
     {
