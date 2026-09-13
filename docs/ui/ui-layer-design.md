@@ -1,6 +1,6 @@
 # UI layer design (proposal, 2026-09-13)
 
-Status: **draft for ratification**. Nothing in this document is implemented. The evidence behind
+Status: **ratified 2026-09-13**; phase 0 has landed (section 7), phases 1 to 5 are not implemented. The evidence behind
 every claim is in `ui-layer-research.md` (section numbers are cited as R1.4, R2.5 and so on).
 
 ## 1. What this is for
@@ -317,7 +317,7 @@ Three tiers, all deterministic, the third gated:
 | Core client | eleven uncalled methods, `web_socket_channel`, `executables`, `ui_models.dart`, exported internals, two inline SSE loops | R2.4, R2.5 |
 | Kit | `UiView`, `UiSpecialistSuggestions`, `UiEditorFrame`, `uiCustoms`, `customMessageForPart`, chat builders and loaders, `onboarding/`, `three_graph_scene`, `forui`, `material_ui`, `three_js`, `flutter_chat_*` | R2.5 (decision points 4, 5) |
 | Shell | about 6,300 lines: `chat/` (minus the graph store and the typedef), `demos/`, `windowing/`, `onboarding/`, `activity_screen.dart`, `chat_screen.dart`, `brain_theme.dart`, unused assets, `flutter_svg`, `AgentChatApp` | R3.5 |
-| Shell tests | the three tests that only reach the deleted subtree; the ten copies of the persistence fake become one `test/support/memory_persistence.dart` | R3.7 |
+| Shell tests | the three tests that only reach the deleted subtree; the ten copies of the persistence fake become one `test/support/memory_workspace.dart` | R3.7 |
 
 Expected size after wave 1: shell from 12,946 to roughly 5,000 lines, kit from 8,939 to roughly
 6,000 with more components, core from 2,205 to roughly 1,800 with typed events and models.
@@ -342,9 +342,11 @@ Each has a default. Silence means the default.
    `flyer_chat_*` (the workspace overrides every builder and only uses the list), `flutter_svg` in
    the shell; keep `graphic` for charts, `gpt_markdown` for markdown, `markdraw` for diagrams
    (moved to the kit). Alternative: keep `flutter_chat_ui` and rebuild the builders on the registry.
-5. **Lumen visuals.** Default: keep `UiBrainGraph` (today's `LumenBrainGraph`) and `NeuronIcon`;
-   drop `InoPresence` and the Lumen controls (their consumers are deleted). Alternative: keep
-   `InoPresence` as a kit component with a fixture.
+5. **Lumen visuals.** Default: keep `UiBrainGraph` (today's `LumenBrainGraph`), `NeuronIcon`, and
+   the `InoPresence` and Lumen controls it renders with (they are reachable from `main.dart`
+   through the brain editor); phase 2 rebuilds the brain graph on tokens and drops what it no
+   longer needs then. Alternative: keep `InoPresence` as a standalone kit component with a
+   fixture.
 6. **New components in wave 1.** Default: `document` and `diagram` (promoted from the shell into
    real components with kernel neurons), `stat` (a `render_stats` tool for KPI tiles from query
    aggregates) and `dashboard` (a grid of part references, so "chart like a table" becomes a
@@ -365,8 +367,9 @@ plans once the contract exists.
    subtree, demos, windowing, onboarding, dead kit symbols, dead client methods and packages, the
    Transcript family, the chat HTTP routes (decision point 1). Tests that only covered deleted code
    go with it; the persistence fake is consolidated. Exit gate: suites green, `main.dart`
-   unchanged in behaviour, line counts in the research note updated. Done on 2026-09-13 (branch
-   feature/ui-phase0-remove-unreachable, commits a5fb62b2..8b22bab1 plus the outcome note).
+   unchanged in behaviour, line counts in the research note updated. Done on 2026-09-13 on branch
+   feature/ui-phase0-remove-unreachable (commits a5fb62b2 to 8b22bab1 inclusive, plus the outcome
+   note).
 1. **The contract.** C# `UiPart` records, `UiPartRef`, `UiToolError`, polymorphic JSON, tool
    results as parts, `IUiPartSource` and `/ui/parts`, cards as refs, the fixture fact and the
    fixture files. Dart core: the `UiPart` hierarchy, typed `AgentEvent`, one `SseDecoder`, the

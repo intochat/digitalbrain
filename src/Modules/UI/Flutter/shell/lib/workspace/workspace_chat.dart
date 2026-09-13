@@ -11,6 +11,7 @@ import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:uuid/uuid.dart';
 
+import '../integrations/integrations_menu.dart';
 import 'workspace_store.dart';
 
 part 'workspace_chat_presentation.dart';
@@ -34,7 +35,7 @@ class WorkspaceChat extends StatefulWidget {
   final WorkspaceProject? project;
   final bool active;
   final AgentRunner? onRun;
-  final Future<void> Function(Uri)? onOpenUrl;
+  final OpenUrl? onOpenUrl;
   final Future<bool> Function()? onSalesforceConnected;
   final void Function(Map<String, dynamic>) onArtifact;
   final VoidCallback onAttach;

@@ -52,7 +52,7 @@ jobs:
   flutter-web-build:
     name: Flutter analyze, test and web build
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     defaults:
       run:
         working-directory: src/Modules/UI/Flutter/shell

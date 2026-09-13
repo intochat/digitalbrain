@@ -7,6 +7,7 @@ import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 
+import '../integrations/integrations_menu.dart';
 import 'brain_graph_store.dart';
 import 'workspace_table_import.dart';
 import 'workspace_store.dart';
@@ -42,7 +43,7 @@ class WorkspaceApp extends StatefulWidget {
   final WorkspaceStore? store;
   final String persistenceKey;
   final AgentRunner? onRun;
-  final Future<void> Function(Uri)? onOpenUrl;
+  final OpenUrl? onOpenUrl;
   final Future<bool> Function()? onSalesforceConnected;
   final Uri? kernelBaseUri;
   final String? statusMessage;

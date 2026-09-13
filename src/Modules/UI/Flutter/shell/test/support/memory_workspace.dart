@@ -12,6 +12,7 @@ final class MemoryWorkspacePersistence implements WorkspacePersistence {
   @override
   Future<void> write(String data) async {
     if (failWrites) throw StateError('Device full');
+    // A microtask yield: widget tests must end with no pending timer.
     await null;
     value = data;
   }

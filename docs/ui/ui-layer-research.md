@@ -540,6 +540,8 @@ surface, activity, chat and entity-reader methods with their models. `AgentRunne
 `workspace/`. Tests: five shell files and two core files deleted, the persistence fake consolidated
 into `test/support/memory_workspace.dart`, the startup and table tool-result tests ported onto
 `WorkspaceApp`, and `ci.yml` now analyzes and tests the three Dart packages on every pull request.
+The final review also removed the graph controller, camera and layout files, whose last consumers
+went with the 3D scene.
 
 Line counts after phase 0: C# Contracts 909 / Module 1938 / Aspire.Hosting 1034; Dart core 1176
-(tests 318), ui 6564 (tests 629), shell 5613 (tests 2008).
+(tests 318), ui 6221 (tests 629), shell 5613 (tests 2008).
