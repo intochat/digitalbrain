@@ -15,6 +15,7 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
     private string? _solutionPath;
     private int _leases;
     private bool _disposed;
+    private long _generation;
 
     public WorkspaceStatus Status
     {
@@ -29,6 +30,8 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
 
     // Design section 4.2: semantic queries run at most two at a time.
     internal int AvailableQuerySlots => _queryGate.CurrentCount;
+
+    public long Generation => Interlocked.Read(ref _generation);
 
     // Starts the load and returns at once; the returned task completes with the load and never faults.
     public Task BeginOpenAsync(string solutionPath)
@@ -86,6 +89,39 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
         ArgumentNullException.ThrowIfNull(query);
         using var lease = await AcquireAsync(cancellationToken).ConfigureAwait(false);
         return await query(lease.Solution, lease.SolutionPath ?? string.Empty, cancellationToken).ConfigureAwait(false);
+    }
+
+    // One lease around the whole transaction: the change is computed on the leased snapshot, applied through
+    // TryApplyChanges, and only then written to disk document by document. TryApplyChanges refuses a snapshot
+    // the workspace has moved past, so a fold or a reload between check and commit cannot be overwritten.
+    public async Task<CommitOutcome> CommitAsync(Func<Solution, CancellationToken, Task<Solution>> change, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        using var lease = await AcquireAsync(cancellationToken).ConfigureAwait(false);
+        var changed = await change(lease.Solution, cancellationToken).ConfigureAwait(false);
+        var documents = changed.GetChanges(lease.Solution).GetProjectChanges()
+            .SelectMany(project => project.GetChangedDocuments().Select(id => changed.GetDocument(id)!))
+            .OrderBy(static document => document.FilePath, StringComparer.Ordinal)
+            .ToArray();
+        if (!lease.Workspace.TryApplyChanges(changed))
+        {
+            throw new InvalidOperationException("The workspace changed while the change set was being checked. Check it again before committing.");
+        }
+
+        var written = new List<string>();
+        foreach (var document in documents)
+        {
+            var path = document.FilePath ?? throw new InvalidOperationException($"Document '{document.Name}' has no file path to write to.");
+            var text = (await document.GetTextAsync(cancellationToken).ConfigureAwait(false)).ToString();
+            if (!File.Exists(path) || !string.Equals(await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false), text, StringComparison.Ordinal))
+            {
+                await File.WriteAllTextAsync(path, text, cancellationToken).ConfigureAwait(false);
+            }
+
+            written.Add(path);
+        }
+
+        return new CommitOutcome(written, Interlocked.Increment(ref _generation));
     }
 
     public Task<SymbolSearchResult> FindSymbolsAsync(SymbolSearch query, CancellationToken cancellationToken)
@@ -181,7 +217,7 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
                 }
 
                 _leases++;
-                return new Lease(this, workspace.CurrentSolution, _solutionPath);
+                return new Lease(this, workspace, workspace.CurrentSolution, _solutionPath);
             }
         }
         catch
@@ -297,8 +333,10 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
         }
     }
 
-    private readonly struct Lease(SolutionWorkspace owner, Solution solution, string? solutionPath) : IDisposable
+    private readonly struct Lease(SolutionWorkspace owner, Workspace workspace, Solution solution, string? solutionPath) : IDisposable
     {
+        public Workspace Workspace { get; } = workspace;
+
         public Solution Solution { get; } = solution;
 
         public string? SolutionPath { get; } = solutionPath;

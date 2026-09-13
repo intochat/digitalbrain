@@ -60,7 +60,6 @@ internal static class SolutionQueries
     internal static async Task<DiagnosticsResult> DiagnosticsAsync(Solution solution, DiagnosticsQuery query, CancellationToken cancellationToken)
     {
         var limit = ClampLimit(query.Limit);
-        List<(Diagnostic Diagnostic, string FallbackPath)> diagnostics;
         if (!string.IsNullOrWhiteSpace(query.Path))
         {
             var path = query.Path;
@@ -68,23 +67,37 @@ internal static class SolutionQueries
                 ?? throw new InvalidOperationException($"No document at '{path}' is in the solution. Use a path from find-symbols.");
             var model = await solution.GetDocument(id)!.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false)
                 ?? throw new InvalidOperationException($"'{path}' has no semantic model.");
-            diagnostics = [.. model.GetDiagnostics(cancellationToken: cancellationToken).Select(diagnostic => (diagnostic, path))];
-        }
-        else
-        {
-            var projects = string.IsNullOrWhiteSpace(query.Project)
-                ? solution.Projects
-                : solution.Projects.Where(project => string.Equals(project.Name, query.Project, StringComparison.OrdinalIgnoreCase));
-            diagnostics = [];
-            foreach (var project in projects)
-            {
-                var compilation = await project.GetCompilationAsync(cancellationToken).ConfigureAwait(false)
-                    ?? throw new InvalidOperationException($"Project '{project.Name}' has no compilation.");
-                var fallbackPath = project.FilePath ?? project.Name;
-                diagnostics.AddRange(compilation.GetDiagnostics(cancellationToken).Select(diagnostic => (diagnostic, fallbackPath)));
-            }
+            var diagnostics = model.GetDiagnostics(cancellationToken: cancellationToken).Select(diagnostic => (diagnostic, path));
+            return DiagnosticsResultFrom(diagnostics, limit);
         }
 
+        var projectIds = (string.IsNullOrWhiteSpace(query.Project)
+                ? solution.Projects
+                : solution.Projects.Where(project => string.Equals(project.Name, query.Project, StringComparison.OrdinalIgnoreCase)))
+            .Select(static project => project.Id)
+            .ToArray();
+        return await ProjectDiagnosticsAsync(solution, projectIds, limit, cancellationToken).ConfigureAwait(false);
+    }
+
+    // Shared with ChangeSetEditor, which diagnoses only the projects a change set touched (and their dependents)
+    // rather than the whole solution.
+    internal static async Task<DiagnosticsResult> ProjectDiagnosticsAsync(Solution solution, IReadOnlyCollection<ProjectId> projects, int limit, CancellationToken cancellationToken)
+    {
+        var diagnostics = new List<(Diagnostic Diagnostic, string FallbackPath)>();
+        foreach (var id in projects)
+        {
+            var project = solution.GetProject(id) ?? throw new InvalidOperationException($"Project '{id}' is not in the solution.");
+            var compilation = await project.GetCompilationAsync(cancellationToken).ConfigureAwait(false)
+                ?? throw new InvalidOperationException($"Project '{project.Name}' has no compilation.");
+            var fallbackPath = project.FilePath ?? project.Name;
+            diagnostics.AddRange(compilation.GetDiagnostics(cancellationToken).Select(diagnostic => (diagnostic, fallbackPath)));
+        }
+
+        return DiagnosticsResultFrom(diagnostics, limit);
+    }
+
+    private static DiagnosticsResult DiagnosticsResultFrom(IEnumerable<(Diagnostic Diagnostic, string FallbackPath)> diagnostics, int limit)
+    {
         var hits = diagnostics
             .Where(static entry => entry.Diagnostic.Severity >= DiagnosticSeverity.Warning)
             .Select(static entry => DiagnosticHitFrom(entry.Diagnostic, entry.FallbackPath))
@@ -295,7 +308,7 @@ internal static class SolutionQueries
                 diagnostic.Location.SourceTree!.FilePath, diagnostic.Location.GetLineSpan().StartLinePosition.Line + 1)
             : new DiagnosticHit(diagnostic.Id, diagnostic.Severity.ToString(), diagnostic.GetMessage(), fallbackPath, 0);
 
-    private static async Task<ISymbol> ResolveAsync(Solution solution, string symbolId, CancellationToken cancellationToken)
+    internal static async Task<ISymbol> ResolveAsync(Solution solution, string symbolId, CancellationToken cancellationToken)
     {
         foreach (var project in solution.Projects)
         {

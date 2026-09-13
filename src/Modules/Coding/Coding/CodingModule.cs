@@ -16,6 +16,7 @@ public sealed class CodingModule : IModule
         builder.Services.TryAddSingleton<CodingModule>();
         builder.Services.TryAddSingleton<SolutionWorkspace>();
         builder.Services.TryAddSingleton<ISolutionLoader, MSBuildSolutionLoader>();
+        builder.Services.TryAddSingleton<ChangeSetEditor>();
         builder.Services.AddHostedService<WorkspaceWarmup>();
 
         builder.Services.AddSingleton<CodingNativeTools>();
