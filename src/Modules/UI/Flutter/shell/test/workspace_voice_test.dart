@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:digitalbrain_flutter_shell/chat/voice_file_io.dart';
+import 'package:digitalbrain_flutter_shell/workspace/voice_file_io.dart';
 import 'package:digitalbrain_flutter_shell/workspace/workspace_voice.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

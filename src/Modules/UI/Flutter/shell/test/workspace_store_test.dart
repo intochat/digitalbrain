@@ -3,22 +3,11 @@ import 'dart:convert';
 import 'package:digitalbrain_flutter_shell/workspace/workspace_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-class MemoryPersistence implements WorkspacePersistence {
-  String? value;
-  bool fail = false;
-  @override
-  Future<String?> read() async => value;
-  @override
-  Future<void> write(String value) async {
-    if (fail) throw StateError('Device full');
-    await Future<void>.delayed(Duration.zero);
-    this.value = value;
-  }
-}
+import 'support/memory_workspace.dart';
 
 void main() {
   test('opening, minimizing, closing and switching agent preserve explicit context', () async {
-    final store = WorkspaceStore(persistence: MemoryPersistence());
+    final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
     await store.load();
     store.addArtifact(
       WorkspaceArtifact(id: 'table', title: 'My table', kind: 'table'),
@@ -40,7 +29,7 @@ void main() {
   });
 
   test('round trip restores projects, transcript, editor state and layout independently', () async {
-    final disk = MemoryPersistence();
+    final disk = MemoryWorkspacePersistence();
     final store = WorkspaceStore(persistence: disk);
     await store.load();
     final originalProjectId = store.currentProject.id;
@@ -94,7 +83,7 @@ void main() {
   test(
     'serialized writes retain newest changes and report save failures',
     () async {
-      final disk = MemoryPersistence();
+      final disk = MemoryWorkspacePersistence();
       final store = WorkspaceStore(persistence: disk);
       await store.load();
       store.setLayout('tabs');
@@ -104,10 +93,10 @@ void main() {
         jsonDecode(disk.value!)['projects'][0]['presentation']['layout'],
         'compare',
       );
-      disk.fail = true;
+      disk.failWrites = true;
       await store.save();
       expect(store.persistenceError, isNotNull);
-      disk.fail = false;
+      disk.failWrites = false;
       await store.save();
       expect(store.persistenceError, isNull);
     },
@@ -116,7 +105,7 @@ void main() {
   test(
     'corrupt storage is preserved on load and produces a recoverable workspace',
     () async {
-      final disk = MemoryPersistence()..value = 'broken json';
+      final disk = MemoryWorkspacePersistence()..value = 'broken json';
       final store = WorkspaceStore(persistence: disk);
       await store.load();
       expect(store.persistenceError, isNotNull);

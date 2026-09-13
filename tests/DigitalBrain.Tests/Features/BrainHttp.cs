@@ -1,4 +1,3 @@
-using DigitalBrain.AI;
 using DigitalBrain.Core;
 using DigitalBrain.Kernel;
 using DigitalBrain.Testing;
@@ -48,18 +47,12 @@ internal sealed class BrainHttp : IAsyncDisposable
         {
             builder.Services.AddSingleton(tables);
         }
-        if (brain.SiloServices.GetService<IAudioTranscriptionService>() is { } transcription)
-        {
-            builder.Services.AddSingleton(transcription);
-        }
 
         var app = builder.Build();
         try
         {
             app.UseBasicAuthGate();
             app.UseSessionNeuron();
-            app.MapChatEndpoints();
-            app.MapChatVoiceEndpoints();
             app.MapSurfaceEndpoints();
             app.MapUiEndpoints();
             app.MapActivityEndpoints();

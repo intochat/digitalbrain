@@ -67,7 +67,7 @@ internal static class FlutterHostLaunch
         Microsoft.Extensions.Configuration.IConfiguration? configuration)
     {
         var deviceTarget = string.IsNullOrWhiteSpace(options.DeviceTarget)
-            ? ShellHostingExtensions.DefaultDeviceTarget
+            ? ShellNames.DefaultDeviceTarget
             : options.DeviceTarget;
         var workDir = ResolveWindowPackageDirectory(packageRoot, deviceTarget)
             ?? throw new InvalidOperationException(
@@ -88,18 +88,18 @@ internal static class FlutterHostLaunch
         FlutterHostOptions options,
         Microsoft.Extensions.Configuration.IConfiguration? configuration)
     {
-        var entry = Path.Combine(packageRoot, ShellHostingExtensions.HeadlessHostEntry.Replace('/', Path.DirectorySeparatorChar));
+        var entry = Path.Combine(packageRoot, ShellNames.HeadlessHostEntry.Replace('/', Path.DirectorySeparatorChar));
         if (!File.Exists(entry))
         {
             throw new InvalidOperationException(
-                $"Headless Flutter host needs '{ShellHostingExtensions.HeadlessHostEntry}' under '{packageRoot}'. " +
+                $"Headless Flutter host needs '{ShellNames.HeadlessHostEntry}' under '{packageRoot}'. " +
                 $"Use {nameof(ShellHostingExtensions.WithWindowHost)}() for Windows chrome under shell/.");
         }
 
         return new Result(
             ResolveDartCommand(options, configuration),
             packageRoot,
-            ["run", ShellHostingExtensions.HeadlessHostEntry]);
+            ["run", ShellNames.HeadlessHostEntry]);
     }
 
     private static string? ResolveWebPackageDirectory(string packageRoot)
@@ -132,9 +132,9 @@ internal static class FlutterHostLaunch
         var deviceTarget = string.IsNullOrWhiteSpace(options.DeviceTarget)
             || string.Equals(
                 options.DeviceTarget,
-                ShellHostingExtensions.DefaultDeviceTarget,
+                ShellNames.DefaultDeviceTarget,
                 StringComparison.OrdinalIgnoreCase)
-            ? ShellHostingExtensions.DefaultWebDeviceTarget
+            ? ShellNames.DefaultWebDeviceTarget
             : options.DeviceTarget;
         var workDir = ResolveWebPackageDirectory(packageRoot)
             ?? throw new InvalidOperationException(
@@ -185,10 +185,10 @@ internal static class FlutterHostLaunch
             return false;
         }
 
-        return Directory.Exists(Path.Combine(workingDirectory, ShellHostingExtensions.WebPlatformDirectoryName))
+        return Directory.Exists(Path.Combine(workingDirectory, ShellNames.WebPlatformDirectoryName))
             && File.Exists(Path.Combine(
                 workingDirectory,
-                ShellHostingExtensions.WebPlatformDirectoryName,
+                ShellNames.WebPlatformDirectoryName,
                 "index.html"));
     }
 
@@ -210,7 +210,7 @@ internal static class FlutterHostLaunch
 
         if (TryConfiguredCommand(
                 Environment.GetEnvironmentVariable(
-                    ShellHostingExtensions.FlutterCommandEnvironmentVariable),
+                    ShellNames.FlutterCommandEnvironmentVariable),
                 out var fromEnv))
         {
             return fromEnv;
@@ -242,7 +242,7 @@ internal static class FlutterHostLaunch
 
         if (TryConfiguredCommand(
                 Environment.GetEnvironmentVariable(
-                    ShellHostingExtensions.DartCommandEnvironmentVariable),
+                    ShellNames.DartCommandEnvironmentVariable),
                 out var fromEnv))
         {
             return fromEnv;

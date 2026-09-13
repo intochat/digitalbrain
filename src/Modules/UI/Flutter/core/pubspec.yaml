@@ -1,8 +1,7 @@
 name: digitalbrain_flutter
 description: >
-  DigitalBrain pure-Dart edge/SSE/projection + headless bin/digitalbrain_host.dart.
-  Lives at clients/flutter/core. Windows Material chrome lives in clients/flutter/shell.
-  Never Orleans, never MCP-as-UI.
+  DigitalBrain kernel client for the Flutter shell: AG-UI runs, tables,
+  workspace artifacts, brain observation. Never Orleans, never MCP-as-UI.
 publish_to: none
 version: 0.1.0
 
@@ -14,11 +13,7 @@ resolution: workspace
 dependencies:
   http: ^1.6.0
   uuid: ^4.6.0
-  web_socket_channel: ^3.0.3
 
 dev_dependencies:
   lints: ^6.1.0
   test: ^1.26.0
-
-executables:
-  digitalbrain_host:

@@ -2,34 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:forui/forui.dart';
 
-class UiSpecialistSuggestions extends StatelessWidget {
-  const UiSpecialistSuggestions({super.key, required this.onStart});
-  final ValueChanged<UiSpecialist> onStart;
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        'Start something new',
-        style: Theme.of(context).textTheme.titleSmall,
-      ),
-      const SizedBox(height: 14),
-      Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        children: [
-          for (final specialist in uiSpecialists)
-            ActionChip(
-              avatar: Icon(specialist.icon, size: 18),
-              label: Text(specialist.name),
-              onPressed: () => onStart(specialist),
-            ),
-        ],
-      ),
-    ],
-  );
-}
-
 @immutable
 class UiSpecialist {
   const UiSpecialist(

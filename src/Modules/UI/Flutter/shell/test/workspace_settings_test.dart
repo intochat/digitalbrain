@@ -4,19 +4,11 @@ import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-class _Storage implements WorkspacePersistence {
-  String? value;
-  @override
-  Future<String?> read() async => value;
-  @override
-  Future<void> write(String value) async {
-    this.value = value;
-  }
-}
+import 'support/memory_workspace.dart';
 
 void main() {
   testWidgets('profile save persists edited preferences', (tester) async {
-    final disk = _Storage();
+    final disk = MemoryWorkspacePersistence();
     final store = WorkspaceStore(persistence: disk);
     await store.load();
     await tester.pumpWidget(
@@ -35,7 +27,7 @@ void main() {
   });
 
   testWidgets('developer tools opens actual gallery route', (tester) async {
-    final store = WorkspaceStore(persistence: _Storage());
+    final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
     await tester.pumpWidget(
       MaterialApp(
         home: WorkspaceSettings(
@@ -56,7 +48,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final store = WorkspaceStore(persistence: _Storage());
+    final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
     await tester.pumpWidget(
       MaterialApp(
         home: WorkspaceSettings(

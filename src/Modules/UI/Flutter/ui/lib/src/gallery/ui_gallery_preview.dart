@@ -13,14 +13,10 @@ import '../components/chart/ui_chart.dart';
 import '../components/clock/ui_clock.dart';
 import '../components/graph/graph_models.dart';
 import '../components/graph/ui_graph.dart';
-import '../components/graph/ui_graph_controller.dart';
-import '../components/graph/ui_graph_navigator.dart';
-import '../components/graph/ui_graph_view.dart';
 import '../components/image/ui_image.dart';
 import '../components/sheet/ui_sheet.dart';
 import '../components/table/ui_data_table.dart';
 import '../components/table/ui_table_controller.dart';
-import '../components/view/ui_view.dart';
 import '../lumen/ino_presence.dart';
 import '../lumen/lumen_brain_graph.dart';
 import '../lumen/lumen_controls.dart';
@@ -171,17 +167,6 @@ const galleryEntries = [
     ['Normal', 'Disabled'],
   ),
   GalleryEntry(
-    'view',
-    'Interactive view',
-    'Inputs & actions',
-    Icons.calculate_outlined,
-    'A kind-bound surface with a calculator keypad and spreadsheet view.',
-    'UiView(kind: …, display: …, phase: …, onKey: …)',
-    'Keys update the local display and report the pressed key. Calculation belongs to the host; this preview does not evaluate expressions.',
-    ['Normal', 'Disabled', 'Spreadsheet'],
-    true,
-  ),
-  GalleryEntry(
     'chat',
     'Chat & rich text',
     'Content',
@@ -277,15 +262,6 @@ const galleryEntries = [
     'This is a fixture snapshot. Select a neuron or relationship to inspect it locally. Stale uses the renderer’s disconnected presentation.',
     ['Normal', 'Empty', 'Stale'],
   ),
-  GalleryEntry(
-    'graph-3d',
-    'Spatial graph',
-    'Graphs',
-    Icons.view_in_ar_outlined,
-    'The WebGL graph and its shared navigation controller.',
-    'UiGraphView(controller: …)\nUiGraphNavigator(controller: …)',
-    'Launch the actual renderer on demand. Drag to orbit, scroll to zoom, and select nodes to focus. Requires a graphics-capable host; no replacement renderer is used.',
-  ),
 ];
 
 final class GalleryPreview extends StatefulWidget {
@@ -313,10 +289,9 @@ final class _GalleryPreviewState extends State<GalleryPreview> {
       ),
     ],
   );
-  final _graph = UiGraphController(nodes: _nodes, edges: _edges);
-  bool _checked = true, _switched = false, _launched = false;
+  bool _checked = true, _switched = false;
   int _count = 0;
-  String _display = '42', _lastAction = 'Select a sample to inspect it.';
+  String _lastAction = 'Select a sample to inspect it.';
   DateTime _due = DateTime.now().toUtc().add(const Duration(minutes: 1));
   static const _nodes = [
     GraphNode(id: 'ino', label: 'IntoCaht', kind: GraphNodeKind.hub),
@@ -339,7 +314,6 @@ final class _GalleryPreviewState extends State<GalleryPreview> {
   void dispose() {
     _draft.dispose();
     _chat.dispose();
-    _graph.dispose();
     super.dispose();
   }
 
@@ -436,18 +410,6 @@ final class _GalleryPreviewState extends State<GalleryPreview> {
   );
   void _action() => setState(() => _count++);
   bool get _disabled => _state == 'Disabled';
-  void _key(String key) => setState(() {
-    _lastAction = 'Pressed $key';
-    if (key == 'C' || key == 'CE') {
-      _display = '0';
-    } else if (key == 'BS') {
-      _display = _display.length <= 1
-          ? '0'
-          : _display.substring(0, _display.length - 1);
-    } else if (RegExp(r'^[0-9.]$').hasMatch(key) && _display.length < 12) {
-      _display = _display == '0' ? key : '$_display$key';
-    }
-  });
   Widget _example() {
     switch (widget.entry.id) {
       case 'lumen':
@@ -694,15 +656,6 @@ final class _GalleryPreviewState extends State<GalleryPreview> {
         );
       case 'data-table':
         return _DataTablePreview(key: ValueKey(_state), state: _state);
-      case 'view':
-        return _stack([
-          UiView(
-            kind: _state == 'Spreadsheet' ? 'spreadsheet' : 'calculator',
-            display: _display,
-            onKey: _disabled ? null : _key,
-          ),
-          Text(_lastAction, style: UiType.bodyMuted),
-        ]);
       case 'clock':
         return Center(
           child: UiClock(
@@ -804,38 +757,6 @@ final class _GalleryPreviewState extends State<GalleryPreview> {
           ),
           Text(_lastAction),
         ]);
-      case 'graph-3d':
-        return !_launched
-            ? _stack([
-                const Icon(
-                  Icons.view_in_ar_outlined,
-                  size: 60,
-                  color: LumenPalette.accent,
-                ),
-                const Text(
-                  'Explore a spatial network',
-                  textAlign: TextAlign.center,
-                ),
-                Center(
-                  child: LumenActionButton(
-                    label: 'Launch 3D preview',
-                    primary: true,
-                    onPressed: () => setState(() => _launched = true),
-                  ),
-                ),
-              ])
-            : SizedBox(
-                height: 380,
-                child: ColoredBox(
-                  color: UiPalette.surface,
-                  child: Column(
-                    children: [
-                      Expanded(child: UiGraphView(controller: _graph)),
-                      UiGraphNavigator(controller: _graph),
-                    ],
-                  ),
-                ),
-              );
       default:
         return const SizedBox.shrink();
     }
