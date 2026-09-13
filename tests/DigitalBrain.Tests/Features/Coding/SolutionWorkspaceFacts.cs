@@ -30,6 +30,18 @@ public sealed class SolutionWorkspaceFacts
     }
 
     [Fact]
+    public async Task A_malformed_solution_path_does_not_stop_the_silo()
+    {
+        await using var brain = await BrainSimulation.StartAsync(new()
+        {
+            Modules = new([typeof(CodingModule)]),
+            ConfigureSilo = silo => silo.Services.AddSingleton<ISolutionLoader>(new AdhocSolutionLoader(FixtureSolutions.TwoProjects)),
+            Configuration = new Dictionary<string, string?> { [CodingModule.SolutionPathKey] = "E:/fixture/bad\0path.slnx" },
+        });
+        Assert.Equal(WorkspacePhase.NotOpened, brain.SiloServices.GetRequiredService<SolutionWorkspace>().Status.Phase);
+    }
+
+    [Fact]
     public void A_fresh_workspace_is_not_opened()
     {
         using var workspace = new SolutionWorkspace(new AdhocSolutionLoader(FixtureSolutions.TwoProjects), TimeProvider.System, NullLogger<SolutionWorkspace>.Instance);
