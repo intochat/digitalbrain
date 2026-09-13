@@ -1,6 +1,7 @@
 using DigitalBrain.Coding;
 using DigitalBrain.Testing;
 using Microsoft.CodeAnalysis;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -19,7 +20,11 @@ public sealed class SolutionWorkspaceFacts
     [Fact]
     public async Task The_coding_module_composes_into_a_silo()
     {
-        await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([typeof(CodingModule)]) });
+        await using var brain = await BrainSimulation.StartAsync(new()
+        {
+            Modules = new([typeof(CodingModule)]),
+            ConfigureSilo = silo => silo.Services.AddSingleton<ISolutionLoader>(new AdhocSolutionLoader(FixtureSolutions.TwoProjects)),
+        });
         Assert.NotNull(brain.SiloServices.GetService(typeof(SolutionWorkspace)));
     }
 
