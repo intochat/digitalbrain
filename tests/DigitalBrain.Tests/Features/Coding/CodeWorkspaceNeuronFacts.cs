@@ -69,6 +69,24 @@ public sealed class CodeWorkspaceNeuronFacts
     }
 
     [Fact]
+    public async Task A_warmed_solution_reads_ready_before_any_open()
+    {
+        await using var brain = await BrainSimulation.StartAsync(new()
+        {
+            Modules = new([typeof(CodingModule)]),
+            ConfigureSilo = silo => silo.Services.AddSingleton<ISolutionLoader>(new AdhocSolutionLoader(FixtureSolutions.TwoProjects)),
+            Configuration = new Dictionary<string, string?> { [CodingModule.SolutionPathKey] = "E:/fixture/Fixture.slnx" },
+        });
+        await brain.SiloServices.GetRequiredService<SolutionWorkspace>().WhenReadyAsync(TestContext.Current.CancellationToken);
+        var workspace = brain.Grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType, "fixture").ToGrainId());
+        var snapshot = await workspace.Read();
+        Assert.Equal(WorkspacePhase.Ready, snapshot.Phase);
+        Assert.Equal(2, snapshot.ProjectCount);
+        Assert.Equal(0, snapshot.Generation);
+        Assert.Equal(Path.GetFullPath("E:/fixture/Fixture.slnx"), snapshot.SolutionPath);
+    }
+
+    [Fact]
     public async Task Open_is_accepted_and_the_workspace_becomes_ready()
     {
         await using var brain = await StartAsync();

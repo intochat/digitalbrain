@@ -49,8 +49,7 @@ internal sealed class WorkspaceNeuron(
     public Task<WorkspaceSnapshot> Read()
     {
         var live = workspace.Status;
-        var phase = State is null ? WorkspacePhase.NotOpened : live.Phase;
-        return Task.FromResult(new WorkspaceSnapshot(State?.SolutionPath, phase, live.ProjectCount, live.DocumentCount, live.Detail, State?.Generation ?? 0));
+        return Task.FromResult(new WorkspaceSnapshot(State?.SolutionPath ?? live.SolutionPath, live.Phase, live.ProjectCount, live.DocumentCount, live.Detail, State?.Generation ?? 0));
     }
 
     [ReadOnly]
