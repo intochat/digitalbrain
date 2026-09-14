@@ -5,11 +5,11 @@ Read this file and `NOTES.md` first after a context reset; resume from the curre
 | Field | Value |
 |---|---|
 | Current phase | 1 (edits as transactions), branch `feature/coding-phase1-changesets` from phase 0 |
-| Current branch | `feature/coding-phase0-workspace` (from `master` at `1e4b395d`) |
+| Current branch | `feature/coding-phase1-changesets` (from `feature/coding-phase0-workspace`, which is from `master` at `1e4b395d`) |
 | Plan | `docs/coding/plans/2026-09-14-coding-phase1-changesets.md` (phase 0: `plans/2026-09-13-coding-phase0-workspace.md`) |
-| Current task | Phase 1 Task 6 (watcher, reload flag, durable map) in progress; Tasks 1-5 complete |
-| Last green gate | `6427778d` (2026-09-14): format + build 0 warnings + `dotnet test DigitalBrain.slnx` 364 passed, 5 skipped, 0 failed |
-| Last commit | `6427778d` coding: the changeset neuron keeps ConfigureAwait(true) throughout |
+| Current task | Phase 1 Task 7 (dotnet and git runners) in progress; Tasks 1-6 complete |
+| Last green gate | `7e4740f6` (2026-09-14): format + build 0 warnings + `dotnet test DigitalBrain.slnx` 370 passed, 5 skipped, 0 failed |
+| Last commit | `7e4740f6` coding: the watcher, warmup and mapping loop fail loudly and stop cleanly |
 | Open PRs | #91 phase 0 (https://github.com/intochat/digitalbrain/pull/91) |
 
 ## Phase ledger
@@ -17,7 +17,7 @@ Read this file and `NOTES.md` first after a context reset; resume from the curre
 | Phase | Branch | Status | PR |
 |---|---|---|---|
 | 0 workspace and map | `feature/coding-phase0-workspace` | complete, PR open | #91 |
-| 1 edits as transactions | `feature/coding-phase1-changesets` | in progress (task 6 of 9) | — |
+| 1 edits as transactions | `feature/coding-phase1-changesets` | in progress (task 7 of 9) | — |
 | 2 slots | — | not started | — |
 | 3 swarm | — | not started | — |
 | 4 learning | — | not started | — |
