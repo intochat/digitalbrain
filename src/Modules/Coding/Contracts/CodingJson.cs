@@ -13,6 +13,7 @@ namespace DigitalBrain.Coding;
 [JsonSerializable(typeof(WorkspaceReceipt))]
 [JsonSerializable(typeof(Accepted<WorkspaceReceipt>))]
 [JsonSerializable(typeof(OpeningBody))]
+[JsonSerializable(typeof(MappingBody))]
 [JsonSerializable(typeof(WorkspacePhase))]
 [JsonSerializable(typeof(WorkspaceSnapshot))]
 [JsonSerializable(typeof(SymbolSearch))]

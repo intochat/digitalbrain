@@ -2,6 +2,8 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Core;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
@@ -14,6 +16,10 @@ internal sealed class WorkspaceNeuron(
     SolutionWorkspace workspace)
     : Neuron<WorkspaceState>(runtime, state), ICodeWorkspace
 {
+    // 600 attempts at the reaction's 1s wait is ten minutes; long enough for any real load, bounded so a
+    // solution that never becomes ready cannot keep re-scheduling this reaction forever.
+    private const int MaxMappingAttempts = 600;
+
     public Task<Accepted<WorkspaceReceipt>> Open(OpenWorkspace command) => ExecuteCommandAsync(
         Descriptor("open"), command, CodingJson.Default.OpenWorkspace, CodingJson.Default.AcceptedWorkspaceReceipt, arguments =>
         {
@@ -109,7 +115,7 @@ internal sealed class WorkspaceNeuron(
                     // The load runs in the service; the reaction only records the request so a restart re-opens.
                     // The previous LastMap carries forward: a reload in flight still answers Map() from the last good snapshot.
                     _ = workspace.BeginOpenAsync(body.SolutionPath);
-                    Schedule(Signal.Create(CodingVocabulary.WorkspaceMapping, "{}"));
+                    Schedule(Signal.FromJson(CodingVocabulary.WorkspaceMapping, new MappingBody(0), CodingJson.Default.MappingBody));
                     await SaveAsync(new WorkspaceState(body.SolutionPath, (State?.Generation ?? 0) + 1, TimeProvider.GetUtcNow(), State?.LastMap), cancellationToken).ConfigureAwait(true);
                     break;
                 }
@@ -122,7 +128,7 @@ internal sealed class WorkspaceNeuron(
                     }
 
                     _ = workspace.Status.Phase == WorkspacePhase.NotOpened ? workspace.BeginOpenAsync(path) : workspace.BeginReloadAsync();
-                    Schedule(Signal.Create(CodingVocabulary.WorkspaceMapping, "{}"));
+                    Schedule(Signal.FromJson(CodingVocabulary.WorkspaceMapping, new MappingBody(0), CodingJson.Default.MappingBody));
                     await SaveAsync(new WorkspaceState(path, (State?.Generation ?? 0) + 1, TimeProvider.GetUtcNow(), State?.LastMap), cancellationToken).ConfigureAwait(true);
                     break;
                 }
@@ -133,16 +139,21 @@ internal sealed class WorkspaceNeuron(
                         return;
                     }
 
+                    var attempt = Body(delivery, CodingJson.Default.MappingBody)?.Attempt ?? 0;
                     switch (workspace.Status.Phase)
                     {
                         case WorkspacePhase.Ready:
                             var map = await workspace.MapAsync(new MapQuery(), cancellationToken).ConfigureAwait(true);
                             await SaveAsync(current with { LastMap = map }, cancellationToken).ConfigureAwait(true);
                             break;
-                        case WorkspacePhase.Opening:
+                        case WorkspacePhase.Opening when attempt < MaxMappingAttempts:
                             // One bounded wait per reaction keeps reads flowing; the next reaction looks again.
                             await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken).ConfigureAwait(true);
-                            Schedule(Signal.Create(CodingVocabulary.WorkspaceMapping, "{}"));
+                            Schedule(Signal.FromJson(CodingVocabulary.WorkspaceMapping, new MappingBody(attempt + 1), CodingJson.Default.MappingBody));
+                            break;
+                        case WorkspacePhase.Opening:
+                            ServiceProvider.GetService<ILogger<WorkspaceNeuron>>()?.LogDebug(
+                                "Gave up caching the map for {SolutionPath} after {Attempts} attempts; the solution is still opening.", current.SolutionPath, attempt);
                             break;
                         default:
                             break;

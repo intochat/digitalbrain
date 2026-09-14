@@ -14,6 +14,7 @@ public sealed class SolutionFileWatcher(SolutionWorkspace workspace, ILogger<Sol
     private FileSystemWatcher? _watcher;
     private CancellationTokenSource? _loop;
     private string? _directory;
+    private bool _disposed;
 
     public static bool IsIgnored(string path)
     {
@@ -26,17 +27,23 @@ public sealed class SolutionFileWatcher(SolutionWorkspace workspace, ILogger<Sol
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
         lock (_gate)
         {
-            if (string.Equals(_directory, directory, StringComparison.OrdinalIgnoreCase) || !Directory.Exists(directory))
+            if (_disposed || string.Equals(_directory, directory, StringComparison.OrdinalIgnoreCase) || !Directory.Exists(directory))
             {
                 return;
             }
 
             StopCore();
             _directory = directory;
-            _watcher = new FileSystemWatcher(directory) { IncludeSubdirectories = true, NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName };
+            _watcher = new FileSystemWatcher(directory) { IncludeSubdirectories = true, InternalBufferSize = 64 * 1024, NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName };
             _watcher.Changed += (_, args) => Enqueue(args.FullPath);
             _watcher.Created += (_, args) => Enqueue(args.FullPath);
             _watcher.Renamed += (_, args) => Enqueue(args.FullPath);
+            _watcher.Error += (_, args) =>
+            {
+                var error = args.GetException();
+                logger.LogWarning(error, "The file watcher for {Directory} reported an error.", directory);
+                workspace.MarkReloadNeeded("watcher: " + error.Message);
+            };
             _watcher.EnableRaisingEvents = true;
             _loop = new CancellationTokenSource();
             _ = DrainAsync(_loop.Token);
@@ -51,7 +58,14 @@ public sealed class SolutionFileWatcher(SolutionWorkspace workspace, ILogger<Sol
         }
     }
 
-    public void Dispose() => Stop();
+    public void Dispose()
+    {
+        lock (_gate)
+        {
+            _disposed = true;
+            StopCore();
+        }
+    }
 
     private void Enqueue(string path)
     {
@@ -76,12 +90,23 @@ public sealed class SolutionFileWatcher(SolutionWorkspace workspace, ILogger<Sol
             {
                 foreach (var (path, seen) in _pending.ToArray())
                 {
-                    if (DateTime.UtcNow - seen < Settle || !_pending.TryRemove(path, out _))
+                    // A conditional remove: if a newer save re-stamped this path after the snapshot above,
+                    // the entry stays put for the next tick instead of being dropped underneath it.
+                    if (DateTime.UtcNow - seen < Settle || !_pending.TryRemove(new KeyValuePair<string, DateTime>(path, seen)))
                     {
                         continue;
                     }
 
-                    await ApplyAsync(path, cancellationToken).ConfigureAwait(false);
+                    try
+                    {
+                        await ApplyAsync(path, cancellationToken).ConfigureAwait(false);
+                    }
+#pragma warning disable CA1031 // the watcher must outlive any single bad path
+                    catch (Exception error) when (error is not OperationCanceledException)
+#pragma warning restore CA1031
+                    {
+                        logger.LogWarning(error, "Could not process {Path}; the watcher continues.", path);
+                    }
                 }
             }
         }
@@ -127,5 +152,6 @@ public sealed class SolutionFileWatcher(SolutionWorkspace workspace, ILogger<Sol
         _watcher?.Dispose();
         _watcher = null;
         _directory = null;
+        _pending.Clear();
     }
 }

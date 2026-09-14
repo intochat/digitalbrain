@@ -9,9 +9,18 @@ namespace DigitalBrain.Coding;
 // Opens the configured solution when the silo starts so the first question does not pay for the load.
 internal sealed class WorkspaceWarmup(SolutionWorkspace workspace, SolutionFileWatcher watcher, IGrainFactory grains, IConfiguration configuration, ILogger<WorkspaceWarmup> logger) : IHostedService
 {
+    private readonly CancellationTokenSource _stopping = new();
+
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        workspace.Opened = path => watcher.Start(Path.GetDirectoryName(path)!);
+        workspace.Opened = path =>
+        {
+            var directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                watcher.Start(directory);
+            }
+        };
         var path = configuration[CodingModule.SolutionPathKey];
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -36,6 +45,8 @@ internal sealed class WorkspaceWarmup(SolutionWorkspace workspace, SolutionFileW
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
+        workspace.Opened = null;
+        _stopping.Cancel();
         watcher.Stop();
         return Task.CompletedTask;
     }
@@ -46,9 +57,13 @@ internal sealed class WorkspaceWarmup(SolutionWorkspace workspace, SolutionFileW
     {
         try
         {
-            await workspace.WhenReadyAsync(CancellationToken.None).ConfigureAwait(false);
+            await workspace.WhenReadyAsync(_stopping.Token).ConfigureAwait(false);
         }
         catch (WorkspaceNotReadyException)
+        {
+            return;
+        }
+        catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
         {
             return;
         }
@@ -61,13 +76,26 @@ internal sealed class WorkspaceWarmup(SolutionWorkspace workspace, SolutionFileW
                 await grain.Open(new OpenWorkspace(CommandId.New(), fullPath)).ConfigureAwait(false);
                 return;
             }
-#pragma warning disable CA1031 // The silo may still be coming up; every exception but cancellation is retried up to the bound below.
-            catch (Exception error) when (error is not OperationCanceledException && attempt < 29)
+#pragma warning disable CA1031 // The silo may still be coming up; every failure is retried up to the bound below, then logged loudly.
+            catch (Exception error)
 #pragma warning restore CA1031
             {
+                if (attempt == 29)
+                {
+                    logger.LogWarning(error, "Recording the open of {SolutionPath} on {Key} failed after {Attempts} attempts; giving up.", fullPath, key, attempt + 1);
+                    return;
+                }
+
                 // The silo is still coming up; a grain call before membership settles is retried.
                 logger.LogDebug(error, "Recording the open of {SolutionPath} on {Key} failed; retrying.", fullPath, key);
-                await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(1), _stopping.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
+                {
+                    return;
+                }
             }
         }
     }

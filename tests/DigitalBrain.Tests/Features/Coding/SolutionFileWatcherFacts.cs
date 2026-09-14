@@ -35,7 +35,7 @@ public sealed class SolutionFileWatcherFacts
         await File.WriteAllTextAsync(fixture.GreeterPath, FixtureSolutions.GreeterSource.Replace("public string Welcome", "public string Hola(string name) => name;\n\n    public string Welcome", StringComparison.Ordinal), TestContext.Current.CancellationToken);
 
         Assert.True(await UntilAsync(async () => (await workspace.FindSymbolsAsync(new("Hola"), TestContext.Current.CancellationToken)).TotalCount == 1, TimeSpan.FromSeconds(10)));
-        Assert.True(workspace.Generation >= 1);
+        Assert.True(workspace.SnapshotVersion >= 1);
         Assert.False(workspace.Status.ReloadNeeded);
     }
 
@@ -59,7 +59,7 @@ public sealed class SolutionFileWatcherFacts
     }
 
     [Fact]
-    public async Task Files_under_obj_are_ignored_and_a_fold_of_the_same_text_is_a_no_op()
+    public async Task A_fold_of_an_unknown_path_or_unchanged_text_is_a_no_op()
     {
         using var fixture = DiskFixture.Create();
         using var workspace = new SolutionWorkspace(new AdhocSolutionLoader(fixture.Open), NullLogger<SolutionWorkspace>.Instance);
@@ -68,7 +68,13 @@ public sealed class SolutionFileWatcherFacts
 
         Assert.False(await workspace.FoldAsync(fixture.Root + "/Alpha/obj/Generated.cs", "namespace X;", TestContext.Current.CancellationToken));
         Assert.False(await workspace.FoldAsync(fixture.GreeterPath, FixtureSolutions.GreeterSource, TestContext.Current.CancellationToken));
-        Assert.Equal(0, workspace.Generation);
+        Assert.Equal(0, workspace.SnapshotVersion);
+    }
+
+    [Fact]
+    public void Build_and_version_control_folders_are_ignored()
+    {
+        using var fixture = DiskFixture.Create();
         Assert.True(SolutionFileWatcher.IsIgnored(fixture.Root + "/Alpha/obj/Debug/x.g.cs"));
         Assert.True(SolutionFileWatcher.IsIgnored(fixture.Root + "/.git/index"));
         Assert.False(SolutionFileWatcher.IsIgnored(fixture.GreeterPath));

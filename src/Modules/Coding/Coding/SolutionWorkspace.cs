@@ -17,7 +17,7 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
     private string? _solutionPath;
     private int _leases;
     private bool _disposed;
-    private long _generation;
+    private long _snapshotVersion;
 
     public WorkspaceStatus Status
     {
@@ -33,7 +33,7 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
     // Design section 4.2: semantic queries run at most two at a time.
     internal int AvailableQuerySlots => _queryGate.CurrentCount;
 
-    public long Generation => Interlocked.Read(ref _generation);
+    public long SnapshotVersion => Interlocked.Read(ref _snapshotVersion);
 
     internal Action<string>? Opened { get; set; }
 
@@ -140,7 +140,7 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
             }
         }
 
-        return new CommitOutcome(written, Interlocked.Increment(ref _generation));
+        return new CommitOutcome(written, Interlocked.Increment(ref _snapshotVersion));
     }
 
     // Folds an external save of one document into the snapshot; false when the path is not a document or
@@ -182,7 +182,7 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
             return false;
         }
 
-        Interlocked.Increment(ref _generation);
+        Interlocked.Increment(ref _snapshotVersion);
         return true;
     }
 
@@ -190,10 +190,13 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
     {
         lock (_gate)
         {
-            if (_status.Phase == WorkspacePhase.Ready)
+            if (_status.Phase != WorkspacePhase.Ready)
             {
-                _status = _status with { ReloadNeeded = true, Detail = $"reload needed: {path}" };
+                return;
             }
+
+            var message = $"reload needed: {path}";
+            _status = _status with { ReloadNeeded = true, Detail = _status.Detail is { } existing ? $"{existing}; {message}" : message };
         }
     }
 
@@ -409,7 +412,16 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
 
         if (opened)
         {
-            Opened?.Invoke(solutionPath);
+#pragma warning disable CA1031 // BeginOpenAsync's task must never fault: a bad Opened callback is logged, not thrown.
+            try
+            {
+                Opened?.Invoke(solutionPath);
+            }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                logger.LogWarning(error, "The opened callback failed for {SolutionPath}.", solutionPath);
+            }
+#pragma warning restore CA1031
         }
     }
 

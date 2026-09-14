@@ -133,7 +133,7 @@ internal sealed class ChangeSetNeuron(
                             Diff = applied.Diff,
                             Detail = null,
                             Files = committed.WrittenPaths,
-                            Generation = committed.Generation,
+                            Generation = committed.SnapshotVersion,
                         };
                     }
                     catch (InvalidOperationException error)

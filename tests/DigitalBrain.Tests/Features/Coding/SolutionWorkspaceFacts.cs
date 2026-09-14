@@ -78,8 +78,8 @@ public sealed class SolutionWorkspaceFacts
         }, TestContext.Current.CancellationToken);
 
         Assert.Equal([fixture.GreeterPath], outcome.WrittenPaths);
-        Assert.Equal(1, outcome.Generation);
-        Assert.Equal(1, workspace.Generation);
+        Assert.Equal(1, outcome.SnapshotVersion);
+        Assert.Equal(1, workspace.SnapshotVersion);
         Assert.Contains("Hi, {name}", await File.ReadAllTextAsync(fixture.GreeterPath, TestContext.Current.CancellationToken), StringComparison.Ordinal);
         Assert.Equal(programBefore, File.GetLastWriteTimeUtc(fixture.ProgramPath));
         var member = await workspace.MemberAsync(new("M:Alpha.Greeter.Greet(System.String)"), TestContext.Current.CancellationToken);
@@ -109,8 +109,8 @@ public sealed class SolutionWorkspaceFacts
             solution.GetDocumentIdsWithFilePath(fixture.GreeterPath).Single(), SourceText.From(currentText))), TestContext.Current.CancellationToken);
 
         Assert.Empty(outcome.WrittenPaths);
-        Assert.Equal(2, outcome.Generation);
-        Assert.Equal(2, workspace.Generation);
+        Assert.Equal(2, outcome.SnapshotVersion);
+        Assert.Equal(2, workspace.SnapshotVersion);
         Assert.Equal(writeTimeBefore, File.GetLastWriteTimeUtc(fixture.GreeterPath));
     }
 

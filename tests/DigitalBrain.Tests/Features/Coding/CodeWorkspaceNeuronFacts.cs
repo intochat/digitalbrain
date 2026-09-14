@@ -233,10 +233,38 @@ public sealed class CodeWorkspaceNeuronFacts
         var first = await workspace.Map(new(), TestContext.Current.CancellationToken);
         Assert.Equal(2, first.Projects.Count);
 
+        // The gated second open keeps the service Opening indefinitely (until gate.SetResult() below), but
+        // LastMap is not on the snapshot, so the cache is proven indirectly: Map() is retried past any
+        // WorkspaceNotReadyException until the mapping reaction's save of the first load's map lands, and
+        // Phase/Map() are read together so the fact cannot pass because the reload quietly finished instead.
         await workspace.Reload(new ReloadWorkspace(CommandId.New()));
-        await WaitAsync(workspace, WorkspacePhase.Opening);
-        var cached = await workspace.Map(new(), TestContext.Current.CancellationToken);
-        Assert.Equal(2, cached.Projects.Count);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        WorkspaceSnapshot snapshot;
+        SolutionMap? cached;
+        while (true)
+        {
+            snapshot = await workspace.Read();
+            try
+            {
+                cached = await workspace.Map(new(), TestContext.Current.CancellationToken);
+            }
+            catch (WorkspaceNotReadyException)
+            {
+                cached = null;
+            }
+
+            if (snapshot.Phase == WorkspacePhase.Opening && cached is not null)
+            {
+                break;
+            }
+
+            await Task.Delay(25, timeout.Token);
+        }
+
+        Assert.Equal(WorkspacePhase.Opening, snapshot.Phase);
+        Assert.Equal(2, cached!.Projects.Count);
+
         gate.SetResult();
         await WaitAsync(workspace, WorkspacePhase.Ready);
     }
