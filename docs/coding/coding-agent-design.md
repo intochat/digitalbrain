@@ -270,7 +270,12 @@ phase 4 `code_remember`, `code_recall`. Every neuron method is reachable through
 
 - Workspace not ready: reads return the status as advice ("opening, 12 of 35 projects; try again").
 - Load failure: `Failed` with the first workspace diagnostic; `reload` retries; the durable map still answers.
-- A `changeset.check` with errors never reaches disk; `commit` refuses with the diagnostics.
+- A `changeset.check` with errors never reaches disk; `commit` refuses with the diagnostics. "Errors" means
+  the diagnostics the change set *introduces*: a multiset difference against the pre-edit baseline, keyed by
+  id, severity, message and path, over the changed projects and their transitive dependents, so a
+  pre-existing error elsewhere in the tree never blocks a check or a commit (amended 2026-09-14, phase 1:
+  the fixture's broken project showed the literal rule refuses every edit on a solution with pre-existing
+  errors).
 - `commit` is not atomic over several files (review finding 7): it writes the documents in order, then
   records the git generation; a crash between the two is reconciled at the next `workspace` activation by
   comparing the tree with the last recorded generation and reloading.

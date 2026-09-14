@@ -333,3 +333,126 @@ SymbolRenameOptions, string, CancellationToken)`, `DocumentEditor`, `Solution.Wi
 5.9.0 is the latest stable on nuget.org. The C# code fixers are MEF exports; the plan discovers the ones with a
 parameterless constructor by reflection, which is the part most likely to surprise (recorded here so the
 outcome lands next to it). Plan: `plans/2026-09-14-coding-phase1-changesets.md`.
+
+## Phase 1 outcome (2026-09-14)
+
+Fact classes added or extended for phase 1, and their counts at the end of Task 9:
+
+- The reflection theory in `CodeWorkspaceNeuronFacts` (`Every_contract_method_uses_section_7_types`)
+  validates `ICodeWorkspace` (12 methods) and `IChangeSet` (5 methods) against the contract's section
+  7 types; `CodeWorkspaceNeuronFacts` itself is 12 facts (10 `[Fact]` plus the 2-case theory).
+- `WorkspaceReadFacts`: 9.
+- `ChangeSetEditorFacts`: 16.
+- `SolutionWorkspaceFacts`: 21 (phase 0's map/reload/lifetime facts plus the durable-map-cache fact
+  and the two commit facts).
+- `ChangeSetNeuronFacts`: 7.
+- `SolutionFileWatcherFacts`: 4.
+- `RunnerFacts`: 11.
+- `CodingNativeToolFacts`: 14 (up from phase 0's 5, now covering all thirteen `code_*` tools plus the
+  never-settles-is-advice and repeated-check-answers-at-once cases).
+- `CodingChatFacts`: 1 (`Rename_X_to_Y_lands_as_a_commit_through_the_chat`).
+- The second gated fact, `CodingSelfTestFacts.The_real_solution_builds_and_one_class_tests_through_the_runner`,
+  alongside phase 0's `The_real_solution_opens_and_answers_a_known_reference`.
+
+Suite total after `CodingChatFacts`: `dotnet test DigitalBrain.slnx -c Release --no-build` reports
+397 total, 391 passed, 0 failed, 6 skipped (4 Docker-gated ClickHouse scenarios plus the two coding
+gated self-tests).
+
+Exit criterion (design 9.1): "rename `TimerNeuron.Alarm` to `AlarmFor` and run the tests" lands as a
+commit on a `coding/<id>` branch with the suite green, driven from the chat.
+`CodingChatFacts.Rename_X_to_Y_lands_as_a_commit_through_the_chat` proves this scripted, end to end,
+on the adhoc fixture (a rename of `Greeter.Greet` to `Hello`, standing in for the live
+`TimerNeuron.Alarm` rename the controller drives against the real solution): a `ScriptedChatClient`
+drives the `/agent` HTTP endpoint through one function-invocation turn — `code_find_symbols`,
+`code_propose_edit` (`Rename`), `code_check`, `code_commit`, `code_build`, `code_test` — ending with
+the model's own closing message. The fact asserts, in order, the six `TOOL_CALL_RESULT` payloads
+(`Draft` after propose, `Checked` after check, `Committed` with `branch: "coding/rename-1"` after
+commit, a succeeded build, 2 passed tests), the renamed call site on disk
+(`.Hello("world")` in `Beta/Program.cs`), the git log's `coding: rename Greet to Hello` message, and
+that the assistant's own `TEXT_MESSAGE_CONTENT` names `coding/rename-1`. The live counterpart
+(`aspire run`, renaming `TimerNeuron.Alarm` verbatim against the real solution) is recorded below
+under "Phase 1 live run" by the controller.
+
+## Phase 1 deviations
+
+1. Design 4.9 amended: `check` and `commit` refuse a change set for the diagnostics it *introduces*
+   (a multiset difference against the pre-edit baseline, keyed by id, severity, message and path,
+   over the changed projects and their dependents), never for errors the tree already had. Reason:
+   the fixture's Beta project is permanently broken, and a literal "any error" filter failed five of
+   nine editor facts; on a clean solution the two readings coincide. Cost: a pre-existing error stays
+   invisible to the model unless it asks `code_diagnostics`; the baseline costs one extra compilation
+   per check.
+2. `ChangeSetSnapshot` carries `Detail` and `Files` beyond design 9.1's five members: the responsible
+   edit must be named and the written files listed.
+3. `SyntaxGenerator` is not used: `SyntaxFactory.ParseMemberDeclaration` plus `DocumentEditor` cover
+   the four member edits.
+4. `ExpectedVersion` on `ProposeEdit` is the change set's edit count.
+5. A rejection's reason travels in the `CommandRejectedException` message argument: only `Message`
+   crosses the grain boundary (the phase 0 lesson repeated).
+6. The changeset neuron keeps `ConfigureAwait(true)` throughout, including inside the commit lambda;
+   an earlier ruling allowing `ConfigureAwait(false)` there was withdrawn and the `ORLEANS0014`
+   pragma removed.
+7. Kernel rule surfaced by a throw: in a reaction `Schedule` must be called before `SaveAsync`.
+8. `WorkspaceState.LastMap` is carried forward on open and reload so the map answers from the
+   durable cache while a reload is in flight; the mapping loop carries an attempt counter
+   (`MappingBody`) and gives up after 600 attempts.
+9. The service counter is `SolutionWorkspace.SnapshotVersion` (and `CommitOutcome.SnapshotVersion`);
+   the contract's `Generation` field keeps its design name.
+10. The phase 0 fact `A_warmed_solution_reads_ready_before_any_open` now sets `WorkspaceKey` to the
+    fixture and polls for generation 1: the warmup records the open on the grain asynchronously.
+11. `DiskFixture.InitGitAsync` (the plan's interface bullet said `InitGit`); collection expressions
+    where IDE0300 forces them.
+12. Task 7's runner snippets were amended in review: the branch probe distinguishes "absent" (exit 1)
+    from a timeout or any other failure; every git call surfaces `TimedOut`; the failed-test pattern
+    keeps parameterized display names; `ProcessRunner` drains both streams after a kill and returns
+    the partial output; `core.quotepath=false`; path comparison ignores case only on Windows.
+13. The suite's skip count is 6 (4 Docker-gated scenarios + 2 coding gated facts).
+14. Parked for later phases: `FoldAsync` returning false after a lost race (the next save
+    re-enqueues); deleted files are not folded out of the snapshot (phase 5);
+    `WorkspaceWarmup._stopping` is never disposed; the summary pattern lacks a word boundary;
+    `ChangedPathsAsync` does not unescape C-quoted porcelain paths; the Windows timeout fact asserts
+    English `ping` output.
+15. Task 8: `code_commit` returns one key set in every branch (`status, files, generation, diff,
+    detail, branch, commit, advice`) instead of the plan's two shapes, so a git refusal after the
+    files are written still shows the model what landed on disk; the change-set tools wait for
+    *this* command's outcome (status moved, `Discarded`, or a `Detail` different from the one read
+    before the command) rather than any non-null `Detail`; a wait that expires is advice, not a
+    thrown cancellation; `code_propose_edit` sends `ExpectedVersion` from a fresh read.
+    `code_implementations("T:Alpha.IWelcome")` counts two implementations (`Shouter` inherits
+    `Greeter`'s); `DiskFixture.BrokenPath` replaces the `E:/fixture` constant.
+16. Task 8 (round 2): `ChangeSetSnapshot` gains `Revision` (`Id(7)`), incremented by every reaction
+    that saves; the tools wait for the revision to move past the one read before the command, which
+    is the only marker that tells "no new result" from "the same result again" (the `Detail` text is
+    a pure function of the edits, so it repeats). The tool wait (`ReactionWait`, two minutes) lives
+    in `CodingToolOptions`, registered by the module and shortened by facts through DI, not through
+    static state.
+17. Task 9: the brief's scripted-chat snippet calls `fixture.InitGitAsync()` with no argument, but
+    `DiskFixture.InitGitAsync` (deviation 11) takes a required `CancellationToken` — `CS7036` on
+    build; fixed by passing `TestContext.Current.CancellationToken`, as the task's own facts specify.
+
+## Phase 1 observations
+
+- Code-fix discovery by reflection: `CodeFixCatalog` loads `Microsoft.CodeAnalysis.CSharp.Features`
+  5.9.0 and finds 155 exported `CodeFixProvider` types (non-abstract, carrying
+  `[ExportCodeFixProviderAttribute]`); every one of them exposes a parameterless constructor in this
+  version, so none is skipped for constructor shape. Only a fixer whose registration itself throws
+  (one that needs the real IDE host) is skipped, at the `RegisterCodeFixesAsync` call site rather
+  than at discovery.
+- Formatter annotations: `ParseMember` and `AddUsingAsync` tag only the syntax they insert or replace
+  with `Formatter.Annotation`, and `ChangeSetEditor.FormatAsync` calls
+  `Formatter.FormatAsync(document, Formatter.Annotation, ...)` rather than formatting the whole
+  document. An inserted member or using directive comes out correctly indented while the rest of the
+  file's existing formatting — and the diff — stays untouched.
+- Reload-needed semantics: the watcher folds a saved `.cs` file straight into the live `Solution`
+  (`SolutionWorkspace.FoldAsync`, `WithDocumentText`), but a `.csproj`/`.props`/`.targets`/`.slnx`/
+  `.sln` change cannot be folded that way — it changes project structure, not one document's text —
+  so `MarkReloadNeeded` only flags `WorkspaceSnapshot.ReloadNeeded`; nothing reloads until asked.
+- The grain-turn lesson: a `[ReadOnly]` `Read()` still queues behind whatever reaction currently
+  holds the grain's one turn. A genuinely stuck `check`/`commit` reaction therefore blocks even a
+  plain read behind it, which is why `CodingNativeTools.WaitAsync` bounds its own `Read()` calls with
+  its own deadline instead of trusting Orleans' own, much longer, request timeout to notice.
+- The "Detail repeats" lesson: `ChangeSetSnapshot.Detail` is a pure function of the edit list, so two
+  unrelated reactions (two identical failing `check`s, for instance) can produce byte-identical
+  `Detail`/`Status`. A wait keyed on "the detail changed" cannot tell that apart from "nothing
+  happened yet"; `Revision`, bumped by every reaction that saves regardless of outcome, is the only
+  marker that answers correctly either way (deviation 16 above).
