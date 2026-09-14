@@ -108,13 +108,13 @@ public sealed class CodingNativeToolFacts
     }
 
     [Fact]
-    public async Task The_fourteen_tools_resolve()
+    public async Task The_fifteen_tools_resolve()
     {
         var (brain, tools, fixture, _) = await StartAsync();
         using var fixtureScope = fixture;
         await using var brainScope = brain;
-        Assert.Equal(14, tools.Resolve(["code_find_symbols", "code_references", "code_diagnostics", "code_map", "code_skeleton", "code_member", "code_callers",
-            "code_implementations", "code_derived", "code_propose_edit", "code_check", "code_commit", "code_build", "code_test"]).Count());
+        Assert.Equal(15, tools.Resolve(["code_find_symbols", "code_references", "code_diagnostics", "code_map", "code_skeleton", "code_member", "code_callers",
+            "code_implementations", "code_derived", "code_propose_edit", "code_check", "code_commit", "code_build", "code_test", "code_promote"]).Count());
     }
 
     [Fact]
@@ -392,5 +392,29 @@ public sealed class CodingNativeToolFacts
         Assert.Equal(string.Empty, branches.Output.Trim());
         var current = await new ProcessRunner().RunAsync("git", ["branch", "--show-current"], fixture.Root, TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         Assert.Equal("main", current.Output.Trim());
+    }
+
+    [Fact]
+    public async Task A_read_that_times_out_behind_a_running_reaction_keeps_the_settle_polling()
+    {
+        var reads = 0;
+
+        var settled = await CodingNativeTools.SettleAsync(
+            () =>
+            {
+                reads++;
+                // A slot's build runs the whole dotnet build inside its turn, so Orleans answers the first
+                // read with its own response timeout while the reaction still holds that turn. Giving up
+                // there would report advice for a build that is merely still running.
+                return reads == 1 ? Task.FromException<int>(new TimeoutException("the response did not arrive")) : Task.FromResult(7);
+            },
+            static snapshot => snapshot > 0,
+            "the subject",
+            static snapshot => $"it is {snapshot}",
+            TimeSpan.FromSeconds(30),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(7, settled);
+        Assert.Equal(2, reads);
     }
 }

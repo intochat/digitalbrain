@@ -16,7 +16,10 @@ public interface ISlot : INeuron
     [Alias("retire")]
     Task<Accepted<SlotReceipt>> Retire(RetireSlot command);
 
+    // A build runs the whole solution build inside the slot's turn, and a read-only read still queues
+    // behind it, so the default response timeout would expire on every poll of a slot that is merely busy.
     [ReadOnly]
     [Alias("read")]
+    [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
     Task<SlotSnapshot> Read();
 }

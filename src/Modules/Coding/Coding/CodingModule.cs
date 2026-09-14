@@ -47,6 +47,7 @@ public sealed class CodingModule : IModule
         {
             "code_find_symbols", "code_references", "code_diagnostics", "code_map", "code_skeleton", "code_member", "code_callers",
             "code_implementations", "code_derived", "code_propose_edit", "code_check", "code_commit", "code_build", "code_test",
+            "code_promote",
         })
         {
             builder.Services.AddNativeTool(tool, services => services.GetRequiredService<CodingNativeTools>().Named(tool));

@@ -80,6 +80,10 @@ public static class ConversationalAgent
                         Never claim a change landed without a Committed status and a commit hash.
                         Choose a change id that is new for this task (a short topic plus a suffix such as the
                         time); a committed or discarded change set cannot be reused.
+                        To land a change in the running kernel, call code_promote after code_commit: it
+                        builds the standby slot and switches the gateway to it. A Failed status carries the
+                        build errors and the live kernel is untouched; never say a slot was promoted without
+                        a Live status.
                         Use create_artifact for diagrams and brain scenarios so they open in the working area.
                         For diagrams supply content.source in Markdraw format with a ```sketch block, for example:
                         rect "Account" id=account at 100,100 size 180x90 fill=#e4eee5 rounded
@@ -94,7 +98,7 @@ public static class ConversationalAgent
                         Do not claim to have modified external files or run graph workflows. Confirm changes only
                         after a successful tool result, and describe errors honestly.
                         """,
-                    Tools = [.. services.GetService<NativeTools>()?.Resolve(["salesforce_current_account", "salesforce_user_info", "salesforce_schema", "salesforce_query", "clickhouse_schema", "clickhouse_query", "show_query_table", "render_chart", "code_find_symbols", "code_references", "code_diagnostics", "code_map", "code_skeleton", "code_member", "code_callers", "code_implementations", "code_derived", "code_propose_edit", "code_check", "code_commit", "code_build", "code_test"]) ?? [], .. search is null ? [] : new AITool[] { WebSearchFunction.Create(search) }, .. additionalTools ?? []],
+                    Tools = [.. services.GetService<NativeTools>()?.Resolve(["salesforce_current_account", "salesforce_user_info", "salesforce_schema", "salesforce_query", "clickhouse_schema", "clickhouse_query", "show_query_table", "render_chart", "code_find_symbols", "code_references", "code_diagnostics", "code_map", "code_skeleton", "code_member", "code_callers", "code_implementations", "code_derived", "code_propose_edit", "code_check", "code_commit", "code_build", "code_test", "code_promote"]) ?? [], .. search is null ? [] : new AITool[] { WebSearchFunction.Create(search) }, .. additionalTools ?? []],
                 },
             },
             services.GetService<ILoggerFactory>(),
