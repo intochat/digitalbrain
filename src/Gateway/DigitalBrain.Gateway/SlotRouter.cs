@@ -35,6 +35,7 @@ internal sealed class SlotRouter
                 [DestinationId] = new DestinationConfig { Address = slot.Value.AbsoluteUri },
             },
         })];
+        // GatewayOptions.From resolves Active to a stored key, so the first route names a cluster that exists.
         _active = options.Active;
         Provider = new InMemoryConfigProvider([RouteFor(_active)], _clusters);
     }
@@ -45,33 +46,38 @@ internal sealed class SlotRouter
 
     public TimeSpan MinSwitchInterval => _options.MinSwitchInterval;
 
-    public bool Knows(string slot) => _options.Slots.ContainsKey(slot);
-
     // Used once at startup, before the server accepts anything, so it needs no debounce and no lock.
     public void Adopt(string slot)
     {
-        if (!Knows(slot) || string.Equals(_active, slot, StringComparison.OrdinalIgnoreCase))
+        if (!_options.TryName(slot, out var canonical))
+        {
+            _logger.LogWarning(
+                "The lease row names slot '{Slot}', which is not configured; slot {Active} from configuration stays active.", slot, Active);
+            return;
+        }
+
+        if (string.Equals(_active, canonical, StringComparison.Ordinal))
         {
             return;
         }
 
-        Volatile.Write(ref _active, slot);
-        Provider.Update([RouteFor(slot)], _clusters);
-        _logger.LogInformation("The lease row names slot {Slot}; the gateway starts out routing to it.", slot);
+        Volatile.Write(ref _active, canonical);
+        Provider.Update([RouteFor(canonical)], _clusters);
+        _logger.LogInformation("The lease row names slot {Slot}; the gateway starts out routing to it.", canonical);
     }
 
     // Nothing here waits: a gateway that sleeps inside a request is a gateway that stops answering. An
     // early re-switch is reported back with the time left, and the caller decides what to do with it.
     public SwitchResult Switch(string slot)
     {
-        if (!Knows(slot))
+        if (!_options.TryName(slot, out var canonical))
         {
             return new SwitchResult(SwitchVerdict.Unknown, TimeSpan.Zero);
         }
 
         lock (_gate)
         {
-            if (string.Equals(_active, slot, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(_active, canonical, StringComparison.Ordinal))
             {
                 return new SwitchResult(SwitchVerdict.Switched, TimeSpan.Zero);
             }
@@ -84,10 +90,10 @@ internal sealed class SlotRouter
                 return new SwitchResult(SwitchVerdict.TooSoon, _options.MinSwitchInterval - since);
             }
 
-            Volatile.Write(ref _active, slot);
+            Volatile.Write(ref _active, canonical);
             _switchedAt = _clock.GetUtcNow();
-            Provider.Update([RouteFor(slot)], _clusters);
-            _logger.LogInformation("The active slot is now {Slot}.", slot);
+            Provider.Update([RouteFor(canonical)], _clusters);
+            _logger.LogInformation("The active slot is now {Slot}.", canonical);
             return new SwitchResult(SwitchVerdict.Switched, TimeSpan.Zero);
         }
     }

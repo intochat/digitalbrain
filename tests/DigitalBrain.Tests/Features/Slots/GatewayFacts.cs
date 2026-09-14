@@ -186,6 +186,41 @@ public sealed class GatewayFacts
     }
 
     [Fact]
+    public async Task A_lease_row_that_never_answers_leaves_the_gateway_listening_on_the_configured_slot()
+    {
+        var hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var slotA = await BackendAsync("a");
+        await using var slotB = await BackendAsync("b");
+        // The row would name a, so a gateway that waited for this answer would route to a instead of b. The
+        // read's budget is a fixed ten seconds, which is what this fact waits out once.
+        await using var leases = await LeaseTableAsync(owner: "a", hold: hold);
+        await using var gateway = await GatewayAsync(slotA, slotB, active: "b", clustering: TableConnection(leases));
+        using var client = Client(gateway);
+
+        Assert.Equal("b", await ActiveAsync(client));
+        Assert.Equal("ok:b", await client.GetStringAsync("/health", TestContext.Current.CancellationToken));
+        hold.SetResult();
+    }
+
+    [Fact]
+    public async Task A_slot_named_in_another_case_is_the_same_slot()
+    {
+        await using var slotA = await BackendAsync("a");
+        await using var slotB = await BackendAsync("b");
+        await using var gateway = await GatewayAsync(slotA, slotB);
+        using var client = Client(gateway);
+
+        using var switched = await client.PostAsync("/switch/B", content: null, TestContext.Current.CancellationToken);
+        switched.EnsureSuccessStatusCode();
+
+        // A route built from "B" would name a cluster nothing answers to, so /health would fail rather than
+        // move: the switch alone answering 200 is not evidence that traffic followed.
+        Assert.Equal("b", SlotOf(await switched.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)));
+        Assert.Equal("b", await ActiveAsync(client));
+        Assert.Equal("ok:b", await client.GetStringAsync("/health", TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public void Configuration_the_gateway_cannot_route_on_is_refused_by_its_key()
     {
         var notAnAddress = Assert.Throws<InvalidOperationException>(
@@ -199,6 +234,13 @@ public sealed class GatewayFacts
         var notADuration = Assert.Throws<InvalidOperationException>(
             () => GatewayOptions.From(Configuration(("DigitalBrain:Gateway:MinSwitchInterval", "15s"))));
         Assert.Contains("MinSwitchInterval", notADuration.Message, StringComparison.Ordinal);
+
+        var negativeDuration = Assert.Throws<InvalidOperationException>(
+            () => GatewayOptions.From(Configuration(("DigitalBrain:Gateway:MinSwitchInterval", "-00:00:01"))));
+        Assert.Contains("MinSwitchInterval", negativeDuration.Message, StringComparison.Ordinal);
+
+        // The configured active slot is resolved to the name the clusters are built from, once, here.
+        Assert.Equal("b", GatewayOptions.From(Configuration(("DigitalBrain:Gateway:Active", "B"))).Active);
 
         var defaults = GatewayOptions.From(new ConfigurationBuilder().Build());
         Assert.Equal("a", defaults.Active);
@@ -253,20 +295,33 @@ public sealed class GatewayFacts
         return app;
     }
 
-    // The one table read the gateway performs at startup, answered either with a row naming an owner or
-    // with the 404 an empty table gives.
-    private static async Task<WebApplication> LeaseTableAsync(string? owner)
+    // The one table read the gateway performs at startup, answered either with a row naming an owner or with
+    // the 404 an empty table gives. A hold, when the fact passes one, keeps the answer back until the fact
+    // releases it, which is how "the gateway gave up on its own" becomes an assertion.
+    private static async Task<WebApplication> LeaseTableAsync(string? owner, TaskCompletionSource? hold = null)
     {
-        var row = $$"""
-            {"PartitionKey":"{{ActiveSlotNames.PartitionKey}}","RowKey":"{{ActiveSlotNames.RowKey}}","{{ActiveSlotNames.Owner}}":"{{owner}}"}
-            """;
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Logging.ClearProviders();
         var app = builder.Build();
-        app.MapGet("/{**rest}", () => owner is null
-            ? Results.NotFound()
-            : Results.Text(row, "application/json;odata=minimalmetadata"));
+        app.MapGet("/{**rest}", async http =>
+        {
+            if (hold is not null)
+            {
+                await hold.Task.WaitAsync(TimeSpan.FromSeconds(60), http.RequestAborted);
+            }
+
+            if (owner is null)
+            {
+                http.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
+
+            http.Response.ContentType = "application/json;odata=minimalmetadata";
+            await http.Response.WriteAsync(
+                $$"""{"PartitionKey":"{{ActiveSlotNames.PartitionKey}}","RowKey":"{{ActiveSlotNames.RowKey}}","{{ActiveSlotNames.Owner}}":"{{owner}}"}""",
+                http.RequestAborted);
+        });
         await app.StartAsync(TestContext.Current.CancellationToken);
         return app;
     }

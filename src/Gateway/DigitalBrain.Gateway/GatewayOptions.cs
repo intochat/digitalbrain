@@ -25,14 +25,35 @@ internal sealed record GatewayOptions(
             ["a"] = Address(gateway["Slots:a"], "Slots:a", DefaultSlotA),
             ["b"] = Address(gateway["Slots:b"], "Slots:b", DefaultSlotB),
         };
-        var active = Text(gateway["Active"], "a");
-        if (!slots.ContainsKey(active))
+        var configuredActive = Text(gateway["Active"], "a");
+        if (!TryName(slots, configuredActive, out var active))
         {
             throw new InvalidOperationException(
-                $"'{Section}:Active' is '{active}', which is not one of the configured slots ({string.Join(", ", slots.Keys)}).");
+                $"'{Section}:Active' is '{configuredActive}', which is not one of the configured slots ({string.Join(", ", slots.Keys)}).");
         }
 
         return new GatewayOptions(slots, active, Duration(gateway["MinSwitchInterval"], "MinSwitchInterval", TimeSpan.FromSeconds(15)));
+    }
+
+    // Slot names are matched without case, but the route and cluster ids are built from the stored key, so a
+    // caller's spelling is resolved to it exactly once, here. Without this, "A" would address slot "a"'s
+    // configuration and then name a cluster "slot-A" that no cluster answers to: YARP accepts such a route
+    // and every proxied request afterwards fails with the switch having answered 200.
+    internal bool TryName(string slot, out string canonical) => TryName(Slots, slot, out canonical);
+
+    private static bool TryName(IReadOnlyDictionary<string, Uri> slots, string slot, out string canonical)
+    {
+        foreach (var name in slots.Keys)
+        {
+            if (string.Equals(name, slot, StringComparison.OrdinalIgnoreCase))
+            {
+                canonical = name;
+                return true;
+            }
+        }
+
+        canonical = string.Empty;
+        return false;
     }
 
     // "localhost:5081" parses as an absolute URI whose scheme is "localhost", so the scheme is checked as
