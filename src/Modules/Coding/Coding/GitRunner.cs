@@ -19,12 +19,24 @@ public sealed class GitRunner(IProcessRunner processes)
         => (await GitAsync(repository, ["branch", "--show-current"], cancellationToken).ConfigureAwait(false)).Output.Trim();
 
     // The generation a slot is built from is the repository's HEAD commit (D3). A tree that is not a
-    // repository is not an error here: the slot is then built from an unrecorded generation.
+    // repository is not an error here: the slot is then built from an unrecorded generation. Anything else
+    // than a full hash is: a generation that is not one would be recorded and never match a real commit.
     public async Task<string?> HeadCommitAsync(string repository, CancellationToken cancellationToken)
     {
         var result = await RunGitAsync(repository, ["rev-parse", "HEAD"], cancellationToken).ConfigureAwait(false);
-        return result.ExitCode == 0 && result.Output.Trim() is { Length: > 0 } hash ? hash : null;
+        if (result.ExitCode != 0)
+        {
+            return null;
+        }
+
+        var hash = result.Output.Trim();
+        return hash.Length == 0
+            ? null
+            : IsCommitHash(hash) ? hash : throw new InvalidOperationException($"git rev-parse HEAD answered '{hash}', which is not a commit hash.");
     }
+
+    private static bool IsCommitHash(string hash)
+        => hash.Length == 40 && hash.All(char.IsAsciiHexDigit);
 
     public async Task<string> EnsureBranchAsync(string repository, string branch, CancellationToken cancellationToken)
     {
@@ -66,7 +78,8 @@ public sealed class GitRunner(IProcessRunner processes)
         var relative = RelativePaths(repository, files);
         await GitAsync(repository, ["add", "--", .. relative], cancellationToken).ConfigureAwait(false);
         await GitAsync(repository, ["commit", "-q", "-m", message], cancellationToken).ConfigureAwait(false);
-        var hash = (await GitAsync(repository, ["rev-parse", "HEAD"], cancellationToken).ConfigureAwait(false)).Output.Trim();
+        var hash = await HeadCommitAsync(repository, cancellationToken).ConfigureAwait(false)
+            ?? throw new InvalidOperationException("git rev-parse HEAD answered nothing after the commit.");
         return new GitCommitOutcome(hash, await CurrentBranchAsync(repository, cancellationToken).ConfigureAwait(false), relative);
     }
 

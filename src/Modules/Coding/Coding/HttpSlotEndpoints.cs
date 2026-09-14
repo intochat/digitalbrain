@@ -1,146 +1,160 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text.Json;
 
 namespace DigitalBrain.Coding;
 
-public sealed class HttpSlotEndpoints(IHttpClientFactory clients) : ISlotEndpoints
+// One send path for every probe, so a slot that is not listening, a slot that answers with something other
+// than JSON and a gateway that never answers all become a value the promotion can act on. Only the switch
+// turns a failure into an exception, because a promotion that cannot move traffic has nothing to report.
+public sealed class HttpSlotEndpoints(HttpClient client) : ISlotEndpoints
 {
     public const string HttpClientName = "digitalbrain-slots";
 
-    public async Task<bool> HealthyAsync(string slotUrl, CancellationToken cancellationToken = default)
+    // A 429 with no usable header, a zero delta or a date already in the past would all become a busy
+    // loop, so the wait the gateway asks for is never shorter than this.
+    private static readonly TimeSpan MinimumRetry = TimeSpan.FromSeconds(1);
+
+    public Task<bool> HealthyAsync(Uri slotUrl, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(slotUrl);
-        using var client = clients.CreateClient(HttpClientName);
-        try
-        {
-            using var response = await client.GetAsync(Address(slotUrl, "/health"), cancellationToken).ConfigureAwait(false);
-            return response.IsSuccessStatusCode;
-        }
-        catch (HttpRequestException)
-        {
+        ArgumentNullException.ThrowIfNull(slotUrl);
+        return SendAsync(HttpMethod.Get, Address(slotUrl, "/health"),
+            static (response, _) => Task.FromResult(response.IsSuccessStatusCode),
             // A slot that is not listening yet is not a failure; the reaction looks again.
-            return false;
-        }
-        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            return false;
-        }
+            static (_, _) => false,
+            cancellationToken);
     }
 
     // The smoke read is a [ReadOnly] neuron read over HTTP, which is exactly what the fence lets a standby
     // answer: it proves the new slot activated its brain without writing anything.
-    public async Task<string?> SmokeAsync(string slotUrl, string path, CancellationToken cancellationToken = default)
+    public Task<string?> SmokeAsync(Uri slotUrl, string path, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(slotUrl);
+        ArgumentNullException.ThrowIfNull(slotUrl);
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        using var client = clients.CreateClient(HttpClientName);
-        try
-        {
-            using var response = await client.GetAsync(Address(slotUrl, path), cancellationToken).ConfigureAwait(false);
-            return response.IsSuccessStatusCode
+        return SendAsync<string?>(HttpMethod.Get, Address(slotUrl, path),
+            (response, _) => Task.FromResult<string?>(response.IsSuccessStatusCode
                 ? null
-                : $"the smoke read {path} on {slotUrl} answered {(int)response.StatusCode}";
+                : $"the smoke read {path} on {slotUrl} answered {(int)response.StatusCode}"),
+            (reason, _) => $"the smoke read {path} on {slotUrl} failed: {reason}",
+            cancellationToken);
+    }
+
+    public Task<bool> HoldsLeaseAsync(Uri slotUrl, string slot, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(slotUrl);
+        ArgumentException.ThrowIfNullOrWhiteSpace(slot);
+        return SendAsync(HttpMethod.Get, Address(slotUrl, "/slots/" + Uri.EscapeDataString(slot)),
+            async (response, token) =>
+            {
+                using var document = await ReadJsonAsync(response, token).ConfigureAwait(false);
+                // The silo names the slot it is: an answer from a silo that is not this slot, or from one
+                // that carries no slot name at all, is never evidence that this slot's flip has landed.
+                return document is not null
+                    && TextOf(document.RootElement, "slot") is { } named
+                    && string.Equals(named, slot, StringComparison.OrdinalIgnoreCase)
+                    && document.RootElement.TryGetProperty("holdsLease", out var holds)
+                    && holds.ValueKind == JsonValueKind.True;
+            },
+            static (_, _) => false,
+            cancellationToken);
+    }
+
+    public Task<TimeSpan?> SwitchAsync(Uri gatewayUrl, string slot, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(gatewayUrl);
+        ArgumentException.ThrowIfNullOrWhiteSpace(slot);
+        return SendAsync(HttpMethod.Post, Address(gatewayUrl, "/switch/" + Uri.EscapeDataString(slot)),
+            (response, _) =>
+            {
+                if (response.StatusCode == HttpStatusCode.TooManyRequests)
+                {
+                    return Task.FromResult<TimeSpan?>(RetryAfter(response.Headers.RetryAfter));
+                }
+
+                return response.IsSuccessStatusCode
+                    ? Task.FromResult<TimeSpan?>(null)
+                    : throw new InvalidOperationException($"the gateway at {gatewayUrl} refused the switch to '{slot}' with {(int)response.StatusCode}");
+            },
+            (reason, error) => throw new InvalidOperationException($"the gateway at {gatewayUrl} did not accept the switch to '{slot}': {reason}", error),
+            cancellationToken);
+    }
+
+    public Task<string?> ActiveAsync(Uri gatewayUrl, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(gatewayUrl);
+        return SendAsync<string?>(HttpMethod.Get, Address(gatewayUrl, "/active"),
+            async (response, token) =>
+            {
+                using var document = await ReadJsonAsync(response, token).ConfigureAwait(false);
+                return document is null ? null : TextOf(document.RootElement, "active");
+            },
+            static (_, _) => null,
+            cancellationToken);
+    }
+
+    // The one place an HTTP failure becomes a value: reason is what the caller may put in a message, and
+    // error is kept so a rethrow does not lose the stack. A cancellation the caller asked for is not a
+    // failure and travels on.
+    private async Task<T> SendAsync<T>(
+        HttpMethod method,
+        Uri address,
+        Func<HttpResponseMessage, CancellationToken, Task<T>> read,
+        Func<string, Exception, T> onFailure,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(method, address);
+        try
+        {
+            using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            return await read(response, cancellationToken).ConfigureAwait(false);
         }
         catch (HttpRequestException error)
         {
-            return $"the smoke read {path} on {slotUrl} failed: {error.Message}";
-        }
-        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            return $"the smoke read {path} on {slotUrl} timed out";
-        }
-    }
-
-    public async Task<bool> HoldsLeaseAsync(string slotUrl, string slot, CancellationToken cancellationToken = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(slotUrl);
-        ArgumentException.ThrowIfNullOrWhiteSpace(slot);
-        using var client = clients.CreateClient(HttpClientName);
-        try
-        {
-            using var response = await client.GetAsync(Address(slotUrl, "/slots/" + Uri.EscapeDataString(slot)), cancellationToken).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
-            {
-                return false;
-            }
-
-            await using var body = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-            using var document = await JsonDocument.ParseAsync(body, cancellationToken: cancellationToken).ConfigureAwait(false);
-            return document.RootElement.TryGetProperty("holdsLease", out var holds) && holds.ValueKind == JsonValueKind.True;
-        }
-        catch (HttpRequestException)
-        {
-            return false;
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
-        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            return false;
-        }
-    }
-
-    // One failure type, so the promotion's reaction has one thing to catch and one thing to report; a 429
-    // is not a failure but a wait the gateway is asking for.
-    public async Task<TimeSpan?> SwitchAsync(string gatewayUrl, string slot, CancellationToken cancellationToken = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(gatewayUrl);
-        ArgumentException.ThrowIfNullOrWhiteSpace(slot);
-        using var client = clients.CreateClient(HttpClientName);
-        try
-        {
-            using var response = await client.PostAsync(Address(gatewayUrl, "/switch/" + Uri.EscapeDataString(slot)), content: null, cancellationToken).ConfigureAwait(false);
-            if (response.StatusCode == HttpStatusCode.TooManyRequests)
-            {
-                return response.Headers.RetryAfter?.Delta
-                    ?? (response.Headers.RetryAfter?.Date is { } date ? date - DateTimeOffset.UtcNow : (TimeSpan?)null)
-                    ?? TimeSpan.FromSeconds(1);
-            }
-
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new InvalidOperationException($"the gateway at {gatewayUrl} refused the switch to '{slot}' with {(int)response.StatusCode}");
-            }
-
-            return null;
-        }
-        catch (HttpRequestException error)
-        {
-            throw new InvalidOperationException($"the gateway at {gatewayUrl} could not be reached: {error.Message}", error);
+            return onFailure(error.Message, error);
         }
         catch (TaskCanceledException error) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new InvalidOperationException($"the gateway at {gatewayUrl} did not answer the switch to '{slot}' in time", error);
+            return onFailure("it did not answer in time", error);
         }
     }
 
-    public async Task<string?> ActiveAsync(string gatewayUrl, CancellationToken cancellationToken = default)
+    // Null when the answer was not a success or was not JSON, so no probe has to guard a parse of its own.
+    private static async Task<JsonDocument?> ReadJsonAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(gatewayUrl);
-        using var client = clients.CreateClient(HttpClientName);
-        try
-        {
-            using var response = await client.GetAsync(Address(gatewayUrl, "/active"), cancellationToken).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
-            {
-                return null;
-            }
-
-            await using var body = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-            using var document = await JsonDocument.ParseAsync(body, cancellationToken: cancellationToken).ConfigureAwait(false);
-            return document.RootElement.TryGetProperty("active", out var active) ? active.GetString() : null;
-        }
-        catch (HttpRequestException)
+        if (!response.IsSuccessStatusCode)
         {
             return null;
+        }
+
+        try
+        {
+            await using var body = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+            return await JsonDocument.ParseAsync(body, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         catch (JsonException)
         {
             return null;
         }
+        catch (IOException)
+        {
+            return null;
+        }
     }
 
-    private static Uri Address(string root, string path) => new(new Uri(root, UriKind.Absolute), path);
+    private static string? TextOf(JsonElement body, string property)
+        => body.ValueKind == JsonValueKind.Object
+            && body.TryGetProperty(property, out var value)
+            && value.ValueKind == JsonValueKind.String
+                ? value.GetString()
+                : null;
+
+    private static TimeSpan RetryAfter(RetryConditionHeaderValue? header)
+    {
+        var asked = header?.Delta
+            ?? (header?.Date is { } date ? date - DateTimeOffset.UtcNow : (TimeSpan?)null)
+            ?? MinimumRetry;
+        return asked < MinimumRetry ? MinimumRetry : asked;
+    }
+
+    private static Uri Address(Uri root, string path) => new(root, path);
 }

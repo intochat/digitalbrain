@@ -12,6 +12,8 @@ public sealed class SlotServiceFacts
 {
     private const string StatePath = "E:/fixture/Delta/SlotState.cs";
     private const string PlainPath = "E:/fixture/Delta/Plain.cs";
+    private const string TallyPath = "E:/fixture/Delta/Tally.cs";
+    private const string TallySerializedPath = "E:/fixture/Delta/Tally.Serialized.cs";
 
     private const string StateSource = """
         namespace Delta;
@@ -30,6 +32,27 @@ public sealed class SlotServiceFacts
         }
         """;
 
+    // The half a landing is likely to edit: members, no attributes.
+    private const string TallySource = """
+        namespace Delta;
+
+        public sealed partial class Tally
+        {
+            public int Total { get; set; }
+        }
+        """;
+
+    // The half that makes Tally serialized state, in a file the landing never touched.
+    private const string TallySerializedSource = """
+        namespace Delta;
+
+        [GenerateSerializer]
+        [Alias("delta.tally")]
+        public sealed partial class Tally
+        {
+        }
+        """;
+
     private static SlotOptions Options(params (string Key, string Value)[] configured)
         => SlotOptions.From(new ConfigurationBuilder()
             .AddInMemoryCollection(configured.Select(entry => new KeyValuePair<string, string?>(entry.Key, entry.Value)))
@@ -40,9 +63,9 @@ public sealed class SlotServiceFacts
     {
         var options = Options();
         Assert.Equal(["a", "b"], SlotOptions.Names);
-        Assert.Equal("http://localhost:5080", options.GatewayUrl);
-        Assert.Equal("http://localhost:5081", options.UrlFor("a"));
-        Assert.Equal("http://localhost:5082", options.UrlFor("b"));
+        Assert.Equal(new Uri("http://localhost:5080"), options.GatewayUrl);
+        Assert.Equal(new Uri("http://localhost:5081"), options.UrlFor("a"));
+        Assert.Equal(new Uri("http://localhost:5082"), options.UrlFor("b"));
         Assert.Equal("kernel-a", options.ResourceFor("a"));
         Assert.Equal("kernel-b", options.ResourceFor("b"));
         Assert.Equal(TimeSpan.FromSeconds(10), options.Grace);
@@ -66,12 +89,12 @@ public sealed class SlotServiceFacts
             ("DigitalBrain:Slots:b:Url", "http://kernel-b:6000"),
             ("DigitalBrain:Slots:b:Resource", "silo-b"));
         Assert.Equal("b", options.Slot);
-        Assert.Equal("http://gateway:9000", options.GatewayUrl);
+        Assert.Equal(new Uri("http://gateway:9000"), options.GatewayUrl);
         Assert.Equal(TimeSpan.FromSeconds(2), options.Grace);
         Assert.Equal(7, options.HealthAttempts);
-        Assert.Equal("http://kernel-b:6000", options.UrlFor("b"));
+        Assert.Equal(new Uri("http://kernel-b:6000"), options.UrlFor("b"));
         Assert.Equal("silo-b", options.ResourceFor("b"));
-        Assert.Equal("http://localhost:5081", options.UrlFor("a"));
+        Assert.Equal(new Uri("http://localhost:5081"), options.UrlFor("a"));
     }
 
     [Fact]
@@ -79,6 +102,31 @@ public sealed class SlotServiceFacts
     {
         var error = Assert.Throws<InvalidOperationException>(() => Options().UrlFor("c"));
         Assert.Contains("DigitalBrain:Slots:c:Url", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_address_that_is_not_http_is_refused_with_its_key()
+    {
+        // "localhost:5082" parses as an absolute URI whose scheme is "localhost", so a probe would be the
+        // first thing to notice the missing scheme; configuration is.
+        var error = Assert.Throws<InvalidOperationException>(() => Options(("DigitalBrain:Slots:b:Url", "localhost:5082")));
+        Assert.Contains("DigitalBrain:Slots:b:Url", error.Message, StringComparison.Ordinal);
+        Assert.Contains("localhost:5082", error.Message, StringComparison.Ordinal);
+
+        var gateway = Assert.Throws<InvalidOperationException>(() => Options(("DigitalBrain:Slots:Gateway", "not a url")));
+        Assert.Contains("DigitalBrain:Slots:Gateway", gateway.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_malformed_duration_or_count_is_refused_with_its_key()
+    {
+        var duration = Assert.Throws<InvalidOperationException>(() => Options(("DigitalBrain:Slots:Grace", "30s")));
+        Assert.Contains("DigitalBrain:Slots:Grace", duration.Message, StringComparison.Ordinal);
+        Assert.Contains("30s", duration.Message, StringComparison.Ordinal);
+
+        // Zero health attempts would make the promotion give up before its first probe.
+        var count = Assert.Throws<InvalidOperationException>(() => Options(("DigitalBrain:Slots:HealthAttempts", "0")));
+        Assert.Contains("DigitalBrain:Slots:HealthAttempts", count.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -111,16 +159,19 @@ public sealed class SlotServiceFacts
     }
 
     [Fact]
-    public async Task A_broken_slot_build_carries_the_errors()
+    public async Task A_broken_slot_build_carries_the_errors_and_scans_nothing()
     {
         var processes = new FakeProcessRunner();
         processes.Enqueue(1, "E:\\repo\\src\\A\\Thing.cs(12,9): error CS0103: The name 'Nope' does not exist [E:\\repo\\src\\A\\A.csproj]");
         var builder = await BuilderAsync(processes);
 
-        var result = await builder.BuildAsync("b", [], TestContext.Current.CancellationToken);
+        // A path the snapshot does not know would be a rollback refusal, but a build that failed is never
+        // promoted, so the verdict is not computed at all.
+        var result = await builder.BuildAsync("b", ["E:/fixture/Delta/Gone.cs"], TestContext.Current.CancellationToken);
 
         Assert.False(result.Build.Succeeded);
         Assert.Equal("CS0103", Assert.Single(result.Build.Errors).Id);
+        Assert.False(result.TouchesSerializedState);
     }
 
     [Fact]
@@ -138,9 +189,28 @@ public sealed class SlotServiceFacts
 
         Assert.True(await editor.TouchesSerializedStateAsync(workspace.CurrentSolution, [StatePath], TestContext.Current.CancellationToken));
         Assert.False(await editor.TouchesSerializedStateAsync(workspace.CurrentSolution, [PlainPath], TestContext.Current.CancellationToken));
-        // A path the snapshot does not know (deleted, or outside the solution) is not evidence of a state change.
-        Assert.False(await editor.TouchesSerializedStateAsync(workspace.CurrentSolution, ["E:/fixture/Delta/Gone.cs"], TestContext.Current.CancellationToken));
+        // A path the snapshot no longer knows (the landing deleted it) cannot be inspected, so the
+        // conservative answer is the only safe one: no rollback.
+        Assert.True(await editor.TouchesSerializedStateAsync(workspace.CurrentSolution, ["E:/fixture/Delta/Gone.cs"], TestContext.Current.CancellationToken));
         Assert.False(await editor.TouchesSerializedStateAsync(workspace.CurrentSolution, [], TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task A_partial_state_type_is_seen_from_the_half_that_carries_no_attribute()
+    {
+        using var workspace = new AdhocWorkspace();
+        var project = ProjectId.CreateNewId("Delta");
+        var solution = workspace.CurrentSolution
+            .AddProject(ProjectInfo.Create(project, VersionStamp.Create(), "Delta", "Delta", LanguageNames.CSharp,
+                filePath: "E:/fixture/Delta/Delta.csproj"))
+            .AddDocument(DocumentId.CreateNewId(project), "Tally.cs", SourceText.From(TallySource), filePath: TallyPath)
+            .AddDocument(DocumentId.CreateNewId(project), "Tally.Serialized.cs", SourceText.From(TallySerializedSource), filePath: TallySerializedPath);
+        Assert.True(workspace.TryApplyChanges(solution));
+        var editor = new ChangeSetEditor(new CodeFixCatalog());
+
+        // The landing wrote the members; the attribute sits on the other declaration of the same type.
+        Assert.True(await editor.TouchesSerializedStateAsync(workspace.CurrentSolution, [TallyPath], TestContext.Current.CancellationToken));
+        Assert.True(await editor.TouchesSerializedStateAsync(workspace.CurrentSolution, [TallySerializedPath], TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -179,6 +249,20 @@ public sealed class SlotServiceFacts
 
         // Not an error: the slot is then built from an unrecorded generation.
         Assert.Null(await git.HeadCommitAsync("E:/repo", TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task An_answer_that_is_not_a_commit_hash_is_refused()
+    {
+        var processes = new FakeProcessRunner();
+        processes.Enqueue(0, "HEAD detached at v1.2\n");
+        var git = new GitRunner(processes);
+
+        // Recording a generation that is not a commit would leave a slot claiming a generation no rollback
+        // could ever check out.
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => git.HeadCommitAsync("E:/repo", TestContext.Current.CancellationToken));
+        Assert.Contains("HEAD detached at v1.2", error.Message, StringComparison.Ordinal);
     }
 
     private static async Task<SlotBuilder> BuilderAsync(FakeProcessRunner processes)

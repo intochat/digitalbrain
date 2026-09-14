@@ -12,7 +12,9 @@ public sealed class SlotBuilder(DotnetRunner dotnet, SolutionWorkspace workspace
         var solutionPath = status.SolutionPath ?? throw new WorkspaceNotReadyException(status);
         var artifacts = options.ArtifactsFor(slot, Path.GetDirectoryName(Path.GetFullPath(solutionPath))!);
         var build = await dotnet.BuildAsync(solutionPath, artifacts, cancellationToken).ConfigureAwait(false);
-        var touches = changedFiles.Count > 0
+        // Only a build that succeeded can be promoted, so only then is the rollback verdict worth the scan.
+        var touches = build.Succeeded
+            && changedFiles.Count > 0
             && await workspace.QueryAsync(
                 (solution, token) => editor.TouchesSerializedStateAsync(solution, changedFiles, token),
                 cancellationToken).ConfigureAwait(false);

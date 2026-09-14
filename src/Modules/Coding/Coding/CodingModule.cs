@@ -1,6 +1,7 @@
 using DigitalBrain.AI;
 using DigitalBrain.Core;
 using DigitalBrain.Microsoft;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -29,8 +30,13 @@ public sealed class CodingModule : IModule
         builder.Services.TryAddSingleton(SlotOptions.From(builder.Configuration));
         builder.Services.TryAddSingleton<ISlotBuilder, SlotBuilder>();
         // 60s: a debounced gateway switch can wait out the gateway's minimum interval before answering.
-        builder.Services.AddHttpClient(HttpSlotEndpoints.HttpClientName, static client => client.Timeout = TimeSpan.FromSeconds(60));
-        builder.Services.TryAddSingleton<ISlotEndpoints, HttpSlotEndpoints>();
+        // A typed client, so every probe shares one handler and the credential is applied in one place.
+        builder.Services.AddHttpClient<ISlotEndpoints, HttpSlotEndpoints>(HttpSlotEndpoints.HttpClientName,
+            static (services, client) =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(60);
+                client.DefaultRequestHeaders.Authorization = SlotProbeCredential.Of(services.GetRequiredService<IConfiguration>());
+            });
         // The Microsoft module registers the real one with AddSingleton, which wins in either composition
         // order: it is skipped by this TryAdd when it ran first, and resolved last when it runs after.
         builder.Services.TryAddSingleton<IAspireResourceCommands, UnconfiguredAspireResourceCommands>();

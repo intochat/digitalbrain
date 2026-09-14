@@ -69,49 +69,91 @@ public sealed class ChangeSetEditor(CodeFixCatalog codeFixes)
     }
 
     // Rollback is only safe when nothing persisted changed shape (R5.3), and a state type is a type
-    // declaration carrying [GenerateSerializer]. A syntax scan of the written files is enough and needs no
-    // compilation: an unresolved attribute name still reads as that attribute.
+    // declaration carrying [GenerateSerializer]. A syntax scan of the written files needs no compilation
+    // (an unresolved attribute name still reads as that attribute); a partial type also has its other
+    // declarations checked, because the attribute may sit on any of them, and a written path the snapshot
+    // no longer knows counts as a touch, because a deleted file's types cannot be inspected at all.
     public async Task<bool> TouchesSerializedStateAsync(Solution solution, IReadOnlyList<string> files, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(solution);
         ArgumentNullException.ThrowIfNull(files);
+        if (files.Count == 0)
+        {
+            return false;
+        }
+
+        // One pass over the snapshot's documents, not one per written file. A path can belong to more than
+        // one project (a linked or multi-targeted file), so any of its documents answers for it.
+        var documentsByPath = solution.Projects
+            .SelectMany(static project => project.Documents)
+            .Where(static document => document.FilePath is not null)
+            .ToLookup(static document => document.FilePath!, StringComparer.OrdinalIgnoreCase);
+
         foreach (var path in files)
         {
-            var document = solution.Projects
-                .SelectMany(static project => project.Documents)
-                .FirstOrDefault(candidate => string.Equals(candidate.FilePath, path, StringComparison.OrdinalIgnoreCase));
-            if (document is null)
+            if (documentsByPath[path].FirstOrDefault() is not { } document)
             {
-                continue;
+                return true;
             }
 
-            if (await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false) is not { } root)
-            {
-                continue;
-            }
-
-            if (root.DescendantNodes().OfType<BaseTypeDeclarationSyntax>()
-                .SelectMany(static declaration => declaration.AttributeLists)
-                .SelectMany(static list => list.Attributes)
-                .Any(IsGenerateSerializer))
+            if (await DeclaresSerializedStateAsync(document, cancellationToken).ConfigureAwait(false))
             {
                 return true;
             }
         }
 
         return false;
+    }
 
-        static bool IsGenerateSerializer(AttributeSyntax attribute)
+    private static async Task<bool> DeclaresSerializedStateAsync(Document document, CancellationToken cancellationToken)
+    {
+        if (await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false) is not { } root)
         {
-            var name = attribute.Name switch
+            return false;
+        }
+
+        var declarations = root.DescendantNodes().OfType<BaseTypeDeclarationSyntax>().ToArray();
+        if (declarations.Any(CarriesGenerateSerializer))
+        {
+            return true;
+        }
+
+        var partials = declarations.Where(static declaration => declaration.Modifiers.Any(SyntaxKind.PartialKeyword)).ToArray();
+        if (partials.Length == 0 || await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false) is not { } model)
+        {
+            return false;
+        }
+
+        foreach (var partial in partials)
+        {
+            if (model.GetDeclaredSymbol(partial, cancellationToken) is not { } type)
+            {
+                continue;
+            }
+
+            foreach (var reference in type.DeclaringSyntaxReferences.Where(candidate => candidate.SyntaxTree != root.SyntaxTree))
+            {
+                if (await reference.GetSyntaxAsync(cancellationToken).ConfigureAwait(false) is BaseTypeDeclarationSyntax elsewhere
+                    && CarriesGenerateSerializer(elsewhere))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool CarriesGenerateSerializer(BaseTypeDeclarationSyntax declaration)
+        => declaration.AttributeLists
+            .SelectMany(static list => list.Attributes)
+            .Select(static attribute => attribute.Name switch
             {
                 QualifiedNameSyntax qualified => qualified.Right.Identifier.ValueText,
                 SimpleNameSyntax simple => simple.Identifier.ValueText,
-                _ => attribute.Name.ToString(),
-            };
-            return name is "GenerateSerializer" or "GenerateSerializerAttribute";
-        }
-    }
+                var other => other.ToString(),
+            })
+            .Any(static name => name is "GenerateSerializer" or "GenerateSerializerAttribute");
 
     private async Task<Solution> ApplyOneAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
         => edit.Kind switch
