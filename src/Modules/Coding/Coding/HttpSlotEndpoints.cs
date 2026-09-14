@@ -43,7 +43,7 @@ public sealed class HttpSlotEndpoints(HttpClient client) : ISlotEndpoints
     {
         ArgumentNullException.ThrowIfNull(slotUrl);
         ArgumentException.ThrowIfNullOrWhiteSpace(slot);
-        return SendAsync(HttpMethod.Get, Address(slotUrl, "/slots/" + Uri.EscapeDataString(slot)),
+        return SendAsync(HttpMethod.Get, LeaseAddress(slotUrl, slot),
             async (response, token) =>
             {
                 using var document = await ReadJsonAsync(response, token).ConfigureAwait(false);
@@ -56,6 +56,22 @@ public sealed class HttpSlotEndpoints(HttpClient client) : ISlotEndpoints
                     && holds.ValueKind == JsonValueKind.True;
             },
             static (_, _) => false,
+            cancellationToken);
+    }
+
+    public Task<string?> NamedSlotAsync(Uri slotUrl, string slot, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(slotUrl);
+        ArgumentException.ThrowIfNullOrWhiteSpace(slot);
+        return SendAsync<string?>(HttpMethod.Get, LeaseAddress(slotUrl, slot),
+            async (response, token) =>
+            {
+                using var document = await ReadJsonAsync(response, token).ConfigureAwait(false);
+                return document is null ? null : TextOf(document.RootElement, "slot");
+            },
+            // A gated silo answers 401 and an unreachable one answers nothing; neither is evidence that
+            // the slot name is wrong, so both read as "not known" and leave the promotion to its wait.
+            static (_, _) => null,
             cancellationToken);
     }
 
@@ -157,4 +173,6 @@ public sealed class HttpSlotEndpoints(HttpClient client) : ISlotEndpoints
     }
 
     private static Uri Address(Uri root, string path) => new(root, path);
+
+    private static Uri LeaseAddress(Uri slotUrl, string slot) => Address(slotUrl, "/slots/" + Uri.EscapeDataString(slot));
 }

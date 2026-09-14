@@ -14,6 +14,12 @@ public interface ISlotEndpoints
     // read is true when the silo names itself the asked slot and says it holds the lease.
     Task<bool> HoldsLeaseAsync(Uri slotUrl, string slot, CancellationToken cancellationToken = default);
 
+    // The slot the silo at this address says it is, from the same read, and null when it did not answer
+    // that read at all. A standby configured for a different slot never reports the lease for the one
+    // being promoted, so the promotion reads the name before it flips anything: that way a typo in
+    // 'DigitalBrain:Slot' is a configuration failure naming both slots, not an unexplained settle timeout.
+    Task<string?> NamedSlotAsync(Uri slotUrl, string slot, CancellationToken cancellationToken = default);
+
     // Null when the switch was accepted; otherwise how long the gateway asks the caller to wait, because it
     // rebuilds its whole route table per update and debounces.
     Task<TimeSpan?> SwitchAsync(Uri gatewayUrl, string slot, CancellationToken cancellationToken = default);

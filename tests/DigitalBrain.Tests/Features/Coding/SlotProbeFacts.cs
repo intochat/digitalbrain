@@ -69,6 +69,24 @@ public sealed class SlotProbeFacts
     }
 
     [Fact]
+    public async Task The_slot_read_names_the_silo_whether_or_not_it_holds_the_lease()
+    {
+        await using var host = await SlotHost.StartAsync("b");
+
+        // What a promotion reads before it flips anything: a silo configured as some other slot could
+        // never report this one's lease, so the name it gives is the difference between advice and a wait.
+        Assert.Equal("b", await host.Endpoints.NamedSlotAsync(SlotAddress, "a", Cancellation));
+        Assert.Equal("b", await host.Endpoints.NamedSlotAsync(SlotAddress, "b", Cancellation));
+
+        await using var unslotted = await SlotHost.StartAsync(new SingleSlotLease(string.Empty));
+        Assert.Equal(string.Empty, await unslotted.Endpoints.NamedSlotAsync(SlotAddress, "b", Cancellation));
+
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        // A silo that is not listening names nothing, which is no evidence that the name is wrong.
+        Assert.Null(await new HttpSlotEndpoints(client).NamedSlotAsync(Unreachable, "b", Cancellation));
+    }
+
+    [Fact]
     public async Task An_unslotted_silo_claims_no_slot_at_all()
     {
         // What a phase 0 or phase 1 host registers: one silo, no slot name, always its own holder.

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using DigitalBrain.Abstractions.Slots;
 
 namespace DigitalBrain.Kernel;
 
@@ -8,8 +9,8 @@ namespace DigitalBrain.Kernel;
 internal static class BasicAuthGate
 {
     public const string DefaultLogin = "owner";
-    public const string UsernameConfigurationKey = "DigitalBrain:Auth:Username";
-    public const string PasswordConfigurationKey = "DigitalBrain:Auth:Password";
+    public const string UsernameConfigurationKey = ActiveSlotNames.AuthUsernameKey;
+    public const string PasswordConfigurationKey = ActiveSlotNames.AuthPasswordKey;
     public const string CheckPath = "/auth/check";
 
     private const string BasicScheme = "Basic";
