@@ -6,8 +6,14 @@ internal sealed class AgentStreamResult : IResult
 {
     private readonly IResult? _response;
     private readonly Exception? _error;
+    private readonly string? _runId;
 
-    public AgentStreamResult(IResult response) => _response = response;
+    public AgentStreamResult(IResult response, string? runId = null)
+    {
+        _response = response;
+        _runId = runId;
+    }
+
     public AgentStreamResult(Exception error) => _error = error;
 
     public async Task ExecuteAsync(HttpContext httpContext)
@@ -17,10 +23,29 @@ internal sealed class AgentStreamResult : IResult
             if (_error is { } error)
             {
                 await WriteFailureAsync(httpContext, error);
+                return;
             }
-            else
+
+            if (_runId is null)
             {
                 await _response!.ExecuteAsync(httpContext);
+                return;
+            }
+
+            // Watch the frames on their way out, so a reconnect for this run id can be answered from what
+            // the model already produced.
+            var tap = new AgentAnswerTap(httpContext.Response.Body,
+                httpContext.RequestServices.GetRequiredService<AgentRunLedger>(), _runId);
+            var body = httpContext.Response.Body;
+            httpContext.Response.Body = tap;
+            try
+            {
+                await _response!.ExecuteAsync(httpContext);
+            }
+            finally
+            {
+                httpContext.Response.Body = body;
+                tap.Complete();
             }
         }
         catch (OperationCanceledException) when (httpContext.RequestAborted.IsCancellationRequested)

@@ -13,6 +13,7 @@ internal static class ConversationalAgentEndpoints
     {
         builder.Services.AddAGUIServer();
         builder.Services.AddSingleton<WorkspaceArtifactStore>();
+        builder.Services.AddSingleton<AgentRunLedger>();
         builder.AddAIAgent(AgentName, static (services, name) => ConversationalAgent.Create(services, name,
             [.. services.GetService<TableService>() is { } tables ? new TableAgentTools(tables).Create() : [],
              .. new WorkspaceAgentTools(services.GetRequiredService<WorkspaceArtifactStore>()).Create()]))
@@ -25,10 +26,19 @@ internal static class ConversationalAgentEndpoints
         => endpoints.MapAGUIServer(AgentName, "/agent")
             .AddEndpointFilter(static async (context, next) =>
             {
+                var run = await AgentRunRequest.ReadAsync(context.HttpContext);
+                if (run is { Resume: true, RunId: { Length: > 0 } runId }
+                    && context.HttpContext.RequestServices.GetRequiredService<AgentRunLedger>().TryGetAnswer(runId, out var answer))
+                {
+                    // This silo already answered that run: replay it rather than paying for the model again
+                    // and appending the same turn to the session a second time.
+                    return new AgentReplayResult(run.ThreadId ?? string.Empty, runId, answer);
+                }
+
                 try
                 {
                     var result = await next(context);
-                    return result is IResult response ? new AgentStreamResult(response) : result;
+                    return result is IResult response ? new AgentStreamResult(response, run?.RunId) : result;
                 }
                 catch (Exception error) when (!context.HttpContext.RequestAborted.IsCancellationRequested)
                 {
