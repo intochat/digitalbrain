@@ -177,4 +177,15 @@ public sealed class ChangeSetEditorFacts
     {
         Assert.NotEmpty(new CodeFixCatalog().For("CS0219"));
     }
+
+    [Fact]
+    public async Task A_rename_that_breaks_a_caller_is_blamed_on_the_rename()
+    {
+        var outcome = await Editor.ApplyAsync(Snapshot(),
+            [new EditRequest(EditKind.AddUsing, Path: FixtureSolutions.GreeterPath, Namespace: "System.Text"),
+             new EditRequest(EditKind.Rename, SymbolId: "M:Alpha.Greeter.Greet(System.String)", NewName: "Welcome")],
+            TestContext.Current.CancellationToken);
+        Assert.True(outcome.HasErrors);
+        Assert.Equal(1, outcome.FailingEdit);
+    }
 }

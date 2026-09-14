@@ -23,11 +23,14 @@ public sealed class ChangeSetEditor(CodeFixCatalog codeFixes)
         var touched = new List<(int Edit, string Path)>();
         for (var index = 0; index < edits.Count; index++)
         {
+            var beforeEdit = solution;
             try
             {
-                var (next, path) = await ApplyOneAsync(solution, edits[index], cancellationToken).ConfigureAwait(false);
-                solution = next;
-                touched.Add((index, path));
+                solution = await ApplyOneAsync(solution, edits[index], cancellationToken).ConfigureAwait(false);
+                foreach (var path in ChangedPaths(solution, ChangedDocumentIds(beforeEdit, solution)))
+                {
+                    touched.Add((index, path));
+                }
             }
             catch (Exception error) when (error is InvalidOperationException or ArgumentException)
             {
@@ -61,7 +64,7 @@ public sealed class ChangeSetEditor(CodeFixCatalog codeFixes)
             ChangedPaths(solution, changedIds), failing, detail);
     }
 
-    private async Task<(Solution Solution, string Path)> ApplyOneAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
+    private async Task<Solution> ApplyOneAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
         => edit.Kind switch
         {
             EditKind.ReplaceMember => await ReplaceMemberAsync(solution, edit, cancellationToken).ConfigureAwait(false),
@@ -73,16 +76,16 @@ public sealed class ChangeSetEditor(CodeFixCatalog codeFixes)
             _ => throw new InvalidOperationException($"Unknown edit kind '{edit.Kind}'."),
         };
 
-    private static async Task<(Solution, string)> ReplaceMemberAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
+    private static async Task<Solution> ReplaceMemberAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
     {
         var (document, node) = await TargetAsync(solution, edit, cancellationToken).ConfigureAwait(false);
         var replacement = ParseMember(Required(edit.Source, "source"));
         var editor = await DocumentEditor.CreateAsync(document, cancellationToken).ConfigureAwait(false);
         editor.ReplaceNode(node, replacement.WithTriviaFrom(node));
-        return (editor.GetChangedDocument().Project.Solution, document.FilePath!);
+        return editor.GetChangedDocument().Project.Solution;
     }
 
-    private static async Task<(Solution, string)> InsertMemberAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
+    private static async Task<Solution> InsertMemberAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
     {
         var (document, node) = await TargetAsync(solution, edit, cancellationToken).ConfigureAwait(false);
         var member = ParseMember(Required(edit.Source, "source"));
@@ -96,10 +99,10 @@ public sealed class ChangeSetEditor(CodeFixCatalog codeFixes)
             editor.InsertAfter(node, member);
         }
 
-        return (editor.GetChangedDocument().Project.Solution, document.FilePath!);
+        return editor.GetChangedDocument().Project.Solution;
     }
 
-    private static async Task<(Solution, string)> AddUsingAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
+    private static async Task<Solution> AddUsingAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
     {
         var path = Required(edit.Path, "path");
         var name = Required(edit.Namespace, "namespace");
@@ -108,16 +111,16 @@ public sealed class ChangeSetEditor(CodeFixCatalog codeFixes)
             ?? throw new InvalidOperationException($"'{path}' has no compilation unit.");
         if (root.Usings.Any(directive => directive.Name?.ToString() == name))
         {
-            return (solution, path);
+            return solution;
         }
 
         var directive = SyntaxFactory.UsingDirective(SyntaxFactory.ParseName(name))
             .WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
             .WithAdditionalAnnotations(Formatter.Annotation);
-        return (document.WithSyntaxRoot(root.AddUsings(directive)).Project.Solution, path);
+        return document.WithSyntaxRoot(root.AddUsings(directive)).Project.Solution;
     }
 
-    private static async Task<(Solution, string)> ReplaceRangeAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
+    private static async Task<Solution> ReplaceRangeAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
     {
         var path = Required(edit.Path, "path");
         var document = SolutionQueries.DocumentAt(solution, path);
@@ -131,10 +134,10 @@ public sealed class ChangeSetEditor(CodeFixCatalog codeFixes)
 
         var span = TextSpan.FromBounds(text.Lines[start - 1].Start, text.Lines[end - 1].End);
         var changed = text.WithChanges(new TextChange(span, edit.Source ?? string.Empty));
-        return (document.WithText(changed).Project.Solution, path);
+        return document.WithText(changed).Project.Solution;
     }
 
-    private static async Task<(Solution, string)> RenameAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
+    private static async Task<Solution> RenameAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
     {
         var newName = Required(edit.NewName, "newName");
         if (!SyntaxFacts.IsValidIdentifier(newName))
@@ -142,13 +145,14 @@ public sealed class ChangeSetEditor(CodeFixCatalog codeFixes)
             throw new InvalidOperationException($"'{newName}' is not a valid C# identifier.");
         }
 
-        var (document, _) = await TargetAsync(solution, edit, cancellationToken).ConfigureAwait(false);
-        var symbol = await SolutionQueries.ResolveAsync(solution, edit.SymbolId!, cancellationToken).ConfigureAwait(false);
-        var renamed = await Renamer.RenameSymbolAsync(solution, symbol, new SymbolRenameOptions(), newName, cancellationToken).ConfigureAwait(false);
-        return (renamed, document.FilePath!);
+        var symbol = await SolutionQueries.ResolveAsync(solution, Required(edit.SymbolId, "symbolId"), cancellationToken).ConfigureAwait(false);
+        var declaringLocation = symbol.Locations.First(static location => location.IsInSource);
+        _ = solution.GetDocument(declaringLocation.SourceTree)
+            ?? throw new InvalidOperationException($"'{edit.SymbolId}' is declared outside the solution.");
+        return await Renamer.RenameSymbolAsync(solution, symbol, new SymbolRenameOptions(), newName, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<(Solution, string)> ApplyCodeFixAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
+    private async Task<Solution> ApplyCodeFixAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
     {
         var path = Required(edit.Path, "path");
         var diagnosticId = Required(edit.DiagnosticId, "diagnosticId");
@@ -180,10 +184,23 @@ public sealed class ChangeSetEditor(CodeFixCatalog codeFixes)
             ?? throw new InvalidOperationException(flat.Length == 0
                 ? $"No code fix is available for {diagnosticId} in this host."
                 : $"No fix titled '{edit.FixTitle}'; available: {string.Join(" | ", flat.Select(static action => action.Title))}.");
-        var operations = await chosen.GetOperationsAsync(cancellationToken).ConfigureAwait(false);
-        var apply = operations.OfType<ApplyChangesOperation>().FirstOrDefault()
-            ?? throw new InvalidOperationException($"The fix '{chosen.Title}' does not change the solution.");
-        return (apply.ChangedSolution, path);
+
+        Solution changed;
+#pragma warning disable CA1031 // running the chosen fix's own operations can fail in any way; surface it as advice through FailingEdit/Detail rather than crash the whole change set
+        try
+        {
+            var operations = await chosen.GetOperationsAsync(cancellationToken).ConfigureAwait(false);
+            var apply = operations.OfType<ApplyChangesOperation>().FirstOrDefault()
+                ?? throw new InvalidOperationException($"The fix '{chosen.Title}' does not change the solution.");
+            changed = apply.ChangedSolution;
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            throw new InvalidOperationException($"The fix '{chosen.Title}' failed: {error.Message}");
+        }
+#pragma warning restore CA1031
+
+        return changed;
     }
 
     private static async Task<(Document Document, SyntaxNode Node)> TargetAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
