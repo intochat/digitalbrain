@@ -33,6 +33,7 @@
     <PackageVersion Include="Aspire.Hosting.Testing" Version="13.5.3" />
     <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.5.3" />
     <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.5.3" />
+    <PackageVersion Include="Azure.Data.Tables" Version="12.12.0" />
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.29.2" />
     <PackageVersion Include="Qdrant.Client" Version="1.19.0" />
     <PackageVersion Include="ClickHouse.Driver" Version="1.4.0" />

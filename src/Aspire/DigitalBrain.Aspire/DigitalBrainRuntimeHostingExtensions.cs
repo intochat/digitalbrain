@@ -1,10 +1,12 @@
 using Azure.Data.Tables;
 using DigitalBrain.Abstractions;
+using DigitalBrain.Abstractions.Slots;
 using DigitalBrain.Core;
 using DigitalBrain.ServiceDefaults;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Dashboard;
 using Orleans.Storage;
@@ -34,6 +36,7 @@ public static class DigitalBrainRuntimeHostingExtensions
         builder.UseOrleans(silo =>
         {
             ConfigureStandaloneAzureClustering(silo, builder.Configuration);
+            ConfigureActiveSlotLease(silo, builder.Configuration);
             silo.Services.AddKeyedSingleton<IGrainStorageSerializer>(
                 DigitalBrainNames.DefaultGrainStorage,
                 static (services, _) => new OrleansGrainStorageSerializer(
@@ -80,5 +83,25 @@ public static class DigitalBrainRuntimeHostingExtensions
         var reminders = configuration.GetConnectionString(DigitalBrainNames.Reminders)
             ?? clustering;
         silo.UseAzureTableReminderService(reminders);
+    }
+
+    // A slot needs the lease row to know whether it may react. Without a slot name (phase 0 and 1 hosts,
+    // every test host) the kernel's SingleSlotLease stands and nothing is fenced.
+    private static void ConfigureActiveSlotLease(ISiloBuilder silo, IConfiguration configuration)
+    {
+        var slot = configuration[ActiveSlotNames.SlotKey];
+        if (string.IsNullOrWhiteSpace(slot)
+            || string.IsNullOrWhiteSpace(configuration.GetConnectionString(DigitalBrainNames.Clustering)))
+        {
+            return;
+        }
+
+        silo.Services.AddSingleton(services => new AzureTableActiveSlotLease(
+            slot,
+            services.GetRequiredKeyedService<TableServiceClient>(DigitalBrainNames.Clustering),
+            services.GetRequiredService<TimeProvider>(),
+            services.GetRequiredService<ILogger<AzureTableActiveSlotLease>>()));
+        silo.Services.AddSingleton<IActiveSlotLease>(static services => services.GetRequiredService<AzureTableActiveSlotLease>());
+        silo.Services.AddHostedService<ActiveSlotLeaseRefresher>();
     }
 }
