@@ -7,8 +7,8 @@ import '../../theme/ui_theme.dart';
 /// Product chart control. Same widget for surface galleries and chat bubbles.
 ///
 /// `chartKind` picks bars (`bar`, the default), a line with points (`line`),
-/// or pie slices (`pie`). Touch a point for a tooltip with the full label and
-/// value; long category labels are shortened on axes and slice titles only.
+/// or pie slices (`pie`). Pie charts show percents on slices and a legend with
+/// labels plus raw values; long category labels are shortened in the legend.
 final class UiChart extends StatelessWidget {
   const UiChart({super.key, required this.part, this.height = 200});
 
@@ -167,33 +167,114 @@ final class UiChart extends StatelessWidget {
   }
 
   Widget _pieChart() {
-    const titleStyle = TextStyle(
+    // Sample2-style percents on slices + sample1-style legend with raw values.
+    final total = part.points.fold<double>(
+      0,
+      (sum, point) => sum + point.value.toDouble().abs(),
+    );
+    const percentStyle = TextStyle(
       color: UiPalette.textPrimary,
-      fontSize: 11,
-      fontWeight: FontWeight.w600,
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
       fontFamily: UiType.bodyFamily,
       fontFamilyFallback: UiType.bodyFallback,
+      shadows: [Shadow(color: Color(0x88000000), blurRadius: 2)],
     );
-    // PieChart has no built-in tooltip bubble in fl_chart 1.2; slice titles carry
-    // the shortened label and the full label stays available via the point model.
-    return PieChart(
-      PieChartData(
-        sectionsSpace: 2,
-        centerSpaceRadius: 36,
-        borderData: FlBorderData(show: false),
-        pieTouchData: PieTouchData(enabled: true),
-        sections: [
-          for (var i = 0; i < part.points.length; i++)
-            PieChartSectionData(
-              value: part.points[i].value.toDouble().abs(),
-              title: axisLabel(part.points[i].label),
-              color: _sliceColors[i % _sliceColors.length],
-              radius: 56,
-              titleStyle: titleStyle,
+
+    return ColoredBox(
+      color: UiPalette.surfaceRaised,
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: PieChart(
+              PieChartData(
+                sectionsSpace: 2,
+                centerSpaceRadius: 32,
+                centerSpaceColor: UiPalette.surfaceRaised,
+                borderData: FlBorderData(show: false),
+                pieTouchData: PieTouchData(enabled: true),
+                sections: [
+                  for (var i = 0; i < part.points.length; i++)
+                    PieChartSectionData(
+                      value: part.points[i].value.toDouble().abs(),
+                      title: percentLabel(part.points[i].value, total),
+                      color: _sliceColors[i % _sliceColors.length],
+                      radius: 52,
+                      titleStyle: percentStyle,
+                      titlePositionPercentageOffset: 0.55,
+                    ),
+                ],
+              ),
             ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 2,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (var i = 0; i < part.points.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 8),
+                    _pieLegendRow(
+                      color: _sliceColors[i % _sliceColors.length],
+                      label: part.points[i].label,
+                      value: part.points[i].value,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  Widget _pieLegendRow({
+    required Color color,
+    required String label,
+    required num value,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            '${axisLabel(label)}  ${formatValue(value)}',
+            style: const TextStyle(
+              color: UiPalette.textMuted,
+              fontSize: 12,
+              fontFamily: UiType.bodyFamily,
+              fontFamilyFallback: UiType.bodyFallback,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  static String formatValue(num value) {
+    final asDouble = value.toDouble();
+    if (asDouble == asDouble.roundToDouble()) {
+      return asDouble.round().toString();
+    }
+    return value.toString();
+  }
+
+  static String percentLabel(num value, double total) {
+    if (total <= 0) {
+      return '0%';
+    }
+    return '${((value.toDouble().abs() / total) * 100).round()}%';
   }
 
   FlTitlesData _titlesData() {

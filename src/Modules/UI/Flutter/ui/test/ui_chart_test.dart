@@ -46,12 +46,28 @@ void main() {
     expect(find.text('Companies by country'), findsOneWidget);
   });
 
-  testWidgets('pie charts draw a PieChart', (tester) async {
+  testWidgets('pie charts draw percents and a value legend', (tester) async {
     await pump(tester, chart('pie'));
     expect(find.byType(PieChart), findsOneWidget);
     expect(find.byType(BarChart), findsNothing);
     expect(find.byType(LineChart), findsNothing);
     expect(find.text('Companies by country'), findsOneWidget);
+    // Percents are canvas-painted; assert section titles. Legend is real Text.
+    final pie = tester.widget<PieChart>(find.byType(PieChart));
+    expect(pie.data.centerSpaceColor, UiPalette.surfaceRaised);
+    expect(
+      pie.data.sections.map((section) => section.title),
+      ['37%', '33%', '30%'],
+    );
+    expect(find.text('GB  11'), findsOneWidget);
+    expect(find.text('DE  10'), findsOneWidget);
+    expect(find.text('CZ  9'), findsOneWidget);
+  });
+
+  test('pie percent labels round from the series total', () {
+    expect(UiChart.percentLabel(11, 30), '37%');
+    expect(UiChart.percentLabel(10, 30), '33%');
+    expect(UiChart.percentLabel(0, 0), '0%');
   });
 
   testWidgets('empty data shows a placeholder instead of a chart', (
