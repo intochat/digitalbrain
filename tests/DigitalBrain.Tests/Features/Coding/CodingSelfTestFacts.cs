@@ -1,4 +1,5 @@
 using DigitalBrain.Coding;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -52,6 +53,26 @@ public sealed class CodingSelfTestFacts
             "DigitalBrain.Tests.Coding.WorkspaceReadFacts", artifacts, timeout.Token);
         Assert.True(tests.Succeeded, tests.Detail ?? string.Join("; ", tests.Failures.Select(failure => failure.Name)));
         Assert.True(tests.Passed >= 7, $"passed {tests.Passed}");
+    }
+
+    [Fact(Skip = Skip, SkipUnless = nameof(SelfTestsEnabled))]
+    public async Task The_real_solution_builds_into_the_standby_slot_output()
+    {
+        var repository = Path.GetDirectoryName(SolutionPath)!;
+        var options = SlotOptions.From(new ConfigurationBuilder().Build());
+        var artifacts = options.ArtifactsFor("b", repository);
+        Assert.True(Path.IsPathFullyQualified(artifacts), artifacts);
+        Assert.Equal(Path.Combine(repository, "artifacts", "slot-b"), artifacts);
+
+        var runner = new DotnetRunner(new ProcessRunner());
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromMinutes(20));
+        var build = await runner.BuildAsync(SolutionPath, artifacts, timeout.Token);
+
+        Assert.True(build.Succeeded, build.Detail ?? string.Join("; ", build.Errors.Select(error => $"{error.Path}:{error.Line} {error.Id}")));
+        // The AppHost starts kernel-b from exactly this path (spike S1).
+        Assert.True(File.Exists(Path.Combine(artifacts, "bin", "DigitalBrain.Silo", "release", "DigitalBrain.Silo.dll")),
+            $"the standby dll is missing under {artifacts}");
     }
 
     private static string FindSolution()

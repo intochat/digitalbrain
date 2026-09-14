@@ -61,6 +61,9 @@ public sealed partial class DotnetRunner(IProcessRunner processes)
         if (!string.IsNullOrWhiteSpace(artifactsPath))
         {
             arguments.Add("-p:ArtifactsPath=" + Path.GetFullPath(artifactsPath, directory));
+            // ArtifactsPath alone does not switch the SDK to the artifacts layout, so the slot's dll would
+            // stay under each project's own bin (spike S1).
+            arguments.Add("-p:UseArtifactsOutput=true");
         }
 
         return directory;

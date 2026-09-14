@@ -18,6 +18,14 @@ public sealed class GitRunner(IProcessRunner processes)
     public async Task<string> CurrentBranchAsync(string repository, CancellationToken cancellationToken)
         => (await GitAsync(repository, ["branch", "--show-current"], cancellationToken).ConfigureAwait(false)).Output.Trim();
 
+    // The generation a slot is built from is the repository's HEAD commit (D3). A tree that is not a
+    // repository is not an error here: the slot is then built from an unrecorded generation.
+    public async Task<string?> HeadCommitAsync(string repository, CancellationToken cancellationToken)
+    {
+        var result = await RunGitAsync(repository, ["rev-parse", "HEAD"], cancellationToken).ConfigureAwait(false);
+        return result.ExitCode == 0 && result.Output.Trim() is { Length: > 0 } hash ? hash : null;
+    }
+
     public async Task<string> EnsureBranchAsync(string repository, string branch, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(branch);

@@ -23,6 +23,7 @@ public sealed class CodeWorkspaceNeuronFacts
     [Theory]
     [InlineData(typeof(ICodeWorkspace), 12)]
     [InlineData(typeof(IChangeSet), 5)]
+    [InlineData(typeof(ISlot), 4)]
     public void Every_contract_method_uses_section_7_types(Type contract, int expectedMethods)
     {
         var options = DescriptorTable.ContractOptions(CodingJson.Default);

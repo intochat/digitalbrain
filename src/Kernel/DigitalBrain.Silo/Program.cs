@@ -46,6 +46,7 @@ app.MapOrleansDashboard("/orleans");
 app.MapConversationalAgent();
 app.MapWorkspaceEndpoints();
 app.MapUiEndpoints();
+app.MapSlotEndpoints();
 app.MapBrainObservationEndpoints();
 
 // Graph HTTP capabilities are optional; conversation handling stays direct.

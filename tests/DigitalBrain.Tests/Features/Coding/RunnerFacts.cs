@@ -67,7 +67,7 @@ public sealed class RunnerFacts
         var call = Assert.Single(processes.Calls);
         Assert.Equal("dotnet", call.FileName);
         // GetFullPath yields backslashes on Windows; the argument's separators are normalized before comparing.
-        Assert.Equal(["build", "E:/repo/Repo.slnx", "-c", "Release", "--nologo", "-p:ArtifactsPath=E:/repo/artifacts/slot-b"],
+        Assert.Equal(["build", "E:/repo/Repo.slnx", "-c", "Release", "--nologo", "-p:ArtifactsPath=E:/repo/artifacts/slot-b", "-p:UseArtifactsOutput=true"],
             call.Arguments.Select(static argument => argument.Replace('\\', '/')));
         Assert.Equal("E:/repo", call.WorkingDirectory.Replace('\\', '/'));
     }

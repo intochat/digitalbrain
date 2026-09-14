@@ -68,6 +68,51 @@ public sealed class ChangeSetEditor(CodeFixCatalog codeFixes)
             ChangedPaths(solution, changedIds), failing, detail);
     }
 
+    // Rollback is only safe when nothing persisted changed shape (R5.3), and a state type is a type
+    // declaration carrying [GenerateSerializer]. A syntax scan of the written files is enough and needs no
+    // compilation: an unresolved attribute name still reads as that attribute.
+    public async Task<bool> TouchesSerializedStateAsync(Solution solution, IReadOnlyList<string> files, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(solution);
+        ArgumentNullException.ThrowIfNull(files);
+        foreach (var path in files)
+        {
+            var document = solution.Projects
+                .SelectMany(static project => project.Documents)
+                .FirstOrDefault(candidate => string.Equals(candidate.FilePath, path, StringComparison.OrdinalIgnoreCase));
+            if (document is null)
+            {
+                continue;
+            }
+
+            if (await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false) is not { } root)
+            {
+                continue;
+            }
+
+            if (root.DescendantNodes().OfType<BaseTypeDeclarationSyntax>()
+                .SelectMany(static declaration => declaration.AttributeLists)
+                .SelectMany(static list => list.Attributes)
+                .Any(IsGenerateSerializer))
+            {
+                return true;
+            }
+        }
+
+        return false;
+
+        static bool IsGenerateSerializer(AttributeSyntax attribute)
+        {
+            var name = attribute.Name switch
+            {
+                QualifiedNameSyntax qualified => qualified.Right.Identifier.ValueText,
+                SimpleNameSyntax simple => simple.Identifier.ValueText,
+                _ => attribute.Name.ToString(),
+            };
+            return name is "GenerateSerializer" or "GenerateSerializerAttribute";
+        }
+    }
+
     private async Task<Solution> ApplyOneAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
         => edit.Kind switch
         {
