@@ -101,9 +101,11 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
         return await query(lease.Solution, lease.SolutionPath ?? string.Empty, cancellationToken).ConfigureAwait(false);
     }
 
-    // One lease around the whole transaction: the change is computed on the leased snapshot, applied through
-    // TryApplyChanges, and only then written to disk document by document. TryApplyChanges refuses a snapshot
-    // the workspace has moved past, so a fold or a reload between check and commit cannot be overwritten.
+    // One lease around the whole transaction: the change is computed on the leased snapshot and applied
+    // through TryApplyChanges, which refuses a snapshot the workspace has moved past so a fold or a reload
+    // between check and commit cannot be overwritten. TryApplyChanges may write the changed documents to disk
+    // itself -- MSBuildWorkspace does -- so the before/after comparison below reports a path as written
+    // whenever its text actually changed, whichever of the two wrote it.
     public async Task<CommitOutcome> CommitAsync(Func<Solution, CancellationToken, Task<Solution>> change, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(change);
@@ -122,22 +124,39 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
             .OrderBy(static document => document.FilePath, StringComparer.Ordinal)
             .Select(document => (Document: document, Path: document.FilePath ?? throw new InvalidOperationException($"Document '{document.Name}' has no file path to write to.")))
             .ToArray();
+
+        // Snapshotted before TryApplyChanges, which may overwrite these files itself: "did this path change"
+        // has to be judged against the text on disk before the apply ran, not against disk afterward.
+        var beforeTexts = new string?[documents.Length];
+        for (var i = 0; i < documents.Length; i++)
+        {
+            var path = documents[i].Path;
+            beforeTexts[i] = File.Exists(path) ? await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false) : null;
+        }
+
         if (!lease.Workspace.TryApplyChanges(changed))
         {
             throw new InvalidOperationException("The workspace changed while the change set was being checked. Check it again before committing.");
         }
 
         var written = new List<string>();
-        foreach (var (document, path) in documents)
+        for (var i = 0; i < documents.Length; i++)
         {
+            var (document, path) = documents[i];
             var text = await document.GetTextAsync(cancellationToken).ConfigureAwait(false);
             var content = text.ToString();
+            if (string.Equals(beforeTexts[i], content, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             if (!File.Exists(path) || !string.Equals(await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false), content, StringComparison.Ordinal))
             {
                 var encoding = text.Encoding ?? new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
                 await File.WriteAllTextAsync(path, content, encoding, cancellationToken).ConfigureAwait(false);
-                written.Add(path);
             }
+
+            written.Add(path);
         }
 
         return new CommitOutcome(written, Interlocked.Increment(ref _snapshotVersion));
