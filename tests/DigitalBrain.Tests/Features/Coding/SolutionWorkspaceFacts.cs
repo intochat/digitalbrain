@@ -68,7 +68,7 @@ public sealed class SolutionWorkspaceFacts
         await workspace.BeginOpenAsync(fixture.SolutionPath);
         await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
         var programBefore = File.GetLastWriteTimeUtc(fixture.ProgramPath);
-        var editor = new ChangeSetEditor();
+        var editor = new ChangeSetEditor(new CodeFixCatalog());
 
         var outcome = await workspace.CommitAsync(async (solution, token) =>
         {
@@ -93,7 +93,7 @@ public sealed class SolutionWorkspaceFacts
         using var workspace = new SolutionWorkspace(new AdhocSolutionLoader(fixture.Open), NullLogger<SolutionWorkspace>.Instance);
         await workspace.BeginOpenAsync(fixture.SolutionPath);
         await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
-        var editor = new ChangeSetEditor();
+        var editor = new ChangeSetEditor(new CodeFixCatalog());
         await workspace.CommitAsync(async (solution, token) =>
         {
             var applied = await editor.ApplyAsync(solution,

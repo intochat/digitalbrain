@@ -6,7 +6,7 @@ namespace DigitalBrain.Tests.Coding;
 
 public sealed class ChangeSetEditorFacts
 {
-    private static readonly ChangeSetEditor Editor = new();
+    private static readonly ChangeSetEditor Editor = new(new CodeFixCatalog());
 
     private static Solution Snapshot() => FixtureSolutions.TwoProjects().CurrentSolution;
 
@@ -128,5 +128,53 @@ public sealed class ChangeSetEditorFacts
             TestContext.Current.CancellationToken);
         Assert.False(outcome.HasErrors);
         Assert.Empty(outcome.Diagnostics);
+    }
+
+    [Fact]
+    public async Task Rename_by_symbol_id_updates_every_reference()
+    {
+        var outcome = await Editor.ApplyAsync(Snapshot(),
+            [new EditRequest(EditKind.Rename, SymbolId: "M:Alpha.Greeter.Greet(System.String)", NewName: "Hello")],
+            TestContext.Current.CancellationToken);
+        Assert.False(outcome.HasErrors);
+        Assert.Equal([FixtureSolutions.GreeterPath, FixtureSolutions.ProgramPath], outcome.ChangedPaths);
+        Assert.Contains(""".Hello("world")""", await TextAsync(outcome.Changed, FixtureSolutions.ProgramPath), StringComparison.Ordinal);
+        Assert.Contains("public string Hello(string name)", await TextAsync(outcome.Changed, FixtureSolutions.GreeterPath), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Rename_refuses_an_invalid_identifier()
+    {
+        var outcome = await Editor.ApplyAsync(Snapshot(),
+            [new EditRequest(EditKind.Rename, SymbolId: "M:Alpha.Greeter.Greet(System.String)", NewName: "not an identifier")],
+            TestContext.Current.CancellationToken);
+        Assert.Equal(0, outcome.FailingEdit);
+        Assert.Contains("identifier", outcome.Detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_code_fix_removes_the_unused_variable()
+    {
+        var outcome = await Editor.ApplyAsync(Snapshot(),
+            [new EditRequest(EditKind.ApplyCodeFix, Path: FixtureSolutions.UnusedPath, DiagnosticId: "CS0219")],
+            TestContext.Current.CancellationToken);
+        Assert.False(outcome.HasErrors);
+        Assert.DoesNotContain("int count", await TextAsync(outcome.Changed, FixtureSolutions.UnusedPath), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_code_fix_for_a_diagnostic_that_is_not_there_is_advice()
+    {
+        var outcome = await Editor.ApplyAsync(Snapshot(),
+            [new EditRequest(EditKind.ApplyCodeFix, Path: FixtureSolutions.GreeterPath, DiagnosticId: "CS0219")],
+            TestContext.Current.CancellationToken);
+        Assert.Equal(0, outcome.FailingEdit);
+        Assert.Contains("CS0219", outcome.Detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_catalog_finds_a_fixer_for_unused_variables()
+    {
+        Assert.NotEmpty(new CodeFixCatalog().For("CS0219"));
     }
 }

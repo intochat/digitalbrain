@@ -1,14 +1,17 @@
 using System.Text;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CodeActions;
+using Microsoft.CodeAnalysis.CodeFixes;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.Formatting;
+using Microsoft.CodeAnalysis.Rename;
 using Microsoft.CodeAnalysis.Text;
 
 namespace DigitalBrain.Coding;
 
-public sealed class ChangeSetEditor
+public sealed class ChangeSetEditor(CodeFixCatalog codeFixes)
 {
     private const int DiagnosticLimit = 200;
 
@@ -58,15 +61,15 @@ public sealed class ChangeSetEditor
             ChangedPaths(solution, changedIds), failing, detail);
     }
 
-    private static async Task<(Solution Solution, string Path)> ApplyOneAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
+    private async Task<(Solution Solution, string Path)> ApplyOneAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
         => edit.Kind switch
         {
             EditKind.ReplaceMember => await ReplaceMemberAsync(solution, edit, cancellationToken).ConfigureAwait(false),
             EditKind.InsertMember => await InsertMemberAsync(solution, edit, cancellationToken).ConfigureAwait(false),
             EditKind.AddUsing => await AddUsingAsync(solution, edit, cancellationToken).ConfigureAwait(false),
             EditKind.ReplaceRange => await ReplaceRangeAsync(solution, edit, cancellationToken).ConfigureAwait(false),
-            EditKind.Rename => throw new NotSupportedException("phase 1 task 4"),
-            EditKind.ApplyCodeFix => throw new NotSupportedException("phase 1 task 4"),
+            EditKind.Rename => await RenameAsync(solution, edit, cancellationToken).ConfigureAwait(false),
+            EditKind.ApplyCodeFix => await ApplyCodeFixAsync(solution, edit, cancellationToken).ConfigureAwait(false),
             _ => throw new InvalidOperationException($"Unknown edit kind '{edit.Kind}'."),
         };
 
@@ -129,6 +132,58 @@ public sealed class ChangeSetEditor
         var span = TextSpan.FromBounds(text.Lines[start - 1].Start, text.Lines[end - 1].End);
         var changed = text.WithChanges(new TextChange(span, edit.Source ?? string.Empty));
         return (document.WithText(changed).Project.Solution, path);
+    }
+
+    private static async Task<(Solution, string)> RenameAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
+    {
+        var newName = Required(edit.NewName, "newName");
+        if (!SyntaxFacts.IsValidIdentifier(newName))
+        {
+            throw new InvalidOperationException($"'{newName}' is not a valid C# identifier.");
+        }
+
+        var (document, _) = await TargetAsync(solution, edit, cancellationToken).ConfigureAwait(false);
+        var symbol = await SolutionQueries.ResolveAsync(solution, edit.SymbolId!, cancellationToken).ConfigureAwait(false);
+        var renamed = await Renamer.RenameSymbolAsync(solution, symbol, new SymbolRenameOptions(), newName, cancellationToken).ConfigureAwait(false);
+        return (renamed, document.FilePath!);
+    }
+
+    private async Task<(Solution, string)> ApplyCodeFixAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
+    {
+        var path = Required(edit.Path, "path");
+        var diagnosticId = Required(edit.DiagnosticId, "diagnosticId");
+        var document = SolutionQueries.DocumentAt(solution, path);
+        var model = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false)
+            ?? throw new InvalidOperationException($"'{path}' has no semantic model.");
+        var diagnostic = model.GetDiagnostics(cancellationToken: cancellationToken)
+            .FirstOrDefault(candidate => candidate.Id == diagnosticId
+                && (edit.StartLine is null || candidate.Location.GetLineSpan().StartLinePosition.Line + 1 == edit.StartLine))
+            ?? throw new InvalidOperationException($"No {diagnosticId} diagnostic in '{path}'{(edit.StartLine is { } line ? $" at line {line}" : string.Empty)}. Ask diagnostics for the ids and lines it has.");
+        var actions = new List<CodeAction>();
+        var context = new CodeFixContext(document, diagnostic, (action, _) => actions.Add(action), cancellationToken);
+        foreach (var provider in codeFixes.For(diagnosticId))
+        {
+#pragma warning disable CA1031 // a fixer built outside its MEF host may fail in any way; the next fixer gets its turn
+            try
+            {
+                await provider.RegisterCodeFixesAsync(context).ConfigureAwait(false);
+            }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                continue;
+            }
+#pragma warning restore CA1031
+        }
+
+        var flat = actions.SelectMany(static action => action.NestedActions.Length > 0 ? action.NestedActions : [action]).ToArray();
+        var chosen = flat.FirstOrDefault(action => edit.FixTitle is null || string.Equals(action.Title, edit.FixTitle, StringComparison.Ordinal))
+            ?? throw new InvalidOperationException(flat.Length == 0
+                ? $"No code fix is available for {diagnosticId} in this host."
+                : $"No fix titled '{edit.FixTitle}'; available: {string.Join(" | ", flat.Select(static action => action.Title))}.");
+        var operations = await chosen.GetOperationsAsync(cancellationToken).ConfigureAwait(false);
+        var apply = operations.OfType<ApplyChangesOperation>().FirstOrDefault()
+            ?? throw new InvalidOperationException($"The fix '{chosen.Title}' does not change the solution.");
+        return (apply.ChangedSolution, path);
     }
 
     private static async Task<(Document Document, SyntaxNode Node)> TargetAsync(Solution solution, EditRequest edit, CancellationToken cancellationToken)
