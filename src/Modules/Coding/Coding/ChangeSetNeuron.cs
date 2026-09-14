@@ -121,11 +121,7 @@ internal sealed class ChangeSetNeuron(
                     {
                         var committed = await workspace.CommitAsync(async (solution, token) =>
                         {
-                            // ORLEANS0014 flags every ConfigureAwait(false) in a grain type, but this delegate runs inside
-                            // SolutionWorkspace.CommitAsync's lease, off the grain turn, so it must not resume on it.
-#pragma warning disable ORLEANS0014
-                            applied = await editor.ApplyAsync(solution, current.Edits, token).ConfigureAwait(false);
-#pragma warning restore ORLEANS0014
+                            applied = await editor.ApplyAsync(solution, current.Edits, token).ConfigureAwait(true);
                             return applied.HasErrors
                                 ? throw new InvalidOperationException(applied.Detail ?? "the change set has errors")
                                 : applied.Changed;
