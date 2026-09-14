@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Interactions;
 using DigitalBrain.Coding;
@@ -23,6 +24,9 @@ public sealed class SlotToolFacts
         FakeAspireResourceCommands Aspire,
         InMemoryActiveSlotLease Lease) : IAsyncDisposable
     {
+        public Task<SlotSnapshot> ReadAsync(string name)
+            => Brain.Grains.GetGrain<ISlot>(new NeuronId(CodingVocabulary.SlotType, name).ToGrainId()).Read();
+
         public ValueTask DisposeAsync() => Brain.DisposeAsync();
     }
 
@@ -133,5 +137,51 @@ public sealed class SlotToolFacts
         var result = await PromoteAsync(world, new() { ["slot"] = "c" });
         Assert.Contains("is not a slot", result.GetProperty("advice").GetString(), StringComparison.Ordinal);
         Assert.Empty(world.Builder.Builds);
+    }
+
+    [Fact]
+    public async Task A_slot_named_in_another_case_is_the_same_slot()
+    {
+        await using var world = await StartAsync();
+        world.Endpoints.UnhealthyProbes = 1;
+
+        var result = await PromoteAsync(world, new() { ["slot"] = "B" });
+
+        // NeuronId lowercases a grain's type but not its name, while the URL, the Aspire resource and the
+        // lease all match case-insensitively: an uncanonicalised 'B' would promote b for real and record the
+        // phase in a second grain that the rollback rule never reads.
+        Assert.Equal("b", result.GetProperty("slot").GetString());
+        Assert.Equal("Live", result.GetProperty("status").GetString());
+        Assert.Equal(SlotPhase.Live, (await world.ReadAsync("b")).Phase);
+    }
+
+    [Fact]
+    public async Task A_rollback_does_not_take_a_change_set()
+    {
+        await using var world = await StartAsync();
+
+        var result = await PromoteAsync(world, new() { ["slot"] = "a", ["promoteOnly"] = true, ["changeId"] = "x" });
+
+        Assert.Contains("Pass one or the other", result.GetProperty("advice").GetString(), StringComparison.Ordinal);
+        Assert.Empty(world.Builder.Builds);
+        Assert.Empty(world.Endpoints.Switches);
+    }
+
+    [Fact]
+    public async Task A_promote_of_a_failed_slot_is_advice()
+    {
+        await using var world = await StartAsync();
+        world.Builder.Outcome = new BuildOutcome(false,
+            [new DiagnosticHit("CS0103", "Error", "The name 'Nope' does not exist", "E:/repo/src/A/Thing.cs", 12)],
+            0, 3.0, "dotnet build", null);
+        Assert.Equal("Failed", (await PromoteAsync(world, new() { ["slot"] = "b" })).GetProperty("status").GetString());
+
+        // Failed is terminal: the artifacts and any process behind them are unaccounted for, so the slot is
+        // built again rather than promoted as it stands.
+        var result = await PromoteAsync(world, new() { ["slot"] = "b", ["promoteOnly"] = true });
+
+        Assert.Contains("failed its last build", result.GetProperty("advice").GetString(), StringComparison.Ordinal);
+        Assert.Empty(world.Endpoints.Switches);
+        Assert.Equal("a", world.Lease.Holder);
     }
 }

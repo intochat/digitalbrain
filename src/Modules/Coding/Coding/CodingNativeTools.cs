@@ -20,10 +20,10 @@ public sealed class CodingNativeTools
     private readonly GitRunner _git;
     private readonly IConfiguration _configuration;
     private readonly CodingToolOptions _options;
-    private readonly SlotOptions _slots;
+    private readonly SlotOptions _slotOptions;
     private readonly Lazy<IReadOnlyList<AIFunction>> _functions;
 
-    public CodingNativeTools(SolutionWorkspace workspace, IGrainFactory grains, DotnetRunner dotnet, GitRunner git, IConfiguration configuration, CodingToolOptions options, SlotOptions slots)
+    public CodingNativeTools(SolutionWorkspace workspace, IGrainFactory grains, DotnetRunner dotnet, GitRunner git, IConfiguration configuration, CodingToolOptions options, SlotOptions slotOptions)
     {
         _workspace = workspace;
         _grains = grains;
@@ -31,7 +31,7 @@ public sealed class CodingNativeTools
         _git = git;
         _configuration = configuration;
         _options = options;
-        _slots = slots;
+        _slotOptions = slotOptions;
         _functions = new(Build);
     }
 
@@ -254,16 +254,26 @@ public sealed class CodingNativeTools
         CancellationToken cancellationToken = default)
         => GuardedAsync(async () =>
         {
-            if (!SlotOptions.Names.Contains(slot, StringComparer.OrdinalIgnoreCase))
+            // Everything downstream of the name matches it case-insensitively - the slot's URL, its Aspire
+            // resource, the lease row, the neuron's own checks - except the grain key, which NeuronId
+            // lowercases only the type. A verbatim 'B' would therefore drive b's endpoints while persisting
+            // its phase into a second grain that nothing, the rollback rule included, ever reads.
+            var name = SlotOptions.Names.FirstOrDefault(known => string.Equals(known, slot, StringComparison.OrdinalIgnoreCase))
+                ?? throw new InvalidOperationException($"'{slot}' is not a slot. Name '{string.Join("' or '", SlotOptions.Names)}'.");
+
+            // A rollback promotes what is already built, so naming a landing to build from it is a
+            // contradiction rather than a detail to ignore.
+            if (promoteOnly && changeId is { Length: > 0 })
             {
-                throw new InvalidOperationException($"'{slot}' is not a slot. Name '{string.Join("' or '", SlotOptions.Names)}'.");
+                throw new InvalidOperationException(
+                    "changeId names a landing to build; a rollback (promoteOnly) promotes what is already built. Pass one or the other.");
             }
 
-            var target = Slot(slot);
+            var target = Slot(name);
             var snapshot = await target.Read().WaitAsync(cancellationToken).ConfigureAwait(false);
             if (promoteOnly)
             {
-                await RefuseForwardOnlyRollbackAsync(slot, cancellationToken).ConfigureAwait(false);
+                await RefuseForwardOnlyRollbackAsync(name, cancellationToken).ConfigureAwait(false);
             }
             else
             {
@@ -284,8 +294,8 @@ public sealed class CodingNativeTools
                 var generation = await GenerationAsync(cancellationToken).ConfigureAwait(false);
                 var beforeBuild = snapshot.Revision;
                 await target.Build(new BuildSlot(CommandId.New(), generation, files)).ConfigureAwait(false);
-                snapshot = await SettleAsync(target.Read, current => current.Revision > beforeBuild, $"slot '{slot}'",
-                    static current => $"it is {current.Phase}", _slots.PromoteWait, cancellationToken).ConfigureAwait(false);
+                snapshot = await SettleAsync(target.Read, current => current.Revision > beforeBuild, $"Slot '{name}'",
+                    static current => $"it is {current.Phase}", _slotOptions.PromoteWait, cancellationToken).ConfigureAwait(false);
                 if (snapshot.Phase != SlotPhase.Built)
                 {
                     return Result(snapshot, snapshot.Detail ?? "the slot did not build");
@@ -296,7 +306,7 @@ public sealed class CodingNativeTools
             await target.Promote(new PromoteSlot(CommandId.New())).ConfigureAwait(false);
             var promoted = await SettleAsync(target.Read,
                 current => current.Revision > beforePromote && current.Phase is SlotPhase.Live or SlotPhase.Failed,
-                $"slot '{slot}'", static current => $"it is {current.Phase}", _slots.PromoteWait, cancellationToken).ConfigureAwait(false);
+                $"Slot '{name}'", static current => $"it is {current.Phase}", _slotOptions.PromoteWait, cancellationToken).ConfigureAwait(false);
             return Result(promoted, promoted.Phase == SlotPhase.Live ? null : promoted.Detail ?? "the promotion failed");
 
             static object Result(SlotSnapshot snapshot, string? advice) => new
@@ -333,15 +343,15 @@ public sealed class CodingNativeTools
     // Rolling back is promoting the slot that is still running, and only the slot that is live now knows
     // whether its own landing changed a [GenerateSerializer] type (design 4.4). A neuron may not read
     // another neuron, but a tool may.
-    private async Task RefuseForwardOnlyRollbackAsync(string slot, CancellationToken cancellationToken)
+    private async Task RefuseForwardOnlyRollbackAsync(string promoting, CancellationToken cancellationToken)
     {
-        foreach (var other in SlotOptions.Names.Where(name => !string.Equals(name, slot, StringComparison.OrdinalIgnoreCase)))
+        foreach (var other in SlotOptions.Names.Where(name => !string.Equals(name, promoting, StringComparison.OrdinalIgnoreCase)))
         {
             var live = await Slot(other).Read().WaitAsync(cancellationToken).ConfigureAwait(false);
             if (live.Phase == SlotPhase.Live && !live.RollbackAllowed)
             {
                 throw new InvalidOperationException(
-                    $"Slot '{other}' is live with a landing that changed persisted state, so it is forward-only: build slot '{slot}' again instead of promoting it back.");
+                    $"Slot '{other}' is live with a landing that changed persisted state, so it is forward-only: build slot '{promoting}' again instead of promoting it back.");
             }
         }
     }
@@ -364,6 +374,9 @@ public sealed class CodingNativeTools
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(budget);
         TSnapshot? last = default;
+        // Whether any poll ever came back, which default(TSnapshot) cannot stand in for: a value-type
+        // snapshot's default is indistinguishable from one a read actually answered with.
+        var answered = false;
         // A reaction that settles at once is usually caught by the first or second poll; the backoff keeps a
         // long check, commit or build from costing hundreds of grain reads while it runs.
         var poll = TimeSpan.FromMilliseconds(20);
@@ -378,6 +391,7 @@ public sealed class CodingNativeTools
                     // the deadline fire at all in that case, instead of Orleans' own request timeout
                     // dominating it.
                     last = await read().WaitAsync(timeout.Token).ConfigureAwait(false);
+                    answered = true;
                     if (settled(last))
                     {
                         return last;
@@ -397,12 +411,12 @@ public sealed class CodingNativeTools
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             throw new InvalidOperationException(
-                $"{subject} did not settle within {budget.TotalSeconds:0}s; {(last is null ? "it answered nothing" : describe(last))}. Read it again or start over.");
+                $"{subject} did not settle within {budget.TotalSeconds:0}s; {(answered ? describe(last!) : "it answered nothing")}. Read it again or start over.");
         }
     }
 
     private Task<ChangeSetSnapshot> WaitAsync(IChangeSet changeSet, ChangeSetSnapshot before, CancellationToken cancellationToken)
-        => SettleAsync(changeSet.Read, snapshot => snapshot.Revision > before.Revision, "the change set",
+        => SettleAsync(changeSet.Read, snapshot => snapshot.Revision > before.Revision, "The change set",
             static snapshot => $"its status is still {snapshot.Status}", _options.ReactionWait, cancellationToken);
 
     private static async Task<JsonElement> GuardedAsync<T>(Func<Task<T>> query)
