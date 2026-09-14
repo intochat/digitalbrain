@@ -14,6 +14,7 @@
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="11.0.0-rc.1.26425.128" />
     <PackageVersion Include="Microsoft.Build.Locator" Version="1.11.2" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.9.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Features" Version="5.9.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.9.0" />
     <PackageVersion Include="xunit.v3" Version="4.0.0" />
     <PackageVersion Include="xunit.v3.extensibility.core" Version="4.0.0" />

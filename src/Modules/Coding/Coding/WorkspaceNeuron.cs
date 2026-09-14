@@ -2,6 +2,8 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Core;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
@@ -14,6 +16,12 @@ internal sealed class WorkspaceNeuron(
     SolutionWorkspace workspace)
     : Neuron<WorkspaceState>(runtime, state), ICodeWorkspace
 {
+    private static readonly TimeSpan MappingWait = TimeSpan.FromMilliseconds(250);
+
+    // 2400 attempts at the reaction's 250ms wait is ten minutes; long enough for any real load, bounded so a
+    // solution that never becomes ready cannot keep re-scheduling this reaction forever.
+    private const int MaxMappingAttempts = 2400;
+
     public Task<Accepted<WorkspaceReceipt>> Open(OpenWorkspace command) => ExecuteCommandAsync(
         Descriptor("open"), command, CodingJson.Default.OpenWorkspace, CodingJson.Default.AcceptedWorkspaceReceipt, arguments =>
         {
@@ -49,7 +57,8 @@ internal sealed class WorkspaceNeuron(
     public Task<WorkspaceSnapshot> Read()
     {
         var live = workspace.Status;
-        return Task.FromResult(new WorkspaceSnapshot(State?.SolutionPath ?? live.SolutionPath, live.Phase, live.ProjectCount, live.DocumentCount, live.Detail, State?.Generation ?? 0));
+        return Task.FromResult(new WorkspaceSnapshot(State?.SolutionPath ?? live.SolutionPath, live.Phase, live.ProjectCount, live.DocumentCount,
+            live.Detail ?? State?.Detail, State?.Generation ?? 0, live.ReloadNeeded));
     }
 
     [ReadOnly]
@@ -65,8 +74,35 @@ internal sealed class WorkspaceNeuron(
         => workspace.DiagnosticsAsync(query, cancellationToken);
 
     [ReadOnly]
-    public Task<SolutionMap> Map(MapQuery query, CancellationToken cancellationToken = default)
-        => workspace.MapAsync(query, cancellationToken);
+    public async Task<SolutionMap> Map(MapQuery query, CancellationToken cancellationToken = default)
+    {
+        if (workspace.Status.Phase == WorkspacePhase.Ready)
+        {
+            return await workspace.MapAsync(query, cancellationToken).ConfigureAwait(true);
+        }
+
+        return State?.LastMap ?? throw new WorkspaceNotReadyException(workspace.Status);
+    }
+
+    [ReadOnly]
+    public Task<Skeleton> Skeleton(SkeletonQuery query, CancellationToken cancellationToken = default)
+        => workspace.SkeletonAsync(query, cancellationToken);
+
+    [ReadOnly]
+    public Task<MemberSource> Member(MemberQuery query, CancellationToken cancellationToken = default)
+        => workspace.MemberAsync(query, cancellationToken);
+
+    [ReadOnly]
+    public Task<CallersResult> Callers(CallersQuery query, CancellationToken cancellationToken = default)
+        => workspace.CallersAsync(query, cancellationToken);
+
+    [ReadOnly]
+    public Task<SymbolSearchResult> Implementations(ImplementationsQuery query, CancellationToken cancellationToken = default)
+        => workspace.ImplementationsAsync(query, cancellationToken);
+
+    [ReadOnly]
+    public Task<SymbolSearchResult> Derived(DerivedQuery query, CancellationToken cancellationToken = default)
+        => workspace.DerivedAsync(query, cancellationToken);
 
     protected override async Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
     {
@@ -80,8 +116,20 @@ internal sealed class WorkspaceNeuron(
                     }
 
                     // The load runs in the service; the reaction only records the request so a restart re-opens.
-                    _ = workspace.BeginOpenAsync(body.SolutionPath);
-                    await SaveAsync(new WorkspaceState(body.SolutionPath, (State?.Generation ?? 0) + 1, TimeProvider.GetUtcNow()), cancellationToken).ConfigureAwait(true);
+                    // The previous LastMap carries forward: a reload in flight still answers Map() from the last good snapshot.
+                    var opening = workspace.BeginOpenAsync(body.SolutionPath);
+                    // A load that is running answers only when it finishes, and reads queue behind this turn,
+                    // so a task still in flight is read as "a load started" instead of being awaited here; a
+                    // repeat open of the path already loaded answers false at once.
+                    var loading = !opening.IsCompleted || await opening.ConfigureAwait(true);
+                    if (!loading && State is { } recorded && string.Equals(recorded.SolutionPath, body.SolutionPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        await SaveAsync(recorded with { Detail = "already open" }, cancellationToken).ConfigureAwait(true);
+                        break;
+                    }
+
+                    Schedule(Signal.FromJson(CodingVocabulary.WorkspaceMapping, new MappingBody(0), CodingJson.Default.MappingBody));
+                    await SaveAsync(new WorkspaceState(body.SolutionPath, (State?.Generation ?? 0) + 1, TimeProvider.GetUtcNow(), State?.LastMap), cancellationToken).ConfigureAwait(true);
                     break;
                 }
             case CodingVocabulary.WorkspaceReloading:
@@ -93,7 +141,38 @@ internal sealed class WorkspaceNeuron(
                     }
 
                     _ = workspace.Status.Phase == WorkspacePhase.NotOpened ? workspace.BeginOpenAsync(path) : workspace.BeginReloadAsync();
-                    await SaveAsync(new WorkspaceState(path, (State?.Generation ?? 0) + 1, TimeProvider.GetUtcNow()), cancellationToken).ConfigureAwait(true);
+                    Schedule(Signal.FromJson(CodingVocabulary.WorkspaceMapping, new MappingBody(0), CodingJson.Default.MappingBody));
+                    await SaveAsync(new WorkspaceState(path, (State?.Generation ?? 0) + 1, TimeProvider.GetUtcNow(), State?.LastMap), cancellationToken).ConfigureAwait(true);
+                    break;
+                }
+            case CodingVocabulary.WorkspaceMapping:
+                {
+                    if (State is not { } current)
+                    {
+                        return;
+                    }
+
+                    var attempt = Body(delivery, CodingJson.Default.MappingBody)?.Attempt ?? 0;
+                    switch (workspace.Status.Phase)
+                    {
+                        case WorkspacePhase.Ready:
+                            var map = await workspace.MapAsync(new MapQuery(), cancellationToken).ConfigureAwait(true);
+                            await SaveAsync(current with { LastMap = map }, cancellationToken).ConfigureAwait(true);
+                            break;
+                        case WorkspacePhase.Opening when attempt < MaxMappingAttempts:
+                            // Reads queue behind this bounded wait, so it stays short: the turn ends after one
+                            // quarter-second and the next reaction looks again.
+                            await Task.Delay(MappingWait, cancellationToken).ConfigureAwait(true);
+                            Schedule(Signal.FromJson(CodingVocabulary.WorkspaceMapping, new MappingBody(attempt + 1), CodingJson.Default.MappingBody));
+                            break;
+                        case WorkspacePhase.Opening:
+                            ServiceProvider.GetService<ILogger<WorkspaceNeuron>>()?.LogDebug(
+                                "Gave up caching the map for {SolutionPath} after {Attempts} attempts; the solution is still opening.", current.SolutionPath, attempt);
+                            break;
+                        default:
+                            break;
+                    }
+
                     break;
                 }
             default:

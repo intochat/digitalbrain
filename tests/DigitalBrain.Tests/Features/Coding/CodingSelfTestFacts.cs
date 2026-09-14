@@ -36,6 +36,24 @@ public sealed class CodingSelfTestFacts
         Assert.Contains(map.References, edge => edge.From == "DigitalBrain.Modules.Time" && edge.To == "DigitalBrain");
     }
 
+    [Fact(Skip = Skip, SkipUnless = nameof(SelfTestsEnabled))]
+    public async Task The_real_solution_builds_and_one_class_tests_through_the_runner()
+    {
+        var artifacts = Path.Combine(Path.GetDirectoryName(SolutionPath)!, "artifacts", "self-test");
+        var runner = new DotnetRunner(new ProcessRunner());
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromMinutes(15));
+
+        var build = await runner.BuildAsync(SolutionPath, artifacts, timeout.Token);
+        Assert.True(build.Succeeded, build.Detail ?? string.Join("; ", build.Errors.Select(error => $"{error.Path}:{error.Line} {error.Id}")));
+        Assert.Empty(build.Errors);
+
+        var tests = await runner.TestAsync(Path.Combine(Path.GetDirectoryName(SolutionPath)!, "tests", "DigitalBrain.Tests", "DigitalBrain.Tests.csproj"),
+            "DigitalBrain.Tests.Coding.WorkspaceReadFacts", artifacts, timeout.Token);
+        Assert.True(tests.Succeeded, tests.Detail ?? string.Join("; ", tests.Failures.Select(failure => failure.Name)));
+        Assert.True(tests.Passed >= 7, $"passed {tests.Passed}");
+    }
+
     private static string FindSolution()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

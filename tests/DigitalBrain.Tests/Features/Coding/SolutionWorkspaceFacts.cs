@@ -2,6 +2,7 @@ using DigitalBrain.Coding;
 using DigitalBrain.Testing;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Host.Mef;
+using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -55,8 +56,145 @@ public sealed class SolutionWorkspaceFacts
         using var workspace = await ReadyAsync();
         Assert.Equal(WorkspacePhase.Ready, workspace.Status.Phase);
         Assert.Equal(2, workspace.Status.ProjectCount);
-        Assert.Equal(3, workspace.Status.DocumentCount);
+        // Six hand-written fixture files plus the generated GreeterCodec document under Alpha/obj.
+        Assert.Equal(7, workspace.Status.DocumentCount);
         Assert.Null(workspace.Status.Detail);
+    }
+
+    [Fact]
+    public async Task Commit_applies_the_snapshot_and_writes_only_the_changed_files()
+    {
+        using var fixture = DiskFixture.Create();
+        using var workspace = new SolutionWorkspace(new AdhocSolutionLoader(fixture.Open), NullLogger<SolutionWorkspace>.Instance);
+        await workspace.BeginOpenAsync(fixture.SolutionPath);
+        await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
+        var programBefore = File.GetLastWriteTimeUtc(fixture.ProgramPath);
+        var editor = new ChangeSetEditor(new CodeFixCatalog());
+
+        var outcome = await workspace.CommitAsync(async (solution, token) =>
+        {
+            var applied = await editor.ApplyAsync(solution,
+                [new EditRequest(EditKind.ReplaceMember, SymbolId: "M:Alpha.Greeter.Greet(System.String)", Source: """public string Greet(string name) => $"Hi, {name}";""")], token);
+            return applied.Changed;
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal([fixture.GreeterPath], outcome.WrittenPaths);
+        Assert.Equal(1, outcome.SnapshotVersion);
+        Assert.Equal(1, workspace.SnapshotVersion);
+        Assert.Contains("Hi, {name}", await File.ReadAllTextAsync(fixture.GreeterPath, TestContext.Current.CancellationToken), StringComparison.Ordinal);
+        Assert.Equal(programBefore, File.GetLastWriteTimeUtc(fixture.ProgramPath));
+        var member = await workspace.MemberAsync(new("M:Alpha.Greeter.Greet(System.String)"), TestContext.Current.CancellationToken);
+        Assert.Contains("Hi, {name}", member.Source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Commit_of_unchanged_text_writes_nothing()
+    {
+        using var fixture = DiskFixture.Create();
+        using var workspace = new SolutionWorkspace(new AdhocSolutionLoader(fixture.Open), NullLogger<SolutionWorkspace>.Instance);
+        await workspace.BeginOpenAsync(fixture.SolutionPath);
+        await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
+        var editor = new ChangeSetEditor(new CodeFixCatalog());
+        await workspace.CommitAsync(async (solution, token) =>
+        {
+            var applied = await editor.ApplyAsync(solution,
+                [new EditRequest(EditKind.ReplaceMember, SymbolId: "M:Alpha.Greeter.Greet(System.String)", Source: """public string Greet(string name) => $"Hi, {name}";""")], token);
+            return applied.Changed;
+        }, TestContext.Current.CancellationToken);
+
+        var writeTimeBefore = File.GetLastWriteTimeUtc(fixture.GreeterPath);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+        var currentText = await File.ReadAllTextAsync(fixture.GreeterPath, TestContext.Current.CancellationToken);
+
+        var outcome = await workspace.CommitAsync((solution, _) => Task.FromResult(solution.WithDocumentText(
+            solution.GetDocumentIdsWithFilePath(fixture.GreeterPath).Single(), SourceText.From(currentText))), TestContext.Current.CancellationToken);
+
+        Assert.Empty(outcome.WrittenPaths);
+        Assert.Equal(2, outcome.SnapshotVersion);
+        Assert.Equal(2, workspace.SnapshotVersion);
+        Assert.Equal(writeTimeBefore, File.GetLastWriteTimeUtc(fixture.GreeterPath));
+    }
+
+    [Fact]
+    public async Task Commit_refuses_a_snapshot_the_workspace_has_moved_past()
+    {
+        using var fixture = DiskFixture.Create();
+        using var workspace = new SolutionWorkspace(new AdhocSolutionLoader(fixture.Open), NullLogger<SolutionWorkspace>.Instance);
+        await workspace.BeginOpenAsync(fixture.SolutionPath);
+        await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
+        var stale = await workspace.QueryAsync((solution, _) => Task.FromResult(solution), TestContext.Current.CancellationToken);
+        await workspace.CommitAsync((solution, _) => Task.FromResult(solution.WithDocumentText(
+            solution.GetDocumentIdsWithFilePath(fixture.GreeterPath).Single(), SourceText.From(FixtureSolutions.GreeterSource + "\n// touched\n"))), TestContext.Current.CancellationToken);
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => workspace.CommitAsync((_, _) => Task.FromResult(stale.WithDocumentText(
+            stale.GetDocumentIdsWithFilePath(fixture.GreeterPath).Single(), SourceText.From("namespace Alpha;"))), TestContext.Current.CancellationToken));
+        Assert.Contains("Check it again", error.Message, StringComparison.Ordinal);
+        Assert.Contains("// touched", await File.ReadAllTextAsync(fixture.GreeterPath, TestContext.Current.CancellationToken), StringComparison.Ordinal);
+    }
+
+    // Each commit computes its change on the snapshot it is applied to: without the writer gate the second
+    // one's TryApplyChanges refuses a snapshot the first has already moved past, even though they touch
+    // different files and neither is stale in any sense the caller could act on.
+    [Fact]
+    public async Task Two_commits_that_touch_different_files_both_land()
+    {
+        using var fixture = DiskFixture.Create();
+        using var workspace = new SolutionWorkspace(new AdhocSolutionLoader(fixture.Open), NullLogger<SolutionWorkspace>.Instance);
+        await workspace.BeginOpenAsync(fixture.SolutionPath);
+        await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
+
+        // The first commit parks inside its own change, holding the writer gate, so the second one is forced
+        // to compute its change while the first has not applied yet - the exact interleaving that used to
+        // make the second commit refuse itself as stale.
+        var release = new TaskCompletionSource();
+        var greeterCommit = workspace.CommitAsync(async (solution, token) =>
+        {
+            await release.Task.WaitAsync(token);
+            return solution.WithDocumentText(solution.GetDocumentIdsWithFilePath(fixture.GreeterPath).Single(),
+                SourceText.From(FixtureSolutions.GreeterSource + "\n// greeter\n"));
+        }, TestContext.Current.CancellationToken);
+        var unusedCommit = workspace.CommitAsync((solution, _) => Task.FromResult(solution.WithDocumentText(
+            solution.GetDocumentIdsWithFilePath(fixture.UnusedPath).Single(), SourceText.From(FixtureSolutions.UnusedSource + "\n// unused\n"))), TestContext.Current.CancellationToken);
+        release.SetResult();
+        var outcomes = await Task.WhenAll(greeterCommit, unusedCommit);
+
+        Assert.Equal([fixture.GreeterPath], outcomes[0].WrittenPaths);
+        Assert.Equal([fixture.UnusedPath], outcomes[1].WrittenPaths);
+        Assert.Equal([1L, 2L], outcomes.Select(static outcome => outcome.SnapshotVersion).Order());
+        Assert.Contains("// greeter", await File.ReadAllTextAsync(fixture.GreeterPath, TestContext.Current.CancellationToken), StringComparison.Ordinal);
+        Assert.Contains("// unused", await File.ReadAllTextAsync(fixture.UnusedPath, TestContext.Current.CancellationToken), StringComparison.Ordinal);
+    }
+
+    // The fold queues on the writer gate instead of racing the commit's TryApplyChanges, so it applies to the
+    // snapshot the commit produced and the saved text reaches the snapshot rather than being refused.
+    [Fact]
+    public async Task A_fold_during_a_commit_is_not_lost()
+    {
+        using var fixture = DiskFixture.Create();
+        using var workspace = new SolutionWorkspace(new AdhocSolutionLoader(fixture.Open), NullLogger<SolutionWorkspace>.Instance);
+        await workspace.BeginOpenAsync(fixture.SolutionPath);
+        await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
+        var release = new TaskCompletionSource();
+
+        // Both calls run synchronously up to their first real await, so by the time they have returned their
+        // tasks the commit holds the writer gate and the fold is queued behind it: no timing assumption.
+        var commit = workspace.CommitAsync(async (solution, token) =>
+        {
+            await release.Task.WaitAsync(token);
+            return solution.WithDocumentText(solution.GetDocumentIdsWithFilePath(fixture.GreeterPath).Single(),
+                SourceText.From(FixtureSolutions.GreeterSource + "\n// committed\n"));
+        }, TestContext.Current.CancellationToken);
+        var folding = workspace.FoldAsync(fixture.UnusedPath, FixtureSolutions.UnusedSource + "\n// saved\n", TestContext.Current.CancellationToken);
+        release.SetResult();
+        var committed = await commit;
+
+        Assert.True(await folding);
+        Assert.Equal([fixture.GreeterPath], committed.WrittenPaths);
+        Assert.Equal(2, workspace.SnapshotVersion);
+        var folded = await workspace.QueryAsync(async (solution, token) =>
+            (await solution.GetDocument(solution.GetDocumentIdsWithFilePath(fixture.UnusedPath).Single())!.GetTextAsync(token)).ToString(),
+            TestContext.Current.CancellationToken);
+        Assert.Contains("// saved", folded, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -102,15 +240,44 @@ public sealed class SolutionWorkspaceFacts
     }
 
     [Fact]
+    public async Task Find_symbols_drops_generated_declarations_and_ranks_exact_names_first()
+    {
+        using var workspace = await ReadyAsync();
+        var result = await workspace.FindSymbolsAsync(new("Greeter"), TestContext.Current.CancellationToken);
+        Assert.Equal("T:Alpha.Greeter", result.Items[0].Id);
+        Assert.DoesNotContain(result.Items, hit => hit.Path.Contains("/obj/", StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Items, hit => hit.Name == "GreeterCodec");
+
+        // "Greeter" alone matches only the type, so the assertion above proves nothing about ranking.
+        // "greet" also matches the Greet method by its exact name, and only a contains-match on the type
+        // name, so this is what actually pins the exact-before-prefix order.
+        var greetResult = await workspace.FindSymbolsAsync(new("greet"), TestContext.Current.CancellationToken);
+        Assert.Equal("M:Alpha.Greeter.Greet(System.String)", greetResult.Items[0].Id);
+        Assert.Equal("T:Alpha.Greeter", greetResult.Items[1].Id);
+    }
+
+    [Fact]
+    public async Task References_mark_hits_in_generated_documents()
+    {
+        using var workspace = await ReadyAsync();
+        var result = await workspace.ReferencesAsync(new("T:Alpha.Greeter"), TestContext.Current.CancellationToken);
+        Assert.Contains(result.Items, hit => hit.Path.Contains("/obj/", StringComparison.Ordinal) && hit.Generated);
+        Assert.Contains(result.Items, hit => hit.Path == FixtureSolutions.ProgramPath && !hit.Generated);
+    }
+
+    [Fact]
     public async Task References_cross_the_project_boundary()
     {
         using var workspace = await ReadyAsync();
         var result = await workspace.ReferencesAsync(new("M:Alpha.Greeter.Greet(System.String)"), TestContext.Current.CancellationToken);
-        var hit = Assert.Single(result.Items);
-        Assert.Equal(FixtureSolutions.ProgramPath, hit.Path);
+        // The generated GreeterCodec document also calls Greet; it is a genuine hit (marked, not dropped -
+        // see References_mark_hits_in_generated_documents), so this looks up the Beta hit by path rather
+        // than asserting there is only one.
+        var hit = Assert.Single(result.Items, hit => hit.Path == FixtureSolutions.ProgramPath);
         Assert.Equal("Beta", hit.Project);
         Assert.Equal(7, hit.Line);
         Assert.Equal("""public static string Run() => new Greeter().Greet("world");""", hit.Text);
+        Assert.False(hit.Generated);
     }
 
     [Fact]
@@ -166,7 +333,7 @@ public sealed class SolutionWorkspaceFacts
         var map = await workspace.MapAsync(new(), TestContext.Current.CancellationToken);
         Assert.Equal(["Alpha", "Beta"], map.Projects.Select(project => project.Name).Order());
         Assert.Equal("Alpha", Assert.Single(map.Projects, project => project.Name == "Alpha").Cluster);
-        Assert.Equal(2, Assert.Single(map.Projects, project => project.Name == "Beta").DocumentCount);
+        Assert.Equal(4, Assert.Single(map.Projects, project => project.Name == "Beta").DocumentCount);
         var edge = Assert.Single(map.References);
         Assert.Equal(("Beta", "Alpha"), (edge.From, edge.To));
     }

@@ -17,45 +17,30 @@ public sealed class CodeWorkspaceNeuronFacts
         ConfigureSilo = silo => silo.Services.AddSingleton<ISolutionLoader>(new AdhocSolutionLoader(FixtureSolutions.TwoProjects)),
     });
 
-    private static async Task<WorkspaceSnapshot> WaitAsync(ICodeWorkspace workspace, WorkspacePhase phase)
-    {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(10));
-        while (true)
-        {
-            var snapshot = await workspace.Read();
-            if (snapshot.Phase == phase)
-            {
-                return snapshot;
-            }
+    private static Task<WorkspaceSnapshot> UntilAsync(ICodeWorkspace workspace, Func<WorkspaceSnapshot, bool> done)
+        => TestWait.UntilAsync(workspace.Read, done, TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
-            await Task.Delay(25, timeout.Token);
-        }
-    }
-
-    [Fact]
-    public void Every_contract_method_uses_section_7_types()
+    [Theory]
+    [InlineData(typeof(ICodeWorkspace), 12)]
+    [InlineData(typeof(IChangeSet), 5)]
+    public void Every_contract_method_uses_section_7_types(Type contract, int expectedMethods)
     {
         var options = DescriptorTable.ContractOptions(CodingJson.Default);
-        var methods = typeof(ICodeWorkspace).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+        var methods = contract.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
 
         foreach (var method in methods)
         {
-            var parameterTypes = method.GetParameters()
+            var argumentTypes = method.GetParameters()
                 .Where(parameter => parameter.ParameterType != typeof(CancellationToken))
-                .Select(parameter => parameter.ParameterType)
-                .ToArray();
-
-            if (parameterTypes.Length == 1)
+                .Select(parameter => parameter.ParameterType);
+            var resultType = method.ReturnType.GetGenericArguments()[0];
+            foreach (var type in argumentTypes.Append(resultType))
             {
-                DescriptorRules.ValidateMemberTypes(method, options.GetTypeInfo(parameterTypes[0]));
+                DescriptorRules.ValidateMemberTypes(method, options.GetTypeInfo(type));
             }
-
-            var returnType = method.ReturnType.GetGenericArguments()[0];
-            DescriptorRules.ValidateMemberTypes(method, options.GetTypeInfo(returnType));
         }
 
-        Assert.True(methods.Length >= 7, $"Expected at least seven declared methods on {nameof(ICodeWorkspace)}, found {methods.Length}.");
+        Assert.Equal(expectedMethods, methods.Length);
     }
 
     [Fact]
@@ -75,15 +60,22 @@ public sealed class CodeWorkspaceNeuronFacts
         {
             Modules = new([typeof(CodingModule)]),
             ConfigureSilo = silo => silo.Services.AddSingleton<ISolutionLoader>(new AdhocSolutionLoader(FixtureSolutions.TwoProjects)),
-            Configuration = new Dictionary<string, string?> { [CodingModule.SolutionPathKey] = "E:/fixture/Fixture.slnx" },
+            Configuration = new Dictionary<string, string?>
+            {
+                [CodingModule.SolutionPathKey] = "E:/fixture/Fixture.slnx",
+                [CodingModule.WorkspaceKeyKey] = "fixture",
+            },
         });
         await brain.SiloServices.GetRequiredService<SolutionWorkspace>().WhenReadyAsync(TestContext.Current.CancellationToken);
         var workspace = brain.Grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType, "fixture").ToGrainId());
         var snapshot = await workspace.Read();
         Assert.Equal(WorkspacePhase.Ready, snapshot.Phase);
         Assert.Equal(2, snapshot.ProjectCount);
-        Assert.Equal(0, snapshot.Generation);
         Assert.Equal(Path.GetFullPath("E:/fixture/Fixture.slnx"), snapshot.SolutionPath);
+        // The service is ready as soon as its own load finishes; the grain's own generation-1 record of that
+        // open runs as a separate, best-effort background call, so it lands a little later than the service does.
+        var recorded = await UntilAsync(workspace, read => read.Generation >= 1);
+        Assert.Equal(1, recorded.Generation);
     }
 
     [Fact]
@@ -98,14 +90,7 @@ public sealed class CodeWorkspaceNeuronFacts
         await brain.SiloServices.GetRequiredService<SolutionWorkspace>().WhenReadyAsync(TestContext.Current.CancellationToken);
         var workspace = brain.Grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType, "fixture").ToGrainId());
         await workspace.Reload(new ReloadWorkspace(CommandId.New()));
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(10));
-        WorkspaceSnapshot snapshot;
-        do
-        {
-            await Task.Delay(25, timeout.Token);
-            snapshot = await workspace.Read();
-        } while (snapshot.Generation != 1 || snapshot.Phase != WorkspacePhase.Ready);
+        var snapshot = await UntilAsync(workspace, read => read.Generation == 1 && read.Phase == WorkspacePhase.Ready);
         Assert.Equal(Path.GetFullPath("E:/fixture/Fixture.slnx"), snapshot.SolutionPath);
     }
 
@@ -116,7 +101,7 @@ public sealed class CodeWorkspaceNeuronFacts
         var workspace = brain.Grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType, "fixture").ToGrainId());
         var accepted = await workspace.Open(new OpenWorkspace(CommandId.New(), "E:/fixture/Fixture.slnx"));
         Assert.Equal("fixture", accepted.Receipt.Key);
-        var ready = await WaitAsync(workspace, WorkspacePhase.Ready);
+        var ready = await UntilAsync(workspace, read => read.Phase == WorkspacePhase.Ready);
         Assert.Equal("E:/fixture/Fixture.slnx", ready.SolutionPath);
         Assert.Equal(2, ready.ProjectCount);
         Assert.Equal(1, ready.Generation);
@@ -137,11 +122,13 @@ public sealed class CodeWorkspaceNeuronFacts
         await using var brain = await StartAsync();
         var workspace = brain.Grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType, "fixture").ToGrainId());
         await workspace.Open(new OpenWorkspace(CommandId.New(), "E:/fixture/Fixture.slnx"));
-        await WaitAsync(workspace, WorkspacePhase.Ready);
+        await UntilAsync(workspace, read => read.Phase == WorkspacePhase.Ready);
         var symbols = await workspace.FindSymbols(new("Greeter"), TestContext.Current.CancellationToken);
         var type = Assert.Single(symbols.Items, hit => hit.Kind == "NamedType");
         var references = await workspace.References(new(type.Id), TestContext.Current.CancellationToken);
-        Assert.Single(references.Items);
+        // Program.cs constructs a Greeter; Shouter.cs names it in "class Shouter : Greeter"; the generated
+        // GreeterCodec document names it as a parameter type (marked Generated, not dropped - design 9.1).
+        Assert.Equal(3, references.Items.Count);
         var diagnostics = await workspace.Diagnostics(new(Path: FixtureSolutions.BrokenPath), TestContext.Current.CancellationToken);
         Assert.Equal(1, diagnostics.ErrorCount);
         var map = await workspace.Map(new(), TestContext.Current.CancellationToken);
@@ -163,16 +150,99 @@ public sealed class CodeWorkspaceNeuronFacts
         await using var brain = await StartAsync();
         var workspace = brain.Grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType, "fixture").ToGrainId());
         await workspace.Open(new OpenWorkspace(CommandId.New(), "E:/fixture/Fixture.slnx"));
-        await WaitAsync(workspace, WorkspacePhase.Ready);
+        await UntilAsync(workspace, read => read.Phase == WorkspacePhase.Ready);
+        await workspace.Reload(new ReloadWorkspace(CommandId.New()));
+        var snapshot = await UntilAsync(workspace, read => read.Generation >= 2 && read.Phase == WorkspacePhase.Ready);
+        Assert.Equal(2, snapshot.Generation);
+    }
+
+    // A second open of the path already loaded starts no load, so the grain records the repeat without
+    // pretending the solution was opened again: the generation a caller passes as ExpectedVersion stands.
+    [Fact]
+    public async Task Opening_the_same_path_again_does_not_bump_the_generation()
+    {
+        await using var brain = await StartAsync();
+        var workspace = brain.Grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType, "fixture").ToGrainId());
+        await workspace.Open(new OpenWorkspace(CommandId.New(), "E:/fixture/Fixture.slnx"));
+        await UntilAsync(workspace, read => read.Phase == WorkspacePhase.Ready);
+
+        await workspace.Open(new OpenWorkspace(CommandId.New(), "E:/fixture/Fixture.slnx", ExpectedVersion: 1));
+        var snapshot = await UntilAsync(workspace, read => read.Detail is not null);
+
+        Assert.Equal("already open", snapshot.Detail);
+        Assert.Equal(1, snapshot.Generation);
+        Assert.Equal(WorkspacePhase.Ready, snapshot.Phase);
+    }
+
+    [Fact]
+    public async Task The_warmup_opens_the_grain_so_its_state_records_the_solution()
+    {
+        await using var brain = await BrainSimulation.StartAsync(new()
+        {
+            Modules = new([typeof(CodingModule)]),
+            ConfigureSilo = silo => silo.Services.AddSingleton<ISolutionLoader>(new AdhocSolutionLoader(FixtureSolutions.TwoProjects)),
+            Configuration = new Dictionary<string, string?>
+            {
+                [CodingModule.SolutionPathKey] = "E:/fixture/Fixture.slnx",
+                [CodingModule.WorkspaceKeyKey] = "fixture",
+            },
+        });
+        var workspace = brain.Grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType, "fixture").ToGrainId());
+        await UntilAsync(workspace, read => read.Phase == WorkspacePhase.Ready);
+        var snapshot = await UntilAsync(workspace, read => read.Generation >= 1);
+        Assert.Equal(1, snapshot.Generation);
+        Assert.Equal(Path.GetFullPath("E:/fixture/Fixture.slnx"), snapshot.SolutionPath);
+    }
+
+    [Fact]
+    public async Task The_map_answers_from_the_durable_cache_while_a_reload_is_in_flight()
+    {
+        var gate = new TaskCompletionSource();
+        var loader = new GatedSecondOpenLoader(FixtureSolutions.TwoProjects, gate);
+        await using var brain = await BrainSimulation.StartAsync(new()
+        {
+            Modules = new([typeof(CodingModule)]),
+            ConfigureSilo = silo => silo.Services.AddSingleton<ISolutionLoader>(loader),
+        });
+        var workspace = brain.Grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType, "fixture").ToGrainId());
+        await workspace.Open(new OpenWorkspace(CommandId.New(), "E:/fixture/Fixture.slnx"));
+        await UntilAsync(workspace, read => read.Phase == WorkspacePhase.Ready);
+        var first = await workspace.Map(new(), TestContext.Current.CancellationToken);
+        Assert.Equal(2, first.Projects.Count);
+
+        // The gated second open keeps the service Opening indefinitely (until gate.SetResult() below), but
+        // LastMap is not on the snapshot, so the cache is proven indirectly: Map() is retried past any
+        // WorkspaceNotReadyException until the mapping reaction's save of the first load's map lands, and
+        // Phase/Map() are read together so the fact cannot pass because the reload quietly finished instead.
         await workspace.Reload(new ReloadWorkspace(CommandId.New()));
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(10));
         WorkspaceSnapshot snapshot;
-        do
+        SolutionMap? cached;
+        while (true)
         {
-            await Task.Delay(25, timeout.Token);
             snapshot = await workspace.Read();
-        } while (snapshot.Generation < 2 || snapshot.Phase != WorkspacePhase.Ready);
-        Assert.Equal(2, snapshot.Generation);
+            try
+            {
+                cached = await workspace.Map(new(), TestContext.Current.CancellationToken);
+            }
+            catch (WorkspaceNotReadyException)
+            {
+                cached = null;
+            }
+
+            if (snapshot.Phase == WorkspacePhase.Opening && cached is not null)
+            {
+                break;
+            }
+
+            await Task.Delay(25, timeout.Token);
+        }
+
+        Assert.Equal(WorkspacePhase.Opening, snapshot.Phase);
+        Assert.Equal(2, cached!.Projects.Count);
+
+        gate.SetResult();
+        await UntilAsync(workspace, read => read.Phase == WorkspacePhase.Ready);
     }
 }

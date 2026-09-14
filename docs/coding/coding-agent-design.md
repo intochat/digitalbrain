@@ -167,7 +167,9 @@ already exists), and click-through from a node to `references`.
 
 - **Slots.** The AppHost declares `kernel-a` and `kernel-b` from the same silo project with
   `WithExplicitStart()` on the standby, each with `DigitalBrain__Slot=a|b` and its own output root
-  `artifacts/slot-a`, `artifacts/slot-b` built with `-p:ArtifactsPath` (R5.4, D3). Each start mints a fresh
+  `artifacts/slot-a`, `artifacts/slot-b` built with `-p:ArtifactsPath` (R5.4, D3; the path is passed absolute,
+  rooted at the repository — a relative `ArtifactsPath` is resolved per project and scatters outputs under
+  every project folder, where the generated sources poison later builds; phase 1 live run). Each start mints a fresh
   `Orleans__ClusterId` (`{slot}-{timestamp}`) when the environment leaves it empty, with the stable
   `ServiceId`, so grain state, journals and reminders are shared and membership is fresh (R5.3).
 - **Gateway.** A small `DigitalBrain.Gateway` project (YARP `LoadFromMemory`, R5.5) listens on 5080 and
@@ -270,7 +272,12 @@ phase 4 `code_remember`, `code_recall`. Every neuron method is reachable through
 
 - Workspace not ready: reads return the status as advice ("opening, 12 of 35 projects; try again").
 - Load failure: `Failed` with the first workspace diagnostic; `reload` retries; the durable map still answers.
-- A `changeset.check` with errors never reaches disk; `commit` refuses with the diagnostics.
+- A `changeset.check` with errors never reaches disk; `commit` refuses with the diagnostics. "Errors" means
+  the diagnostics the change set *introduces*: a multiset difference against the pre-edit baseline, keyed by
+  id, severity, message and path, over the changed projects and their transitive dependents, so a
+  pre-existing error elsewhere in the tree never blocks a check or a commit (amended 2026-09-14, phase 1:
+  the fixture's broken project showed the literal rule refuses every edit on a solution with pre-existing
+  errors).
 - `commit` is not atomic over several files (review finding 7): it writes the documents in order, then
   records the git generation; a crash between the two is reconciled at the next `workspace` activation by
   comparing the tree with the last recorded generation and reloading.
@@ -298,7 +305,7 @@ Three tiers, matching the repo (R6.5):
 |---|---|---|---|
 | D1 | Where Roslyn runs | In the kernel silo as a module singleton (4.2) | A sidecar process with an RPC seam; only if the BuildHost or Locator misbehaves inside the silo (phase 0 proves it) |
 | D2 | Live rebuild shape | Two kernel slots behind a gateway with the active-slot fence (4.4) | A single kernel restarted by Aspire (downtime per landing) or a separate forge silo (approach B) |
-| D3 | Slot outputs | `ArtifactsPath` per slot, one working tree, the slot built from a recorded git generation | A git worktree per slot |
+| D3 | Slot outputs | `ArtifactsPath` per slot (absolute, under `<repo>/artifacts/`), one working tree, the slot built from a recorded git generation | A git worktree per slot |
 | D4 | Discussion engine | `chat` neuron with a new `chair` manager; `refactoring` neuron drives phases (4.5) | MAF Magentic workflow with `RequirePlanSignoff` inside the `refactoring` reaction, checkpointed to blob storage |
 | D5 | Agent granularity | One agent per document, cap 24, then per type or project | One agent per project |
 | D6 | Model routing | Config per role with the defaults in 4.7 | Fixed models |

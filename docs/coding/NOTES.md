@@ -321,3 +321,284 @@ is public with no external caller.
 - Flutter (from `src/Modules/UI/Flutter`): `dart format --output=none --set-exit-if-changed core ui shell/lib shell/test`
   87 files, 0 changed; `flutter analyze` no issues in `ui` and `shell`; `flutter test` 22 passed in `ui`,
   49 passed in `shell`.
+
+## Phase 1 spikes (2026-09-14)
+
+Design 9.1 lists no spikes for phase 1. Before the plan was written the APIs it relies on were checked
+against current documentation (Context7, /dotnet/roslyn): `Renamer.RenameSymbolAsync(Solution, ISymbol,
+SymbolRenameOptions, string, CancellationToken)`, `DocumentEditor`, `Solution.WithDocumentText`,
+`SymbolFinder.FindCallersAsync`, `FindImplementationsAsync`, `FindDerivedClassesAsync`,
+`CodeFixContext(Document, Diagnostic, Action<CodeAction, ImmutableArray<Diagnostic>>, CancellationToken)`,
+`CodeAction.GetOperationsAsync` and `ApplyChangesOperation.ChangedSolution`. `Microsoft.CodeAnalysis.CSharp.Features`
+5.9.0 is the latest stable on nuget.org. The C# code fixers are MEF exports; the plan discovers the ones with a
+parameterless constructor by reflection, which is the part most likely to surprise (recorded here so the
+outcome lands next to it). Plan: `plans/2026-09-14-coding-phase1-changesets.md`.
+
+## Phase 1 outcome (2026-09-14)
+
+Fact classes added or extended for phase 1, and their counts at the end of Task 9:
+
+- The reflection theory in `CodeWorkspaceNeuronFacts` (`Every_contract_method_uses_section_7_types`)
+  validates `ICodeWorkspace` (12 methods) and `IChangeSet` (5 methods) against the contract's section
+  7 types; `CodeWorkspaceNeuronFacts` itself is 12 facts (10 `[Fact]` plus the 2-case theory),
+  including `The_map_answers_from_the_durable_cache_while_a_reload_is_in_flight`.
+- `WorkspaceReadFacts`: 9.
+- `ChangeSetEditorFacts`: 16.
+- `SolutionWorkspaceFacts`: 21 (phase 0's map/reload/lifetime facts plus the three commit facts:
+  `Commit_applies_the_snapshot_and_writes_only_the_changed_files`,
+  `Commit_of_unchanged_text_writes_nothing`, `Commit_refuses_a_snapshot_the_workspace_has_moved_past`).
+- `ChangeSetNeuronFacts`: 7.
+- `SolutionFileWatcherFacts`: 4.
+- `RunnerFacts`: 11.
+- `CodingNativeToolFacts`: 14 (up from phase 0's 5, now covering all thirteen `code_*` tools plus the
+  never-settles-is-advice and repeated-check-answers-at-once cases).
+- `CodingChatFacts`: 1 (`Rename_X_to_Y_lands_as_a_commit_through_the_chat`).
+- The second gated fact, `CodingSelfTestFacts.The_real_solution_builds_and_one_class_tests_through_the_runner`,
+  alongside phase 0's `The_real_solution_opens_and_answers_a_known_reference`.
+
+Suite total after `CodingChatFacts`: `dotnet test DigitalBrain.slnx -c Release --no-build` reports
+397 total, 391 passed, 0 failed, 6 skipped (4 Docker-gated ClickHouse scenarios plus the two coding
+gated self-tests).
+
+Exit criterion (design 9.1): "rename `TimerNeuron.Alarm` to `AlarmFor` and run the tests" lands as a
+commit on a `coding/<id>` branch with the suite green, driven from the chat.
+`CodingChatFacts.Rename_X_to_Y_lands_as_a_commit_through_the_chat` proves this scripted, end to end,
+on the adhoc fixture (a rename of `Greeter.Greet` to `Hello`, standing in for the live
+`TimerNeuron.Alarm` rename the controller drives against the real solution): a `ScriptedChatClient`
+drives the `/agent` HTTP endpoint through one function-invocation turn — `code_find_symbols`,
+`code_propose_edit` (`Rename`), `code_check`, `code_commit`, `code_build`, `code_test` — ending with
+the model's own closing message. The fact asserts, in order, the six `TOOL_CALL_RESULT` payloads
+(`Draft` after propose, `Checked` after check, `Committed` with `branch: "coding/rename-1"` after
+commit, a succeeded build, 2 passed tests), the renamed call site on disk
+(`.Hello("world")` in `Beta/Program.cs`), the git log's `coding: rename Greet to Hello` message, and
+that the assistant's own `TEXT_MESSAGE_CONTENT` names `coding/rename-1`. The live counterpart
+(`aspire run`, renaming `TimerNeuron.Alarm` verbatim against the real solution) is recorded below
+under "Phase 1 live run" by the controller.
+
+## Phase 1 deviations
+
+1. Design 4.9 amended: `check` and `commit` refuse a change set for the diagnostics it *introduces*
+   (a multiset difference against the pre-edit baseline, keyed by id, severity, message and path,
+   over the changed projects and their dependents), never for errors the tree already had. Reason:
+   the fixture's Beta project is permanently broken, and a literal "any error" filter failed five of
+   nine editor facts; on a clean solution the two readings coincide. Cost: a pre-existing error stays
+   invisible to the model unless it asks `code_diagnostics`; the baseline costs one extra compilation
+   per check.
+2. `ChangeSetSnapshot` carries `Detail` and `Files` beyond design 9.1's five members: the responsible
+   edit must be named and the written files listed.
+3. `SyntaxGenerator` is not used: `SyntaxFactory.ParseMemberDeclaration` plus `DocumentEditor` cover
+   the four member edits.
+4. `ExpectedVersion` on `ProposeEdit` is the change set's edit count.
+5. A rejection's reason travels in the `CommandRejectedException` message argument: only `Message`
+   crosses the grain boundary (the phase 0 lesson repeated).
+6. The changeset neuron keeps `ConfigureAwait(true)` throughout, including inside the commit lambda;
+   an earlier ruling allowing `ConfigureAwait(false)` there was withdrawn and the `ORLEANS0014`
+   pragma removed.
+7. Kernel rule surfaced by a throw: in a reaction `Schedule` must be called before `SaveAsync`.
+8. `WorkspaceState.LastMap` is carried forward on open and reload so the map answers from the
+   durable cache while a reload is in flight; the mapping loop carries an attempt counter
+   (`MappingBody`) and gives up after 600 attempts.
+9. The service counter is `SolutionWorkspace.SnapshotVersion` (and `CommitOutcome.SnapshotVersion`);
+   the contract's `Generation` field keeps its design name.
+10. The phase 0 fact `A_warmed_solution_reads_ready_before_any_open` now sets `WorkspaceKey` to the
+    fixture and polls for generation 1: the warmup records the open on the grain asynchronously.
+11. `DiskFixture.InitGitAsync` (the plan's interface bullet said `InitGit`); collection expressions
+    where IDE0300 forces them.
+12. Task 7's runner snippets were amended in review: the branch probe distinguishes "absent" (exit 1)
+    from a timeout or any other failure; every git call surfaces `TimedOut`; the failed-test pattern
+    keeps parameterized display names; `ProcessRunner` drains both streams after a kill and returns
+    the partial output; `core.quotepath=false`; path comparison ignores case only on Windows.
+13. The suite's skip count is 6 (4 Docker-gated scenarios + 2 coding gated facts).
+14. Parked for later phases: `FoldAsync` returning false after a lost race (the next save
+    re-enqueues); deleted files are not folded out of the snapshot (phase 5);
+    `WorkspaceWarmup._stopping` is never disposed; the summary pattern lacks a word boundary;
+    `ChangedPathsAsync` does not unescape C-quoted porcelain paths; the Windows timeout fact asserts
+    English `ping` output.
+15. Task 8: `code_commit` returns one key set in every branch (`status, files, generation, diff,
+    detail, branch, commit, advice`) instead of the plan's two shapes, so a git refusal after the
+    files are written still shows the model what landed on disk; the change-set tools wait for
+    *this* command's outcome (status moved, `Discarded`, or a `Detail` different from the one read
+    before the command) rather than any non-null `Detail`; a wait that expires is advice, not a
+    thrown cancellation; `code_propose_edit` sends `ExpectedVersion` from a fresh read.
+    `code_implementations("T:Alpha.IWelcome")` counts two implementations (`Shouter` inherits
+    `Greeter`'s); `DiskFixture.BrokenPath` replaces the `E:/fixture` constant.
+16. Task 8 (round 2): `ChangeSetSnapshot` gains `Revision` (`Id(7)`), incremented by every reaction
+    that saves; the tools wait for the revision to move past the one read before the command, which
+    is the only marker that tells "no new result" from "the same result again" (the `Detail` text is
+    a pure function of the edits, so it repeats). The tool wait (`ReactionWait`, two minutes) lives
+    in `CodingToolOptions`, registered by the module and shortened by facts through DI, not through
+    static state.
+17. Task 9: the brief's scripted-chat snippet calls `fixture.InitGitAsync()` with no argument, but
+    `DiskFixture.InitGitAsync` (deviation 11) takes a required `CancellationToken` — `CS7036` on
+    build; fixed by passing `TestContext.Current.CancellationToken`, as the task's own facts specify.
+
+## Phase 1 observations
+
+- Code-fix discovery by reflection: `CodeFixCatalog` loads `Microsoft.CodeAnalysis.CSharp.Features`
+  5.9.0 and finds 155 exported `CodeFixProvider` types (non-abstract, carrying
+  `[ExportCodeFixProviderAttribute]`); every one of them exposes a parameterless constructor in this
+  version, so none is skipped for constructor shape. Only a fixer whose registration itself throws
+  (one that needs the real IDE host) is skipped, at the `RegisterCodeFixesAsync` call site rather
+  than at discovery.
+- Formatter annotations: `ParseMember` and `AddUsingAsync` tag only the syntax they insert or replace
+  with `Formatter.Annotation`, and `ChangeSetEditor.FormatAsync` calls
+  `Formatter.FormatAsync(document, Formatter.Annotation, ...)` rather than formatting the whole
+  document. An inserted member or using directive comes out correctly indented while the rest of the
+  file's existing formatting — and the diff — stays untouched.
+- Reload-needed semantics: the watcher folds a saved `.cs` file straight into the live `Solution`
+  (`SolutionWorkspace.FoldAsync`, `WithDocumentText`), but a `.csproj`/`.props`/`.targets`/`.slnx`/
+  `.sln` change cannot be folded that way — it changes project structure, not one document's text —
+  so `MarkReloadNeeded` only flags `WorkspaceSnapshot.ReloadNeeded`; nothing reloads until asked.
+- The grain-turn lesson: a `[ReadOnly]` `Read()` still queues behind whatever reaction currently
+  holds the grain's one turn. A genuinely stuck `check`/`commit` reaction therefore blocks even a
+  plain read behind it, which is why `CodingNativeTools.WaitAsync` bounds its own `Read()` calls with
+  its own deadline instead of trusting Orleans' own, much longer, request timeout to notice.
+- The "Detail repeats" lesson: `ChangeSetSnapshot.Detail` is a pure function of the edit list, so two
+  unrelated reactions (two identical failing `check`s, for instance) can produce byte-identical
+  `Detail`/`Status`. A wait keyed on "the detail changed" cannot tell that apart from "nothing
+  happened yet"; `Revision`, bumped by every reaction that saves regardless of outcome, is the only
+  marker that answers correctly either way (deviation 16 above).
+
+## Phase 1 live run (`aspire run --detach`, 2026-09-14)
+
+### Run 1, 04:11 UTC: "rename `TimerNeuron.Alarm` to `AlarmFor` and run the tests"
+
+The kernel answered on 5080 eight seconds after `aspire run --detach` returned; the chat was sent at 04:12:42Z
+through `/agent` (transcript `live/chat-rename-1.txt`, tool durations measured client-side from the AG-UI events).
+
+| Step | Tool | Duration | Result |
+|---|---|---|---|
+| 1 | `code_find_symbols("TimerNeuron.Alarm")` | 2.0 s | 0 hits (qualified names do not match) |
+| 2 | `code_find_symbols("Alarm", 50)` | 4.8 s | hits led by Orleans-generated `Codec_Invokable_ITimerAlarm_*` types from `obj/Debug/...g.cs` |
+| 3 | `code_references(M:DigitalBrain.Time.TimerNeuron.Alarm(System.Int64))` | 8.2 s | the five call sites in `TimerNeuron.cs` |
+| 4 | `code_propose_edit(Rename → AlarmFor)` | 0.7 s | `Draft`, revision 1 |
+| 5 | `code_check` | 2.7 s | `Checked`, no diagnostics, a six-line diff of `TimerNeuron.cs` |
+| 6 | `code_commit` | 1.4 s | `Committed`, generation 1, **`files: []`**, git refused: "changes outside the change set: src/Modules/Time/Time/TimerNeuron.cs" |
+| 7 | `code_build(artifactsPath: "artifacts/rename-timer-alarm")` | 9.4 s | "succeeded", 0 warnings — but see finding 2 |
+| 8 | `code_test(artifactsPath: ...)` | — | result lost: the smoke script crashed printing U+2193 on a cp1252 console |
+
+Findings, each fixed before run 2:
+
+1. **`MSBuildWorkspace.TryApplyChanges` writes the files itself.** `SolutionWorkspace.CommitAsync` applied the
+   snapshot and then wrote every changed document whose disk text differed from the new text; against the real
+   workspace the apply had already saved the file, so nothing differed, `WrittenPaths` came back empty, the tool
+   handed git an empty list and git refused the tree's own change. The adhoc test workspace never writes on apply,
+   which is why no fact caught it. Fix: the commit snapshots each document's disk text before the apply and reports
+   every document whose text changed; the test workspace now mirrors the MSBuild behaviour so the commit facts are
+   the regression proof.
+2. **A relative `ArtifactsPath` is per project.** `-p:ArtifactsPath=artifacts/rename-timer-alarm` produced
+   `artifacts/rename-timer-alarm/{obj,bin}` under all 38 project directories (git-ignored only through the bin/obj
+   patterns), and the generated `obj/**/*.cs` there enter every later build's compile glob: the next build in the
+   tree failed with 17 CS0579 duplicate-attribute errors. Fix: `DotnetRunner` roots the path at the solution
+   directory; phase 2's slots must use absolute paths under `<repo>/artifacts/<slot>`.
+3. The smoke script printed with the console code page; it now forces UTF-8.
+
+Open observation: `code_find_symbols` still lists Orleans-generated types from `obj/` first for a short query
+(design 9.1's query-hygiene note); the model recovered by asking for references of the exact id.
+
+### Run 2, 04:58 UTC, on the three fixes
+
+| Step | Tool | Duration | Result |
+|---|---|---|---|
+| 1 | `code_find_symbols("TimerNeuron")` | 4.0 s | exactly `T:DigitalBrain.Time.TimerNeuron` — the generated codec types no longer appear |
+| 2 | `code_skeleton(TimerNeuron.cs)` | 1.0 s | the type, its fields and members with ids |
+| 3 | `code_propose_edit(Rename, changeId "rename-timer-alarm")` | 0.8 s | refused: "the change set is committed. Start a new change set with a new id." |
+| 4 | `code_check("rename-timer-alarm")` | 1.2 s | refused likewise; the model asked for a new change-set context instead of choosing one |
+
+Finding 4: change sets are durable grains keyed by a model-chosen id, so run 1's committed change set was
+still there after the restart. Fix: the agent instructions ask for a fresh id per task and the refusal
+suggests one.
+
+### Run 3, 05:22 UTC, on all four fixes: the exit criterion
+
+Kernel restarted on `45e26df3`; the same sentence, sent at 05:31:47Z; the run finished after 130 s
+(transcript `live/chat-rename-3.txt`).
+
+| Step | Tool | Duration | Result |
+|---|---|---|---|
+| 1 | `code_find_symbols` | 4.4 s | `T:DigitalBrain.Time.TimerNeuron` only |
+| 2 | `code_references(M:DigitalBrain.Time.TimerNeuron.Alarm(System.Int64))` | 7.1 s | the five call sites |
+| 3 | `code_propose_edit(Rename → AlarmFor, changeId "rename-timer-alarm-20260914")` | 1.2 s | `Draft`, revision 1 — a fresh id this time |
+| 4 | `code_check` | 3.6 s | `Checked`, no new diagnostics, six-line diff |
+| 5 | `code_commit` | 1.5 s | `Committed`, `files: [TimerNeuron.cs]`, branch `coding/rename-timer-alarm-20260914`, commit `272f9499` |
+| 6 | `code_build(artifactsPath "artifacts/rename-timer-alarm-20260914")` | 8.4 s | succeeded, 0 warnings, outputs under `<repo>/artifacts/rename-timer-alarm-20260914` (nothing under project folders) |
+| 7 | `code_test(artifactsPath …)` | 88.8 s | 417 total, 411 passed, 0 failed, 6 skipped |
+| 8 | assistant | — | "Renamed `TimerNeuron.Alarm` to `AlarmFor`." |
+
+`git log -1 coding/rename-timer-alarm-20260914` shows `272f9499 coding: Rename TimerNeuron Alarm helper to
+AlarmFor`, one file, six lines each way — design 9.1's exit, driven from the chat. The branch stays local as
+evidence and is not pushed; the phase branch is untouched by it. The dashboard trace for the run exceeded the
+MCP tool's size limit and could not be listed; the durations above are measured client-side from the AG-UI
+events.
+
+## Phase 1 whole-branch review and fix wave (2026-09-14)
+
+The review ran the code-review skill at high effort over `feature/coding-phase0-workspace..HEAD`: eight
+finder angles (line-by-line, removed behaviour, cross-file, reuse, simplification, efficiency, altitude,
+conventions) over the branch diff split by area, then one verifier per angle (recall-biased: PLAUSIBLE by
+default, REFUTED only when constructible from the code). Ten findings were reported; the fix wave took every
+confirmed one plus the confirmed minors, in five commits (`006074cf`, `ae77e759`, `e804be1a`, `4a526e96`,
+`5e223563`). Two deviations the implementer recorded: the "already open" branch also requires the grain to
+have recorded that path, so the warmup's first open still reaches generation 1; and the check-side catch is
+covered by regression only (every exception the check path raises today derives from
+`InvalidOperationException`), the commit-side denied-write fact being the red-before-green proof of the same
+catch shape.
+
+Important, fixed:
+
+1. `CommitAsync` and `FoldAsync` shared the two-slot query gate, so a watcher fold during a commit could be
+   refused as stale or silently dropped. A dedicated writer gate now serialises writers ahead of the lease.
+2. The checking and committing reactions caught only `InvalidOperationException`; an `IOException` from a locked
+   file left the change set unsettled and retrying while the tool reported only "did not settle". Both catch
+   every non-cancellation exception and settle with the message.
+3. Nothing bounded the Roslyn work inside a reaction, so a hung edit could hold the grain's single turn after
+   the tool's client-side wait gave up. `CodingToolOptions.EditDeadline` (90 s) bounds the check query and the
+   commit's apply; a timeout settles as `Draft` with the reason.
+4. `code_map` called the service directly and never reached the grain's durable map cache. It goes through the
+   `workspace` grain, which answers from the cache while a reload is in flight.
+5. `code_commit` created and checked out `coding/<id>` before the dirty-tree check, so a refused commit parked
+   the tree on an empty branch. The check runs first; the result reports the base branch; the tree stays on
+   `coding/<id>` afterwards and later change sets commit on top of it (one working tree keeps disk and snapshot
+   coherent — design 4.5 step 7, D3).
+6. Re-opening the already loaded path was a service no-op while the grain bumped `Generation`. `BeginOpenAsync`
+   reports whether a load started; the reaction records "already open" without a bump.
+7. Per-project diagnostics compiled one project at a time, twice per check; the baseline and the edited
+   snapshot now compile concurrently, as do the changed projects.
+
+Minor, fixed: blame prefers the edit whose path and line span contain the error; the dead four-tools fact is
+gone and `code_derived` joins the tools (fourteen); the mapping reaction waits 250 ms per attempt; renames
+enqueue the old path and a vanished file flags a reload; the reload reason is bounded (last path plus a count);
+the watcher uses `TimeProvider`; the tool poll backs off from 20 ms to 500 ms; formatting runs concurrently;
+the idle watcher tick no longer snapshots an empty dictionary; the runner shares one artifacts-path helper; one
+`TestWait.UntilAsync` replaces three test wait helpers and four hand-rolled loops; the one pragma without an
+inline reason got one.
+
+Refuted or deferred with a note: dropping generated declarations from `find-symbols` is what design 9.1
+sanctions (references mark them); the exact-name-first ordering is the intended phase 0 follow-up; the
+post-apply read in `CommitAsync` avoids a redundant write under `MSBuildWorkspace`; `Generation` stays on the
+change-set snapshot (design 9.1's name); the warmup's bounded retry and a path-based generated-code test are
+acceptable for phase 1; a `cached` marker on `SolutionMap`, a shared process runner with the AI module's
+`RepositoryDiffFunction`, a shared poll helper with the ClickHouse tools and a shared settle helper in the
+neuron are later refactors.
+
+### Final gates (2026-09-14, at `5e223563`)
+
+Run by the controller after the fix wave, on a clean tree:
+
+```text
+dotnet format whitespace DigitalBrain.slnx --verify-no-changes   -> no changes
+dotnet build DigitalBrain.slnx -c Release                         -> 0 Warning(s), 0 Error(s)
+dotnet test DigitalBrain.slnx -c Release --no-build               -> total 423, failed 0, succeeded 417, skipped 6 (1m 25s)
+DIGITALBRAIN_CODING_SELF_TESTS=1 dotnet test ... CodingSelfTestFacts -> total 2, failed 0, succeeded 2 (21s)
+```
+
+Re-run after the follow-up commit `d7b0db44`: the same counts (417 passed, 0 failed, 6 skipped; a clean rebuild
+reported 0 warnings).
+
+The six skips are the four Docker-gated ClickHouse scenarios and the two coding self-tests when the variable
+is unset. No Dart file changed in phase 1, so the Flutter gate was not run. The scoped re-review of the fix
+wave (five commits) verified every finding and found no new Critical or Important breakage; its three minors
+(the writer gate disposed from the lease-release path at shutdown, the new map-cache fact racing the warmup,
+an unbounded fan-out for whole-solution diagnostics) were folded into one follow-up commit and the gate was
+re-run on it. Accepted residual: an `open` of the same path that arrives while the first load is still in
+flight bumps the generation once more.
