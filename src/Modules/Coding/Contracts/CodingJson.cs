@@ -50,4 +50,13 @@ namespace DigitalBrain.Coding;
 [JsonSerializable(typeof(CallersResult))]
 [JsonSerializable(typeof(ImplementationsQuery))]
 [JsonSerializable(typeof(DerivedQuery))]
+[JsonSerializable(typeof(BuildSlot))]
+[JsonSerializable(typeof(PromoteSlot))]
+[JsonSerializable(typeof(RetireSlot))]
+[JsonSerializable(typeof(SlotReceipt))]
+[JsonSerializable(typeof(Accepted<SlotReceipt>))]
+[JsonSerializable(typeof(SlotPhase))]
+[JsonSerializable(typeof(SlotSnapshot))]
+[JsonSerializable(typeof(SlotBuildingBody))]
+[JsonSerializable(typeof(SlotPromotionBody))]
 public sealed partial class CodingJson : JsonSerializerContext;

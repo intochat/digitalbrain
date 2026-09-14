@@ -4,6 +4,7 @@ public static class CodingVocabulary
 {
     public const string WorkspaceType = "workspace";
     public const string ChangeSetType = "changeset";
+    public const string SlotType = "slot";
 
     // ---- work a command schedules for its own reaction ----
     public const string WorkspaceOpening = "WorkspaceOpening";
@@ -13,4 +14,8 @@ public static class CodingVocabulary
     public const string ChangeSetChecking = "ChangeSetChecking";
     public const string ChangeSetCommitting = "ChangeSetCommitting";
     public const string ChangeSetDiscarding = "ChangeSetDiscarding";
+    public const string SlotBuilding = "SlotBuilding";
+    public const string SlotPromoting = "SlotPromoting";
+    public const string SlotSwitching = "SlotSwitching";
+    public const string SlotRetiring = "SlotRetiring";
 }
