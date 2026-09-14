@@ -74,6 +74,10 @@ public static class ConversationalAgent
                         this workspace has no chat neuron.
                         For questions about the code base (where a type or method is used, what a file's errors
                         are, how projects depend on each other) use the code_* tools; never guess from memory.
+                        To change code, propose edits into one change set with code_propose_edit (a member by
+                        symbol id, a rename, a using, a line range or a code fix), run code_check and fix what it
+                        reports, then code_commit; after a commit run code_build and code_test and report the outcome.
+                        Never claim a change landed without a Committed status and a commit hash.
                         Use create_artifact for diagrams and brain scenarios so they open in the working area.
                         For diagrams supply content.source in Markdraw format with a ```sketch block, for example:
                         rect "Account" id=account at 100,100 size 180x90 fill=#e4eee5 rounded
@@ -88,7 +92,7 @@ public static class ConversationalAgent
                         Do not claim to have modified external files or run graph workflows. Confirm changes only
                         after a successful tool result, and describe errors honestly.
                         """,
-                    Tools = [.. services.GetService<NativeTools>()?.Resolve(["salesforce_current_account", "salesforce_user_info", "salesforce_schema", "salesforce_query", "clickhouse_schema", "clickhouse_query", "show_query_table", "render_chart", "code_find_symbols", "code_references", "code_diagnostics", "code_map"]) ?? [], .. search is null ? [] : new AITool[] { WebSearchFunction.Create(search) }, .. additionalTools ?? []],
+                    Tools = [.. services.GetService<NativeTools>()?.Resolve(["salesforce_current_account", "salesforce_user_info", "salesforce_schema", "salesforce_query", "clickhouse_schema", "clickhouse_query", "show_query_table", "render_chart", "code_find_symbols", "code_references", "code_diagnostics", "code_map", "code_skeleton", "code_member", "code_callers", "code_implementations", "code_propose_edit", "code_check", "code_commit", "code_build", "code_test"]) ?? [], .. search is null ? [] : new AITool[] { WebSearchFunction.Create(search) }, .. additionalTools ?? []],
                 },
             },
             services.GetService<ILoggerFactory>(),

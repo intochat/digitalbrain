@@ -16,6 +16,8 @@ internal sealed class DiskFixture : IDisposable
 
     public string ProgramPath => Root + "/Beta/Program.cs";
 
+    public string BrokenPath => Root + "/Beta/Broken.cs";
+
     public string UnusedPath => Root + "/Beta/Unused.cs";
 
     public static DiskFixture Create()
