@@ -1,5 +1,8 @@
 using System.ComponentModel;
+using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Descriptors;
+using DigitalBrain.Abstractions.Slots;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Journaling;
@@ -23,6 +26,15 @@ public static class DigitalBrainRuntime
                     "Neurons hold a retry reminder for pending work. Configure UseAzureTableReminderService for a real host or UseInMemoryReminderService for a test host.");
             }
 
+            // A slot that resolved the single-slot lease would react to shared reminders and shared
+            // pending work while another slot serves traffic (design section 8, finding 1).
+            if (services.GetRequiredService<IConfiguration>()[ActiveSlotNames.SlotKey] is { Length: > 0 } slot
+                && services.GetRequiredService<IActiveSlotLease>() is SingleSlotLease)
+            {
+                throw new InvalidOperationException(
+                    $"Slot '{slot}' has no active-slot lease store, so nothing would fence it. Register one (AddDigitalBrain does when the '{DigitalBrainNames.Clustering}' connection string is set) or clear '{ActiveSlotNames.SlotKey}'.");
+            }
+
             // Building the table here turns a grain class descriptor violation into a silo-start failure.
             services.GetRequiredService<DescriptorTable>();
             return Task.CompletedTask;
@@ -36,6 +48,8 @@ public static class DigitalBrainRuntime
         builder.UseJsonJournalFormat(DurableStateJson.TypeInfoResolver);
         ModelPayloadSerialization.AddModelPayloadSerialization(builder.Services);
         builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        builder.Services.TryAddSingleton<IActiveSlotLease>(static services =>
+            new SingleSlotLease(services.GetRequiredService<IConfiguration>()[ActiveSlotNames.SlotKey] ?? string.Empty));
         builder.Services.TryAddSingleton<NeuronOptions>();
         builder.Services.TryAddSingleton<NeuronRuntime>();
         builder.Services.TryAddSingleton<StreamWake>();
