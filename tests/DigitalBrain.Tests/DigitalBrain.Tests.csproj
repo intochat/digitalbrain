@@ -23,6 +23,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Kernel/DigitalBrain.Silo/DigitalBrain.Silo.csproj" />
+    <ProjectReference Include="../../src/Gateway/DigitalBrain.Gateway/DigitalBrain.Gateway.csproj" />
     <ProjectReference Include="../../src/Modules/Salesforce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
     <ProjectReference Include="../../src/Modules/Salesforce/Contracts/DigitalBrain.Modules.Salesforce.Contracts.csproj" />
     <ProjectReference Include="../../src/Modules/Google/Google/DigitalBrain.Modules.Google.csproj" />

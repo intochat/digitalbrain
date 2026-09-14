@@ -59,6 +59,9 @@
     <File Path=".editorconfig" />
     <File Path="Directory.Packages.props" />
   </Folder>
+  <Folder Name="/Gateway/">
+    <Project Path="src/Gateway/DigitalBrain.Gateway/DigitalBrain.Gateway.csproj" />
+  </Folder>
   <Folder Name="/Testing/">
     <Project Path="src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
   </Folder>
