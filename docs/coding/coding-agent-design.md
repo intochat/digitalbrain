@@ -168,7 +168,7 @@ already exists), and click-through from a node to `references`.
 - **Slots.** The AppHost declares `kernel-a` and `kernel-b` from the same silo project with
   `WithExplicitStart()` on the standby, each with `DigitalBrain__Slot=a|b` and its own output root
   `artifacts/slot-a`, `artifacts/slot-b` built with `-p:ArtifactsPath` (R5.4, D3; the path is passed absolute,
-  rooted at the repository — a relative `ArtifactsPath` is resolved per project and scatters outputs under
+  rooted at the repository â€” a relative `ArtifactsPath` is resolved per project and scatters outputs under
   every project folder, where the generated sources poison later builds; phase 1 live run). Each start mints a fresh
   `Orleans__ClusterId` (`{slot}-{timestamp}`) when the environment leaves it empty, with the stable
   `ServiceId`, so grain state, journals and reminders are shared and membership is fresh (R5.3).

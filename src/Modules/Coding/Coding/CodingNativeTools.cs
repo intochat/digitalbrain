@@ -77,6 +77,12 @@ public sealed class CodingNativeTools
     private string SolutionPath()
         => _workspace.Status.SolutionPath ?? throw new InvalidOperationException(_workspace.Status.Advice);
 
+    // Build and test must name the same artifacts root even though TestProjectKey points TestAsync at the
+    // test project's own directory: resolving here, once, against the solution directory before either
+    // runner sees the path is what lets "artifacts/x" mean one folder for both code_build and code_test.
+    private string? ResolveArtifactsPath(string? artifactsPath)
+        => string.IsNullOrWhiteSpace(artifactsPath) ? artifactsPath : Path.GetFullPath(artifactsPath, Path.GetDirectoryName(SolutionPath())!);
+
     private Task<JsonElement> FindSymbols(
         [Description("Part of a symbol name, case-insensitive")] string query,
         [Description("Maximum hits, default 20")] int limit = 20,
@@ -200,13 +206,13 @@ public sealed class CodingNativeTools
     private Task<JsonElement> BuildSolution(
         [Description("Optional output root for this build, relative to the solution directory (use artifacts/<name>); never a path under a project folder")] string? artifactsPath = null,
         CancellationToken cancellationToken = default)
-        => GuardedAsync(() => _dotnet.BuildAsync(SolutionPath(), artifactsPath, cancellationToken));
+        => GuardedAsync(() => _dotnet.BuildAsync(SolutionPath(), ResolveArtifactsPath(artifactsPath), cancellationToken));
 
     private Task<JsonElement> Test(
         [Description("A test class full name to run only that class, or empty for everything")] string? filterClass = null,
         [Description("Optional output root for this build, relative to the solution directory (use artifacts/<name>); never a path under a project folder")] string? artifactsPath = null,
         CancellationToken cancellationToken = default)
-        => GuardedAsync(() => _dotnet.TestAsync(_configuration[CodingModule.TestProjectKey] is { Length: > 0 } project ? project : SolutionPath(), filterClass, artifactsPath, cancellationToken));
+        => GuardedAsync(() => _dotnet.TestAsync(_configuration[CodingModule.TestProjectKey] is { Length: > 0 } project ? project : SolutionPath(), filterClass, ResolveArtifactsPath(artifactsPath), cancellationToken));
 
     // Commands return at once; the reaction that does the work saves a new snapshot, which is what the model needs.
     // Every reaction that saves - propose, check, commit (success or failure), discard - bumps Revision, so

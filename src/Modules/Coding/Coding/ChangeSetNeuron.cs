@@ -168,7 +168,8 @@ internal sealed class ChangeSetNeuron(
         if (Current.Status is ChangeSetStatus.Committed or ChangeSetStatus.Discarded)
         {
             var status = Current.Status.ToString().ToLowerInvariant();
-            throw new CommandRejectedException(id, "change set closed", $"the change set is {status}. Start a new change set with a new id.");
+            throw new CommandRejectedException(id, "change set closed",
+                $"the change set '{Id.Name}' is {status}; start a new change set with a different id, for example '{Id.Name}-2'.");
         }
     }
 

@@ -110,6 +110,17 @@ public sealed class RunnerFacts
     }
 
     [Fact]
+    public async Task An_absolute_test_artifacts_path_passes_through_unchanged()
+    {
+        var processes = new FakeProcessRunner();
+        processes.Enqueue(0, "Test run summary: Passed!\n  total: 0\n  failed: 0\n  succeeded: 0\n  skipped: 0\n");
+        await new DotnetRunner(processes).TestAsync("E:/repo/tests/Tests.csproj", null, "E:/repo/artifacts/slot-b", TestContext.Current.CancellationToken);
+        var call = Assert.Single(processes.Calls);
+        var artifactsArgument = Assert.Single(call.Arguments, static argument => argument.StartsWith("-p:ArtifactsPath=", StringComparison.Ordinal));
+        Assert.Equal("E:/repo/artifacts/slot-b", artifactsArgument.Replace('\\', '/')["-p:ArtifactsPath=".Length..]);
+    }
+
+    [Fact]
     public async Task A_parameterized_test_failure_keeps_its_display_name()
     {
         var processes = new FakeProcessRunner();

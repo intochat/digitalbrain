@@ -12,11 +12,19 @@ namespace DigitalBrain.Tests.Coding;
 
 public sealed class CodingNativeToolFacts
 {
-    private static async Task<(BrainSimulation Brain, NativeTools Tools, DiskFixture Fixture, FakeProcessRunner Dotnet)> StartAsync(CodingToolOptions? options = null)
+    private static async Task<(BrainSimulation Brain, NativeTools Tools, DiskFixture Fixture, FakeProcessRunner Dotnet)> StartAsync(CodingToolOptions? options = null, bool configureTestProject = false)
     {
         var fixture = DiskFixture.Create();
         await fixture.InitGitAsync(TestContext.Current.CancellationToken);
         var dotnet = new FakeProcessRunner();
+        var configuration = new Dictionary<string, string?> { [CodingModule.SolutionPathKey] = fixture.SolutionPath };
+        if (configureTestProject)
+        {
+            // The fake runner never actually executes this path; it only has to exist so the tool passes
+            // a test-project path (not the solution) to DotnetRunner.TestAsync, the same as the live kernel.
+            configuration[CodingModule.TestProjectKey] = fixture.Root + "/Beta/Beta.csproj";
+        }
+
         var brain = await BrainSimulation.StartAsync(new()
         {
             Modules = new([typeof(AIModule), typeof(CodingModule)]),
@@ -30,7 +38,7 @@ public sealed class CodingNativeToolFacts
                     silo.Services.AddSingleton(options);
                 }
             },
-            Configuration = new Dictionary<string, string?> { [CodingModule.SolutionPathKey] = fixture.SolutionPath },
+            Configuration = configuration,
         });
         await brain.SiloServices.GetRequiredService<SolutionWorkspace>().WhenReadyAsync(TestContext.Current.CancellationToken);
         return (brain, brain.SiloServices.GetRequiredService<NativeTools>(), fixture, dotnet);
@@ -128,7 +136,8 @@ public sealed class CodingNativeToolFacts
         var callers = await InvokeAsync(tools, "code_callers", new() { ["symbolId"] = "M:Alpha.Greeter.Greet(System.String)" });
         // The generated GreeterCodec document also calls Greet and sorts first by path ("Alpha/obj/..."
         // precedes "Beta/Program.cs"); callers is not in design 9.1's query-hygiene scope, so both are real hits.
-        Assert.Contains(callers.GetProperty("items").EnumerateArray(), item => item.GetProperty("id").GetString() == "M:Beta.Program.Run");
+        Assert.Equal(2, callers.GetProperty("totalCount").GetInt32());
+        Assert.Equal("M:Beta.Program.Run", callers.GetProperty("items")[1].GetProperty("id").GetString());
         var implementations = await InvokeAsync(tools, "code_implementations", new() { ["symbolId"] = "T:Alpha.IWelcome" });
         // Shouter also implements IWelcome by inheriting Greeter, so the interface type has two implementers
         // (WorkspaceReadFacts.Derived_of_an_interface_are_its_implementing_types pins the same pair by name).
@@ -212,6 +221,29 @@ public sealed class CodingNativeToolFacts
         Assert.True(tests.GetProperty("succeeded").GetBoolean());
         Assert.Equal(3, tests.GetProperty("passed").GetInt32());
         Assert.Contains("--filter-class Some.Class", tests.GetProperty("command").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Build_and_test_share_one_artifacts_root_rooted_at_the_solution()
+    {
+        // TestProject points DotnetRunner.TestAsync at the Beta project directory, not the solution
+        // directory; a relative artifactsPath rooted there instead of at the solution would name a
+        // second, different folder than the one code_build just used for the identical argument.
+        var (brain, tools, fixture, dotnet) = await StartAsync(configureTestProject: true);
+        using var fixtureScope = fixture;
+        await using var brainScope = brain;
+
+        dotnet.Enqueue(0, "Build succeeded.\n    0 Warning(s)\n    0 Error(s)");
+        await InvokeAsync(tools, "code_build", new() { ["artifactsPath"] = "artifacts/x" });
+        var buildArtifacts = Assert.Single(dotnet.Calls[^1].Arguments, static argument => argument.StartsWith("-p:ArtifactsPath=", StringComparison.Ordinal));
+
+        dotnet.Enqueue(0, "Test run summary: Passed!\n  total: 0\n  failed: 0\n  succeeded: 0\n  skipped: 0\n");
+        await InvokeAsync(tools, "code_test", new() { ["artifactsPath"] = "artifacts/x" });
+        var testArtifacts = Assert.Single(dotnet.Calls[^1].Arguments, static argument => argument.StartsWith("-p:ArtifactsPath=", StringComparison.Ordinal));
+
+        var expected = "-p:ArtifactsPath=" + fixture.Root + "/artifacts/x";
+        Assert.Equal(expected, buildArtifacts.Replace('\\', '/'));
+        Assert.Equal(expected, testArtifacts.Replace('\\', '/'));
     }
 
     [Fact]

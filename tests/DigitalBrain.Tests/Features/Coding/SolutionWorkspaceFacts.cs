@@ -182,6 +182,13 @@ public sealed class SolutionWorkspaceFacts
         Assert.Equal("T:Alpha.Greeter", result.Items[0].Id);
         Assert.DoesNotContain(result.Items, hit => hit.Path.Contains("/obj/", StringComparison.Ordinal));
         Assert.DoesNotContain(result.Items, hit => hit.Name == "GreeterCodec");
+
+        // "Greeter" alone matches only the type, so the assertion above proves nothing about ranking.
+        // "greet" also matches the Greet method by its exact name, and only a contains-match on the type
+        // name, so this is what actually pins the exact-before-prefix order.
+        var greetResult = await workspace.FindSymbolsAsync(new("greet"), TestContext.Current.CancellationToken);
+        Assert.Equal("M:Alpha.Greeter.Greet(System.String)", greetResult.Items[0].Id);
+        Assert.Equal("T:Alpha.Greeter", greetResult.Items[1].Id);
     }
 
     [Fact]

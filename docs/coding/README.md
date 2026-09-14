@@ -35,7 +35,9 @@ methods:
 | `derived` | `DerivedQuery(SymbolId, Limit=50)` | `SymbolSearchResult(Items, TotalCount, Truncated)` | The classes derived from a base type. Reachable through `/mcp`; phase 1 does not wire a `code_*` tool to it. |
 
 **`changeset:<id>`** (`IChangeSet`, grain type `changeset`, name = a caller-chosen change id; edits
-with the same id compose into one snapshot) answers five methods:
+with the same id compose into one snapshot) answers five methods. The id is durable and never
+reused: once a change set is `Committed` or `Discarded` it stays closed forever, so the next task
+needs a fresh id.
 
 | Method | Argument | Result | Does |
 |---|---|---|---|

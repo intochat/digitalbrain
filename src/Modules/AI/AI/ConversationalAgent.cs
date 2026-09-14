@@ -78,6 +78,8 @@ public static class ConversationalAgent
                         symbol id, a rename, a using, a line range or a code fix), run code_check and fix what it
                         reports, then code_commit; after a commit run code_build and code_test and report the outcome.
                         Never claim a change landed without a Committed status and a commit hash.
+                        Choose a change id that is new for this task (a short topic plus a suffix such as the
+                        time); a committed or discarded change set cannot be reused.
                         Use create_artifact for diagrams and brain scenarios so they open in the working area.
                         For diagrams supply content.source in Markdraw format with a ```sketch block, for example:
                         rect "Account" id=account at 100,100 size 180x90 fill=#e4eee5 rounded

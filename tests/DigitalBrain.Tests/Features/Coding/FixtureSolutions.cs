@@ -115,7 +115,7 @@ internal static class FixtureSolutions
 
     internal static Workspace Build(string root)
     {
-        var workspace = new DiskWritingWorkspace();
+        var workspace = new DiskWritingWorkspace(root);
         var alpha = ProjectId.CreateNewId("Alpha");
         var beta = ProjectId.CreateNewId("Beta");
         var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary);
@@ -161,25 +161,29 @@ internal static class FixtureSolutions
 
     // AdhocWorkspace is sealed, so this mirrors it directly: same permissive CanApplyChange, but
     // ApplyDocumentTextChanged also writes to disk, like MSBuildWorkspace does against the live kernel.
-    // The Root fixture's "E:/fixture" paths were never created on disk, so the write there is skipped and
-    // only a DiskFixture-backed workspace (real temp files) actually gets touched. Unlike MSBuildWorkspace's
-    // own unconditional write, this one checks content first: Solution.WithDocumentText bumps the document's
-    // version even when the new text is byte-identical to what is already there, and TryApplyChanges still
-    // routes that through ApplyDocumentTextChanged -- an unguarded write would then touch the file's mtime on
-    // a semantic no-op and break Commit_of_unchanged_text_writes_nothing.
-    private sealed class DiskWritingWorkspace() : Workspace(MefHostServices.DefaultHost, WorkspaceKind.Host)
+    // The adhoc Root fixture ("E:/fixture") never had its paths created on disk, so it is named explicitly
+    // and the write is skipped for it; only a DiskFixture-backed workspace (real temp files) actually gets
+    // touched. Unlike MSBuildWorkspace's own unconditional write, this one checks content first:
+    // Solution.WithDocumentText bumps the document's version even when the new text is byte-identical to
+    // what is already there, and TryApplyChanges still routes that through ApplyDocumentTextChanged -- an
+    // unguarded write would then touch the file's mtime on a semantic no-op and break
+    // Commit_of_unchanged_text_writes_nothing.
+    private sealed class DiskWritingWorkspace(string root) : Workspace(MefHostServices.DefaultHost, WorkspaceKind.Host)
     {
         public override bool CanApplyChange(ApplyChangesKind feature) => true;
 
         protected override void ApplyDocumentTextChanged(DocumentId documentId, SourceText newText)
         {
-            var path = CurrentSolution.GetDocument(documentId)?.FilePath;
-            if (path is not null && (File.Exists(path) || Directory.Exists(Path.GetDirectoryName(path))))
+            if (root != Root)
             {
-                var content = newText.ToString();
-                if (!File.Exists(path) || !string.Equals(File.ReadAllText(path), content, StringComparison.Ordinal))
+                var path = CurrentSolution.GetDocument(documentId)?.FilePath;
+                if (path is not null)
                 {
-                    File.WriteAllText(path, content);
+                    var content = newText.ToString();
+                    if (!File.Exists(path) || !string.Equals(File.ReadAllText(path), content, StringComparison.Ordinal))
+                    {
+                        File.WriteAllText(path, content);
+                    }
                 }
             }
 
