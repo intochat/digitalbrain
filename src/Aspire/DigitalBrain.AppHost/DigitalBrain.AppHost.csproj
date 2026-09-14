@@ -15,6 +15,7 @@
     <ProjectReference Include="../../Modules/ClickHouse/Aspire.Hosting/DigitalBrain.Modules.ClickHouse.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../Modules/Coding/Aspire.Hosting/DigitalBrain.Modules.Coding.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../Kernel/DigitalBrain.Silo/DigitalBrain.Silo.csproj" />
+    <ProjectReference Include="../../Gateway/DigitalBrain.Gateway/DigitalBrain.Gateway.csproj" />
     <ProjectReference Include="../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../Modules/Excel/Excel/DigitalBrain.Modules.Excel.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../Modules/Google/Aspire.Hosting/DigitalBrain.Modules.Google.Aspire.Hosting.csproj" IsAspireProjectResource="false" />

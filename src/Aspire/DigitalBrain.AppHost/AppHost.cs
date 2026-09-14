@@ -79,23 +79,42 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
     .AddModule<CodingModule>(coding => coding.WithSolution(Path.Combine(builder.AppHostDirectory, "..", "..", "..", "DigitalBrain.slnx")))
     .AddModule<UIModule>(ui => ui.WithWindowHost());
 
-// Isolated Aspire runs reuse the persistent Azurite volume while assigning new random silo
-// ports. A per-run development cluster avoids trying to contact a dead membership row from the
-// previous run; the service id remains stable, so grain and reminder state are still preserved.
-var developmentClusterId = builder.Environment.IsDevelopment()
-    ? $"digitalbrain-{Guid.NewGuid():N}"
-    : null;
+// Both slots run the same silo against one ServiceId, so grain state, journals and reminders survive a
+// swap. Neither gets an Orleans__ClusterId: the silo mints "{slot}-{timestamp}" per start, because a
+// reused cluster id makes the new silo stall on the previous one's dead membership row (R5.3, spike S2).
+var repositoryRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", ".."));
+var standbyDll = Path.Combine(repositoryRoot, "artifacts", "slot-b", "bin", "DigitalBrain.Silo", "release", "DigitalBrain.Silo.dll");
 
-builder.AddProject<Projects.DigitalBrain_Silo>(ProductSurfaceResources.Kernel)
+// Declared before the kernels on purpose: the UI module's projection binds DIGITALBRAIN_UI_BASE to the
+// first resource that takes the brain reference, and the shell must talk to the gateway, never to a slot.
+var gateway = builder.AddProject<Projects.DigitalBrain_Gateway>(ProductSurfaceResources.Gateway)
+    .WithReference(brain)
+    .WithHttpEndpoint(
+        port: ProductSurfaceResources.GatewayHttpPort,
+        name: "http",
+        isProxied: false)
+    .WithEnvironment("DigitalBrain__Gateway__Slots__a", ProductSurfaceResources.KernelAUrl)
+    .WithEnvironment("DigitalBrain__Gateway__Slots__b", ProductSurfaceResources.KernelBUrl)
+    .WithEnvironment("DigitalBrain__Gateway__Active", "a")
+    // Its own liveness, not the product's: /health is proxied to whichever slot is active.
+    .WithHttpHealthCheck("/active", endpointName: "http");
+
+var kernelA = builder.AddProject<Projects.DigitalBrain_Silo>(ProductSurfaceResources.KernelA)
     .WithReference(brain)
     .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION", "false")
     .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_HTTPCLIENT_DISABLE_URL_QUERY_REDACTION", "false")
+    .WithEnvironment("DigitalBrain__Slot", "a")
+    .WithEnvironment("DigitalBrain__Slots__Gateway", ProductSurfaceResources.GatewayUrl)
+    // The same root the standby dll above is taken from: the builder and the AppHost must not drift.
+    .WithEnvironment("DigitalBrain__Slots__ArtifactsRoot", Path.Combine(repositoryRoot, "artifacts"))
+    .WithEnvironment("DigitalBrain__Slots__a__Url", ProductSurfaceResources.KernelAUrl)
+    .WithEnvironment("DigitalBrain__Slots__b__Url", ProductSurfaceResources.KernelBUrl)
     .WithHttpEndpoint(
-        port: ProductSurfaceResources.UiHttpPort,
+        port: ProductSurfaceResources.KernelAHttpPort,
         name: "http",
         isProxied: false)
     // Without this, "kernel healthy" means only "process launched": Kestrel binds AFTER the
-    // Orleans silo and brain activation finish, so waiters would proceed while 5080 still
+    // Orleans silo and brain activation finish, so waiters would proceed while the port still
     // refuses connections (observed on loaded CI runners).
     .WithHttpHealthCheck("/health", endpointName: "http")
     .WithUrlForEndpoint(
@@ -108,16 +127,45 @@ builder.AddProject<Projects.DigitalBrain_Silo>(ProductSurfaceResources.Kernel)
         })
     .WithEnvironment(context =>
     {
-        if (developmentClusterId is not null)
-        {
-            context.EnvironmentVariables["Orleans__ClusterId"] = developmentClusterId;
-        }
-
         // The typed neuron surface (/mcp describe and call) is how Claude Code and Codex reach the coding tools.
         if (builder.ExecutionContext.IsRunMode)
         {
             context.EnvironmentVariables["DigitalBrain__Graph__Enabled"] = "true";
         }
     });
+
+// The standby is an executable over its own build output: two AddProject resources from one project share
+// one output, so they cannot differ by ArtifactsPath (spike S1). Build it with
+// dotnet build DigitalBrain.slnx -c Release -p:ArtifactsPath=<repo>/artifacts/slot-b -p:UseArtifactsOutput=true
+// before starting it; the slot neuron does exactly that.
+var kernelB = builder.AddExecutable(ProductSurfaceResources.KernelB, "dotnet", repositoryRoot, standbyDll)
+    .WithReference(brain)
+    .WithExplicitStart()
+    .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION", "false")
+    .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_HTTPCLIENT_DISABLE_URL_QUERY_REDACTION", "false")
+    .WithEnvironment("DigitalBrain__Slot", "b")
+    .WithEnvironment("DigitalBrain__Slots__Gateway", ProductSurfaceResources.GatewayUrl)
+    .WithEnvironment("DigitalBrain__Slots__ArtifactsRoot", Path.Combine(repositoryRoot, "artifacts"))
+    .WithEnvironment("DigitalBrain__Slots__a__Url", ProductSurfaceResources.KernelAUrl)
+    .WithEnvironment("DigitalBrain__Slots__b__Url", ProductSurfaceResources.KernelBUrl)
+    .WithHttpEndpoint(
+        port: ProductSurfaceResources.KernelBHttpPort,
+        name: "http",
+        isProxied: false)
+    .WithHttpHealthCheck("/health", endpointName: "http")
+    .WithEnvironment(context =>
+    {
+        if (builder.ExecutionContext.IsRunMode)
+        {
+            context.EnvironmentVariables["DigitalBrain__Graph__Enabled"] = "true";
+        }
+    });
+
+// An executable gets no ASPNETCORE_URLS from WithHttpEndpoint, and a proxied endpoint's address is the
+// proxy's own, which the process then collides with: both halves of spike S1's fix.
+kernelB.WithEnvironment("ASPNETCORE_URLS", kernelB.GetEndpoint("http"));
+
+// The gateway proxies to kernel-a first, so it waits for it rather than answering 502 to the shell.
+gateway.WaitFor(kernelA);
 
 builder.Build().Run();
