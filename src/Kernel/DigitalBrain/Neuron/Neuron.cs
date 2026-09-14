@@ -128,7 +128,10 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         await base.OnActivateAsync(cancellationToken).ConfigureAwait(true);
         _components.NoteReloaded();
         _fence.NoteStoredState(StorageHoldsState());
-        if (CommandReconciliation.Reconcile(_components.Commands, _components.Dedup, TimeProvider.GetUtcNow()))
+
+        // A standby shares this neuron's storage and reminder row with the live slot, so activation must
+        // not write either: a [ReadOnly] read still activates and answers from what is already committed.
+        if (!IsStandby && CommandReconciliation.Reconcile(_components.Commands, _components.Dedup, TimeProvider.GetUtcNow()))
         {
             await PersistAsync().ConfigureAwait(true);
         }
@@ -136,7 +139,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         await OnNeuronActivatedAsync(cancellationToken).ConfigureAwait(true);
 
         // Pending entries and stored announcements survive deactivation: resume the drain for both.
-        if (_components.Pending.Peek() is not null || HasStoredAnnouncements)
+        if (!IsStandby && (_components.Pending.Peek() is not null || HasStoredAnnouncements))
         {
             await _retry.EnsureReminderAsync().ConfigureAwait(true);
             Wake();

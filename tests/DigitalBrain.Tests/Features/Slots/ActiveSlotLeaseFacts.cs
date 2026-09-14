@@ -84,4 +84,11 @@ public sealed class ActiveSlotLeaseFacts
         Assert.Equal("b", error.Slot);
         Assert.Equal("standby slot: silo 'b' does not hold the active lease", error.Message);
     }
+
+    [Fact]
+    public void Minting_a_cluster_id_stamps_the_slot_with_the_given_instant()
+    {
+        var now = new DateTimeOffset(2026, 9, 14, 11, 21, 58, 337, TimeSpan.Zero);
+        Assert.Equal("a-20260914112158337", ClusterIdMinting.Mint("a", now));
+    }
 }

@@ -1,4 +1,3 @@
-using System.Globalization;
 using DigitalBrain.Abstractions.Slots;
 using DigitalBrain.Aspire;
 using DigitalBrain.Core;
@@ -17,13 +16,12 @@ var builder = WebApplication.CreateBuilder(args);
 // Both slots share a ServiceId so grain state, journals and reminders survive a swap; membership must be
 // fresh or the new silo stalls on the previous one's dead row (R5.3). A slot that was given no ClusterId
 // mints one per start; the in-memory source is added last, so it wins precedence (spike S2).
-if (string.IsNullOrWhiteSpace(builder.Configuration["Orleans:ClusterId"])
+if (string.IsNullOrWhiteSpace(builder.Configuration[ActiveSlotNames.ClusterIdKey])
     && builder.Configuration[ActiveSlotNames.SlotKey] is { Length: > 0 } slot)
 {
-    var stamp = DateTimeOffset.UtcNow.ToString("yyyyMMddHHmmssfff", CultureInfo.InvariantCulture);
     builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
     {
-        ["Orleans:ClusterId"] = slot + "-" + stamp,
+        [ActiveSlotNames.ClusterIdKey] = ClusterIdMinting.Mint(slot, TimeProvider.System.GetUtcNow()),
     });
 }
 

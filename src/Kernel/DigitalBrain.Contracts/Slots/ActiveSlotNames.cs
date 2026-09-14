@@ -4,6 +4,7 @@ namespace DigitalBrain.Abstractions.Slots;
 public static class ActiveSlotNames
 {
     public const string SlotKey = "DigitalBrain:Slot";
+    public const string ClusterIdKey = "Orleans:ClusterId";
     public const string Table = "DigitalBrainLeases";
     public const string PartitionKey = "slot";
     public const string RowKey = "active";
