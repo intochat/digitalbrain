@@ -54,8 +54,12 @@ public sealed class ChangeSetEditor(CodeFixCatalog codeFixes)
         string? detail = null;
         if (diagnostics.Items.FirstOrDefault(static hit => hit.Severity == nameof(DiagnosticSeverity.Error)) is { } firstError)
         {
-            // The last edit that touched the failing file is the likely cause; else the last edit overall.
-            var responsible = touched.LastOrDefault(entry => string.Equals(entry.Path, firstError.Path, StringComparison.OrdinalIgnoreCase));
+            // An edit that names the failing file and whose own line range covers the error is the cause
+            // even when a later edit touched the same file; otherwise the last edit that touched that file
+            // is the likely one, and failing that the last edit overall.
+            var inFailingFile = touched.Where(entry => string.Equals(entry.Path, firstError.Path, StringComparison.OrdinalIgnoreCase)).ToArray();
+            var responsible = inFailingFile.FirstOrDefault(entry => CoversLine(edits[entry.Edit], firstError.Line));
+            responsible = responsible.Path is null ? inFailingFile.LastOrDefault() : responsible;
             failing = responsible.Path is null ? touched[^1].Edit : responsible.Edit;
             detail = Describe(failing.Value, edits[failing.Value], $"left {diagnostics.ErrorCount} error(s); first: {firstError.Id} {firstError.Path}:{firstError.Line} {firstError.Message}");
         }
@@ -229,12 +233,24 @@ public sealed class ChangeSetEditor(CodeFixCatalog codeFixes)
     private static string Describe(int index, EditRequest edit, string message)
         => $"edit {index + 1} ({edit.Kind} {edit.SymbolId ?? edit.Path ?? "?"}) {message}";
 
+    // Only the kinds that name their own lines can be matched against a diagnostic's line; a rename or a
+    // member replacement is placed by symbol, so its span comes with the symbol work of a later phase.
+    private static bool CoversLine(EditRequest edit, int line)
+        => edit.Kind is EditKind.ReplaceRange or EditKind.ApplyCodeFix or EditKind.AddUsing
+            && edit.StartLine is { } start
+            && line >= start
+            && line <= (edit.EndLine ?? start);
+
+    // Every changed document is formatted against the same pre-format snapshot, concurrently, and only the
+    // resulting texts are folded back in - the documents do not depend on each other's formatting.
     private static async Task<Solution> FormatAsync(Solution solution, IReadOnlyList<DocumentId> changedIds, CancellationToken cancellationToken)
     {
-        foreach (var id in changedIds)
+        var formatted = await Task.WhenAll(changedIds.Select(id =>
+            Formatter.FormatAsync(solution.GetDocument(id)!, Formatter.Annotation, cancellationToken: cancellationToken))).ConfigureAwait(false);
+        for (var index = 0; index < changedIds.Count; index++)
         {
-            var formatted = await Formatter.FormatAsync(solution.GetDocument(id)!, Formatter.Annotation, cancellationToken: cancellationToken).ConfigureAwait(false);
-            solution = formatted.Project.Solution;
+            var text = await formatted[index].GetTextAsync(cancellationToken).ConfigureAwait(false);
+            solution = solution.WithDocumentText(changedIds[index], text);
         }
 
         return solution;
@@ -248,8 +264,13 @@ public sealed class ChangeSetEditor(CodeFixCatalog codeFixes)
     private static async Task<DiagnosticsResult> DiagnoseAsync(Solution original, Solution solution, IReadOnlyList<DocumentId> changedIds, CancellationToken cancellationToken)
     {
         var projects = ChangedAndDependents(solution, changedIds);
-        var before = await SolutionQueries.ProjectDiagnosticsAsync(original, projects, DiagnosticLimit, cancellationToken).ConfigureAwait(false);
-        var after = await SolutionQueries.ProjectDiagnosticsAsync(solution, projects, DiagnosticLimit, cancellationToken).ConfigureAwait(false);
+        // The baseline and the edited tree compile at the same time: both are immutable snapshots and
+        // neither result feeds the other, so waiting for the first before starting the second only
+        // doubled the wall clock of every check and commit.
+        var diagnosed = await Task.WhenAll(
+            SolutionQueries.ProjectDiagnosticsAsync(original, projects, DiagnosticLimit, cancellationToken),
+            SolutionQueries.ProjectDiagnosticsAsync(solution, projects, DiagnosticLimit, cancellationToken)).ConfigureAwait(false);
+        var (before, after) = (diagnosed[0], diagnosed[1]);
         var preexisting = new Dictionary<(string Id, string Severity, string Message, string Path), int>();
         foreach (var hit in before.Items)
         {

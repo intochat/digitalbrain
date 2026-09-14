@@ -84,19 +84,20 @@ internal static class SolutionQueries
 
     // Shared with ChangeSetEditor, which diagnoses only the projects a change set touched (and their dependents)
     // rather than the whole solution.
+    // The projects compile concurrently - a Solution snapshot is immutable, so each compilation is
+    // independent - and DiagnosticsResultFrom's own sort restores a deterministic order afterwards.
     internal static async Task<DiagnosticsResult> ProjectDiagnosticsAsync(Solution solution, IReadOnlyCollection<ProjectId> projects, int limit, CancellationToken cancellationToken)
     {
-        var diagnostics = new List<(Diagnostic Diagnostic, string FallbackPath)>();
-        foreach (var id in projects)
+        var perProject = await Task.WhenAll(projects.Select(async id =>
         {
             var project = solution.GetProject(id) ?? throw new InvalidOperationException($"Project '{id}' is not in the solution.");
             var compilation = await project.GetCompilationAsync(cancellationToken).ConfigureAwait(false)
                 ?? throw new InvalidOperationException($"Project '{project.Name}' has no compilation.");
             var fallbackPath = project.FilePath ?? project.Name;
-            diagnostics.AddRange(compilation.GetDiagnostics(cancellationToken).Select(diagnostic => (diagnostic, fallbackPath)));
-        }
+            return compilation.GetDiagnostics(cancellationToken).Select(diagnostic => (Diagnostic: diagnostic, FallbackPath: fallbackPath));
+        })).ConfigureAwait(false);
 
-        return DiagnosticsResultFrom(diagnostics, limit);
+        return DiagnosticsResultFrom(perProject.SelectMany(static diagnostics => diagnostics), limit);
     }
 
     private static DiagnosticsResult DiagnosticsResultFrom(IEnumerable<(Diagnostic Diagnostic, string FallbackPath)> diagnostics, int limit)

@@ -247,9 +247,9 @@ public sealed class CodingNativeToolFacts
     }
 
     [Fact]
-    public async Task A_change_set_that_never_settles_is_advice_not_an_exception()
+    public async Task A_check_that_cannot_get_a_query_slot_settles_as_a_draft()
     {
-        var (brain, tools, fixture, _) = await StartAsync(new CodingToolOptions(TimeSpan.FromSeconds(2)));
+        var (brain, tools, fixture, _) = await StartAsync(new CodingToolOptions(TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1)));
         using var fixtureScope = fixture;
         await using var brainScope = brain;
         await InvokeAsync(tools, "code_propose_edit", new()
@@ -260,11 +260,10 @@ public sealed class CodingNativeToolFacts
             ["newName"] = "Hello",
         });
 
-        // Every reaction that settles (success or a caught failure) now bumps Revision and answers at once, so
-        // the only way to force the tool-side deadline for real is a reaction that never reaches SaveAsync at
-        // all. Occupying both of the workspace's concurrent query slots does that: the check reaction's own
-        // workspace.QueryAsync call blocks inside the grain (never throwing, never saving) for as long as the
-        // slots stay taken, so this proves the deadline becomes advice rather than an escaped exception.
+        // Occupying both of the workspace's concurrent query slots keeps the check reaction's own
+        // workspace.QueryAsync call from ever starting. The reaction's one-second edit deadline is what
+        // settles it - as a Draft whose detail says the check did not finish - rather than the tool's much
+        // longer wait expiring on a reaction that never reached SaveAsync at all.
         var workspace = brain.SiloServices.GetRequiredService<SolutionWorkspace>();
         var release = new TaskCompletionSource();
         var occupy1 = workspace.QueryAsync(async (_, token) =>
@@ -280,11 +279,12 @@ public sealed class CodingNativeToolFacts
         try
         {
             var result = await InvokeAsync(tools, "code_check", new() { ["changeId"] = "t4" });
-            Assert.Contains("did not settle", result.GetProperty("advice").GetString(), StringComparison.Ordinal);
+            Assert.Equal("Draft", result.GetProperty("status").GetString());
+            Assert.Contains("did not finish within 1s", result.GetProperty("detail").GetString(), StringComparison.Ordinal);
+            Assert.False(result.TryGetProperty("advice", out _));
         }
         finally
         {
-            // Let the stuck reaction finish so the silo has nothing pending when brainScope disposes.
             release.SetResult();
             await Task.WhenAll(occupy1, occupy2);
         }
@@ -293,7 +293,7 @@ public sealed class CodingNativeToolFacts
     [Fact]
     public async Task A_repeated_check_answers_again_without_waiting()
     {
-        var (brain, tools, fixture, _) = await StartAsync(new CodingToolOptions(TimeSpan.FromSeconds(30)));
+        var (brain, tools, fixture, _) = await StartAsync(new CodingToolOptions(TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(90)));
         using var fixtureScope = fixture;
         await using var brainScope = brain;
         await InvokeAsync(tools, "code_propose_edit", new()

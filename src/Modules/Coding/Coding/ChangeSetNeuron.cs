@@ -3,6 +3,7 @@ using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Core;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
@@ -92,10 +93,13 @@ internal sealed class ChangeSetNeuron(
                 }
             case CodingVocabulary.ChangeSetChecking:
                 {
+                    var editDeadline = EditDeadline;
+                    using var bounded = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    bounded.CancelAfter(editDeadline);
                     ChangeSetState next;
                     try
                     {
-                        var outcome = await workspace.QueryAsync((solution, token) => editor.ApplyAsync(solution, current.Edits, token), cancellationToken).ConfigureAwait(true);
+                        var outcome = await workspace.QueryAsync((solution, token) => editor.ApplyAsync(solution, current.Edits, token), bounded.Token).ConfigureAwait(true);
                         next = current with
                         {
                             Status = outcome.HasErrors ? ChangeSetStatus.Draft : ChangeSetStatus.Checked,
@@ -105,10 +109,16 @@ internal sealed class ChangeSetNeuron(
                             Revision = current.Revision + 1,
                         };
                     }
-                    catch (InvalidOperationException error)
+                    catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
                     {
-                        // The workspace is not ready or refused the snapshot; the detail is the advice.
-                        next = current with { Status = ChangeSetStatus.Draft, Detail = error.Message, Revision = current.Revision + 1 };
+                        next = Refused(current, $"the check did not finish within {editDeadline.TotalSeconds:0}s");
+                    }
+#pragma warning disable CA1031 // any Roslyn or file-system failure must settle as advice, never leave the change set unsettled and retrying
+                    catch (Exception error) when (error is not OperationCanceledException)
+#pragma warning restore CA1031
+                    {
+                        // The workspace is not ready, refused the snapshot, or Roslyn itself failed; the detail is the advice.
+                        next = Refused(current, error.Message);
                     }
 
                     await SaveAsync(next, cancellationToken).ConfigureAwait(true);
@@ -116,13 +126,18 @@ internal sealed class ChangeSetNeuron(
                 }
             case CodingVocabulary.ChangeSetCommitting:
                 {
+                    var editDeadline = EditDeadline;
+                    // Only the edit work is bounded: once the writes begin they run under the reaction's own
+                    // token, so a deadline can never abandon a commit halfway through writing files.
+                    using var bounded = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    bounded.CancelAfter(editDeadline);
                     EditOutcome? applied = null;
                     ChangeSetState next;
                     try
                     {
-                        var committed = await workspace.CommitAsync(async (solution, token) =>
+                        var committed = await workspace.CommitAsync(async (solution, _) =>
                         {
-                            applied = await editor.ApplyAsync(solution, current.Edits, token).ConfigureAwait(true);
+                            applied = await editor.ApplyAsync(solution, current.Edits, bounded.Token).ConfigureAwait(true);
                             return applied.HasErrors
                                 ? throw new InvalidOperationException(applied.Detail ?? "the change set has errors")
                                 : applied.Changed;
@@ -138,16 +153,19 @@ internal sealed class ChangeSetNeuron(
                             Revision = current.Revision + 1,
                         };
                     }
-                    catch (InvalidOperationException error)
+                    catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
                     {
-                        next = current with
-                        {
-                            Status = ChangeSetStatus.Draft,
-                            Diagnostics = applied?.Diagnostics ?? current.Diagnostics,
-                            Diff = applied?.Diff ?? current.Diff,
-                            Detail = error.Message,
-                            Revision = current.Revision + 1,
-                        };
+                        next = Refused(current, $"the commit did not finish within {editDeadline.TotalSeconds:0}s", applied);
+                    }
+#pragma warning disable CA1031 // any Roslyn or file-system failure must settle as advice, never leave the change set unsettled and retrying
+                    catch (Exception error) when (error is not OperationCanceledException)
+#pragma warning restore CA1031
+                    {
+                        // A change set with errors is refused before anything is written; any other failure
+                        // can have come after TryApplyChanges, which writes the changed documents itself.
+                        next = Refused(current, applied is { HasErrors: true }
+                            ? error.Message
+                            : error.Message + " Files may already have been written; read the change set and check the tree.", applied);
                     }
 
                     await SaveAsync(next, cancellationToken).ConfigureAwait(true);
@@ -160,6 +178,18 @@ internal sealed class ChangeSetNeuron(
                 return;
         }
     }
+
+    private TimeSpan EditDeadline => (ServiceProvider.GetService<CodingToolOptions>() ?? CodingToolOptions.Default).EditDeadline;
+
+    private static ChangeSetState Refused(ChangeSetState current, string detail, EditOutcome? applied = null)
+        => current with
+        {
+            Status = ChangeSetStatus.Draft,
+            Diagnostics = applied?.Diagnostics ?? current.Diagnostics,
+            Diff = applied?.Diff ?? current.Diff,
+            Detail = detail,
+            Revision = current.Revision + 1,
+        };
 
     private ChangeSetReceipt Receipt(int editCount) => new(Id.Name, editCount, Current.Status);
 

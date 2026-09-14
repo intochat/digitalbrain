@@ -181,6 +181,28 @@ public sealed class ChangeSetEditorFacts
         Assert.NotEmpty(new CodeFixCatalog().For("CS0219"));
     }
 
+    // Two edits in one file: the range edit introduced the error inside its own lines, the using came after
+    // it and merely shifted them. Blaming the last edit that touched the file would name the using.
+    [Fact]
+    public async Task The_edit_whose_range_covers_the_error_is_blamed_over_a_later_edit_in_the_same_file()
+    {
+        var outcome = await Editor.ApplyAsync(Snapshot(),
+            [new EditRequest(EditKind.ReplaceRange, Path: FixtureSolutions.GreeterPath, StartLine: 3, EndLine: 8, Source: """
+                public class Greeter : IWelcome
+                {
+                    public string Greet(string name) => 42;
+
+                    public string Welcome(string name) => "Welcome, " + name;
+                }
+                """),
+             new EditRequest(EditKind.AddUsing, Path: FixtureSolutions.GreeterPath, Namespace: "System.Text")],
+            TestContext.Current.CancellationToken);
+        Assert.True(outcome.HasErrors);
+        Assert.Equal(0, outcome.FailingEdit);
+        Assert.StartsWith("edit 1 (ReplaceRange", outcome.Detail, StringComparison.Ordinal);
+        Assert.Contains(outcome.Diagnostics, hit => hit.Id == "CS0029" && hit.Path == FixtureSolutions.GreeterPath);
+    }
+
     [Fact]
     public async Task A_rename_that_breaks_a_caller_is_blamed_on_the_rename()
     {

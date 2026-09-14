@@ -111,6 +111,49 @@ public sealed class ChangeSetNeuronFacts
         Assert.Equal(FixtureSolutions.GreeterSource, await File.ReadAllTextAsync(fixture.GreeterPath, TestContext.Current.CancellationToken));
     }
 
+    // A check whose workspace call fails with something Roslyn never raises as InvalidOperationException
+    // (here a disposed workspace, as at silo shutdown) must still settle as advice.
+    [Fact]
+    public async Task A_check_against_a_disposed_workspace_settles_as_a_draft()
+    {
+        var (brain, fixture) = await StartAsync();
+        await using var _ = brain;
+        using var __ = fixture;
+        var changeSet = ChangeSet(brain, "c9");
+        await changeSet.Propose(new ProposeEdit(CommandId.New(), FriendlyGreet));
+        var proposed = await WaitAsync(changeSet, snapshot => snapshot.Edits.Count == 1);
+        brain.SiloServices.GetRequiredService<SolutionWorkspace>().Dispose();
+
+        await changeSet.Check(new CheckChangeSet(CommandId.New()));
+        var refused = await WaitAsync(changeSet, snapshot => snapshot.Revision > proposed.Revision);
+
+        Assert.Equal(ChangeSetStatus.Draft, refused.Status);
+        Assert.NotNull(refused.Detail);
+    }
+
+    // A write that fails for a reason Roslyn never raises as InvalidOperationException (here the target path
+    // is a directory, so the file write is denied) has to settle the change set as advice: an escaping
+    // exception would leave it unsettled and the reaction retrying.
+    [Fact]
+    public async Task A_commit_whose_write_is_denied_settles_as_a_draft_with_the_message()
+    {
+        var (brain, fixture) = await StartAsync();
+        await using var _ = brain;
+        using var __ = fixture;
+        var changeSet = ChangeSet(brain, "c8");
+        await changeSet.Propose(new ProposeEdit(CommandId.New(), FriendlyGreet));
+        await WaitAsync(changeSet, snapshot => snapshot.Edits.Count == 1);
+        File.Delete(fixture.GreeterPath);
+        Directory.CreateDirectory(fixture.GreeterPath);
+
+        await changeSet.Commit(new CommitChangeSet(CommandId.New(), "friendlier greeting"));
+        var refused = await WaitAsync(changeSet, snapshot => snapshot.Detail is not null);
+
+        Assert.Equal(ChangeSetStatus.Draft, refused.Status);
+        Assert.Contains("Greeter.cs", refused.Detail, StringComparison.Ordinal);
+        Assert.Contains("Files may already have been written", refused.Detail, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Discard_closes_the_change_set()
     {
