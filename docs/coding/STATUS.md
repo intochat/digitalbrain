@@ -7,9 +7,9 @@ Read this file and `NOTES.md` first after a context reset; resume from the curre
 | Current phase | 1 (edits as transactions), branch `feature/coding-phase1-changesets` from phase 0 |
 | Current branch | `feature/coding-phase1-changesets` (from `feature/coding-phase0-workspace`, which is from `master` at `1e4b395d`) |
 | Plan | `docs/coding/plans/2026-09-14-coding-phase1-changesets.md` (phase 0: `plans/2026-09-13-coding-phase0-workspace.md`) |
-| Current task | Phase 1 gate: tasks 1-9 complete; live exit check, whole-branch review, final gates and PR pending |
-| Last green gate | `e175c188` (2026-09-14): format + build 0 warnings + `dotnet test DigitalBrain.slnx` 391 passed, 6 skipped (4 Docker + 2 coding gated), 0 failed |
-| Last commit | `e175c188` coding: phase 1 docs match the code; the chat fact names its tool sequence |
+| Current task | Phase 1 gate: tasks 1-9 complete; live exit check met (run 3: commit 272f9499 on local branch coding/rename-timer-alarm-20260914, suite green through the chat); whole-branch review, fix wave, final gates and PR pending |
+| Last green gate | `45e26df3` (2026-09-14): format + build 0 warnings + `dotnet test DigitalBrain.slnx` 411 passed, 6 skipped (4 Docker + 2 coding gated), 0 failed |
+| Last commit | `45e26df3` coding: one artifacts root for build and test; fresh change-set ids; review fixes |
 | Open PRs | #91 phase 0 (https://github.com/intochat/digitalbrain/pull/91) |
 
 ## Phase ledger
