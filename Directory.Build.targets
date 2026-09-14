@@ -4,4 +4,29 @@
     <RuntimeIdentifier></RuntimeIdentifier>
     <EnableSdkContainerSupport>false</EnableSdkContainerSupport>
   </PropertyGroup>
+
+  <Target Name="RefreshCodeGraph"
+          BeforeTargets="BeforeBuild"
+          Inputs="@(Compile);$(MSBuildProjectFullPath)"
+          Outputs="$(_CodeGraphStamp)"
+          Condition="'$(DesignTimeBuild)' != 'true' And '$(MSBuildProjectExtension)' == '.csproj' And '$(CI)' != 'true' And '$(CodeGraphRefresh)' != 'false'">
+    <PropertyGroup>
+      <_CodeGraphIndexExists>$([System.IO.Directory]::Exists('$(_CodeGraphIndex)'))</_CodeGraphIndexExists>
+    </PropertyGroup>
+    <Exec Command="$(_CodeGraphCommand) init &quot;$(_CodeGraphRepositoryRoot)&quot;"
+          WorkingDirectory="$(_CodeGraphRepositoryRoot)"
+          Condition="'$(_CodeGraphIndexExists)' != 'True'"
+          IgnoreStandardErrorWarningFormat="true"
+          ContinueOnError="WarnAndContinue">
+      <Output TaskParameter="ExitCode" PropertyName="_CodeGraphExitCode" />
+    </Exec>
+    <Exec Command="$(_CodeGraphCommand) sync --quiet &quot;$(_CodeGraphRepositoryRoot)&quot;"
+          WorkingDirectory="$(_CodeGraphRepositoryRoot)"
+          Condition="'$(_CodeGraphIndexExists)' == 'True'"
+          IgnoreStandardErrorWarningFormat="true"
+          ContinueOnError="WarnAndContinue">
+      <Output TaskParameter="ExitCode" PropertyName="_CodeGraphExitCode" />
+    </Exec>
+    <Touch Files="$(_CodeGraphStamp)" AlwaysCreate="true" Condition="'$(_CodeGraphExitCode)' == '0'" />
+  </Target>
 </Project>

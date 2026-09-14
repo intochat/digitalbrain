@@ -35,6 +35,13 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
+  <PropertyGroup>
+    <CodeGraphRefresh Condition="'$(CodeGraphRefresh)' == ''">true</CodeGraphRefresh>
+    <_CodeGraphRepositoryRoot>$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory).'))</_CodeGraphRepositoryRoot>
+    <_CodeGraphIndex>$([System.IO.Path]::Combine('$(_CodeGraphRepositoryRoot)', '.codegraph'))</_CodeGraphIndex>
+    <_CodeGraphStamp>$([System.IO.Path]::Combine('$(_CodeGraphIndex)', 'msbuild-refresh.stamp'))</_CodeGraphStamp>
+    <_CodeGraphCommand Condition="'$(_CodeGraphCommand)' == ''">npx -y @colbymchenry/codegraph@latest</_CodeGraphCommand>
+  </PropertyGroup>
   <ItemGroup Condition="'$(IsPackable)' == 'true'">
     <None Include="$(MSBuildThisFileDirectory)src/Assets/nuget/icon.png" Pack="true" PackagePath="/" Visible="false" Condition="Exists('$(MSBuildThisFileDirectory)src/Assets/nuget/icon.png')" />
     <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" Visible="false" Condition="Exists('$(MSBuildThisFileDirectory)README.md')" />
