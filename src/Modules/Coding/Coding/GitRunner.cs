@@ -33,12 +33,12 @@ public sealed class GitRunner(IProcessRunner processes)
     }
 
     // Refuses when the tree carries changes outside the change set: a commit must contain exactly what the
-    // snapshot wrote, never a stray edit the owner had not saved on purpose.
-    public async Task<GitCommitOutcome> CommitAsync(string repository, IReadOnlyList<string> files, string message, CancellationToken cancellationToken)
+    // snapshot wrote, never a stray edit the owner had not saved on purpose. The caller runs this before it
+    // ensures the branch, so a refused commit never leaves the tree parked on a branch it just created.
+    public async Task RefuseIfDirtyOutsideAsync(string repository, IReadOnlyList<string> files, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(files);
-        ArgumentException.ThrowIfNullOrWhiteSpace(message);
-        var relative = files.Select(file => Path.GetRelativePath(repository, file).Replace('\\', '/')).ToArray();
+        var relative = RelativePaths(repository, files);
         var outside = (await ChangedPathsAsync(repository, cancellationToken).ConfigureAwait(false))
             .Where(path => !relative.Contains(path, PathComparer))
             .ToArray();
@@ -46,12 +46,24 @@ public sealed class GitRunner(IProcessRunner processes)
         {
             throw new InvalidOperationException($"The working tree has changes outside the change set: {string.Join(", ", outside.Take(5))}. Commit or stash them first.");
         }
+    }
 
+    public async Task<GitCommitOutcome> CommitAsync(string repository, IReadOnlyList<string> files, string message, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(files);
+        ArgumentException.ThrowIfNullOrWhiteSpace(message);
+        // Checked again here, not only by the caller: a commit must never carry a stray edit even when it
+        // was reached without the tool's earlier check.
+        await RefuseIfDirtyOutsideAsync(repository, files, cancellationToken).ConfigureAwait(false);
+        var relative = RelativePaths(repository, files);
         await GitAsync(repository, ["add", "--", .. relative], cancellationToken).ConfigureAwait(false);
         await GitAsync(repository, ["commit", "-q", "-m", message], cancellationToken).ConfigureAwait(false);
         var hash = (await GitAsync(repository, ["rev-parse", "HEAD"], cancellationToken).ConfigureAwait(false)).Output.Trim();
         return new GitCommitOutcome(hash, await CurrentBranchAsync(repository, cancellationToken).ConfigureAwait(false), relative);
     }
+
+    private static IReadOnlyList<string> RelativePaths(string repository, IReadOnlyList<string> files)
+        => [.. files.Select(file => Path.GetRelativePath(repository, file).Replace('\\', '/'))];
 
     private async Task<ProcessResult> GitAsync(string repository, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
     {

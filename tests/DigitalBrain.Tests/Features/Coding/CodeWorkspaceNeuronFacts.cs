@@ -246,8 +246,7 @@ public sealed class CodeWorkspaceNeuronFacts
     public async Task The_map_answers_from_the_durable_cache_while_a_reload_is_in_flight()
     {
         var gate = new TaskCompletionSource();
-        var opens = 0;
-        var loader = new GatedSecondOpenLoader(FixtureSolutions.TwoProjects, gate, () => opens++);
+        var loader = new GatedSecondOpenLoader(FixtureSolutions.TwoProjects, gate);
         await using var brain = await BrainSimulation.StartAsync(new()
         {
             Modules = new([typeof(CodingModule)]),
@@ -293,22 +292,5 @@ public sealed class CodeWorkspaceNeuronFacts
 
         gate.SetResult();
         await WaitAsync(workspace, WorkspacePhase.Ready);
-    }
-
-    // The first open completes at once; the second waits for the gate so a fact can observe "Opening".
-    private sealed class GatedSecondOpenLoader(Func<global::Microsoft.CodeAnalysis.Workspace> open, TaskCompletionSource gate, Action opened) : ISolutionLoader
-    {
-        private int _opens;
-
-        public async Task<LoadedSolution> OpenAsync(string solutionPath, IProgress<string> progress, CancellationToken cancellationToken)
-        {
-            if (Interlocked.Increment(ref _opens) > 1)
-            {
-                await gate.Task.WaitAsync(cancellationToken);
-            }
-
-            opened();
-            return new LoadedSolution(open(), []);
-        }
     }
 }

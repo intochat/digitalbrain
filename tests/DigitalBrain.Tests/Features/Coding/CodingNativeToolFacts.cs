@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
+using DigitalBrain.Abstractions.Commands;
+using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Interactions;
 using DigitalBrain.Coding;
@@ -12,7 +14,8 @@ namespace DigitalBrain.Tests.Coding;
 
 public sealed class CodingNativeToolFacts
 {
-    private static async Task<(BrainSimulation Brain, NativeTools Tools, DiskFixture Fixture, FakeProcessRunner Dotnet)> StartAsync(CodingToolOptions? options = null, bool configureTestProject = false)
+    private static async Task<(BrainSimulation Brain, NativeTools Tools, DiskFixture Fixture, FakeProcessRunner Dotnet)> StartAsync(
+        CodingToolOptions? options = null, bool configureTestProject = false, Func<DiskFixture, ISolutionLoader>? loader = null)
     {
         var fixture = DiskFixture.Create();
         await fixture.InitGitAsync(TestContext.Current.CancellationToken);
@@ -30,7 +33,7 @@ public sealed class CodingNativeToolFacts
             Modules = new([typeof(AIModule), typeof(CodingModule)]),
             ConfigureSilo = silo =>
             {
-                silo.Services.AddSingleton<ISolutionLoader>(new AdhocSolutionLoader(fixture.Open));
+                silo.Services.AddSingleton<ISolutionLoader>(loader is null ? new AdhocSolutionLoader(fixture.Open) : loader(fixture));
                 silo.Services.AddSingleton<IUntrustedContentScreen, ScriptedContentScreen>();
                 silo.Services.AddSingleton(new DotnetRunner(dotnet));
                 if (options is not null)
@@ -49,15 +52,6 @@ public sealed class CodingNativeToolFacts
         var tool = Assert.IsAssignableFrom<AIFunction>(Assert.Single(tools.Resolve([name])));
         var result = await tool.InvokeAsync(new AIFunctionArguments(arguments), TestContext.Current.CancellationToken);
         return JsonSerializer.SerializeToElement(result);
-    }
-
-    [Fact]
-    public async Task The_four_tools_resolve()
-    {
-        var (brain, tools, fixture, _) = await StartAsync();
-        using var fixtureScope = fixture;
-        await using var brainScope = brain;
-        Assert.Equal(4, tools.Resolve(["code_find_symbols", "code_references", "code_diagnostics", "code_map"]).Count());
     }
 
     [Fact]
@@ -114,13 +108,13 @@ public sealed class CodingNativeToolFacts
     }
 
     [Fact]
-    public async Task The_thirteen_tools_resolve()
+    public async Task The_fourteen_tools_resolve()
     {
         var (brain, tools, fixture, _) = await StartAsync();
         using var fixtureScope = fixture;
         await using var brainScope = brain;
-        Assert.Equal(13, tools.Resolve(["code_find_symbols", "code_references", "code_diagnostics", "code_map", "code_skeleton", "code_member", "code_callers",
-            "code_implementations", "code_propose_edit", "code_check", "code_commit", "code_build", "code_test"]).Count());
+        Assert.Equal(14, tools.Resolve(["code_find_symbols", "code_references", "code_diagnostics", "code_map", "code_skeleton", "code_member", "code_callers",
+            "code_implementations", "code_derived", "code_propose_edit", "code_check", "code_commit", "code_build", "code_test"]).Count());
     }
 
     [Fact]
@@ -142,6 +136,45 @@ public sealed class CodingNativeToolFacts
         // Shouter also implements IWelcome by inheriting Greeter, so the interface type has two implementers
         // (WorkspaceReadFacts.Derived_of_an_interface_are_its_implementing_types pins the same pair by name).
         Assert.Equal(2, implementations.GetProperty("totalCount").GetInt32());
+        var derived = await InvokeAsync(tools, "code_derived", new() { ["symbolId"] = "T:Alpha.Greeter" });
+        Assert.Equal(1, derived.GetProperty("totalCount").GetInt32());
+        Assert.Equal("T:Beta.Shouter", derived.GetProperty("items")[0].GetProperty("id").GetString());
+    }
+
+    [Fact]
+    public async Task Map_answers_from_the_durable_cache_while_a_reload_is_in_flight()
+    {
+        var gate = new TaskCompletionSource();
+        var (brain, tools, fixture, _) = await StartAsync(loader: disk => new GatedSecondOpenLoader(disk.Open, gate));
+        using var fixtureScope = fixture;
+        await using var brainScope = brain;
+        Assert.Equal("graph", (await InvokeAsync(tools, "code_map", new())).GetProperty("kind").GetString());
+
+        // The gated second open keeps the service Opening until the gate is released below. The tool now asks
+        // the workspace grain, which answers a reload in flight from its durable LastMap, so the map keeps
+        // coming back; asking the live service directly would be a "still opening" advice instead.
+        var workspace = brain.Grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType, "digitalbrain").ToGrainId());
+        await workspace.Reload(new ReloadWorkspace(CommandId.New()));
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(20));
+        JsonElement cached;
+        while (true)
+        {
+            var snapshot = await workspace.Read();
+            cached = await InvokeAsync(tools, "code_map", new());
+            if (snapshot.Phase == WorkspacePhase.Opening && cached.TryGetProperty("kind", out _))
+            {
+                break;
+            }
+
+            await Task.Delay(25, timeout.Token);
+        }
+
+        Assert.Equal("graph", cached.GetProperty("kind").GetString());
+        Assert.Equal(2, cached.GetProperty("nodes").GetArrayLength());
+
+        gate.SetResult();
+        await brain.SiloServices.GetRequiredService<SolutionWorkspace>().WhenReadyAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -167,6 +200,7 @@ public sealed class CodingNativeToolFacts
         var committed = await InvokeAsync(tools, "code_commit", new() { ["changeId"] = "t1", ["message"] = "rename Greet to Hello" });
         Assert.Equal("Committed", committed.GetProperty("status").GetString());
         Assert.Equal("coding/t1", committed.GetProperty("branch").GetString());
+        Assert.Equal("main", committed.GetProperty("baseBranch").GetString());
         Assert.Equal(40, committed.GetProperty("commit").GetString()!.Length);
         // Greeter.cs, Program.cs and the generated GreeterCodec document (which also calls Greet) all change.
         Assert.Equal(3, committed.GetProperty("files").GetArrayLength());
@@ -319,7 +353,7 @@ public sealed class CodingNativeToolFacts
     }
 
     [Fact]
-    public async Task A_git_refusal_after_the_files_are_written_reports_the_written_files()
+    public async Task A_dirty_tree_outside_the_change_set_is_refused_before_any_branch_is_created()
     {
         var (brain, tools, fixture, _) = await StartAsync();
         using var fixtureScope = fixture;
@@ -333,16 +367,21 @@ public sealed class CodingNativeToolFacts
         });
         await InvokeAsync(tools, "code_check", new() { ["changeId"] = "t6" });
 
-        // Dirty a file the change set never touches; GitRunner.CommitAsync refuses a tree with changes outside
-        // the change set, but only after the grain already wrote its files and closed the change set, and only
-        // after EnsureBranchAsync itself already succeeded.
+        // Dirty a file the change set never touches. The grain still writes its files and closes the change
+        // set, but the git step is refused before the branch is ensured, so the tree stays where it was.
         await File.AppendAllTextAsync(fixture.UnusedPath, "// dirty", TestContext.Current.CancellationToken);
 
         var committed = await InvokeAsync(tools, "code_commit", new() { ["changeId"] = "t6", ["message"] = "rename Greet to Hello" });
         Assert.Equal("Committed", committed.GetProperty("status").GetString());
         Assert.True(committed.GetProperty("files").GetArrayLength() > 0);
-        Assert.Equal("coding/t6", committed.GetProperty("branch").GetString());
+        Assert.Equal(JsonValueKind.Null, committed.GetProperty("branch").ValueKind);
+        Assert.Equal("main", committed.GetProperty("baseBranch").GetString());
         Assert.Equal(JsonValueKind.Null, committed.GetProperty("commit").ValueKind);
         Assert.Contains("outside the change set", committed.GetProperty("advice").GetString(), StringComparison.Ordinal);
+
+        var branches = await new ProcessRunner().RunAsync("git", ["branch", "--list", "coding/t6"], fixture.Root, TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        Assert.Equal(string.Empty, branches.Output.Trim());
+        var current = await new ProcessRunner().RunAsync("git", ["branch", "--show-current"], fixture.Root, TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        Assert.Equal("main", current.Output.Trim());
     }
 }

@@ -94,7 +94,7 @@ public static class ConversationalAgent
                         Do not claim to have modified external files or run graph workflows. Confirm changes only
                         after a successful tool result, and describe errors honestly.
                         """,
-                    Tools = [.. services.GetService<NativeTools>()?.Resolve(["salesforce_current_account", "salesforce_user_info", "salesforce_schema", "salesforce_query", "clickhouse_schema", "clickhouse_query", "show_query_table", "render_chart", "code_find_symbols", "code_references", "code_diagnostics", "code_map", "code_skeleton", "code_member", "code_callers", "code_implementations", "code_propose_edit", "code_check", "code_commit", "code_build", "code_test"]) ?? [], .. search is null ? [] : new AITool[] { WebSearchFunction.Create(search) }, .. additionalTools ?? []],
+                    Tools = [.. services.GetService<NativeTools>()?.Resolve(["salesforce_current_account", "salesforce_user_info", "salesforce_schema", "salesforce_query", "clickhouse_schema", "clickhouse_query", "show_query_table", "render_chart", "code_find_symbols", "code_references", "code_diagnostics", "code_map", "code_skeleton", "code_member", "code_callers", "code_implementations", "code_derived", "code_propose_edit", "code_check", "code_commit", "code_build", "code_test"]) ?? [], .. search is null ? [] : new AITool[] { WebSearchFunction.Create(search) }, .. additionalTools ?? []],
                 },
             },
             services.GetService<ILoggerFactory>(),

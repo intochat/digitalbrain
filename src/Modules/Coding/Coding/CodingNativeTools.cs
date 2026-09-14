@@ -64,15 +64,27 @@ public sealed class CodingNativeTools
         AIFunctionFactory.Create(Member, new AIFunctionFactoryOptions { Name = "code_member", Description = "One declaration with its body, by symbol id." }),
         AIFunctionFactory.Create(Callers, new AIFunctionFactoryOptions { Name = "code_callers", Description = "The symbols that call a method or read a property, with the call sites." }),
         AIFunctionFactory.Create(Implementations, new AIFunctionFactoryOptions { Name = "code_implementations", Description = "The implementations of an interface or an abstract or virtual member." }),
+        AIFunctionFactory.Create(Derived, new AIFunctionFactoryOptions { Name = "code_derived", Description = "The classes derived from a class or the interfaces extending an interface." }),
         AIFunctionFactory.Create(ProposeEdit, new AIFunctionFactoryOptions { Name = "code_propose_edit", Description = "Add one edit to a change set. Nothing touches disk until code_commit; code_check compiles the snapshot first." }),
         AIFunctionFactory.Create(Check, new AIFunctionFactoryOptions { Name = "code_check", Description = "Apply a change set to one snapshot and compile it: diagnostics and a diff, no files written." }),
-        AIFunctionFactory.Create(Commit, new AIFunctionFactoryOptions { Name = "code_commit", Description = "Write a clean change set to disk and commit it on a coding/<changeId> git branch. Refuses when the check has errors or the tree is dirty elsewhere." }),
+        AIFunctionFactory.Create(Commit, new AIFunctionFactoryOptions
+        {
+            Name = "code_commit",
+            Description = "Write a clean change set to disk and commit it on a coding/<changeId> git branch. Refuses when the check has errors or the tree is dirty elsewhere. "
+                + "The working tree stays on the coding/<changeId> branch afterwards; later change sets commit on top of it.",
+        }),
         AIFunctionFactory.Create(BuildSolution, new AIFunctionFactoryOptions { Name = "code_build", Description = "dotnet build of the solution in Release; parsed errors and warnings." }),
         AIFunctionFactory.Create(Test, new AIFunctionFactoryOptions { Name = "code_test", Description = "dotnet test without rebuilding; counts and the failing tests. Run code_build first." }),
     ];
 
     private IChangeSet ChangeSet(string changeId)
         => _grains.GetGrain<IChangeSet>(new NeuronId(CodingVocabulary.ChangeSetType, changeId).ToGrainId());
+
+    // The same grain WorkspaceWarmup records the open on, so a read that the grain can answer from its
+    // durable state (the map, while a reload is in flight) is not refused by the live service instead.
+    private ICodeWorkspace Workspace()
+        => _grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType,
+            _configuration[CodingModule.WorkspaceKeyKey] ?? "digitalbrain").ToGrainId());
 
     private string SolutionPath()
         => _workspace.Status.SolutionPath ?? throw new InvalidOperationException(_workspace.Status.Advice);
@@ -106,7 +118,7 @@ public sealed class CodingNativeTools
         CancellationToken cancellationToken = default)
         => GuardedAsync(async () =>
         {
-            var map = await _workspace.MapAsync(new MapQuery(), cancellationToken).ConfigureAwait(false);
+            var map = await Workspace().Map(new MapQuery(), cancellationToken).ConfigureAwait(false);
             var nodes = map.Projects.Select(project => new GraphNodeState(project.Name, project.Name, GraphNodeKinds.Module, project.Cluster)).ToArray();
             var edges = map.References.Select(edge => new GraphEdgeState($"{edge.From}-{edge.To}", edge.From, edge.To)).ToArray();
             // One artifact per solution: the shell keys artifacts by id, so a second map replaces the first.
@@ -125,6 +137,9 @@ public sealed class CodingNativeTools
 
     private Task<JsonElement> Implementations([Description("An interface, abstract member or virtual member id")] string symbolId, [Description("Maximum hits, default 50")] int limit = 50, CancellationToken cancellationToken = default)
         => GuardedAsync(() => _workspace.ImplementationsAsync(new ImplementationsQuery(symbolId, limit), cancellationToken));
+
+    private Task<JsonElement> Derived([Description("A class or interface id")] string symbolId, [Description("Maximum hits, default 50")] int limit = 50, CancellationToken cancellationToken = default)
+        => GuardedAsync(() => _workspace.DerivedAsync(new DerivedQuery(symbolId, limit), cancellationToken));
 
     private Task<JsonElement> ProposeEdit(
         [Description("The change set id; edits with the same id compose into one snapshot")] string changeId,
@@ -178,16 +193,23 @@ public sealed class CodingNativeTools
             var snapshot = await WaitAsync(changeSet, before, cancellationToken).ConfigureAwait(false);
             if (snapshot.Status != ChangeSetStatus.Committed)
             {
-                return Result(snapshot, branch: null, commit: null, advice: snapshot.Detail);
+                return Result(snapshot, baseBranch: null, branch: null, commit: null, advice: snapshot.Detail);
             }
 
             var repository = Path.GetDirectoryName(SolutionPath())!;
+            string? baseBranch = null;
             string? branch = null;
             try
             {
+                // The branch the tree was on when this commit started, and the dirty-tree refusal, both come
+                // before EnsureBranchAsync: a refused commit must not leave the tree parked on a coding branch
+                // it just created and checked out.
+                var current = await _git.CurrentBranchAsync(repository, cancellationToken).ConfigureAwait(false);
+                baseBranch = string.IsNullOrWhiteSpace(current) ? null : current;
+                await _git.RefuseIfDirtyOutsideAsync(repository, snapshot.Files, cancellationToken).ConfigureAwait(false);
                 branch = await _git.EnsureBranchAsync(repository, "coding/" + changeId, cancellationToken).ConfigureAwait(false);
                 var outcome = await _git.CommitAsync(repository, snapshot.Files, "coding: " + message, cancellationToken).ConfigureAwait(false);
-                return Result(snapshot, branch, outcome.Hash, advice: null);
+                return Result(snapshot, baseBranch, branch, outcome.Hash, advice: null);
             }
 #pragma warning disable CA1031 // a missing git binary (or any other git failure) must reach the model as advice, not an exception
             catch (Exception error) when (error is not OperationCanceledException)
@@ -195,12 +217,12 @@ public sealed class CodingNativeTools
             {
                 // The grain already wrote the files and closed the change set; git merely failed the extra
                 // branch/commit step, so that must not read as "nothing happened" to whoever reads this result.
-                // branch is reported even here when EnsureBranchAsync itself succeeded before CommitAsync failed.
-                return Result(snapshot, branch, commit: null, advice: error.Message + " The change set already wrote these files; commit them yourself.");
+                // branch stays null unless EnsureBranchAsync itself already succeeded.
+                return Result(snapshot, baseBranch, branch, commit: null, advice: error.Message + " The change set already wrote these files; commit them yourself.");
             }
 
-            static object Result(ChangeSetSnapshot snapshot, string? branch, string? commit, string? advice)
-                => new { status = snapshot.Status, files = snapshot.Files, generation = snapshot.Generation, diff = snapshot.Diff, detail = snapshot.Detail, branch, commit, advice };
+            static object Result(ChangeSetSnapshot snapshot, string? baseBranch, string? branch, string? commit, string? advice)
+                => new { status = snapshot.Status, files = snapshot.Files, generation = snapshot.Generation, diff = snapshot.Diff, detail = snapshot.Detail, branch, baseBranch, commit, advice };
         });
 
     private Task<JsonElement> BuildSolution(
@@ -226,6 +248,9 @@ public sealed class CodingNativeTools
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(_options.ReactionWait);
         var last = before;
+        // A reaction that settles at once is usually caught by the first or second poll; the backoff keeps a
+        // long check or commit from costing hundreds of grain reads while it runs.
+        var poll = TimeSpan.FromMilliseconds(20);
         try
         {
             while (true)
@@ -239,7 +264,8 @@ public sealed class CodingNativeTools
                     return last;
                 }
 
-                await Task.Delay(100, timeout.Token).ConfigureAwait(false);
+                await Task.Delay(poll, timeout.Token).ConfigureAwait(false);
+                poll = TimeSpan.FromMilliseconds(Math.Min(500, poll.TotalMilliseconds * 2));
             }
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
