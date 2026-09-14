@@ -24,6 +24,7 @@ public sealed class MicrosoftModule : IModule
             settings = new(project, configuration["ApplicationName"] ?? "DigitalBrain", configuration["Command"] ?? "aspire");
         }
         builder.Services.AddSingleton(new AspireConnection(settings));
+        builder.Services.AddSingleton<IAspireResourceCommands>(static services => services.GetRequiredService<AspireConnection>());
         if (settings is not null)
         {
             builder.Services.AddNativeTool("aspire_read", services => services.GetRequiredService<AspireNativeTools>().CreateRead());

@@ -6,7 +6,7 @@ using ModelContextProtocol.Client;
 
 namespace DigitalBrain.Microsoft;
 
-public sealed class AspireConnection
+public sealed class AspireConnection : IAspireResourceCommands
 {
     private readonly AspireConnectionSettings? _settings;
 
@@ -14,13 +14,42 @@ public sealed class AspireConnection
 
     public string? ApplicationName => _settings?.ApplicationName;
 
-    public async Task<JsonElement> ReadAsync(string tool, IReadOnlyDictionary<string, object?> arguments, CancellationToken cancellationToken = default)
+    public Task<JsonElement> ReadAsync(string tool, IReadOnlyDictionary<string, object?> arguments, CancellationToken cancellationToken = default)
     {
-        var settings = _settings ?? throw new InvalidOperationException("Configure the Aspire AppHost project before reading its resources.");
+        // Configuration first: an unconfigured host answers what to do about it, not "not allowed".
+        var settings = RequireSettings();
         if (tool is not ("list_resources" or "list_console_logs" or "list_structured_logs" or "list_traces" or "list_trace_structured_logs"))
         {
             throw new InvalidOperationException("This Aspire operation is not allowed.");
         }
+
+        return CallAsync(settings, tool, arguments, cancellationToken);
+    }
+
+    // Promotion starts the standby and stops the retired slot (R5.2). Nothing else is executable: an
+    // arbitrary command name would let a model reshape the running application.
+    public Task<JsonElement> ExecuteAsync(string resourceName, string command, CancellationToken cancellationToken = default)
+        => ExecuteResourceCommandAsync(resourceName, command, cancellationToken);
+
+    public Task<JsonElement> ExecuteResourceCommandAsync(string resourceName, string command, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(resourceName);
+        var settings = RequireSettings();
+        if (command is not ("start" or "stop" or "restart"))
+        {
+            throw new InvalidOperationException("An Aspire resource takes start, stop or restart.");
+        }
+
+        return CallAsync(settings, "execute_resource_command",
+            new Dictionary<string, object?> { ["resourceName"] = resourceName, ["commandName"] = command },
+            cancellationToken);
+    }
+
+    private AspireConnectionSettings RequireSettings()
+        => _settings ?? throw new InvalidOperationException("Configure the Aspire AppHost project before reading or commanding its resources.");
+
+    private async Task<JsonElement> CallAsync(AspireConnectionSettings settings, string tool, IReadOnlyDictionary<string, object?> arguments, CancellationToken cancellationToken)
+    {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(30));
         try
