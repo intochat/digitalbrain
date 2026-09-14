@@ -17,6 +17,9 @@ public sealed record SlotOptions(
     TimeSpan PromoteWait,
     string SmokePath,
     int HealthAttempts,
+    TimeSpan HealthPoll,
+    int SwitchAttempts,
+    TimeSpan SwitchWait,
     IReadOnlyDictionary<string, Uri> Urls,
     IReadOnlyDictionary<string, string> Resources)
 {
@@ -24,22 +27,47 @@ public sealed record SlotOptions(
 
     private const string ArtifactsDirectoryName = "artifacts";
 
+    // The ceiling on every wait a reaction performs inside one turn. Reads of a neuron queue behind its
+    // turn, so a slot that waits an hour is a slot nobody can read for an hour: the value is refused here
+    // rather than clamped, because a promotion that silently waited ten seconds instead of the hour
+    // somebody configured would never explain itself.
+    private static readonly TimeSpan MaxTurnWait = TimeSpan.FromMinutes(2);
+
+    // PromoteWait is the caller's total patience, not a turn, and has to outlast HealthAttempts polls of
+    // HealthPoll each, so it gets its own far looser ceiling.
+    private static readonly TimeSpan MaxPromoteWait = TimeSpan.FromHours(1);
+
     public static IReadOnlyList<string> Names { get; } = ["a", "b"];
+
+    // How long the whole gateway switch may take, deadline included: the loop is bounded by elapsed time,
+    // not by the sum of its waits, or one slow answer per attempt would outlast the budget on its own.
+    public TimeSpan SwitchDeadline => SwitchWait * SwitchAttempts;
 
     public static SlotOptions From(IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         var slots = configuration.GetSection(Section);
+        var switchAttempts = Count(slots["SwitchAttempts"], "SwitchAttempts", 3);
+        var switchWait = Duration(slots["SwitchWait"], "SwitchWait", TimeSpan.FromSeconds(20), MaxTurnWait);
+        if (switchWait * switchAttempts > MaxTurnWait)
+        {
+            throw new InvalidOperationException(
+                $"'{Section}:SwitchWait' of '{switchWait}' across '{Section}:SwitchAttempts' of {switchAttempts} lets one switch hold the slot's turn for {(switchWait * switchAttempts).TotalMinutes:0.#} minutes; the maximum is {MaxTurnWait.TotalMinutes:0} minutes.");
+        }
+
         return new SlotOptions(
             configuration[ActiveSlotNames.SlotKey],
             slots["ArtifactsRoot"],
             Address(slots["Gateway"], "Gateway", "http://localhost:5080"),
-            Duration(slots["Grace"], "Grace", TimeSpan.FromSeconds(10)),
+            Duration(slots["Grace"], "Grace", TimeSpan.FromSeconds(10), MaxTurnWait),
             // Five refresher intervals: the standby learns of a lease flip through its own poll.
-            Duration(slots["LeaseSettle"], "LeaseSettle", ActiveSlotNames.RefreshInterval * 5),
-            Duration(slots["PromoteWait"], "PromoteWait", TimeSpan.FromMinutes(20)),
+            Duration(slots["LeaseSettle"], "LeaseSettle", ActiveSlotNames.RefreshInterval * 5, MaxTurnWait),
+            Duration(slots["PromoteWait"], "PromoteWait", TimeSpan.FromMinutes(20), MaxPromoteWait),
             Text(slots["SmokePath"], "/chats/slot-smoke/brain"),
             Count(slots["HealthAttempts"], "HealthAttempts", 120),
+            Duration(slots["HealthPoll"], "HealthPoll", TimeSpan.FromSeconds(1), MaxTurnWait),
+            switchAttempts,
+            switchWait,
             Names.ToDictionary(name => name, name => Address(slots[$"{name}:Url"], $"{name}:Url", DefaultUrl(name)), StringComparer.OrdinalIgnoreCase),
             Names.ToDictionary(name => name, name => Text(slots[$"{name}:Resource"], "kernel-" + name), StringComparer.OrdinalIgnoreCase));
     }
@@ -88,16 +116,22 @@ public sealed record SlotOptions(
 
     // A value that does not parse is a refusal, not the default: a promotion that waited ten seconds
     // because "30s" is not a TimeSpan would never explain itself.
-    private static TimeSpan Duration(string? configured, string key, TimeSpan fallback)
+    private static TimeSpan Duration(string? configured, string key, TimeSpan fallback, TimeSpan maximum)
     {
         if (configured is not { Length: > 0 } value)
         {
             return fallback;
         }
 
-        return TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var parsed) && parsed >= TimeSpan.Zero
+        if (!TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var parsed) || parsed < TimeSpan.Zero)
+        {
+            throw new InvalidOperationException($"'{Section}:{key}' is '{value}', which is not a duration like '00:00:10'.");
+        }
+
+        return parsed <= maximum
             ? parsed
-            : throw new InvalidOperationException($"'{Section}:{key}' is '{value}', which is not a duration like '00:00:10'.");
+            : throw new InvalidOperationException(
+                $"'{Section}:{key}' is '{value}', which is longer than the {maximum.TotalMinutes:0.#} minute maximum.");
     }
 
     private static int Count(string? configured, string key, int fallback)

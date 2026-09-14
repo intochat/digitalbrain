@@ -75,7 +75,36 @@ public sealed class SlotServiceFacts
         Assert.True(options.LeaseSettle >= ActiveSlotNames.RefreshInterval * 2);
         Assert.Equal("/chats/slot-smoke/brain", options.SmokePath);
         Assert.Equal(120, options.HealthAttempts);
+        Assert.Equal(TimeSpan.FromSeconds(1), options.HealthPoll);
+        Assert.Equal(3, options.SwitchAttempts);
+        Assert.Equal(TimeSpan.FromSeconds(20), options.SwitchWait);
+        // The whole switch is bounded by elapsed time, so its budget is the product of the two.
+        Assert.Equal(TimeSpan.FromMinutes(1), options.SwitchDeadline);
         Assert.Null(options.Slot);
+    }
+
+    [Fact]
+    public void A_wait_longer_than_one_turn_may_hold_is_refused_with_its_key()
+    {
+        // Reads of a slot queue behind its turn, so an hour-long Grace is an hour nobody can read it.
+        foreach (var key in new[] { "Grace", "LeaseSettle", "HealthPoll", "SwitchWait" })
+        {
+            var error = Assert.Throws<InvalidOperationException>(() => Options(($"DigitalBrain:Slots:{key}", "00:03:00")));
+            Assert.Contains($"DigitalBrain:Slots:{key}", error.Message, StringComparison.Ordinal);
+            Assert.Contains("maximum", error.Message, StringComparison.Ordinal);
+        }
+
+        // Each attempt is inside the ceiling, but three of them are not.
+        var deadline = Assert.Throws<InvalidOperationException>(() => Options(
+            ("DigitalBrain:Slots:SwitchWait", "00:01:00"),
+            ("DigitalBrain:Slots:SwitchAttempts", "3")));
+        Assert.Contains("DigitalBrain:Slots:SwitchWait", deadline.Message, StringComparison.Ordinal);
+        Assert.Contains("DigitalBrain:Slots:SwitchAttempts", deadline.Message, StringComparison.Ordinal);
+
+        // PromoteWait is the caller's total patience, not a turn, and has to outlast every health poll.
+        Assert.Equal(TimeSpan.FromMinutes(30), Options(("DigitalBrain:Slots:PromoteWait", "00:30:00")).PromoteWait);
+        var patience = Assert.Throws<InvalidOperationException>(() => Options(("DigitalBrain:Slots:PromoteWait", "02:00:00")));
+        Assert.Contains("DigitalBrain:Slots:PromoteWait", patience.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -86,12 +115,19 @@ public sealed class SlotServiceFacts
             ("DigitalBrain:Slots:Gateway", "http://gateway:9000"),
             ("DigitalBrain:Slots:Grace", "00:00:02"),
             ("DigitalBrain:Slots:HealthAttempts", "7"),
+            ("DigitalBrain:Slots:HealthPoll", "00:00:00.250"),
+            ("DigitalBrain:Slots:SwitchAttempts", "5"),
+            ("DigitalBrain:Slots:SwitchWait", "00:00:02"),
             ("DigitalBrain:Slots:b:Url", "http://kernel-b:6000"),
             ("DigitalBrain:Slots:b:Resource", "silo-b"));
         Assert.Equal("b", options.Slot);
         Assert.Equal(new Uri("http://gateway:9000"), options.GatewayUrl);
         Assert.Equal(TimeSpan.FromSeconds(2), options.Grace);
         Assert.Equal(7, options.HealthAttempts);
+        Assert.Equal(TimeSpan.FromMilliseconds(250), options.HealthPoll);
+        Assert.Equal(5, options.SwitchAttempts);
+        Assert.Equal(TimeSpan.FromSeconds(2), options.SwitchWait);
+        Assert.Equal(TimeSpan.FromSeconds(10), options.SwitchDeadline);
         Assert.Equal(new Uri("http://kernel-b:6000"), options.UrlFor("b"));
         Assert.Equal("silo-b", options.ResourceFor("b"));
         Assert.Equal(new Uri("http://localhost:5081"), options.UrlFor("a"));

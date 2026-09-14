@@ -14,10 +14,16 @@ internal sealed class FakeSlotBuilder : ISlotBuilder
 
     public string ArtifactsPath { get; set; } = "E:/repo/artifacts/slot-b";
 
+    // What the real builder throws rather than answers: a missing dotnet, an unusable artifacts path, or
+    // Roslyn failing inside the rollback scan. None of them is an InvalidOperationException.
+    public Exception? Failure { get; set; }
+
     public Task<SlotBuildResult> BuildAsync(string slot, IReadOnlyList<string> changedFiles, CancellationToken cancellationToken = default)
     {
         Builds.Add((slot, changedFiles));
-        return Task.FromResult(new SlotBuildResult(Outcome, ArtifactsPath, TouchesSerializedState));
+        return Failure is { } failure
+            ? Task.FromException<SlotBuildResult>(failure)
+            : Task.FromResult(new SlotBuildResult(Outcome, ArtifactsPath, TouchesSerializedState));
     }
 }
 
@@ -41,6 +47,9 @@ internal sealed class FakeSlotEndpoints : ISlotEndpoints
     public string? SmokeFailure { get; set; }
 
     public string? ActiveSlot { get; set; }
+
+    // The gateway takes the switch and goes on serving the slot it was serving: traffic never moved.
+    public bool SwitchDoesNotTakeEffect { get; set; }
 
     // Each entry answers one switch attempt with the gateway's Retry-After instead of accepting it.
     public Queue<TimeSpan> SwitchRetryAfter { get; } = new();
@@ -77,7 +86,11 @@ internal sealed class FakeSlotEndpoints : ISlotEndpoints
         }
 
         Switches.Add(slot);
-        ActiveSlot = slot;
+        if (!SwitchDoesNotTakeEffect)
+        {
+            ActiveSlot = slot;
+        }
+
         return Task.FromResult<TimeSpan?>(null);
     }
 
