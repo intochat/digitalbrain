@@ -126,7 +126,9 @@ public sealed class CodingNativeToolFacts
         var member = await InvokeAsync(tools, "code_member", new() { ["symbolId"] = "M:Alpha.Greeter.Greet(System.String)" });
         Assert.Contains("Hello", member.GetProperty("source").GetString(), StringComparison.Ordinal);
         var callers = await InvokeAsync(tools, "code_callers", new() { ["symbolId"] = "M:Alpha.Greeter.Greet(System.String)" });
-        Assert.Equal("M:Beta.Program.Run", callers.GetProperty("items")[0].GetProperty("id").GetString());
+        // The generated GreeterCodec document also calls Greet and sorts first by path ("Alpha/obj/..."
+        // precedes "Beta/Program.cs"); callers is not in design 9.1's query-hygiene scope, so both are real hits.
+        Assert.Contains(callers.GetProperty("items").EnumerateArray(), item => item.GetProperty("id").GetString() == "M:Beta.Program.Run");
         var implementations = await InvokeAsync(tools, "code_implementations", new() { ["symbolId"] = "T:Alpha.IWelcome" });
         // Shouter also implements IWelcome by inheriting Greeter, so the interface type has two implementers
         // (WorkspaceReadFacts.Derived_of_an_interface_are_its_implementing_types pins the same pair by name).
@@ -157,7 +159,8 @@ public sealed class CodingNativeToolFacts
         Assert.Equal("Committed", committed.GetProperty("status").GetString());
         Assert.Equal("coding/t1", committed.GetProperty("branch").GetString());
         Assert.Equal(40, committed.GetProperty("commit").GetString()!.Length);
-        Assert.Equal(2, committed.GetProperty("files").GetArrayLength());
+        // Greeter.cs, Program.cs and the generated GreeterCodec document (which also calls Greet) all change.
+        Assert.Equal(3, committed.GetProperty("files").GetArrayLength());
         Assert.Equal(JsonValueKind.Null, committed.GetProperty("advice").ValueKind);
         Assert.Contains(""".Hello("world")""", await File.ReadAllTextAsync(fixture.ProgramPath, TestContext.Current.CancellationToken), StringComparison.Ordinal);
         var log = await new ProcessRunner().RunAsync("git", ["log", "-1", "--format=%s"], fixture.Root, TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);

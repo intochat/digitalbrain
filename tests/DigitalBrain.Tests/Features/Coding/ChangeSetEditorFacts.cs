@@ -137,9 +137,12 @@ public sealed class ChangeSetEditorFacts
             [new EditRequest(EditKind.Rename, SymbolId: "M:Alpha.Greeter.Greet(System.String)", NewName: "Hello")],
             TestContext.Current.CancellationToken);
         Assert.False(outcome.HasErrors);
-        Assert.Equal([FixtureSolutions.GreeterPath, FixtureSolutions.ProgramPath], outcome.ChangedPaths);
+        // Renamer.RenameSymbolAsync works over the whole solution, generated documents included: the
+        // generated GreeterCodec document also calls Greet and so is renamed along with the other two.
+        Assert.Equal([FixtureSolutions.GreeterPath, FixtureSolutions.GeneratedGreeterPath, FixtureSolutions.ProgramPath], outcome.ChangedPaths);
         Assert.Contains(""".Hello("world")""", await TextAsync(outcome.Changed, FixtureSolutions.ProgramPath), StringComparison.Ordinal);
         Assert.Contains("public string Hello(string name)", await TextAsync(outcome.Changed, FixtureSolutions.GreeterPath), StringComparison.Ordinal);
+        Assert.Contains(""".Hello("codec")""", await TextAsync(outcome.Changed, FixtureSolutions.GeneratedGreeterPath), StringComparison.Ordinal);
     }
 
     [Fact]

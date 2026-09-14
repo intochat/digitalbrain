@@ -24,8 +24,8 @@ methods:
 | `open` | `OpenWorkspace(SolutionPath, ExpectedVersion?)` | `Accepted<WorkspaceReceipt>` | Refuses a blank path or a stale `ExpectedVersion`; schedules the load and returns at once. |
 | `reload` | `ReloadWorkspace()` | `Accepted<WorkspaceReceipt>` | Refuses if nothing has been opened yet; otherwise re-opens or reloads the same solution path. |
 | `read` | none | `WorkspaceSnapshot(SolutionPath, Phase, ProjectCount, DocumentCount, Detail, Generation, ReloadNeeded)` | Reports the live `SolutionWorkspace` status (phase, counts, detail, whether a project-file change is waiting on a reload) together with the grain's own path and generation. |
-| `find-symbols` | `SymbolSearch(Query, Limit=20)` | `SymbolSearchResult(Items, TotalCount, Truncated)` | Case-insensitive substring match over type and member declarations; `NamedType` hits sort first. |
-| `references` | `ReferenceSearch(SymbolId, Limit=50)` | `ReferenceSearchResult(SymbolId, Items, TotalCount, Truncated)` | Every location that references a symbol id, with the trimmed source line. |
+| `find-symbols` | `SymbolSearch(Query, Limit=20)` | `SymbolSearchResult(Items, TotalCount, Truncated)` | Case-insensitive substring match over type and member declarations; drops declarations in generated documents (`obj/`, `bin/`, `*.g.cs`, `*.g.i.cs`, `*.generated.cs`, `*.designer.cs`), then ranks an exact name match first, `NamedType` hits next. |
+| `references` | `ReferenceSearch(SymbolId, Limit=50)` | `ReferenceSearchResult(SymbolId, Items, TotalCount, Truncated)` | Every location that references a symbol id, with the trimmed source line; each `ReferenceHit` carries `Generated`, true for a hit in a generated document (marked, not dropped). |
 | `diagnostics` | `DiagnosticsQuery(Path?, Project?, Limit=50)` | `DiagnosticsResult(Items, ErrorCount, WarningCount, Truncated, TotalCount)` | Compiler diagnostics of warning severity or above, for one file, one project, or the whole solution. |
 | `map` | `MapQuery(IncludeDocumentCounts=true)` | `SolutionMap(SolutionPath, Projects, References)` | The project dependency graph, projects clustered by solution folder; answered from the durable `LastMap` cache while a reload is still in flight. |
 | `skeleton` | `SkeletonQuery(Path)` | `Skeleton(Path, Project, Members)` | The types and member signatures of one file, without bodies; each `SkeletonMember(Id, Kind, Signature, Line, Depth)` carries a symbol id to use with `member`. |
@@ -61,6 +61,11 @@ Notes on the shapes above:
 
 - `find-symbols` and `references` share the envelope `{ items, totalCount, truncated }`;
   `diagnostics` reports `{ items, errorCount, warningCount, truncated, totalCount }` instead.
+- `GeneratedDocuments.IsGenerated` classifies a path as generated (an `obj`/`bin` path segment, or a file
+  name ending `.g.cs`, `.g.i.cs`, `.generated.cs` or `.designer.cs`, such as Orleans codegen); `find-symbols`
+  drops those declarations outright and ranks an exact (case-insensitive) name match first, `references`
+  keeps them but marks each hit's `Generated`. `callers`/`implementations`/`derived` are unaffected (design
+  9.1 scopes the hygiene to `find-symbols` and `references` only).
 - Symbol ids are documentation-comment ids, the same format Roslyn uses in XML doc comments
   (`T:DigitalBrain.Time.ITimer`, `M:...`).
 - A diagnostic with no source location (a project that fails to compile at all, such as a missing

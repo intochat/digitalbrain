@@ -16,6 +16,10 @@ internal static class FixtureSolutions
     internal const string ShouterPath = Root + "/Beta/Shouter.cs";
     internal const string UnusedPath = Root + "/Beta/Unused.cs";
 
+    // Stands in for Orleans/Roslyn source-generator output: a declaration that mentions Greeter, sitting
+    // under obj/, so query-hygiene facts can prove it is dropped from find-symbols and marked in references.
+    internal const string GeneratedGreeterPath = Root + "/Alpha/obj/Debug/net11.0/Greeter.g.cs";
+
     private static readonly IReadOnlyList<MetadataReference> Runtime = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
         .Split(Path.PathSeparator)
         .Where(static path => Path.GetFileName(path) is "System.Runtime.dll" or "System.Private.CoreLib.dll" or "netstandard.dll" or "System.Console.dll")
@@ -87,6 +91,15 @@ internal static class FixtureSolutions
         }
         """;
 
+    internal const string GeneratedGreeterSource = """
+        namespace Alpha;
+
+        public sealed class GreeterCodec
+        {
+            public static string Describe(Greeter greeter) => greeter.Greet("codec");
+        }
+        """;
+
     internal static IReadOnlyList<(string Path, string Source)> Documents(string root) =>
     [
         (root + "/Alpha/Greeter.cs", GreeterSource),
@@ -95,6 +108,7 @@ internal static class FixtureSolutions
         (root + "/Beta/Broken.cs", BrokenSource),
         (root + "/Beta/Shouter.cs", ShouterSource),
         (root + "/Beta/Unused.cs", UnusedSource),
+        (root + "/Alpha/obj/Debug/net11.0/Greeter.g.cs", GeneratedGreeterSource),
     ];
 
     internal static Workspace TwoProjects() => Build(Root);

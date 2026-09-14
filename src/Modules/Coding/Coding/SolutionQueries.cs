@@ -21,7 +21,9 @@ internal static class SolutionQueries
         var hits = declarations
             .Select(symbol => Hit(solution, symbol))
             .OfType<SymbolHit>()
-            .OrderBy(static hit => hit.Kind == nameof(SymbolKind.NamedType) ? 0 : 1)
+            .Where(static hit => !GeneratedDocuments.IsGenerated(hit.Path))
+            .OrderBy(hit => string.Equals(hit.Name, query.Query, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(static hit => hit.Kind == nameof(SymbolKind.NamedType) ? 0 : 1)
             .ThenBy(static hit => hit.Name, StringComparer.Ordinal)
             .ToArray();
         return new SymbolSearchResult([.. hits.Take(limit)], hits.Length, hits.Length > limit);
@@ -46,7 +48,8 @@ internal static class SolutionQueries
             }
 
             var line = span.StartLinePosition.Line;
-            hits.Add(new ReferenceHit(document.FilePath ?? document.Name, line + 1, document.Project.Name, text.Lines[line].ToString().Trim()));
+            hits.Add(new ReferenceHit(document.FilePath ?? document.Name, line + 1, document.Project.Name, text.Lines[line].ToString().Trim(),
+                GeneratedDocuments.IsGenerated(document.FilePath)));
         }
 
         hits.Sort(static (left, right) =>

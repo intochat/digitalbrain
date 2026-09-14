@@ -43,12 +43,13 @@ public sealed class WorkspaceReadFacts
     {
         using var workspace = await ReadyAsync();
         var callers = await workspace.CallersAsync(new("M:Alpha.Greeter.Greet(System.String)"), TestContext.Current.CancellationToken);
-        var hit = Assert.Single(callers.Items);
-        Assert.Equal("M:Beta.Program.Run", hit.Id);
+        // The generated GreeterCodec document also calls Greet; callers is not in design 9.1's query-hygiene
+        // scope (only find-symbols and references are), so it is a genuine second caller here.
+        var hit = Assert.Single(callers.Items, hit => hit.Id == "M:Beta.Program.Run");
         Assert.Equal(FixtureSolutions.ProgramPath, hit.Path);
         Assert.Equal(7, hit.Line);
         Assert.Equal("Beta", hit.Project);
-        Assert.Equal(1, callers.TotalCount);
+        Assert.Equal(2, callers.TotalCount);
     }
 
     [Fact]

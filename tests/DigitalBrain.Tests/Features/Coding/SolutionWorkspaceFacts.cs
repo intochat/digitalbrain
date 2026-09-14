@@ -56,7 +56,8 @@ public sealed class SolutionWorkspaceFacts
         using var workspace = await ReadyAsync();
         Assert.Equal(WorkspacePhase.Ready, workspace.Status.Phase);
         Assert.Equal(2, workspace.Status.ProjectCount);
-        Assert.Equal(6, workspace.Status.DocumentCount);
+        // Six hand-written fixture files plus the generated GreeterCodec document under Alpha/obj.
+        Assert.Equal(7, workspace.Status.DocumentCount);
         Assert.Null(workspace.Status.Detail);
     }
 
@@ -174,15 +175,37 @@ public sealed class SolutionWorkspaceFacts
     }
 
     [Fact]
+    public async Task Find_symbols_drops_generated_declarations_and_ranks_exact_names_first()
+    {
+        using var workspace = await ReadyAsync();
+        var result = await workspace.FindSymbolsAsync(new("Greeter"), TestContext.Current.CancellationToken);
+        Assert.Equal("T:Alpha.Greeter", result.Items[0].Id);
+        Assert.DoesNotContain(result.Items, hit => hit.Path.Contains("/obj/", StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Items, hit => hit.Name == "GreeterCodec");
+    }
+
+    [Fact]
+    public async Task References_mark_hits_in_generated_documents()
+    {
+        using var workspace = await ReadyAsync();
+        var result = await workspace.ReferencesAsync(new("T:Alpha.Greeter"), TestContext.Current.CancellationToken);
+        Assert.Contains(result.Items, hit => hit.Path.Contains("/obj/", StringComparison.Ordinal) && hit.Generated);
+        Assert.Contains(result.Items, hit => hit.Path == FixtureSolutions.ProgramPath && !hit.Generated);
+    }
+
+    [Fact]
     public async Task References_cross_the_project_boundary()
     {
         using var workspace = await ReadyAsync();
         var result = await workspace.ReferencesAsync(new("M:Alpha.Greeter.Greet(System.String)"), TestContext.Current.CancellationToken);
-        var hit = Assert.Single(result.Items);
-        Assert.Equal(FixtureSolutions.ProgramPath, hit.Path);
+        // The generated GreeterCodec document also calls Greet; it is a genuine hit (marked, not dropped -
+        // see References_mark_hits_in_generated_documents), so this looks up the Beta hit by path rather
+        // than asserting there is only one.
+        var hit = Assert.Single(result.Items, hit => hit.Path == FixtureSolutions.ProgramPath);
         Assert.Equal("Beta", hit.Project);
         Assert.Equal(7, hit.Line);
         Assert.Equal("""public static string Run() => new Greeter().Greet("world");""", hit.Text);
+        Assert.False(hit.Generated);
     }
 
     [Fact]

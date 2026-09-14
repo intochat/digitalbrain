@@ -153,8 +153,9 @@ public sealed class CodeWorkspaceNeuronFacts
         var symbols = await workspace.FindSymbols(new("Greeter"), TestContext.Current.CancellationToken);
         var type = Assert.Single(symbols.Items, hit => hit.Kind == "NamedType");
         var references = await workspace.References(new(type.Id), TestContext.Current.CancellationToken);
-        // Program.cs constructs a Greeter; Shouter.cs names it in "class Shouter : Greeter".
-        Assert.Equal(2, references.Items.Count);
+        // Program.cs constructs a Greeter; Shouter.cs names it in "class Shouter : Greeter"; the generated
+        // GreeterCodec document names it as a parameter type (marked Generated, not dropped - design 9.1).
+        Assert.Equal(3, references.Items.Count);
         var diagnostics = await workspace.Diagnostics(new(Path: FixtureSolutions.BrokenPath), TestContext.Current.CancellationToken);
         Assert.Equal(1, diagnostics.ErrorCount);
         var map = await workspace.Map(new(), TestContext.Current.CancellationToken);
