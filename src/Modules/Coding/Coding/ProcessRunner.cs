@@ -96,11 +96,7 @@ public sealed class ProcessRunner : IProcessRunner
         return text.ToString();
     }
 
-    // Belt-and-braces alongside ReadBoundedAsync's own cancellation handling above: once the process has
-    // been killed, a read still blocked on the now-closing pipe could fault with something other than
-    // OperationCanceledException. Either way its result no longer changes the outcome already decided, but
-    // it must still be observed before Dispose closes the underlying handles.
-#pragma warning disable CA1031
+#pragma warning disable CA1031 // a read left blocked on the pipe of a killed process can fault with anything; the outcome is already decided and the read must still be observed before Dispose closes the handles
     private static async Task<string> DrainAsync(Task<string> read)
     {
         try

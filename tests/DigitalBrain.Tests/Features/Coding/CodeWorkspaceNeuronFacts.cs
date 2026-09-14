@@ -17,21 +17,8 @@ public sealed class CodeWorkspaceNeuronFacts
         ConfigureSilo = silo => silo.Services.AddSingleton<ISolutionLoader>(new AdhocSolutionLoader(FixtureSolutions.TwoProjects)),
     });
 
-    private static async Task<WorkspaceSnapshot> WaitAsync(ICodeWorkspace workspace, WorkspacePhase phase)
-    {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(10));
-        while (true)
-        {
-            var snapshot = await workspace.Read();
-            if (snapshot.Phase == phase)
-            {
-                return snapshot;
-            }
-
-            await Task.Delay(25, timeout.Token);
-        }
-    }
+    private static Task<WorkspaceSnapshot> UntilAsync(ICodeWorkspace workspace, Func<WorkspaceSnapshot, bool> done)
+        => TestWait.UntilAsync(workspace.Read, done, TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
     [Theory]
     [InlineData(typeof(ICodeWorkspace), 12)]
@@ -87,15 +74,8 @@ public sealed class CodeWorkspaceNeuronFacts
         Assert.Equal(Path.GetFullPath("E:/fixture/Fixture.slnx"), snapshot.SolutionPath);
         // The service is ready as soon as its own load finishes; the grain's own generation-1 record of that
         // open runs as a separate, best-effort background call, so it lands a little later than the service does.
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(10));
-        while (snapshot.Generation < 1)
-        {
-            await Task.Delay(25, timeout.Token);
-            snapshot = await workspace.Read();
-        }
-
-        Assert.Equal(1, snapshot.Generation);
+        var recorded = await UntilAsync(workspace, read => read.Generation >= 1);
+        Assert.Equal(1, recorded.Generation);
     }
 
     [Fact]
@@ -110,14 +90,7 @@ public sealed class CodeWorkspaceNeuronFacts
         await brain.SiloServices.GetRequiredService<SolutionWorkspace>().WhenReadyAsync(TestContext.Current.CancellationToken);
         var workspace = brain.Grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType, "fixture").ToGrainId());
         await workspace.Reload(new ReloadWorkspace(CommandId.New()));
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(10));
-        WorkspaceSnapshot snapshot;
-        do
-        {
-            await Task.Delay(25, timeout.Token);
-            snapshot = await workspace.Read();
-        } while (snapshot.Generation != 1 || snapshot.Phase != WorkspacePhase.Ready);
+        var snapshot = await UntilAsync(workspace, read => read.Generation == 1 && read.Phase == WorkspacePhase.Ready);
         Assert.Equal(Path.GetFullPath("E:/fixture/Fixture.slnx"), snapshot.SolutionPath);
     }
 
@@ -128,7 +101,7 @@ public sealed class CodeWorkspaceNeuronFacts
         var workspace = brain.Grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType, "fixture").ToGrainId());
         var accepted = await workspace.Open(new OpenWorkspace(CommandId.New(), "E:/fixture/Fixture.slnx"));
         Assert.Equal("fixture", accepted.Receipt.Key);
-        var ready = await WaitAsync(workspace, WorkspacePhase.Ready);
+        var ready = await UntilAsync(workspace, read => read.Phase == WorkspacePhase.Ready);
         Assert.Equal("E:/fixture/Fixture.slnx", ready.SolutionPath);
         Assert.Equal(2, ready.ProjectCount);
         Assert.Equal(1, ready.Generation);
@@ -149,7 +122,7 @@ public sealed class CodeWorkspaceNeuronFacts
         await using var brain = await StartAsync();
         var workspace = brain.Grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType, "fixture").ToGrainId());
         await workspace.Open(new OpenWorkspace(CommandId.New(), "E:/fixture/Fixture.slnx"));
-        await WaitAsync(workspace, WorkspacePhase.Ready);
+        await UntilAsync(workspace, read => read.Phase == WorkspacePhase.Ready);
         var symbols = await workspace.FindSymbols(new("Greeter"), TestContext.Current.CancellationToken);
         var type = Assert.Single(symbols.Items, hit => hit.Kind == "NamedType");
         var references = await workspace.References(new(type.Id), TestContext.Current.CancellationToken);
@@ -177,16 +150,9 @@ public sealed class CodeWorkspaceNeuronFacts
         await using var brain = await StartAsync();
         var workspace = brain.Grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType, "fixture").ToGrainId());
         await workspace.Open(new OpenWorkspace(CommandId.New(), "E:/fixture/Fixture.slnx"));
-        await WaitAsync(workspace, WorkspacePhase.Ready);
+        await UntilAsync(workspace, read => read.Phase == WorkspacePhase.Ready);
         await workspace.Reload(new ReloadWorkspace(CommandId.New()));
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(10));
-        WorkspaceSnapshot snapshot;
-        do
-        {
-            await Task.Delay(25, timeout.Token);
-            snapshot = await workspace.Read();
-        } while (snapshot.Generation < 2 || snapshot.Phase != WorkspacePhase.Ready);
+        var snapshot = await UntilAsync(workspace, read => read.Generation >= 2 && read.Phase == WorkspacePhase.Ready);
         Assert.Equal(2, snapshot.Generation);
     }
 
@@ -198,17 +164,10 @@ public sealed class CodeWorkspaceNeuronFacts
         await using var brain = await StartAsync();
         var workspace = brain.Grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType, "fixture").ToGrainId());
         await workspace.Open(new OpenWorkspace(CommandId.New(), "E:/fixture/Fixture.slnx"));
-        await WaitAsync(workspace, WorkspacePhase.Ready);
+        await UntilAsync(workspace, read => read.Phase == WorkspacePhase.Ready);
 
         await workspace.Open(new OpenWorkspace(CommandId.New(), "E:/fixture/Fixture.slnx", ExpectedVersion: 1));
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(10));
-        WorkspaceSnapshot snapshot;
-        do
-        {
-            await Task.Delay(25, timeout.Token);
-            snapshot = await workspace.Read();
-        } while (snapshot.Detail is null);
+        var snapshot = await UntilAsync(workspace, read => read.Detail is not null);
 
         Assert.Equal("already open", snapshot.Detail);
         Assert.Equal(1, snapshot.Generation);
@@ -229,15 +188,8 @@ public sealed class CodeWorkspaceNeuronFacts
             },
         });
         var workspace = brain.Grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType, "fixture").ToGrainId());
-        var snapshot = await WaitAsync(workspace, WorkspacePhase.Ready);
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(10));
-        while (snapshot.Generation < 1)
-        {
-            await Task.Delay(50, timeout.Token);
-            snapshot = await workspace.Read();
-        }
-
+        await UntilAsync(workspace, read => read.Phase == WorkspacePhase.Ready);
+        var snapshot = await UntilAsync(workspace, read => read.Generation >= 1);
         Assert.Equal(1, snapshot.Generation);
         Assert.Equal(Path.GetFullPath("E:/fixture/Fixture.slnx"), snapshot.SolutionPath);
     }
@@ -254,7 +206,7 @@ public sealed class CodeWorkspaceNeuronFacts
         });
         var workspace = brain.Grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType, "fixture").ToGrainId());
         await workspace.Open(new OpenWorkspace(CommandId.New(), "E:/fixture/Fixture.slnx"));
-        await WaitAsync(workspace, WorkspacePhase.Ready);
+        await UntilAsync(workspace, read => read.Phase == WorkspacePhase.Ready);
         var first = await workspace.Map(new(), TestContext.Current.CancellationToken);
         Assert.Equal(2, first.Projects.Count);
 
@@ -291,6 +243,6 @@ public sealed class CodeWorkspaceNeuronFacts
         Assert.Equal(2, cached!.Projects.Count);
 
         gate.SetResult();
-        await WaitAsync(workspace, WorkspacePhase.Ready);
+        await UntilAsync(workspace, read => read.Phase == WorkspacePhase.Ready);
     }
 }

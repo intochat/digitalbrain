@@ -1,4 +1,5 @@
 using DigitalBrain.Coding;
+using DigitalBrain.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -6,22 +7,6 @@ namespace DigitalBrain.Tests.Coding;
 
 public sealed class SolutionFileWatcherFacts
 {
-    private static async Task<bool> UntilAsync(Func<Task<bool>> condition, TimeSpan timeout)
-    {
-        var deadline = DateTime.UtcNow + timeout;
-        while (DateTime.UtcNow < deadline)
-        {
-            if (await condition())
-            {
-                return true;
-            }
-
-            await Task.Delay(100, TestContext.Current.CancellationToken);
-        }
-
-        return false;
-    }
-
     [Fact]
     public async Task A_saved_source_file_is_folded_into_the_snapshot()
     {
@@ -34,7 +19,8 @@ public sealed class SolutionFileWatcherFacts
 
         await File.WriteAllTextAsync(fixture.GreeterPath, FixtureSolutions.GreeterSource.Replace("public string Welcome", "public string Hola(string name) => name;\n\n    public string Welcome", StringComparison.Ordinal), TestContext.Current.CancellationToken);
 
-        Assert.True(await UntilAsync(async () => (await workspace.FindSymbolsAsync(new("Hola"), TestContext.Current.CancellationToken)).TotalCount == 1, TimeSpan.FromSeconds(10)));
+        await TestWait.UntilAsync(async () => (await workspace.FindSymbolsAsync(new("Hola"), TestContext.Current.CancellationToken)).TotalCount,
+            count => count == 1, TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.True(workspace.SnapshotVersion >= 1);
         Assert.False(workspace.Status.ReloadNeeded);
     }
@@ -51,8 +37,9 @@ public sealed class SolutionFileWatcherFacts
 
         await File.WriteAllTextAsync(fixture.Root + "/Alpha/Alpha.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\" />", TestContext.Current.CancellationToken);
 
-        Assert.True(await UntilAsync(() => Task.FromResult(workspace.Status.ReloadNeeded), TimeSpan.FromSeconds(10)));
-        Assert.Contains("Alpha.csproj", workspace.Status.Detail, StringComparison.Ordinal);
+        var flagged = await TestWait.UntilAsync(() => Task.FromResult(workspace.Status), status => status.ReloadNeeded,
+            TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.Contains("Alpha.csproj", flagged.Detail, StringComparison.Ordinal);
         await workspace.BeginReloadAsync();
         await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
         Assert.False(workspace.Status.ReloadNeeded);

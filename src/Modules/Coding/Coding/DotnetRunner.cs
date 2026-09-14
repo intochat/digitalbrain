@@ -11,16 +11,8 @@ public sealed partial class DotnetRunner(IProcessRunner processes)
     public async Task<BuildOutcome> BuildAsync(string solutionPath, string? artifactsPath, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(solutionPath);
-        var solutionDirectory = Path.GetDirectoryName(Path.GetFullPath(solutionPath))!;
         var arguments = new List<string> { "build", solutionPath, "-c", "Release", "--nologo" };
-        if (!string.IsNullOrWhiteSpace(artifactsPath))
-        {
-            // MSBuild resolves a relative ArtifactsPath against each project's own directory, not the
-            // solution's; rooting it here at the solution directory keeps one build's leftovers from
-            // being created under every project folder and entering the next build's default compile glob.
-            arguments.Add("-p:ArtifactsPath=" + Path.GetFullPath(artifactsPath, solutionDirectory));
-        }
-
+        var solutionDirectory = RunDirectory(arguments, solutionPath, artifactsPath);
         var result = await processes.RunAsync("dotnet", arguments, solutionDirectory, BuildTimeout, cancellationToken).ConfigureAwait(false);
         var hits = ParseDiagnostics(result.Output + "\n" + result.Error);
         var errors = hits.Where(static hit => hit.Severity == "Error").ToArray();
@@ -36,15 +28,8 @@ public sealed partial class DotnetRunner(IProcessRunner processes)
     public async Task<TestOutcome> TestAsync(string projectOrSolutionPath, string? filterClass, string? artifactsPath, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(projectOrSolutionPath);
-        var projectDirectory = Path.GetDirectoryName(Path.GetFullPath(projectOrSolutionPath))!;
         var arguments = new List<string> { "test", projectOrSolutionPath, "-c", "Release", "--no-build" };
-        if (!string.IsNullOrWhiteSpace(artifactsPath))
-        {
-            // Same rooting as BuildAsync: a relative path is the caller's project/solution directory, not
-            // MSBuild's per-project default.
-            arguments.Add("-p:ArtifactsPath=" + Path.GetFullPath(artifactsPath, projectDirectory));
-        }
-
+        var projectDirectory = RunDirectory(arguments, projectOrSolutionPath, artifactsPath);
         if (!string.IsNullOrWhiteSpace(filterClass))
         {
             arguments.AddRange(["--", "--filter-class", filterClass]);
@@ -64,6 +49,21 @@ public sealed partial class DotnetRunner(IProcessRunner processes)
             total, passed, failed, skipped, failures, result.Duration.TotalSeconds,
             Command(arguments),
             Detail(result, total == 0 ? "no test summary was found in the output" : null));
+    }
+
+    // The directory the dotnet process runs in, and where a relative artifacts path is rooted: MSBuild
+    // resolves a relative ArtifactsPath against each project's own directory, not the directory of the
+    // solution or project it was asked to build, so rooting it here keeps one build's leftovers from being
+    // created under every project folder and entering the next build's default compile glob.
+    private static string RunDirectory(List<string> arguments, string projectOrSolutionPath, string? artifactsPath)
+    {
+        var directory = Path.GetDirectoryName(Path.GetFullPath(projectOrSolutionPath))!;
+        if (!string.IsNullOrWhiteSpace(artifactsPath))
+        {
+            arguments.Add("-p:ArtifactsPath=" + Path.GetFullPath(artifactsPath, directory));
+        }
+
+        return directory;
     }
 
     private static string Command(IReadOnlyList<string> arguments)

@@ -28,21 +28,8 @@ public sealed class ChangeSetNeuronFacts
     private static IChangeSet ChangeSet(BrainSimulation brain, string id)
         => brain.Grains.GetGrain<IChangeSet>(new NeuronId(CodingVocabulary.ChangeSetType, id).ToGrainId());
 
-    private static async Task<ChangeSetSnapshot> WaitAsync(IChangeSet changeSet, Func<ChangeSetSnapshot, bool> done)
-    {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(30));
-        while (true)
-        {
-            var snapshot = await changeSet.Read();
-            if (done(snapshot))
-            {
-                return snapshot;
-            }
-
-            await Task.Delay(50, timeout.Token);
-        }
-    }
+    private static Task<ChangeSetSnapshot> WaitAsync(IChangeSet changeSet, Func<ChangeSetSnapshot, bool> done)
+        => TestWait.UntilAsync(changeSet.Read, done, TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
     [Fact]
     public async Task Propose_then_check_yields_a_checked_snapshot_with_a_diff()
