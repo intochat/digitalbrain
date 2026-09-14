@@ -827,7 +827,8 @@ git commit -m "coding: fence a standby slot in the call filter, the drain and th
   `src/Aspire/DigitalBrain.Aspire/Slots/ActiveSlotLeaseRefresher.cs`,
   `tests/DigitalBrain.Tests/Features/Slots/AzureTableActiveSlotLeaseFacts.cs`
 - Modify: `src/Aspire/DigitalBrain.Aspire/DigitalBrainRuntimeHostingExtensions.cs`,
-  `src/Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj`, `Directory.Packages.props`
+  `src/Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj`, `Directory.Packages.props`,
+  `tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj` (the direct `Azure.Data.Tables` reference for the gated fact)
 
 **Interfaces:**
 - Produces `DigitalBrain.Aspire.AzureTableActiveSlotLease(string slot, TableServiceClient tables, TimeProvider clock, ILogger<AzureTableActiveSlotLease> logger)`
@@ -2500,9 +2501,10 @@ Expected: warning-free build, suite green with one more gated skip.
 
 - [ ] **Step 9: Commit**
 
-This task is the largest of the phase, so it lands as two commits: the first once the contracts and
-`SlotOptions` are in (the four `SlotOptions` facts of Step 1 green, the rest of `SlotServiceFacts` not yet
-written), the second once Steps 4 to 7 are in and the whole class is green.
+This task is the largest of the phase, so it lands as two commits, and `SlotServiceFacts` is authored in two
+halves to match: for the first commit write only the four `SlotOptions` facts from Step 1's file (the test
+project must compile, and the other facts reference types Steps 4 to 7 create), run the class green, commit;
+then append the remaining facts from Step 1, implement Steps 4 to 7, run the whole class green, commit.
 
 ```bash
 git add src/Modules/Coding/Contracts src/Modules/Coding/Coding/SlotOptions.cs tests/DigitalBrain.Tests/Features/Coding/SlotServiceFacts.cs
@@ -2510,7 +2512,7 @@ git commit -m "coding: the slot contract and the configuration keys behind it"
 ```
 
 ```bash
-git add src/Modules/Coding src/Modules/Microsoft src/Kernel/DigitalBrain.Silo tests/DigitalBrain.Tests/Features/Coding
+git add src/Modules/Coding src/Kernel/DigitalBrain.Silo tests/DigitalBrain.Tests/Features/Coding
 git commit -m "coding: the slot builder, its endpoints, the state scan and the git generation"
 ```
 
@@ -5298,7 +5300,7 @@ Replace the `try { _subscription = run(...).listen(...); } catch ...` block at t
 
 The four shell test files fake an `AgentRunner` with an explicit named-parameter closure, so each of the
 eight closures gains the new parameter. Every one of them has a `required text,` line followed by the
-closing `}`; insert `resume,` after it. For example, in `shell/test/workspace_tool_results_test.dart`:
+closing `}`; insert `resume = false,` after it (a non-nullable optional named parameter needs a default in Dart). For example, in `shell/test/workspace_tool_results_test.dart`:
 
 ```dart
       onRun: ({
@@ -5306,7 +5308,7 @@ closing `}`; insert `resume,` after it. For example, in `shell/test/workspace_to
         required runId,
         parentRunId,
         required text,
-        resume,
+        resume = false,
       }) => events.stream,
 ```
 
