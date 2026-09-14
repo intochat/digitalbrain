@@ -20,6 +20,9 @@ public sealed class CodingModule : IModule
         builder.Services.TryAddSingleton<CodeFixCatalog>();
         builder.Services.TryAddSingleton<ChangeSetEditor>();
         builder.Services.TryAddSingleton<SolutionFileWatcher>();
+        builder.Services.TryAddSingleton<IProcessRunner, ProcessRunner>();
+        builder.Services.TryAddSingleton<DotnetRunner>();
+        builder.Services.TryAddSingleton<GitRunner>();
         builder.Services.AddHostedService<WorkspaceWarmup>();
 
         builder.Services.AddSingleton<CodingNativeTools>();
