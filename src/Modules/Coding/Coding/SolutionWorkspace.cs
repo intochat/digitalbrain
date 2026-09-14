@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
 
 namespace DigitalBrain.Coding;
@@ -34,6 +35,8 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
 
     public long Generation => Interlocked.Read(ref _generation);
 
+    internal Action<string>? Opened { get; set; }
+
     // Starts the load and returns at once; the returned task completes with the load and never faults.
     public Task BeginOpenAsync(string solutionPath)
     {
@@ -43,6 +46,12 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
             if (_status.Phase == WorkspacePhase.Opening && string.Equals(_solutionPath, solutionPath, StringComparison.OrdinalIgnoreCase))
             {
                 return _pending;
+            }
+
+            // The grain's own open after a warmup already opened the same path must not reload it.
+            if (_status.Phase == WorkspacePhase.Ready && string.Equals(_solutionPath, solutionPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.CompletedTask;
             }
 
             _solutionPath = solutionPath;
@@ -132,6 +141,60 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
         }
 
         return new CommitOutcome(written, Interlocked.Increment(ref _generation));
+    }
+
+    // Folds an external save of one document into the snapshot; false when the path is not a document or
+    // the text is unchanged (our own commit writes come back through the watcher and must not bump anything).
+    public async Task<bool> FoldAsync(string path, string text, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        ArgumentNullException.ThrowIfNull(text);
+        if (Status.Phase != WorkspacePhase.Ready)
+        {
+            return false;
+        }
+
+        using var lease = await AcquireAsync(cancellationToken).ConfigureAwait(false);
+        var ids = lease.Solution.GetDocumentIdsWithFilePath(path);
+        if (ids.IsDefaultOrEmpty)
+        {
+            // MSBuildWorkspace registers documents with the platform separator; the adhoc fixture uses forward slashes.
+            ids = lease.Solution.GetDocumentIdsWithFilePath(path.Replace('/', Path.DirectorySeparatorChar));
+        }
+
+        if (ids.IsDefaultOrEmpty)
+        {
+            return false;
+        }
+
+        var changed = lease.Solution;
+        foreach (var id in ids)
+        {
+            var current = await changed.GetDocument(id)!.GetTextAsync(cancellationToken).ConfigureAwait(false);
+            if (!string.Equals(current.ToString(), text, StringComparison.Ordinal))
+            {
+                changed = changed.WithDocumentText(id, SourceText.From(text));
+            }
+        }
+
+        if (ReferenceEquals(changed, lease.Solution) || !lease.Workspace.TryApplyChanges(changed))
+        {
+            return false;
+        }
+
+        Interlocked.Increment(ref _generation);
+        return true;
+    }
+
+    public void MarkReloadNeeded(string path)
+    {
+        lock (_gate)
+        {
+            if (_status.Phase == WorkspacePhase.Ready)
+            {
+                _status = _status with { ReloadNeeded = true, Detail = $"reload needed: {path}" };
+            }
+        }
     }
 
     public Task<SymbolSearchResult> FindSymbolsAsync(SymbolSearch query, CancellationToken cancellationToken)
@@ -279,6 +342,7 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
         });
         Workspace? disposeNow = null;
         var disposeLifetime = false;
+        var opened = false;
         try
         {
             var loaded = await loader.OpenAsync(solutionPath, progress, cancellationToken).ConfigureAwait(false);
@@ -298,7 +362,8 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
                 {
                     var previous = _workspace;
                     _workspace = loaded.Workspace;
-                    _status = new WorkspaceStatus(WorkspacePhase.Ready, solutionPath, solution.ProjectIds.Count, documents, detail);
+                    _status = new WorkspaceStatus(WorkspacePhase.Ready, solutionPath, solution.ProjectIds.Count, documents, detail, ReloadNeeded: false);
+                    opened = true;
                     if (previous is not null)
                     {
                         if (_leases == 0)
@@ -340,6 +405,11 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
         if (disposeLifetime)
         {
             _lifetime.Dispose();
+        }
+
+        if (opened)
+        {
+            Opened?.Invoke(solutionPath);
         }
     }
 

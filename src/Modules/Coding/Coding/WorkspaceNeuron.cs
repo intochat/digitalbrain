@@ -49,7 +49,7 @@ internal sealed class WorkspaceNeuron(
     public Task<WorkspaceSnapshot> Read()
     {
         var live = workspace.Status;
-        return Task.FromResult(new WorkspaceSnapshot(State?.SolutionPath ?? live.SolutionPath, live.Phase, live.ProjectCount, live.DocumentCount, live.Detail, State?.Generation ?? 0, ReloadNeeded: false));
+        return Task.FromResult(new WorkspaceSnapshot(State?.SolutionPath ?? live.SolutionPath, live.Phase, live.ProjectCount, live.DocumentCount, live.Detail, State?.Generation ?? 0, live.ReloadNeeded));
     }
 
     [ReadOnly]
@@ -65,8 +65,15 @@ internal sealed class WorkspaceNeuron(
         => workspace.DiagnosticsAsync(query, cancellationToken);
 
     [ReadOnly]
-    public Task<SolutionMap> Map(MapQuery query, CancellationToken cancellationToken = default)
-        => workspace.MapAsync(query, cancellationToken);
+    public async Task<SolutionMap> Map(MapQuery query, CancellationToken cancellationToken = default)
+    {
+        if (workspace.Status.Phase == WorkspacePhase.Ready)
+        {
+            return await workspace.MapAsync(query, cancellationToken).ConfigureAwait(true);
+        }
+
+        return State?.LastMap ?? throw new WorkspaceNotReadyException(workspace.Status);
+    }
 
     [ReadOnly]
     public Task<Skeleton> Skeleton(SkeletonQuery query, CancellationToken cancellationToken = default)
@@ -100,8 +107,10 @@ internal sealed class WorkspaceNeuron(
                     }
 
                     // The load runs in the service; the reaction only records the request so a restart re-opens.
+                    // The previous LastMap carries forward: a reload in flight still answers Map() from the last good snapshot.
                     _ = workspace.BeginOpenAsync(body.SolutionPath);
-                    await SaveAsync(new WorkspaceState(body.SolutionPath, (State?.Generation ?? 0) + 1, TimeProvider.GetUtcNow()), cancellationToken).ConfigureAwait(true);
+                    Schedule(Signal.Create(CodingVocabulary.WorkspaceMapping, "{}"));
+                    await SaveAsync(new WorkspaceState(body.SolutionPath, (State?.Generation ?? 0) + 1, TimeProvider.GetUtcNow(), State?.LastMap), cancellationToken).ConfigureAwait(true);
                     break;
                 }
             case CodingVocabulary.WorkspaceReloading:
@@ -113,7 +122,32 @@ internal sealed class WorkspaceNeuron(
                     }
 
                     _ = workspace.Status.Phase == WorkspacePhase.NotOpened ? workspace.BeginOpenAsync(path) : workspace.BeginReloadAsync();
-                    await SaveAsync(new WorkspaceState(path, (State?.Generation ?? 0) + 1, TimeProvider.GetUtcNow()), cancellationToken).ConfigureAwait(true);
+                    Schedule(Signal.Create(CodingVocabulary.WorkspaceMapping, "{}"));
+                    await SaveAsync(new WorkspaceState(path, (State?.Generation ?? 0) + 1, TimeProvider.GetUtcNow(), State?.LastMap), cancellationToken).ConfigureAwait(true);
+                    break;
+                }
+            case CodingVocabulary.WorkspaceMapping:
+                {
+                    if (State is not { } current)
+                    {
+                        return;
+                    }
+
+                    switch (workspace.Status.Phase)
+                    {
+                        case WorkspacePhase.Ready:
+                            var map = await workspace.MapAsync(new MapQuery(), cancellationToken).ConfigureAwait(true);
+                            await SaveAsync(current with { LastMap = map }, cancellationToken).ConfigureAwait(true);
+                            break;
+                        case WorkspacePhase.Opening:
+                            // One bounded wait per reaction keeps reads flowing; the next reaction looks again.
+                            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken).ConfigureAwait(true);
+                            Schedule(Signal.Create(CodingVocabulary.WorkspaceMapping, "{}"));
+                            break;
+                        default:
+                            break;
+                    }
+
                     break;
                 }
             default:

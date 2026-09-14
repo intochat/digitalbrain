@@ -1,0 +1,131 @@
+using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
+
+namespace DigitalBrain.Coding;
+
+// Saves from the owner's editor, dotnet format or a git checkout reach the snapshot without a reload;
+// project-file changes only flag that a reload is needed (design 4.2).
+public sealed class SolutionFileWatcher(SolutionWorkspace workspace, ILogger<SolutionFileWatcher> logger) : IDisposable
+{
+    private static readonly TimeSpan Settle = TimeSpan.FromMilliseconds(200);
+    private static readonly string[] IgnoredSegments = ["/bin/", "/obj/", "/.git/", "/artifacts/", "/node_modules/"];
+    private readonly ConcurrentDictionary<string, DateTime> _pending = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Lock _gate = new();
+    private FileSystemWatcher? _watcher;
+    private CancellationTokenSource? _loop;
+    private string? _directory;
+
+    public static bool IsIgnored(string path)
+    {
+        var normalized = path.Replace('\\', '/');
+        return IgnoredSegments.Any(segment => normalized.Contains(segment, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public void Start(string directory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(directory);
+        lock (_gate)
+        {
+            if (string.Equals(_directory, directory, StringComparison.OrdinalIgnoreCase) || !Directory.Exists(directory))
+            {
+                return;
+            }
+
+            StopCore();
+            _directory = directory;
+            _watcher = new FileSystemWatcher(directory) { IncludeSubdirectories = true, NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName };
+            _watcher.Changed += (_, args) => Enqueue(args.FullPath);
+            _watcher.Created += (_, args) => Enqueue(args.FullPath);
+            _watcher.Renamed += (_, args) => Enqueue(args.FullPath);
+            _watcher.EnableRaisingEvents = true;
+            _loop = new CancellationTokenSource();
+            _ = DrainAsync(_loop.Token);
+        }
+    }
+
+    public void Stop()
+    {
+        lock (_gate)
+        {
+            StopCore();
+        }
+    }
+
+    public void Dispose() => Stop();
+
+    private void Enqueue(string path)
+    {
+        if (IsIgnored(path))
+        {
+            return;
+        }
+
+        var extension = Path.GetExtension(path);
+        if (extension is ".cs" or ".csproj" or ".props" or ".targets" or ".slnx" or ".sln")
+        {
+            _pending[path] = DateTime.UtcNow;
+        }
+    }
+
+    private async Task DrainAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(Settle);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+            {
+                foreach (var (path, seen) in _pending.ToArray())
+                {
+                    if (DateTime.UtcNow - seen < Settle || !_pending.TryRemove(path, out _))
+                    {
+                        continue;
+                    }
+
+                    await ApplyAsync(path, cancellationToken).ConfigureAwait(false);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task ApplyAsync(string path, CancellationToken cancellationToken)
+    {
+        if (!string.Equals(Path.GetExtension(path), ".cs", StringComparison.OrdinalIgnoreCase))
+        {
+            workspace.MarkReloadNeeded(path);
+            return;
+        }
+
+        if (!File.Exists(path))
+        {
+            return;
+        }
+
+        try
+        {
+            var text = await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
+            await workspace.FoldAsync(path.Replace('\\', '/'), text, cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException error)
+        {
+            // The editor still holds the file; the next save re-enqueues it.
+            logger.LogDebug(error, "Could not read {Path} after a save; waiting for the next one.", path);
+        }
+        catch (InvalidOperationException error)
+        {
+            logger.LogDebug(error, "Could not fold {Path}.", path);
+        }
+    }
+
+    private void StopCore()
+    {
+        _loop?.Cancel();
+        _loop?.Dispose();
+        _loop = null;
+        _watcher?.Dispose();
+        _watcher = null;
+        _directory = null;
+    }
+}

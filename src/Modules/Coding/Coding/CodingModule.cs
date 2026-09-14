@@ -9,6 +9,7 @@ public sealed class CodingModule : IModule
 {
     public const string ConfigurationRoot = "DigitalBrain:Coding";
     public const string SolutionPathKey = "DigitalBrain:Coding:SolutionPath";
+    public const string WorkspaceKeyKey = "DigitalBrain:Coding:WorkspaceKey";
 
     public void Configure(ISiloBuilder builder)
     {
@@ -18,6 +19,7 @@ public sealed class CodingModule : IModule
         builder.Services.TryAddSingleton<ISolutionLoader, MSBuildSolutionLoader>();
         builder.Services.TryAddSingleton<CodeFixCatalog>();
         builder.Services.TryAddSingleton<ChangeSetEditor>();
+        builder.Services.TryAddSingleton<SolutionFileWatcher>();
         builder.Services.AddHostedService<WorkspaceWarmup>();
 
         builder.Services.AddSingleton<CodingNativeTools>();
