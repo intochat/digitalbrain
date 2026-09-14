@@ -10,12 +10,14 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
     private readonly Lock _gate = new();
     private readonly CancellationTokenSource _lifetime = new();
     private readonly SemaphoreSlim _queryGate = new(2, 2);
+    private readonly SemaphoreSlim _writeGate = new(1, 1);
     private readonly List<Workspace> _retired = [];
     private Workspace? _workspace;
     private Task _pending = Task.CompletedTask;
     private WorkspaceStatus _status = WorkspaceStatus.NotOpened;
     private string? _solutionPath;
     private int _leases;
+    private int _reloadReasons;
     private bool _disposed;
     private long _snapshotVersion;
 
@@ -37,27 +39,30 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
 
     internal Action<string>? Opened { get; set; }
 
-    // Starts the load and returns at once; the returned task completes with the load and never faults.
-    public Task BeginOpenAsync(string solutionPath)
+    // Starts the load and returns at once; the returned task completes with the load, never faults, and
+    // answers true only when this call is what started a load. The grain's own open after a warmup (or a
+    // second open of the path already loaded) answers false so it can record a repeat without reloading.
+    public Task<bool> BeginOpenAsync(string solutionPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(solutionPath);
         lock (_gate)
         {
-            if (_status.Phase == WorkspacePhase.Opening && string.Equals(_solutionPath, solutionPath, StringComparison.OrdinalIgnoreCase))
+            if (_status.Phase is WorkspacePhase.Opening or WorkspacePhase.Ready && string.Equals(_solutionPath, solutionPath, StringComparison.OrdinalIgnoreCase))
             {
-                return _pending;
-            }
-
-            // The grain's own open after a warmup already opened the same path must not reload it.
-            if (_status.Phase == WorkspacePhase.Ready && string.Equals(_solutionPath, solutionPath, StringComparison.OrdinalIgnoreCase))
-            {
-                return Task.CompletedTask;
+                return WhenLoaded(_pending, started: false);
             }
 
             _solutionPath = solutionPath;
+            _reloadReasons = 0;
             _status = new WorkspaceStatus(WorkspacePhase.Opening, solutionPath, 0, 0, "starting");
             _pending = OpenCoreAsync(solutionPath, _lifetime.Token);
-            return _pending;
+            return WhenLoaded(_pending, started: true);
+        }
+
+        static async Task<bool> WhenLoaded(Task load, bool started)
+        {
+            await load.ConfigureAwait(false);
+            return started;
         }
     }
 
@@ -66,6 +71,7 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
         lock (_gate)
         {
             var path = _solutionPath ?? throw new WorkspaceNotReadyException(_status);
+            _reloadReasons = 0;
             _status = new WorkspaceStatus(WorkspacePhase.Opening, path, 0, 0, "reloading");
             _pending = OpenCoreAsync(path, _lifetime.Token);
             return _pending;
@@ -106,9 +112,25 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
     // between check and commit cannot be overwritten. TryApplyChanges may write the changed documents to disk
     // itself -- MSBuildWorkspace does -- so the before/after comparison below reports a path as written
     // whenever its text actually changed, whichever of the two wrote it.
+    // The writer gate is taken before the lease so the snapshot a change is computed on is the snapshot it
+    // is applied to: two writers that only queue on TryApplyChanges would refuse the second as stale even
+    // when the two touch different files. Readers keep the two-slot query gate and never wait on this one.
     public async Task<CommitOutcome> CommitAsync(Func<Solution, CancellationToken, Task<Solution>> change, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(change);
+        await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await CommitCoreAsync(change, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
+    }
+
+    private async Task<CommitOutcome> CommitCoreAsync(Func<Solution, CancellationToken, Task<Solution>> change, CancellationToken cancellationToken)
+    {
         using var lease = await AcquireAsync(cancellationToken).ConfigureAwait(false);
         var changed = await change(lease.Solution, cancellationToken).ConfigureAwait(false);
         var projectChanges = changed.GetChanges(lease.Solution).GetProjectChanges().ToArray();
@@ -173,6 +195,19 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
             return false;
         }
 
+        await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await FoldCoreAsync(path, text, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
+    }
+
+    private async Task<bool> FoldCoreAsync(string path, string text, CancellationToken cancellationToken)
+    {
         using var lease = await AcquireAsync(cancellationToken).ConfigureAwait(false);
         var ids = lease.Solution.GetDocumentIdsWithFilePath(path);
         if (ids.IsDefaultOrEmpty)
@@ -205,6 +240,9 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
         return true;
     }
 
+    // The reason is bounded: the path that asked for the reload last, plus how many others asked before it.
+    // A rebuild or a branch switch can touch hundreds of project files, and a concatenated detail would grow
+    // without limit in a status every read carries. The count resets when the next load lands.
     public void MarkReloadNeeded(string path)
     {
         lock (_gate)
@@ -214,8 +252,9 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
                 return;
             }
 
+            _reloadReasons++;
             var message = $"reload needed: {path}";
-            _status = _status with { ReloadNeeded = true, Detail = _status.Detail is { } existing ? $"{existing}; {message}" : message };
+            _status = _status with { ReloadNeeded = true, Detail = _reloadReasons == 1 ? message : $"{message} (+{_reloadReasons - 1} more)" };
         }
     }
 
@@ -294,6 +333,7 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
         if (disposeGate)
         {
             _queryGate.Dispose();
+            _writeGate.Dispose();
         }
     }
 
@@ -345,6 +385,7 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
         if (disposeGate)
         {
             _queryGate.Dispose();
+            _writeGate.Dispose();
         }
     }
 
@@ -384,6 +425,7 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
                 {
                     var previous = _workspace;
                     _workspace = loaded.Workspace;
+                    _reloadReasons = 0;
                     _status = new WorkspaceStatus(WorkspacePhase.Ready, solutionPath, solution.ProjectIds.Count, documents, detail, ReloadNeeded: false);
                     opened = true;
                     if (previous is not null)

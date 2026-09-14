@@ -190,6 +190,31 @@ public sealed class CodeWorkspaceNeuronFacts
         Assert.Equal(2, snapshot.Generation);
     }
 
+    // A second open of the path already loaded starts no load, so the grain records the repeat without
+    // pretending the solution was opened again: the generation a caller passes as ExpectedVersion stands.
+    [Fact]
+    public async Task Opening_the_same_path_again_does_not_bump_the_generation()
+    {
+        await using var brain = await StartAsync();
+        var workspace = brain.Grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType, "fixture").ToGrainId());
+        await workspace.Open(new OpenWorkspace(CommandId.New(), "E:/fixture/Fixture.slnx"));
+        await WaitAsync(workspace, WorkspacePhase.Ready);
+
+        await workspace.Open(new OpenWorkspace(CommandId.New(), "E:/fixture/Fixture.slnx", ExpectedVersion: 1));
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        WorkspaceSnapshot snapshot;
+        do
+        {
+            await Task.Delay(25, timeout.Token);
+            snapshot = await workspace.Read();
+        } while (snapshot.Detail is null);
+
+        Assert.Equal("already open", snapshot.Detail);
+        Assert.Equal(1, snapshot.Generation);
+        Assert.Equal(WorkspacePhase.Ready, snapshot.Phase);
+    }
+
     [Fact]
     public async Task The_warmup_opens_the_grain_so_its_state_records_the_solution()
     {

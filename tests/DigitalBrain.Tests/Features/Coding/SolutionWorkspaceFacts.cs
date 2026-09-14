@@ -132,6 +132,71 @@ public sealed class SolutionWorkspaceFacts
         Assert.Contains("// touched", await File.ReadAllTextAsync(fixture.GreeterPath, TestContext.Current.CancellationToken), StringComparison.Ordinal);
     }
 
+    // Each commit computes its change on the snapshot it is applied to: without the writer gate the second
+    // one's TryApplyChanges refuses a snapshot the first has already moved past, even though they touch
+    // different files and neither is stale in any sense the caller could act on.
+    [Fact]
+    public async Task Two_commits_that_touch_different_files_both_land()
+    {
+        using var fixture = DiskFixture.Create();
+        using var workspace = new SolutionWorkspace(new AdhocSolutionLoader(fixture.Open), NullLogger<SolutionWorkspace>.Instance);
+        await workspace.BeginOpenAsync(fixture.SolutionPath);
+        await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
+
+        // The first commit parks inside its own change, holding the writer gate, so the second one is forced
+        // to compute its change while the first has not applied yet - the exact interleaving that used to
+        // make the second commit refuse itself as stale.
+        var release = new TaskCompletionSource();
+        var greeterCommit = workspace.CommitAsync(async (solution, token) =>
+        {
+            await release.Task.WaitAsync(token);
+            return solution.WithDocumentText(solution.GetDocumentIdsWithFilePath(fixture.GreeterPath).Single(),
+                SourceText.From(FixtureSolutions.GreeterSource + "\n// greeter\n"));
+        }, TestContext.Current.CancellationToken);
+        var unusedCommit = workspace.CommitAsync((solution, _) => Task.FromResult(solution.WithDocumentText(
+            solution.GetDocumentIdsWithFilePath(fixture.UnusedPath).Single(), SourceText.From(FixtureSolutions.UnusedSource + "\n// unused\n"))), TestContext.Current.CancellationToken);
+        release.SetResult();
+        var outcomes = await Task.WhenAll(greeterCommit, unusedCommit);
+
+        Assert.Equal([fixture.GreeterPath], outcomes[0].WrittenPaths);
+        Assert.Equal([fixture.UnusedPath], outcomes[1].WrittenPaths);
+        Assert.Equal([1L, 2L], outcomes.Select(static outcome => outcome.SnapshotVersion).Order());
+        Assert.Contains("// greeter", await File.ReadAllTextAsync(fixture.GreeterPath, TestContext.Current.CancellationToken), StringComparison.Ordinal);
+        Assert.Contains("// unused", await File.ReadAllTextAsync(fixture.UnusedPath, TestContext.Current.CancellationToken), StringComparison.Ordinal);
+    }
+
+    // The fold queues on the writer gate instead of racing the commit's TryApplyChanges, so it applies to the
+    // snapshot the commit produced and the saved text reaches the snapshot rather than being refused.
+    [Fact]
+    public async Task A_fold_during_a_commit_is_not_lost()
+    {
+        using var fixture = DiskFixture.Create();
+        using var workspace = new SolutionWorkspace(new AdhocSolutionLoader(fixture.Open), NullLogger<SolutionWorkspace>.Instance);
+        await workspace.BeginOpenAsync(fixture.SolutionPath);
+        await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
+        var release = new TaskCompletionSource();
+
+        // Both calls run synchronously up to their first real await, so by the time they have returned their
+        // tasks the commit holds the writer gate and the fold is queued behind it: no timing assumption.
+        var commit = workspace.CommitAsync(async (solution, token) =>
+        {
+            await release.Task.WaitAsync(token);
+            return solution.WithDocumentText(solution.GetDocumentIdsWithFilePath(fixture.GreeterPath).Single(),
+                SourceText.From(FixtureSolutions.GreeterSource + "\n// committed\n"));
+        }, TestContext.Current.CancellationToken);
+        var folding = workspace.FoldAsync(fixture.UnusedPath, FixtureSolutions.UnusedSource + "\n// saved\n", TestContext.Current.CancellationToken);
+        release.SetResult();
+        var committed = await commit;
+
+        Assert.True(await folding);
+        Assert.Equal([fixture.GreeterPath], committed.WrittenPaths);
+        Assert.Equal(2, workspace.SnapshotVersion);
+        var folded = await workspace.QueryAsync(async (solution, token) =>
+            (await solution.GetDocument(solution.GetDocumentIdsWithFilePath(fixture.UnusedPath).Single())!.GetTextAsync(token)).ToString(),
+            TestContext.Current.CancellationToken);
+        Assert.Contains("// saved", folded, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Load_failures_stay_visible_on_a_ready_workspace()
     {

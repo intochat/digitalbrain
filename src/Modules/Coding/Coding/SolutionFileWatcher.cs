@@ -5,11 +5,11 @@ namespace DigitalBrain.Coding;
 
 // Saves from the owner's editor, dotnet format or a git checkout reach the snapshot without a reload;
 // project-file changes only flag that a reload is needed (design 4.2).
-public sealed class SolutionFileWatcher(SolutionWorkspace workspace, ILogger<SolutionFileWatcher> logger) : IDisposable
+public sealed class SolutionFileWatcher(SolutionWorkspace workspace, TimeProvider clock, ILogger<SolutionFileWatcher> logger) : IDisposable
 {
     private static readonly TimeSpan Settle = TimeSpan.FromMilliseconds(200);
     private static readonly string[] IgnoredSegments = ["/bin/", "/obj/", "/.git/", "/artifacts/", "/node_modules/"];
-    private readonly ConcurrentDictionary<string, DateTime> _pending = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _pending = new(StringComparer.OrdinalIgnoreCase);
     private readonly Lock _gate = new();
     private FileSystemWatcher? _watcher;
     private CancellationTokenSource? _loop;
@@ -37,7 +37,13 @@ public sealed class SolutionFileWatcher(SolutionWorkspace workspace, ILogger<Sol
             _watcher = new FileSystemWatcher(directory) { IncludeSubdirectories = true, InternalBufferSize = 64 * 1024, NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName };
             _watcher.Changed += (_, args) => Enqueue(args.FullPath);
             _watcher.Created += (_, args) => Enqueue(args.FullPath);
-            _watcher.Renamed += (_, args) => Enqueue(args.FullPath);
+            _watcher.Renamed += (_, args) =>
+            {
+                // Both ends of a rename matter: the new path may be a document to fold, and the old one has
+                // just disappeared from the snapshot, which only a reload can reconcile.
+                Enqueue(args.OldFullPath);
+                Enqueue(args.FullPath);
+            };
             _watcher.Error += (_, args) =>
             {
                 var error = args.GetException();
@@ -77,7 +83,7 @@ public sealed class SolutionFileWatcher(SolutionWorkspace workspace, ILogger<Sol
         var extension = Path.GetExtension(path);
         if (extension is ".cs" or ".csproj" or ".props" or ".targets" or ".slnx" or ".sln")
         {
-            _pending[path] = DateTime.UtcNow;
+            _pending[path] = clock.GetUtcNow();
         }
     }
 
@@ -88,11 +94,16 @@ public sealed class SolutionFileWatcher(SolutionWorkspace workspace, ILogger<Sol
         {
             while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
             {
+                if (_pending.IsEmpty)
+                {
+                    continue;
+                }
+
                 foreach (var (path, seen) in _pending.ToArray())
                 {
                     // A conditional remove: if a newer save re-stamped this path after the snapshot above,
                     // the entry stays put for the next tick instead of being dropped underneath it.
-                    if (DateTime.UtcNow - seen < Settle || !_pending.TryRemove(new KeyValuePair<string, DateTime>(path, seen)))
+                    if (clock.GetUtcNow() - seen < Settle || !_pending.TryRemove(new KeyValuePair<string, DateTimeOffset>(path, seen)))
                     {
                         continue;
                     }
@@ -125,13 +136,21 @@ public sealed class SolutionFileWatcher(SolutionWorkspace workspace, ILogger<Sol
 
         if (!File.Exists(path))
         {
+            // A deleted or renamed-away document cannot be folded: the snapshot still has it, so only a
+            // reload can reconcile the file list.
+            workspace.MarkReloadNeeded(path);
             return;
         }
 
         try
         {
             var text = await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
-            await workspace.FoldAsync(path.Replace('\\', '/'), text, cancellationToken).ConfigureAwait(false);
+            if (!await workspace.FoldAsync(path.Replace('\\', '/'), text, cancellationToken).ConfigureAwait(false))
+            {
+                // Unchanged text (our own commit's write coming back) or a path the snapshot does not carry
+                // as a document; either way the next save re-enqueues it, so this is a trace, not a warning.
+                logger.LogDebug("{Path} was not folded into the snapshot.", path);
+            }
         }
         catch (IOException error)
         {

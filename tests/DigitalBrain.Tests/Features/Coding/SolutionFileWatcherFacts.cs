@@ -27,7 +27,7 @@ public sealed class SolutionFileWatcherFacts
     {
         using var fixture = DiskFixture.Create();
         using var workspace = new SolutionWorkspace(new AdhocSolutionLoader(fixture.Open), NullLogger<SolutionWorkspace>.Instance);
-        using var watcher = new SolutionFileWatcher(workspace, NullLogger<SolutionFileWatcher>.Instance);
+        using var watcher = new SolutionFileWatcher(workspace, TimeProvider.System, NullLogger<SolutionFileWatcher>.Instance);
         await workspace.BeginOpenAsync(fixture.SolutionPath);
         await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
         watcher.Start(fixture.Root);
@@ -44,7 +44,7 @@ public sealed class SolutionFileWatcherFacts
     {
         using var fixture = DiskFixture.Create();
         using var workspace = new SolutionWorkspace(new AdhocSolutionLoader(fixture.Open), NullLogger<SolutionWorkspace>.Instance);
-        using var watcher = new SolutionFileWatcher(workspace, NullLogger<SolutionFileWatcher>.Instance);
+        using var watcher = new SolutionFileWatcher(workspace, TimeProvider.System, NullLogger<SolutionFileWatcher>.Instance);
         await workspace.BeginOpenAsync(fixture.SolutionPath);
         await workspace.WhenReadyAsync(TestContext.Current.CancellationToken);
         watcher.Start(fixture.Root);

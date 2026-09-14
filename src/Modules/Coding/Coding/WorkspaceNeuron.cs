@@ -16,9 +16,11 @@ internal sealed class WorkspaceNeuron(
     SolutionWorkspace workspace)
     : Neuron<WorkspaceState>(runtime, state), ICodeWorkspace
 {
-    // 600 attempts at the reaction's 1s wait is ten minutes; long enough for any real load, bounded so a
+    private static readonly TimeSpan MappingWait = TimeSpan.FromMilliseconds(250);
+
+    // 2400 attempts at the reaction's 250ms wait is ten minutes; long enough for any real load, bounded so a
     // solution that never becomes ready cannot keep re-scheduling this reaction forever.
-    private const int MaxMappingAttempts = 600;
+    private const int MaxMappingAttempts = 2400;
 
     public Task<Accepted<WorkspaceReceipt>> Open(OpenWorkspace command) => ExecuteCommandAsync(
         Descriptor("open"), command, CodingJson.Default.OpenWorkspace, CodingJson.Default.AcceptedWorkspaceReceipt, arguments =>
@@ -55,7 +57,8 @@ internal sealed class WorkspaceNeuron(
     public Task<WorkspaceSnapshot> Read()
     {
         var live = workspace.Status;
-        return Task.FromResult(new WorkspaceSnapshot(State?.SolutionPath ?? live.SolutionPath, live.Phase, live.ProjectCount, live.DocumentCount, live.Detail, State?.Generation ?? 0, live.ReloadNeeded));
+        return Task.FromResult(new WorkspaceSnapshot(State?.SolutionPath ?? live.SolutionPath, live.Phase, live.ProjectCount, live.DocumentCount,
+            live.Detail ?? State?.Detail, State?.Generation ?? 0, live.ReloadNeeded));
     }
 
     [ReadOnly]
@@ -114,7 +117,17 @@ internal sealed class WorkspaceNeuron(
 
                     // The load runs in the service; the reaction only records the request so a restart re-opens.
                     // The previous LastMap carries forward: a reload in flight still answers Map() from the last good snapshot.
-                    _ = workspace.BeginOpenAsync(body.SolutionPath);
+                    var opening = workspace.BeginOpenAsync(body.SolutionPath);
+                    // A load that is running answers only when it finishes, and reads queue behind this turn,
+                    // so a task still in flight is read as "a load started" instead of being awaited here; a
+                    // repeat open of the path already loaded answers false at once.
+                    var loading = !opening.IsCompleted || await opening.ConfigureAwait(true);
+                    if (!loading && State is { } recorded && string.Equals(recorded.SolutionPath, body.SolutionPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        await SaveAsync(recorded with { Detail = "already open" }, cancellationToken).ConfigureAwait(true);
+                        break;
+                    }
+
                     Schedule(Signal.FromJson(CodingVocabulary.WorkspaceMapping, new MappingBody(0), CodingJson.Default.MappingBody));
                     await SaveAsync(new WorkspaceState(body.SolutionPath, (State?.Generation ?? 0) + 1, TimeProvider.GetUtcNow(), State?.LastMap), cancellationToken).ConfigureAwait(true);
                     break;
@@ -147,8 +160,9 @@ internal sealed class WorkspaceNeuron(
                             await SaveAsync(current with { LastMap = map }, cancellationToken).ConfigureAwait(true);
                             break;
                         case WorkspacePhase.Opening when attempt < MaxMappingAttempts:
-                            // One bounded wait per reaction keeps reads flowing; the next reaction looks again.
-                            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken).ConfigureAwait(true);
+                            // Reads queue behind this bounded wait, so it stays short: the turn ends after one
+                            // quarter-second and the next reaction looks again.
+                            await Task.Delay(MappingWait, cancellationToken).ConfigureAwait(true);
                             Schedule(Signal.FromJson(CodingVocabulary.WorkspaceMapping, new MappingBody(attempt + 1), CodingJson.Default.MappingBody));
                             break;
                         case WorkspacePhase.Opening:
