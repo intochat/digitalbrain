@@ -11,13 +11,17 @@ public sealed partial class DotnetRunner(IProcessRunner processes)
     public async Task<BuildOutcome> BuildAsync(string solutionPath, string? artifactsPath, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(solutionPath);
+        var solutionDirectory = Path.GetDirectoryName(Path.GetFullPath(solutionPath))!;
         var arguments = new List<string> { "build", solutionPath, "-c", "Release", "--nologo" };
         if (!string.IsNullOrWhiteSpace(artifactsPath))
         {
-            arguments.Add("-p:ArtifactsPath=" + artifactsPath);
+            // MSBuild resolves a relative ArtifactsPath against each project's own directory, not the
+            // solution's; rooting it here at the solution directory keeps one build's leftovers from
+            // being created under every project folder and entering the next build's default compile glob.
+            arguments.Add("-p:ArtifactsPath=" + Path.GetFullPath(artifactsPath, solutionDirectory));
         }
 
-        var result = await processes.RunAsync("dotnet", arguments, Path.GetDirectoryName(Path.GetFullPath(solutionPath))!, BuildTimeout, cancellationToken).ConfigureAwait(false);
+        var result = await processes.RunAsync("dotnet", arguments, solutionDirectory, BuildTimeout, cancellationToken).ConfigureAwait(false);
         var hits = ParseDiagnostics(result.Output + "\n" + result.Error);
         var errors = hits.Where(static hit => hit.Severity == "Error").ToArray();
         return new BuildOutcome(
@@ -32,10 +36,13 @@ public sealed partial class DotnetRunner(IProcessRunner processes)
     public async Task<TestOutcome> TestAsync(string projectOrSolutionPath, string? filterClass, string? artifactsPath, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(projectOrSolutionPath);
+        var projectDirectory = Path.GetDirectoryName(Path.GetFullPath(projectOrSolutionPath))!;
         var arguments = new List<string> { "test", projectOrSolutionPath, "-c", "Release", "--no-build" };
         if (!string.IsNullOrWhiteSpace(artifactsPath))
         {
-            arguments.Add("-p:ArtifactsPath=" + artifactsPath);
+            // Same rooting as BuildAsync: a relative path is the caller's project/solution directory, not
+            // MSBuild's per-project default.
+            arguments.Add("-p:ArtifactsPath=" + Path.GetFullPath(artifactsPath, projectDirectory));
         }
 
         if (!string.IsNullOrWhiteSpace(filterClass))
@@ -43,7 +50,7 @@ public sealed partial class DotnetRunner(IProcessRunner processes)
             arguments.AddRange(["--", "--filter-class", filterClass]);
         }
 
-        var result = await processes.RunAsync("dotnet", arguments, Path.GetDirectoryName(Path.GetFullPath(projectOrSolutionPath))!, TestTimeout, cancellationToken).ConfigureAwait(false);
+        var result = await processes.RunAsync("dotnet", arguments, projectDirectory, TestTimeout, cancellationToken).ConfigureAwait(false);
         var text = result.Output + "\n" + result.Error;
         var total = Count(text, "total");
         var failed = Count(text, "failed");

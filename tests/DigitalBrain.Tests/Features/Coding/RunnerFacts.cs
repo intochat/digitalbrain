@@ -66,8 +66,21 @@ public sealed class RunnerFacts
         Assert.Equal(1, outcome.WarningCount);
         var call = Assert.Single(processes.Calls);
         Assert.Equal("dotnet", call.FileName);
-        Assert.Equal(["build", "E:/repo/Repo.slnx", "-c", "Release", "--nologo", "-p:ArtifactsPath=E:/repo/artifacts/slot-b"], call.Arguments);
+        // GetFullPath yields backslashes on Windows; the argument's separators are normalized before comparing.
+        Assert.Equal(["build", "E:/repo/Repo.slnx", "-c", "Release", "--nologo", "-p:ArtifactsPath=E:/repo/artifacts/slot-b"],
+            call.Arguments.Select(static argument => argument.Replace('\\', '/')));
         Assert.Equal("E:/repo", call.WorkingDirectory.Replace('\\', '/'));
+    }
+
+    [Fact]
+    public async Task A_relative_artifacts_path_is_rooted_at_the_solution_directory()
+    {
+        var processes = new FakeProcessRunner();
+        processes.Enqueue(0, "Build succeeded.\n    0 Warning(s)\n    0 Error(s)");
+        await new DotnetRunner(processes).BuildAsync("E:/repo/Repo.slnx", "artifacts/slot-b", TestContext.Current.CancellationToken);
+        var call = Assert.Single(processes.Calls);
+        var artifactsArgument = Assert.Single(call.Arguments, static argument => argument.StartsWith("-p:ArtifactsPath=", StringComparison.Ordinal));
+        Assert.EndsWith("E:/repo/artifacts/slot-b", artifactsArgument.Replace('\\', '/'), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -83,6 +96,17 @@ public sealed class RunnerFacts
         Assert.Contains("Values differ", failure.Message, StringComparison.Ordinal);
         Assert.Contains("RunnerFacts.cs:line 42", failure.Message, StringComparison.Ordinal);
         Assert.Equal(["test", "E:/repo/tests/Tests.csproj", "-c", "Release", "--no-build", "--", "--filter-class", "DigitalBrain.Tests.Coding.RunnerFacts"], processes.Calls[0].Arguments);
+    }
+
+    [Fact]
+    public async Task A_relative_test_artifacts_path_is_rooted_at_the_project_directory()
+    {
+        var processes = new FakeProcessRunner();
+        processes.Enqueue(0, "Test run summary: Passed!\n  total: 0\n  failed: 0\n  succeeded: 0\n  skipped: 0\n");
+        await new DotnetRunner(processes).TestAsync("E:/repo/tests/Tests.csproj", null, "artifacts/slot-b", TestContext.Current.CancellationToken);
+        var call = Assert.Single(processes.Calls);
+        var artifactsArgument = Assert.Single(call.Arguments, static argument => argument.StartsWith("-p:ArtifactsPath=", StringComparison.Ordinal));
+        Assert.EndsWith("E:/repo/tests/artifacts/slot-b", artifactsArgument.Replace('\\', '/'), StringComparison.Ordinal);
     }
 
     [Fact]

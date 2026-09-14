@@ -197,12 +197,14 @@ public sealed class CodingNativeTools
                 => new { status = snapshot.Status, files = snapshot.Files, generation = snapshot.Generation, diff = snapshot.Diff, detail = snapshot.Detail, branch, commit, advice };
         });
 
-    private Task<JsonElement> BuildSolution([Description("Output root for bin and obj, or empty for the default")] string? artifactsPath = null, CancellationToken cancellationToken = default)
+    private Task<JsonElement> BuildSolution(
+        [Description("Optional output root for this build, relative to the solution directory (use artifacts/<name>); never a path under a project folder")] string? artifactsPath = null,
+        CancellationToken cancellationToken = default)
         => GuardedAsync(() => _dotnet.BuildAsync(SolutionPath(), artifactsPath, cancellationToken));
 
     private Task<JsonElement> Test(
         [Description("A test class full name to run only that class, or empty for everything")] string? filterClass = null,
-        [Description("The artifacts root the build used, or empty")] string? artifactsPath = null,
+        [Description("Optional output root for this build, relative to the solution directory (use artifacts/<name>); never a path under a project folder")] string? artifactsPath = null,
         CancellationToken cancellationToken = default)
         => GuardedAsync(() => _dotnet.TestAsync(_configuration[CodingModule.TestProjectKey] is { Length: > 0 } project ? project : SolutionPath(), filterClass, artifactsPath, cancellationToken));
 

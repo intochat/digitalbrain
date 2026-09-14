@@ -149,7 +149,11 @@ The runners (`DotnetRunner`, `GitRunner`) both take an `IProcessRunner` (`Proces
 production, a fake in tests) and a bounded timeout per call (10 minutes build, 20 minutes test, 60
 seconds per git call). `code_build`/`code_test` accept an optional `artifactsPath`, passed through
 as `dotnet ... -p:ArtifactsPath=<path>` so a self-test or a slot build (phase 2) never collides with
-the live build's `bin`/`obj`.
+the live build's `bin`/`obj`. A relative `artifactsPath` is rooted at the solution directory
+(`BuildAsync`) or the given project/solution's directory (`TestAsync`) rather than left for MSBuild
+to resolve per project, which would otherwise create `bin`/`obj` under every project folder and feed
+their generated sources into the next build's default compile glob; an absolute path passes through
+unchanged.
 
 The dev AppHost also sets `DigitalBrain__Graph__Enabled=true`, but only in run mode (never during
 `aspire publish`). That flag turns on the kernel's typed neuron surface over `/mcp` (`describe`,
