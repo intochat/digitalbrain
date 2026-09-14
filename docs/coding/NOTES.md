@@ -372,6 +372,16 @@ Context7 first. Two spikes change the design.
   active slot. A slot killed mid-stream surfaces as a transport receive error with no terminal `[DONE]` — that
   is the signal the shell's SSE client must treat as "reconnect and resume".
 
+Two design assumptions found false while planning (recorded here, the plan states the deviations): (1) the
+chat behind `/agent` is not a neuron — the AG-UI adapter keeps its session in memory and the conversational
+agent has no chat neuron — so "the chat transcript in journals" (design 4.4) does not hold for that surface; a
+run interrupted inside a slot resumes from an in-process run ledger by run id, and a run interrupted by the
+swap itself becomes a fresh run in the new slot. (2) The shell has no surface-stream subscription to give a
+cursor to; the one cursor-bearing stream it consumes (`/chats/{name}/brain/events`) already reconnects on its
+own, so "the session stream gains run id and cursor" reduces to the run-id half. Design 4.4's promotion
+ends with stopping the old slot; the plan keeps it fenced and running when the landing allows rollback and
+stops it on `retire`, because rollback needs it alive.
+
 ## Phase 1 outcome (2026-09-14)
 
 Fact classes added or extended for phase 1, and their counts at the end of Task 9:
