@@ -85,16 +85,28 @@ internal static class SolutionQueries
     // Shared with ChangeSetEditor, which diagnoses only the projects a change set touched (and their dependents)
     // rather than the whole solution.
     // The projects compile concurrently - a Solution snapshot is immutable, so each compilation is
-    // independent - and DiagnosticsResultFrom's own sort restores a deterministic order afterwards.
+    // independent - and DiagnosticsResultFrom's own sort restores a deterministic order afterwards. The gate
+    // bounds how many compilations run at once: an unfiltered call fans out over every project in the
+    // solution, and MSBuildWorkspace compilations are heavy enough that doing all of them at once starves the
+    // machine instead of finishing sooner.
     internal static async Task<DiagnosticsResult> ProjectDiagnosticsAsync(Solution solution, IReadOnlyCollection<ProjectId> projects, int limit, CancellationToken cancellationToken)
     {
+        using var gate = new SemaphoreSlim(Environment.ProcessorCount);
         var perProject = await Task.WhenAll(projects.Select(async id =>
         {
-            var project = solution.GetProject(id) ?? throw new InvalidOperationException($"Project '{id}' is not in the solution.");
-            var compilation = await project.GetCompilationAsync(cancellationToken).ConfigureAwait(false)
-                ?? throw new InvalidOperationException($"Project '{project.Name}' has no compilation.");
-            var fallbackPath = project.FilePath ?? project.Name;
-            return compilation.GetDiagnostics(cancellationToken).Select(diagnostic => (Diagnostic: diagnostic, FallbackPath: fallbackPath));
+            await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                var project = solution.GetProject(id) ?? throw new InvalidOperationException($"Project '{id}' is not in the solution.");
+                var compilation = await project.GetCompilationAsync(cancellationToken).ConfigureAwait(false)
+                    ?? throw new InvalidOperationException($"Project '{project.Name}' has no compilation.");
+                var fallbackPath = project.FilePath ?? project.Name;
+                return compilation.GetDiagnostics(cancellationToken).Select(diagnostic => (Diagnostic: diagnostic, FallbackPath: fallbackPath));
+            }
+            finally
+            {
+                gate.Release();
+            }
         })).ConfigureAwait(false);
 
         return DiagnosticsResultFrom(perProject.SelectMany(static diagnostics => diagnostics), limit);

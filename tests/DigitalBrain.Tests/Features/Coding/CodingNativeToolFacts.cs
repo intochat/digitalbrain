@@ -150,10 +150,19 @@ public sealed class CodingNativeToolFacts
         await using var brainScope = brain;
         Assert.Equal("graph", (await InvokeAsync(tools, "code_map", new())).GetProperty("kind").GetString());
 
+        // The mapping reaction that saves LastMap runs in its own turn after the open above, so it can still
+        // be in flight here; reloading before it lands would have the loop below race a cache that never got
+        // written. Wait for the open's generation bump and a live map before moving the workspace to Opening.
+        var workspace = brain.Grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType, "digitalbrain").ToGrainId());
+        await TestWait.UntilAsync(
+            async () => (await workspace.Read()).Generation >= 1 && (await InvokeAsync(tools, "code_map", new())).TryGetProperty("kind", out _),
+            static warm => warm,
+            TimeSpan.FromSeconds(20),
+            TestContext.Current.CancellationToken);
+
         // The gated second open keeps the service Opening until the gate is released below. The tool now asks
         // the workspace grain, which answers a reload in flight from its durable LastMap, so the map keeps
         // coming back; asking the live service directly would be a "still opening" advice instead.
-        var workspace = brain.Grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType, "digitalbrain").ToGrainId());
         await workspace.Reload(new ReloadWorkspace(CommandId.New()));
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(20));

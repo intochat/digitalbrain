@@ -290,7 +290,7 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
         Workspace? disposeNow = null;
         List<Workspace> retiredNow = [];
         bool pendingCompleted;
-        bool disposeGate;
+        bool disposeQueryGate;
         lock (_gate)
         {
             if (_disposed)
@@ -315,7 +315,7 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
 
             _status = new WorkspaceStatus(WorkspacePhase.Failed, _solutionPath, 0, 0, "the workspace was disposed");
             pendingCompleted = _pending.IsCompleted;
-            disposeGate = _leases == 0;
+            disposeQueryGate = _leases == 0;
         }
 
         _lifetime.Cancel();
@@ -330,9 +330,18 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
             _lifetime.Dispose();
         }
 
-        if (disposeGate)
+        if (disposeQueryGate)
         {
             _queryGate.Dispose();
+        }
+
+        // CommitAsync/FoldAsync release this gate from their own finally after the inner query lease is
+        // already gone, so disposing it from Release() (or unconditionally here) can race that release and
+        // throw ObjectDisposedException, masking a commit that otherwise succeeded. Claiming it with a
+        // zero-timeout wait only disposes it when no writer currently holds it; a writer in flight simply
+        // keeps it (a SemaphoreSlim that never touches AvailableWaitHandle holds no unmanaged resource).
+        if (_writeGate.Wait(0))
+        {
             _writeGate.Dispose();
         }
     }
@@ -364,7 +373,7 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
 
     private void Release()
     {
-        bool disposeGate;
+        bool disposeQueryGate;
         lock (_gate)
         {
             _leases--;
@@ -378,14 +387,13 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
                 _retired.Clear();
             }
 
-            disposeGate = _disposed && _leases == 0;
+            disposeQueryGate = _disposed && _leases == 0;
         }
 
         _queryGate.Release();
-        if (disposeGate)
+        if (disposeQueryGate)
         {
             _queryGate.Dispose();
-            _writeGate.Dispose();
         }
     }
 
