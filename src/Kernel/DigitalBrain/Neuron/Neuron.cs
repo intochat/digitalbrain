@@ -28,6 +28,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     private readonly DescriptorTable _descriptors;
     private readonly ILogger? _logger;
     private readonly StreamWake? _streamWake;
+    private readonly IActiveSlotLease? _lease;
 
     private readonly CancellationTokenSource _activation = new();
     private readonly RetryScheduler _retry;
@@ -40,6 +41,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         ArgumentNullException.ThrowIfNull(runtime);
         _logger = ServiceProvider.GetService<ILogger<Neuron>>();
         _streamWake = ServiceProvider.GetService<StreamWake>();
+        _lease = ServiceProvider.GetService<IActiveSlotLease>();
         _descriptors = ServiceProvider.GetRequiredService<DescriptorTable>();
         _components = runtime.Bind(ServiceProvider, Id);
         _fence = new PersistenceFence(Id, StateManager, _activation.Token,
@@ -60,6 +62,10 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         => throw new InvalidOperationException($"Neuron '{Id}' must call PersistAsync to write through the persistence fence.");
 
     internal Task GuardActivationAsync() => _fence.GuardAsync();
+
+    // A standby slot reacts to nothing: its pending work stays queued and the slot that holds the lease
+    // next drains it (design 4.4).
+    private bool IsStandby => _lease is { HoldsLease: false };
 
     private protected void Guard() => _fence.Guard();
 
@@ -338,6 +344,11 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     async Task INeuronInbox.Drain()
     {
         Guard();
+        if (IsStandby)
+        {
+            return;
+        }
+
         RequestContext.Clear();
         if (_components.Pending.Peek() is not { } head)
         {
@@ -609,7 +620,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     // still work. A tick is also this activation's only proof that a reminder row is out there.
     Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
     {
-        if (reminderName != RetryScheduler.ReminderName)
+        if (reminderName != RetryScheduler.ReminderName || IsStandby)
         {
             return Task.CompletedTask;
         }

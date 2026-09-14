@@ -1,6 +1,10 @@
+using System.Reflection;
+using DigitalBrain.Abstractions.Slots;
+using Orleans.Concurrency;
+
 namespace DigitalBrain.Core;
 
-internal sealed class NeuronActivationGuardFilter : IIncomingGrainCallFilter
+internal sealed class NeuronActivationGuardFilter(IActiveSlotLease lease) : IIncomingGrainCallFilter
 {
     public async Task Invoke(IIncomingGrainCallContext context)
     {
@@ -11,6 +15,14 @@ internal sealed class NeuronActivationGuardFilter : IIncomingGrainCallFilter
             if (declaringInterface != typeof(INeuronInbox)
                 && declaringInterface != typeof(IRemindable))
             {
+                // A standby silo shares this neuron's storage and reminders with the live one, so it may
+                // answer reads (the promotion smoke-checks it through them) and change nothing. Throwing
+                // here, before the method body, is what keeps the refusal out of the command journal.
+                if (!lease.HoldsLease && !context.InterfaceMethod.IsDefined(typeof(ReadOnlyAttribute)))
+                {
+                    throw new StandbySlotException(lease.Slot);
+                }
+
                 await neuron.GuardActivationAsync().ConfigureAwait(true);
             }
         }
