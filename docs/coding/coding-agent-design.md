@@ -165,8 +165,10 @@ already exists), and click-through from a node to `references`.
 
 ### 4.4 Live rebuild: slots and a gateway
 
-- **Slots.** The AppHost declares `kernel-a` and `kernel-b` from the same silo project with
-  `WithExplicitStart()` on the standby, each with `DigitalBrain__Slot=a|b` and its own output root
+- **Slots.** The AppHost declares `kernel-a` from the silo project and `kernel-b`, the standby, as an executable
+  over the slot's built output (`AddExecutable` with `dotnet <artifacts>/slot-b/bin/DigitalBrain.Silo/release/DigitalBrain.Silo.dll`,
+  an unproxied `http` endpoint and `ASPNETCORE_URLS` — two `AddProject`s from one project share one build output;
+  phase 2 spike S1) with `WithExplicitStart()` on the standby, each with `DigitalBrain__Slot=a|b` and its own output root
   `artifacts/slot-a`, `artifacts/slot-b` built with `-p:ArtifactsPath` (R5.4, D3; the path is passed absolute,
   rooted at the repository — a relative `ArtifactsPath` is resolved per project and scatters outputs under
   every project folder, where the generated sources poison later builds; phase 1 live run). Each start mints a fresh
@@ -177,7 +179,8 @@ already exists), and click-through from a node to `references`.
   proxies SSE and streamable HTTP unchanged. The shell and every MCP client keep talking to 5080.
 - **The active-slot fence** (review findings 1 and 2). Two silos sharing a `ServiceId` share reminder
   rows and grain storage, so a standby that merely starts would already run reminders and activate the same
-  neurons. A single `ActiveSlot` lease row (compare-and-swap in the clustering table) names the owner.
+  neurons. A single `ActiveSlot` lease row (compare-and-swap through the table ETag, in a dedicated
+  `DigitalBrainLeases` table next to the clustering table — Orleans owns that one's schema; spike S3) names the owner.
   A silo whose slot does not hold the lease starts in standby: its reminder ticks are ignored, its
   reactions are not drained, and its commands refuse with "standby slot" (one check in the kernel's
   existing grain-call filter and reminder handler). Promotion is: flip the lease to the new slot, switch the

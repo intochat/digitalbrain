@@ -334,6 +334,44 @@ SymbolRenameOptions, string, CancellationToken)`, `DocumentEditor`, `Solution.Wi
 parameterless constructor by reflection, which is the part most likely to surprise (recorded here so the
 outcome lands next to it). Plan: `plans/2026-09-14-coding-phase1-changesets.md`.
 
+## Phase 2 spikes (2026-09-14)
+
+Design 9.2 lists four; each ran as an isolated, git-ignored project under `.superpowers/sdd/phase2-spikes/`
+(results files `S1-S2-results.md`, `S3-results.md`, `S4-results.md`, code kept there), APIs looked up with
+Context7 first. Two spikes change the design.
+
+- **S1, two resources from one silo project.** `AddProject<Projects.Api>` twice under different names builds and
+  runs both, but both report the same `project.path`/`workDir`, so they share one build output and cannot
+  differ by `ArtifactsPath`. `AddExecutable("kernel-b", "dotnet", workDir, dllPath)` over a dll built with
+  `dotnet build ... -p:ArtifactsPath=<repo>/artifacts/slot-b -p:UseArtifactsOutput=true` works like a project
+  resource (endpoints, health, env, dashboard, MCP) provided it gets `.WithHttpEndpoint(port, name: "http",
+  isProxied: false)` and `.WithEnvironment("ASPNETCORE_URLS", resource.GetEndpoint("http"))` — without the first
+  Kestrel has nothing to bind, without the second the proxy port collides. `WithExplicitStart()` keeps it stopped
+  until `start`. Design 4.4 amended: `kernel-a` stays `AddProject` (the bootstrap live slot), the standby is an
+  executable over the slot's artifacts.
+- **S2, restart semantics and ClusterId.** `execute_resource_command(<resource>, restart)` re-evaluates
+  `WithEnvironment(context => ...)` on every restart for both shapes (new pid, new stamp, new id each time).
+  Appending `builder.Configuration.AddInMemoryCollection` after the existing sources only when
+  `Orleans:ClusterId` is empty mints `{slot}-{yyyyMMddHHmmssfff}` and wins precedence; shown across five process
+  starts. Both assumptions hold. Side effect to remember: `aspire run` against a spike AppHost rewrote the tracked
+  `aspire.config.json`; it was reverted.
+- **S3, compare-and-swap lease row.** `GetEntityAsync` then `UpdateEntityAsync(entity, etag,
+  TableUpdateMode.Replace)` is the CAS: a fresh ETag succeeds (204), a stale one fails with
+  `RequestFailedException` 412 `UpdateConditionNotSatisfied`, two concurrent attempts from one read yield exactly
+  one winner, a stale reader is fenced after a take-over on an expired heartbeat; 1.15 ms per round trip on
+  Azurite (20 samples). `UpsertEntity` with `ETag.All` is the non-fencing baseline only. Design 4.4 amended: the
+  row lives in a dedicated `DigitalBrainLeases` table in the clustering storage account, not in Orleans'
+  `OrleansSiloInstances` table, whose schema Orleans owns.
+- **S4, YARP gateway.** `Yarp.ReverseProxy` with one explicitly owned `InMemoryConfigProvider(routes, clusters)`
+  registered as `IProxyConfigProvider`; both slot clusters stay registered and a switch rebuilds the route with
+  the other `ClusterId` through `Update(...)` under a lock (YARP warns against more than one update per ~15 s).
+  `/switch/{slot}` and `/active` are ordinary minimal-API routes next to `MapReverseProxy()`. An in-flight
+  `/agent` stream finished with all 50 events from the old slot while the switch happened and the next request
+  hit the new slot; `/mcp` in both its SSE and JSON modes and a 5 MB chunked body proxied byte-identical; SSE
+  events arrived live (~109 ms apart) with no buffering settings; sub-millisecond overhead; `/health` follows the
+  active slot. A slot killed mid-stream surfaces as a transport receive error with no terminal `[DONE]` — that
+  is the signal the shell's SSE client must treat as "reconnect and resume".
+
 ## Phase 1 outcome (2026-09-14)
 
 Fact classes added or extended for phase 1, and their counts at the end of Task 9:
