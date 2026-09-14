@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// Approved Lumen design tokens. Legacy UiPalette remains dark until each
-/// older surface is migrated, avoiding implicit color changes in charts.
+/// older surface is migrated; charts now resolve colors from Theme/Lumen.
 abstract final class LumenPalette {
   static const background = Color(0xFFF7F7F2);
   static const surface = Color(0xFFFFFFFF);

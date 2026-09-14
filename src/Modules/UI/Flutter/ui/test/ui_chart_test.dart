@@ -15,12 +15,17 @@ UiChartPart chart(String kind, {List<UiChartPoint>? points}) => UiChartPart(
       ],
 );
 
-Future<void> pump(WidgetTester tester, UiChartPart part) async {
+Future<void> pump(
+  WidgetTester tester,
+  UiChartPart part, {
+  Brightness brightness = Brightness.light,
+}) async {
   tester.view.physicalSize = const Size(800, 600);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
     MaterialApp(
+      theme: UiTheme.workspace(brightness),
       home: Scaffold(
         body: SizedBox(width: 600, child: UiChart(part: part)),
       ),
@@ -52,9 +57,8 @@ void main() {
     expect(find.byType(BarChart), findsNothing);
     expect(find.byType(LineChart), findsNothing);
     expect(find.text('Companies by country'), findsOneWidget);
-    // Percents are canvas-painted; assert section titles. Legend is real Text.
     final pie = tester.widget<PieChart>(find.byType(PieChart));
-    expect(pie.data.centerSpaceColor, UiPalette.surfaceRaised);
+    expect(pie.data.centerSpaceColor, LumenPalette.surface);
     expect(
       pie.data.sections.map((section) => section.title),
       ['37%', '33%', '30%'],
@@ -62,6 +66,17 @@ void main() {
     expect(find.text('GB  11'), findsOneWidget);
     expect(find.text('DE  10'), findsOneWidget);
     expect(find.text('CZ  9'), findsOneWidget);
+  });
+
+  testWidgets('light theme keeps the pie card on Lumen white', (tester) async {
+    await pump(tester, chart('pie'), brightness: Brightness.light);
+    final card = tester.widget<DecoratedBox>(
+      find.byKey(const Key('ui_chart_Companies by country')),
+    );
+    final decoration = card.decoration as BoxDecoration;
+    expect(decoration.color, LumenPalette.surface);
+    final pie = tester.widget<PieChart>(find.byType(PieChart));
+    expect(pie.data.centerSpaceColor, LumenPalette.surface);
   });
 
   test('pie percent labels round from the series total', () {
