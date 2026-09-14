@@ -340,11 +340,13 @@ Fact classes added or extended for phase 1, and their counts at the end of Task 
 
 - The reflection theory in `CodeWorkspaceNeuronFacts` (`Every_contract_method_uses_section_7_types`)
   validates `ICodeWorkspace` (12 methods) and `IChangeSet` (5 methods) against the contract's section
-  7 types; `CodeWorkspaceNeuronFacts` itself is 12 facts (10 `[Fact]` plus the 2-case theory).
+  7 types; `CodeWorkspaceNeuronFacts` itself is 12 facts (10 `[Fact]` plus the 2-case theory),
+  including `The_map_answers_from_the_durable_cache_while_a_reload_is_in_flight`.
 - `WorkspaceReadFacts`: 9.
 - `ChangeSetEditorFacts`: 16.
-- `SolutionWorkspaceFacts`: 21 (phase 0's map/reload/lifetime facts plus the durable-map-cache fact
-  and the two commit facts).
+- `SolutionWorkspaceFacts`: 21 (phase 0's map/reload/lifetime facts plus the three commit facts:
+  `Commit_applies_the_snapshot_and_writes_only_the_changed_files`,
+  `Commit_of_unchanged_text_writes_nothing`, `Commit_refuses_a_snapshot_the_workspace_has_moved_past`).
 - `ChangeSetNeuronFacts`: 7.
 - `SolutionFileWatcherFacts`: 4.
 - `RunnerFacts`: 11.

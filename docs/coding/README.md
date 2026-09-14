@@ -39,7 +39,7 @@ with the same id compose into one snapshot) answers five methods:
 
 | Method | Argument | Result | Does |
 |---|---|---|---|
-| `propose` | `ProposeEdit(Edit, ExpectedVersion?)` | `Accepted<ChangeSetReceipt>` | Refuses a closed change set (`Committed`/`Discarded`) or a stale `ExpectedVersion` (the edit count); appends one `EditRequest` and schedules the reaction that re-derives `Diagnostics`/`Diff`/`Detail` from scratch. |
+| `propose` | `ProposeEdit(Edit, ExpectedVersion?)` | `Accepted<ChangeSetReceipt>` | Refuses a closed change set (`Committed`/`Discarded`) or a stale `ExpectedVersion` (the edit count); appends one `EditRequest` and schedules the reaction that clears `Diagnostics`/`Diff`/`Detail` (a `check` afterwards derives them again from the full edit list). |
 | `check` | `CheckChangeSet()` | `Accepted<ChangeSetReceipt>` | Refuses a closed or empty change set; applies every edit to one snapshot of the live solution (no files written) and reports the diagnostics the edits *introduce* and a unified diff. |
 | `commit` | `CommitChangeSet(Message)` | `Accepted<ChangeSetReceipt>` | Refuses a closed or empty change set, or a blank message; re-applies the edits, and only if they are still clean writes the changed documents to disk and records the written paths and the new generation. |
 | `discard` | `DiscardChangeSet()` | `Accepted<ChangeSetReceipt>` | Refuses a closed change set; marks it `Discarded`. Nothing on disk changes. |
@@ -81,7 +81,7 @@ Notes on the shapes above:
 | `code_find_symbols(query, limit=20)` | Find types and members by name in the loaded solution. Returns ids to use with `code_references`. |
 | `code_references(symbolId, limit=50)` | Every place a symbol is used, with file, line and the source line. Semantic, not text search. |
 | `code_diagnostics(path?, project?)` | Compiler errors and warnings for a file, a project, or the whole solution, without running a build. |
-| `code_map(title="Solution map")` | A graph of every project in the solution and the references between them. |
+| `code_map(title="Solution map")` | A graph of every project in the solution and the references between them. Use it whenever the person asks to see or map the solution, its projects, or their dependencies. |
 | `code_skeleton(path)` | The types and member signatures of one file, without bodies, with symbol ids. |
 | `code_member(symbolId)` | One declaration with its body, by symbol id. |
 | `code_callers(symbolId, limit=50)` | The symbols that call a method or read a property, with the call sites. |
@@ -97,13 +97,17 @@ Notes on the shapes above:
 Nodes are `{ id, label, kind: "module", cluster }`; edges are `{ id, sourceId, targetId, dotted }`.
 The Flutter shell opens a `graph` result with `UiGraph`.
 
-`code_propose_edit`, `code_check` and `code_commit` return the `changeset` snapshot shape above
-(`{ status, edits, diagnostics, diff, generation, detail, files, revision }`, `code_commit` adding
-`{ branch, commit, advice }`); the tool waits on the grain's `Revision` for its own command to
-settle, up to `CodingToolOptions.ReactionWait` (2 minutes by default), and turns a wait that expires
-into advice rather than an exception. `code_build` returns `{ succeeded, errors, warningCount,
-durationSeconds, command, detail }`; `code_test` returns `{ succeeded, total, passed, failed,
-skipped, failures, durationSeconds, command, detail }`.
+`code_propose_edit` and `code_check` return the `changeset` snapshot shape above (`{ status, edits,
+diagnostics, diff, generation, detail, files, revision }`). `code_commit` returns a different,
+constant shape in every branch: `{ status, files, generation, diff, detail, branch, commit, advice }`
+— on a clean git commit, `commit` is filled and `advice` is null; on a git refusal after the files
+were already written, `status` is still `Committed`, `commit` is null and `advice` explains what to
+do; when the change set itself was never committed (`status` stays `Draft`), `advice` is exactly
+`detail`. Every one of `code_propose_edit`/`code_check`/`code_commit` waits on the grain's `Revision`
+for its own command to settle, up to `CodingToolOptions.ReactionWait` (2 minutes by default), and
+turns a wait that expires into advice rather than an exception. `code_build` returns `{ succeeded,
+errors, warningCount, durationSeconds, command, detail }`; `code_test` returns `{ succeeded, total,
+passed, failed, skipped, failures, durationSeconds, command, detail }`.
 
 Every tool answers with `{ advice: <message> }` instead of failing the call when the underlying
 query throws (an unknown symbol id, a workspace that is not ready, a change set that never
@@ -171,11 +175,13 @@ dotnet test tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj -c Release -- --f
 
 - `SolutionWorkspaceFacts` drives `SolutionWorkspace`/`SolutionQueries` against a two-project adhoc
   fixture: symbol search, references, diagnostics (including a compiler error with no source
-  location), the map (including the durable cache answering while a reload is in flight), reload,
-  the lease/dispose lifetime, and the failure path.
+  location), the map, reload, the lease/dispose lifetime, the failure path, and the three commit
+  facts (`Commit_applies_the_snapshot_and_writes_only_the_changed_files`,
+  `Commit_of_unchanged_text_writes_nothing`, `Commit_refuses_a_snapshot_the_workspace_has_moved_past`).
 - `CodeWorkspaceNeuronFacts` drives the same behaviour through the real `workspace` grain interface
-  over Orleans, plus a reflection theory that validates `ICodeWorkspace` (12 methods) and
-  `IChangeSet` (5 methods) against the contract's section 7 types.
+  over Orleans — including `The_map_answers_from_the_durable_cache_while_a_reload_is_in_flight` — plus
+  a reflection theory that validates `ICodeWorkspace` (12 methods) and `IChangeSet` (5 methods)
+  against the contract's section 7 types.
 - `WorkspaceReadFacts` covers the five phase 1 reads (`skeleton`, `member`, `callers`,
   `implementations`, `derived`) against the two-project fixture, including a cross-project caller
   and an interface's two implementers.
@@ -196,9 +202,11 @@ dotnet test tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj -c Release -- --f
 - `CodingChatFacts` drives the whole edit path through the `/agent` HTTP endpoint with a
   `ScriptedChatClient`: `code_find_symbols`, `code_propose_edit` (Rename), `code_check`,
   `code_commit`, `code_build`, `code_test`, ending with the model's own summary naming the
-  `coding/<changeId>` branch — the scripted proof of design 9.1's phase 1 exit criterion
-  ("rename X to Y lands as a commit on a `coding/<id>` branch with the suite green, driven from
-  the chat"; `NOTES.md` records the same scenario driven live through `aspire run`).
+  `coding/<changeId>` branch — the scripted proof of design 9.1's phase 1 exit criterion, quoted
+  verbatim: "rename `TimerNeuron.Alarm` to `AlarmFor` and run the tests" lands as a commit on a
+  `coding/<id>` branch with the suite green, driven from the chat. On the adhoc fixture the scripted
+  rename is `Greeter.Greet` to `Hello`, standing in for the live `TimerNeuron.Alarm` rename;
+  `NOTES.md` records that live scenario driven through `aspire run`.
 
 The gated self-tests open this repository's own `DigitalBrain.slnx` through the real MSBuild
 loader:

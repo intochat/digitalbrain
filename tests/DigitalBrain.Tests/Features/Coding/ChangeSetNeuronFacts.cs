@@ -54,11 +54,14 @@ public sealed class ChangeSetNeuronFacts
         var accepted = await changeSet.Propose(new ProposeEdit(CommandId.New(), FriendlyGreet));
         Assert.Equal("c1", accepted.Receipt.ChangeId);
         Assert.Equal(1, accepted.Receipt.EditCount);
+        var proposed = await WaitAsync(changeSet, snapshot => snapshot.Edits.Count == 1);
+        Assert.Equal(1, proposed.Revision);
         await changeSet.Check(new CheckChangeSet(CommandId.New()));
         var checkedSnapshot = await WaitAsync(changeSet, snapshot => snapshot.Status == ChangeSetStatus.Checked);
         Assert.Contains("+    public string Greet(string name)", checkedSnapshot.Diff, StringComparison.Ordinal);
         Assert.Empty(checkedSnapshot.Diagnostics);
         Assert.Null(checkedSnapshot.Detail);
+        Assert.True(checkedSnapshot.Revision > proposed.Revision);
     }
 
     [Fact]

@@ -49,6 +49,11 @@ public sealed class CodingChatFacts
         await using var app = await StartAgentAsync(brain, model);
         using var client = app.GetTestClient();
         var events = await TableAgentFacts.RunAsync(client, "Rename Greeter.Greet to Hello and run the tests");
+        var toolCalls = events.Where(item => item.GetProperty("type").GetString() == "TOOL_CALL_START")
+            .Select(item => item.GetProperty("toolCallName").GetString())
+            .ToArray();
+        Assert.Equal(["code_find_symbols", "code_propose_edit", "code_check", "code_commit", "code_build", "code_test"], toolCalls);
+
         var results = events.Where(item => item.GetProperty("type").GetString() == "TOOL_CALL_RESULT")
             .Select(item => JsonSerializer.Deserialize<JsonElement>(item.GetProperty("content").GetString()!))
             .ToArray();
