@@ -7,9 +7,9 @@ Read this file and `NOTES.md` first after a context reset; resume from the curre
 | Current phase | 1 (edits as transactions), branch `feature/coding-phase1-changesets` from phase 0 |
 | Current branch | `feature/coding-phase0-workspace` (from `master` at `1e4b395d`) |
 | Plan | `docs/coding/plans/2026-09-14-coding-phase1-changesets.md` (phase 0: `plans/2026-09-13-coding-phase0-workspace.md`) |
-| Current task | Phase 1 Task 3 (editor core and commit path) in progress; Tasks 1-2 complete |
-| Last green gate | `51687f48` (2026-09-14): format + build 0 warnings + `dotnet test DigitalBrain.slnx` 338 passed, 5 skipped, 0 failed |
-| Last commit | `51687f48` coding: skeleton and member cover fields; derived results deduplicated |
+| Current task | Phase 1 Task 4 (rename and code fixes) in progress; Tasks 1-3 complete |
+| Last green gate | `a22742aa` (2026-09-14): format + build 0 warnings + `dotnet test DigitalBrain.slnx` 351 passed, 5 skipped, 0 failed |
+| Last commit | `a22742aa` coding: diagnostics introduced by a change set are counted, commits refuse unwritable snapshots |
 | Open PRs | #91 phase 0 (https://github.com/intochat/digitalbrain/pull/91) |
 
 ## Phase ledger
@@ -17,7 +17,7 @@ Read this file and `NOTES.md` first after a context reset; resume from the curre
 | Phase | Branch | Status | PR |
 |---|---|---|---|
 | 0 workspace and map | `feature/coding-phase0-workspace` | complete, PR open | #91 |
-| 1 edits as transactions | `feature/coding-phase1-changesets` | in progress (task 3 of 9) | — |
+| 1 edits as transactions | `feature/coding-phase1-changesets` | in progress (task 4 of 9) | — |
 | 2 slots | — | not started | — |
 | 3 swarm | — | not started | — |
 | 4 learning | — | not started | — |
