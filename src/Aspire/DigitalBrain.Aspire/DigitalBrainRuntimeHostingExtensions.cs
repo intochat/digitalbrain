@@ -103,5 +103,10 @@ public static class DigitalBrainRuntimeHostingExtensions
             services.GetRequiredService<ILogger<AzureTableActiveSlotLease>>()));
         silo.Services.AddSingleton<IActiveSlotLease>(static services => services.GetRequiredService<AzureTableActiveSlotLease>());
         silo.Services.AddHostedService<ActiveSlotLeaseRefresher>();
+        // Below BecomeActive: the row is bootstrapped before the silo serves any grain call, so a restarted
+        // live slot is never fenced against its own row while it boots. The refresher only re-reads after this.
+        silo.AddStartupTask(
+            (services, cancellationToken) => services.GetRequiredService<AzureTableActiveSlotLease>().BootstrapAsync(cancellationToken),
+            ServiceLifecycleStage.ApplicationServices);
     }
 }

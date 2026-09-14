@@ -1,39 +1,60 @@
 using DigitalBrain.Abstractions.Slots;
-using DigitalBrain.Core;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace DigitalBrain.Aspire;
 
-// HoldsLease is read on every grain call, so the row is read out of band. The first read happens before
-// the host serves anything: a live slot must not be fenced while it boots.
+// The lease row is bootstrapped by an Orleans startup task below BecomeActive (see
+// DigitalBrainRuntimeHostingExtensions.ConfigureActiveSlotLease), before the silo serves any grain call;
+// this hosted service only keeps the cache fresh afterward. An unread verdict — before the startup task or
+// the first tick has run — reads as standby (HoldsLease false), the safe default.
 internal sealed class ActiveSlotLeaseRefresher(AzureTableActiveSlotLease lease, ILogger<ActiveSlotLeaseRefresher> logger) : IHostedService
 {
     private readonly CancellationTokenSource _stopping = new();
     private Task? _loop;
+    private bool _stopped;
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public Task StartAsync(CancellationToken cancellationToken)
     {
-        await lease.BootstrapAsync(cancellationToken).ConfigureAwait(false);
         _loop = RefreshAsync();
+        return Task.CompletedTask;
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        await _stopping.CancelAsync().ConfigureAwait(false);
-        if (_loop is { } loop)
+        if (_stopped)
         {
-            await loop.WaitAsync(cancellationToken).ConfigureAwait(false);
+            return;
         }
 
-        _stopping.Dispose();
+        _stopped = true;
+        try
+        {
+            await _stopping.CancelAsync().ConfigureAwait(false);
+            if (_loop is { } loop)
+            {
+                try
+                {
+                    await loop.WaitAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    // The host's shutdown timeout elapsed before the loop noticed cancellation; nothing more to wait for.
+                    logger.LogDebug("Active-slot lease refresher did not stop before the shutdown timeout.");
+                }
+            }
+        }
+        finally
+        {
+            _stopping.Dispose();
+        }
     }
 
     private async Task RefreshAsync()
     {
         // The one interval both sides of a promotion agree on (Task 1).
         using var timer = new PeriodicTimer(ActiveSlotNames.RefreshInterval);
-        while (await SafeWaitAsync(timer).ConfigureAwait(false))
+        while (await WaitForTickOrStopAsync(timer).ConfigureAwait(false))
         {
             try
             {
@@ -52,7 +73,7 @@ internal sealed class ActiveSlotLeaseRefresher(AzureTableActiveSlotLease lease, 
         }
     }
 
-    private async Task<bool> SafeWaitAsync(PeriodicTimer timer)
+    private async Task<bool> WaitForTickOrStopAsync(PeriodicTimer timer)
     {
         try
         {

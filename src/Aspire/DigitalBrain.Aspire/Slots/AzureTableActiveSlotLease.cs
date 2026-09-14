@@ -11,11 +11,11 @@ namespace DigitalBrain.Aspire;
 public sealed class AzureTableActiveSlotLease : IActiveSlotLease
 {
     private readonly TableServiceClient _tables;
-    private readonly TableClient _table;
+    private readonly TableClient _leaseTable;
     private readonly TimeProvider _clock;
     private readonly ILogger<AzureTableActiveSlotLease> _logger;
     private Cached _cached = new(false, 0);
-    private bool _tableReady;
+    private Task? _tableReadyTask;
 
     public AzureTableActiveSlotLease(string slot, TableServiceClient tables, TimeProvider clock, ILogger<AzureTableActiveSlotLease> logger)
     {
@@ -25,7 +25,7 @@ public sealed class AzureTableActiveSlotLease : IActiveSlotLease
         ArgumentNullException.ThrowIfNull(logger);
         Slot = slot;
         _tables = tables;
-        _table = tables.GetTableClient(ActiveSlotNames.Table);
+        _leaseTable = tables.GetTableClient(ActiveSlotNames.Table);
         _clock = clock;
         _logger = logger;
     }
@@ -47,18 +47,7 @@ public sealed class AzureTableActiveSlotLease : IActiveSlotLease
             return;
         }
 
-        try
-        {
-            await _table.AddEntityAsync(
-                new ActiveSlotLeaseEntity { Owner = Slot, Generation = 1, Fenced = _clock.GetUtcNow() },
-                cancellationToken).ConfigureAwait(false);
-            Cache(Slot, 1);
-        }
-        catch (RequestFailedException error) when (error.Status == 409)
-        {
-            // Another slot inserted the row first; its owner decides.
-            await RefreshAsync(cancellationToken).ConfigureAwait(false);
-        }
+        await SeatOnMissingRowAsync(Slot, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<bool> TryAcquireAsync(string slot, CancellationToken cancellationToken = default)
@@ -67,18 +56,17 @@ public sealed class AzureTableActiveSlotLease : IActiveSlotLease
         await EnsureTableAsync(cancellationToken).ConfigureAwait(false);
         if (await ReadAsync(cancellationToken).ConfigureAwait(false) is not { } row)
         {
-            await BootstrapAsync(cancellationToken).ConfigureAwait(false);
-            return string.Equals(await OwnerAsync(cancellationToken).ConfigureAwait(false), slot, StringComparison.OrdinalIgnoreCase);
+            return await SeatOnMissingRowAsync(slot, cancellationToken).ConfigureAwait(false);
         }
 
         var etag = row.ETag;
         var generation = row.Generation + 1;
         row.Owner = slot;
         row.Generation = generation;
-        row.Fenced = _clock.GetUtcNow();
+        row.ChangedAt = _clock.GetUtcNow();
         try
         {
-            await _table.UpdateEntityAsync(row, etag, TableUpdateMode.Replace, cancellationToken).ConfigureAwait(false);
+            await _leaseTable.UpdateEntityAsync(row, etag, TableUpdateMode.Replace, cancellationToken).ConfigureAwait(false);
             Cache(slot, generation);
             return true;
         }
@@ -103,29 +91,61 @@ public sealed class AzureTableActiveSlotLease : IActiveSlotLease
         var generation = row.Generation + 1;
         row.Owner = string.Empty;
         row.Generation = generation;
-        row.Fenced = _clock.GetUtcNow();
+        row.ChangedAt = _clock.GetUtcNow();
         try
         {
-            await _table.UpdateEntityAsync(row, etag, TableUpdateMode.Replace, cancellationToken).ConfigureAwait(false);
+            await _leaseTable.UpdateEntityAsync(row, etag, TableUpdateMode.Replace, cancellationToken).ConfigureAwait(false);
             Cache(string.Empty, generation);
         }
         catch (RequestFailedException error) when (error.Status == 412)
         {
+            _logger.LogWarning("Slot '{Slot}' lost the active-slot compare-and-swap while releasing.", Slot);
             await RefreshAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
-    public async Task RefreshAsync(CancellationToken cancellationToken = default)
+    public Task RefreshAsync(CancellationToken cancellationToken = default)
+        => ReadAndCacheAsync(cancellationToken);
+
+    // The row does not exist yet: whoever's insert lands first seats that owner. A concurrent insert (409)
+    // means someone else won; re-read to see whether it happened to be the owner asked for.
+    private async Task<bool> SeatOnMissingRowAsync(string owner, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _leaseTable.AddEntityAsync(
+                new ActiveSlotLeaseEntity { Owner = owner, Generation = 1, ChangedAt = _clock.GetUtcNow() },
+                cancellationToken).ConfigureAwait(false);
+            Cache(owner, 1);
+            return true;
+        }
+        catch (RequestFailedException error) when (error.Status == 409)
+        {
+            var existing = await ReadAndCacheAsync(cancellationToken).ConfigureAwait(false);
+            return existing is not null && string.Equals(existing.Owner, owner, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private async Task<ActiveSlotLeaseEntity?> ReadAndCacheAsync(CancellationToken cancellationToken)
     {
         var row = await ReadAsync(cancellationToken).ConfigureAwait(false);
-        Cache(row?.Owner, row?.Generation ?? 0);
+        if (row is null)
+        {
+            ResetCache();
+        }
+        else
+        {
+            Cache(row.Owner, row.Generation);
+        }
+
+        return row;
     }
 
     private async Task<ActiveSlotLeaseEntity?> ReadAsync(CancellationToken cancellationToken)
     {
         try
         {
-            var response = await _table.GetEntityAsync<ActiveSlotLeaseEntity>(
+            var response = await _leaseTable.GetEntityAsync<ActiveSlotLeaseEntity>(
                 ActiveSlotNames.PartitionKey, ActiveSlotNames.RowKey, cancellationToken: cancellationToken).ConfigureAwait(false);
             return response.Value;
         }
@@ -136,22 +156,45 @@ public sealed class AzureTableActiveSlotLease : IActiveSlotLease
         }
     }
 
-    private async Task<string?> OwnerAsync(CancellationToken cancellationToken)
-        => (await ReadAsync(cancellationToken).ConfigureAwait(false))?.Owner;
-
-    private async Task EnsureTableAsync(CancellationToken cancellationToken)
+    private Task EnsureTableAsync(CancellationToken cancellationToken)
     {
-        if (_tableReady)
+        var existing = Volatile.Read(ref _tableReadyTask);
+        if (existing is not null)
         {
-            return;
+            return existing;
         }
 
-        await _tables.CreateTableIfNotExistsAsync(ActiveSlotNames.Table, cancellationToken).ConfigureAwait(false);
-        _tableReady = true;
+        // First caller's task is published for everyone to share; CreateTableIfNotExistsAsync tolerates
+        // the rare double-fire from a race here, so no stricter guard is needed.
+        var created = _tables.CreateTableIfNotExistsAsync(ActiveSlotNames.Table, cancellationToken);
+        return Interlocked.CompareExchange(ref _tableReadyTask, created, null) ?? created;
     }
 
-    private void Cache(string? owner, long generation)
-        => Volatile.Write(ref _cached, new Cached(string.Equals(owner, Slot, StringComparison.OrdinalIgnoreCase), generation));
+    // Monotonic in Generation: a refresh that read the row before a hand-over can land after it completes,
+    // and must not resurrect the verdict it read. Internal so the fact that proves this can drive it
+    // directly instead of racing a real hand-over.
+    internal void Cache(string? owner, long generation)
+    {
+        var holds = string.Equals(owner, Slot, StringComparison.OrdinalIgnoreCase);
+        Cached current;
+        Cached updated;
+        do
+        {
+            current = Volatile.Read(ref _cached);
+            if (generation < current.Generation)
+            {
+                return;
+            }
+
+            updated = new Cached(holds, generation);
+        }
+        while (Interlocked.CompareExchange(ref _cached, updated, current) != current);
+    }
+
+    // The row is absent (never bootstrapped, or the table was reset): nobody holds the lease. This bypasses
+    // the monotonic check in Cache because "absent" is not a generation the CAS path could ever produce.
+    private void ResetCache()
+        => Volatile.Write(ref _cached, new Cached(false, 0));
 
     private sealed record Cached(bool Holds, long Generation);
 }

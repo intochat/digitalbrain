@@ -34,6 +34,46 @@ public sealed class AzureTableActiveSlotLeaseFacts : IAsyncDisposable
         Assert.True(first.HoldsLease);
         Assert.False(second.HoldsLease);
         Assert.Equal("a", await OwnerAsync());
+
+        // Contract-tests the serialized property name independent of the typed entity.
+        var generic = await _tables.GetTableClient(ActiveSlotNames.Table)
+            .GetEntityAsync<TableEntity>(ActiveSlotNames.PartitionKey, ActiveSlotNames.RowKey,
+                cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal("a", generic.Value.GetString(ActiveSlotNames.Owner));
+    }
+
+    [Fact(Skip = Skip, SkipUnless = nameof(LeaseTestsEnabled))]
+    public async Task Acquiring_for_another_slot_on_a_missing_row_seats_that_slot()
+    {
+        await ResetAsync();
+        var lease = Lease("a");
+
+        Assert.True(await lease.TryAcquireAsync("b", TestContext.Current.CancellationToken));
+
+        Assert.False(lease.HoldsLease);
+        Assert.Equal(1, lease.Generation);
+        Assert.Equal("b", await OwnerAsync());
+    }
+
+    [Fact(Skip = Skip, SkipUnless = nameof(LeaseTestsEnabled))]
+    public async Task Two_acquires_from_one_row_state_have_exactly_one_winner()
+    {
+        await ResetAsync();
+        var seed = Lease("x");
+        await seed.BootstrapAsync(TestContext.Current.CancellationToken);
+
+        var a = Lease("a");
+        var b = Lease("b");
+        var acquired = await Task.WhenAll(
+            a.TryAcquireAsync("a", TestContext.Current.CancellationToken),
+            b.TryAcquireAsync("b", TestContext.Current.CancellationToken));
+
+        Assert.Equal(1, acquired.Count(result => result));
+        var winner = acquired[0] ? a : b;
+        var loser = acquired[0] ? b : a;
+        Assert.True(winner.HoldsLease);
+        Assert.False(loser.HoldsLease);
+        Assert.Equal(winner.Slot, await OwnerAsync());
     }
 
     [Fact(Skip = Skip, SkipUnless = nameof(LeaseTestsEnabled))]
@@ -81,6 +121,19 @@ public sealed class AzureTableActiveSlotLeaseFacts : IAsyncDisposable
         await lease.RefreshAsync(TestContext.Current.CancellationToken);
         Assert.False(lease.HoldsLease);
         Assert.Equal(0, lease.Generation);
+    }
+
+    // No Azurite needed: this drives the cache directly, because forcing a refresh to land after a
+    // hand-over deterministically against the real table is not practical.
+    [Fact]
+    public void A_refresh_that_read_before_a_hand_over_cannot_resurrect_the_old_verdict()
+    {
+        var lease = Lease("a");
+        lease.Cache("b", 6);
+        lease.Cache("a", 5);
+
+        Assert.False(lease.HoldsLease);
+        Assert.Equal(6, lease.Generation);
     }
 
     private AzureTableActiveSlotLease Lease(string slot)

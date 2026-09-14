@@ -4,9 +4,9 @@ using DigitalBrain.Abstractions.Slots;
 
 namespace DigitalBrain.Aspire;
 
-// One row in DigitalBrainLeases: which slot may react, and when it last said so. The table is ours, not
+// One row in DigitalBrainLeases: which slot may react, and when it last changed. The table is ours, not
 // Orleans' (spike S3: the clustering table's layout is Orleans' private schema).
-public sealed class ActiveSlotLeaseEntity : ITableEntity
+internal sealed class ActiveSlotLeaseEntity : ITableEntity
 {
     public string PartitionKey { get; set; } = ActiveSlotNames.PartitionKey;
 
@@ -20,5 +20,6 @@ public sealed class ActiveSlotLeaseEntity : ITableEntity
 
     public long Generation { get; set; }
 
-    public DateTimeOffset Fenced { get; set; }
+    // Audit-only: stamped on every ownership change. Nothing reads it back to judge liveness.
+    public DateTimeOffset ChangedAt { get; set; }
 }
