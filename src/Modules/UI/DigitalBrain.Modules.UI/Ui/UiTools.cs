@@ -23,7 +23,7 @@ internal sealed class UiTools(
     {
         Task<JsonElement> RenderChart(
             [Description("Short chart title")] string title,
-            [Description("bar or line")] string chartKind,
+            [Description("bar, line, or pie")] string chartKind,
             [Description("Point labels, one per value")] string[] labels,
             [Description("Point values, one per label")] double[] values,
             CancellationToken cancellationToken,
@@ -44,9 +44,9 @@ internal sealed class UiTools(
             AIFunctionFactory.Create(RenderChart, new AIFunctionFactoryOptions
             {
                 Name = "render_chart",
-                Description = "Render a bar or line chart from labels and values. It appears as a live card "
+                Description = "Render a bar, line, or pie chart from labels and values. It appears as a live card "
                     + "in the chat when a chat is named and opens in the workspace otherwise. Use it whenever "
-                    + "the person asks to see data as a chart.",
+                    + "the person asks to see data as a chart. Pass chartKind=pie when they ask for a pie chart.",
             }),
             AIFunctionFactory.Create(ShowGraph, new AIFunctionFactoryOptions
             {
@@ -185,7 +185,7 @@ internal sealed class UiTools(
             }
 
             var trimmedTitle = title.Trim();
-            var kind = string.IsNullOrWhiteSpace(chartKind) ? "bar" : chartKind.Trim();
+            var kind = string.IsNullOrWhiteSpace(chartKind) ? "bar" : chartKind.Trim().ToLowerInvariant();
             var name = $"chart-{Guid.NewGuid():N}"[..14];
             var neuron = new NeuronId(UIVocabulary.ChartType, name);
             var points = labels.Zip(values, static (label, value) => new ChartPoint(label, value)).ToList();

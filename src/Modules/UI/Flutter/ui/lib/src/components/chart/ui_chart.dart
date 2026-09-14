@@ -6,9 +6,9 @@ import '../../theme/ui_theme.dart';
 
 /// Product chart control. Same widget for surface galleries and chat bubbles.
 ///
-/// `chartKind` picks bars (`bar`, the default) or a line with points (`line`).
-/// Touch a point for a tooltip with the full label and value; long category
-/// labels are shortened on the axis only.
+/// `chartKind` picks bars (`bar`, the default), a line with points (`line`),
+/// or pie slices (`pie`). Touch a point for a tooltip with the full label and
+/// value; long category labels are shortened on axes and slice titles only.
 final class UiChart extends StatelessWidget {
   const UiChart({super.key, required this.part, this.height = 200});
 
@@ -16,6 +16,15 @@ final class UiChart extends StatelessWidget {
   final double height;
 
   static const axisLabelLength = 12;
+
+  static const _sliceColors = [
+    UiPalette.signal,
+    UiPalette.owner,
+    UiPalette.success,
+    Color(0xFFC47AC0),
+    Color(0xFF5EC4D4),
+    Color(0xFFE0C35C),
+  ];
 
   static String axisLabel(String label) => label.length <= axisLabelLength
       ? label
@@ -29,7 +38,7 @@ final class UiChart extends StatelessWidget {
               .map((p) => p.value.toDouble())
               .reduce((a, b) => a > b ? a : b);
     final maxY = maxValue * 1.15;
-    final line = part.chartKind == 'line';
+    final kind = part.chartKind.trim().toLowerCase();
 
     return DecoratedBox(
       key: Key('ui_chart_${part.title}'),
@@ -51,9 +60,11 @@ final class UiChart extends StatelessWidget {
                   ? const Center(
                       child: Text('No series', style: UiType.bodyMuted),
                     )
-                  : line
-                  ? _lineChart(maxY)
-                  : _barChart(maxY),
+                  : switch (kind) {
+                      'line' => _lineChart(maxY),
+                      'pie' => _pieChart(),
+                      _ => _barChart(maxY),
+                    },
             ),
           ],
         ),
@@ -150,6 +161,36 @@ final class UiChart extends StatelessWidget {
             dotData: const FlDotData(show: true),
             belowBarData: BarAreaData(show: false),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _pieChart() {
+    const titleStyle = TextStyle(
+      color: UiPalette.textPrimary,
+      fontSize: 11,
+      fontWeight: FontWeight.w600,
+      fontFamily: UiType.bodyFamily,
+      fontFamilyFallback: UiType.bodyFallback,
+    );
+    // PieChart has no built-in tooltip bubble in fl_chart 1.2; slice titles carry
+    // the shortened label and the full label stays available via the point model.
+    return PieChart(
+      PieChartData(
+        sectionsSpace: 2,
+        centerSpaceRadius: 36,
+        borderData: FlBorderData(show: false),
+        pieTouchData: PieTouchData(enabled: true),
+        sections: [
+          for (var i = 0; i < part.points.length; i++)
+            PieChartSectionData(
+              value: part.points[i].value.toDouble().abs(),
+              title: axisLabel(part.points[i].label),
+              color: _sliceColors[i % _sliceColors.length],
+              radius: 56,
+              titleStyle: titleStyle,
+            ),
         ],
       ),
     );

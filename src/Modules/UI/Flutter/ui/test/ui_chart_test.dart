@@ -34,6 +34,7 @@ void main() {
     await pump(tester, chart('bar'));
     expect(find.byType(BarChart), findsOneWidget);
     expect(find.byType(LineChart), findsNothing);
+    expect(find.byType(PieChart), findsNothing);
     expect(find.text('Companies by country'), findsOneWidget);
   });
 
@@ -41,6 +42,15 @@ void main() {
     await pump(tester, chart('line'));
     expect(find.byType(LineChart), findsOneWidget);
     expect(find.byType(BarChart), findsNothing);
+    expect(find.byType(PieChart), findsNothing);
+    expect(find.text('Companies by country'), findsOneWidget);
+  });
+
+  testWidgets('pie charts draw a PieChart', (tester) async {
+    await pump(tester, chart('pie'));
+    expect(find.byType(PieChart), findsOneWidget);
+    expect(find.byType(BarChart), findsNothing);
+    expect(find.byType(LineChart), findsNothing);
     expect(find.text('Companies by country'), findsOneWidget);
   });
 
@@ -51,6 +61,7 @@ void main() {
     expect(find.text('No series'), findsOneWidget);
     expect(find.byType(BarChart), findsNothing);
     expect(find.byType(LineChart), findsNothing);
+    expect(find.byType(PieChart), findsNothing);
   });
 
   test('long category labels are shortened for the axis', () {

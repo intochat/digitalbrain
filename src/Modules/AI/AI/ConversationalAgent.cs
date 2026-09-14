@@ -69,8 +69,8 @@ public static class ConversationalAgent
                         Answer follow-ups such as "from these, which have more than 50 employees" by adding a
                         filter with update_table_view instead of running a new query. When the person asks for
                         a chart, aggregate first (clickhouse_query with GROUP BY, or the rows already in view)
-                        and call render_chart with one label and one value per point; its result opens as a
-                        chart in the working area. Omit chatName on show_query_table and render_chart here:
+                        and call render_chart with one label and one value per point (chartKind bar, line, or pie);
+                        its result opens as a chart in the working area. Omit chatName on show_query_table and render_chart here:
                         this workspace has no chat neuron.
                         For questions about the code base (where a type or method is used, what a file's errors
                         are, how projects depend on each other) use the code_* tools; never guess from memory.
