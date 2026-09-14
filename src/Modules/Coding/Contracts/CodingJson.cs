@@ -38,6 +38,7 @@ namespace DigitalBrain.Coding;
 [JsonSerializable(typeof(Accepted<ChangeSetReceipt>))]
 [JsonSerializable(typeof(ChangeSetStatus))]
 [JsonSerializable(typeof(ChangeSetSnapshot))]
+[JsonSerializable(typeof(CommittingBody))]
 [JsonSerializable(typeof(SkeletonQuery))]
 [JsonSerializable(typeof(SkeletonMember))]
 [JsonSerializable(typeof(Skeleton))]
