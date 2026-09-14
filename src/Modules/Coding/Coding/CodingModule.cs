@@ -24,6 +24,7 @@ public sealed class CodingModule : IModule
         builder.Services.TryAddSingleton<IProcessRunner, ProcessRunner>();
         builder.Services.TryAddSingleton<DotnetRunner>();
         builder.Services.TryAddSingleton<GitRunner>();
+        builder.Services.TryAddSingleton(CodingToolOptions.Default);
         builder.Services.AddHostedService<WorkspaceWarmup>();
 
         builder.Services.AddSingleton<CodingNativeTools>();

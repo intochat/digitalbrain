@@ -14,24 +14,22 @@ public sealed class CodingNativeTools
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
 
-    // Mutable and internal only so a fact can shorten it (InternalsVisibleTo already covers the tests project)
-    // to prove a wait that never settles becomes advice rather than an escaped exception.
-    internal static TimeSpan ReactionWait = TimeSpan.FromMinutes(2);
-
     private readonly SolutionWorkspace _workspace;
     private readonly IGrainFactory _grains;
     private readonly DotnetRunner _dotnet;
     private readonly GitRunner _git;
     private readonly IConfiguration _configuration;
+    private readonly CodingToolOptions _options;
     private readonly Lazy<IReadOnlyList<AIFunction>> _functions;
 
-    public CodingNativeTools(SolutionWorkspace workspace, IGrainFactory grains, DotnetRunner dotnet, GitRunner git, IConfiguration configuration)
+    public CodingNativeTools(SolutionWorkspace workspace, IGrainFactory grains, DotnetRunner dotnet, GitRunner git, IConfiguration configuration, CodingToolOptions options)
     {
         _workspace = workspace;
         _grains = grains;
         _dotnet = dotnet;
         _git = git;
         _configuration = configuration;
+        _options = options;
         _functions = new(Build);
     }
 
@@ -146,27 +144,20 @@ public sealed class CodingNativeTools
             }
 
             var changeSet = ChangeSet(changeId);
-            // Scoped to this command: the grain rejects a stale proposal outright, and the wait only accepts a
-            // snapshot that moved past what was already there before this propose was issued.
+            // Read before issuing: the grain rejects a stale proposal outright, and the wait below only
+            // accepts a snapshot whose Revision moved past this one, i.e. this command's own settle.
             var before = await changeSet.Read().ConfigureAwait(false);
             await changeSet.Propose(new ProposeEdit(CommandId.New(), edit with { Kind = parsed }, before.Edits.Count)).ConfigureAwait(false);
-            return await WaitAsync(changeSet, snapshot => snapshot.Edits.Count > before.Edits.Count || (snapshot.Detail is not null && snapshot.Detail != before.Detail), cancellationToken).ConfigureAwait(false);
+            return await WaitAsync(changeSet, before, cancellationToken).ConfigureAwait(false);
         });
 
     private Task<JsonElement> Check([Description("The change set id")] string changeId, CancellationToken cancellationToken = default)
         => GuardedAsync(async () =>
         {
             var changeSet = ChangeSet(changeId);
-            // Detail is sticky (only a propose clears it), so a plain "Detail is not null" predicate would accept
-            // a leftover failure from before this check was even issued. Comparing against the pre-command snapshot
-            // (and treating Discarded as terminal alongside Checked) waits for this command's own outcome instead.
             var before = await changeSet.Read().ConfigureAwait(false);
             await changeSet.Check(new CheckChangeSet(CommandId.New())).ConfigureAwait(false);
-            return await WaitAsync(changeSet, snapshot =>
-                snapshot.Status == ChangeSetStatus.Checked
-                || snapshot.Status == ChangeSetStatus.Discarded
-                || (snapshot.Detail is not null && snapshot.Detail != before.Detail),
-                cancellationToken).ConfigureAwait(false);
+            return await WaitAsync(changeSet, before, cancellationToken).ConfigureAwait(false);
         });
 
     private Task<JsonElement> Commit(
@@ -178,28 +169,28 @@ public sealed class CodingNativeTools
             var changeSet = ChangeSet(changeId);
             var before = await changeSet.Read().ConfigureAwait(false);
             await changeSet.Commit(new CommitChangeSet(CommandId.New(), message)).ConfigureAwait(false);
-            var snapshot = await WaitAsync(changeSet, snapshot =>
-                snapshot.Status == ChangeSetStatus.Committed
-                || snapshot.Status == ChangeSetStatus.Discarded
-                || (snapshot.Detail is not null && snapshot.Detail != before.Detail),
-                cancellationToken).ConfigureAwait(false);
+            var snapshot = await WaitAsync(changeSet, before, cancellationToken).ConfigureAwait(false);
             if (snapshot.Status != ChangeSetStatus.Committed)
             {
                 return Result(snapshot, branch: null, commit: null, advice: snapshot.Detail);
             }
 
             var repository = Path.GetDirectoryName(SolutionPath())!;
+            string? branch = null;
             try
             {
-                var branch = await _git.EnsureBranchAsync(repository, "coding/" + changeId, cancellationToken).ConfigureAwait(false);
+                branch = await _git.EnsureBranchAsync(repository, "coding/" + changeId, cancellationToken).ConfigureAwait(false);
                 var outcome = await _git.CommitAsync(repository, snapshot.Files, "coding: " + message, cancellationToken).ConfigureAwait(false);
                 return Result(snapshot, branch, outcome.Hash, advice: null);
             }
-            catch (InvalidOperationException error)
+#pragma warning disable CA1031 // a missing git binary (or any other git failure) must reach the model as advice, not an exception
+            catch (Exception error) when (error is not OperationCanceledException)
+#pragma warning restore CA1031
             {
                 // The grain already wrote the files and closed the change set; git merely failed the extra
                 // branch/commit step, so that must not read as "nothing happened" to whoever reads this result.
-                return Result(snapshot, branch: null, commit: null, advice: error.Message + " The change set already wrote these files; commit them yourself.");
+                // branch is reported even here when EnsureBranchAsync itself succeeded before CommitAsync failed.
+                return Result(snapshot, branch, commit: null, advice: error.Message + " The change set already wrote these files; commit them yourself.");
             }
 
             static object Result(ChangeSetSnapshot snapshot, string? branch, string? commit, string? advice)
@@ -216,29 +207,37 @@ public sealed class CodingNativeTools
         => GuardedAsync(() => _dotnet.TestAsync(_configuration[CodingModule.TestProjectKey] is { Length: > 0 } project ? project : SolutionPath(), filterClass, artifactsPath, cancellationToken));
 
     // Commands return at once; the reaction that does the work saves a new snapshot, which is what the model needs.
+    // Every reaction that saves - propose, check, commit (success or failure), discard - bumps Revision, so
+    // waiting for Revision to move past the pre-command snapshot always recognizes this command's own settle,
+    // never a leftover Detail/Status a previous command already produced (Detail is a pure function of the edit
+    // list and can repeat verbatim across two otherwise-unrelated reactions).
     // The deadline is internal bookkeeping, not a real cancellation: when it fires (and the caller did not itself
     // cancel), it becomes advice instead of an OperationCanceledException escaping GuardedAsync's filter.
-    private static async Task<ChangeSetSnapshot> WaitAsync(IChangeSet changeSet, Func<ChangeSetSnapshot, bool> done, CancellationToken cancellationToken)
+    private async Task<ChangeSetSnapshot> WaitAsync(IChangeSet changeSet, ChangeSetSnapshot before, CancellationToken cancellationToken)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(ReactionWait);
-        while (true)
+        timeout.CancelAfter(_options.ReactionWait);
+        var last = before;
+        try
         {
-            var snapshot = await changeSet.Read().ConfigureAwait(false);
-            if (done(snapshot))
+            while (true)
             {
-                return snapshot;
-            }
+                // Read() takes no token of its own, and a genuinely stuck reaction holds the grain's one turn,
+                // queuing Read() behind it too - bounding the call from our own side is what lets the deadline
+                // fire at all in that case, instead of Orleans' own much longer request timeout dominating it.
+                last = await changeSet.Read().WaitAsync(timeout.Token).ConfigureAwait(false);
+                if (last.Revision > before.Revision)
+                {
+                    return last;
+                }
 
-            try
-            {
                 await Task.Delay(100, timeout.Token).ConfigureAwait(false);
             }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-                throw new InvalidOperationException(
-                    $"The change set did not settle within {ReactionWait.TotalSeconds:0}s; its status is still {snapshot.Status}. Read it again or start a new change set.");
-            }
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new InvalidOperationException(
+                $"The change set did not settle within {_options.ReactionWait.TotalSeconds:0}s; its status is still {last.Status}. Read it again or start a new change set.");
         }
     }
 

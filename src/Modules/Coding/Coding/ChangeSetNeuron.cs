@@ -72,7 +72,7 @@ internal sealed class ChangeSetNeuron(
     public Task<ChangeSetSnapshot> Read()
     {
         var current = Current;
-        return Task.FromResult(new ChangeSetSnapshot(current.Status, current.Edits, current.Diagnostics, current.Diff, current.Generation, current.Detail, current.Files));
+        return Task.FromResult(new ChangeSetSnapshot(current.Status, current.Edits, current.Diagnostics, current.Diff, current.Generation, current.Detail, current.Files, current.Revision));
     }
 
     protected override async Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
@@ -87,7 +87,7 @@ internal sealed class ChangeSetNeuron(
                         return;
                     }
 
-                    await SaveAsync(current with { Status = ChangeSetStatus.Draft, Edits = [.. current.Edits, edit], Diagnostics = [], Diff = null, Detail = null }, cancellationToken).ConfigureAwait(true);
+                    await SaveAsync(current with { Status = ChangeSetStatus.Draft, Edits = [.. current.Edits, edit], Diagnostics = [], Diff = null, Detail = null, Revision = current.Revision + 1 }, cancellationToken).ConfigureAwait(true);
                     break;
                 }
             case CodingVocabulary.ChangeSetChecking:
@@ -102,12 +102,13 @@ internal sealed class ChangeSetNeuron(
                             Diagnostics = outcome.Diagnostics,
                             Diff = outcome.Diff,
                             Detail = outcome.Detail,
+                            Revision = current.Revision + 1,
                         };
                     }
                     catch (InvalidOperationException error)
                     {
                         // The workspace is not ready or refused the snapshot; the detail is the advice.
-                        next = current with { Status = ChangeSetStatus.Draft, Detail = error.Message };
+                        next = current with { Status = ChangeSetStatus.Draft, Detail = error.Message, Revision = current.Revision + 1 };
                     }
 
                     await SaveAsync(next, cancellationToken).ConfigureAwait(true);
@@ -134,6 +135,7 @@ internal sealed class ChangeSetNeuron(
                             Detail = null,
                             Files = committed.WrittenPaths,
                             Generation = committed.SnapshotVersion,
+                            Revision = current.Revision + 1,
                         };
                     }
                     catch (InvalidOperationException error)
@@ -144,6 +146,7 @@ internal sealed class ChangeSetNeuron(
                             Diagnostics = applied?.Diagnostics ?? current.Diagnostics,
                             Diff = applied?.Diff ?? current.Diff,
                             Detail = error.Message,
+                            Revision = current.Revision + 1,
                         };
                     }
 
@@ -151,7 +154,7 @@ internal sealed class ChangeSetNeuron(
                     break;
                 }
             case CodingVocabulary.ChangeSetDiscarding:
-                await SaveAsync(current with { Status = ChangeSetStatus.Discarded, Detail = null }, cancellationToken).ConfigureAwait(true);
+                await SaveAsync(current with { Status = ChangeSetStatus.Discarded, Detail = null, Revision = current.Revision + 1 }, cancellationToken).ConfigureAwait(true);
                 break;
             default:
                 return;

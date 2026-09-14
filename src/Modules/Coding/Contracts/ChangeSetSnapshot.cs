@@ -10,4 +10,8 @@ public sealed record ChangeSetSnapshot(
     [property: Id(3)] string? Diff,
     [property: Id(4)] long Generation,
     [property: Id(5)] string? Detail,
-    [property: Id(6)] IReadOnlyList<string> Files);
+    [property: Id(6)] IReadOnlyList<string> Files,
+    // Bumped by every reaction that saves (propose, check, commit - success or failure - and discard), so a
+    // caller that read the change set before issuing a command can wait for exactly this command's own
+    // settle, never a leftover Detail/Status a previous command already produced.
+    [property: Id(7)] int Revision);

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Interactions;
@@ -11,7 +12,7 @@ namespace DigitalBrain.Tests.Coding;
 
 public sealed class CodingNativeToolFacts
 {
-    private static async Task<(BrainSimulation Brain, NativeTools Tools, DiskFixture Fixture, FakeProcessRunner Dotnet)> StartAsync()
+    private static async Task<(BrainSimulation Brain, NativeTools Tools, DiskFixture Fixture, FakeProcessRunner Dotnet)> StartAsync(CodingToolOptions? options = null)
     {
         var fixture = DiskFixture.Create();
         await fixture.InitGitAsync(TestContext.Current.CancellationToken);
@@ -24,6 +25,10 @@ public sealed class CodingNativeToolFacts
                 silo.Services.AddSingleton<ISolutionLoader>(new AdhocSolutionLoader(fixture.Open));
                 silo.Services.AddSingleton<IUntrustedContentScreen, ScriptedContentScreen>();
                 silo.Services.AddSingleton(new DotnetRunner(dotnet));
+                if (options is not null)
+                {
+                    silo.Services.AddSingleton(options);
+                }
             },
             Configuration = new Dictionary<string, string?> { [CodingModule.SolutionPathKey] = fixture.SolutionPath },
         });
@@ -209,38 +214,51 @@ public sealed class CodingNativeToolFacts
     [Fact]
     public async Task A_change_set_that_never_settles_is_advice_not_an_exception()
     {
-        var (brain, tools, fixture, _) = await StartAsync();
+        var (brain, tools, fixture, _) = await StartAsync(new CodingToolOptions(TimeSpan.FromSeconds(2)));
         using var fixtureScope = fixture;
         await using var brainScope = brain;
-        var original = CodingNativeTools.ReactionWait;
-        CodingNativeTools.ReactionWait = TimeSpan.FromSeconds(1);
+        await InvokeAsync(tools, "code_propose_edit", new()
+        {
+            ["changeId"] = "t4",
+            ["kind"] = "Rename",
+            ["symbolId"] = "M:Alpha.Greeter.Greet(System.String)",
+            ["newName"] = "Hello",
+        });
+
+        // Every reaction that settles (success or a caught failure) now bumps Revision and answers at once, so
+        // the only way to force the tool-side deadline for real is a reaction that never reaches SaveAsync at
+        // all. Occupying both of the workspace's concurrent query slots does that: the check reaction's own
+        // workspace.QueryAsync call blocks inside the grain (never throwing, never saving) for as long as the
+        // slots stay taken, so this proves the deadline becomes advice rather than an escaped exception.
+        var workspace = brain.SiloServices.GetRequiredService<SolutionWorkspace>();
+        var release = new TaskCompletionSource();
+        var occupy1 = workspace.QueryAsync(async (_, token) =>
+        {
+            await release.Task.WaitAsync(token).ConfigureAwait(false);
+            return 0;
+        }, TestContext.Current.CancellationToken);
+        var occupy2 = workspace.QueryAsync(async (_, token) =>
+        {
+            await release.Task.WaitAsync(token).ConfigureAwait(false);
+            return 0;
+        }, TestContext.Current.CancellationToken);
         try
         {
-            await InvokeAsync(tools, "code_propose_edit", new()
-            {
-                ["changeId"] = "t4",
-                ["kind"] = "ReplaceMember",
-                ["symbolId"] = "M:Alpha.Greeter.Greet(System.String)",
-                ["source"] = "public string Greet(string name) => 42;",
-            });
-
-            // The first check fails and settles normally (Detail moves from null to an error). Checking again with
-            // no propose in between reproduces the exact same failure, so Detail never changes and Status never
-            // reaches Checked: the wait can never see this command settle, and the shortened deadline fires for real.
-            await InvokeAsync(tools, "code_check", new() { ["changeId"] = "t4" });
-            var second = await InvokeAsync(tools, "code_check", new() { ["changeId"] = "t4" });
-            Assert.Contains("did not settle", second.GetProperty("advice").GetString(), StringComparison.Ordinal);
+            var result = await InvokeAsync(tools, "code_check", new() { ["changeId"] = "t4" });
+            Assert.Contains("did not settle", result.GetProperty("advice").GetString(), StringComparison.Ordinal);
         }
         finally
         {
-            CodingNativeTools.ReactionWait = original;
+            // Let the stuck reaction finish so the silo has nothing pending when brainScope disposes.
+            release.SetResult();
+            await Task.WhenAll(occupy1, occupy2);
         }
     }
 
     [Fact]
-    public async Task A_second_check_after_a_failed_one_waits_for_the_new_result()
+    public async Task A_repeated_check_answers_again_without_waiting()
     {
-        var (brain, tools, fixture, _) = await StartAsync();
+        var (brain, tools, fixture, _) = await StartAsync(new CodingToolOptions(TimeSpan.FromSeconds(30)));
         using var fixtureScope = fixture;
         await using var brainScope = brain;
         await InvokeAsync(tools, "code_propose_edit", new()
@@ -250,19 +268,19 @@ public sealed class CodingNativeToolFacts
             ["symbolId"] = "M:Alpha.Greeter.Greet(System.String)",
             ["source"] = "public string Greet(string name) => 42;",
         });
-        var firstCheck = await InvokeAsync(tools, "code_check", new() { ["changeId"] = "t5" });
-        Assert.Equal("Draft", firstCheck.GetProperty("status").GetString());
+        var first = await InvokeAsync(tools, "code_check", new() { ["changeId"] = "t5" });
+        Assert.Equal("CS0029", first.GetProperty("diagnostics")[0].GetProperty("id").GetString());
 
-        await InvokeAsync(tools, "code_propose_edit", new()
-        {
-            ["changeId"] = "t5",
-            ["kind"] = "ReplaceMember",
-            ["symbolId"] = "M:Alpha.Greeter.Greet(System.String)",
-            ["source"] = """public string Greet(string name) => $"Hello, {name}";""",
-        });
-        var secondCheck = await InvokeAsync(tools, "code_check", new() { ["changeId"] = "t5" });
-        Assert.Equal("Checked", secondCheck.GetProperty("status").GetString());
-        Assert.Equal(0, secondCheck.GetProperty("diagnostics").GetArrayLength());
+        // No propose in between: the second check reproduces the exact same failure, so the old Detail-based
+        // wait (round 1) could not tell "no new result yet" from "the same result again" and stalled for the
+        // full deadline. Revision bumps on every settle regardless, so this answers immediately either way.
+        var clock = Stopwatch.StartNew();
+        var second = await InvokeAsync(tools, "code_check", new() { ["changeId"] = "t5" });
+        clock.Stop();
+
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(10), $"the repeated check took {clock.Elapsed}; a 30s options.ReactionWait means the old stall would fail this.");
+        Assert.Equal("CS0029", second.GetProperty("diagnostics")[0].GetProperty("id").GetString());
+        Assert.False(second.TryGetProperty("advice", out _));
     }
 
     [Fact]
@@ -281,13 +299,14 @@ public sealed class CodingNativeToolFacts
         await InvokeAsync(tools, "code_check", new() { ["changeId"] = "t6" });
 
         // Dirty a file the change set never touches; GitRunner.CommitAsync refuses a tree with changes outside
-        // the change set, but only after the grain already wrote its files and closed the change set.
+        // the change set, but only after the grain already wrote its files and closed the change set, and only
+        // after EnsureBranchAsync itself already succeeded.
         await File.AppendAllTextAsync(fixture.UnusedPath, "// dirty", TestContext.Current.CancellationToken);
 
         var committed = await InvokeAsync(tools, "code_commit", new() { ["changeId"] = "t6", ["message"] = "rename Greet to Hello" });
         Assert.Equal("Committed", committed.GetProperty("status").GetString());
         Assert.True(committed.GetProperty("files").GetArrayLength() > 0);
-        Assert.Equal(JsonValueKind.Null, committed.GetProperty("branch").ValueKind);
+        Assert.Equal("coding/t6", committed.GetProperty("branch").GetString());
         Assert.Equal(JsonValueKind.Null, committed.GetProperty("commit").ValueKind);
         Assert.Contains("outside the change set", committed.GetProperty("advice").GetString(), StringComparison.Ordinal);
     }
