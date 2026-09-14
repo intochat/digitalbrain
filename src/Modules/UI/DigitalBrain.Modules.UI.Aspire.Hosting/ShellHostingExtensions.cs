@@ -25,6 +25,18 @@ public static class ShellHostingExtensions
         Action<FlutterHostOptions>? configure = null)
         => ConfigureFlutterHost(module, FlutterHostKind.Web, configure);
 
+    // The resource the shell addresses. The product's front door is the gateway, which references the brain
+    // only as a client (no module secrets), so it is named here rather than discovered as the first resource
+    // that took WithReference(brain). Declared once; a later WithReference(brain) elsewhere changes nothing.
+    public static IResourceBuilder<TResource> AsShellFrontDoor<TResource>(this IResourceBuilder<TResource> builder, DigitalBrainBuilder brain)
+        where TResource : IResourceWithEnvironment, IResourceWithEndpoints
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(brain);
+        brain.GetOrAddState(static owner => new ShellHostingState(owner), out _).Apply(builder);
+        return builder;
+    }
+
     private static DigitalBrainModuleBuilder<UIModule> ConfigureFlutterHost(
         DigitalBrainModuleBuilder<UIModule> module,
         FlutterHostKind kind,

@@ -85,10 +85,13 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
 var repositoryRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", ".."));
 var standbyDll = Path.Combine(repositoryRoot, "artifacts", "slot-b", "bin", "DigitalBrain.Silo", "release", "DigitalBrain.Silo.dll");
 
-// Declared before the kernels on purpose: the UI module's projection binds DIGITALBRAIN_UI_BASE to the
-// first resource that takes the brain reference, and the shell must talk to the gateway, never to a slot.
+// Declared before the kernels because the kernels wait on nothing of the gateway, and the shell's front
+// door is bound explicitly below (AsShellFrontDoor) rather than discovered from declaration order.
 var gateway = builder.AddProject<Projects.DigitalBrain_Gateway>(ProductSurfaceResources.Gateway)
-    .WithReference(brain)
+    // A client reference, not WithReference(brain): the gateway only ever reads the lease row through
+    // ConnectionStrings:clustering, so it gets the Orleans client connection and the startup waits, never
+    // the module secrets (GitHub, Gmail, Salesforce, Tavily) that WithReference(brain) would project onto it.
+    .WithReference(brain.AsClient())
     .WithHttpEndpoint(
         port: ProductSurfaceResources.GatewayHttpPort,
         name: "http",
@@ -98,6 +101,7 @@ var gateway = builder.AddProject<Projects.DigitalBrain_Gateway>(ProductSurfaceRe
     .WithEnvironment("DigitalBrain__Gateway__Active", "a")
     // Its own liveness, not the product's: /health is proxied to whichever slot is active.
     .WithHttpHealthCheck("/active", endpointName: "http");
+gateway.AsShellFrontDoor(brain);
 
 var kernelA = builder.AddProject<Projects.DigitalBrain_Silo>(ProductSurfaceResources.KernelA)
     .WithReference(brain)
