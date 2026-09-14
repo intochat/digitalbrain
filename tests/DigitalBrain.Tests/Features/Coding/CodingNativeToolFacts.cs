@@ -42,8 +42,8 @@ public sealed class CodingNativeToolFacts
     public async Task The_four_tools_resolve()
     {
         var (brain, tools, fixture, _) = await StartAsync();
-        await using var _ = brain;
-        using var __ = fixture;
+        using var fixtureScope = fixture;
+        await using var brainScope = brain;
         Assert.Equal(4, tools.Resolve(["code_find_symbols", "code_references", "code_diagnostics", "code_map"]).Count());
     }
 
@@ -51,8 +51,8 @@ public sealed class CodingNativeToolFacts
     public async Task Find_symbols_returns_the_envelope()
     {
         var (brain, tools, fixture, _) = await StartAsync();
-        await using var _ = brain;
-        using var __ = fixture;
+        using var fixtureScope = fixture;
+        await using var brainScope = brain;
         var result = await InvokeAsync(tools, "code_find_symbols", new() { ["query"] = "Greeter", ["limit"] = 10 });
         Assert.Equal(1, result.GetProperty("totalCount").GetInt32());
         Assert.Equal("T:Alpha.Greeter", result.GetProperty("items")[0].GetProperty("id").GetString());
@@ -62,8 +62,8 @@ public sealed class CodingNativeToolFacts
     public async Task References_with_a_bad_id_return_advice()
     {
         var (brain, tools, fixture, _) = await StartAsync();
-        await using var _ = brain;
-        using var __ = fixture;
+        using var fixtureScope = fixture;
+        await using var brainScope = brain;
         var result = await InvokeAsync(tools, "code_references", new() { ["symbolId"] = "T:Nope" });
         Assert.Contains("find-symbols", result.GetProperty("advice").GetString(), StringComparison.Ordinal);
     }
@@ -72,8 +72,8 @@ public sealed class CodingNativeToolFacts
     public async Task Diagnostics_report_the_broken_file()
     {
         var (brain, tools, fixture, _) = await StartAsync();
-        await using var _ = brain;
-        using var __ = fixture;
+        using var fixtureScope = fixture;
+        await using var brainScope = brain;
         var result = await InvokeAsync(tools, "code_diagnostics", new() { ["path"] = fixture.BrokenPath });
         Assert.Equal(1, result.GetProperty("errorCount").GetInt32());
     }
@@ -82,8 +82,8 @@ public sealed class CodingNativeToolFacts
     public async Task Map_is_a_graph_result_the_shell_can_open()
     {
         var (brain, tools, fixture, _) = await StartAsync();
-        await using var _ = brain;
-        using var __ = fixture;
+        using var fixtureScope = fixture;
+        await using var brainScope = brain;
         var result = await InvokeAsync(tools, "code_map", new() { ["title"] = "Fixture" });
         Assert.Equal("graph", result.GetProperty("kind").GetString());
         var id = result.GetProperty("id").GetString();
@@ -104,8 +104,8 @@ public sealed class CodingNativeToolFacts
     public async Task The_thirteen_tools_resolve()
     {
         var (brain, tools, fixture, _) = await StartAsync();
-        await using var _ = brain;
-        using var __ = fixture;
+        using var fixtureScope = fixture;
+        await using var brainScope = brain;
         Assert.Equal(13, tools.Resolve(["code_find_symbols", "code_references", "code_diagnostics", "code_map", "code_skeleton", "code_member", "code_callers",
             "code_implementations", "code_propose_edit", "code_check", "code_commit", "code_build", "code_test"]).Count());
     }
@@ -114,8 +114,8 @@ public sealed class CodingNativeToolFacts
     public async Task Skeleton_member_callers_and_implementations_answer_from_the_snapshot()
     {
         var (brain, tools, fixture, _) = await StartAsync();
-        await using var _ = brain;
-        using var __ = fixture;
+        using var fixtureScope = fixture;
+        await using var brainScope = brain;
         var skeleton = await InvokeAsync(tools, "code_skeleton", new() { ["path"] = fixture.GreeterPath });
         Assert.Equal(3, skeleton.GetProperty("members").GetArrayLength());
         var member = await InvokeAsync(tools, "code_member", new() { ["symbolId"] = "M:Alpha.Greeter.Greet(System.String)" });
@@ -132,8 +132,8 @@ public sealed class CodingNativeToolFacts
     public async Task Propose_check_and_commit_land_a_change_on_a_coding_branch()
     {
         var (brain, tools, fixture, _) = await StartAsync();
-        await using var _ = brain;
-        using var __ = fixture;
+        using var fixtureScope = fixture;
+        await using var brainScope = brain;
         var proposed = await InvokeAsync(tools, "code_propose_edit", new()
         {
             ["changeId"] = "t1",
@@ -153,6 +153,7 @@ public sealed class CodingNativeToolFacts
         Assert.Equal("coding/t1", committed.GetProperty("branch").GetString());
         Assert.Equal(40, committed.GetProperty("commit").GetString()!.Length);
         Assert.Equal(2, committed.GetProperty("files").GetArrayLength());
+        Assert.Equal(JsonValueKind.Null, committed.GetProperty("advice").ValueKind);
         Assert.Contains(""".Hello("world")""", await File.ReadAllTextAsync(fixture.ProgramPath, TestContext.Current.CancellationToken), StringComparison.Ordinal);
         var log = await new ProcessRunner().RunAsync("git", ["log", "-1", "--format=%s"], fixture.Root, TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         Assert.Equal("coding: rename Greet to Hello", log.Output.Trim());
@@ -162,8 +163,8 @@ public sealed class CodingNativeToolFacts
     public async Task A_check_that_fails_reports_the_edit_and_the_diagnostics()
     {
         var (brain, tools, fixture, _) = await StartAsync();
-        await using var _ = brain;
-        using var __ = fixture;
+        using var fixtureScope = fixture;
+        await using var brainScope = brain;
         await InvokeAsync(tools, "code_propose_edit", new()
         {
             ["changeId"] = "t2",
@@ -181,8 +182,8 @@ public sealed class CodingNativeToolFacts
     public async Task An_unknown_edit_kind_is_advice()
     {
         var (brain, tools, fixture, _) = await StartAsync();
-        await using var _ = brain;
-        using var __ = fixture;
+        using var fixtureScope = fixture;
+        await using var brainScope = brain;
         var result = await InvokeAsync(tools, "code_propose_edit", new() { ["changeId"] = "t3", ["kind"] = "Explode" });
         Assert.Contains("ReplaceMember", result.GetProperty("advice").GetString(), StringComparison.Ordinal);
     }
@@ -191,8 +192,8 @@ public sealed class CodingNativeToolFacts
     public async Task Build_and_test_return_the_parsed_outcomes()
     {
         var (brain, tools, fixture, dotnet) = await StartAsync();
-        await using var _ = brain;
-        using var __ = fixture;
+        using var fixtureScope = fixture;
+        await using var brainScope = brain;
         dotnet.Enqueue(0, "Build succeeded.\n    0 Warning(s)\n    0 Error(s)");
         var build = await InvokeAsync(tools, "code_build", new());
         Assert.True(build.GetProperty("succeeded").GetBoolean());
@@ -203,5 +204,91 @@ public sealed class CodingNativeToolFacts
         Assert.True(tests.GetProperty("succeeded").GetBoolean());
         Assert.Equal(3, tests.GetProperty("passed").GetInt32());
         Assert.Contains("--filter-class Some.Class", tests.GetProperty("command").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_change_set_that_never_settles_is_advice_not_an_exception()
+    {
+        var (brain, tools, fixture, _) = await StartAsync();
+        using var fixtureScope = fixture;
+        await using var brainScope = brain;
+        var original = CodingNativeTools.ReactionWait;
+        CodingNativeTools.ReactionWait = TimeSpan.FromSeconds(1);
+        try
+        {
+            await InvokeAsync(tools, "code_propose_edit", new()
+            {
+                ["changeId"] = "t4",
+                ["kind"] = "ReplaceMember",
+                ["symbolId"] = "M:Alpha.Greeter.Greet(System.String)",
+                ["source"] = "public string Greet(string name) => 42;",
+            });
+
+            // The first check fails and settles normally (Detail moves from null to an error). Checking again with
+            // no propose in between reproduces the exact same failure, so Detail never changes and Status never
+            // reaches Checked: the wait can never see this command settle, and the shortened deadline fires for real.
+            await InvokeAsync(tools, "code_check", new() { ["changeId"] = "t4" });
+            var second = await InvokeAsync(tools, "code_check", new() { ["changeId"] = "t4" });
+            Assert.Contains("did not settle", second.GetProperty("advice").GetString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            CodingNativeTools.ReactionWait = original;
+        }
+    }
+
+    [Fact]
+    public async Task A_second_check_after_a_failed_one_waits_for_the_new_result()
+    {
+        var (brain, tools, fixture, _) = await StartAsync();
+        using var fixtureScope = fixture;
+        await using var brainScope = brain;
+        await InvokeAsync(tools, "code_propose_edit", new()
+        {
+            ["changeId"] = "t5",
+            ["kind"] = "ReplaceMember",
+            ["symbolId"] = "M:Alpha.Greeter.Greet(System.String)",
+            ["source"] = "public string Greet(string name) => 42;",
+        });
+        var firstCheck = await InvokeAsync(tools, "code_check", new() { ["changeId"] = "t5" });
+        Assert.Equal("Draft", firstCheck.GetProperty("status").GetString());
+
+        await InvokeAsync(tools, "code_propose_edit", new()
+        {
+            ["changeId"] = "t5",
+            ["kind"] = "ReplaceMember",
+            ["symbolId"] = "M:Alpha.Greeter.Greet(System.String)",
+            ["source"] = """public string Greet(string name) => $"Hello, {name}";""",
+        });
+        var secondCheck = await InvokeAsync(tools, "code_check", new() { ["changeId"] = "t5" });
+        Assert.Equal("Checked", secondCheck.GetProperty("status").GetString());
+        Assert.Equal(0, secondCheck.GetProperty("diagnostics").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task A_git_refusal_after_the_files_are_written_reports_the_written_files()
+    {
+        var (brain, tools, fixture, _) = await StartAsync();
+        using var fixtureScope = fixture;
+        await using var brainScope = brain;
+        await InvokeAsync(tools, "code_propose_edit", new()
+        {
+            ["changeId"] = "t6",
+            ["kind"] = "Rename",
+            ["symbolId"] = "M:Alpha.Greeter.Greet(System.String)",
+            ["newName"] = "Hello",
+        });
+        await InvokeAsync(tools, "code_check", new() { ["changeId"] = "t6" });
+
+        // Dirty a file the change set never touches; GitRunner.CommitAsync refuses a tree with changes outside
+        // the change set, but only after the grain already wrote its files and closed the change set.
+        await File.AppendAllTextAsync(fixture.UnusedPath, "// dirty", TestContext.Current.CancellationToken);
+
+        var committed = await InvokeAsync(tools, "code_commit", new() { ["changeId"] = "t6", ["message"] = "rename Greet to Hello" });
+        Assert.Equal("Committed", committed.GetProperty("status").GetString());
+        Assert.True(committed.GetProperty("files").GetArrayLength() > 0);
+        Assert.Equal(JsonValueKind.Null, committed.GetProperty("branch").ValueKind);
+        Assert.Equal(JsonValueKind.Null, committed.GetProperty("commit").ValueKind);
+        Assert.Contains("outside the change set", committed.GetProperty("advice").GetString(), StringComparison.Ordinal);
     }
 }
