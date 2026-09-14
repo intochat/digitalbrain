@@ -141,6 +141,7 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
     if ([
       'table',
       'chart',
+      'graph',
       'diagram',
       'brain',
       'image',

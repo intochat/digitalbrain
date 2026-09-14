@@ -315,6 +315,7 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
               [
                 'table',
                 'chart',
+                'graph',
                 'diagram',
                 'brain',
                 'image',

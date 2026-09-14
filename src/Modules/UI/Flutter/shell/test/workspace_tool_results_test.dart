@@ -137,4 +137,59 @@ void main() {
       await finish(tester, events);
     },
   );
+
+  testWidgets(
+    'a graph tool result opens as a graph artifact in the working area',
+    (tester) async {
+      final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
+      final events = await sendFirstMessage(tester, store);
+      events.add(
+        AgentEvent({
+          'type': 'TOOL_CALL_START',
+          'toolCallId': 'map',
+          'toolCallName': 'code_map',
+        }),
+      );
+      events.add(
+        AgentEvent({
+          'type': 'TOOL_CALL_RESULT',
+          'toolCallId': 'map',
+          'content': {
+            'kind': 'graph',
+            'id': 'map-0123abcd',
+            'name': 'map-0123abcd',
+            'title': 'Fixture',
+            'nodes': [
+              {
+                'id': 'Alpha',
+                'label': 'Alpha',
+                'kind': 'module',
+                'cluster': 'Alpha',
+              },
+              {
+                'id': 'Beta',
+                'label': 'Beta',
+                'kind': 'module',
+                'cluster': 'Beta',
+              },
+            ],
+            'edges': [
+              {
+                'id': 'Beta-Alpha',
+                'sourceId': 'Beta',
+                'targetId': 'Alpha',
+                'dotted': false,
+              },
+            ],
+          },
+        }),
+      );
+      await tester.pumpAndSettle();
+      expect(store.currentProject.artifacts.single.kind, 'graph');
+      expect(store.currentProject.artifacts.single.id, 'map-0123abcd');
+      expect(find.byType(UiGraph), findsOneWidget);
+      expect(tester.widget<UiGraph>(find.byType(UiGraph)).nodes.length, 2);
+      await finish(tester, events);
+    },
+  );
 }

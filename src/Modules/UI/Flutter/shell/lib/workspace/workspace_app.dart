@@ -246,10 +246,10 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     super.dispose();
   }
 
-  /// Tables and charts arrive complete in the tool result: there is no saved
-  /// artifact to re-read on open or to write back on edit.
+  /// Tables, charts, and graphs arrive complete in the tool result: there is
+  /// no saved artifact to re-read on open or to write back on edit.
   static bool _servedByResult(String kind) =>
-      kind == 'table' || kind == 'chart';
+      kind == 'table' || kind == 'chart' || kind == 'graph';
 
   void _accept(Map<String, dynamic> result, {WorkspaceProject? project}) {
     final destination = project ?? store.currentProject;

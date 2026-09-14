@@ -5,6 +5,8 @@ using DigitalBrain.AI.FoundryLocal;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.ClickHouse;
 using DigitalBrain.ClickHouse.Aspire.Hosting;
+using DigitalBrain.Coding.Aspire.Hosting;
+using DigitalBrain.Coding;
 using DigitalBrain.Excel;
 using DigitalBrain.Google.Aspire.Hosting;
 using DigitalBrain.Google;
@@ -74,6 +76,7 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
     .AddModule<MicrosoftModule>(microsoft => microsoft
         .WithAspire(Path.Combine(builder.AppHostDirectory, "DigitalBrain.AppHost.csproj"))
         .WithConfiguredGitHubRepositories(builder.Configuration))
+    .AddModule<CodingModule>(coding => coding.WithSolution(Path.Combine(builder.AppHostDirectory, "..", "..", "..", "DigitalBrain.slnx")))
     .AddModule<UIModule>(ui => ui.WithWindowHost());
 
 // Isolated Aspire runs reuse the persistent Azurite volume while assigning new random silo
@@ -108,6 +111,12 @@ builder.AddProject<Projects.DigitalBrain_Silo>(ProductSurfaceResources.Kernel)
         if (developmentClusterId is not null)
         {
             context.EnvironmentVariables["Orleans__ClusterId"] = developmentClusterId;
+        }
+
+        // The typed neuron surface (/mcp describe and call) is how Claude Code and Codex reach the coding tools.
+        if (builder.ExecutionContext.IsRunMode)
+        {
+            context.EnvironmentVariables["DigitalBrain__Graph__Enabled"] = "true";
         }
     });
 

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:markdraw/markdraw.dart' as markdraw;
 
 import 'brain_graph_store.dart';
+import 'graph_artifact.dart';
 import 'workspace_store.dart';
 
 /// Use the editor's own serializer for new documents as well as saved edits.
@@ -78,6 +79,15 @@ class WorkspaceArtifactEditor extends StatelessWidget {
       key: ValueKey(artifact.id),
       artifact: artifact,
       onChanged: onChanged,
+    ),
+    'graph' => LayoutBuilder(
+      builder: (context, constraints) {
+        final data = GraphArtifactData.fromMap(artifact.data);
+        return SizedBox(
+          height: constraints.hasBoundedHeight ? constraints.maxHeight : 480,
+          child: UiGraph(nodes: data.nodes, edges: data.edges),
+        );
+      },
     ),
     'brain' => _BrainEditor(
       artifact: artifact,
