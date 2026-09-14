@@ -1,4 +1,5 @@
 using DigitalBrain.Microsoft;
+using ModelContextProtocol.Protocol;
 using Xunit;
 
 namespace DigitalBrain.Tests;
@@ -51,5 +52,32 @@ public sealed class AspireConnectionFacts
     public void The_connection_is_the_resource_command_seam()
     {
         Assert.IsAssignableFrom<IAspireResourceCommands>(new AspireConnection(settings: null));
+    }
+
+    [Fact]
+    public void An_error_result_with_text_yields_the_verbatim_message()
+    {
+        var result = new CallToolResult
+        {
+            IsError = true,
+            Content = [new TextContentBlock { Text = "kernel-b is not currently running." }],
+        };
+        var error = Assert.Throws<InvalidOperationException>(() => AspireConnection.ThrowIfFailed(result));
+        Assert.Equal("Aspire: kernel-b is not currently running.", error.Message);
+    }
+
+    [Fact]
+    public void An_error_result_without_text_yields_the_fallback_message()
+    {
+        var result = new CallToolResult { IsError = true, Content = [] };
+        var error = Assert.Throws<InvalidOperationException>(() => AspireConnection.ThrowIfFailed(result));
+        Assert.Equal("Aspire returned an error without a message.", error.Message);
+    }
+
+    [Fact]
+    public void A_non_error_result_yields_no_exception()
+    {
+        var result = new CallToolResult { IsError = false, Content = [] };
+        AspireConnection.ThrowIfFailed(result);
     }
 }

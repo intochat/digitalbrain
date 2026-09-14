@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using ModelContextProtocol;
 using ModelContextProtocol.Client;
+using ModelContextProtocol.Protocol;
 
 namespace DigitalBrain.Microsoft;
 
@@ -23,7 +24,7 @@ public sealed class AspireConnection : IAspireResourceCommands
             throw new InvalidOperationException("This Aspire operation is not allowed.");
         }
 
-        return CallAsync(settings, tool, arguments, cancellationToken);
+        return InvokeToolAsync(settings, tool, arguments, cancellationToken);
     }
 
     // Promotion starts the standby and stops the retired slot (R5.2). Nothing else is executable: an
@@ -40,7 +41,7 @@ public sealed class AspireConnection : IAspireResourceCommands
             throw new InvalidOperationException("An Aspire resource takes start, stop or restart.");
         }
 
-        return CallAsync(settings, "execute_resource_command",
+        return InvokeToolAsync(settings, "execute_resource_command",
             new Dictionary<string, object?> { ["resourceName"] = resourceName, ["commandName"] = command },
             cancellationToken);
     }
@@ -48,10 +49,12 @@ public sealed class AspireConnection : IAspireResourceCommands
     private AspireConnectionSettings RequireSettings()
         => _settings ?? throw new InvalidOperationException("Configure the Aspire AppHost project before reading or commanding its resources.");
 
-    private async Task<JsonElement> CallAsync(AspireConnectionSettings settings, string tool, IReadOnlyDictionary<string, object?> arguments, CancellationToken cancellationToken)
+    private async Task<JsonElement> InvokeToolAsync(AspireConnectionSettings settings, string tool, IReadOnlyDictionary<string, object?> arguments, CancellationToken cancellationToken)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        CallToolResult result;
+#pragma warning disable CA1031 // a broken transport, a missing CLI or an unreachable AppHost can fail in any way; every one collapses to the same "unavailable" advice
         try
         {
             var transport = new StdioClientTransport(new StdioClientTransportOptions
@@ -63,26 +66,37 @@ public sealed class AspireConnection : IAspireResourceCommands
             });
             await using var client = await McpClient.CreateAsync(transport, cancellationToken: timeout.Token).ConfigureAwait(false);
             await BindApplicationAsync(client, settings, timeout.Token).ConfigureAwait(false);
-            var result = await client.CallToolAsync(tool, arguments.ToDictionary(), cancellationToken: timeout.Token).ConfigureAwait(false);
-            if (result.IsError == true)
-            {
-                throw new InvalidOperationException("Aspire did not return successful evidence.");
-            }
-            var envelope = JsonSerializer.SerializeToElement(result, McpJsonUtilities.DefaultOptions);
-            if (Encoding.UTF8.GetByteCount(envelope.GetRawText()) > 128 * 1024)
-            {
-                throw new InvalidOperationException("Aspire evidence exceeds the response budget.");
-            }
-            var content = JsonNode.Parse(envelope.GetRawText())!.AsObject();
-            // screened at the NativeTools boundary (AI module)
-            content["untrustedData"] = true;
-            return JsonSerializer.SerializeToElement(content);
+            result = await client.CallToolAsync(tool, arguments.ToDictionary(), cancellationToken: timeout.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception)
         {
             throw new InvalidOperationException("The configured Aspire application is unavailable. Check its AppHost and try again.");
         }
+#pragma warning restore CA1031
+
+        // Evaluated outside the transport try: Aspire's own error text must reach the caller verbatim,
+        // never collapsed into the generic transport-failure message above.
+        ThrowIfFailed(result);
+        var envelope = JsonSerializer.SerializeToElement(result, McpJsonUtilities.DefaultOptions);
+        if (Encoding.UTF8.GetByteCount(envelope.GetRawText()) > 128 * 1024)
+        {
+            throw new InvalidOperationException("Aspire evidence exceeds the response budget.");
+        }
+        var content = JsonNode.Parse(envelope.GetRawText())!.AsObject();
+        // screened at the NativeTools boundary (AI module)
+        content["untrustedData"] = true;
+        return JsonSerializer.SerializeToElement(content);
+    }
+
+    internal static void ThrowIfFailed(CallToolResult result)
+    {
+        if (result.IsError != true)
+        {
+            return;
+        }
+        var text = string.Concat(result.Content.OfType<TextContentBlock>().Select(block => block.Text));
+        throw new InvalidOperationException(text.Length == 0 ? "Aspire returned an error without a message." : "Aspire: " + text);
     }
 
     private static async Task BindApplicationAsync(McpClient client, AspireConnectionSettings settings, CancellationToken cancellationToken)
