@@ -5,6 +5,8 @@ namespace DigitalBrain.Tests.Coding;
 
 public sealed class RunnerFacts
 {
+    public static bool IsWindows => OperatingSystem.IsWindows();
+
     private const string BuildOutput = """
           Determining projects to restore...
         E:\repo\src\A\Thing.cs(12,9): error CS0103: The name 'x' does not exist in the current context [E:\repo\src\A\A.csproj]
@@ -19,6 +21,8 @@ public sealed class RunnerFacts
         Running tests from E:\repo\tests\bin\Release\net11.0\Tests.dll (net11.0|x64)
         failed DigitalBrain.Tests.Coding.RunnerFacts.Nope (12ms)
           Assert.Equal() Failure: Values differ
+
+             at DigitalBrain.Tests.Coding.RunnerFacts.Nope() in E:\repo\tests\RunnerFacts.cs:line 42
         E:\repo\tests\bin\Release\net11.0\Tests.dll (net11.0|x64) failed [+327/x1/?5] (1m 37s)
 
         Test run summary: Failed!
@@ -27,6 +31,26 @@ public sealed class RunnerFacts
           succeeded: 327
           skipped: 5
           duration: 1m 37s 446ms
+        """;
+
+    private const string ParameterizedTestOutput = """
+        Running tests from E:\repo\tests\bin\Release\net11.0\Tests.dll (net11.0|x64)
+        failed Ns.Facts.Rejects(name: "a b") (12ms)
+          Assert.True() Failure
+        E:\repo\tests\bin\Release\net11.0\Tests.dll (net11.0|x64) failed [+0/x1/?0] (1s)
+
+        Test run summary: Failed!
+          total: 1
+          failed: 1
+          succeeded: 0
+          skipped: 0
+        """;
+
+    private const string SingleLineSummaryOutput = """
+        Running tests from E:\repo\tests\bin\Release\net11.0\Tests.dll (net11.0|x64)
+
+        Test run summary: Zero tests ran
+          total: 5, failed: 1, succeeded: 3, skipped: 1
         """;
 
     [Fact]
@@ -57,15 +81,32 @@ public sealed class RunnerFacts
         var failure = Assert.Single(outcome.Failures);
         Assert.Equal("DigitalBrain.Tests.Coding.RunnerFacts.Nope", failure.Name);
         Assert.Contains("Values differ", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("RunnerFacts.cs:line 42", failure.Message, StringComparison.Ordinal);
         Assert.Equal(["test", "E:/repo/tests/Tests.csproj", "-c", "Release", "--no-build", "--", "--filter-class", "DigitalBrain.Tests.Coding.RunnerFacts"], processes.Calls[0].Arguments);
+    }
+
+    [Fact]
+    public async Task A_parameterized_test_failure_keeps_its_display_name()
+    {
+        var processes = new FakeProcessRunner();
+        processes.Enqueue(1, ParameterizedTestOutput);
+        var outcome = await new DotnetRunner(processes).TestAsync("E:/repo/tests/Tests.csproj", null, null, TestContext.Current.CancellationToken);
+        var failure = Assert.Single(outcome.Failures);
+        Assert.Equal("Ns.Facts.Rejects(name: \"a b\")", failure.Name);
+    }
+
+    [Fact]
+    public async Task A_single_line_summary_is_parsed()
+    {
+        var processes = new FakeProcessRunner();
+        processes.Enqueue(8, SingleLineSummaryOutput);
+        var outcome = await new DotnetRunner(processes).TestAsync("E:/repo/tests/Tests.csproj", null, null, TestContext.Current.CancellationToken);
+        Assert.Equal((5, 3, 1, 1), (outcome.Total, outcome.Passed, outcome.Failed, outcome.Skipped));
     }
 
     [Fact]
     public async Task A_timed_out_process_is_a_failed_outcome_with_advice()
     {
-        var processes = new FakeProcessRunner();
-        processes.Enqueue(-1, string.Empty);
-        processes.Calls.Clear();
         var timedOut = new TimedOutProcessRunner();
         var outcome = await new DotnetRunner(timedOut).BuildAsync("E:/repo/Repo.slnx", null, TestContext.Current.CancellationToken);
         Assert.False(outcome.Succeeded);
@@ -82,7 +123,7 @@ public sealed class RunnerFacts
     public async Task Git_commits_the_change_set_files_on_a_coding_branch()
     {
         using var fixture = DiskFixture.Create();
-        await fixture.InitGitAsync();
+        await fixture.InitGitAsync(TestContext.Current.CancellationToken);
         var git = new GitRunner(new ProcessRunner());
         await File.WriteAllTextAsync(fixture.GreeterPath, FixtureSolutions.GreeterSource.Replace("Hello", "Hi", StringComparison.Ordinal), TestContext.Current.CancellationToken);
 
@@ -102,7 +143,7 @@ public sealed class RunnerFacts
     public async Task Git_refuses_when_the_tree_is_dirty_outside_the_change_set()
     {
         using var fixture = DiskFixture.Create();
-        await fixture.InitGitAsync();
+        await fixture.InitGitAsync(TestContext.Current.CancellationToken);
         var git = new GitRunner(new ProcessRunner());
         await File.WriteAllTextAsync(fixture.GreeterPath, "namespace Alpha;", TestContext.Current.CancellationToken);
         await File.WriteAllTextAsync(fixture.ProgramPath, "namespace Beta;", TestContext.Current.CancellationToken);
@@ -110,5 +151,46 @@ public sealed class RunnerFacts
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() => git.CommitAsync(fixture.Root, [fixture.GreeterPath], "coding: partial", TestContext.Current.CancellationToken));
         Assert.Contains("Beta/Program.cs", error.Message, StringComparison.Ordinal);
         Assert.Contains("outside the change set", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_timed_out_branch_probe_is_an_error_not_a_missing_branch()
+    {
+        var processes = new FakeProcessRunner();
+        processes.Enqueue(-1, string.Empty, timedOut: true);
+        var git = new GitRunner(processes);
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => git.EnsureBranchAsync("E:/repo", "coding/c1", TestContext.Current.CancellationToken));
+        Assert.Contains("timed out", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Every_git_call_disables_the_pager_and_fsmonitor()
+    {
+        var processes = new FakeProcessRunner();
+        processes.Enqueue(0, string.Empty);
+        var git = new GitRunner(processes);
+        await git.CurrentBranchAsync("E:/repo", TestContext.Current.CancellationToken);
+        var call = Assert.Single(processes.Calls);
+        Assert.Equal(["--no-pager", "-c", "core.fsmonitor=false", "-c", "core.quotepath=false", "branch", "--show-current"], call.Arguments);
+    }
+
+    [Fact]
+    public async Task A_failing_process_reports_its_exit_code_and_stderr()
+    {
+        using var fixture = DiskFixture.Create();
+        await fixture.InitGitAsync(TestContext.Current.CancellationToken);
+        var result = await new ProcessRunner().RunAsync("git", ["rev-parse", "--verify", "nonexistent-ref"], fixture.Root, TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        Assert.Equal(128, result.ExitCode);
+        Assert.False(string.IsNullOrWhiteSpace(result.Error));
+        Assert.False(result.TimedOut);
+    }
+
+    [Fact(Skip = "Windows only", SkipUnless = nameof(IsWindows))]
+    public async Task A_process_that_outlives_its_timeout_is_killed_and_its_partial_output_kept()
+    {
+        var result = await new ProcessRunner().RunAsync("cmd", ["/c", "ping", "-n", "30", "127.0.0.1"], Path.GetTempPath(), TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
+        Assert.True(result.TimedOut);
+        Assert.True(result.Duration < TimeSpan.FromSeconds(10));
+        Assert.Contains("Pinging", result.Output, StringComparison.Ordinal);
     }
 }

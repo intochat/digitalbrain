@@ -34,7 +34,7 @@ internal sealed class DiskFixture : IDisposable
     public Workspace Open() => FixtureSolutions.Build(Root);
 
     // A repository with the fixture files committed, for the git facts and the chat scenario.
-    public async Task InitGitAsync()
+    public async Task InitGitAsync(CancellationToken cancellationToken)
     {
         var git = new ProcessRunner();
         foreach (var arguments in new string[][]
@@ -47,10 +47,10 @@ internal sealed class DiskFixture : IDisposable
             ["commit", "-q", "-m", "fixture"],
         })
         {
-            var result = await git.RunAsync("git", arguments, Root, TimeSpan.FromSeconds(30), CancellationToken.None);
+            var result = await git.RunAsync("git", arguments, Root, TimeSpan.FromSeconds(30), cancellationToken);
             if (result.ExitCode != 0)
             {
-                throw new InvalidOperationException($"git {arguments[0]} failed: {result.Error}");
+                throw new InvalidOperationException($"git {arguments[0]} failed: {(string.IsNullOrWhiteSpace(result.Error) ? result.Output : result.Error).Trim()}");
             }
         }
     }

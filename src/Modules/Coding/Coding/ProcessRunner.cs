@@ -34,22 +34,31 @@ public sealed class ProcessRunner : IProcessRunner
         var clock = Stopwatch.StartNew();
         using var process = new Process { StartInfo = start };
         process.Start();
+        var stdout = ReadBoundedAsync(process.StandardOutput, deadline.Token);
+        var stderr = ReadBoundedAsync(process.StandardError, deadline.Token);
         try
         {
-            var stdout = ReadBoundedAsync(process.StandardOutput, deadline.Token);
-            var stderr = ReadBoundedAsync(process.StandardError, deadline.Token);
-            await Task.WhenAll(stdout, stderr, process.WaitForExitAsync(deadline.Token)).ConfigureAwait(false);
+            await process.WaitForExitAsync(deadline.Token).ConfigureAwait(false);
             return new ProcessResult(process.ExitCode, await stdout.ConfigureAwait(false), await stderr.ConfigureAwait(false), clock.Elapsed, TimedOut: false);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             Kill(process);
-            return new ProcessResult(-1, string.Empty, string.Empty, clock.Elapsed, TimedOut: true);
+            return new ProcessResult(-1, await DrainAsync(stdout).ConfigureAwait(false), await DrainAsync(stderr).ConfigureAwait(false), clock.Elapsed, TimedOut: true);
         }
         catch (OperationCanceledException)
         {
             Kill(process);
+            await DrainAsync(stdout).ConfigureAwait(false);
+            await DrainAsync(stderr).ConfigureAwait(false);
             throw;
+        }
+        finally
+        {
+            if (!process.HasExited)
+            {
+                Kill(process);
+            }
         }
     }
 
@@ -67,15 +76,41 @@ public sealed class ProcessRunner : IProcessRunner
     {
         var text = new StringBuilder();
         var buffer = new char[4096];
-        int read;
-        while ((read = await reader.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+        try
         {
-            if (text.Length < MaximumOutputCharacters)
+            int read;
+            while ((read = await reader.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
             {
-                text.Append(buffer, 0, Math.Min(read, MaximumOutputCharacters - text.Length));
+                if (text.Length < MaximumOutputCharacters)
+                {
+                    text.Append(buffer, 0, Math.Min(read, MaximumOutputCharacters - text.Length));
+                }
             }
+        }
+        catch (OperationCanceledException)
+        {
+            // The deadline can cancel a read that is already in flight; whatever was captured in earlier
+            // iterations is still worth handing back as partial output rather than losing it to the fault.
         }
 
         return text.ToString();
     }
+
+    // Belt-and-braces alongside ReadBoundedAsync's own cancellation handling above: once the process has
+    // been killed, a read still blocked on the now-closing pipe could fault with something other than
+    // OperationCanceledException. Either way its result no longer changes the outcome already decided, but
+    // it must still be observed before Dispose closes the underlying handles.
+#pragma warning disable CA1031
+    private static async Task<string> DrainAsync(Task<string> read)
+    {
+        try
+        {
+            return await read.ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            return string.Empty;
+        }
+    }
+#pragma warning restore CA1031
 }

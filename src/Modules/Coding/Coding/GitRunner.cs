@@ -2,7 +2,8 @@ namespace DigitalBrain.Coding;
 
 public sealed class GitRunner(IProcessRunner processes)
 {
-    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan GitTimeout = TimeSpan.FromSeconds(60);
+    private static readonly StringComparer PathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
 
     public async Task<IReadOnlyList<string>> ChangedPathsAsync(string repository, CancellationToken cancellationToken)
     {
@@ -20,8 +21,14 @@ public sealed class GitRunner(IProcessRunner processes)
     public async Task<string> EnsureBranchAsync(string repository, string branch, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(branch);
-        var exists = await processes.RunAsync("git", ["rev-parse", "--verify", "--quiet", "refs/heads/" + branch], repository, Timeout, cancellationToken).ConfigureAwait(false);
-        await GitAsync(repository, exists.ExitCode == 0 ? ["checkout", "-q", branch] : ["checkout", "-q", "-b", branch], cancellationToken).ConfigureAwait(false);
+        var probe = await RunGitAsync(repository, ["rev-parse", "--verify", "--quiet", "refs/heads/" + branch], cancellationToken).ConfigureAwait(false);
+        var exists = probe.ExitCode switch
+        {
+            0 => true,
+            1 => false,
+            _ => throw Failed("rev-parse", probe),
+        };
+        await GitAsync(repository, exists ? ["checkout", "-q", branch] : ["checkout", "-q", "-b", branch], cancellationToken).ConfigureAwait(false);
         return branch;
     }
 
@@ -33,7 +40,7 @@ public sealed class GitRunner(IProcessRunner processes)
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
         var relative = files.Select(file => Path.GetRelativePath(repository, file).Replace('\\', '/')).ToArray();
         var outside = (await ChangedPathsAsync(repository, cancellationToken).ConfigureAwait(false))
-            .Where(path => !relative.Contains(path, StringComparer.OrdinalIgnoreCase))
+            .Where(path => !relative.Contains(path, PathComparer))
             .ToArray();
         if (outside.Length > 0)
         {
@@ -48,12 +55,28 @@ public sealed class GitRunner(IProcessRunner processes)
 
     private async Task<ProcessResult> GitAsync(string repository, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
     {
-        var result = await processes.RunAsync("git", ["--no-pager", "-c", "core.fsmonitor=false", .. arguments], repository, Timeout, cancellationToken).ConfigureAwait(false);
+        var result = await RunGitAsync(repository, arguments, cancellationToken).ConfigureAwait(false);
         if (result.ExitCode != 0)
         {
-            throw new InvalidOperationException($"git {arguments[0]} failed: {(string.IsNullOrWhiteSpace(result.Error) ? result.Output : result.Error).Trim()}");
+            throw Failed(arguments[0], result);
         }
 
         return result;
     }
+
+    // Every git call goes through here so the timeout check and the pager/fsmonitor/quotepath flags apply
+    // uniformly - including the EnsureBranchAsync probe, whose non-zero exit codes are not all errors.
+    private async Task<ProcessResult> RunGitAsync(string repository, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
+    {
+        var result = await processes.RunAsync("git", ["--no-pager", "-c", "core.fsmonitor=false", "-c", "core.quotepath=false", .. arguments], repository, GitTimeout, cancellationToken).ConfigureAwait(false);
+        if (result.TimedOut)
+        {
+            throw new InvalidOperationException($"git {arguments[0]} timed out after {GitTimeout.TotalSeconds:0}s");
+        }
+
+        return result;
+    }
+
+    private static InvalidOperationException Failed(string verb, ProcessResult result)
+        => new($"git {verb} failed: {(string.IsNullOrWhiteSpace(result.Error) ? result.Output : result.Error).Trim()}");
 }
