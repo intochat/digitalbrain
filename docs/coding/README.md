@@ -21,7 +21,7 @@ methods:
 
 | Method | Argument | Result | Does |
 |---|---|---|---|
-| `open` | `OpenWorkspace(SolutionPath, ExpectedVersion?)` | `Accepted<WorkspaceReceipt>` | Refuses a blank path or a stale `ExpectedVersion`; schedules the load and returns at once. |
+| `open` | `OpenWorkspace(SolutionPath, ExpectedVersion?)` | `Accepted<WorkspaceReceipt>` | Refuses a blank path or a stale `ExpectedVersion`; schedules the load and returns at once. A second open of the path already loaded starts no load: the generation stays put and `Detail` reads `already open`. |
 | `reload` | `ReloadWorkspace()` | `Accepted<WorkspaceReceipt>` | Refuses if nothing has been opened yet; otherwise re-opens or reloads the same solution path. |
 | `read` | none | `WorkspaceSnapshot(SolutionPath, Phase, ProjectCount, DocumentCount, Detail, Generation, ReloadNeeded)` | Reports the live `SolutionWorkspace` status (phase, counts, detail, whether a project-file change is waiting on a reload) together with the grain's own path and generation. |
 | `find-symbols` | `SymbolSearch(Query, Limit=20)` | `SymbolSearchResult(Items, TotalCount, Truncated)` | Case-insensitive substring match over type and member declarations; drops declarations in generated documents (`obj/`, `bin/`, `*.g.cs`, `*.g.i.cs`, `*.generated.cs`, `*.designer.cs`), then ranks an exact name match first, `NamedType` hits next. |
@@ -32,7 +32,7 @@ methods:
 | `member` | `MemberQuery(SymbolId)` | `MemberSource(Id, Path, StartLine, EndLine, Source)` | One declaration with its body, by symbol id. |
 | `callers` | `CallersQuery(SymbolId, Limit=50)` | `CallersResult(SymbolId, Items, TotalCount, Truncated)` | The symbols that call a method or read a property; each `CallerHit(Id, Display, Path, Line, Project)` is one call site. |
 | `implementations` | `ImplementationsQuery(SymbolId, Limit=50)` | `SymbolSearchResult(Items, TotalCount, Truncated)` | The implementations of an interface or an abstract or virtual member. |
-| `derived` | `DerivedQuery(SymbolId, Limit=50)` | `SymbolSearchResult(Items, TotalCount, Truncated)` | The classes derived from a base type. Reachable through `/mcp`; phase 1 does not wire a `code_*` tool to it. |
+| `derived` | `DerivedQuery(SymbolId, Limit=50)` | `SymbolSearchResult(Items, TotalCount, Truncated)` | The classes derived from a class, or the interfaces and types extending an interface (`code_derived`). |
 
 **`changeset:<id>`** (`IChangeSet`, grain type `changeset`, name = a caller-chosen change id; edits
 with the same id compose into one snapshot) answers five methods. The id is durable and never
@@ -43,7 +43,7 @@ needs a fresh id.
 |---|---|---|---|
 | `propose` | `ProposeEdit(Edit, ExpectedVersion?)` | `Accepted<ChangeSetReceipt>` | Refuses a closed change set (`Committed`/`Discarded`) or a stale `ExpectedVersion` (the edit count); appends one `EditRequest` and schedules the reaction that clears `Diagnostics`/`Diff`/`Detail` (a `check` afterwards derives them again from the full edit list). |
 | `check` | `CheckChangeSet()` | `Accepted<ChangeSetReceipt>` | Refuses a closed or empty change set; applies every edit to one snapshot of the live solution (no files written) and reports the diagnostics the edits *introduce* and a unified diff. |
-| `commit` | `CommitChangeSet(Message)` | `Accepted<ChangeSetReceipt>` | Refuses a closed or empty change set, or a blank message; re-applies the edits, and only if they are still clean writes the changed documents to disk and records the written paths and the new generation. |
+| `commit` | `CommitChangeSet(Message)` | `Accepted<ChangeSetReceipt>` | Refuses a closed or empty change set, or a blank message; re-applies the edits, and only if they are still clean writes the changed documents to disk and records the written paths and the new generation. A commit or fold already in flight is waited out (one writer at a time), so the snapshot a change is computed on is the one it is applied to. |
 | `discard` | `DiscardChangeSet()` | `Accepted<ChangeSetReceipt>` | Refuses a closed change set; marks it `Discarded`. Nothing on disk changes. |
 | `read` | none | `ChangeSetSnapshot(Status, Edits, Diagnostics, Diff, Generation, Detail, Files, Revision)` | The current snapshot: `Status` is `Draft`/`Checked`/`Committed`/`Discarded`; `Detail` names the edit a failed check or commit refused on; `Files` lists the paths a commit wrote; `Revision` increments on every reaction that saves (propose, check, commit - success or failure - and discard), so a caller can wait for exactly its own command's settle instead of a leftover result. |
 
@@ -75,6 +75,11 @@ Notes on the shapes above:
 - A query against an unknown symbol id, or against a workspace that is not `Ready`, does not throw
   an opaque error: the caller gets an advice string explaining what happened and what to do next
   (`WorkspaceStatus.Advice`, or the tool's own `{ advice: ... }` result below).
+- Both reactions always settle: any Roslyn or file-system failure becomes a `Draft` whose `Detail` is the
+  message (a failed commit adds that files may already have been written), and the edit work itself is
+  bounded by `CodingToolOptions.EditDeadline` (90 s, under `ReactionWait`) — a check or commit that runs
+  past it settles as a `Draft` saying it did not finish. Only the edit work is bounded; once a commit starts
+  writing, the writes run to the end.
 - `check`/`commit` refuse only for diagnostics the change set *introduces*: a multiset difference
   against the pre-edit baseline, keyed by id, severity, message and path, over the changed projects
   and their transitive dependents. A pre-existing error elsewhere in the tree (the fixture's
@@ -88,14 +93,15 @@ Notes on the shapes above:
 | `code_find_symbols(query, limit=20)` | Find types and members by name in the loaded solution. Returns ids to use with `code_references`. |
 | `code_references(symbolId, limit=50)` | Every place a symbol is used, with file, line and the source line. Semantic, not text search. |
 | `code_diagnostics(path?, project?)` | Compiler errors and warnings for a file, a project, or the whole solution, without running a build. |
-| `code_map(title="Solution map")` | A graph of every project in the solution and the references between them. Use it whenever the person asks to see or map the solution, its projects, or their dependencies. |
+| `code_map(title="Solution map")` | A graph of every project in the solution and the references between them. Use it whenever the person asks to see or map the solution, its projects, or their dependencies. Asks the `workspace` grain, so a reload in flight is answered from its durable `LastMap` instead of refused. |
 | `code_skeleton(path)` | The types and member signatures of one file, without bodies, with symbol ids. |
 | `code_member(symbolId)` | One declaration with its body, by symbol id. |
 | `code_callers(symbolId, limit=50)` | The symbols that call a method or read a property, with the call sites. |
 | `code_implementations(symbolId, limit=50)` | The implementations of an interface or an abstract or virtual member. |
+| `code_derived(symbolId, limit=50)` | The classes derived from a class or the interfaces extending an interface. |
 | `code_propose_edit(changeId, kind, symbolId?, path?, source?, newName?, startLine?, endLine?, namespace?, diagnosticId?, fixTitle?)` | Add one edit to a change set. Nothing touches disk until `code_commit`; `code_check` compiles the snapshot first. |
 | `code_check(changeId)` | Apply a change set to one snapshot and compile it: diagnostics and a diff, no files written. |
-| `code_commit(changeId, message)` | Write a clean change set to disk and commit it on a `coding/<changeId>` git branch. Refuses when the check has errors or the tree is dirty elsewhere. |
+| `code_commit(changeId, message)` | Write a clean change set to disk and commit it on a `coding/<changeId>` git branch. Refuses when the check has errors or the tree is dirty elsewhere. The working tree stays on that branch afterwards; later change sets commit on top of it. |
 | `code_build(artifactsPath?)` | `dotnet build` of the solution in Release; parsed errors and warnings. |
 | `code_test(filterClass?, artifactsPath?)` | `dotnet test` without rebuilding; counts and the failing tests. Run `code_build` first. |
 
@@ -106,11 +112,13 @@ The Flutter shell opens a `graph` result with `UiGraph`.
 
 `code_propose_edit` and `code_check` return the `changeset` snapshot shape above (`{ status, edits,
 diagnostics, diff, generation, detail, files, revision }`). `code_commit` returns a different,
-constant shape in every branch: `{ status, files, generation, diff, detail, branch, commit, advice }`
-— on a clean git commit, `commit` is filled and `advice` is null; on a git refusal after the files
-were already written, `status` is still `Committed`, `commit` is null and `advice` explains what to
-do; when the change set itself was never committed (`status` stays `Draft`), `advice` is exactly
-`detail`. Every one of `code_propose_edit`/`code_check`/`code_commit` waits on the grain's `Revision`
+constant shape in every branch: `{ status, files, generation, diff, detail, branch, baseBranch,
+commit, advice }` — on a clean git commit, `commit` is filled and `advice` is null; on a git refusal
+after the files were already written, `status` is still `Committed`, `commit` is null and `advice`
+explains what to do; when the change set itself was never committed (`status` stays `Draft`),
+`advice` is exactly `detail`. `baseBranch` is the branch the tree was on before the commit (null when
+git could not say). The dirty-tree refusal runs before the `coding/<changeId>` branch is ensured, so a
+refused commit leaves `branch` null and the tree where it was. Every one of `code_propose_edit`/`code_check`/`code_commit` waits on the grain's `Revision`
 for its own command to settle, up to `CodingToolOptions.ReactionWait` (2 minutes by default), and
 turns a wait that expires into advice rather than an exception. `code_build` returns `{ succeeded,
 errors, warningCount, durationSeconds, command, detail }`; `code_test` returns `{ succeeded, total,
@@ -142,14 +150,20 @@ folds a saved `.cs` file straight into the live snapshot with `SolutionWorkspace
 (`WithDocumentText`), so an owner's editor save, a `dotnet format` pass or a git checkout is visible
 to the next query without a reload. A saved `.csproj`/`.props`/`.targets`/`.slnx`/`.sln` file cannot
 be folded that way, so it only flags `WorkspaceSnapshot.ReloadNeeded` (`workspace.read`'s
-`reloadNeeded`) instead; `bin/`, `obj/`, `.git/`, `artifacts/` and `node_modules/` are ignored.
+`reloadNeeded`) instead, and so does a queued `.cs` path that has disappeared (a delete, or the old
+end of a rename — both ends are queued). The reason stays bounded: the path that asked last plus a
+count of the others (`reload needed: <path> (+3 more)`), reset when the next load lands. `bin/`,
+`obj/`, `.git/`, `artifacts/` and `node_modules/` are ignored.
 
 `code_commit` (design 4.9, D10): applies the change set's edits to one snapshot of the live
 solution; if that snapshot is still clean, `SolutionWorkspace.CommitAsync` writes the changed
-documents to disk in path order inside one `TryApplyChanges` transaction, then `GitRunner` ensures
-a `coding/<changeId>` branch exists (creating and checking it out if not) and commits exactly the
-written files. A dirty working tree outside those files refuses the git step with the paths named,
-but the files the change set wrote are already on disk and the returned `files`/`generation` name
+documents to disk in path order inside one `TryApplyChanges` transaction, then `GitRunner` records the current
+branch, refuses a working tree with changes outside those files (`RefuseIfDirtyOutsideAsync`, before
+anything is checked out, so a refusal never parks the tree on a new branch), ensures a
+`coding/<changeId>` branch exists (creating and checking it out if not) and commits exactly the
+written files. The tree stays on that branch afterwards: the next change set commits on top of it,
+which is what keeps disk and snapshot coherent in one working tree. A refusal still names the paths,
+and the files the change set wrote are already on disk with the returned `files`/`generation` naming
 them, so nothing is silently lost; `advice` explains what to do next.
 
 The runners (`DotnetRunner`, `GitRunner`) both take an `IProcessRunner` (`ProcessRunner` in
@@ -186,9 +200,11 @@ dotnet test tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj -c Release -- --f
 
 - `SolutionWorkspaceFacts` drives `SolutionWorkspace`/`SolutionQueries` against a two-project adhoc
   fixture: symbol search, references, diagnostics (including a compiler error with no source
-  location), the map, reload, the lease/dispose lifetime, the failure path, and the three commit
+  location), the map, reload, the lease/dispose lifetime, the failure path, the three commit
   facts (`Commit_applies_the_snapshot_and_writes_only_the_changed_files`,
-  `Commit_of_unchanged_text_writes_nothing`, `Commit_refuses_a_snapshot_the_workspace_has_moved_past`).
+  `Commit_of_unchanged_text_writes_nothing`, `Commit_refuses_a_snapshot_the_workspace_has_moved_past`)
+  and the two writer-gate facts (`Two_commits_that_touch_different_files_both_land`,
+  `A_fold_during_a_commit_is_not_lost`).
 - `CodeWorkspaceNeuronFacts` drives the same behaviour through the real `workspace` grain interface
   over Orleans — including `The_map_answers_from_the_durable_cache_while_a_reload_is_in_flight` — plus
   a reflection theory that validates `ICodeWorkspace` (12 methods) and `IChangeSet` (5 methods)
@@ -201,15 +217,19 @@ dotnet test tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj -c Release -- --f
   ignored.
 - `ChangeSetEditorFacts` drives `ChangeSetEditor.ApplyAsync` directly: every `EditKind` (including a
   rename that crosses the Alpha/Beta project boundary and a code fix from `CodeFixCatalog`), the
-  diagnostics-introduced baseline diff, and the responsible-edit `Detail` text.
+  diagnostics-introduced baseline diff, and the responsible-edit `Detail` text — including blame
+  landing on the edit whose own line range covers the error rather than a later edit in that file.
 - `ChangeSetNeuronFacts` drives `propose`/`check`/`commit`/`discard`/`read` through the real
-  `changeset` grain interface: closed and empty-change-set refusals, and `Revision` bumping on
-  every reaction that saves.
+  `changeset` grain interface: closed and empty-change-set refusals, `Revision` bumping on
+  every reaction that saves, and a failure Roslyn never raises as `InvalidOperationException` (a
+  denied write, a disposed workspace) still settling as a `Draft` with the message.
 - `RunnerFacts` covers `DotnetRunner`'s build/test output parsing (including a parameterized test's
   display name and a timed-out process) and `GitRunner`'s branch/commit/refusal/timeout paths
   against a `FakeProcessRunner`.
-- `CodingNativeToolFacts` proves the thirteen `code_*` tools resolve and return the shapes above,
-  including the change-set-never-settles-is-advice and repeated-check-answers-at-once cases.
+- `CodingNativeToolFacts` proves the fourteen `code_*` tools resolve and return the shapes above,
+  including the edit-deadline-settles-a-draft and repeated-check-answers-at-once cases, `code_map`
+  answered from the grain's cache while a reload is in flight, and a dirty tree outside the change
+  set refused before any `coding/<id>` branch exists.
 - `CodingChatFacts` drives the whole edit path through the `/agent` HTTP endpoint with a
   `ScriptedChatClient`: `code_find_symbols`, `code_propose_edit` (Rename), `code_check`,
   `code_commit`, `code_build`, `code_test`, ending with the model's own summary naming the
