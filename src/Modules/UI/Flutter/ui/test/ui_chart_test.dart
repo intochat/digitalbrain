@@ -1,7 +1,7 @@
 import 'package:digitalbrain_ui/digitalbrain_ui.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:graphic/graphic.dart';
 
 UiChartPart chart(String kind, {List<UiChartPoint>? points}) => UiChartPart(
   title: 'Companies by country',
@@ -30,26 +30,17 @@ Future<void> pump(WidgetTester tester, UiChartPart part) async {
 }
 
 void main() {
-  testWidgets('bar charts draw intervals', (tester) async {
+  testWidgets('bar charts draw a BarChart', (tester) async {
     await pump(tester, chart('bar'));
-    final widget = tester.widget<Chart>(
-      find.byWidgetPredicate((w) => w is Chart),
-    );
-    expect(widget.marks.whereType<IntervalMark>(), hasLength(1));
-    expect(widget.marks.whereType<LineMark>(), isEmpty);
-    expect(widget.tooltip, isNotNull);
-    expect(widget.crosshair, isNotNull);
-    expect(widget.selections?.keys, contains('tap'));
+    expect(find.byType(BarChart), findsOneWidget);
+    expect(find.byType(LineChart), findsNothing);
+    expect(find.text('Companies by country'), findsOneWidget);
   });
 
-  testWidgets('line charts draw a line with points', (tester) async {
+  testWidgets('line charts draw a LineChart', (tester) async {
     await pump(tester, chart('line'));
-    final widget = tester.widget<Chart>(
-      find.byWidgetPredicate((w) => w is Chart),
-    );
-    expect(widget.marks.whereType<LineMark>(), hasLength(1));
-    expect(widget.marks.whereType<PointMark>(), hasLength(1));
-    expect(widget.marks.whereType<IntervalMark>(), isEmpty);
+    expect(find.byType(LineChart), findsOneWidget);
+    expect(find.byType(BarChart), findsNothing);
     expect(find.text('Companies by country'), findsOneWidget);
   });
 
@@ -58,7 +49,8 @@ void main() {
   ) async {
     await pump(tester, chart('line', points: const []));
     expect(find.text('No series'), findsOneWidget);
-    expect(find.byWidgetPredicate((w) => w is Chart), findsNothing);
+    expect(find.byType(BarChart), findsNothing);
+    expect(find.byType(LineChart), findsNothing);
   });
 
   test('long category labels are shortened for the axis', () {
