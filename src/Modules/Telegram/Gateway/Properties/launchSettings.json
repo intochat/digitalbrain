@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "DigitalBrain.Modules.Telegram.Gateway": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:52471;http://localhost:52472"
+    }
+  }
+}
