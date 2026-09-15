@@ -19,6 +19,7 @@ using DigitalBrain.Salesforce;
 using DigitalBrain.Time;
 using DigitalBrain.Twitter;
 using DigitalBrain.Telegram;
+using DigitalBrain.Telegram.Aspire.Hosting;
 using DigitalBrain.UI.Aspire.Hosting;
 using DigitalBrain.UI;
 using Microsoft.Extensions.Configuration;
@@ -90,7 +91,7 @@ var developmentClusterId = builder.Environment.IsDevelopment()
     ? $"digitalbrain-{Guid.NewGuid():N}"
     : null;
 
-builder.AddProject<Projects.DigitalBrain_Silo>(ProductSurfaceResources.Kernel)
+var kernel = builder.AddProject<Projects.DigitalBrain_Silo>(ProductSurfaceResources.Kernel)
     .WithReference(brain)
     .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION", "false")
     .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_HTTPCLIENT_DISABLE_URL_QUERY_REDACTION", "false")
@@ -123,5 +124,7 @@ builder.AddProject<Projects.DigitalBrain_Silo>(ProductSurfaceResources.Kernel)
             context.EnvironmentVariables["DigitalBrain__Graph__Enabled"] = "true";
         }
     });
+
+kernel.WithTelegramBot<Projects.DigitalBrain_Modules_Telegram_Gateway>();
 
 builder.Build().Run();

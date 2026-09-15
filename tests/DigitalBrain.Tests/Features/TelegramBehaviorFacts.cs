@@ -1,4 +1,7 @@
 using System.Text.Json;
+using System.Text;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using DigitalBrain.Abstractions.Behaviors;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.AI;
@@ -18,6 +21,39 @@ public sealed class TelegramBehaviorFacts
     private const long User = 81723;
     private static readonly NeuronId Inbox = new("notification", $"telegram-{User}");
     private static readonly NeuronId ReminderBook = new("reminders", $"telegram-{User}");
+
+    [Fact]
+    public async Task Authenticated_provider_webhook_installs_behavior_and_reacts_to_message()
+    {
+        using var model = new ScriptedChatClient();
+        model.Say(JsonSerializer.Serialize(new { intent = "reminder", text = "Call Alice", dueUnixSeconds = DateTimeOffset.UtcNow.AddMinutes(10).ToUnixTimeSeconds() }));
+        await using var brain = await Start(model);
+        var app = new ApplicationBuilder(brain.SiloServices);
+        new TelegramHttpSurface(new TelegramOptions { BotToken = "123:test", WebhookSecret = "secret", MiniAppRoot = "" }).Map(app);
+        var pipeline = app.Build();
+        var body = JsonSerializer.Serialize(new
+        {
+            update_id = 123, message = new { from = new { id = User, is_bot = false }, chat = new { id = User, type = "private" },
+                text = "Remind me in ten minutes to call Alice", date = DateTimeOffset.UtcNow.ToUnixTimeSeconds() }
+        });
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            var context = new DefaultHttpContext { RequestServices = brain.SiloServices };
+            context.Request.Method = "POST";
+            context.Request.Path = "/telegram/webhook";
+            context.Request.Headers["X-Telegram-Bot-Api-Secret-Token"] = "secret";
+            context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(body));
+            context.Response.Body = new MemoryStream();
+            await pipeline(context);
+            Assert.Equal(200, context.Response.StatusCode);
+        }
+        var inbox = brain.Grains.GetGrain<INotification>(Inbox.ToGrainId());
+        var reminders = brain.Grains.GetGrain<IReminders>(ReminderBook.ToGrainId());
+        await ReactionWait.UntilAsync(async () => (await inbox.Read()).Items.Count == 1 && (await reminders.Read()).Items.Count == 1, TestContext.Current.CancellationToken);
+        Assert.Equal("Call Alice", Assert.Single((await reminders.Read()).Items).Text);
+        Assert.Single(model.Calls);
+        Assert.NotNull(brain.SiloServices.GetRequiredService<TelegramConnectionStatus>().Read().LastMessageAt);
+    }
 
     [Fact]
     public async Task Message_creates_one_reminder_and_due_notification_after_cold_restart()

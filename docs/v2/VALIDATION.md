@@ -62,3 +62,15 @@ No live AppHost session or production data migration was run. Existing HTTP and 
 - No live bot registration, real model/provider requests, deployment, or commit performed. The release workflow change was inspected and its constituent Flutter/.NET build commands ran locally; the hosted release pipeline was not invoked.
 
 See [Telegram design and operation](TELEGRAM.md) and [implementation plan](TELEGRAM-PLAN.md).
+
+## Live Telegram onboarding — September 16, 2026
+
+- Prior implementation committed as `5843497a4` after a fresh Release baseline (542 passed, 6 existing skips).
+- New full Release regression: **573 passed, 0 failed, 6 existing skips** (579 total).
+- Focused Telegram run: **44 passed**; full regression additionally includes the final authenticated-health contract case.
+- Release AppHost build: **0 warnings, 0 errors**. Normal Aspire stop/start rebuilt and started the new Debug AppHost successfully.
+- New tests cover registration ordering, preservation of pending updates, own-instance/bundle verification before webhook mutation, wrong credentials, unsafe origins, menu registration, unexpected webhook ownership, gateway routing/header isolation and body bounds, fresh tunnel parsing, and authenticated webhook → automatic behavior setup → one reminder/inbox entry despite redelivery.
+- Read-only review found no concrete correctness/security defects.
+- Live gateway and Cloudflare tunnel started. Public `/mcp` returned **404**; unsigned `/telegram/health` and `/telegram/miniapp/state` returned **401**.
+- The Aspire dashboard's unresolved **telegram-bot-token** secret prompt is open. Kernel startup waits for that value. No token was copied from TripRadar, no real Telegram registration was performed, and no real incoming message has yet been verified. Enter the token there, then send `/start` and a reminder request to verify provider delivery.
+- Existing stored data was preserved during normal Aspire restart. The Flutter code was unchanged in this increment; the previously verified bundle is reused.

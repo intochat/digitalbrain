@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>DigitalBrain.Telegram.Aspire.Hosting</RootNamespace>
+    <Description>Aspire onboarding for Telegram through a restricted gateway.</Description>
+  </PropertyGroup>
+  <ItemGroup><PackageReference Include="Aspire.Hosting" /></ItemGroup>
+</Project>

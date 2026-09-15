@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>DigitalBrain.Telegram.Gateway</RootNamespace>
+    <Description>Restricted public entry point for Telegram webhooks and the Mini App.</Description>
+  </PropertyGroup>
+</Project>

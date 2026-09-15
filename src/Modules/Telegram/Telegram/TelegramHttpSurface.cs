@@ -32,13 +32,25 @@ public sealed class TelegramHttpSurface(TelegramOptions options) : IHttpSurface
         app.Use(async (context, next) =>
         {
             var path = context.Request.Path.Value;
-            if (path is not ("/telegram/webhook" or "/telegram/miniapp/state" or "/telegram/miniapp/notifications/dismiss" or "/telegram/miniapp/reminders/cancel"))
+            if (path is not ("/telegram/health" or "/telegram/webhook" or "/telegram/miniapp/state" or "/telegram/miniapp/notifications/dismiss" or "/telegram/miniapp/reminders/cancel"))
             {
                 await next(context).ConfigureAwait(false);
                 return;
             }
             context.Response.Headers.CacheControl = "no-store";
             if (!options.Enabled) { context.Response.StatusCode = 503; return; }
+            if (path == "/telegram/health")
+            {
+                if (!HttpMethods.IsGet(context.Request.Method)) { context.Response.StatusCode = 405; return; }
+                if (!TelegramAuthentication.IsWebhookSecretValid(options.WebhookSecret, context.Request.Headers["X-Telegram-Bot-Api-Secret-Token"].ToString()))
+                { context.Response.StatusCode = 401; return; }
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    instanceId = context.RequestServices.GetRequiredService<TelegramConnectionStatus>().InstanceId,
+                    miniAppAvailable = File.Exists(Path.Combine(options.MiniAppRoot, "index.html")) && File.Exists(Path.Combine(options.MiniAppRoot, "main.dart.js"))
+                }, context.RequestAborted).ConfigureAwait(false);
+                return;
+            }
             if (context.Request.ContentLength > 65536) { context.Response.StatusCode = 413; return; }
             try
             {
@@ -65,6 +77,7 @@ public sealed class TelegramHttpSurface(TelegramOptions options) : IHttpSurface
         await services.GetRequiredService<ITelegramBehaviorSetup>().EnsureAsync(message!.UserId, context.RequestAborted).ConfigureAwait(false);
         var grains = services.GetRequiredService<IGrainFactory>();
         await grains.GetGrain<ITelegram>(new NeuronId("telegram", message.UserId.ToString(CultureInfo.InvariantCulture)).ToGrainId()).Accept(message).ConfigureAwait(false);
+        services.GetService<TelegramConnectionStatus>()?.MessageReceived();
         if (message.Text.Split(' ', 2)[0] == "/start" && Uri.TryCreate(options.MiniAppUrl, UriKind.Absolute, out var url) && url.Scheme == "https")
         {
             await context.Response.WriteAsJsonAsync(new { method = "sendMessage", chat_id = message.UserId, text = "Open your reminders and inbox.",

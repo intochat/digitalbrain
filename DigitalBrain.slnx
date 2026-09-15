@@ -31,6 +31,8 @@
     <Project Path="src/Modules/Twitter/Twitter/DigitalBrain.Modules.Twitter.csproj" />
   </Folder>
   <Folder Name="/Modules/Telegram/">
+    <Project Path="src/Modules/Telegram/Aspire.Hosting/DigitalBrain.Modules.Telegram.Aspire.Hosting.csproj" />
+    <Project Path="src/Modules/Telegram/Gateway/DigitalBrain.Modules.Telegram.Gateway.csproj" />
     <Project Path="src/Modules/Telegram/Contracts/DigitalBrain.Modules.Telegram.Contracts.csproj" />
     <Project Path="src/Modules/Telegram/Telegram/DigitalBrain.Modules.Telegram.csproj" />
   </Folder>

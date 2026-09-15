@@ -13,6 +13,13 @@ public sealed class TelegramModule : Core.IModule
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.TryAddSingleton(services => services.GetService<IConfiguration>()?.GetSection("DigitalBrain:Telegram").Get<TelegramOptions>() ?? new());
         builder.Services.TryAddSingleton<TelegramReminderBehavior>();
+        builder.Services.TryAddSingleton<TelegramConnectionStatus>();
+        builder.Services.TryAddSingleton(_ => new TelegramBotApi(new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false })
+        {
+            Timeout = TimeSpan.FromSeconds(15), MaxResponseContentBufferSize = 131072
+        }));
+        builder.Services.TryAddSingleton<TelegramBotConnection>();
+        builder.Services.AddHostedService(services => services.GetRequiredService<TelegramBotConnection>());
         builder.Services.TryAddSingleton<ITelegramBehaviorSetup, TelegramBehaviorSetup>();
         builder.Services.AddSingleton<Core.IHttpSurface, TelegramHttpSurface>();
         builder.Services.AddSingleton(new BehaviorSourceContract("telegram", [new(MessageReceivedSignal,
@@ -22,6 +29,8 @@ public sealed class TelegramModule : Core.IModule
 
 public sealed class TelegramOptions
 {
+    public bool AutoConfigure { get; set; }
+    public string PublicUrl { get; set; } = "";
     public string BotToken { get; set; } = "";
     public string WebhookSecret { get; set; } = "";
     public string MiniAppUrl { get; set; } = "";

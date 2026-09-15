@@ -116,11 +116,11 @@ public sealed class TelegramFacts
         new TelegramHttpSurface(new TelegramOptions { BotToken = "token", WebhookSecret = "secret", MiniAppRoot = "" }).Map(app);
         app.Run(context => { context.Response.StatusCode = 418; return Task.CompletedTask; });
         var pipeline = app.Build();
-        foreach (var path in new[] { "/telegram/webhook", "/telegram/miniapp/state", "/telegram/miniapp/notifications/dismiss", "/telegram/miniapp/reminders/cancel" })
+        foreach (var path in new[] { "/telegram/health", "/telegram/webhook", "/telegram/miniapp/state", "/telegram/miniapp/notifications/dismiss", "/telegram/miniapp/reminders/cancel" })
         {
             var context = new DefaultHttpContext { RequestServices = services };
             context.Request.Path = path;
-            context.Request.Method = path.EndsWith("state", StringComparison.Ordinal) ? "GET" : "POST";
+            context.Request.Method = path.EndsWith("state", StringComparison.Ordinal) || path.EndsWith("health", StringComparison.Ordinal) ? "GET" : "POST";
             await pipeline(context);
             Assert.Equal(401, context.Response.StatusCode);
         }
@@ -143,6 +143,25 @@ public sealed class TelegramFacts
         Assert.Equal(1, (await source.Read()).PublishedCount);
         Assert.Single((await source.ReadJournal(JournalKind.Outgoing, 0)).Delta, entry => entry.Signal.Type == TelegramModule.MessageReceivedSignal);
         await Assert.ThrowsAsync<CommandRejectedException>(() => source.Accept(command with { Id = CommandId.New(), UserId = 99 }));
+    }
+
+    [Fact]
+    public async Task Authenticated_health_identifies_instance_and_reports_missing_bundle()
+    {
+        var status = new TelegramConnectionStatus();
+        using var services = new ServiceCollection().AddSingleton(status).BuildServiceProvider();
+        var app = new ApplicationBuilder(services);
+        new TelegramHttpSurface(new TelegramOptions { BotToken = "123:test", WebhookSecret = "secret", MiniAppRoot = "" }).Map(app);
+        var context = new DefaultHttpContext { RequestServices = services };
+        context.Request.Method = "GET";
+        context.Request.Path = "/telegram/health";
+        context.Request.Headers["X-Telegram-Bot-Api-Secret-Token"] = "secret";
+        context.Response.Body = new MemoryStream();
+        await app.Build()(context);
+        Assert.Equal(200, context.Response.StatusCode);
+        using var response = JsonDocument.Parse(((MemoryStream)context.Response.Body).ToArray());
+        Assert.Equal(status.InstanceId, response.RootElement.GetProperty("instanceId").GetString());
+        Assert.False(response.RootElement.GetProperty("miniAppAvailable").GetBoolean());
     }
 
     [Fact]

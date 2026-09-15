@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><RootNamespace>DigitalBrain.Telegram</RootNamespace></PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="OpenTelemetry" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Telegram.Contracts.csproj" />
     <ProjectReference Include="../../../Kernel/DigitalBrain/DigitalBrain.csproj" />
