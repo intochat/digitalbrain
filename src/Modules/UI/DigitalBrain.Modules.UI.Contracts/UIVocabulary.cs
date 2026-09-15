@@ -15,6 +15,10 @@ public static class UIVocabulary
 
     public const string SurfaceType = "surface";
 
+    public const string NotificationType = "notification";
+    public const string NotificationPublishing = "NotificationPublishing";
+    public const string NotificationDismissing = "NotificationDismissing";
+
     public const string ChartType = "chart";
 
     public const string GraphType = "graph";

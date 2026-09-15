@@ -67,7 +67,9 @@ ENV ASPNETCORE_ENVIRONMENT=Production \
     DigitalBrain__Modules__4="DigitalBrain.Google.GoogleModule, DigitalBrain.Modules.Google" \
     DigitalBrain__Modules__5="DigitalBrain.Salesforce.SalesforceModule, DigitalBrain.Modules.Salesforce" \
     DigitalBrain__Modules__6="DigitalBrain.Microsoft.MicrosoftModule, DigitalBrain.Modules.Microsoft" \
-    DigitalBrain__Modules__7="DigitalBrain.UI.UIModule, DigitalBrain.Modules.UI"
+    DigitalBrain__Modules__7="DigitalBrain.UI.UIModule, DigitalBrain.Modules.UI" \
+    DigitalBrain__Modules__8="DigitalBrain.Twitter.TwitterModule, DigitalBrain.Modules.Twitter" \
+    DigitalBrain__Modules__9="DigitalBrain.Telegram.TelegramModule, DigitalBrain.Modules.Telegram"
 
 EXPOSE 8080 5000
 

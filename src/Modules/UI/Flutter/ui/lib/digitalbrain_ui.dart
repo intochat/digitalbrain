@@ -9,6 +9,7 @@ export 'src/components/clock/ui_clock.dart';
 export 'src/components/graph/graph_models.dart';
 export 'src/components/graph/ui_graph.dart';
 export 'src/components/image/ui_image.dart';
+export 'src/components/notification/ui_notification_card.dart';
 export 'src/components/project/ui_artifact_dock.dart';
 export 'src/components/project/ui_explore.dart';
 export 'src/components/project/ui_project_library.dart';

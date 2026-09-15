@@ -15,7 +15,7 @@ namespace DigitalBrain.Core;
 
 // A durable actor with one receive slot. Owns its synapses, three bounded journals, and the
 // latest signal of each type it received. Fire travels along synapses; nothing else routes.
-public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable, ICommandHost
+public abstract class Neuron : DurableGrain, INeuron, INeuronOwnership, INeuronInbox, IRemindable, ICommandHost
 {
     // Latest-per-type is keyed by type name, so a caller putting identity in the type would
     // grow it without bound. The cap turns that mistake into one sentence of advice.
@@ -52,6 +52,9 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     public NeuronId Id => NeuronId.FromGrainId(this.GetGrainId());
 
     protected TimeProvider TimeProvider => _components.Clock;
+
+    // Processor configuration must use the same durable lifecycle claim as resource cleanup.
+    protected bool IsOwnedBy(string owner) => string.Equals(_components.Owner.Value, owner, StringComparison.Ordinal);
 
     // A durable write belongs to the activation, so request cancellation cannot interrupt it.
     protected Task PersistAsync() => _fence.PersistAsync();
@@ -142,6 +145,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
             || _components.Journals.OutgoingNextSequence > 1
             || _components.Commands.LastSequence > 0
             || _components.Synapses.All().Count > 0
+            || !string.IsNullOrEmpty(_components.Owner.Value)
             || _components.Pending.Count > 0
             || _components.Latest.Count > 0;
 
@@ -223,6 +227,58 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         Guard();
         ArgumentException.ThrowIfNullOrWhiteSpace(signalType);
         if (_components.Synapses.Disconnect(target, signalType))
+        {
+            await PersistAsync().ConfigureAwait(true);
+        }
+    }
+
+    async Task INeuronOwnership.Claim(string owner)
+    {
+        Guard();
+        NeuronSynapses.ValidateOwner(owner);
+        var current = _components.Owner.Value;
+        if (string.Equals(current, owner, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(current))
+        {
+            throw new InvalidOperationException($"Neuron '{Id}' is already claimed by '{current}'.");
+        }
+
+        _components.Owner.Value = owner;
+        await PersistAsync().ConfigureAwait(true);
+    }
+
+    async Task INeuronOwnership.Release(string owner)
+    {
+        Guard();
+        NeuronSynapses.ValidateOwner(owner);
+        if (string.Equals(_components.Owner.Value, owner, StringComparison.Ordinal))
+        {
+            _components.Owner.Value = string.Empty;
+            await PersistAsync().ConfigureAwait(true);
+        }
+    }
+
+    async Task INeuronOwnership.ConnectFor(string owner, NeuronId target, string signalType)
+    {
+        Guard();
+        NeuronSynapses.ValidateOwner(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(signalType);
+        if (_components.Synapses.ConnectFor(owner, target, signalType))
+        {
+            await PersistAsync().ConfigureAwait(true);
+        }
+    }
+
+    async Task INeuronOwnership.DisconnectFor(string owner, NeuronId target, string signalType)
+    {
+        Guard();
+        NeuronSynapses.ValidateOwner(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(signalType);
+        if (_components.Synapses.DisconnectFor(owner, target, signalType))
         {
             await PersistAsync().ConfigureAwait(true);
         }

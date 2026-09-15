@@ -1,0 +1,19 @@
+name: digitalbrain_telegram
+description: Telegram Mini App for the DigitalBrain inbox and reminders.
+publish_to: none
+version: 0.1.0
+environment:
+  sdk: ^3.13.0
+resolution: workspace
+dependencies:
+  flutter:
+    sdk: flutter
+  digitalbrain_ui:
+    path: ../ui
+  http: ^1.6.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
+  uses-material-design: true

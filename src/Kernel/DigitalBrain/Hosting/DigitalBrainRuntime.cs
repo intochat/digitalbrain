@@ -41,6 +41,7 @@ public static class DigitalBrainRuntime
         builder.Services.TryAddSingleton<StreamWake>();
         builder.Services.TryAddSingleton<DescriptorTable>();
         builder.Services.TryAddSingleton<INeuronInvoker, NeuronInvoker>();
+        builder.Services.TryAddSingleton<Behaviors.BehaviorCatalog>();
 
         foreach (var hook in ModuleHooksOf(modules))
         {

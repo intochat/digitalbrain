@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Abstractions.Identity;
 
@@ -29,11 +31,31 @@ internal sealed class NeuronInvoker(IGrainFactory grains, DescriptorTable table)
         }
 
         var method = table.Method(interfaceAlias, methodAlias);
+        var payload = WithCommandId(arguments, method);
         var proxy = grains.GetGrain(grainId, method.InterfaceType);
-        var argument = method.ArgumentsJson is null ? null : JsonSerializer.Deserialize(arguments, method.ArgumentsJson)
+        var argument = method.ArgumentsJson is null ? null : JsonSerializer.Deserialize(payload, method.ArgumentsJson)
             ?? throw new ArgumentException($"Arguments for interface '{interfaceAlias}', method '{methodAlias}' must match the method's schema.", nameof(arguments));
         var task = method.Invoke(proxy, argument, cancellationToken);
         await task.ConfigureAwait(true);
         return method.ResultJson is null ? null : JsonSerializer.SerializeToElement(method.Result!(task), method.ResultJson);
+    }
+
+    private static JsonElement WithCommandId(JsonElement arguments, InvocationMetadata method)
+    {
+        if (method.ArgumentsJson is null || method.CommandIdPropertyName is not { } commandId)
+        {
+            return arguments;
+        }
+
+        if (arguments.ValueKind == JsonValueKind.Object && arguments.TryGetProperty(commandId, out _))
+        {
+            return arguments;
+        }
+
+        var node = arguments.ValueKind == JsonValueKind.Object
+            ? JsonNode.Parse(arguments.GetRawText()) as JsonObject ?? []
+            : [];
+        node[commandId] = JsonSerializer.SerializeToNode(CommandId.New(), method.ArgumentsJson.Options);
+        return JsonSerializer.SerializeToElement(node);
     }
 }

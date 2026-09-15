@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><RootNamespace>DigitalBrain.Telegram</RootNamespace></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../../Kernel/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" /></ItemGroup>
+</Project>

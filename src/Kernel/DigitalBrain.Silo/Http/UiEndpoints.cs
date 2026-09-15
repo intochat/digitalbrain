@@ -15,6 +15,8 @@ internal static class UiEndpoints
         }
         MapRead<IChart, ChartState>(endpoints, "/ui/charts/{name}", UIVocabulary.ChartType,
             static neuron => neuron.Read(), static state => state);
+        MapRead<INotification, NotificationState>(endpoints, "/ui/notifications/{name}", UIVocabulary.NotificationType,
+            static neuron => neuron.Read(), static state => state);
         MapRead<IGraph, GraphState>(endpoints, "/ui/graphs/{name}", UIVocabulary.GraphType,
             static neuron => neuron.Read(), static state => state);
         MapRead<IImage, ImageState>(endpoints, "/ui/images/{name}", UIVocabulary.ImageType,

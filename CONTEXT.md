@@ -1,91 +1,79 @@
 # DigitalBrain
 
-A personal assistant whose durable graph a user (or the assistant) programs with typed C#.
-
-The sentence that settles naming: **a neuron fires a signal along a synapse**.
+A personal assistant that composes durable behaviors from registered capabilities.
 
 ## Graph
 
 **Neuron**
-A durable actor. It receives and emits typed Signals, owns its Synapses and journals, and keeps its own state.
-_Avoid_: agent, service, grain (product language)
+An addressable participant with its own state, incoming work, journals and outgoing connections. A neuron receives and emits signals.
 
 **Signal**
-A typed, immutable message. Identity, causation, correlation, and ownership ride the delivery envelope, not the payload.
-_Avoid_: event, bus message, “synapse” as a message
+One named message carrying a JSON payload. Identity, causation and correlation belong to its delivery envelope.
+
+**Signal contract**
+A signal name and the payload schema its sender promises and its recipient requires.
 
 **Synapse**
-A directed, typed, weighted edge between two Neurons. Lives on the source. `SubscribeTo` writes a Bound edge (does not decay). A handled Send writes a Learned edge (decays). Anatomy, not traffic.
-_Avoid_: message, subscription grain, journal entry
+A directed connection from one neuron to another for one signal type. A connection can have manual ownership and multiple behavior owners. It remains active while any owner needs it.
 
 **Journal**
-A bounded window over a Neuron’s incoming or outgoing Signals. How scripts notice that something happened.
-_Avoid_: event store, execution history, a record of Synapses
+A bounded record of incoming signals, outgoing signals or command outcomes. Journal retention is distinct from pending work and durable state.
 
-**Entity**
-A live snapshot (Chart, Surface, Memory). Direct typed reads/writes. Not on the graph: no journal, no synapses, not a signal target.
-_Avoid_: neuron, run history
+**Command**
+A requested state change with a stable identity. Acceptance can schedule durable work; acceptance is not proof that the work finished.
 
-**IDigitalBrain**
-The owner’s typed handle: `Get<TNeuron>`, `GetEntity<TEntity>`, journals. The assistant and scripts use this, not Orleans.
+## Composition
 
-In code, a `Neuron` owns its outgoing relationships through `NeuronSynapses` and its incoming/outgoing journal windows (`JournalWindow`) through `NeuronJournals`. Synapses `Bind`, `Unbind`, and `Reinforce`; journals record signal deliveries.
+**Capability**
+A registered operation available to composition, with configuration requirements, input/output contracts and an ownership policy.
 
-## Programming
-
-**Script**
-User- or assistant-authored C#, compiled against module contracts, executed outside the silo.
+**Behavior definition**
+A saved intent expressed as named roles, capability configurations, signal contracts and connections. It contains data, not generated executable code.
 
 **Behavior**
-A named `IBehavior` neuron that owns a saved C# handler, its validated draft and active revision,
-subscriptions, durable accepted inputs, execution claims, request checkpoints and output delivery.
-The scripting host runs handlers outside serialized neuron turns. Each accepted input pins its
-revision. Saving changes creates a draft; activation affects future inputs. Disable removes its
-incoming subscriptions and fences outstanding execution and output.
+A durable owner of a configured network that fulfills an intent. It manages the network's lifecycle, distinguishes owned processors from shared resources, and preserves other owners when it stops.
 
-Trigger is type-safe: you may `Send`/`Publish` `TSignal` only to a neuron that `IHandle<TSignal>`s it.
-`IHandle<T>` is the capability to receive T. A **synapse** is who actually receives T from **this** source.
-`SubscribeTo<TSource, TSignal>(sourceId)` writes that synapse (durable, does not decay). Broadcast fires only along those synapses — not to every neuron type that `IHandle`s T.
+**Role**
+A neuron's place within one behavior. A role is distinct from the identity of a shared resource.
 
-```csharp
-await using IDigitalBrain digitalBrain = await DigitalBrainClient.ConnectAsync(args);
-var inbox = digitalBrain.Get<IUserMessages>("default");
-var memoryAgent = digitalBrain.Get<IBehavior>("memory-agent");
-await memoryAgent.SaveScriptAsync<UserMessaged>(handlerSource);
-await memoryAgent.SubscribeToAsync<IUserMessages, UserMessaged>(inbox.Id);
-await memoryAgent.ActivateAsync();
-```
+**Shared resource**
+A neuron whose identity and state exist independently of a particular behavior, such as a Twitter account or a chart.
 
-English is how the owner asks. A compiled script is what they get. There is no second runtime, grant catalog, or JSON capability bus for this path.
+**Owned processor**
+A neuron configured for one behavior run. Its configuration is immutable during that run. Filters, mappings, actions and decision neurons are owned processors.
 
-Start with [Flutter chat and personal C# review routines](docs/GETTING_STARTED.md).
-The assistant can save, inspect, validate, connect, activate, invoke and disable behaviors.
-Each definition lives on its own `BehaviorNeuron`; `BehaviorsNeuron` is the discovery index.
-Its notifications wake the separate scripting worker;
-durable recovery handles missed notifications. Composition commands are not replayed on restart.
-The former admitted-script runtime and fixed GitHub review pipeline have been removed.
-Development chat can read the configured local repository diff for a one-off review.
+**Filter**
+A processor that emits its input only when a configured condition matches.
 
-The SDK owns the concrete client and reusable `WebhookNeuron`. A thin authenticated HTTP
-adapter durably accepts receipts before acknowledging them. Provider modules translate those
-receipts into minimal typed domain facts. `IRepository : IWebhook` is the GitHub source;
-there is no mandatory second webhook neuron or GitHub-specific review orchestrator.
-See [the implementation contract](docs/programmable-behaviors-implementation.md).
+**Mapping**
+A processor that constructs a new payload from declared input fields and constants.
 
-## Specialist modules
+**Action**
+A processor that invokes a registered operation. Retries retain the same logical action identity.
 
-Ino delegates to `IAspire`, `IGmail`, and `ISalesforce`. Each inherits `IAgent`
-(`IHandle<AgentRequest>` with `AgentReply`) and owns its native discovered MCP tools.
-An ordinary request uses the initiating neuron's source-owned send path and can
-create a Learned synapse; it does not create a Bound subscription.
+**Decision neuron**
+A processor that uses an AI model to produce a schema-validated structured decision. It does not invoke tools; declared downstream connections determine subsequent actions.
 
-Google, Salesforce, and Microsoft own connection policy and static presentation
-metadata. The SDK owns MCP sessions/discovery; the shared AI tool boundary owns
-screened evidence. Provider operation schemas remain MCP-owned.
+**Composing assistant**
+The conversational assistant that discovers capabilities and creates, inspects, starts and stops behaviors on the user's behalf. It is distinct from decision neurons inside a running behavior.
 
-`IClickHouse` is the read-only door into ClickHouse: its query table neuron owns a saved SELECT,
-serves pages live, and fires `TableRendered` along its synapse to the chat, which shows the table card.
+**Uncertain action**
+An action whose external outcome cannot be established safely. Its work is paused and surfaced for inspection instead of being blindly repeated.
 
-`AgentActivity` records diagnostic journal evidence, not subscriber delivery.
-Unsubscribe removes the current edge; a later explicit handled send can establish
-a Learned edge that is again eligible for broadcast. Journals remain bounded.
+**Recipe**
+An existing instruction-driven composition neuron. Saved recipes remain usable; they are not silently converted into behavior definitions.
+
+## Sources
+
+**Post**
+A publication with a provider identity, author and text. Receipt retries do not represent additional posts within the source's declared deduplication window.
+
+**Receipt source**
+A neuron that durably accepts integration input and emits domain signals. Availability of its local contract does not imply a live external provider connection.
+
+## Telegram reminders
+
+- **Telegram source** (`ITelegram`): durable private-chat receipts from an authenticated webhook. User identity and update identity belong to the provider adapter; behavior roles cannot replace them.
+- **Reminder collection** (`IReminders`): owns independent Time timers, absolute deadlines and the lifecycle of one-off reminders. Accepted scheduling requests emit `ReminderDue` or `ReminderRejected`; routine refusal does not fault the behavior action. Recovery uses original admission time.
+- **Notification** (`INotification`): durable bounded UI inbox with idempotent publish and dismiss commands. `UiNotificationCard` renders an entry as plain text. It does not imply an OS push or outgoing Telegram message.
+- **Telegram Mini App**: same-origin Flutter UI over signed, user-scoped requests; no generic kernel authority or bot token reaches the browser. The default per-user saved behavior connects receipt, decision, scheduling, refusal and notification paths. See `docs/v2/TELEGRAM.md`.

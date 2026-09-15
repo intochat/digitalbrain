@@ -83,7 +83,7 @@ public sealed class BrainTools(BrainOperations operations, SessionPrincipal sess
         "Discover the typed methods a neuron exposes before calling them. Pass `neuron` alone to list its module methods, "
         + "or pass `interface` and `method` aliases together to inspect one method. Returns interface and method aliases, "
         + "whether each method is read-only, JSON schemas for its arguments and result, and documentation when available. "
-        + "Use the argument schema to construct the JSON for call; kernel operations are available as separate tools.")]
+        + "Use the argument schema to construct JSON for call. For persistent automation, describe behavior:name, then call behavior catalog/validate/save/start/read/stop. Save definitions composed from registered capabilities; decision neurons have no tools. Kernel operations remain separate tools.")]
     public Task<string> Describe(
         [Description("Neuron name, e.g. counter:items; omit when selecting an interface and method")] string? neuron = null,
         [Description("Interface alias returned by describe; provide together with method")] string? @interface = null,

@@ -15,6 +15,8 @@
     <ProjectReference Include="../../Modules/ClickHouse/ClickHouse/DigitalBrain.Modules.ClickHouse.csproj" />
     <ProjectReference Include="../../Modules/Coding/Coding/DigitalBrain.Modules.Coding.csproj" />
     <ProjectReference Include="../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
+    <ProjectReference Include="../../Modules/Twitter/Twitter/DigitalBrain.Modules.Twitter.csproj" />
+    <ProjectReference Include="../../Modules/Telegram/Telegram/DigitalBrain.Modules.Telegram.csproj" />
     <ProjectReference Include="../../Modules/Excel/Excel/DigitalBrain.Modules.Excel.csproj" />
     <ProjectReference Include="../../Modules/Google/Google/DigitalBrain.Modules.Google.csproj" />
     <ProjectReference Include="../../Modules/Salesforce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
@@ -24,5 +26,8 @@
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Tests" />
     <PackageReference Include="Microsoft.Agents.AI.Hosting.AGUI.AspNetCore" />
+  </ItemGroup>
+  <ItemGroup Condition="Exists('../../Modules/UI/Flutter/telegram/build/web/index.html')">
+    <Content Include="../../Modules/UI/Flutter/telegram/build/web/**/*" Link="telegram-app/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

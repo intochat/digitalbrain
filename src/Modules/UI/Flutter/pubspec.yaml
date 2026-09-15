@@ -8,6 +8,7 @@ workspace:
   - core
   - ui
   - shell
+  - telegram
 
 # Markdraw 0.2.0 declares the old annotation package but does not import it.
 # Chat Core uses 3.x; Markdraw editor/controller behavior is covered by tests.

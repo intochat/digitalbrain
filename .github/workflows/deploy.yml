@@ -43,6 +43,19 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.2'
+          cache: true
+
+      - name: Build Telegram Mini App into kernel bundle
+        working-directory: src/Modules/UI/Flutter/telegram
+        run: |
+          flutter pub get --enforce-lockfile
+          flutter test --no-pub
+          flutter build web --release --base-href "/telegram/app/" --no-pub
+
       - name: Publish kernel image
         env:
           ContainerImageTags: ${{ github.event.release.tag_name }};latest

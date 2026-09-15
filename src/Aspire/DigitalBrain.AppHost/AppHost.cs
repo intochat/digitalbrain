@@ -17,6 +17,8 @@ using DigitalBrain.Microsoft;
 using DigitalBrain.Salesforce.Aspire.Hosting;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Time;
+using DigitalBrain.Twitter;
+using DigitalBrain.Telegram;
 using DigitalBrain.UI.Aspire.Hosting;
 using DigitalBrain.UI;
 using Microsoft.Extensions.Configuration;
@@ -70,6 +72,8 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
     .AddModule<MemoryModule>(memory => memory.WithQdrant())
     .AddModule<ClickHouseModule>(clickhouse => clickhouse.WithClickHouse(options => options.WithSeed("leads")))
     .AddModule<TimeModule>()
+    .AddModule<TwitterModule>()
+    .AddModule<TelegramModule>()
     .AddModule<ExcelModule>()
     .AddModule<GoogleModule>(google => google.WithGmail())
     .AddModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())

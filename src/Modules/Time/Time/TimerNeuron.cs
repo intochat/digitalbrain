@@ -14,6 +14,20 @@ internal sealed class TimerNeuron(
 {
     private const int RecoveredAfterMinutes = 1;
 
+    public Task<Accepted<TimerGeneration>> ScheduleAt(ScheduleTimerAt command) => ExecuteCommandAsync(
+        Descriptor("schedule-at"), command, TimeJson.Default.ScheduleTimerAt, TimeJson.Default.AcceptedTimerGeneration, arguments =>
+        {
+            if (arguments.DueUnixSeconds < DateTimeOffset.MinValue.ToUnixTimeSeconds() ||
+                arguments.DueUnixSeconds > DateTimeOffset.MaxValue.ToUnixTimeSeconds() || string.IsNullOrWhiteSpace(arguments.Note))
+            {
+                throw new CommandRejectedException(arguments.Id, "invalid absolute timer", "Provide a supported Unix timestamp and a non-blank note.");
+            }
+
+            var body = new SchedulingBody(0, arguments.Note, arguments.DueUnixSeconds);
+            var work = Schedule(Signal.FromJson(TimeSignals.TimerScheduling, body, TimeJson.Default.SchedulingBody));
+            return new Accepted<TimerGeneration>(new TimerGeneration(State?.Generation ?? 0), work);
+        });
+
     public Task<Accepted<TimerGeneration>> Schedule(ScheduleTimer command) => ExecuteCommandAsync(
         Descriptor("schedule"), command, TimeJson.Default.ScheduleTimer, TimeJson.Default.AcceptedTimerGeneration, arguments =>
         {
@@ -73,8 +87,13 @@ internal sealed class TimerNeuron(
 
                     var generation = (State?.Generation ?? 0) + 1;
                     var scheduledAt = TimeProvider.GetUtcNow();
-                    var dueAt = scheduledAt + TimeSpan.FromSeconds(body.DurationSeconds);
-                    next = new TimerState(TimerStatus.Scheduled, generation, scheduledAt, dueAt, body.DurationSeconds, body.Note);
+                    var dueAt = body.DueUnixSeconds is { } absolute
+                        ? DateTimeOffset.FromUnixTimeSeconds(absolute)
+                        : scheduledAt + TimeSpan.FromSeconds(body.DurationSeconds);
+                    var duration = body.DueUnixSeconds is not null
+                        ? (int)Math.Clamp(Math.Ceiling((dueAt - scheduledAt).TotalSeconds), 0, int.MaxValue)
+                        : body.DurationSeconds;
+                    next = new TimerState(TimerStatus.Scheduled, generation, scheduledAt, dueAt, duration, body.Note);
                     await Alarm(generation).Arm(dueAt - TimeProvider.GetUtcNow()).ConfigureAwait(true);
                     break;
                 }

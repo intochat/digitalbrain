@@ -26,6 +26,14 @@
     <Project Path="src/Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <Project Path="src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
   </Folder>
+  <Folder Name="/Modules/Twitter/">
+    <Project Path="src/Modules/Twitter/Contracts/DigitalBrain.Modules.Twitter.Contracts.csproj" />
+    <Project Path="src/Modules/Twitter/Twitter/DigitalBrain.Modules.Twitter.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Telegram/">
+    <Project Path="src/Modules/Telegram/Contracts/DigitalBrain.Modules.Telegram.Contracts.csproj" />
+    <Project Path="src/Modules/Telegram/Telegram/DigitalBrain.Modules.Telegram.csproj" />
+  </Folder>
   <Folder Name="/Modules/Excel/">
     <Project Path="src/Modules/Excel/Contracts/DigitalBrain.Modules.Excel.Contracts.csproj" />
     <Project Path="src/Modules/Excel/Excel/DigitalBrain.Modules.Excel.csproj" />

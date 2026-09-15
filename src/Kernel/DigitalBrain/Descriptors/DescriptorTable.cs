@@ -105,6 +105,8 @@ public sealed class DescriptorTable
 
     public IReadOnlyList<MethodDescriptor> For(GrainType grainType) => _descriptors.GetValueOrDefault(grainType) ?? [];
 
+    public bool Contains(GrainType grainType) => _descriptors.ContainsKey(grainType);
+
     public MethodDescriptor Get(string interfaceAlias, string methodAlias) => Method(interfaceAlias, methodAlias).Descriptor;
 
     public ArgumentContract? ArgumentContractOf(string interfaceAlias, string methodAlias)

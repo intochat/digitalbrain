@@ -11,6 +11,10 @@ public interface ITimer : INeuron
     [Alias("schedule")]
     Task<Accepted<TimerGeneration>> Schedule(ScheduleTimer command);
 
+    /// <summary>Schedules an absolute deadline; overdue work fires as soon as recovered.</summary>
+    [Alias("schedule-at")]
+    Task<Accepted<TimerGeneration>> ScheduleAt(ScheduleTimerAt command);
+
     /// <summary>Stops the scheduled timer.</summary>
     [Alias("stop")]
     Task<Accepted<TimerGeneration>> Stop(StopTimer command);

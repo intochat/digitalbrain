@@ -36,6 +36,8 @@
     <ProjectReference Include="../../src/Modules/Coding/Coding/DigitalBrain.Modules.Coding.csproj" />
     <ProjectReference Include="../../src/Modules/Coding/Contracts/DigitalBrain.Modules.Coding.Contracts.csproj" />
     <ProjectReference Include="../../src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
+    <ProjectReference Include="../../src/Modules/Twitter/Twitter/DigitalBrain.Modules.Twitter.csproj" />
+    <ProjectReference Include="../../src/Modules/Telegram/Telegram/DigitalBrain.Modules.Telegram.csproj" />
     <ProjectReference Include="../../src/Modules/Excel/Excel/DigitalBrain.Modules.Excel.csproj" />
     <ProjectReference Include="../../src/Modules/Microsoft/Microsoft/DigitalBrain.Modules.Microsoft.csproj" />
     <ProjectReference Include="../../src/Modules/Microsoft/Contracts/DigitalBrain.Modules.Microsoft.Contracts.csproj" />

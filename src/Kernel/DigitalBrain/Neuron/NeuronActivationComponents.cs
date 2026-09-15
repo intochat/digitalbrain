@@ -11,6 +11,7 @@ internal sealed record NeuronActivationComponents(
     CommandDedup Dedup,
     CommandExecution Execution,
     NeuronSynapses Synapses,
+    IDurableValue<string> Owner,
     IDurableDictionary<string, SignalDelivery> Latest,
     PendingWork Pending)
 {

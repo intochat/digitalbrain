@@ -39,7 +39,10 @@ public sealed class NeuronRuntime(TimeProvider clock, NeuronOptions options)
             commands,
             dedup,
             new CommandExecution(commands, dedup, Clock, services.GetService<ICommandCrashPoint>()),
-            new NeuronSynapses(services.GetRequiredKeyedService<IDurableDictionary<string, Synapse>>("synapses"), neuronId, Clock),
+            new NeuronSynapses(
+                services.GetRequiredKeyedService<IDurableDictionary<string, Synapse>>("synapses"),
+                services.GetRequiredKeyedService<IDurableDictionary<string, string[]>>("synapses.owners"), neuronId, Clock),
+            services.GetRequiredKeyedService<IDurableValue<string>>("ownership.owner"),
             services.GetRequiredKeyedService<IDurableDictionary<string, SignalDelivery>>("latest"),
             new PendingWork(
                 services.GetRequiredKeyedService<IDurableQueue<SignalDelivery>>("pending"),

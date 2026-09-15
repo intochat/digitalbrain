@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>true</IsPackable><RootNamespace>DigitalBrain.Twitter</RootNamespace><NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Contracts/DigitalBrain.Modules.Twitter.Contracts.csproj" />
+    <ProjectReference Include="../../../Kernel/DigitalBrain/DigitalBrain.csproj" />
+  </ItemGroup>
+</Project>

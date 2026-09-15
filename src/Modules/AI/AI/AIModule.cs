@@ -1,5 +1,6 @@
 using DigitalBrain.AI.WebSearch;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Behaviors;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -18,6 +19,12 @@ public sealed class AIModule : IModule
         WebSearchHosting.Add(builder.Services, builder.Configuration);
 
         builder.Services.TryAddSingleton<NativeTools>();
+        builder.Services.TryAddSingleton<BehaviorTools>();
+        foreach (var toolName in BehaviorTools.Names)
+        {
+            builder.Services.AddNativeTool(toolName, services => services.GetRequiredService<BehaviorTools>().Create().Single(tool => tool.Name == toolName));
+        }
+        builder.Services.TryAddSingleton<IBehaviorDecision, BehaviorDecision>();
         if (builder.Configuration.GetValue<bool>(TavilyWebSearch.EnabledConfigurationKey))
         {
             builder.Services.AddNativeTool("websearch", services => WebSearchFunction.Create(services.GetRequiredService<IWebSearch>()));
