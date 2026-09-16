@@ -74,7 +74,7 @@ prefix routes reads: `table-`, `chtable-`, `chart-`, `graph-`, `image-`, `docume
 `sheet-`), a `title`, a `revision`, and a kind-specific payload. A `UiPartRef` is the same
 identity without the payload; it is what a chat card carries and what a listing returns.
 
-C# (Contracts, namespace `DigitalBrain.UI`; the `DigitalBrain.Chat` namespace folds into it):
+C# (Contracts, namespace `DigitalBrain.Flutter`; the `DigitalBrain.Chat` namespace folds into it):
 
 ```csharp
 public static class UiPartKinds
@@ -137,14 +137,14 @@ final class UiToolError { final String tool, code, message; … }
 
 The contract is pinned by fixtures, not by reflection. A C# fact serialises one sample of every
 kind, every ref, every error and every AG-UI tool-result envelope into
-`src/Modules/UI/contracts/fixtures/parts/*.json` and fails when the checked-in file differs
+`src/Modules/Flutter/contracts/fixtures/parts/*.json` and fails when the checked-in file differs
 (`DIGITALBRAIN_UPDATE_FIXTURES=1` rewrites). A Dart test in `core` loads the same files, parses
 each into the expected subtype and asserts a lossless `toJson` round trip. The reflection golden
 (`flutter-wire-contracts.golden.json`) is retired once the fixtures cover its types.
 
 ### 4.2 Kernel and UI module
 
-- **Module shape** stays: `UIModule` registers services, part sources and native tools. Tools are
+- **Module shape** stays: `FlutterModule` registers services, part sources and native tools. Tools are
   built once per tool class, not once per tool name (R1.5).
 - **Neurons** keep their contracts (`IChat`, `ITable`, `IChart`, `IGraph`, `IImage`,
   `IWorkspaces`) and gain `IDocument` and `IDiagram` (text neurons with revision conflicts, the
@@ -292,7 +292,7 @@ Three tiers, all deterministic, the third gated:
   `/agent` host over a `BrainSimulation` (the `TableAgentFacts.StartAsync` hosting, R4.1) for a
   small set of scenarios (`chart_by_country`, `query_table`, `table_error`, `text_only`) and
   records the raw SSE bytes, normalised for ids and timestamps, into
-  `src/Modules/UI/contracts/fixtures/agui/<scenario>.sse`; the fact fails when a recording
+  `src/Modules/Flutter/contracts/fixtures/agui/<scenario>.sse`; the fact fails when a recording
   drifts. Dart shell tests serve those bytes through `MockClient.streaming` to the real
   `DigitalBrainUiClient`, boot the real shell with `buildShell(edge:)`, type the prompt, and assert
   on widgets and semantics (`find.bySemanticsLabel('GB 11')`, `UiChart` with three points, the
@@ -353,7 +353,7 @@ Each has a default. Silence means the default.
    composable surface). Alternative: only `document` and `diagram` now.
 7. **Live end-to-end tier.** Default: T2 is the last phase, gated by `DIGITALBRAIN_UI_E2E=1`,
    with its own CI job. Alternative: T1 only.
-8. **Namespaces and names.** Default: `DigitalBrain.Chat` folds into `DigitalBrain.UI`; the
+8. **Namespaces and names.** Default: `DigitalBrain.Chat` folds into `DigitalBrain.Flutter`; the
    product name is spelled `IntoChat` everywhere; `spreadsheet` is the kind and `Sheet` the
    Dart type. Alternative: leave namespaces alone to limit churn.
 

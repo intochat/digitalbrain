@@ -27,7 +27,7 @@ node_modules/
 
 # Dart / Flutter clients
 **/.dart_tool/
-/src/Modules/UI/Flutter/build/
+/src/Modules/Flutter/app/build/
 **/packages/pubspec_overrides.yaml
 
 # Reqnroll code-behind: generated into obj/, never source
@@ -42,7 +42,7 @@ apphost.out.log
 apphost.err.log
 *.log
 # Locally saved application sources and compiled artifacts.
-src/Kernel/DigitalBrain.Silo/applications/
+src/Applications/IntoChat/IntoChat/applications/
 .test-results/
 # Scratch source bundles produced by file-application tests.
 .agent-facade-tests/

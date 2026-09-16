@@ -55,7 +55,7 @@ jobs:
     timeout-minutes: 35
     defaults:
       run:
-        working-directory: src/Modules/UI/Flutter/shell
+        working-directory: src/Modules/Flutter/app/shell
     steps:
       - uses: actions/checkout@v7
 
@@ -66,30 +66,30 @@ jobs:
           cache: true
 
       - name: Resolve Flutter workspace
-        working-directory: src/Modules/UI/Flutter
+        working-directory: src/Modules/Flutter/app
         run: flutter pub get --enforce-lockfile
 
       - name: Dart format
-        working-directory: src/Modules/UI/Flutter
+        working-directory: src/Modules/Flutter/app
         run: dart format --output=none --set-exit-if-changed core ui shell
 
       - name: Analyze core, ui and shell
-        working-directory: src/Modules/UI/Flutter
+        working-directory: src/Modules/Flutter/app
         run: |
           (cd core && dart analyze --fatal-infos)
           (cd ui && flutter analyze --no-pub)
           (cd shell && flutter analyze --no-pub)
 
       - name: Core tests
-        working-directory: src/Modules/UI/Flutter/core
+        working-directory: src/Modules/Flutter/app/core
         run: dart test
 
       - name: Ui tests
-        working-directory: src/Modules/UI/Flutter/ui
+        working-directory: src/Modules/Flutter/app/ui
         run: flutter test --no-pub
 
       - name: Shell tests
-        working-directory: src/Modules/UI/Flutter/shell
+        working-directory: src/Modules/Flutter/app/shell
         run: flutter test --no-pub
 
       - name: Web release build

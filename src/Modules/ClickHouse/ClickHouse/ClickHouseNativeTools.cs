@@ -5,7 +5,7 @@ using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Chat;
-using DigitalBrain.UI;
+using DigitalBrain.Flutter;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.ClickHouse;

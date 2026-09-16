@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../../Testing/Module.Tests.props" />
+  <ItemGroup>
+    <ProjectReference Include="../Memory/DigitalBrain.Modules.Memory.csproj" />
+  </ItemGroup>
+</Project>

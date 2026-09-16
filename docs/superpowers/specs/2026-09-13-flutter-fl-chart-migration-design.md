@@ -19,9 +19,9 @@ Replace the `graphic` dependency in the DigitalBrain Flutter UI package with `fl
 
 ## Current state
 
-- Dependency: `graphic: ^2.7.0` in `src/Modules/UI/Flutter/ui/pubspec.yaml`
-- Implementation: `src/Modules/UI/Flutter/ui/lib/src/components/chart/ui_chart.dart`
-- Tests: `src/Modules/UI/Flutter/ui/test/ui_chart_test.dart` assert graphic `IntervalMark` / `LineMark` / `PointMark`
+- Dependency: `graphic: ^2.7.0` in `src/Modules/Flutter/app/ui/pubspec.yaml`
+- Implementation: `src/Modules/Flutter/app/ui/lib/src/components/chart/ui_chart.dart`
+- Tests: `src/Modules/Flutter/app/ui/test/ui_chart_test.dart` assert graphic `IntervalMark` / `LineMark` / `PointMark`
 - Call sites (unchanged by this work): gallery preview, shell artifact editors, chat tool results — they consume `UiChart` / `UiChartPart` only
 
 ## Target behavior
@@ -44,17 +44,17 @@ Replace the `graphic` dependency in the DigitalBrain Flutter UI package with `fl
 
 ## Files to touch
 
-1. `src/Modules/UI/Flutter/ui/pubspec.yaml` — replace `graphic` with `fl_chart: ^1.2.0`
-2. `src/Modules/UI/Flutter/ui/lib/src/components/chart/ui_chart.dart` — rewrite chart body to fl_chart
-3. `src/Modules/UI/Flutter/ui/test/ui_chart_test.dart` — assert `BarChart` / `LineChart` instead of graphic marks
-4. Workspace lockfile under `src/Modules/UI/Flutter/` — refresh via `flutter pub get`
+1. `src/Modules/Flutter/app/ui/pubspec.yaml` — replace `graphic` with `fl_chart: ^1.2.0`
+2. `src/Modules/Flutter/app/ui/lib/src/components/chart/ui_chart.dart` — rewrite chart body to fl_chart
+3. `src/Modules/Flutter/app/ui/test/ui_chart_test.dart` — assert `BarChart` / `LineChart` instead of graphic marks
+4. Workspace lockfile under `src/Modules/Flutter/app/` — refresh via `flutter pub get`
 
 Shell tests that only find `UiChart` and inspect `part` metadata do not need changes.
 
 ## Verification
 
-- `flutter test` in `src/Modules/UI/Flutter/ui` (at least `ui_chart_test.dart`)
-- Confirm no remaining `graphic` references under `src/Modules/UI/Flutter`
+- `flutter test` in `src/Modules/Flutter/app/ui` (at least `ui_chart_test.dart`)
+- Confirm no remaining `graphic` references under `src/Modules/Flutter/app`
 - Smoke: gallery chart entry and empty-series placeholder still render
 
 ## Out of scope

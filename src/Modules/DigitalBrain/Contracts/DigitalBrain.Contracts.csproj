@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>The DigitalBrain programming model: signals, synapses, and neurons.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain" />
+    <InternalsVisibleTo Include="DigitalBrain.Mcp" />
+    <InternalsVisibleTo Include="DigitalBrain.Testing" />
+    <InternalsVisibleTo Include="DigitalBrain.Tests" />
+    <InternalsVisibleTo Include="IntoChat.Tests" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.ClickHouse.Tests" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Coding.Tests" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Flutter.Tests" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Supabase.Tests" />
+    <InternalsVisibleTo Include="DigitalBrain.Runtime.Tests" />
+  </ItemGroup>
+</Project>

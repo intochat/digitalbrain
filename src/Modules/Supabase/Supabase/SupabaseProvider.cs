@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
-using DigitalBrain.UI;
+using DigitalBrain.Flutter;
 using Npgsql;
 
 namespace DigitalBrain.Supabase;

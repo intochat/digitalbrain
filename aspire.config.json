@@ -1,6 +1,6 @@
 {
-  "appHostPath": "src/Aspire/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj",
+  "appHostPath": "src/Applications/IntoChat/AppHost/IntoChat.AppHost.csproj",
   "appHost": {
-    "path": "src/Aspire/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj"
+    "path": "src/Applications/IntoChat/AppHost/IntoChat.AppHost.csproj"
   }
 }

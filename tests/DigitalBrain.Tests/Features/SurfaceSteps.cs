@@ -2,7 +2,7 @@ using System.Text.Json;
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
-using DigitalBrain.UI;
+using DigitalBrain.Flutter;
 using Reqnroll;
 using Xunit;
 

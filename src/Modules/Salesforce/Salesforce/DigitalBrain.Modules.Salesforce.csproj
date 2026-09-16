@@ -7,13 +7,15 @@
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Tests" />
+    <InternalsVisibleTo Include="IntoChat.Tests" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Salesforce.Tests" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="ModelContextProtocol.Core" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Salesforce.Contracts.csproj" />
     <ProjectReference Include="../../AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
-    <ProjectReference Include="../../../Kernel/DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../../DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
   </ItemGroup>
 
 </Project>

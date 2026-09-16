@@ -7,13 +7,15 @@
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Tests" />
+    <InternalsVisibleTo Include="IntoChat.Tests" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.ClickHouse.Tests" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="ClickHouse.Driver" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.ClickHouse.Contracts.csproj" />
     <ProjectReference Include="../../AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
-    <ProjectReference Include="../../UI/DigitalBrain.Modules.UI/DigitalBrain.Modules.UI.csproj" />
-    <ProjectReference Include="../../../Kernel/DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../../Flutter/Flutter/DigitalBrain.Modules.Flutter.csproj" />
+    <ProjectReference Include="../../DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
   </ItemGroup>
 </Project>

@@ -7,6 +7,8 @@
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Tests" />
+    <InternalsVisibleTo Include="IntoChat.Tests" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Google.Tests" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
     <PackageReference Include="ModelContextProtocol.Core" />
@@ -14,7 +16,7 @@
   <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Google.Contracts.csproj" />
     <ProjectReference Include="../../AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
-    <ProjectReference Include="../../../Kernel/DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../../DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
   </ItemGroup>
 
 </Project>

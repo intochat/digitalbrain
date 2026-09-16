@@ -1,5 +1,5 @@
 using System.Text.Json;
-using DigitalBrain.UI;
+using DigitalBrain.Flutter;
 
 namespace DigitalBrain.Supabase;
 

@@ -3,7 +3,7 @@ using System.Text.Json;
 using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
-using DigitalBrain.UI;
+using DigitalBrain.Flutter;
 using Microsoft.Extensions.AI;
 using Microsoft.VisualBasic.FileIO;
 

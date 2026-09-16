@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../../Testing/Module.Tests.props" />
+  <ItemGroup>
+    <ProjectReference Include="../IntoChat/IntoChat.csproj" />
+    <ProjectReference Include="../../../Modules/Supabase/Aspire.Hosting/DigitalBrain.Modules.Supabase.Aspire.Hosting.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+    <Compile Include="../../../Modules/AI/Tests/Fixtures/ScriptedChatClient.cs" Link="Fixtures/%(Filename)%(Extension)" />
+    <Compile Include="../../../Modules/AI/Tests/Fixtures/ScriptedContentScreen.cs" Link="Fixtures/%(Filename)%(Extension)" />
+    <Compile Include="../../../Modules/Coding/Tests/Fixtures/AdhocSolutionLoader.cs" Link="Fixtures/%(Filename)%(Extension)" />
+    <Compile Include="../../../Modules/Coding/Tests/Fixtures/DiskFixture.cs" Link="Fixtures/%(Filename)%(Extension)" />
+    <Compile Include="../../../Modules/Coding/Tests/Fixtures/FakeProcessRunner.cs" Link="Fixtures/%(Filename)%(Extension)" />
+    <Compile Include="../../../Modules/Coding/Tests/Fixtures/FixtureSolutions.cs" Link="Fixtures/%(Filename)%(Extension)" />
+    <Compile Include="../../../Modules/Coding/Tests/Fixtures/GatedSecondOpenLoader.cs" Link="Fixtures/%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

@@ -32,7 +32,7 @@ the child detected the exited launcher and cancelled its build. Relevant logs:
 
 The E2E fixture now gives CLI discovery the test assembly identity and randomizes
 proxyless project ports too. Normal startup is `aspire start --apphost
-src/Aspire/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj --non-interactive`.
+src/Applications/IntoChat/AppHost/IntoChat.AppHost.csproj --non-interactive`.
 Use Aspire state to get current endpoints. Do not reuse stale process IDs.
 
 ## Verification and remaining work

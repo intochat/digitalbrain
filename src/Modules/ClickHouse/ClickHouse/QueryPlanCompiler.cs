@@ -1,6 +1,6 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using DigitalBrain.UI;
+using DigitalBrain.Flutter;
 
 namespace DigitalBrain.ClickHouse;
 

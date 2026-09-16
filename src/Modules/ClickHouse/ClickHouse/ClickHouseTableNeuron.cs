@@ -4,7 +4,7 @@ using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Core;
-using DigitalBrain.UI;
+using DigitalBrain.Flutter;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Concurrency;
 using Orleans.Runtime;

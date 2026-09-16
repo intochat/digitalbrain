@@ -318,7 +318,7 @@ is public with no external caller.
   at `8f397b42`: 0 warnings, 333 total, 328 passed, 5 skipped (4 Docker + 1 coding self-test), 0 failed.
 - Gated self-test at `8f397b42`: `DIGITALBRAIN_CODING_SELF_TESTS=1 dotnet test tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj -c Release -- --filter-class DigitalBrain.Tests.Coding.CodingSelfTestFacts`
   passed (1/1).
-- Flutter (from `src/Modules/UI/Flutter`): `dart format --output=none --set-exit-if-changed core ui shell/lib shell/test`
+- Flutter (from `src/Modules/Flutter/app`): `dart format --output=none --set-exit-if-changed core ui shell/lib shell/test`
   87 files, 0 changed; `flutter analyze` no issues in `ui` and `shell`; `flutter test` 22 passed in `ui`,
   49 passed in `shell`.
 

@@ -30,7 +30,7 @@ Deviations are listed at the end and repeated in the PR description.
   query table neuron use `UIJson`, and `create-query` uses `ClickHouseJson`.
 - **`TableService` is the only routing point.** It hard-codes the `table-` prefix and the `table`
   grain type in `Table(id)` and `ListAsync`; the `ITableSource` seam replaces both.
-- **`TablePolicy` is internal** to `DigitalBrain.Modules.UI`; the ClickHouse module reaches it through
+- **`TablePolicy` is internal** to `DigitalBrain.Modules.Flutter`; the ClickHouse module reaches it through
   `InternalsVisibleTo` rather than a copy.
 - **Working-tree line endings are LF** even though `.editorconfig` says CRLF; `.gitattributes` normalises
   on commit and `dotnet format whitespace --verify-no-changes` passes either way.
@@ -103,7 +103,7 @@ DIGITALBRAIN_CLICKHOUSE_TESTS=1 dotnet test tests/DigitalBrain.Tests/DigitalBrai
 15. `TablePolicy.Apply(source)` was extracted from `Query` so the fake provider reuses the exact filter
     and sort engine; `Query` still calls it.
 16. The wire golden did not change: `TableRendered`, `UiCardKinds.Table` and `ITableSource` add no
-    record to `DigitalBrain.Modules.UI.Contracts`, so `FlutterWireGoldenFacts` passes untouched.
+    record to `DigitalBrain.Modules.Flutter.Contracts`, so `FlutterWireGoldenFacts` passes untouched.
 17. The Flutter table card creates its own `UiTableController` per card and re-reads the table on a
     later offer for the same name; controllers are not shared across cards.
 
@@ -282,7 +282,7 @@ Ten review angles ran over the branch; the confirmed findings and what changed:
     it retry the whole turn. An unreachable server during create is a terminal `invalid` result rather
     than an indefinite retry that would attach the card to a later, unrelated turn.
 29. **The table tools are native tools too.** `TableAgentTools` moved from the kernel into the UI
-    module and `UIModule` registers `create_table`, `read_table`, `update_table_view` and
+    module and `FlutterModule` registers `create_table`, `read_table`, `update_table_view` and
     `list_tables` through `AddNativeTool`, so a uichat agent instructed with them can refine a query
     table the way the workspace agent does (before, only the workspace agent had them). The ClickHouse
     module registers `TableService` itself, so composing AI + ClickHouse without UI cannot poison the

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>DigitalBrain client: fire, connect, disconnect, read — as C# and as MCP tools.</Description>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
+    <PackageReference Include="Microsoft.Orleans.Client" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Contracts/DigitalBrain.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Tests" />
+    <InternalsVisibleTo Include="IntoChat.Tests" />
+    <InternalsVisibleTo Include="DigitalBrain.Runtime.Tests" />
+  </ItemGroup>
+</Project>

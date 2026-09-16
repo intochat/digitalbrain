@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <!-- Local runs write journal and grain state under this folder. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);.digitalbrain/**</DefaultItemExcludes>
+    <NoWarn>$(NoWarn);CA2007;CA1812</NoWarn>
+    <!-- Microsoft.CodeAnalysis.Workspaces.MSBuild carries Microsoft.Build.Framework; the SDK refuses to copy it by default. -->
+    <DisableMSBuildAssemblyCopyCheck>true</DisableMSBuildAssemblyCopyCheck>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ServiceDefaults/IntoChat.ServiceDefaults.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Aspire/DigitalBrain.Aspire.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Mcp/DigitalBrain.Mcp.csproj" />
+    <ProjectReference Include="../../../Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
+    <ProjectReference Include="../../../Modules/Memory/Memory/DigitalBrain.Modules.Memory.csproj" />
+    <ProjectReference Include="../../../Modules/ClickHouse/ClickHouse/DigitalBrain.Modules.ClickHouse.csproj" />
+    <ProjectReference Include="../../../Modules/Supabase/Supabase/DigitalBrain.Modules.Supabase.csproj" />
+    <ProjectReference Include="../../../Modules/Coding/Coding/DigitalBrain.Modules.Coding.csproj" />
+    <ProjectReference Include="../../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
+    <ProjectReference Include="../../../Modules/Excel/Excel/DigitalBrain.Modules.Excel.csproj" />
+    <ProjectReference Include="../../../Modules/Google/Google/DigitalBrain.Modules.Google.csproj" />
+    <ProjectReference Include="../../../Modules/Salesforce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
+    <ProjectReference Include="../../../Modules/Microsoft/Microsoft/DigitalBrain.Modules.Microsoft.csproj" />
+    <ProjectReference Include="../../../Modules/Flutter/Flutter/DigitalBrain.Modules.Flutter.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Tests" />
+    <InternalsVisibleTo Include="IntoChat.Tests" />
+    <PackageReference Include="Microsoft.Agents.AI.Hosting.AGUI.AspNetCore" />
+  </ItemGroup>
+</Project>

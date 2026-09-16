@@ -12,7 +12,9 @@
     <PackageReference Include="ModelContextProtocol.Core" />
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Microsoft.Contracts.csproj" />
     <ProjectReference Include="../../AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
-    <ProjectReference Include="../../../Kernel/DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../../DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
     <InternalsVisibleTo Include="DigitalBrain.Tests" />
+    <InternalsVisibleTo Include="IntoChat.Tests" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.Tests" />
   </ItemGroup>
 </Project>

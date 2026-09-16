@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../../Testing/Module.Tests.props" />
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />
+    <Compile Include="Scenarios/AnnounceFixtures.cs" Link="Fixtures/%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

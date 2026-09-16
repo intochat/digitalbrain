@@ -6,6 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Microsoft/DigitalBrain.Modules.Microsoft.csproj" />
-    <ProjectReference Include="../../../Aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>

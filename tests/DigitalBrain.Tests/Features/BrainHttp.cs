@@ -1,7 +1,7 @@
 using DigitalBrain.Core;
-using DigitalBrain.Kernel;
+using IntoChat;
 using DigitalBrain.Testing;
-using DigitalBrain.UI;
+using DigitalBrain.Flutter;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;

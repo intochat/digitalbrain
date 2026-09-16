@@ -4,7 +4,7 @@ using System.Text.Json;
 using ClickHouse.Driver;
 using ClickHouse.Driver.ADO;
 using ClickHouse.Driver.ADO.Parameters;
-using DigitalBrain.UI;
+using DigitalBrain.Flutter;
 
 namespace DigitalBrain.ClickHouse;
 

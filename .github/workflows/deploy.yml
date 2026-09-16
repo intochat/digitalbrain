@@ -47,7 +47,7 @@ jobs:
         env:
           ContainerImageTags: ${{ github.event.release.tag_name }};latest
         run: |
-          dotnet publish src/Kernel/DigitalBrain.Silo/DigitalBrain.Silo.csproj \
+          dotnet publish src/Applications/IntoChat/IntoChat/IntoChat.csproj \
             -c Release -r linux-x64 /t:PublishContainer \
             -p:PublishProfile=Container \
             -p:EnableSdkContainerSupport=true \
@@ -120,7 +120,7 @@ jobs:
       #   env:
       #     ContainerImageTags: ${{ github.event.release.tag_name }};latest
       #   run: |
-      #     dotnet publish src/Kernel/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj \
+      #     dotnet publish src/Modules/DigitalBrain/Mcp/DigitalBrain.Mcp.csproj \
       #       -c Release -r linux-x64 /t:PublishContainer \
       #       -p:PublishProfile=Container \
       #       -p:EnableSdkContainerSupport=true \
@@ -218,7 +218,7 @@ jobs:
       url: https://purple-sky-0f80f110f.7.azurestaticapps.net/
     defaults:
       run:
-        working-directory: src/Modules/UI/Flutter/shell
+        working-directory: src/Modules/Flutter/app/shell
     steps:
       - uses: actions/checkout@v7
 
@@ -229,20 +229,20 @@ jobs:
           cache: true
 
       - name: Resolve Flutter workspace
-        working-directory: src/Modules/UI/Flutter
+        working-directory: src/Modules/Flutter/app
         run: flutter pub get --enforce-lockfile
 
       - name: Dart format
-        working-directory: src/Modules/UI/Flutter
+        working-directory: src/Modules/Flutter/app
         run: dart format --output=none --set-exit-if-changed core ui shell
 
       - name: Core package tests
-        working-directory: src/Modules/UI/Flutter/core
+        working-directory: src/Modules/Flutter/app/core
         run: |
           if [ -d test ]; then dart test; else echo "no core tests"; fi
 
       - name: Ui package tests
-        working-directory: src/Modules/UI/Flutter/ui
+        working-directory: src/Modules/Flutter/app/ui
         run: |
           if [ -d test ]; then flutter test --no-pub; else echo "no ui tests"; fi
 
@@ -260,7 +260,7 @@ jobs:
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           action: upload
-          app_location: src/Modules/UI/Flutter/shell/build/web
+          app_location: src/Modules/Flutter/app/shell/build/web
           api_location: ''
           output_location: ''
           skip_app_build: true

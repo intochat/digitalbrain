@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../../Testing/Module.Tests.props" />
+  <ItemGroup>
+    <ProjectReference Include="../Coding/DigitalBrain.Modules.Coding.csproj" />
+    <ProjectReference Include="../../AI/AI/DigitalBrain.Modules.AI.csproj" />
+    <Compile Include="../../AI/Tests/Fixtures/ScriptedChatClient.cs" Link="Fixtures/%(Filename)%(Extension)" />
+    <Compile Include="../../AI/Tests/Fixtures/ScriptedContentScreen.cs" Link="Fixtures/%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

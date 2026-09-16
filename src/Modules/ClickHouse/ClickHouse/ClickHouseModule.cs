@@ -1,7 +1,7 @@
 using ClickHouse.Driver;
 using DigitalBrain.AI;
 using DigitalBrain.Core;
-using DigitalBrain.UI;
+using DigitalBrain.Flutter;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;

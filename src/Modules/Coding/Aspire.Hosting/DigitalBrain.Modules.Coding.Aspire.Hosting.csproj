@@ -8,6 +8,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Coding/DigitalBrain.Modules.Coding.csproj" />
-    <ProjectReference Include="../../../Aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>

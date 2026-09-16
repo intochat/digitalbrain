@@ -253,7 +253,7 @@ about 18 seconds. The second runs `DotnetRunner.BuildAsync`/`TestAsync` against 
 (`-p:ArtifactsPath` under `artifacts/self-test`) and asserts a clean build and at least 7 passing
 `WorkspaceReadFacts`. Without the environment variable both facts are skipped.
 
-Flutter, from `src/Modules/UI/Flutter/shell`:
+Flutter, from `src/Modules/Flutter/app/shell`:
 
 ```bash
 flutter test test/workspace/graph_artifact_test.dart

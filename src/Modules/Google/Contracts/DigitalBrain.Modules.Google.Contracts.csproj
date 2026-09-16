@@ -7,6 +7,6 @@
     <RootNamespace>DigitalBrain.Google</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../../Kernel/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Contracts/DigitalBrain.Contracts.csproj" />
   </ItemGroup>
 </Project>

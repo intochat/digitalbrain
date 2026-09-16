@@ -22,13 +22,13 @@
     <PackageReference Include="Testcontainers.PostgreSql" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../src/Kernel/DigitalBrain.Silo/DigitalBrain.Silo.csproj" />
+    <ProjectReference Include="../../src/Applications/IntoChat/IntoChat/IntoChat.csproj" />
     <ProjectReference Include="../../src/Modules/Salesforce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
     <ProjectReference Include="../../src/Modules/Salesforce/Contracts/DigitalBrain.Modules.Salesforce.Contracts.csproj" />
     <ProjectReference Include="../../src/Modules/Google/Google/DigitalBrain.Modules.Google.csproj" />
     <ProjectReference Include="../../src/Modules/Google/Contracts/DigitalBrain.Modules.Google.Contracts.csproj" />
-    <ProjectReference Include="../../src/Kernel/DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
-    <ProjectReference Include="../../src/Kernel/DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../../src/Modules/DigitalBrain/Mcp/DigitalBrain.Mcp.csproj" />
+    <ProjectReference Include="../../src/Modules/DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
     <ProjectReference Include="../../src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
     <ProjectReference Include="../../src/Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
     <ProjectReference Include="../../src/Modules/Memory/Memory/DigitalBrain.Modules.Memory.csproj" />
@@ -41,6 +41,13 @@
     <ProjectReference Include="../../src/Modules/Excel/Excel/DigitalBrain.Modules.Excel.csproj" />
     <ProjectReference Include="../../src/Modules/Microsoft/Microsoft/DigitalBrain.Modules.Microsoft.csproj" />
     <ProjectReference Include="../../src/Modules/Microsoft/Contracts/DigitalBrain.Modules.Microsoft.Contracts.csproj" />
-    <ProjectReference Include="../../src/Modules/UI/DigitalBrain.Modules.UI/DigitalBrain.Modules.UI.csproj" />
+    <ProjectReference Include="../../src/Modules/Flutter/Flutter/DigitalBrain.Modules.Flutter.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="DigitalBrain.Testing" />
+    <Compile Include="../../src/Modules/*/Tests/Scenarios/**/*.cs" Link="Modules/%(RecursiveDir)%(Filename)%(Extension)" />
+    <ReqnrollFeatureFile Include="../../src/Modules/*/Tests/Scenarios/**/*.feature" Link="Modules/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="../../src/Modules/AI/Tests/Fixtures/*.cs" Link="Fixtures/%(Filename)%(Extension)" />
+    <Compile Include="../../src/Modules/DigitalBrain/Tests/Fixtures/Fixtures.cs" Link="Fixtures/Fixtures.cs" />
   </ItemGroup>
 </Project>
