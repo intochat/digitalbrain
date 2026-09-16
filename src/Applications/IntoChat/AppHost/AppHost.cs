@@ -25,14 +25,13 @@ using Microsoft.Extensions.Hosting;
 using OpenAIModels = DigitalBrain.AI.OpenAI;
 
 var builder = DistributedApplication.CreateBuilder(args);
-var captureGenAiContent = builder.Configuration.GetSection($"{AIOptions.SectionName}:Telemetry")
-    .Get<AITelemetryOptions>()?.EnableSensitiveData
-    ?? (builder.Environment.IsDevelopment() && builder.ExecutionContext.IsRunMode);
 
 var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules)
     .AddModule<AIModule>(module =>
     {
-        module.EnableSensitiveData = captureGenAiContent;
+        module.EnableSensitiveData = builder.Configuration
+            .GetValue<bool?>($"{AIOptions.SectionName}:Telemetry:EnableSensitiveData")
+            ?? (builder.Environment.IsDevelopment() && builder.ExecutionContext.IsRunMode);
 
         // --- OpenAI ---
         //module.WithLlm<OpenAIModels.IGpt56Sol>();
