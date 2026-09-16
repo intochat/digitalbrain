@@ -19,7 +19,6 @@
     <ProjectReference Include="../../Modules/Twitter/Twitter/DigitalBrain.Modules.Twitter.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../Modules/Telegram/Telegram/DigitalBrain.Modules.Telegram.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../Modules/Telegram/Aspire.Hosting/DigitalBrain.Modules.Telegram.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../../Modules/Telegram/Gateway/DigitalBrain.Modules.Telegram.Gateway.csproj" />
     <ProjectReference Include="../../Modules/Excel/Excel/DigitalBrain.Modules.Excel.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../Modules/Google/Aspire.Hosting/DigitalBrain.Modules.Google.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../Modules/Salesforce/Aspire.Hosting/DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" IsAspireProjectResource="false" />

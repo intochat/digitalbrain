@@ -28,8 +28,15 @@ public sealed class TelegramBehaviorFacts
         using var model = new ScriptedChatClient();
         model.Say(JsonSerializer.Serialize(new { intent = "reminder", text = "Call Alice", dueUnixSeconds = DateTimeOffset.UtcNow.AddMinutes(10).ToUnixTimeSeconds() }));
         await using var brain = await Start(model);
-        var app = new ApplicationBuilder(brain.SiloServices);
-        new TelegramHttpSurface(new TelegramOptions { BotToken = "123:test", WebhookSecret = "secret", MiniAppRoot = "" }).Map(app);
+        using var services = new ServiceCollection().AddLogging().AddRouting()
+            .AddSingleton(new System.Diagnostics.DiagnosticListener("TelegramTests"))
+            .AddSingleton<IGrainFactory>(brain.Grains)
+            .AddSingleton(brain.SiloServices.GetRequiredService<ITelegramBehaviorSetup>())
+            .AddSingleton(brain.SiloServices.GetRequiredService<TelegramConnectionStatus>())
+            .BuildServiceProvider();
+        var app = new ApplicationBuilder(services);
+        app.UseRouting();
+        app.UseEndpoints(endpoints => new TelegramHttpSurface(new TelegramOptions { BotToken = "123:test", WebhookSecret = "secret", MiniAppRoot = "" }).Map(endpoints));
         var pipeline = app.Build();
         var body = JsonSerializer.Serialize(new
         {
@@ -38,7 +45,7 @@ public sealed class TelegramBehaviorFacts
         });
         for (var attempt = 0; attempt < 2; attempt++)
         {
-            var context = new DefaultHttpContext { RequestServices = brain.SiloServices };
+            var context = new DefaultHttpContext { RequestServices = services };
             context.Request.Method = "POST";
             context.Request.Path = "/telegram/webhook";
             context.Request.Headers["X-Telegram-Bot-Api-Secret-Token"] = "secret";
@@ -69,7 +76,7 @@ public sealed class TelegramBehaviorFacts
             model.Say(JsonSerializer.Serialize(new { intent = "reminder", text = "Call Alice", dueUnixSeconds = now + 8 }));
             var behavior = brain.Grains.GetGrain<IBehavior>(TelegramReminderBehavior.Identity(User).ToGrainId());
             run = (await behavior.Read()).RunId;
-            var source = brain.Grains.GetGrain<ITelegram>(new NeuronId("telegram", User.ToString(System.Globalization.CultureInfo.InvariantCulture)).ToGrainId());
+            var source = brain.Grains.GetGrain<IBot>(new NeuronId("telegram", User.ToString(System.Globalization.CultureInfo.InvariantCulture)).ToGrainId());
             await source.Accept(new(CommandId.New(), "update-1", User, "Remind me in eight seconds to call Alice", now, "UTC"));
             var reminders = brain.Grains.GetGrain<IReminders>(ReminderBook.ToGrainId());
             var inbox = brain.Grains.GetGrain<INotification>(Inbox.ToGrainId());
@@ -105,7 +112,7 @@ public sealed class TelegramBehaviorFacts
         await using var brain = await Start(model);
         var setup = brain.SiloServices.GetRequiredService<ITelegramBehaviorSetup>();
         await setup.EnsureAsync(User, TestContext.Current.CancellationToken);
-        var source = brain.Grains.GetGrain<ITelegram>(new NeuronId("telegram", User.ToString(System.Globalization.CultureInfo.InvariantCulture)).ToGrainId());
+        var source = brain.Grains.GetGrain<IBot>(new NeuronId("telegram", User.ToString(System.Globalization.CultureInfo.InvariantCulture)).ToGrainId());
         var inbox = brain.Grains.GetGrain<INotification>(Inbox.ToGrainId());
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         await source.Accept(new(CommandId.New(), "ordinary", User, "Hello", now, "UTC"));
@@ -137,7 +144,7 @@ public sealed class TelegramBehaviorFacts
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         model.Say(JsonSerializer.Serialize(new { intent = "reminder", text = "Too far away", dueUnixSeconds = now + 2L * 366 * 86400 }));
         model.Say(JsonSerializer.Serialize(new { intent = "reminder", text = "Call Alice", dueUnixSeconds = now + 60 }));
-        var source = brain.Grains.GetGrain<ITelegram>(new NeuronId("telegram", User.ToString(System.Globalization.CultureInfo.InvariantCulture)).ToGrainId());
+        var source = brain.Grains.GetGrain<IBot>(new NeuronId("telegram", User.ToString(System.Globalization.CultureInfo.InvariantCulture)).ToGrainId());
         var inbox = brain.Grains.GetGrain<INotification>(Inbox.ToGrainId());
         var reminders = brain.Grains.GetGrain<IReminders>(ReminderBook.ToGrainId());
         await source.Accept(new(CommandId.New(), "too-far", User, "Remind me in two years", now, "UTC"));

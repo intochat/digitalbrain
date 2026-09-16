@@ -7,9 +7,6 @@ internal static class WorkspaceEndpoints
 {
     public static IEndpointRouteBuilder MapWorkspaceEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/agent/connections/telegram", (IServiceProvider services) =>
-            Results.Ok(services.GetService<DigitalBrain.Telegram.TelegramConnectionStatus>()?.Read()
-                ?? new DigitalBrain.Telegram.TelegramConnectionSnapshot("Disabled", null, null, null, null, null)));
         endpoints.MapGet("/agent/connections/salesforce", async (IServiceProvider services) =>
             Results.Ok(new { connected = services.GetService<DigitalBrain.Salesforce.SalesforceNativeTools>() is { } tools && await tools.IsConnected() }));
         endpoints.MapGet("/agent/capabilities", (IServiceProvider services, IConfiguration configuration) => Results.Ok(new

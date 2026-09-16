@@ -73,10 +73,11 @@ public sealed class TelegramFacts
         await own.Publish(new(CommandId.New(), "same-event", "Own", "private42", "incoming"), TestContext.Current.CancellationToken);
         await other.Publish(new(CommandId.New(), "same-event", "Other", "private99", "incoming"), TestContext.Current.CancellationToken);
         await ReactionWait.UntilAsync(async () => await own.ReadPendingCount() == 0 && await other.ReadPendingCount() == 0, TestContext.Current.CancellationToken);
-        using var services = new ServiceCollection().AddSingleton<IGrainFactory>(brain.Grains)
+        using var services = new ServiceCollection().AddLogging().AddRouting().AddSingleton(new System.Diagnostics.DiagnosticListener("TelegramTests")).AddSingleton<IGrainFactory>(brain.Grains)
             .AddSingleton<TimeProvider>(new FakeTimeProvider(Now)).BuildServiceProvider();
         var app = new ApplicationBuilder(services);
-        new TelegramHttpSurface(new TelegramOptions { BotToken = "test-token", WebhookSecret = "secret", MiniAppRoot = "" }).Map(app);
+        app.UseRouting();
+        app.UseEndpoints(endpoints => new TelegramHttpSurface(new TelegramOptions { BotToken = "test-token", WebhookSecret = "secret", MiniAppRoot = "" }).Map(endpoints));
         app.Run(context => { context.Response.StatusCode = 418; return Task.CompletedTask; });
         var pipeline = app.Build();
         var read = Request("GET", "/telegram/miniapp/state", "");
@@ -111,9 +112,10 @@ public sealed class TelegramFacts
     [Fact]
     public async Task Surface_rejects_unverified_requests_before_resolving_any_grains()
     {
-        using var services = new ServiceCollection().BuildServiceProvider();
+        using var services = new ServiceCollection().AddLogging().AddRouting().AddSingleton(new System.Diagnostics.DiagnosticListener("TelegramTests")).BuildServiceProvider();
         var app = new ApplicationBuilder(services);
-        new TelegramHttpSurface(new TelegramOptions { BotToken = "token", WebhookSecret = "secret", MiniAppRoot = "" }).Map(app);
+        app.UseRouting();
+        app.UseEndpoints(endpoints => new TelegramHttpSurface(new TelegramOptions { BotToken = "token", WebhookSecret = "secret", MiniAppRoot = "" }).Map(endpoints));
         app.Run(context => { context.Response.StatusCode = 418; return Task.CompletedTask; });
         var pipeline = app.Build();
         foreach (var path in new[] { "/telegram/health", "/telegram/webhook", "/telegram/miniapp/state", "/telegram/miniapp/notifications/dismiss", "/telegram/miniapp/reminders/cancel" })
@@ -149,9 +151,10 @@ public sealed class TelegramFacts
     public async Task Authenticated_health_identifies_instance_and_reports_missing_bundle()
     {
         var status = new TelegramConnectionStatus();
-        using var services = new ServiceCollection().AddSingleton(status).BuildServiceProvider();
+        using var services = new ServiceCollection().AddLogging().AddRouting().AddSingleton(new System.Diagnostics.DiagnosticListener("TelegramTests")).AddSingleton(status).BuildServiceProvider();
         var app = new ApplicationBuilder(services);
-        new TelegramHttpSurface(new TelegramOptions { BotToken = "123:test", WebhookSecret = "secret", MiniAppRoot = "" }).Map(app);
+        app.UseRouting();
+        app.UseEndpoints(endpoints => new TelegramHttpSurface(new TelegramOptions { BotToken = "123:test", WebhookSecret = "secret", MiniAppRoot = "" }).Map(endpoints));
         var context = new DefaultHttpContext { RequestServices = services };
         context.Request.Method = "GET";
         context.Request.Path = "/telegram/health";
@@ -183,7 +186,7 @@ public sealed class TelegramFacts
         }
     }
 
-    private static ITelegram Source(BrainSimulation brain) => brain.Grains.GetGrain<ITelegram>(new NeuronId("telegram", "42").ToGrainId());
+    private static IBot Source(BrainSimulation brain) => brain.Grains.GetGrain<IBot>(new NeuronId("telegram", "42").ToGrainId());
     private static string Update(long chat = 42, string type = "private", bool bot = false) => JsonSerializer.Serialize(new
     {
         update_id = 123, message = new { from = new { id = 42, is_bot = bot }, chat = new { id = chat, type }, text = "hello", date = 1800000000 },

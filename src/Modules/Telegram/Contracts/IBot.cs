@@ -6,7 +6,7 @@ using Orleans.Concurrency;
 namespace DigitalBrain.Telegram;
 
 [Alias("telegram")]
-public interface ITelegram : INeuron
+public interface IBot : INeuron
 {
     [Alias("accept")]
     Task<Accepted<MessageReceived>> Accept(TelegramMessage command);

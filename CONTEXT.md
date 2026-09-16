@@ -73,7 +73,7 @@ A neuron that durably accepts integration input and emits domain signals. Availa
 
 ## Telegram reminders
 
-- **Telegram source** (`ITelegram`): durable private-chat receipts from an authenticated webhook. User identity and update identity belong to the provider adapter; behavior roles cannot replace them.
+- **Telegram source** (`IBot`): durable private-chat receipts from an authenticated webhook. User identity and update identity belong to the provider adapter; behavior roles cannot replace them.
 - **Reminder collection** (`IReminders`): owns independent Time timers, absolute deadlines and the lifecycle of one-off reminders. Accepted scheduling requests emit `ReminderDue` or `ReminderRejected`; routine refusal does not fault the behavior action. Recovery uses original admission time.
 - **Notification** (`INotification`): durable bounded UI inbox with idempotent publish and dismiss commands. `UiNotificationCard` renders an entry as plain text. It does not imply an OS push or outgoing Telegram message.
 - **Telegram Mini App**: same-origin Flutter UI over signed, user-scoped requests; no generic kernel authority or bot token reaches the browser. The default per-user saved behavior connects receipt, decision, scheduling, refusal and notification paths. See `docs/v2/TELEGRAM.md`.

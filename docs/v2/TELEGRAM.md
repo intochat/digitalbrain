@@ -8,7 +8,7 @@ The reusable UI primitive is `INotification` / `NotificationNeuron` plus Flutter
 
 ```mermaid
 flowchart LR
-    Telegram[ITelegram MessageReceived] --> MessageMap[Map notification]
+    Telegram[IBot MessageReceived] --> MessageMap[Map notification]
     MessageMap --> Inbox[INotification]
     Telegram --> Decision[Structured reminder decision]
     Decision --> Filter[Reminder filter]
@@ -44,23 +44,25 @@ One saved `behavior:telegram-reminders-{userId}` contains these paths. Shared re
 
 Start the AppHost with `aspire start --apphost src/Aspire/DigitalBrain.AppHost/DigitalBrain.AppHost.csproj --non-interactive`. Open its dashboard and enter the **telegram-bot-token** secret parameter from BotFather. Aspire generates and persists a separate webhook secret. Do not put the bot token in chat, source control, Flutter, or a command line.
 
-The AppHost builds a missing Mini App bundle, starts a restricted gateway and a Cloudflare quick tunnel, and supplies the resulting HTTPS origin to the kernel. The runtime checks `getMe`, verifies that the public route reaches this kernel and its built assets, registers `setWebhook` with `drop_pending_updates: false`, installs the Mini App menu button, and confirms `getWebhookInfo`. Only then does connection status become `Connected`.
+The AppHost configures `.AddModule<TelegramModule>(telegram => telegram.WithBot())`, following the UI module projection pattern. The module builds a missing Mini App bundle and creates a dedicated Telegram HTTP listener in the kernel plus a Cloudflare quick tunnel. No separate gateway process is needed. The runtime uses Telegram.BotAPI 9.5.0 to check `getMe`, verify the public route and built assets, register `setWebhook` with `drop_pending_updates: false`, install the Mini App menu button, and confirm `getWebhookInfo`.
 
 Send `/start` to the bot, open **Open reminders**, then send a private message such as “Remind me in ten minutes to call Alice.” The incoming message installs the user's default behavior and enters the existing durable pipeline. Reminder decisions require the configured AI provider to be available.
 
 The owner-authenticated endpoint `/agent/connections/telegram` reports setup state, sanitized errors, bot username, verification time and the last accepted message time. `Connected` means provider registration was verified; `lastMessageAt` is separate evidence that an incoming receipt reached DigitalBrain.
 
-Cloudflare is needed only when this local machine lacks a public HTTPS endpoint. For a stable endpoint set **AppHost** `Telegram:PublicUrl=https://your-public-host` and route it to `telegram-gateway`. Set `Telegram:Enabled=false` to omit local onboarding. See [hosting configuration](../../src/Modules/Telegram/Aspire.Hosting/README.md) for executable paths and restart behavior. Quick tunnels are for development; restart the AppHost after a tunnel restart so the new URL is registered. Production requires a stable HTTPS origin or named tunnel.
+Cloudflare is needed only when this local machine lacks a public HTTPS endpoint. For a stable endpoint set **AppHost** `Telegram:PublicUrl=https://your-public-host` and route it to the kernel's named `telegram` endpoint. Set `Telegram:Enabled=false` to omit local onboarding. See [hosting configuration](../../src/Modules/Telegram/Aspire.Hosting/README.md) for executable paths and restart behavior. Quick tunnels are for development; restart the AppHost after a tunnel restart so the new URL is registered. Production requires a stable HTTPS origin or named tunnel.
 
 ### Standalone kernel / deployment
 
-Set these environment variables on the kernel host (secret values belong in the deployment's secret store). Route the public origin through the Telegram gateway:
+Set these environment variables on the kernel host (secret values belong in the deployment's secret store). Bind a separate port for Telegram and route only that port through the public HTTPS origin. `PublicPort` must match the actual local listener port; it selects the isolation guard, not the socket binding:
 
 ```text
 DigitalBrain__Telegram__BotToken=<bot token>
 DigitalBrain__Telegram__WebhookSecret=<random webhook secret>
 DigitalBrain__Telegram__AutoConfigure=true
 DigitalBrain__Telegram__PublicUrl=https://your-public-host
+ASPNETCORE_URLS=http://+:5080;http://+:5081
+DigitalBrain__Telegram__PublicPort=5081
 DigitalBrain__Telegram__TimeZone=Europe/Prague
 # Optional direct AI provider/model selection; otherwise use existing AI defaults:
 DigitalBrain__Telegram__DecisionProvider=<configured provider>
@@ -71,7 +73,7 @@ Configure a direct model client capable of structured JSON output. Function-invo
 
 With `AutoConfigure=true`, registration and the menu button are automatic. To retain externally managed registration, omit it (default false), set `MiniAppUrl` explicitly, and configure the webhook with the matching `secret_token` and `allowed_updates: ["message"]`. Registration does not erase pending updates or unregister the bot on shutdown.
 
-Telegram routes authenticate themselves through the existing module HTTP surface before the owner Basic-auth gate. All other kernel routes keep their existing authentication. Webhooks require the configured secret; Mini App requests require signed `Telegram.WebApp.initData` with a one-hour lifetime. The server derives the user ID from the signature, and accepts private human chat messages only. No bot token is sent to Flutter. Reopen the app when its signed session expires.
+Telegram maps its routes through `IModule.Configure(IEndpointRouteBuilder)`. Only explicitly marked module routes bypass the owner gate and perform their own provider authentication. The Telegram listener rejects all other endpoints, even when the request supplies owner credentials. Webhooks require the configured secret; Mini App requests require signed `Telegram.WebApp.initData` with a one-hour lifetime. The server derives the user ID from the signature, and accepts private human chat messages only. No bot token is sent to Flutter. Reopen the app when its signed session expires.
 
 ## Build and run
 
@@ -84,7 +86,7 @@ flutter build web --release --base-href /telegram/app/ --no-pub
 dotnet build DigitalBrain.slnx -p:CodeGraphRefresh=false
 ```
 
-The silo project copies the built web bundle to `telegram-app` in build/publish output. The release workflow builds it before publishing the kernel container. Local Docker builds also require this Flutter build before building the image. To serve another build directory, set `DigitalBrain__Telegram__MiniAppRoot` to its absolute path. No separate Flutter server or duplicate Orleans host is required.
+The Telegram module project copies the built web bundle to `telegram-app` in build/publish output. The release workflow builds it before publishing the kernel container. Local Docker builds also require this Flutter build before building the image. To serve another build directory, set `DigitalBrain__Telegram__MiniAppRoot` to its absolute path. No separate Flutter server or duplicate Orleans host is required.
 
 Without bot configuration the provider endpoints are disabled. The source and behavior can still be exercised through the deterministic tests, without an external bot or model account:
 
@@ -103,4 +105,4 @@ dotnet test tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj -p:CodeGraphRefre
 
 ## References
 
-Telegram contracts follow the official [Bot API](https://core.telegram.org/bots/api) and [Mini App authentication documentation](https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app), retrieved via Context7. The `ino/clients/Telegram` reference informed same-origin hosting and the launch button. `E:/projects/TripRadar/src/Aspire/Hosting` informed secret parameters, bot identity resolution and local HTTPS onboarding. DigitalBrain uses a restricted gateway, bounded tunnel discovery and no localhost fallback. See also [Cloudflare quick tunnels](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/).
+Telegram contracts follow the official [Bot API](https://core.telegram.org/bots/api) and [Mini App authentication documentation](https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app), retrieved via Context7. The `ino/clients/Telegram` reference informed same-origin hosting and the launch button. `E:/projects/TripRadar/src/Aspire/Hosting` informed secret parameters, bot identity resolution and local HTTPS onboarding. DigitalBrain uses a restricted in-process listener, bounded tunnel discovery and no localhost fallback. See also [Cloudflare quick tunnels](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/).

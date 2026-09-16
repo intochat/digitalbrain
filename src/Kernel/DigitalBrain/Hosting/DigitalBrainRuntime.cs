@@ -45,6 +45,7 @@ public static class DigitalBrainRuntime
 
         foreach (var hook in ModuleHooksOf(modules))
         {
+            builder.Services.AddSingleton<IModule>(hook);
             hook.Configure(builder);
         }
     }

@@ -1,3 +1,4 @@
+using DigitalBrain.Core;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -33,7 +34,8 @@ internal static class BasicAuthGate
 
         app.Use(async (context, next) =>
         {
-            if (IsAnonymous(context.Request) || credential.Matches(context.Request.Headers.Authorization))
+            if (context.GetEndpoint()?.Metadata.GetMetadata<ModuleEndpointMetadata>() is not null
+                || IsAnonymous(context.Request) || credential.Matches(context.Request.Headers.Authorization))
             {
                 await next(context).ConfigureAwait(false);
                 return;

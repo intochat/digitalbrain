@@ -22,12 +22,15 @@ builder.Services.AddDigitalBrainMcp()
 
 var app = builder.Build();
 
+app.UseRouting();
+app.UseModuleEndpointIsolation();
 app.UseKernelCors();
 // Module surfaces (browser OAuth callbacks) carry their own one-use request guards and must
 // run before authentication and the Basic gate.
 app.UseModuleHttpSurfaces();
 app.UseAuthentication();
 app.UseBasicAuthGate();
+app.MapModuleEndpoints();
 app.MapDefaultEndpoints();
 app.MapOrleansDashboard("/orleans");
 app.MapConversationalAgent();

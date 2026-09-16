@@ -2,7 +2,7 @@
 
 **Goal:** Add a typed Telegram module, Flutter Mini App, reusable Notification neuron/widget, and one saved behavior connecting incoming private bot messages to durable reminders and notifications.
 
-**Architecture:** Telegram adapts authenticated provider receipts into `ITelegram.MessageReceived`. A persisted behavior branches to an incoming-message Notification and a tool-free structured decision. Reminder decisions call Time's `IReminders.Schedule`; the reminder aggregate allocates one existing ITimer per reminder. Its `ReminderDue` output flows through the same behavior to Notification. Ambiguous decisions produce a clarification notification. Flutter presents these durable records and cancel/dismiss actions.
+**Architecture:** Telegram adapts authenticated provider receipts into `IBot.MessageReceived`. A persisted behavior branches to an incoming-message Notification and a tool-free structured decision. Reminder decisions call Time's `IReminders.Schedule`; the reminder aggregate allocates one existing ITimer per reminder. Its `ReminderDue` output flows through the same behavior to Notification. Ambiguous decisions produce a clarification notification. Flutter presents these durable records and cancel/dismiss actions.
 
 ## Decisions
 
@@ -13,7 +13,7 @@
 - Use configured timezone (UTC default), provider message timestamp and explicit clock in the semantic input. Missing/ambiguous time produces clarification, not a guessed alarm. No recurring schedule in this iteration.
 - `INotification.Publish(PublishNotification(Id, EventId, Title, Message, Kind))`, `Dismiss(DismissNotification(Id, EventId))`, `Read()` maintain a bounded durable inbox. Names `notification:telegram-{userId}`; fields EventId, Title, Message, Kind, CreatedUnixSeconds, Dismissed.
 - `IReminders.Schedule(SetReminder(Id, ReminderId, Text, DueUnixSeconds))`, `Cancel(CancelReminder(Id, ReminderId))`, `Read()`. Names `reminders:telegram-{userId}`. ReminderDue payload ReminderId, Text, DueUnixSeconds. Unique timer per reminder; duplicate commands/events cannot create multiple alarms. Future timestamps bounded to one year; no silent overwrite of existing ID.
-- `ITelegram.Accept(TelegramMessage(Id, EventId, UserId, Text, SentUnixSeconds, TimeZone))`; name `telegram:{userId}`. Shared MessageReceived payload EventId/UserId/Text/SentUnixSeconds/TimeZone in camel case. Private-chat webhook and `/start` Mini App link; no external setup executed during development.
+- `IBot.Accept(TelegramMessage(Id, EventId, UserId, Text, SentUnixSeconds, TimeZone))`; name `telegram:{userId}`. Shared MessageReceived payload EventId/UserId/Text/SentUnixSeconds/TimeZone in camel case. Private-chat webhook and `/start` Mini App link; no external setup executed during development.
 - One fixed behavior definition per user, configured before ingress: incoming message → notification; message → structured decision → reminder filter → map → schedule; reminder source → map → due notification; clarification decision → map → clarification notification. Every decision is schema checked and cannot call tools. Other messages create only the incoming notification.
 - Mini App endpoints under `/telegram/miniapp`: GET state -> {notifications,reminders}; POST notifications/dismiss {eventId}; POST reminders/cancel {reminderId}. Authorization header carries `tma <initData>`. Static bundle `/telegram/app/`. Do not grant Telegram identity generic DigitalBrain access.
 

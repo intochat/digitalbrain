@@ -4,7 +4,7 @@ public sealed record TelegramConnectionSnapshot(
     string State, string? BotUsername, string? PublicUrl, string? Error,
     DateTimeOffset? VerifiedAt, DateTimeOffset? LastMessageAt);
 
-/// <summary>Operational state; provider receipts remain durable in ITelegram.</summary>
+/// <summary>Operational state; provider receipts remain durable in IBot.</summary>
 public sealed class TelegramConnectionStatus
 {
     private TelegramConnectionSnapshot _snapshot = new("Starting", null, null, null, null, null);

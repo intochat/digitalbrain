@@ -8,9 +8,9 @@ using Orleans.Runtime;
 namespace DigitalBrain.Telegram;
 
 [GrainType("telegram")]
-internal sealed class TelegramNeuron(NeuronRuntime runtime,
+internal sealed class BotNeuron(NeuronRuntime runtime,
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<TelegramState>> state)
-    : Neuron<TelegramState>(runtime, state), ITelegram
+    : Neuron<TelegramState>(runtime, state), IBot
 {
     private const string Receiving = "TelegramReceiving";
 

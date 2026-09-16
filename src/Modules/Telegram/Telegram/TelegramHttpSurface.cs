@@ -9,61 +9,74 @@ using DigitalBrain.UI;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.StaticFiles;
 
 namespace DigitalBrain.Telegram;
 
 /// <summary>Exact provider routes with their own authentication, before the general host gate.</summary>
-public sealed class TelegramHttpSurface(TelegramOptions options) : IHttpSurface
+public sealed class TelegramHttpSurface(TelegramOptions options)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
 
-    public void Map(IApplicationBuilder app)
+    public void Map(IEndpointRouteBuilder endpoints)
     {
-        ArgumentNullException.ThrowIfNull(app);
+        ArgumentNullException.ThrowIfNull(endpoints);
+        var metadata = new ModuleEndpointMetadata(typeof(TelegramModule));
+        endpoints.MapGet("/telegram/health", HandleAsync).WithMetadata(metadata);
+        endpoints.MapPost("/telegram/webhook", HandleAsync).WithMetadata(metadata);
+        endpoints.MapGet("/telegram/miniapp/state", HandleAsync).WithMetadata(metadata);
+        endpoints.MapPost("/telegram/miniapp/notifications/dismiss", HandleAsync).WithMetadata(metadata);
+        endpoints.MapPost("/telegram/miniapp/reminders/cancel", HandleAsync).WithMetadata(metadata);
         if (options.Enabled && Directory.Exists(options.MiniAppRoot))
         {
-            app.Map("/telegram/app", bundle => bundle.UseFileServer(new FileServerOptions
+            var root = Path.GetFullPath(options.MiniAppRoot);
+            var types = new FileExtensionContentTypeProvider();
+            // Register only existing files: an unknown path never inherits the module's owner-gate exemption.
+            foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
             {
-                FileProvider = new PhysicalFileProvider(Path.GetFullPath(options.MiniAppRoot)),
-                EnableDirectoryBrowsing = false,
-            }));
-        }
-        app.Use(async (context, next) =>
-        {
-            var path = context.Request.Path.Value;
-            if (path is not ("/telegram/health" or "/telegram/webhook" or "/telegram/miniapp/state" or "/telegram/miniapp/notifications/dismiss" or "/telegram/miniapp/reminders/cancel"))
-            {
-                await next(context).ConfigureAwait(false);
-                return;
-            }
-            context.Response.Headers.CacheControl = "no-store";
-            if (!options.Enabled) { context.Response.StatusCode = 503; return; }
-            if (path == "/telegram/health")
-            {
-                if (!HttpMethods.IsGet(context.Request.Method)) { context.Response.StatusCode = 405; return; }
-                if (!TelegramAuthentication.IsWebhookSecretValid(options.WebhookSecret, context.Request.Headers["X-Telegram-Bot-Api-Secret-Token"].ToString()))
-                { context.Response.StatusCode = 401; return; }
-                await context.Response.WriteAsJsonAsync(new
+                var relative = Path.GetRelativePath(root, file).Replace(Path.DirectorySeparatorChar, '/');
+                if (relative.Split('/').Any(segment => segment.StartsWith('.')) ||
+                    !types.TryGetContentType(file, out var contentType)) { continue; }
+                var fullPath = Path.GetFullPath(file);
+                endpoints.MapMethods("/telegram/app/" + relative, [HttpMethods.Get, HttpMethods.Head], () => Results.File(fullPath, contentType)).WithMetadata(metadata);
+                if (relative == "index.html")
                 {
-                    instanceId = context.RequestServices.GetRequiredService<TelegramConnectionStatus>().InstanceId,
-                    miniAppAvailable = File.Exists(Path.Combine(options.MiniAppRoot, "index.html")) && File.Exists(Path.Combine(options.MiniAppRoot, "main.dart.js"))
-                }, context.RequestAborted).ConfigureAwait(false);
-                return;
+                    endpoints.MapMethods("/telegram/app", [HttpMethods.Get, HttpMethods.Head], () => Results.File(fullPath, contentType)).WithMetadata(metadata);
+                }
             }
-            if (context.Request.ContentLength > 65536) { context.Response.StatusCode = 413; return; }
-            try
+        }
+    }
+
+    private async Task HandleAsync(HttpContext context)
+    {
+        var path = context.Request.Path.Value?.TrimEnd('/').ToLowerInvariant();
+        context.Response.Headers.CacheControl = "no-store";
+        if (!options.Enabled) { context.Response.StatusCode = 503; return; }
+        if (path == "/telegram/health")
+        {
+            if (!HttpMethods.IsGet(context.Request.Method)) { context.Response.StatusCode = 405; return; }
+            if (!TelegramAuthentication.IsWebhookSecretValid(options.WebhookSecret, context.Request.Headers["X-Telegram-Bot-Api-Secret-Token"].ToString()))
+            { context.Response.StatusCode = 401; return; }
+            await context.Response.WriteAsJsonAsync(new
             {
-                if (path == "/telegram/webhook") { await WebhookAsync(context).ConfigureAwait(false); }
-                else { await MiniAppAsync(context).ConfigureAwait(false); }
-            }
-            catch (JsonException) { context.Response.StatusCode = 400; }
-            catch (Exception error) when (error is InvalidOperationException or TimeoutException)
-            {
-                context.Response.StatusCode = 503;
-                await context.Response.WriteAsJsonAsync(new { error = "Telegram processing is unavailable. Please retry." }, context.RequestAborted).ConfigureAwait(false);
-            }
-        });
+                instanceId = context.RequestServices.GetRequiredService<TelegramConnectionStatus>().InstanceId,
+                miniAppAvailable = File.Exists(Path.Combine(options.MiniAppRoot, "index.html")) && File.Exists(Path.Combine(options.MiniAppRoot, "main.dart.js"))
+            }, context.RequestAborted).ConfigureAwait(false);
+            return;
+        }
+        if (context.Request.ContentLength > 65536) { context.Response.StatusCode = 413; return; }
+        try
+        {
+            if (path == "/telegram/webhook") { await WebhookAsync(context).ConfigureAwait(false); }
+            else { await MiniAppAsync(context, path).ConfigureAwait(false); }
+        }
+        catch (JsonException) { context.Response.StatusCode = 400; }
+        catch (Exception error) when (error is InvalidOperationException or TimeoutException)
+        {
+            context.Response.StatusCode = 503;
+            await context.Response.WriteAsJsonAsync(new { error = "Telegram processing is unavailable. Please retry." }, context.RequestAborted).ConfigureAwait(false);
+        }
     }
 
     private async Task WebhookAsync(HttpContext context)
@@ -76,7 +89,7 @@ public sealed class TelegramHttpSurface(TelegramOptions options) : IHttpSurface
         var services = context.RequestServices;
         await services.GetRequiredService<ITelegramBehaviorSetup>().EnsureAsync(message!.UserId, context.RequestAborted).ConfigureAwait(false);
         var grains = services.GetRequiredService<IGrainFactory>();
-        await grains.GetGrain<ITelegram>(new NeuronId("telegram", message.UserId.ToString(CultureInfo.InvariantCulture)).ToGrainId()).Accept(message).ConfigureAwait(false);
+        await grains.GetGrain<IBot>(new NeuronId("telegram", message.UserId.ToString(CultureInfo.InvariantCulture)).ToGrainId()).Accept(message).ConfigureAwait(false);
         services.GetService<TelegramConnectionStatus>()?.MessageReceived();
         if (message.Text.Split(' ', 2)[0] == "/start" && Uri.TryCreate(options.MiniAppUrl, UriKind.Absolute, out var url) && url.Scheme == "https")
         {
@@ -85,7 +98,7 @@ public sealed class TelegramHttpSurface(TelegramOptions options) : IHttpSurface
         }
     }
 
-    private async Task MiniAppAsync(HttpContext context)
+    private async Task MiniAppAsync(HttpContext context, string? path)
     {
         var now = context.RequestServices.GetService<TimeProvider>()?.GetUtcNow() ?? DateTimeOffset.UtcNow;
         if (!TelegramAuthentication.TryValidateInitData(context.Request.Headers.Authorization.ToString(), options.BotToken, now, out var userId))
@@ -94,7 +107,7 @@ public sealed class TelegramHttpSurface(TelegramOptions options) : IHttpSurface
         var scope = "telegram-" + userId.ToString(CultureInfo.InvariantCulture);
         var notifications = grains.GetGrain<INotification>(new NeuronId("notification", scope).ToGrainId());
         var reminders = grains.GetGrain<IReminders>(new NeuronId("reminders", scope).ToGrainId());
-        if (context.Request.Path == "/telegram/miniapp/state")
+        if (path == "/telegram/miniapp/state")
         {
             if (!HttpMethods.IsGet(context.Request.Method)) { context.Response.StatusCode = 405; return; }
             var behavior = grains.GetGrain<IBehavior>(TelegramReminderBehavior.Identity(userId).ToGrainId());
@@ -107,7 +120,7 @@ public sealed class TelegramHttpSurface(TelegramOptions options) : IHttpSurface
         }
         if (!HttpMethods.IsPost(context.Request.Method)) { context.Response.StatusCode = 405; return; }
         using var document = await ReadBodyAsync(context).ConfigureAwait(false);
-        var dismiss = context.Request.Path == "/telegram/miniapp/notifications/dismiss";
+        var dismiss = path == "/telegram/miniapp/notifications/dismiss";
         var property = dismiss ? "eventId" : "reminderId";
         if (document.RootElement.ValueKind != JsonValueKind.Object || document.RootElement.EnumerateObject().Count() != 1 ||
             !document.RootElement.TryGetProperty(property, out var element) || element.ValueKind != JsonValueKind.String ||

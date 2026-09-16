@@ -92,6 +92,32 @@ public sealed class TelegramConnectionFacts
         Assert.Contains("another application", status.Read().Error!);
     }
 
+    [Theory]
+    [InlineData("{\"ok\":false,\"error_code\":401,\"description\":\"123456:test_credential\"}")]
+    [InlineData("123456:test_credential")]
+    public async Task Sdk_provider_errors_are_sanitized(string response)
+    {
+        var status = new TelegramConnectionStatus();
+        using var handler = new Provider(status.InstanceId) { RawResponse = response };
+        using var api = new TelegramBotApi(new HttpClient(handler));
+        await new TelegramBotConnection(Options(), api, status, new Lifetime()).ConnectAsync(CancellationToken.None);
+        Assert.Equal("Failed", status.Read().State);
+        Assert.DoesNotContain(Token, status.Read().Error!);
+        Assert.Contains("getMe", status.Read().Error!);
+    }
+
+    [Theory]
+    [InlineData("update_id")]
+    [InlineData("is_bot")]
+    public void Sdk_update_deserialization_rejects_missing_security_fields(string field)
+    {
+        var json = """{"update_id":123,"message":{"from":{"id":42,"is_bot":false},"chat":{"id":42,"type":"private"},"text":"hello","date":1800000000}}""";
+        json = field == "update_id" ? json.Replace("\"update_id\":123,", "", StringComparison.Ordinal)
+            : json.Replace(",\"is_bot\":false", "", StringComparison.Ordinal);
+        using var update = JsonDocument.Parse(json);
+        Assert.False(TelegramWebhook.TryReadMessage(update.RootElement, "UTC", out _));
+    }
+
     private static TelegramOptions Options() => new()
     {
         AutoConfigure = true, BotToken = Token, WebhookSecret = "webhook-secret", PublicUrl = "https://bot.example"
@@ -112,6 +138,7 @@ public sealed class TelegramConnectionFacts
         public string? HealthSecret { get; private set; }
         public bool Assets { get; init; } = true;
         public string? Failure { get; init; }
+        public string? RawResponse { get; init; }
         public string Webhook { get; init; } = "https://bot.example/telegram/webhook";
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -123,6 +150,7 @@ public sealed class TelegramConnectionFacts
                 Bodies.Add(method, body.RootElement.Clone());
             }
             if (method == Failure) { return new(HttpStatusCode.Unauthorized) { Content = new StringContent(Token) }; }
+            if (RawResponse is not null) { return new(HttpStatusCode.OK) { Content = new StringContent(RawResponse) }; }
             if (method == "health")
             {
                 Assert.Equal("bot.example", request.RequestUri.Host);

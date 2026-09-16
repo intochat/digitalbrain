@@ -22,7 +22,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Kernel/DigitalBrain.Silo/DigitalBrain.Silo.csproj" />
-    <ProjectReference Include="../../src/Modules/Telegram/Gateway/DigitalBrain.Modules.Telegram.Gateway.csproj" />
     <ProjectReference Include="../../src/Modules/Telegram/Aspire.Hosting/DigitalBrain.Modules.Telegram.Aspire.Hosting.csproj" />
     <ProjectReference Include="../../src/Modules/Salesforce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
     <ProjectReference Include="../../src/Modules/Salesforce/Contracts/DigitalBrain.Modules.Salesforce.Contracts.csproj" />

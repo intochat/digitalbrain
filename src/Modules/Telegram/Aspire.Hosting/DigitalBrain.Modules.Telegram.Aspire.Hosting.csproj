@@ -1,7 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>DigitalBrain.Telegram.Aspire.Hosting</RootNamespace>
-    <Description>Aspire onboarding for Telegram through a restricted gateway.</Description>
+    <Description>Module-owned Telegram bot, Mini App and tunnel hosting.</Description>
   </PropertyGroup>
   <ItemGroup><PackageReference Include="Aspire.Hosting" /></ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Telegram/DigitalBrain.Modules.Telegram.csproj" />
+    <ProjectReference Include="../../../Aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
+  </ItemGroup>
 </Project>

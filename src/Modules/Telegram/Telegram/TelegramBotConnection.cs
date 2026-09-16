@@ -32,30 +32,23 @@ public sealed class TelegramBotConnection(
         status.Update("Connecting", null, origin!.AbsoluteUri, null);
         try
         {
-            var me = await api.CallAsync(options.BotToken, "getMe", new { }, cancellationToken).ConfigureAwait(false);
-            if (!me.TryGetProperty("is_bot", out var bot) || bot.ValueKind != System.Text.Json.JsonValueKind.True ||
-                !me.TryGetProperty("username", out var name) || string.IsNullOrWhiteSpace(name.GetString()))
+            var me = await api.GetMeAsync(options.BotToken, cancellationToken).ConfigureAwait(false);
+            if (me is null || !me.IsBot || string.IsNullOrWhiteSpace(me.Username))
             {
                 throw new InvalidOperationException("The supplied credential did not identify a Telegram bot.");
             }
-            var username = name.GetString()!;
+            var username = me.Username;
             await api.VerifyIngressAsync(origin, options.WebhookSecret, status.InstanceId, cancellationToken).ConfigureAwait(false);
             var webhook = new Uri(origin, "/telegram/webhook").AbsoluteUri;
             var miniApp = new Uri(origin, "/telegram/app/").AbsoluteUri;
             options.MiniAppUrl = miniApp;
-            var registered = await api.CallAsync(options.BotToken, "setWebhook", new
-            {
-                url = webhook, secret_token = options.WebhookSecret, allowed_updates = new[] { "message" }, drop_pending_updates = false
-            }, cancellationToken).ConfigureAwait(false);
-            if (registered.ValueKind != System.Text.Json.JsonValueKind.True)
+            var registered = await api.SetWebhookAsync(options.BotToken, webhook, options.WebhookSecret, cancellationToken).ConfigureAwait(false);
+            if (!registered)
             {
                 throw new InvalidOperationException("Telegram did not confirm webhook registration.");
             }
-            var menu = await api.CallAsync(options.BotToken, "setChatMenuButton", new
-            {
-                menu_button = new { type = "web_app", text = "Open reminders", web_app = new { url = miniApp } }
-            }, cancellationToken).ConfigureAwait(false);
-            if (menu.ValueKind != System.Text.Json.JsonValueKind.True)
+            var menu = await api.SetMenuButtonAsync(options.BotToken, miniApp, cancellationToken).ConfigureAwait(false);
+            if (!menu)
             {
                 throw new InvalidOperationException("Telegram did not confirm the Mini App menu button.");
             }
@@ -75,8 +68,8 @@ public sealed class TelegramBotConnection(
 
     private async Task VerifyWebhookAsync(string expected, CancellationToken cancellationToken)
     {
-        var info = await api.CallAsync(options.BotToken, "getWebhookInfo", new { }, cancellationToken).ConfigureAwait(false);
-        if (!info.TryGetProperty("url", out var actual) || actual.GetString() != expected)
+        var info = await api.GetWebhookInfoAsync(options.BotToken, cancellationToken).ConfigureAwait(false);
+        if (info?.Url != expected)
         {
             throw new InvalidOperationException("Telegram's webhook does not point to this instance. Check whether another application uses the same bot.");
         }

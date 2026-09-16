@@ -74,7 +74,7 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
     .AddModule<ClickHouseModule>(clickhouse => clickhouse.WithClickHouse(options => options.WithSeed("leads")))
     .AddModule<TimeModule>()
     .AddModule<TwitterModule>()
-    .AddModule<TelegramModule>()
+    .AddModule<TelegramModule>(telegram => telegram.WithBot())
     .AddModule<ExcelModule>()
     .AddModule<GoogleModule>(google => google.WithGmail())
     .AddModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
@@ -124,7 +124,5 @@ var kernel = builder.AddProject<Projects.DigitalBrain_Silo>(ProductSurfaceResour
             context.EnvironmentVariables["DigitalBrain__Graph__Enabled"] = "true";
         }
     });
-
-kernel.WithTelegramBot<Projects.DigitalBrain_Modules_Telegram_Gateway>();
 
 builder.Build().Run();

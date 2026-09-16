@@ -1,5 +1,7 @@
 # Live Telegram connection plan
 
+Historical onboarding plan. The separate gateway was replaced by module-owned endpoints and a restricted in-process listener; see [current refactor](TELEGRAM-MODULE-REFACTOR.md).
+
 Continue on v2 after committing the existing behavior/reminder implementation.
 
 - [x] Aspire prompts for a secret Telegram bot token; generates/persists a webhook secret. Telegram:Enabled=false explicitly disables local onboarding.

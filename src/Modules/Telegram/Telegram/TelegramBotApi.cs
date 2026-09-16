@@ -1,7 +1,10 @@
-using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using OpenTelemetry;
+using Telegram.BotAPI;
+using Telegram.BotAPI.AvailableMethods;
+using Telegram.BotAPI.AvailableTypes;
+using Telegram.BotAPI.GettingUpdates;
 
 namespace DigitalBrain.Telegram;
 
@@ -12,39 +15,52 @@ public sealed partial class TelegramBotApi(HttpClient client) : IDisposable
     private static partial Regex TokenPattern();
     public static bool IsTokenValid(string token) => token.Length <= 256 && TokenPattern().IsMatch(token);
 
-    public async Task<JsonElement> CallAsync(string token, string method, object arguments, CancellationToken cancellationToken)
+    public Task<User> GetMeAsync(string token, CancellationToken cancellationToken) =>
+        InvokeAsync(token, "getMe", bot => bot.GetMeAsync(cancellationToken));
+
+    public Task<bool> SetWebhookAsync(string token, string url, string secret, CancellationToken cancellationToken) =>
+        InvokeAsync(token, "setWebhook", bot => bot.SetWebhookAsync(new SetWebhookArgs(url)
+        {
+            SecretToken = secret, AllowedUpdates = ["message"], DropPendingUpdates = false
+        }, cancellationToken));
+
+    public Task<bool> SetMenuButtonAsync(string token, string miniAppUrl, CancellationToken cancellationToken) =>
+        InvokeAsync(token, "setChatMenuButton", bot => bot.SetChatMenuButtonAsync(
+            menuButton: new MenuButtonWebApp { Text = "Open reminders", WebApp = new WebAppInfo(miniAppUrl) },
+            cancellationToken: cancellationToken));
+
+    public Task<WebhookInfo> GetWebhookInfoAsync(string token, CancellationToken cancellationToken) =>
+        InvokeAsync(token, "getWebhookInfo", bot => bot.GetWebhookInfoAsync(cancellationToken));
+
+    private async Task<T> InvokeAsync<T>(string token, string operation, Func<ITelegramBotClient, Task<T>> call)
     {
         if (!IsTokenValid(token))
         {
             throw new InvalidOperationException("Enter the bot token provided by BotFather in the Telegram secret parameter.");
         }
-        if (method is not ("getMe" or "setWebhook" or "setChatMenuButton" or "getWebhookInfo"))
-        {
-            throw new ArgumentException("Unsupported bot setup method.", nameof(method));
-        }
         using var suppression = SuppressInstrumentationScope.Begin();
         try
         {
-            using var response = await client.PostAsJsonAsync(new Uri($"https://api.telegram.org/bot{token}/{method}"), arguments, cancellationToken).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new InvalidOperationException($"Telegram rejected {method} (HTTP {(int)response.StatusCode}). Check the bot token and network connection.");
-            }
-            using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
-            if (!body.RootElement.TryGetProperty("ok", out var ok) || ok.ValueKind != JsonValueKind.True ||
-                !body.RootElement.TryGetProperty("result", out var result))
-            {
-                throw new InvalidOperationException($"Telegram did not accept {method}. Check the bot configuration.");
-            }
-            return result.Clone();
+            return await call(new TelegramBotClient(new TelegramBotClientOptions(token, client))).ConfigureAwait(false);
         }
-        catch (HttpRequestException)
+        catch (OperationCanceledException)
         {
-            throw new InvalidOperationException($"Telegram {method} could not reach the provider. Check network access.");
+            // Cancellation exceptions can contain token-bearing request details too.
+            throw new OperationCanceledException("Telegram request was cancelled.");
         }
-        catch (JsonException)
+        catch (HttpRequestException error)
         {
-            throw new InvalidOperationException($"Telegram {method} returned an invalid response.");
+            var detail = error.StatusCode is { } code ? $" (HTTP {(int)code})" : "";
+            throw new InvalidOperationException($"Telegram {operation} could not reach the provider{detail}. Check network access.");
+        }
+        catch (BotRequestException error)
+        {
+            throw new InvalidOperationException($"Telegram rejected {operation} (code {error.ErrorCode}). Check the bot configuration.");
+        }
+        catch (Exception)
+        {
+            // SDK exceptions can carry raw provider bodies or credential-bearing URLs.
+            throw new InvalidOperationException($"Telegram {operation} returned an invalid response.");
         }
     }
 

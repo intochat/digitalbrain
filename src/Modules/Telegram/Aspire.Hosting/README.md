@@ -1,18 +1,24 @@
-# Telegram Aspire onboarding
+# Telegram module hosting
 
-`kernel.WithTelegramBot<Projects.DigitalBrain_Modules_Telegram_Gateway>()` enables the bot by default. Aspire prompts for the secret `telegram-bot-token` parameter and generates/persists `telegram-webhook-secret`. Neither secret is passed to the gateway or Flutter.
+Like UI's `WithWindowHost`, configure Telegram through its module builder:
 
-In local run mode, the gateway starts independently of the kernel. A direct `cloudflared` executable forwards only to that gateway. The kernel waits up to 90 seconds for an HTTPS quick-tunnel origin in a fresh, uniquely named log; failure has no localhost fallback. The kernel registrar verifies its own authenticated public health response before configuring Telegram.
+```csharp
+builder.AddDigitalBrain("brain")
+    .AddModule<TelegramModule>(telegram => telegram.WithBot());
+```
 
-Configuration on the **AppHost**:
+The projection adds secret parameters, a named `telegram` HTTP endpoint on the consuming kernel, and local Flutter build/tunnel resources. No Gateway project or extra .NET process remains. `IModule.Configure(IEndpointRouteBuilder)` owns the webhook, Mini App and status endpoints. The `IBot` neuron owns durable incoming receipts.
+
+The kernel has two listeners. Its usual `http` listener retains owner APIs. The `telegram` listener permits only endpoints explicitly owned by Telegram; other APIs, health and OAuth callbacks return 404 there. Cloudflare forwards only to that listener. `DigitalBrain__Telegram__PublicPort` is injected from its target port; no Host or forwarded header determines isolation.
+
+Configuration on the AppHost:
 
 - `Telegram:Enabled=false`: omit onboarding resources and token prompts.
-- `Telegram:PublicUrl=https://your-public-host`: use a stable public origin and omit cloudflared. Route that origin to `telegram-gateway`, never the unrestricted kernel.
-- `Telegram:CloudflaredCommand`: optional executable path, otherwise `cloudflared` on PATH.
-- `DigitalBrain:FlutterCommand`: optional Flutter executable path, otherwise `flutter` on PATH.
+- `Telegram:PublicUrl=https://your-public-host`: use a stable HTTPS origin and omit cloudflared. Route that origin to the named `telegram` listener.
+- `Telegram:CloudflaredCommand`: optional executable path.
+- `DigitalBrain:FlutterCommand`: optional Flutter executable path.
+- `WithBot(options => ...)` also accepts PublicUrl, MiniAppDirectory and CloudflaredCommand.
 
-The local Mini App bundle is built through an Aspire completion resource when missing. Existing builds are reused. After editing Flutter, rebuild `src/Modules/UI/Flutter/telegram` using `flutter build web --release --base-href /telegram/app/`, then refresh the Mini App.
+Aspire prompts for `telegram-bot-token`, and generates/persists `telegram-webhook-secret`. A missing bundle is built before kernel startup; existing bundles are reused. After Flutter changes, rebuild with `flutter build web --release --base-href /telegram/app/`. The Telegram runtime project owns bundle copying into build/publish output.
 
-Quick-tunnel URLs change. Restart the **AppHost** after a tunnel process exits or is restarted so that a new log/origin and registration belong to the same run. This integration does not silently loop/restart a tunnel while the kernel keeps a stale URL. Production publishing requires `Telegram:PublicUrl` or an explicit disable; quick tunnels are development-only.
-
-The gateway forwards only `POST /telegram/webhook`, authenticated `GET /telegram/health`, the three exact Mini App API routes, and `GET`/`HEAD` assets below `/telegram/app/`. It strips queries, cookies, host/forwarding headers, method overrides, and response authentication cookies. Provider requests carry only the webhook-secret header; Mini App requests carry only their `tma` authorization header. The kernel still verifies both authentication schemes. Redirects cannot forward credentials to another origin.
+Each AppHost run uses a fresh tunnel log and bounded HTTPS-origin discovery. Restart the AppHost after a tunnel process restart to re-register its new URL. Production publishing requires a stable public HTTPS origin or explicit disable. Tokens stay in the server; provider errors are sanitized and token-bearing HTTP traces suppressed.

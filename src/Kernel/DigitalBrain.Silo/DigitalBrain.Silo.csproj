@@ -27,7 +27,4 @@
     <InternalsVisibleTo Include="DigitalBrain.Tests" />
     <PackageReference Include="Microsoft.Agents.AI.Hosting.AGUI.AspNetCore" />
   </ItemGroup>
-  <ItemGroup Condition="Exists('../../Modules/UI/Flutter/telegram/build/web/index.html')">
-    <Content Include="../../Modules/UI/Flutter/telegram/build/web/**/*" Link="telegram-app/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-  </ItemGroup>
 </Project>
