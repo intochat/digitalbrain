@@ -3,6 +3,7 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Aspire.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -38,6 +39,7 @@ public static class ShellHostingExtensions
             options.DeviceTarget = ShellNames.DefaultWebDeviceTarget;
         }
 
+        module.DigitalBrainBuilder.ApplicationBuilder.Configuration.GetSection(FlutterHostOptions.SectionName).Bind(options);
         configure?.Invoke(options);
         GetOrCreateState(module).EnsureFlutterHost(kind, options);
         return module;
@@ -45,7 +47,7 @@ public static class ShellHostingExtensions
 
     private static ShellHostingState GetOrCreateState(DigitalBrainModuleBuilder<FlutterModule> module)
     {
-        var state = module.Brain.GetOrAddState(
+        var state = module.DigitalBrainBuilder.GetOrAddState(
             static brain => new ShellHostingState(brain),
             out var added);
         if (added)

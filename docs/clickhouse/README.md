@@ -2,13 +2,13 @@
 
 Gives the brain a read-only door into a ClickHouse database and turns query results into live,
 pageable tables in the chat. It mirrors the Memory (Qdrant) and Salesforce modules: three
-projects, a provider seam with an in-memory fake, native tools for the assistant, and an Aspire
+projects, a provider seam backed by the ClickHouse driver, native tools for the assistant, and an Aspire
 projection that hosts the server.
 
 | Project | Namespace | What it holds |
 |---|---|---|
 | `src/Modules/ClickHouse/Contracts` | `DigitalBrain.ClickHouse` | `IClickHouse`, `IClickHouseTable : ITable`, the records, `ClickHouseJson`, `ClickHouseNames` |
-| `src/Modules/ClickHouse/ClickHouse` | `DigitalBrain.ClickHouse` | `ClickHouseModule`, the two neurons, `ClickHouseDriverProvider`, `FakeClickHouseProvider`, the guard, the plan compiler, the native tools |
+| `src/Modules/ClickHouse/ClickHouse` | `DigitalBrain.ClickHouse` | `ClickHouseModule`, the two neurons, `ClickHouseDriverProvider`, the guard, the plan compiler, the native tools |
 | `src/Modules/ClickHouse/Aspire.Hosting` | `DigitalBrain.ClickHouse.Aspire.Hosting` | `WithClickHouse()` projection and the embedded `Seeds/leads.sql` |
 
 ## Neurons
@@ -54,7 +54,7 @@ it only renders the neuron and hands the points back. The smoke transcripts in `
 ## AppHost
 
 ```csharp
-.AddModule<ClickHouseModule>(clickhouse => clickhouse.WithClickHouse(options => options.WithSeed("leads")))
+.AddModule<ClickHouseModule>(module => module.WithClickHouse(options => options.WithSeed("leads")))
 ```
 
 `WithClickHouse` adds the `clickhouse` container under the brain with a data volume
@@ -68,16 +68,14 @@ the `clickhouse-db` database `digitalbrain`. Options:
 
 The kernel receives `ConnectionStrings__clickhouse`, waits until the database is healthy and gets
 `DigitalBrain__ClickHouse__Provider=ClickHouse` and `DigitalBrain__ClickHouse__ConnectionName=clickhouse`.
-With `WithDigitalBrainFakes()` the projection wires nothing and the module uses the fake.
 
 ## Configuration keys
 
 | Key | Meaning |
 |---|---|
-| `DigitalBrain:ClickHouse:Provider` | `ClickHouse` for the driver; unset (with no connection string) selects the fake. |
+| `DigitalBrain:ClickHouse:Provider` | `ClickHouse` is required for the driver. |
 | `DigitalBrain:ClickHouse:ConnectionName` | Connection string name, default `clickhouse`. |
 | `ConnectionStrings:<name>` | `Host=…;Port=8123;Username=…;Password=…;Database=digitalbrain` from Aspire. |
-| `DigitalBrain:Fakes:Enabled` | `true` forces the fake provider regardless of the other keys. |
 
 A connection string with an unset provider fails loudly at startup, the same rule Memory applies.
 
@@ -108,21 +106,6 @@ still lets a SELECT call `url()`, `s3()` or `remote()`. Until the dedicated read
 1. Put an idempotent `.sql` file under `src/Modules/ClickHouse/Aspire.Hosting/Seeds/` (`CREATE … IF NOT EXISTS`,
    inserts guarded by `WHERE (SELECT count() FROM …) = 0`).
 2. Register it with `WithSeed("<file name without .sql>")`.
-3. Mirror the tables you need in scenarios in `FakeLeads` so tests stay Docker-free.
-
-## Tests
-
-- `tests/DigitalBrain.Tests/Features/clickhouse.feature` runs on the fake provider: schema, typed
-  query, refused write, server-side paging/filtering with revision conflicts, and the card signal.
-- `ClickHouseQueryGuardFacts`, `ClickHouseTypeMapFacts`, `QueryPlanCompilerFacts` pin the pure parts;
-  `ClickHouseTableAgentFacts` proves `read_table` / `update_table_view` / `/ui/tables` on a `chtable-` id.
-- `ClickHouseDriverProviderIntegrationFacts` runs the real provider against Testcontainers:
-
-  ```bash
-  DIGITALBRAIN_CLICKHOUSE_TESTS=1 dotnet test tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj -c Release -- --filter-class DigitalBrain.Tests.ClickHouseDriverProviderIntegrationFacts
-  ```
-
-  It needs Docker and pulls `clickhouse/clickhouse-server:25.8`; without the variable the four facts are skipped.
 
 ## Known limits
 

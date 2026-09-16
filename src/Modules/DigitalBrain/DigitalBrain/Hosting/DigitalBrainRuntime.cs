@@ -2,6 +2,7 @@ using System.ComponentModel;
 using DigitalBrain.Abstractions.Descriptors;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
 
@@ -20,7 +21,7 @@ public static class DigitalBrainRuntime
             if (services.GetService<Orleans.IReminderTable>() is null)
             {
                 throw new InvalidOperationException(
-                    "Neurons hold a retry reminder for pending work. Configure UseAzureTableReminderService for a real host or UseInMemoryReminderService for a test host.");
+                    "Neurons hold a retry reminder for pending work. Configure a reminder service, such as UseAzureTableReminderService.");
             }
 
             // Building the table here turns a grain class descriptor violation into a silo-start failure.
@@ -36,7 +37,12 @@ public static class DigitalBrainRuntime
         builder.UseJsonJournalFormat(DurableStateJson.TypeInfoResolver);
         ModelPayloadSerialization.AddModelPayloadSerialization(builder.Services);
         builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
-        builder.Services.TryAddSingleton<NeuronOptions>();
+        builder.Services.AddOptions<NeuronOptions>()
+            .BindConfiguration(NeuronOptions.SectionName)
+            .Validate(options => options.StorageOperationBudget > TimeSpan.Zero && options.RetryReminderPeriod > TimeSpan.Zero,
+                "Neuron storage budget and retry reminder period must be positive.")
+            .ValidateOnStart();
+        builder.Services.TryAddSingleton(services => services.GetRequiredService<IOptions<NeuronOptions>>().Value);
         builder.Services.TryAddSingleton<NeuronRuntime>();
         builder.Services.TryAddSingleton<StreamWake>();
         builder.Services.TryAddSingleton<DescriptorTable>();

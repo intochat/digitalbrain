@@ -21,14 +21,9 @@
     <InternalsVisibleTo Include="DigitalBrain.Modules.Google" />
     <InternalsVisibleTo Include="DigitalBrain.Modules.Flutter" />
     <InternalsVisibleTo Include="DigitalBrain.Modules.Salesforce" />
-    <InternalsVisibleTo Include="DigitalBrain.Tests" />
-    <InternalsVisibleTo Include="IntoChat.Tests" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.ClickHouse.Tests" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Coding.Tests" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Flutter.Tests" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Supabase.Tests" />
-    <InternalsVisibleTo Include="DigitalBrain.Runtime.Tests" />
-    <InternalsVisibleTo Include="DigitalBrain.Testing" />
     <InternalsVisibleTo Include="DigitalBrain.Mcp" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Testing" />
   </ItemGroup>
 </Project>

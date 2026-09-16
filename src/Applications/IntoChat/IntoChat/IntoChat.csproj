@@ -24,8 +24,6 @@
     <ProjectReference Include="../../../Modules/Flutter/Flutter/DigitalBrain.Modules.Flutter.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Tests" />
-    <InternalsVisibleTo Include="IntoChat.Tests" />
     <PackageReference Include="Microsoft.Agents.AI.Hosting.AGUI.AspNetCore" />
   </ItemGroup>
 </Project>

@@ -2,7 +2,5 @@
   <Import Project="../../../Testing/Module.Tests.props" />
   <ItemGroup>
     <ProjectReference Include="../Supabase/DigitalBrain.Modules.Supabase.csproj" />
-    <ProjectReference Include="../Aspire.Hosting/DigitalBrain.Modules.Supabase.Aspire.Hosting.csproj" />
-    <PackageReference Include="Testcontainers.PostgreSql" />
   </ItemGroup>
 </Project>

@@ -2,12 +2,14 @@ using DigitalBrain.Memory.Qdrant;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Qdrant.Client;
 
 namespace DigitalBrain.Memory;
 
 public sealed class MemoryModule : Core.IModule
 {
+    public const string ConfigurationRoot = MemoryOptions.SectionName;
     public const string ProviderConfigurationKey = "DigitalBrain:Memory:Provider";
     public const string QdrantProviderName = "Qdrant";
 
@@ -15,46 +17,25 @@ public sealed class MemoryModule : Core.IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        var provider = builder.Configuration[ProviderConfigurationKey];
-        if (string.Equals(provider, QdrantProviderName, StringComparison.OrdinalIgnoreCase))
-        {
-            builder.Services.TryAddSingleton(CreateQdrantClient);
-            builder.Services.TryAddSingleton(CreateQdrantProvider);
-            builder.Services.AddSingleton<IVectorMemoryStore, QdrantVectorMemoryStore>();
-        }
-        else
-        {
-            var connectionName = ResolveQdrantConnectionName(builder.Configuration);
-            var qdrantConnectionString = builder.Configuration.GetConnectionString(connectionName)
-                ?? builder.Configuration[$"ConnectionStrings:{connectionName}"];
-            if (!string.IsNullOrWhiteSpace(qdrantConnectionString))
-            {
-                throw new InvalidOperationException(
-                    $"Connection string '{connectionName}' is configured but '{ProviderConfigurationKey}' is " +
-                    (string.IsNullOrWhiteSpace(provider) ? "unset" : $"'{provider}', not '{QdrantProviderName}'") +
-                    $"; memory would silently fall back to an in-memory store and lose data on restart. Set " +
-                    $"'{ProviderConfigurationKey}' to '{QdrantProviderName}' to use it, or remove connection " +
-                    $"string '{connectionName}' to genuinely opt into in-memory storage.");
-            }
-
-            builder.Services.TryAddSingleton<IVectorMemoryStore, InMemoryVectorMemoryStore>();
-        }
-    }
-
-    private static string ResolveQdrantConnectionName(Microsoft.Extensions.Configuration.IConfiguration configuration)
-    {
-        var connectionName = configuration[QdrantVectorMemoryRegistration.ConnectionNameConfigurationKey];
-        return string.IsNullOrWhiteSpace(connectionName)
-            ? QdrantVectorMemoryRegistration.DefaultConnectionName
-            : connectionName;
+        builder.Services.AddOptions<MemoryOptions>()
+            .BindConfiguration(ConfigurationRoot)
+            .PostConfigure<IConfiguration>(static (options, configuration) => options.ResolveConnection(configuration))
+            .Validate(static options => string.Equals(options.Provider, QdrantProviderName, StringComparison.OrdinalIgnoreCase),
+                "Memory requires DigitalBrain:Memory:Provider=Qdrant.")
+            .Validate(static options => !string.IsNullOrWhiteSpace(options.Qdrant.ConnectionString)
+                && QdrantVectorMemoryRegistration.TryParseConnectionString(options.Qdrant.ConnectionString, out _, out _),
+                "Qdrant vector memory requires a valid connection string with Endpoint and optional Key.")
+            .ValidateOnStart();
+        builder.Services.TryAddSingleton(CreateQdrantClient);
+        builder.Services.TryAddSingleton(CreateQdrantProvider);
+        builder.Services.AddSingleton<IVectorMemoryStore, QdrantVectorMemoryStore>();
     }
 
     private static QdrantClient CreateQdrantClient(IServiceProvider services)
     {
-        var configuration = services.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
-        var connectionName = ResolveQdrantConnectionName(configuration);
-        var connectionString = configuration.GetConnectionString(connectionName)
-            ?? configuration[$"ConnectionStrings:{connectionName}"]
+        var options = services.GetRequiredService<IOptions<MemoryOptions>>().Value.Qdrant;
+        var connectionName = options.ConnectionName;
+        var connectionString = options.ConnectionString
             ?? throw new InvalidOperationException(
                 $"Qdrant vector memory requires connection string '{connectionName}'.");
 
@@ -63,9 +44,9 @@ public sealed class MemoryModule : Core.IModule
 
     private static QdrantVectorMemoryProvider CreateQdrantProvider(IServiceProvider services)
     {
-        var configuration = services.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
+        var options = services.GetRequiredService<IOptions<MemoryOptions>>().Value;
         var client = services.GetRequiredService<QdrantClient>();
-        var collectionName = configuration[QdrantVectorMemoryRegistration.CollectionNameConfigurationKey];
+        var collectionName = options.Qdrant.CollectionName;
         return new QdrantVectorMemoryProvider(client, collectionName);
     }
 }

@@ -6,6 +6,16 @@ namespace DigitalBrain.Salesforce.Aspire.Hosting;
 
 public static class SalesforceHostingExtensions
 {
+    public static DigitalBrainModuleBuilder<SalesforceModule> WithHostedMcp(
+        this DigitalBrainModuleBuilder<SalesforceModule> module, Action<SalesforceHostingOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        ArgumentNullException.ThrowIfNull(configure);
+        var options = new SalesforceHostingOptions();
+        configure(options);
+        return module.WithHostedMcp(options.Endpoint, options.PublicOrigin);
+    }
+
     // Only the kernel receives these values. The endpoint defaults to the hosted sobject server;
     // the public origin defaults to the kernel's own http endpoint.
     public static DigitalBrainModuleBuilder<SalesforceModule> WithHostedMcp(
@@ -14,7 +24,7 @@ public static class SalesforceHostingExtensions
         Uri? publicOrigin = null)
     {
         ArgumentNullException.ThrowIfNull(module);
-        var state = module.Brain.GetOrAddState(brain => new SalesforceHostingState(brain, module.Resource), out var added);
+        var state = module.DigitalBrainBuilder.GetOrAddState(brain => new SalesforceHostingState(brain, module.Resource), out var added);
         if (added)
         {
             module.AddProjection(state);
@@ -46,7 +56,7 @@ public static class SalesforceHostingExtensions
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {
             ArgumentNullException.ThrowIfNull(builder);
-            if (!_enabled || brain.FakesEnabled)
+            if (!_enabled)
             {
                 return;
             }

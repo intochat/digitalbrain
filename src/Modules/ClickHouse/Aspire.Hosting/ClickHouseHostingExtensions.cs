@@ -20,7 +20,7 @@ public static class ClickHouseHostingExtensions
 
     private static ClickHouseHostingState State(DigitalBrainModuleBuilder<ClickHouseModule> module)
     {
-        var state = module.Brain.GetOrAddState(static brain => new ClickHouseHostingState(brain), out var added);
+        var state = module.DigitalBrainBuilder.GetOrAddState(static brain => new ClickHouseHostingState(brain), out var added);
         if (added)
         {
             module.AddProjection(state);
@@ -86,7 +86,7 @@ public static class ClickHouseHostingExtensions
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {
             ArgumentNullException.ThrowIfNull(builder);
-            if (!_enabled || brain.FakesEnabled || _database is null)
+            if (!_enabled || _database is null)
             {
                 return;
             }

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace DigitalBrain.AI;
@@ -9,10 +10,13 @@ internal static class VoiceToTextHosting
     public const string DefaultTranscriptionKey = AIClients.DefaultTranscriptionKey;
 
     internal static void Add(IServiceCollection services, IConfiguration configuration)
+        => Add(services, AIOptions.Read(configuration));
+
+    internal static void Add(IServiceCollection services, AIOptions configuration)
     {
         services.TryAddSingleton<IAudioConverter, OggOpusToWavConverter>();
 
-        var markerName = configuration[DefaultTranscriptionKey];
+        var markerName = configuration.Default.Transcription;
         if (string.IsNullOrWhiteSpace(markerName))
         {
             services.TryAddSingleton<IAudioTranscriptionService, UnavailableTranscriptionService>();
@@ -36,7 +40,10 @@ internal static class VoiceToTextHosting
         switch (model.Provider)
         {
             case AiProvider.FoundryLocal:
-                services.TryAddSingleton<FoundryLocalTranscriptionService>();
+                services.TryAddSingleton(sp => new FoundryLocalTranscriptionService(
+                    sp.GetRequiredService<IOptions<AIOptions>>(),
+                    sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<FoundryLocalTranscriptionService>>(),
+                    sp.GetRequiredService<IAudioConverter>()));
                 services.TryAddSingleton<IAudioTranscriptionService>(static sp =>
                     sp.GetRequiredService<FoundryLocalTranscriptionService>());
                 services.AddHostedService(static sp =>
@@ -45,7 +52,7 @@ internal static class VoiceToTextHosting
 
             case AiProvider.OpenAI:
                 services.TryAddSingleton<IAudioTranscriptionService>(sp =>
-                    new OpenAITranscriptionService(model, sp.GetRequiredService<IConfiguration>()));
+                    new OpenAITranscriptionService(model, sp.GetRequiredService<IOptions<AIOptions>>()));
                 break;
 
             default:

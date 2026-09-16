@@ -19,9 +19,4 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" />
     <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" />
   </ItemGroup>
-  <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Tests" />
-    <InternalsVisibleTo Include="IntoChat.Tests" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Coding.Tests" />
-  </ItemGroup>
 </Project>

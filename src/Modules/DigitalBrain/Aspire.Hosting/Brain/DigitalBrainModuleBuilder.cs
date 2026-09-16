@@ -5,13 +5,13 @@ namespace DigitalBrain.Aspire.Hosting;
 public sealed class DigitalBrainModuleBuilder<TModule>
     where TModule : class
 {
-    internal DigitalBrainModuleBuilder(DigitalBrainBuilder brain) => Brain = brain;
+    internal DigitalBrainModuleBuilder(DigitalBrainBuilder digitalBrainBuilder) => DigitalBrainBuilder = digitalBrainBuilder;
 
-    public DigitalBrainBuilder Brain { get; }
+    public DigitalBrainBuilder DigitalBrainBuilder { get; }
 
     public IResourceBuilder<DigitalBrainModuleResource> Resource
-        => Brain.GetOrAddModuleNode(typeof(TModule));
+        => DigitalBrainBuilder.GetOrAddModuleNode(typeof(TModule));
 
     public void AddProjection(DigitalBrainModuleProjection projection)
-        => Brain.AddProjection(projection);
+        => DigitalBrainBuilder.AddProjection(projection);
 }

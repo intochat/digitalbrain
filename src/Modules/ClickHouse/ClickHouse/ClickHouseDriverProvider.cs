@@ -250,8 +250,7 @@ internal sealed class ClickHouseDriverProvider(ClickHouseClient client, string d
     }
 }
 
-// Schema reads sample this many categorical columns with this many distinct values each; the fake
-// applies the same caps so scenarios see what the driver would return.
+// Limits on categorical columns and distinct values sampled by schema reads.
 internal static class ClickHouseSchemaSampling
 {
     public const int MaxColumns = 24;

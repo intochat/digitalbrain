@@ -40,7 +40,3 @@ updates:
         patterns:
           - 'Microsoft.Orleans.*'
           - 'Orleans.*'
-      test-stack:
-        patterns:
-          - 'xunit*'
-          - 'Microsoft.NET.Test.Sdk'

@@ -15,7 +15,7 @@ internal static class GmailAuthentication
 {
     private static readonly object TokensKey = new();
 
-    internal static IServiceCollection AddGmailAuthentication(this IServiceCollection services, GmailOAuthConfiguration settings, BrowserLoginDefinition definition)
+    internal static IServiceCollection AddGmailAuthentication(this IServiceCollection services, BrowserLoginDefinition definition)
     {
         services.AddLogging(logging =>
         {
@@ -24,7 +24,8 @@ internal static class GmailAuthentication
             logging.AddFilter("Microsoft.IdentityModel", LogLevel.None);
             logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.Warning);
         });
-        services.AddAuthentication().AddScheme<OpenIdConnectOptions, GmailOAuthHandler>(definition.Scheme, options =>
+        services.AddAuthentication().AddScheme<OpenIdConnectOptions, GmailOAuthHandler>(definition.Scheme, _ => { });
+        services.AddOptions<OpenIdConnectOptions>(definition.Scheme).Configure<GmailOAuthConfiguration>((options, settings) =>
         {
             // Placeholders avoid startup failure; pre-auth guard refuses any challenge until configured.
             options.ClientId = settings.IsConfigured ? settings.ClientId : "not-configured";

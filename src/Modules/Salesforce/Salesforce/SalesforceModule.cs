@@ -1,6 +1,7 @@
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.AI;
 using DigitalBrain.Core;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -18,23 +19,19 @@ public sealed class SalesforceModule : IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
         var services = builder.Services;
-        var settings = new SalesforceOAuthConfiguration(builder.Configuration);
         services.TryAddSingleton<TokenHandoff>();
         services.AddSingleton<SalesforceWriteAccess>();
-        services.AddSingleton(settings);
+        services.AddOptions<SalesforceOAuthOptions>().Bind(builder.Configuration.GetSection(SalesforceOAuthOptions.SectionName));
+        services.AddSingleton(services => new SalesforceOAuthConfiguration(services.GetRequiredService<IOptions<SalesforceOAuthOptions>>()));
         services.AddSingleton<SalesforceLogins>();
         services.AddSingleton<IHttpSurface>(static services => new BrowserLoginSurface(services.GetRequiredService<SalesforceLogins>()));
-        var endpoint = ReadEndpoint(builder.Configuration);
-        if (DigitalBrainFakes.Enabled(builder.Configuration))
-        {
-            services.AddSingleton<ISalesforceProvider, FakeSalesforceProvider>();
-            services.AddSingleton<ISalesforceTokenExchange, FakeSalesforceTokenExchange>();
-        }
-        else
-        {
-            services.AddSingleton<ISalesforceProvider>(new SalesforceMcpProvider(endpoint));
-            services.AddSingleton<ISalesforceTokenExchange, SalesforceTokenExchange>();
-        }
+        services.AddOptions<SalesforceMcpOptions>()
+            .Bind(builder.Configuration.GetSection(SalesforceMcpOptions.SectionName))
+            .Validate(options => { _ = options.ResolveEndpoint(); return true; })
+            .ValidateOnStart();
+        services.AddSingleton<ISalesforceProvider>(services => new SalesforceMcpProvider(
+            services.GetRequiredService<IOptions<SalesforceMcpOptions>>().Value.ResolveEndpoint()));
+        services.AddSingleton<ISalesforceTokenExchange, SalesforceTokenExchange>();
         services.AddSingleton<SalesforceTokenRefresh>();
         services.AddNativeTool("salesforce_current_account", services => services.GetRequiredService<SalesforceNativeTools>().CreateCurrentAccount());
         services.AddNativeTool("salesforce_schema", services => services.GetRequiredService<SalesforceNativeTools>().CreateSchema());
@@ -45,26 +42,6 @@ public sealed class SalesforceModule : IModule
         services.AddSingleton(static services => new SalesforceNativeTools(
             services.GetRequiredService<IGrainFactory>().GetGrain<ISalesforce>(new NeuronId("salesforce", "salesforce").ToGrainId()),
             services.GetRequiredService<TimeProvider>(), services.GetRequiredService<SalesforceLogins>()));
-        services.AddSalesforceAuthentication(settings, SalesforceLogins.LoginDefinition);
-    }
-
-    private static Uri? ReadEndpoint(Microsoft.Extensions.Configuration.IConfiguration configuration)
-    {
-        var value = configuration[McpEndpointConfigurationKey];
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-
-        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)
-            || uri.Scheme != Uri.UriSchemeHttps || uri.Host != "api.salesforce.com" || !uri.IsDefaultPort
-            || !uri.AbsolutePath.StartsWith("/platform/mcp/", StringComparison.Ordinal)
-            || uri.UserInfo.Length != 0 || uri.Query.Length != 0 || uri.Fragment.Length != 0)
-        {
-            throw new InvalidOperationException(
-                $"Configuration '{McpEndpointConfigurationKey}' must be an HTTPS hosted MCP endpoint on api.salesforce.com.");
-        }
-
-        return uri;
+        services.AddSalesforceAuthentication(SalesforceLogins.LoginDefinition);
     }
 }

@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.AI.WebSearch;
 
@@ -17,7 +18,12 @@ public sealed class TavilyWebSearch : IWebSearch
     private readonly string _apiKey;
 
     public TavilyWebSearch(HttpClient httpClient, IConfiguration configuration)
-        : this(httpClient, configuration[ApiKeyConfigurationKey]
+        : this(httpClient, Options.Create(AIOptions.Read(configuration)))
+    {
+    }
+
+    public TavilyWebSearch(HttpClient httpClient, IOptions<AIOptions> options)
+        : this(httpClient, options.Value.Tavily.ApiKey
             ?? throw new InvalidOperationException(
                 $"Tavily web search is enabled but {ApiKeyConfigurationKey} is missing."))
     {

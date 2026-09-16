@@ -24,7 +24,7 @@ public static class AIVocabulary
     /// Configuration, held as latest-per-type.
     /// <para>
     /// For an <see cref="AgentType"/> neuron:
-    /// <c>{ "provider": "xai|openai|scripted", "model": "grok-4.6", "system": "...", "tools": ["websearch"] }</c>.
+    /// <c>{ "provider": "xai|openai", "model": "grok-4.6", "system": "...", "tools": ["websearch"] }</c>.
     /// Every field is optional: the provider falls back to the configured default provider,
     /// the model to the provider's default model, and <c>tools</c> names native tools on top
     /// of the seven brain operations every agent always has.

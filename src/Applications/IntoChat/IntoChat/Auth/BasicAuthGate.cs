@@ -24,7 +24,7 @@ internal static class BasicAuthGate
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        var credential = BasicAuthCredential.FromConfiguration(app.Configuration);
+        var credential = BasicAuthCredential.FromOptions(IntoChatConfiguration.ResolveAuthOptions(app));
         if (credential is null)
         {
             // Unset credentials mean an open kernel — the local and test posture.
@@ -80,8 +80,14 @@ internal static class BasicAuthGate
         {
             ArgumentNullException.ThrowIfNull(configuration);
 
-            var username = configuration[UsernameConfigurationKey];
-            var password = configuration[PasswordConfigurationKey];
+            return FromOptions(configuration.GetSection(BasicAuthOptions.SectionName).Get<BasicAuthOptions>() ?? new());
+        }
+
+        public static BasicAuthCredential? FromOptions(BasicAuthOptions options)
+        {
+            ArgumentNullException.ThrowIfNull(options);
+            var username = options.Username;
+            var password = options.Password;
 
             return string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password)
                 ? null

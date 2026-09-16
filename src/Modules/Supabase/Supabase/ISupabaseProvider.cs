@@ -2,7 +2,7 @@ using DigitalBrain.Flutter;
 
 namespace DigitalBrain.Supabase;
 
-// The seam between the neurons and a Supabase server; the fake implements it in memory.
+// The interface between the neurons and a Supabase server.
 internal interface ISupabaseProvider
 {
     string ProviderName { get; }

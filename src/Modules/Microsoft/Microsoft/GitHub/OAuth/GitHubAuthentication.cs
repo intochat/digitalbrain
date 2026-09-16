@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Microsoft.GitHub;
 
@@ -12,9 +13,9 @@ internal static class GitHubAuthentication
 {
     internal static void AddGitHubAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
-        var settings = new GitHubOAuthConfiguration(configuration);
         var definition = GitHubLogins.LoginDefinition;
-        services.AddSingleton(settings);
+        services.AddOptions<GitHubAppOptions>().Bind(configuration.GetSection(GitHubAppOptions.SectionName));
+        services.AddSingleton(services => new GitHubOAuthConfiguration(services.GetRequiredService<IOptions<GitHubAppOptions>>()));
         services.AddSingleton<GitHubLogins>();
         services.AddSingleton<IHttpSurface>(s => new BrowserLoginSurface(s.GetRequiredService<GitHubLogins>()));
         services.AddLogging(logging =>
@@ -22,7 +23,8 @@ internal static class GitHubAuthentication
             logging.AddFilter(typeof(GitHubOAuthHandler).FullName, LogLevel.None);
             logging.AddFilter("Microsoft.AspNetCore.Authentication.OAuth", LogLevel.None);
         });
-        services.AddAuthentication().AddOAuth<OAuthOptions, GitHubOAuthHandler>(definition.Scheme, options =>
+        services.AddAuthentication().AddOAuth<OAuthOptions, GitHubOAuthHandler>(definition.Scheme, _ => { });
+        services.AddOptions<OAuthOptions>(definition.Scheme).Configure<GitHubOAuthConfiguration>((options, settings) =>
         {
             options.ClientId = settings.IsConfigured ? settings.ClientId : "not-configured";
             options.ClientSecret = settings.IsConfigured ? settings.ClientSecret : "not-configured";

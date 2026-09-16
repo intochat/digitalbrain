@@ -10,7 +10,7 @@ namespace DigitalBrain.Salesforce;
 internal static class SalesforceAuthentication
 {
     internal static IServiceCollection AddSalesforceAuthentication(
-        this IServiceCollection services, SalesforceOAuthConfiguration settings, BrowserLoginDefinition definition)
+        this IServiceCollection services, BrowserLoginDefinition definition)
     {
         // Framework diagnostics can include remote error descriptions and callback query strings.
         // Keep only our sanitized status messages for this credential boundary.
@@ -22,7 +22,8 @@ internal static class SalesforceAuthentication
         });
         services.AddAuthentication()
             .AddCookie("SalesforceCallback", options => options.Cookie.Name = "db.sf.unused")
-            .AddOAuth<OAuthOptions, SalesforceOAuthHandler>(definition.Scheme, options =>
+            .AddOAuth<OAuthOptions, SalesforceOAuthHandler>(definition.Scheme, _ => { });
+        services.AddOptions<OAuthOptions>(definition.Scheme).Configure<SalesforceOAuthConfiguration>((options, settings) =>
             {
                 settings.Configure(options);
                 options.SignInScheme = "SalesforceCallback";

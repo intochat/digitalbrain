@@ -2,6 +2,5 @@
   <Import Project="../../../Testing/Module.Tests.props" />
   <ItemGroup>
     <ProjectReference Include="../ClickHouse/DigitalBrain.Modules.ClickHouse.csproj" />
-    <PackageReference Include="Testcontainers.ClickHouse" />
   </ItemGroup>
 </Project>

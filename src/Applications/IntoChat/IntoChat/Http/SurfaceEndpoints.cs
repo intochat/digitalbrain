@@ -5,6 +5,7 @@ using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Core;
 using DigitalBrain.Flutter;
+using Microsoft.Extensions.Options;
 
 namespace IntoChat;
 
@@ -61,14 +62,14 @@ internal static class SurfaceEndpoints
             }).AddEndpointFilter(new NeuronNameFilter("surfaceName"));
 
         endpoints.MapGet("/surfaces/{surfaceName}/events",
-            static async Task (string surfaceName, long? afterSequence, IGrainFactory grains, StreamWake wake, SessionStreamOptions options,
+            static async Task (string surfaceName, long? afterSequence, IGrainFactory grains, StreamWake wake, IOptions<SessionStreamOptions> options,
                 HttpContext http, CancellationToken cancellationToken) =>
             {
                 var surfaceId = new NeuronId(UIVocabulary.SurfaceType, surfaceName);
                 var surface = grains.GetGrain<ISurface>(surfaceId.ToGrainId());
                 await SessionStream.RunAsync(http, surface, surfaceId, JournalKind.Outgoing,
                     afterSequence.GetValueOrDefault(), ProjectSurface, "surface",
-                    async token => await surface.Read().WaitAsync(token), wake, options, cancellationToken);
+                    async token => await surface.Read().WaitAsync(token), wake, options.Value, cancellationToken);
             }).AddEndpointFilter(new NeuronNameFilter("surfaceName"));
 
         return endpoints;

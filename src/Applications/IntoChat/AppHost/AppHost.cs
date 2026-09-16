@@ -25,61 +25,64 @@ using Microsoft.Extensions.Hosting;
 using OpenAIModels = DigitalBrain.AI.OpenAI;
 
 var builder = DistributedApplication.CreateBuilder(args);
-var captureGenAiContent = builder.Configuration.GetValue<bool?>("DigitalBrain:AI:Telemetry:EnableSensitiveData")
+var captureGenAiContent = builder.Configuration.GetSection($"{AIOptions.SectionName}:Telemetry")
+    .Get<AITelemetryOptions>()?.EnableSensitiveData
     ?? (builder.Environment.IsDevelopment() && builder.ExecutionContext.IsRunMode);
 
-var brain = builder.AddDigitalBrain(ProductSurfaceResources.Modules)
-    .AddModule<AIModule>(ai =>
+var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules)
+    .AddModule<AIModule>(module =>
     {
-        ai.EnableSensitiveData = captureGenAiContent;
+        module.EnableSensitiveData = captureGenAiContent;
 
         // --- OpenAI ---
-        //ai.WithLlm<OpenAIModels.IGpt56Sol>();
-        //ai.WithLlm<OpenAIModels.IGpt56Terra>();
-        ai.WithLlm<OpenAIModels.IGpt56Luna>();
-        ai.WithDefaultLlm<OpenAIModels.IGpt56Luna>();
-        ai.WithEmbedding<OpenAIModels.ITextEmbedding3Small>();
-        ai.WithDefaultEmbedding<OpenAIModels.ITextEmbedding3Small>();
+        //module.WithLlm<OpenAIModels.IGpt56Sol>();
+        //module.WithLlm<OpenAIModels.IGpt56Terra>();
+        module.WithLlm<OpenAIModels.IGpt56Luna>();
+        module.WithDefaultLlm<OpenAIModels.IGpt56Luna>();
+        module.WithEmbedding<OpenAIModels.ITextEmbedding3Small>();
+        module.WithDefaultEmbedding<OpenAIModels.ITextEmbedding3Small>();
 
         // --- Anthropic ---
-        // ai.WithLlm<AnthropicModels.IFable5>();
-        // ai.WithLlm<AnthropicModels.ISonnet5>();
-        // ai.WithLlm<AnthropicModels.IHaiku45>();
-        // ai.WithDefaultLlm<AnthropicModels.IFable5>();
+        // module.WithLlm<AnthropicModels.IFable5>();
+        // module.WithLlm<AnthropicModels.ISonnet5>();
+        // module.WithLlm<AnthropicModels.IHaiku45>();
+        // module.WithDefaultLlm<AnthropicModels.IFable5>();
 
         // --- Google ---
-        // ai.WithLlm<GoogleModels.IGemini31Pro>();
-        // ai.WithLlm<GoogleModels.IGemini36Flash>();
-        // ai.WithDefaultLlm<GoogleModels.IGemini31Pro>();
-        // ai.WithEmbedding<GoogleModels.IGeminiEmbedding>();
-        // ai.WithDefaultEmbedding<GoogleModels.IGeminiEmbedding>();
+        // module.WithLlm<GoogleModels.IGemini31Pro>();
+        // module.WithLlm<GoogleModels.IGemini36Flash>();
+        // module.WithDefaultLlm<GoogleModels.IGemini31Pro>();
+        // module.WithEmbedding<GoogleModels.IGeminiEmbedding>();
+        // module.WithDefaultEmbedding<GoogleModels.IGeminiEmbedding>();
 
         // --- xAI ---
-        // ai.WithLlm<XaiModels.IGrok46>();
-        // ai.WithDefaultLlm<XaiModels.IGrok46>();
+        // module.WithLlm<XaiModels.IGrok46>();
+        // module.WithDefaultLlm<XaiModels.IGrok46>();
 
         // --- Ollama ---
-        // ai.WithLlm<OllamaModels.IGemma4>();
-        // ai.WithLlm<OllamaModels.IQwen35>();
-        // ai.WithDefaultLlm<OllamaModels.IQwen35>();
-        // ai.WithEmbedding<OllamaModels.IEmbeddingGemma>();
-        // ai.WithDefaultEmbedding<OllamaModels.IEmbeddingGemma>();
+        // module.WithLlm<OllamaModels.IGemma4>();
+        // module.WithLlm<OllamaModels.IQwen35>();
+        // module.WithDefaultLlm<OllamaModels.IQwen35>();
+        // module.WithEmbedding<OllamaModels.IEmbeddingGemma>();
+        // module.WithDefaultEmbedding<OllamaModels.IEmbeddingGemma>();
 
-        ai.WithVoiceToText<IWhisperLargeV3Turbo>();
-        ai.WithTavilySearch();
+        module.WithVoiceToText<IWhisperLargeV3Turbo>();
+        module.WithTavilySearch();
     })
-    .AddModule<MemoryModule>(memory => memory.WithQdrant())
-    .AddModule<ClickHouseModule>(clickhouse => clickhouse.WithClickHouse(options => options.WithSeed("leads")))
+    .AddModule<MemoryModule>(module => module.WithQdrant())
+    .AddModule<ClickHouseModule>(module =>
+        module.WithClickHouse(options =>
+            options.WithSeed("leads")))
     .AddModule<SupabaseModule>()
     .AddModule<TimeModule>()
     .AddModule<ExcelModule>()
-    .AddModule<GoogleModule>(google => google.WithGmail())
-    .AddModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
-    .AddModule<MicrosoftModule>(microsoft => microsoft
+    .AddModule<GoogleModule>(module => module.WithGmail())
+    .AddModule<SalesforceModule>(module => module.WithHostedMcp())
+    .AddModule<MicrosoftModule>(module => module
         .WithAspire(Path.Combine(builder.AppHostDirectory, "IntoChat.AppHost.csproj"))
         .WithConfiguredGitHubRepositories(builder.Configuration))
-    .AddModule<CodingModule>(coding => coding.WithSolution(Path.Combine(builder.AppHostDirectory, "..", "..", "..", "..", "DigitalBrain.slnx")))
-    .AddModule<FlutterModule>(ui => ui.WithWindowHost());
+    .AddModule<CodingModule>(module => module.WithSolution(Path.Combine(builder.AppHostDirectory, "..", "..", "..", "..", "DigitalBrain.slnx")))
+    .AddModule<FlutterModule>(module => module.WithWindowHost());
 
 // Isolated Aspire runs reuse the persistent Azurite volume while assigning new random silo
 // ports. A per-run development cluster avoids trying to contact a dead membership row from the
@@ -89,7 +92,7 @@ var developmentClusterId = builder.Environment.IsDevelopment()
     : null;
 
 builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.IntoChat)
-    .WithReference(brain)
+    .WithReference(digitalBrain)
     .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION", "false")
     .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_HTTPCLIENT_DISABLE_URL_QUERY_REDACTION", "false")
     .WithHttpEndpoint(

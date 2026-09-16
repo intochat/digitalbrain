@@ -6,6 +6,16 @@ namespace DigitalBrain.Google.Aspire.Hosting;
 
 public static class GoogleHostingExtensions
 {
+    public static DigitalBrainModuleBuilder<GoogleModule> WithGmail(
+        this DigitalBrainModuleBuilder<GoogleModule> module, Action<GmailHostingOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        ArgumentNullException.ThrowIfNull(configure);
+        var options = new GmailHostingOptions();
+        configure(options);
+        return module.WithGmail(options.PublicOrigin);
+    }
+
     // Only the kernel receives these values. The public origin defaults to the kernel's own
     // http endpoint; pass one explicitly when a reverse proxy fronts the callback.
     public static DigitalBrainModuleBuilder<GoogleModule> WithGmail(
@@ -13,7 +23,7 @@ public static class GoogleHostingExtensions
         Uri? publicOrigin = null)
     {
         ArgumentNullException.ThrowIfNull(module);
-        var state = module.Brain.GetOrAddState(brain => new GmailHostingState(brain, module.Resource), out var added);
+        var state = module.DigitalBrainBuilder.GetOrAddState(brain => new GmailHostingState(brain, module.Resource), out var added);
         if (added)
         {
             module.AddProjection(state);
@@ -43,7 +53,7 @@ public static class GoogleHostingExtensions
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {
             ArgumentNullException.ThrowIfNull(builder);
-            if (!_enabled || brain.FakesEnabled)
+            if (!_enabled)
             {
                 return;
             }

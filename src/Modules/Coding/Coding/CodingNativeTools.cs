@@ -7,6 +7,7 @@ using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Flutter;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Coding;
 
@@ -18,17 +19,23 @@ public sealed class CodingNativeTools
     private readonly IGrainFactory _grains;
     private readonly DotnetRunner _dotnet;
     private readonly GitRunner _git;
-    private readonly IConfiguration _configuration;
+    private readonly CodingOptions _configuration;
     private readonly CodingToolOptions _options;
     private readonly Lazy<IReadOnlyList<AIFunction>> _functions;
 
     public CodingNativeTools(SolutionWorkspace workspace, IGrainFactory grains, DotnetRunner dotnet, GitRunner git, IConfiguration configuration, CodingToolOptions options)
+        : this(workspace, grains, dotnet, git,
+            Microsoft.Extensions.Options.Options.Create(configuration.GetSection(CodingOptions.SectionName).Get<CodingOptions>() ?? new()), options)
+    {
+    }
+
+    public CodingNativeTools(SolutionWorkspace workspace, IGrainFactory grains, DotnetRunner dotnet, GitRunner git, IOptions<CodingOptions> configuration, CodingToolOptions options)
     {
         _workspace = workspace;
         _grains = grains;
         _dotnet = dotnet;
         _git = git;
-        _configuration = configuration;
+        _configuration = configuration.Value;
         _options = options;
         _functions = new(Build);
     }
@@ -84,7 +91,7 @@ public sealed class CodingNativeTools
     // durable state (the map, while a reload is in flight) is not refused by the live service instead.
     private ICodeWorkspace Workspace()
         => _grains.GetGrain<ICodeWorkspace>(new NeuronId(CodingVocabulary.WorkspaceType,
-            _configuration[CodingModule.WorkspaceKeyKey] ?? "digitalbrain").ToGrainId());
+            _configuration.WorkspaceKey).ToGrainId());
 
     private string SolutionPath()
         => _workspace.Status.SolutionPath ?? throw new InvalidOperationException(_workspace.Status.Advice);
@@ -234,7 +241,7 @@ public sealed class CodingNativeTools
         [Description("A test class full name to run only that class, or empty for everything")] string? filterClass = null,
         [Description("Optional output root for this build, relative to the solution directory (use artifacts/<name>); never a path under a project folder")] string? artifactsPath = null,
         CancellationToken cancellationToken = default)
-        => GuardedAsync(() => _dotnet.TestAsync(_configuration[CodingModule.TestProjectKey] is { Length: > 0 } project ? project : SolutionPath(), filterClass, ResolveArtifactsPath(artifactsPath), cancellationToken));
+        => GuardedAsync(() => _dotnet.TestAsync(_configuration.TestProject is { Length: > 0 } project ? project : SolutionPath(), filterClass, ResolveArtifactsPath(artifactsPath), cancellationToken));
 
     // Commands return at once; the reaction that does the work saves a new snapshot, which is what the model needs.
     // Every reaction that saves - propose, check, commit (success or failure), discard - bumps Revision, so

@@ -1,18 +1,18 @@
 using System.ClientModel;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using OpenAI;
 using OpenAI.Images;
 
 namespace DigitalBrain.AI;
 
-internal sealed class OpenAIImageGeneration(ImageModel model, IConfiguration configuration) : IImageGeneration
+internal sealed class OpenAIImageGeneration(ImageModel model, IOptions<AIOptions> options) : IImageGeneration
 {
     public async Task<GeneratedUiImage> GenerateAsync(string prompt, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
 
         var apiKeyKey = $"{AIClients.ConfigurationRoot}:{model.Provider}:ApiKey";
-        var apiKey = configuration[apiKeyKey]
+        var apiKey = options.Value.Provider(model.Provider).ApiKey
             ?? throw new InvalidOperationException($"Image generation requires {apiKeyKey}.");
 
         var client = new OpenAIClient(new ApiKeyCredential(apiKey)).GetImageClient(model.Id);

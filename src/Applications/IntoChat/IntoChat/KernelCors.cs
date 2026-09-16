@@ -1,3 +1,6 @@
+using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.Extensions.Options;
+
 namespace IntoChat;
 
 // The deployed shell is served from a different Static Web App origin. Inactive unless
@@ -12,17 +15,18 @@ internal static class KernelCors
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        if (ResolveOrigin(builder.Configuration) is not { } origin)
+        builder.Services.AddOptions<KernelCorsOptions>().BindConfiguration(KernelCorsOptions.SectionName);
+        builder.Services.AddCors();
+        builder.Services.AddOptions<CorsOptions>().Configure<IOptions<KernelCorsOptions>>((cors, options) =>
         {
-            return builder;
-        }
-
-        builder.Services.AddCors(options => options.AddPolicy(
-            PolicyName,
-            policy => policy
-                .WithOrigins(origin)
-                .AllowAnyHeader()
-                .AllowAnyMethod()));
+            if (ResolveOrigin(options.Value) is { } origin)
+            {
+                cors.AddPolicy(PolicyName, policy => policy
+                    .WithOrigins(origin)
+                    .AllowAnyHeader()
+                    .AllowAnyMethod());
+            }
+        });
 
         return builder;
     }
@@ -31,7 +35,7 @@ internal static class KernelCors
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        if (ResolveOrigin(app.Configuration) is not null)
+        if (ResolveOrigin(app.Services.GetRequiredService<IOptions<KernelCorsOptions>>().Value) is not null)
         {
             // Ahead of the auth gate so a 401 still carries the CORS headers the
             // browser needs to surface it as a status rather than a network error.
@@ -41,8 +45,8 @@ internal static class KernelCors
         return app;
     }
 
-    private static string? ResolveOrigin(IConfiguration configuration)
-        => configuration[AllowedOriginConfigurationKey] is { Length: > 0 } origin
+    private static string? ResolveOrigin(KernelCorsOptions options)
+        => options.AllowedOrigin is { Length: > 0 } origin
             ? origin.TrimEnd('/')
             : null;
 }

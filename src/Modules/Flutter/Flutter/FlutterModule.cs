@@ -33,6 +33,7 @@ public sealed class FlutterModule : IModule
         builder.Services.AddNativeTool("render_chart", services => UiToolNamed(services, "render_chart"));
         builder.Services.AddNativeTool("show_graph", services => UiToolNamed(services, "show_graph"));
         // generate_image appears only once an image model is configured, the same gate AIClients uses.
+        // This composition gate deliberately avoids a dependency on the AI implementation package.
         if (!string.IsNullOrWhiteSpace(builder.Configuration["DigitalBrain:AI:Default:Image"]))
         {
             builder.Services.AddNativeTool("generate_image", services => UiToolNamed(services, "generate_image"));

@@ -1,6 +1,8 @@
 using System.Reflection;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Microsoft.Extensions.Configuration;
+using System.Globalization;
 
 namespace DigitalBrain.Aspire.Hosting;
 
@@ -9,9 +11,21 @@ public static class DigitalBrainHostingExtensions
     public static string DurableStateConnectionName => DigitalBrainNames.JournalConnection;
 
     public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name)
+        => builder.AddDigitalBrain(name, static options => { });
+
+    public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name,
+        Action<DigitalBrainHostingOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(configure);
+        var options = builder.Configuration.GetSection(DigitalBrainHostingOptions.SectionName)
+            .Get<DigitalBrainHostingOptions>() ?? new();
+        configure(options);
+        if (options.StorageOperationBudget <= TimeSpan.Zero || options.RetryReminderPeriod <= TimeSpan.Zero)
+        {
+            throw new ArgumentException("Neuron storage budget and retry reminder period must be positive.", nameof(configure));
+        }
 
         var resource = builder.AddResource(new DigitalBrainResource(name))
             .ExcludeFromManifest()
@@ -23,6 +37,10 @@ public static class DigitalBrainHostingExtensions
                 Properties = [new(CustomResourceKnownProperties.Source, "DigitalBrain modules")],
             });
         var brain = new DigitalBrainBuilder(builder, name, resource);
+        if (options.StorageOperationBudget is not null || options.RetryReminderPeriod is not null)
+        {
+            brain.AddProjection(new NeuronConfigurationProjection(options.StorageOperationBudget, options.RetryReminderPeriod));
+        }
         var kernel = brain.GetOrAddModuleNode(DigitalBrainHostingNames.Kernel);
         var storage = builder
             .AddAzureStorage(DigitalBrainNames.Storage)
@@ -51,7 +69,7 @@ public static class DigitalBrainHostingExtensions
 
     public static DigitalBrainBuilder AddModule<TModule>(this DigitalBrainBuilder brain)
         where TModule : class
-        => brain.AddModule<TModule>(static _ => { });
+        => brain.AddModule<TModule>(static module => { });
 
     public static DigitalBrainBuilder AddModule<TModule>(this DigitalBrainBuilder brain, Action<DigitalBrainModuleBuilder<TModule>> configure)
         where TModule : class
@@ -79,28 +97,6 @@ public static class DigitalBrainHostingExtensions
         }
 
         return brain;
-    }
-
-    public static DigitalBrainBuilder WithDigitalBrainFakes(this DigitalBrainBuilder brain)
-    {
-        ArgumentNullException.ThrowIfNull(brain);
-
-        var state = brain.GetOrAddState(static _ => new FakesHostingState(), out var added);
-        if (added)
-        {
-            brain.AddProjection(state);
-        }
-
-        state.Enable();
-        brain.FakesEnabled = true;
-        return brain;
-    }
-
-    public static IResourceBuilder<T> WithDigitalBrainFakes<T>(this IResourceBuilder<T> builder)
-        where T : IResourceWithEnvironment
-    {
-        ArgumentNullException.ThrowIfNull(builder);
-        return builder.WithEnvironment("DigitalBrain__Fakes__Enabled", "true");
     }
 
     public static IResourceBuilder<TResource> WithReference<TResource>(this IResourceBuilder<TResource> builder, DigitalBrainBuilder brain)
@@ -153,21 +149,20 @@ public static class DigitalBrainHostingExtensions
         }
     }
 
-    private sealed class FakesHostingState : DigitalBrainModuleProjection
+    private sealed class NeuronConfigurationProjection(TimeSpan? storageBudget, TimeSpan? retryPeriod) : DigitalBrainModuleProjection
     {
-        private bool _enabled;
-
-        internal void Enable() => _enabled = true;
-
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {
             ArgumentNullException.ThrowIfNull(builder);
-            if (!_enabled)
+            if (storageBudget is { } budget)
             {
-                return;
+                builder.WithEnvironment("DigitalBrain__Neuron__StorageOperationBudget", budget.ToString("c", CultureInfo.InvariantCulture));
             }
-
-            builder.WithEnvironment("DigitalBrain__Fakes__Enabled", "true");
+            if (retryPeriod is { } period)
+            {
+                builder.WithEnvironment("DigitalBrain__Neuron__RetryReminderPeriod", period.ToString("c", CultureInfo.InvariantCulture));
+            }
         }
     }
+
 }

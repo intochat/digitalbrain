@@ -118,7 +118,7 @@ public sealed class GmailNativeTools(IGmail gmail, BrowserLogins logins, TimePro
             {
                 break;
             }
-            // This waits for refresh reaction scheduler latency, not domain time; a fake clock cannot remove it.
+            // This waits for refresh reaction scheduler latency, rather than domain time.
             await Task.Delay(20, timeout.Token).ConfigureAwait(false);
         }
         return await read().ConfigureAwait(false);

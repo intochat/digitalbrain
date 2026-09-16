@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.Options;
 
 namespace IntoChat;
 
@@ -8,12 +9,22 @@ internal sealed record UpdateWorkspaceArtifact(long ExpectedRevision, string Tit
 internal sealed class ArtifactConflictException() : InvalidOperationException("The artifact changed. Read its current revision before applying your edit.");
 
 /// <summary>Single-owner durable documents. Tables continue to use authoritative UI neurons.</summary>
-internal sealed class WorkspaceArtifactStore(IConfiguration configuration, IHostEnvironment environment)
+internal sealed class WorkspaceArtifactStore
 {
+    public WorkspaceArtifactStore(IConfiguration configuration, IHostEnvironment environment)
+        : this(Options.Create(configuration.GetSection(WorkspaceStorageOptions.SectionName).Get<WorkspaceStorageOptions>() ?? new()), environment)
+    {
+    }
+
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private readonly SemaphoreSlim _gate = new(1, 1);
-    private readonly string _directory = Path.GetFullPath(configuration["DigitalBrain:Workspace:StoragePath"]
-        ?? Path.Combine(environment.ContentRootPath, ".digitalbrain", "workspace"));
+    private readonly string _directory;
+
+    internal WorkspaceArtifactStore(IOptions<WorkspaceStorageOptions> options, IHostEnvironment environment)
+    {
+        _directory = Path.GetFullPath(options.Value.StoragePath
+            ?? Path.Combine(environment.ContentRootPath, ".digitalbrain", "workspace"));
+    }
 
     public async Task<WorkspaceArtifact> CreateAsync(CreateWorkspaceArtifact input, CancellationToken cancellationToken)
     {

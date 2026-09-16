@@ -1,5 +1,6 @@
-using DigitalBrain.AI;
 using DigitalBrain.AI.WebSearch;
+using DigitalBrain.AI;
+using Microsoft.Extensions.Options;
 
 namespace IntoChat;
 
@@ -9,12 +10,12 @@ internal static class WorkspaceEndpoints
     {
         endpoints.MapGet("/agent/connections/salesforce", async (IServiceProvider services) =>
             Results.Ok(new { connected = services.GetService<DigitalBrain.Salesforce.SalesforceNativeTools>() is { } tools && await tools.IsConnected() }));
-        endpoints.MapGet("/agent/capabilities", (IServiceProvider services, IConfiguration configuration) => Results.Ok(new
+        endpoints.MapGet("/agent/capabilities", (IServiceProvider services, IOptions<GraphOptions> options) => Results.Ok(new
         {
             webSearch = services.GetService<IWebSearch>() is not null,
             voice = services.GetService<IAudioTranscriptionService>()?.IsReady == true,
             brain = true,
-            graphExecution = configuration.GetValue<bool>("DigitalBrain:Graph:Enabled"),
+            graphExecution = options.Value.Enabled,
         }));
         endpoints.MapGet("/workspace/artifacts", (WorkspaceArtifactStore store, CancellationToken ct) =>
             RespondAsync(async () => Results.Ok(await store.ListAsync(ct))));

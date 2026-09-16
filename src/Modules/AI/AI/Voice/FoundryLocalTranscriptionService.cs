@@ -1,5 +1,6 @@
 using Microsoft.AI.Foundry.Local;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -22,7 +23,7 @@ public sealed class FoundryLocalTranscriptionService :
     private static readonly TimeSpan DownloadTimeout = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan LoadTimeout = TimeSpan.FromMinutes(2);
 
-    private readonly IConfiguration _configuration;
+    private readonly AIOptions _options;
     private readonly IAudioConverter? _audioConverter;
     private readonly ILogger<FoundryLocalTranscriptionService> _logger;
     private IModel? _model;
@@ -33,8 +34,16 @@ public sealed class FoundryLocalTranscriptionService :
         IConfiguration configuration,
         ILogger<FoundryLocalTranscriptionService> logger,
         IAudioConverter? audioConverter = null)
+        : this(Options.Create(AIOptions.Read(configuration)), logger, audioConverter)
     {
-        _configuration = configuration;
+    }
+
+    public FoundryLocalTranscriptionService(
+        IOptions<AIOptions> options,
+        ILogger<FoundryLocalTranscriptionService> logger,
+        IAudioConverter? audioConverter = null)
+    {
+        _options = options.Value;
         _logger = logger;
         _audioConverter = audioConverter;
     }
@@ -323,7 +332,7 @@ public sealed class FoundryLocalTranscriptionService :
     {
         // The key names a marker; the Foundry catalogue is keyed by wire id.
         var configuredId = TranscriptionModel
-            .FindByMarkerName(_configuration[DefaultTranscriptionKey] ?? string.Empty)?.Id;
+            .FindByMarkerName(_options.Default.Transcription ?? string.Empty)?.Id;
         if (!string.IsNullOrEmpty(configuredId))
         {
             var configured = await catalog.GetModelAsync(configuredId).ConfigureAwait(false);

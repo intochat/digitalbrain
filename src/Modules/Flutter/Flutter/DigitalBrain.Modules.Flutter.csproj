@@ -15,11 +15,6 @@
     <ProjectReference Include="../../DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Tests" />
-    <InternalsVisibleTo Include="IntoChat.Tests" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.ClickHouse.Tests" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Flutter.Tests" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Supabase.Tests" />
     <InternalsVisibleTo Include="DigitalBrain.Modules.ClickHouse" />
     <InternalsVisibleTo Include="DigitalBrain.Modules.Supabase" />
   </ItemGroup>

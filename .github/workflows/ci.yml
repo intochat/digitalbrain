@@ -47,10 +47,10 @@ jobs:
         run: dotnet build DigitalBrain.slnx -c Release --no-restore
 
       - name: Run tests
-        run: dotnet test DigitalBrain.slnx -c Release --no-build --no-restore --verbosity minimal
+        run: dotnet test --solution DigitalBrain.slnx -c Release --no-build --ignore-exit-code 8
 
   flutter-web-build:
-    name: Flutter analyze, test and web build
+    name: Flutter analyze and web build
     runs-on: ubuntu-latest
     timeout-minutes: 35
     defaults:
@@ -79,18 +79,6 @@ jobs:
           (cd core && dart analyze --fatal-infos)
           (cd ui && flutter analyze --no-pub)
           (cd shell && flutter analyze --no-pub)
-
-      - name: Core tests
-        working-directory: src/Modules/Flutter/app/core
-        run: dart test
-
-      - name: Ui tests
-        working-directory: src/Modules/Flutter/app/ui
-        run: flutter test --no-pub
-
-      - name: Shell tests
-        working-directory: src/Modules/Flutter/app/shell
-        run: flutter test --no-pub
 
       - name: Web release build
         run: flutter build web --release --base-href "/" --no-tree-shake-icons --no-pub

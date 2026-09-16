@@ -6,9 +6,6 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Tests" />
-    <InternalsVisibleTo Include="IntoChat.Tests" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.ClickHouse.Tests" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="ClickHouse.Driver" />
   </ItemGroup>

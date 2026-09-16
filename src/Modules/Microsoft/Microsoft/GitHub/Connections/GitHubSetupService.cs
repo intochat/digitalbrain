@@ -1,10 +1,10 @@
 using DigitalBrain.Abstractions.Identity;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Microsoft.GitHub;
 
 internal sealed class GitHubSetupService(
-    IConfiguration configuration, GitHubRepositoryBindings bindings, IGrainFactory grains,
+    IOptions<GitHubAppOptions> options, GitHubRepositoryBindings bindings, IGrainFactory grains,
     GitHubInstallationTokens tokens, IGitHubRepositorySource source)
 {
     internal const string AppRoot = "DigitalBrain:Microsoft:GitHub:App";
@@ -41,7 +41,7 @@ internal sealed class GitHubSetupService(
             return new(url, "access_revoked", id, [], "Reconnect repository access before enabling subscriptions.");
         }
 
-        var ingress = configuration[$"{AppRoot}:PublicWebhookUrl"];
+        var ingress = options.Value.PublicWebhookUrl;
         if (!Uri.TryCreate(ingress, UriKind.Absolute, out var endpoint) || endpoint.Scheme != "https"
             || endpoint.AbsolutePath != "/integrations/github/webhook" || endpoint.UserInfo.Length != 0
             || endpoint.Query.Length != 0 || endpoint.Fragment.Length != 0)
@@ -110,15 +110,14 @@ internal sealed class GitHubSetupService(
     }
 
     private bool Configured(long? appId)
-        => long.TryParse(configuration[$"{AppRoot}:AppId"], out var configured)
-            && configured > 0 && (appId is null || appId == configured)
-            && !string.IsNullOrWhiteSpace(configuration[$"{AppRoot}:PrivateKeyPem"])
-            && configuration[$"{AppRoot}:WebhookSecret"] is { Length: >= 16 };
+        => options.Value.ParsedAppId > 0 && (appId is null || appId == options.Value.ParsedAppId)
+            && !string.IsNullOrWhiteSpace(options.Value.PrivateKeyPem)
+            && options.Value.WebhookSecret is { Length: >= 16 };
 
     private GitHubRepositoryBinding Create(GitHubConnectionRecord record)
         => new(record.Id, record.RepositoryId, record.InstallationId, record.AppId,
             record.RepositoryOwner, record.RepositoryName,
-            configuration[$"{AppRoot}:PrivateKeyPem"]!, configuration[$"{AppRoot}:WebhookSecret"]!,
+            options.Value.PrivateKeyPem!, options.Value.WebhookSecret!,
             authorizationEpoch: record.Epoch);
 
     internal static (string Owner, string Name) ParseUrl(string value)

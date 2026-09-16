@@ -8,6 +8,17 @@ namespace DigitalBrain.Microsoft.Hosting;
 public static class GitHubHostingExtensions
 {
     public static DigitalBrainModuleBuilder<MicrosoftModule> WithGitHubRepository(
+        this DigitalBrainModuleBuilder<MicrosoftModule> module, Action<GitHubRepositoryHostingOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        ArgumentNullException.ThrowIfNull(configure);
+        var options = new GitHubRepositoryHostingOptions();
+        configure(options);
+        return module.WithGitHubRepository(options.BindingId, options.AppId, options.InstallationId, options.RepositoryId,
+            options.RepoOwner, options.RepoName, options.EndpointId, options.ApiHost, options.McpEndpoint);
+    }
+
+    public static DigitalBrainModuleBuilder<MicrosoftModule> WithGitHubRepository(
         this DigitalBrainModuleBuilder<MicrosoftModule> module,
         string bindingId, long appId, long installationId,
         long repositoryId, string repositoryOwner, string repositoryName,
@@ -25,12 +36,12 @@ public static class GitHubHostingExtensions
         {
             throw new ArgumentException("The GitHub hosting binding must use at most 80 letters, digits or hyphens.", nameof(bindingId));
         }
-        var state = module.Brain.GetOrAddState(static _ => new GitHubHostingState(), out var added);
+        var state = module.DigitalBrainBuilder.GetOrAddState(static _ => new GitHubHostingState(), out var added);
         if (added)
         {
             module.AddProjection(state);
         }
-        state.Add(bindingId, endpointId ?? bindingId, new GitHubProjection(module.Brain, bindingId, appId,
+        state.Add(bindingId, endpointId ?? bindingId, new GitHubProjection(module.DigitalBrainBuilder, bindingId, appId,
             installationId, repositoryId, repositoryOwner, repositoryName, endpointId ?? bindingId, apiHost, mcpEndpoint));
         return module;
     }
@@ -67,10 +78,6 @@ public static class GitHubHostingExtensions
 
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {
-            if (brain.FakesEnabled)
-            {
-                return;
-            }
             var microsoft = brain.GetOrAddModuleNode(typeof(MicrosoftModule));
             _privateKey ??= brain.ApplicationBuilder.AddParameter($"github-{id}-app-private-key", secret: true)
                 .WithDescription("PEM private key for the configured GitHub App. Only the kernel receives this secret.")

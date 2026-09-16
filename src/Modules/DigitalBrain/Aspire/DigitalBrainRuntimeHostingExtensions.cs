@@ -62,7 +62,7 @@ public static class DigitalBrainRuntimeHostingExtensions
         var clustering = configuration.GetConnectionString(DigitalBrainNames.Clustering);
         if (string.IsNullOrWhiteSpace(clustering))
         {
-            if (configuration.GetValue("DigitalBrain:Standalone", false))
+            if (configuration.GetSection(StandaloneOptions.SectionName).Get<StandaloneOptions>()?.Standalone == true)
             {
                 throw new InvalidOperationException(
                     $"Missing connection string '{DigitalBrainNames.Clustering}'. "

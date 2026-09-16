@@ -1,5 +1,6 @@
 using System.ClientModel;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using OpenAI;
 using OpenAI.Audio;
 
@@ -26,9 +27,14 @@ public sealed class OpenAITranscriptionService : IAudioTranscriptionService
     private readonly Lazy<AudioClient>? _client;
 
     public OpenAITranscriptionService(TranscriptionModel model, IConfiguration configuration)
+        : this(model, Options.Create(AIOptions.Read(configuration)))
+    {
+    }
+
+    public OpenAITranscriptionService(TranscriptionModel model, IOptions<AIOptions> settings)
     {
         ArgumentNullException.ThrowIfNull(model);
-        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(settings);
 
         _model = model;
 
@@ -43,14 +49,14 @@ public sealed class OpenAITranscriptionService : IAudioTranscriptionService
         }
 
         var apiKeyKey = $"{AIClients.ConfigurationRoot}:{model.Provider}:ApiKey";
-        if (configuration[apiKeyKey] is not { Length: > 0 } apiKey)
+        if (settings.Value.Provider(model.Provider).ApiKey is not { Length: > 0 } apiKey)
         {
             ErrorMessage = $"{model.DisplayName} requires {apiKeyKey}.";
             return;
         }
 
         var options = new OpenAIClientOptions { NetworkTimeout = RequestTimeout };
-        if (configuration[$"{AIClients.ConfigurationRoot}:{model.Provider}:Endpoint"] is { Length: > 0 } endpoint)
+        if (settings.Value.Provider(model.Provider).Endpoint is { Length: > 0 } endpoint)
         {
             options.Endpoint = new Uri(endpoint);
         }

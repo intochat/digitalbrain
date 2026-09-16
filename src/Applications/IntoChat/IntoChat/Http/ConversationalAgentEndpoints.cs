@@ -1,7 +1,8 @@
 using DigitalBrain.AI;
 using DigitalBrain.Flutter;
-using Microsoft.Agents.AI.Hosting;
 using Microsoft.Agents.AI.Hosting.AGUI.AspNetCore;
+using Microsoft.Agents.AI.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace IntoChat;
 
@@ -12,7 +13,9 @@ internal static class ConversationalAgentEndpoints
     public static void AddConversationalAgent(this IHostApplicationBuilder builder)
     {
         builder.Services.AddAGUIServer();
-        builder.Services.AddSingleton<WorkspaceArtifactStore>();
+        builder.Services.AddSingleton(services => new WorkspaceArtifactStore(
+            services.GetRequiredService<IOptions<WorkspaceStorageOptions>>(),
+            services.GetRequiredService<IHostEnvironment>()));
         builder.AddAIAgent(AgentName, static (services, name) => ConversationalAgent.Create(services, name,
             [.. services.GetService<TableService>() is { } tables ? new TableAgentTools(tables).Create() : [],
              .. new WorkspaceAgentTools(services.GetRequiredService<WorkspaceArtifactStore>()).Create()]))

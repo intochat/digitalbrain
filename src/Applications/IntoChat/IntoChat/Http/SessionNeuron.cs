@@ -8,10 +8,11 @@ internal static class SessionNeuron
 {
     public static WebApplication UseSessionNeuron(this WebApplication app)
     {
+        var options = IntoChatConfiguration.ResolveAuthOptions(app);
         app.Use(async (context, next) =>
         {
             var previous = RequestContext.Get(NeuronRequestKeys.Caller);
-            RequestContext.Set(NeuronRequestKeys.Caller, For(app.Configuration).ToString());
+            RequestContext.Set(NeuronRequestKeys.Caller, For(options).ToString());
             try
             {
                 await next(context).ConfigureAwait(false);
@@ -32,5 +33,8 @@ internal static class SessionNeuron
     }
 
     public static NeuronId For(IConfiguration configuration)
-        => NeuronId.Plain(configuration[BasicAuthGate.UsernameConfigurationKey] is { Length: > 0 } login ? login : BasicAuthGate.DefaultLogin);
+        => For(configuration.GetSection(BasicAuthOptions.SectionName).Get<BasicAuthOptions>() ?? new());
+
+    public static NeuronId For(BasicAuthOptions options)
+        => NeuronId.Plain(options.Username is { Length: > 0 } login ? login : BasicAuthGate.DefaultLogin);
 }

@@ -15,28 +15,22 @@ src/
   Testing/
     DigitalBrain.Testing/
     Module.Tests.props
-tests/
-  DigitalBrain.Tests/
 ```
 
-Other modules use `{Contracts,<Name>,Tests}` and add `Aspire.Hosting` when needed. Excel and Time do not need that adapter. Flutter's Dart workspace lives in `app/`, with its existing `core`, `ui`, and `shell` packages and package-local Dart tests.
+Other modules use `{Contracts,<Name>}` and add `Aspire.Hosting` when needed. Excel and Time do not need that adapter. Flutter's Dart workspace lives in `app/`, with its existing `core`, `ui`, and `shell` packages.
 
 Contracts expose capabilities using the DigitalBrain neuron/Orleans model. Implementations reference the contracts they use; applications choose and host implementations. Application service defaults are registered by the silo, not by the reusable DigitalBrain Aspire package.
 
-IntoChat is the product built on the DigitalBrain framework. Its application projects are `IntoChat`, `IntoChat.AppHost`, `IntoChat.ServiceDefaults`, and `IntoChat.Tests`; the Aspire process resource is `IntoChat`. The core NuGet package and assembly remain `DigitalBrain`, while the non-packable product executable is `IntoChat.dll`. Flutter C# projects use `DigitalBrain.Modules.Flutter`, `.Contracts`, and `.Aspire.Hosting`, with namespace `DigitalBrain.Flutter` and module type `FlutterModule`. Existing UI wire aliases, routes, configuration keys, and Dart package names remain unchanged.
+Configuration types live in a `Configuration/` folder within their owning project. Hosting options belong in `Aspire.Hosting/Configuration/`; runtime options belong in the module implementation's `Configuration/` folder. Keep options in the project's public namespace so folder organization does not change the configuration API. In module composition lambdas, use `module` for the module builder and `options` for its configuration object. See [configuration.md](configuration.md) for ownership, precedence, and examples.
 
-## Tests
+IntoChat is the product built on the DigitalBrain framework. Its application projects are `IntoChat`, `IntoChat.AppHost`, `IntoChat.ServiceDefaults`; the Aspire process resource is `IntoChat`. The core NuGet package and assembly remain `DigitalBrain`, while the non-packable product executable is `IntoChat.dll`. Flutter C# projects use `DigitalBrain.Modules.Flutter`, `.Contracts`, and `.Aspire.Hosting`, with namespace `DigitalBrain.Flutter` and module type `FlutterModule`. Existing UI wire aliases, routes, configuration keys, and Dart package names remain unchanged.
 
-Each module's `Tests` project references the shared `DigitalBrain.Testing` runtime harness through `src/Testing/Module.Tests.props`. The shared SDK depends on the foundational runtime, not feature modules. Module fixtures live beside their module's tests. Application composition and HTTP tests live in `src/Applications/IntoChat/Tests`.
+## Verification
 
-The existing BDD suite uses a composed, multi-module `BrainWorld`. Module-specific bindings and feature files are owned by the module's `Tests/Scenarios` folder but linked into the system runner at `tests/DigitalBrain.Tests`. Explicit `ReqnrollFeatureFile` items preserve discovery on a fresh checkout. Cross-module integration features and their scenario harness remain with that runner.
-
-Some module projects currently have only scenarios or fixtures, and therefore discover no standalone xUnit tests; run their existing scenarios through the system runner. Do not add placeholder assertions solely to populate those projects. Shared AI/Coding fixtures used by application tests are linked from their owning module rather than copied into the runtime SDK.
+The shared `DigitalBrain.Testing` framework and simple test projects are available for every module and IntoChat. A small runtime test verifies that `BrainSimulation` starts and restarts. The other test projects are empty starting points; the old suites and production fake providers remain removed. See [the testing guide](../src/Testing/README.md). Enabled data modules require real providers and valid connections.
 
 ```powershell
 dotnet build DigitalBrain.slnx
-dotnet test --project src/Modules/Flutter/Tests/DigitalBrain.Modules.Flutter.Tests.csproj
-dotnet test --project tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj
 aspire start --apphost src/Applications/IntoChat/AppHost/IntoChat.AppHost.csproj --non-interactive
 ```
 

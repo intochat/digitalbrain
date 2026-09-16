@@ -5,12 +5,13 @@ using DigitalBrain.Flutter;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.ClickHouse;
 
 public sealed class ClickHouseModule : IModule
 {
-    public const string ConfigurationRoot = "DigitalBrain:ClickHouse";
+    public const string ConfigurationRoot = ClickHouseOptions.SectionName;
     public const string ProviderConfigurationKey = "DigitalBrain:ClickHouse:Provider";
     public const string DriverProviderName = "ClickHouse";
 
@@ -18,41 +19,19 @@ public sealed class ClickHouseModule : IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
         var services = builder.Services;
-        var configuration = builder.Configuration;
-        var provider = configuration[ProviderConfigurationKey];
-        var connectionName = ResolveConnectionName(configuration);
-        var connectionString = configuration.GetConnectionString(connectionName) ?? configuration[$"ConnectionStrings:{connectionName}"];
-
-        if (DigitalBrainFakes.Enabled(configuration) || string.IsNullOrWhiteSpace(provider))
-        {
-            if (!DigitalBrainFakes.Enabled(configuration) && !string.IsNullOrWhiteSpace(connectionString))
-            {
-                throw new InvalidOperationException(
-                    $"Connection string '{connectionName}' is configured but '{ProviderConfigurationKey}' is unset; ClickHouse would " +
-                    $"silently answer from an in-memory fake. Set '{ProviderConfigurationKey}' to '{DriverProviderName}' to use it, " +
-                    $"or remove connection string '{connectionName}' to genuinely opt into the fake.");
-            }
-
-            services.TryAddSingleton<FakeClickHouseProvider>();
-            services.TryAddSingleton<IClickHouseProvider>(static services => services.GetRequiredService<FakeClickHouseProvider>());
-        }
-        else if (string.Equals(provider, DriverProviderName, StringComparison.OrdinalIgnoreCase))
-        {
-            if (string.IsNullOrWhiteSpace(connectionString))
-            {
-                throw new InvalidOperationException($"ClickHouse provider '{DriverProviderName}' requires connection string '{connectionName}'.");
-            }
-
-            services.AddHttpClient(ClickHouseRegistration.HttpClientName, static client => client.Timeout = TimeSpan.FromMinutes(2));
-            services.TryAddSingleton(services => new ClickHouseClient(connectionString, services.GetRequiredService<IHttpClientFactory>(), ClickHouseRegistration.HttpClientName));
-            services.TryAddSingleton<IClickHouseProvider>(services => new ClickHouseDriverProvider(
-                services.GetRequiredService<ClickHouseClient>(), ClickHouseDriverProvider.DatabaseOf(connectionString)));
-            services.AddHealthChecks().AddCheck<ClickHouseHealthCheck>("clickhouse", tags: ["ready"]);
-        }
-        else
-        {
-            throw new InvalidOperationException($"'{ProviderConfigurationKey}' is '{provider}'; the only supported provider is '{DriverProviderName}' (or unset for the fake).");
-        }
+        services.AddOptions<ClickHouseOptions>()
+            .BindConfiguration(ConfigurationRoot)
+            .PostConfigure<IConfiguration>(static (options, configuration) => options.ResolveConnection(configuration))
+            .Validate(static options => string.Equals(options.Provider, DriverProviderName, StringComparison.OrdinalIgnoreCase),
+                "ClickHouse requires DigitalBrain:ClickHouse:Provider=ClickHouse.")
+            .Validate(static options => !string.IsNullOrWhiteSpace(options.ConnectionString),
+                "ClickHouse requires a connection string for its configured connection name.")
+            .ValidateOnStart();
+        services.AddHttpClient(ClickHouseRegistration.HttpClientName, static client => client.Timeout = TimeSpan.FromMinutes(2));
+        services.TryAddSingleton(services => new ClickHouseClient(services.GetRequiredService<IOptions<ClickHouseOptions>>().Value.ConnectionString!, services.GetRequiredService<IHttpClientFactory>(), ClickHouseRegistration.HttpClientName));
+        services.TryAddSingleton<IClickHouseProvider>(services => new ClickHouseDriverProvider(
+            services.GetRequiredService<ClickHouseClient>(), ClickHouseDriverProvider.DatabaseOf(services.GetRequiredService<IOptions<ClickHouseOptions>>().Value.ConnectionString!)));
+        services.AddHealthChecks().AddCheck<ClickHouseHealthCheck>("clickhouse", tags: ["ready"]);
 
         services.AddSingleton<ITableSource>(new TableSource(ClickHouseNames.TableIdPrefix, ClickHouseNames.TableType));
         // The tools need TableService whether or not the UI module is composed; both register it TryAdd-style.
@@ -61,11 +40,5 @@ public sealed class ClickHouseModule : IModule
         services.AddNativeTool("clickhouse_schema", static services => services.GetRequiredService<ClickHouseNativeTools>().CreateSchema());
         services.AddNativeTool("clickhouse_query", static services => services.GetRequiredService<ClickHouseNativeTools>().CreateQuery());
         services.AddNativeTool("show_query_table", static services => services.GetRequiredService<ClickHouseNativeTools>().CreateShowQueryTable());
-    }
-
-    private static string ResolveConnectionName(IConfiguration configuration)
-    {
-        var connectionName = configuration[ClickHouseRegistration.ConnectionNameConfigurationKey];
-        return string.IsNullOrWhiteSpace(connectionName) ? ClickHouseRegistration.DefaultConnectionName : connectionName;
     }
 }

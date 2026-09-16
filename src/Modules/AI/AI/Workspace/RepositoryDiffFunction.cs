@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Text;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.AI;
 
@@ -13,8 +14,13 @@ internal sealed class RepositoryDiffFunction
     private readonly int _maxOutputCharacters;
 
     internal RepositoryDiffFunction(IConfiguration configuration, int maxOutputCharacters = 64 * 1024)
+        : this(Options.Create(configuration.GetSection(AIWorkspaceOptions.SectionName).Get<AIWorkspaceOptions>() ?? new()), maxOutputCharacters)
     {
-        _repositoryPath = configuration["DigitalBrain:Workspace:RepositoryPath"];
+    }
+
+    internal RepositoryDiffFunction(IOptions<AIWorkspaceOptions> options, int maxOutputCharacters = 64 * 1024)
+    {
+        _repositoryPath = options.Value.RepositoryPath;
         _maxOutputCharacters = maxOutputCharacters;
         Function = AIFunctionFactory.Create(ReadAsync, new AIFunctionFactoryOptions
         {

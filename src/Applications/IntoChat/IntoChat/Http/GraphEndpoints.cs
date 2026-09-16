@@ -3,6 +3,7 @@ using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Core;
 using DigitalBrain.Flutter;
+using Microsoft.Extensions.Options;
 
 namespace IntoChat;
 
@@ -17,23 +18,23 @@ internal static class GraphEndpoints
     public static IEndpointRouteBuilder MapBrainObservationEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/chats/{chatName}/brain",
-            static async Task<IResult> (string chatName, IGrainFactory grains, HttpContext http, IConfiguration configuration,
+            static async Task<IResult> (string chatName, IGrainFactory grains, HttpContext http, IOptions<BasicAuthOptions> auth,
                 CancellationToken cancellationToken) =>
             {
                 http.Response.Headers.CacheControl = "no-store";
                 return Results.Ok(await BrainGraphProjection.ReadAsync(grains,
-                    new NeuronId(UIVocabulary.ChatType, chatName), SessionNeuron.For(configuration), cancellationToken));
+                    new NeuronId(UIVocabulary.ChatType, chatName), SessionNeuron.For(auth.Value), cancellationToken));
             }).AddEndpointFilter(new NeuronNameFilter("chatName"));
 
         endpoints.MapGet("/chats/{chatName}/brain/events",
-            static async Task (string chatName, long? afterSequence, IGrainFactory grains, StreamWake wake, SessionStreamOptions options,
-                HttpContext http, IConfiguration configuration, CancellationToken cancellationToken) =>
+            static async Task (string chatName, long? afterSequence, IGrainFactory grains, StreamWake wake, IOptions<SessionStreamOptions> options,
+                HttpContext http, IOptions<BasicAuthOptions> auth, CancellationToken cancellationToken) =>
             {
                 var chat = new NeuronId(UIVocabulary.ChatType, chatName);
-                var session = SessionNeuron.For(configuration);
+                var session = SessionNeuron.For(auth.Value);
                 await SessionStream.RunSnapshotAsync(http, grains.GetGrain<INeuron>(chat.ToGrainId()), chat,
                     JournalKind.Outgoing, afterSequence.GetValueOrDefault(),
-                    token => BrainGraphProjection.ReadAsync(grains, chat, session, token), "brain-snapshot", wake, options, cancellationToken);
+                    token => BrainGraphProjection.ReadAsync(grains, chat, session, token), "brain-snapshot", wake, options.Value, cancellationToken);
             }).AddEndpointFilter(new NeuronNameFilter("chatName"));
 
         return endpoints;
@@ -61,12 +62,12 @@ internal static class GraphEndpoints
             }).AddEndpointFilter(new NeuronNameFilter("chatName"));
 
         endpoints.MapGet("/chats/{chatName}/activities",
-            static async Task<IResult> (string chatName, IGrainFactory grains, HttpContext http, IConfiguration configuration,
+            static async Task<IResult> (string chatName, IGrainFactory grains, HttpContext http, IOptions<BasicAuthOptions> auth,
                 CancellationToken cancellationToken) =>
             {
                 http.Response.Headers.CacheControl = "no-store";
                 var snapshot = await BrainGraphProjection.ReadAsync(grains,
-                    new NeuronId(UIVocabulary.ChatType, chatName), SessionNeuron.For(configuration), cancellationToken);
+                    new NeuronId(UIVocabulary.ChatType, chatName), SessionNeuron.For(auth.Value), cancellationToken);
                 return Results.Ok(new { snapshot.ObservedAt, snapshot.Truncated, snapshot.Correlations });
             }).AddEndpointFilter(new NeuronNameFilter("chatName"));
 

@@ -2,6 +2,8 @@ using DigitalBrain.AI;
 using DigitalBrain.Core;
 using DigitalBrain.Microsoft.GitHub;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Microsoft;
 
@@ -12,19 +14,17 @@ public sealed class MicrosoftModule : IModule
     public void Configure(ISiloBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        var configuration = builder.Configuration.GetSection(AspireConfigurationRoot);
-        AspireConnectionSettings? settings = null;
-        if (!DigitalBrainFakes.Enabled(builder.Configuration) && !string.IsNullOrWhiteSpace(configuration["ProjectPath"]))
-        {
-            var project = Path.GetFullPath(configuration["ProjectPath"]!);
-            if (!File.Exists(project))
+        var options = builder.Configuration.GetSection(AspireOptions.SectionName).Get<AspireOptions>() ?? new();
+        var enabled = !string.IsNullOrWhiteSpace(options.ProjectPath);
+        builder.Services.AddOptions<AspireOptions>().Bind(builder.Configuration.GetSection(AspireOptions.SectionName))
+            .Validate(options =>
             {
-                throw new InvalidOperationException("The configured Aspire AppHost project does not exist.");
-            }
-            settings = new(project, configuration["ApplicationName"] ?? "DigitalBrain", configuration["Command"] ?? "aspire");
-        }
-        builder.Services.AddSingleton(new AspireConnection(settings));
-        if (settings is not null)
+                _ = options.CreateSettings();
+                return true;
+            })
+            .ValidateOnStart();
+        builder.Services.AddSingleton(services => new AspireConnection(services.GetRequiredService<IOptions<AspireOptions>>().Value.CreateSettings()));
+        if (enabled)
         {
             builder.Services.AddNativeTool("aspire_read", services => services.GetRequiredService<AspireNativeTools>().CreateRead());
         }

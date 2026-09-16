@@ -14,7 +14,5 @@
     <PackageReference Include="xunit.v3.mtp-v2" />
     <Using Include="DigitalBrain.Testing" />
     <ProjectReference Include="$(MSBuildThisFileDirectory)DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
-    <!-- BDD scenarios need the composed system harness and are linked by its runner. -->
-    <Compile Remove="Scenarios/**/*.cs" />
   </ItemGroup>
 </Project>

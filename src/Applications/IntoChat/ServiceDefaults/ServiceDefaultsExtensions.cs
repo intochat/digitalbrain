@@ -6,11 +6,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using OpenTelemetry;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using OpenTelemetry;
 
 namespace IntoChat.ServiceDefaults;
 
@@ -53,10 +53,10 @@ public static class ServiceDefaultsExtensions
             .AddHealthChecks()
             .AddCheck("self", static () => HealthCheckResult.Healthy(), ["live"]);
 
-    private static void AddOpenTelemetryExporters<TBuilder>(TBuilder builder)
+    private static void AddOpenTelemetryExporters<TBuilder>(TBuilder builder, TelemetryIntegrationOptions integration)
         where TBuilder : IHostApplicationBuilder
     {
-        if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
+        if (!string.IsNullOrWhiteSpace(integration.ExporterEndpoint))
         {
             builder.Services.AddOpenTelemetry().UseOtlpExporter();
         }
@@ -65,7 +65,9 @@ public static class ServiceDefaultsExtensions
     private static void ConfigureOpenTelemetry<TBuilder>(TBuilder builder)
         where TBuilder : IHostApplicationBuilder
     {
-        var configuredSampleRatio = builder.Configuration.GetValue<double?>("Telemetry:Tracing:SampleRatio");
+        var options = builder.Configuration.GetSection(ServiceTelemetryOptions.SectionName).Get<ServiceTelemetryOptions>() ?? new();
+        var integration = builder.Configuration.Get<TelemetryIntegrationOptions>() ?? new();
+        var configuredSampleRatio = options.SampleRatio;
         var sampleRatio = Math.Clamp(configuredSampleRatio ?? 1d, 0d, 1d);
         var rootSampler = new SuppressAzureStorageSampler(new TraceIdRatioBasedSampler(sampleRatio));
 
@@ -75,8 +77,8 @@ public static class ServiceDefaultsExtensions
             logging.IncludeScopes = true;
         });
 
-        if (builder.Configuration.GetValue<bool?>("DigitalBrain:AI:Telemetry:EnableSensitiveData")
-            ?? builder.Configuration.GetValue<bool?>("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT")
+        if (integration.EnableSensitiveData
+            ?? integration.CaptureMessageContent
             ?? false)
         {
             // MEAI's structured inference events use this category. Broad Microsoft
@@ -121,7 +123,7 @@ public static class ServiceDefaultsExtensions
                     options.FilterHttpRequestMessage = static request => !IsAzuriteRequest(request);
                 }));
 
-        AddOpenTelemetryExporters(builder);
+        AddOpenTelemetryExporters(builder, integration);
     }
 
     private static bool IsAzuriteRequest(HttpRequestMessage request)

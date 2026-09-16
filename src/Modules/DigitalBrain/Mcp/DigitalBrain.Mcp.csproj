@@ -11,9 +11,4 @@
   <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Contracts.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Tests" />
-    <InternalsVisibleTo Include="IntoChat.Tests" />
-    <InternalsVisibleTo Include="DigitalBrain.Runtime.Tests" />
-  </ItemGroup>
 </Project>

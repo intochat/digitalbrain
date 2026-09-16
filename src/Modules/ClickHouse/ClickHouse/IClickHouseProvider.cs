@@ -2,7 +2,7 @@ using DigitalBrain.Flutter;
 
 namespace DigitalBrain.ClickHouse;
 
-// The seam between the neurons and a ClickHouse server; the fake implements it in memory.
+// The interface between the neurons and a ClickHouse server.
 internal interface IClickHouseProvider
 {
     string ProviderName { get; }

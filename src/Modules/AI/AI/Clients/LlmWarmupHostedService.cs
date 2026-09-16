@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using DigitalBrain.AI.Ollama;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -10,7 +10,7 @@ namespace DigitalBrain.AI;
 
 internal sealed class LlmWarmupHostedService(
     IServiceProvider services,
-    IConfiguration configuration,
+    IOptions<AIOptions> options,
     ILogger<LlmWarmupHostedService> logger) : IHostedService
 {
     private static readonly TimeSpan WarmBudget = TimeSpan.FromMinutes(3);
@@ -26,10 +26,10 @@ internal sealed class LlmWarmupHostedService(
             new EventId(2, nameof(LogWarmFailed)),
             "LLM warmup failed for {Model}; first chat may still pay cold start.");
 
-    private static readonly (Type Key, string ConfiguredModelKey)[] OllamaTargets =
+    private static readonly Type[] OllamaTargets =
     [
-        (typeof(IGemma4), $"{AIClients.ConfigurationRoot}:Ollama:IGemma4:Model"),
-        (typeof(IQwen35), $"{AIClients.ConfigurationRoot}:Ollama:IQwen35:Model"),
+        typeof(IGemma4),
+        typeof(IQwen35),
     ];
 
     private CancellationTokenSource? _warmup;
@@ -53,7 +53,7 @@ internal sealed class LlmWarmupHostedService(
 
     private async Task WarmConfiguredModelsAsync(CancellationToken cancellationToken)
     {
-        foreach (var (key, _) in ConfiguredTargets())
+        foreach (var key in ConfiguredTargets())
         {
             if (cancellationToken.IsCancellationRequested)
             {
@@ -64,11 +64,11 @@ internal sealed class LlmWarmupHostedService(
         }
     }
 
-    private IEnumerable<(Type Key, string ConfiguredModelKey)> ConfiguredTargets()
+    private IEnumerable<Type> ConfiguredTargets()
     {
         foreach (var target in OllamaTargets)
         {
-            if (!string.IsNullOrWhiteSpace(configuration[target.ConfiguredModelKey]))
+            if (!string.IsNullOrWhiteSpace(options.Value.Ollama.Models.GetValueOrDefault(target.Name)?.Model))
             {
                 yield return target;
             }

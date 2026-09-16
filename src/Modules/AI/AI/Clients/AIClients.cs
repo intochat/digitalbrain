@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.AI;
 
@@ -43,9 +44,13 @@ internal static class AIClients
                 model.Marker,
                 (provider, _) => Factories[model.Provider].CreateEmbeddingGenerator(
                     model,
-                    provider.GetRequiredService<IConfiguration>()));
+                    provider.GetRequiredService<IOptions<AIOptions>>().Value));
         }
 
+        // Resolve the final options after application Configure delegates have run.
+        // An empty marker preserves Providers' fallback to the default IChatClient.
+        services.TryAddSingleton(provider => new AIDefaults(
+            provider.GetRequiredService<IOptions<AIOptions>>().Value.Default.Model ?? string.Empty));
         services.TryAddSingleton(DefaultChatClient);
         services.TryAddSingleton(DefaultEmbeddingGenerator);
 
@@ -54,13 +59,12 @@ internal static class AIClients
 
     private static IChatClient BuildChatPipeline(IServiceProvider provider, LLMModel model)
         => BuildChatPipeline(provider, model, Factories[model.Provider].CreateChatClient(
-            model, provider.GetRequiredService<IConfiguration>()));
+            model, provider.GetRequiredService<IOptions<AIOptions>>().Value));
 
     internal static IChatClient BuildChatPipeline(IServiceProvider provider, LLMModel model, IChatClient innerClient)
     {
-        var configuration = provider.GetRequiredService<IConfiguration>();
-        var captureContent = configuration.GetValue<bool?>(SensitiveTelemetryKey)
-            ?? configuration.GetValue<bool?>("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT")
+        var configuration = provider.GetRequiredService<IOptions<AIOptions>>().Value;
+        var captureContent = configuration.Telemetry.EnableSensitiveData
             ?? false;
         var loggerFactory = provider.GetService<ILoggerFactory>();
         var pipeline = new ChatClientBuilder(innerClient);
@@ -91,15 +95,15 @@ internal static class AIClients
 
     private static IChatClient DefaultChatClient(IServiceProvider provider)
     {
-        var configuration = provider.GetRequiredService<IConfiguration>();
-        var model = configuration[DefaultModelKey] is { Length: > 0 } markerName
+        var configuration = provider.GetRequiredService<IOptions<AIOptions>>().Value;
+        var model = configuration.Default.Model is { Length: > 0 } markerName
             ? LLMModel.FindByMarkerName(markerName)
                 ?? throw UnknownMarker(DefaultModelKey, markerName, LLMModel.All.Select(static m => m.Marker.Name))
             : FirstConfiguredModel(configuration);
         return provider.GetRequiredKeyedService<IChatClient>(model.Marker);
     }
 
-    private static LLMModel FirstConfiguredModel(IConfiguration configuration)
+    private static LLMModel FirstConfiguredModel(AIOptions configuration)
         => LLMModel.All.FirstOrDefault(model => Factories[model.Provider].IsConfigured(configuration))
             ?? throw new InvalidOperationException(
                 $"No LLM provider is configured. Supply a provider API key (for example "
@@ -107,9 +111,9 @@ internal static class AIClients
 
     private static IEmbeddingGenerator<string, Embedding<float>> DefaultEmbeddingGenerator(IServiceProvider provider)
     {
-        var configuration = provider.GetRequiredService<IConfiguration>();
+        var configuration = provider.GetRequiredService<IOptions<AIOptions>>().Value;
 
-        if (configuration[DefaultEmbeddingKey] is { Length: > 0 } markerName)
+        if (configuration.Default.Embedding is { Length: > 0 } markerName)
         {
             var configured = EmbeddingModel.FindByMarkerName(markerName)
                 ?? throw UnknownMarker(DefaultEmbeddingKey, markerName, EmbeddingModel.All.Select(static m => m.Marker.Name));
@@ -132,10 +136,13 @@ internal static class AIClients
     }
 
     internal static void AddImageGeneration(IServiceCollection services, IConfiguration configuration)
+        => AddImageGeneration(services, AIOptions.Read(configuration));
+
+    internal static void AddImageGeneration(IServiceCollection services, AIOptions configuration)
     {
         // The marker names the model, as with chat and embeddings; an unpinned
         // key keeps the catalogue's first entry.
-        var markerName = configuration[DefaultImageKey];
+        var markerName = configuration.Default.Image;
         var model = string.IsNullOrEmpty(markerName)
             ? ImageModel.All[0]
             : ImageModel.FindByMarkerName(markerName);
@@ -151,10 +158,10 @@ internal static class AIClients
             return;
         }
 
-        if (configuration[$"{ConfigurationRoot}:{model.Provider}:ApiKey"] is { Length: > 0 })
+        if (configuration.Provider(model.Provider).ApiKey is { Length: > 0 })
         {
             services.AddSingleton<IImageGeneration>(sp =>
-                new OpenAIImageGeneration(model, sp.GetRequiredService<IConfiguration>()));
+                new OpenAIImageGeneration(model, sp.GetRequiredService<IOptions<AIOptions>>()));
         }
     }
 

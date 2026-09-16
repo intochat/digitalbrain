@@ -9,13 +9,12 @@ public static class GitHubConfigurationHostingExtensions
         this DigitalBrainModuleBuilder<MicrosoftModule> module, IConfiguration configuration)
     {
         module.WithConfiguredGitHubApp(configuration);
-        foreach (var repository in configuration.GetSection("DigitalBrain:Microsoft:GitHub:Repositories").GetChildren())
+        var repositories = configuration.GetSection("DigitalBrain:Microsoft:GitHub:Repositories")
+            .Get<Dictionary<string, GitHubRepositoryHostingOptions>>() ?? [];
+        foreach (var (id, options) in repositories)
         {
-            module.WithGitHubRepository(repository.Key, Number(repository, "AppId"),
-                Number(repository, "InstallationId"), Number(repository, "RepositoryId"),
-                Required(repository, "RepoOwner"), Required(repository, "RepoName"),
-                repository["EndpointId"], repository["ApiHost"] is { } api ? new Uri(api) : null,
-                repository["McpEndpoint"] is { } mcp ? new Uri(mcp) : null);
+            module.WithGitHubRepository(id, options.AppId, options.InstallationId, options.RepositoryId,
+                options.RepoOwner, options.RepoName, options.EndpointId, options.ApiHost, options.McpEndpoint);
         }
         return module;
     }
@@ -23,19 +22,14 @@ public static class GitHubConfigurationHostingExtensions
     public static DigitalBrainModuleBuilder<MicrosoftModule> WithConfiguredGitHubApp(
         this DigitalBrainModuleBuilder<MicrosoftModule> module, IConfiguration configuration)
     {
-        var app = configuration.GetSection("DigitalBrain:Microsoft:GitHub:App");
-        if (app.Exists())
+        var options = configuration.GetSection("DigitalBrain:Microsoft:GitHub:App").Get<GitHubAppHostingOptions>();
+        if (options is not null)
         {
-            module.WithGitHubApp(Number(app, "AppId"), Required(app, "Slug"), Required(app, "ClientId"),
-                new Uri(Required(app, "PublicOrigin")), new Uri(Required(app, "PublicWebhookUrl")));
+            ArgumentNullException.ThrowIfNull(options.PublicOrigin);
+            ArgumentNullException.ThrowIfNull(options.PublicWebhookUrl);
+            module.WithGitHubApp(options.AppId, options.Slug, options.ClientId,
+                options.PublicOrigin, options.PublicWebhookUrl);
         }
         return module;
     }
-
-    private static string Required(IConfiguration section, string name)
-        => !string.IsNullOrWhiteSpace(section[name]) ? section[name]!
-            : throw new InvalidOperationException($"The GitHub repository binding requires {name}.");
-
-    private static long Number(IConfiguration section, string name)
-        => long.Parse(Required(section, name), System.Globalization.CultureInfo.InvariantCulture);
 }

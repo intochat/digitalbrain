@@ -1,13 +1,13 @@
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Identity;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace DigitalBrain.Coding;
 
 // Opens the configured solution when the silo starts so the first question does not pay for the load.
-internal sealed class WorkspaceWarmup(SolutionWorkspace workspace, SolutionFileWatcher watcher, IGrainFactory grains, IConfiguration configuration, ILogger<WorkspaceWarmup> logger) : IHostedService
+internal sealed class WorkspaceWarmup(SolutionWorkspace workspace, SolutionFileWatcher watcher, IGrainFactory grains, IOptions<CodingOptions> options, ILogger<WorkspaceWarmup> logger) : IHostedService
 {
     private readonly CancellationTokenSource _stopping = new();
 
@@ -21,7 +21,7 @@ internal sealed class WorkspaceWarmup(SolutionWorkspace workspace, SolutionFileW
                 watcher.Start(directory);
             }
         };
-        var path = configuration[CodingModule.SolutionPathKey];
+        var path = options.Value.SolutionPath;
         if (string.IsNullOrWhiteSpace(path))
         {
             return Task.CompletedTask;
@@ -39,7 +39,7 @@ internal sealed class WorkspaceWarmup(SolutionWorkspace workspace, SolutionFileW
         }
 
         _ = workspace.BeginOpenAsync(fullPath);
-        _ = RecordOpenAsync(fullPath, configuration[CodingModule.WorkspaceKeyKey] ?? "digitalbrain");
+        _ = RecordOpenAsync(fullPath, options.Value.WorkspaceKey);
         return Task.CompletedTask;
     }
 

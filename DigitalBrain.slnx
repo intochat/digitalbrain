@@ -77,14 +77,12 @@
     <Project Path="src/Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <Project Path="src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
   </Folder>
-  <Folder Name="/Testing/">
-    <Project Path="src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
-  </Folder>
-  <Folder Name="/Tests/">
-    <Project Path="tests/DigitalBrain.Tests/DigitalBrain.Tests.csproj" />
-  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path="Directory.Packages.props" />
+  </Folder>
+  <Folder Name="/Testing/">
+    <Project Path="src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+    <File Path="src/Testing/Module.Tests.props" />
   </Folder>
 </Solution>

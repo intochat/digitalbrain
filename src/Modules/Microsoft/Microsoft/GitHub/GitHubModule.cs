@@ -1,6 +1,7 @@
 using DigitalBrain.AI;
 using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Microsoft.GitHub;
 
@@ -8,20 +9,15 @@ internal static class GitHubModule
 {
     internal static void Configure(ISiloBuilder builder)
     {
-        var fake = DigitalBrainFakes.Enabled(builder.Configuration);
-        var bindings = fake ? new GitHubRepositoryBindings([FakeGitHubRepositorySource.CreateBinding()])
-            : GitHubRepositoryBindings.Read(builder.Configuration);
-        builder.Services.AddSingleton(bindings);
+        builder.Services.AddOptions<GitHubRepositoriesOptions>()
+            .Bind(builder.Configuration.GetSection(GitHubRepositoriesOptions.SectionName))
+            .Validate(options => { _ = options.CreateBindings(); return true; })
+            .ValidateOnStart();
+        builder.Services.AddSingleton(services =>
+            services.GetRequiredService<IOptions<GitHubRepositoriesOptions>>().Value.CreateBindings());
         builder.Services.AddGitHubAuthentication(builder.Configuration);
         builder.Services.AddSingleton<GitHubInstallationTokens>();
-        if (fake)
-        {
-            builder.Services.AddSingleton<IGitHubRepositorySource, FakeGitHubRepositorySource>();
-        }
-        else
-        {
-            builder.Services.AddSingleton<IGitHubRepositorySource, GitHubRepositorySource>();
-        }
+        builder.Services.AddSingleton<IGitHubRepositorySource, GitHubRepositorySource>();
         builder.Services.AddSingleton<GitHubSetupService>();
         builder.Services.AddSingleton<GitHubWebhookIngress>();
         builder.Services.AddSingleton<IHttpSurface, GitHubWebhookSurface>();

@@ -67,19 +67,6 @@ and extension types use PostgreSQL's text representation, matching text filters.
 Individual text cells are capped at 4000 characters. Server errors expose a
 SQLSTATE code rather than server detail or connection credentials.
 
-## Fakes and tests
-
-`.WithDigitalBrainFakes()` before consumers are attached skips the parameter,
-whether called before or after `.AddModule<SupabaseModule>()`. The runtime uses
-the fake only in explicit fake/testing mode; missing production configuration
-fails instead of silently returning fake results. The fake supports exact
-scripted query results and includes `SELECT 1 AS value` as a default example.
-
-The test suite covers hosting parameters, fake composition, query restrictions,
-connection formats, and agent/live-table behavior. Set
-`DIGITALBRAIN_SUPABASE_TESTS=1` to also run the disposable PostgreSQL integration
-tests (Docker required). These test the SQL provider, not hosted Supabase services.
-
 ## Integration choice
 
 This module uses Npgsql and Aspire's built-in connection-string parameters.

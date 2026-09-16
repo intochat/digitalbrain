@@ -9,15 +9,24 @@ public static class MemoryHostingExtensions
 {
     public static DigitalBrainModuleBuilder<MemoryModule> WithQdrant(
         this DigitalBrainModuleBuilder<MemoryModule> module)
+        => WithQdrant(module, null);
+
+    public static DigitalBrainModuleBuilder<MemoryModule> WithQdrant(
+        this DigitalBrainModuleBuilder<MemoryModule> module,
+        Action<QdrantHostingOptions>? configure)
     {
         ArgumentNullException.ThrowIfNull(module);
-        State(module).Enable();
+        var options = new QdrantHostingOptions();
+        configure?.Invoke(options);
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.ResourceName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.ConnectionName);
+        State(module).Enable(options);
         return module;
     }
 
     private static MemoryHostingState State(DigitalBrainModuleBuilder<MemoryModule> module)
     {
-        var state = module.Brain.GetOrAddState(brain => new MemoryHostingState(brain, module.Resource), out var added);
+        var state = module.DigitalBrainBuilder.GetOrAddState(brain => new MemoryHostingState(brain, module.Resource), out var added);
         if (added)
         {
             module.AddProjection(state);
@@ -32,8 +41,9 @@ public static class MemoryHostingExtensions
     {
         private IResourceBuilder<QdrantServerResource>? _qdrant;
         private bool _enabled;
+        private QdrantHostingOptions _options = new();
 
-        internal void Enable()
+        internal void Enable(QdrantHostingOptions options)
         {
             if (_enabled)
             {
@@ -41,7 +51,8 @@ public static class MemoryHostingExtensions
             }
 
             var builder = brain.ApplicationBuilder;
-            _qdrant = builder.AddQdrant("qdrant").WithParentRelationship(module);
+            _options = options;
+            _qdrant = builder.AddQdrant(options.ResourceName).WithParentRelationship(module);
             _enabled = true;
         }
 
@@ -55,12 +66,16 @@ public static class MemoryHostingExtensions
 
             // WaitAnnotation: Apply targets IResourceWithEnvironment (kernel), not always IResourceWithWaitSupport.
             builder
-                .WithReference(_qdrant, connectionName: QdrantVectorMemoryRegistration.DefaultConnectionName)
+                .WithReference(_qdrant, connectionName: _options.ConnectionName)
                 .WithAnnotation(new WaitAnnotation(_qdrant.Resource, WaitType.WaitUntilHealthy, exitCode: 0))
                 .WithEnvironment("DigitalBrain__Memory__Provider", MemoryModule.QdrantProviderName)
                 .WithEnvironment(
                     "DigitalBrain__Memory__Qdrant__ConnectionName",
-                    QdrantVectorMemoryRegistration.DefaultConnectionName);
+                    _options.ConnectionName);
+            if (!string.IsNullOrWhiteSpace(_options.CollectionName))
+            {
+                builder.WithEnvironment("DigitalBrain__Memory__Qdrant__CollectionName", _options.CollectionName);
+            }
         }
     }
 }

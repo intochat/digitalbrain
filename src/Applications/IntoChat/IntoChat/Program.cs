@@ -1,9 +1,10 @@
 using DigitalBrain.Aspire;
 using DigitalBrain.Core;
-using IntoChat;
 using DigitalBrain.Mcp;
 using IntoChat.ServiceDefaults;
+using IntoChat;
 using Microsoft.Build.Locator;
+using Microsoft.Extensions.Options;
 using ModelContextProtocol.AspNetCore;
 using Orleans.Dashboard;
 
@@ -12,12 +13,12 @@ MSBuildLocator.RegisterDefaults();
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddIntoChatOptions();
 builder.AddServiceDefaults();
 builder.AddDigitalBrain();
 builder.AddConversationalAgent();
 builder.AddKernelCors();
 builder.Services.AddAuthentication();
-builder.Services.AddSingleton<SessionStreamOptions>();
 builder.Services.AddDigitalBrainMcp()
     .WithHttpTransport(options => options.SessionMode = HttpServerSessionMode.Stateless);
 
@@ -38,7 +39,7 @@ app.MapBrainObservationEndpoints();
 
 // Graph HTTP capabilities are optional; conversation handling stays direct.
 // Table tools use UI neurons independently of these graph routes.
-if (app.Configuration.GetValue<bool>("DigitalBrain:Graph:Enabled"))
+if (app.Services.GetRequiredService<IOptions<GraphOptions>>().Value.Enabled)
 {
     app.UseSessionNeuron();
     app.MapDigitalBrainMcp("/mcp");

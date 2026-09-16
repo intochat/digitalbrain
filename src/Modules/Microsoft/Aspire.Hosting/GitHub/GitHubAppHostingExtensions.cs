@@ -7,6 +7,18 @@ namespace DigitalBrain.Microsoft.Hosting;
 public static class GitHubAppHostingExtensions
 {
     public static DigitalBrainModuleBuilder<MicrosoftModule> WithGitHubApp(
+        this DigitalBrainModuleBuilder<MicrosoftModule> module, Action<GitHubAppHostingOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        ArgumentNullException.ThrowIfNull(configure);
+        var options = new GitHubAppHostingOptions();
+        configure(options);
+        ArgumentNullException.ThrowIfNull(options.PublicOrigin);
+        ArgumentNullException.ThrowIfNull(options.PublicWebhookUrl);
+        return module.WithGitHubApp(options.AppId, options.Slug, options.ClientId, options.PublicOrigin!, options.PublicWebhookUrl!);
+    }
+
+    public static DigitalBrainModuleBuilder<MicrosoftModule> WithGitHubApp(
         this DigitalBrainModuleBuilder<MicrosoftModule> module,
         long appId, string slug, string clientId, Uri publicOrigin, Uri publicWebhookUrl)
     {
@@ -26,7 +38,7 @@ public static class GitHubAppHostingExtensions
         {
             throw new ArgumentException("GitHub requires a public HTTPS /integrations/github/webhook endpoint.", nameof(publicWebhookUrl));
         }
-        var projection = module.Brain.GetOrAddState(_ => new GitHubAppProjection(module.Brain, appId, slug, clientId, publicOrigin, publicWebhookUrl), out var added);
+        var projection = module.DigitalBrainBuilder.GetOrAddState(_ => new GitHubAppProjection(module.DigitalBrainBuilder, appId, slug, clientId, publicOrigin, publicWebhookUrl), out var added);
         if (!added)
         {
             throw new InvalidOperationException("Configure the shared GitHub App once per DigitalBrain.");
@@ -44,10 +56,6 @@ public static class GitHubAppHostingExtensions
 
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {
-            if (brain.FakesEnabled)
-            {
-                return;
-            }
             _privateKey ??= brain.ApplicationBuilder.AddParameter("github-app-private-key", secret: true)
                 .WithDescription("PEM private key for the GitHub App; projected only to the kernel.");
             _webhookSecret ??= brain.ApplicationBuilder.AddParameter("github-app-webhook-secret", secret: true)

@@ -10,8 +10,6 @@ internal enum FlutterHostKind
 internal static class FlutterHostLaunch
 {
     private const string ShellPackageDirectoryName = "shell";
-    private const string ConfigurationFlutterCommandKey = "DigitalBrain:FlutterCommand";
-    private const string ConfigurationDartCommandKey = "DigitalBrain:DartCommand";
     private const string DefaultFlutterCommand = "flutter";
     private const string DefaultDartCommand = "dart";
 
@@ -203,7 +201,7 @@ internal static class FlutterHostLaunch
             return fromOptions;
         }
 
-        if (TryConfiguredCommand(configuration?[ConfigurationFlutterCommandKey], out var fromConfig))
+        if (TryConfiguredCommand(FlutterToolchainOptions.Read(configuration).FlutterCommand, out var fromConfig))
         {
             return fromConfig;
         }
@@ -235,7 +233,7 @@ internal static class FlutterHostLaunch
             return fromOptions;
         }
 
-        if (TryConfiguredCommand(configuration?[ConfigurationDartCommandKey], out var fromConfig))
+        if (TryConfiguredCommand(FlutterToolchainOptions.Read(configuration).DartCommand, out var fromConfig))
         {
             return fromConfig;
         }
