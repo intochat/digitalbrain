@@ -10,9 +10,6 @@ internal static class VoiceToTextHosting
 
     internal static void Add(IServiceCollection services, IConfiguration configuration)
     {
-        ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(configuration);
-
         services.TryAddSingleton<IAudioConverter, OggOpusToWavConverter>();
 
         var markerName = configuration[DefaultTranscriptionKey];

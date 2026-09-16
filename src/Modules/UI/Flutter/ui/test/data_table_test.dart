@@ -26,6 +26,76 @@ TableSnapshot sample({
 );
 
 void main() {
+  testWidgets('table fills a bounded pane instead of a fixed grid height', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1000, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final controller = UiTableController(snapshot: sample());
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(visualDensity: VisualDensity.compact),
+        home: Scaffold(body: UiDataTable(controller: controller)),
+      ),
+    );
+    expect(tester.getSize(find.byType(UiDataTable)).height, greaterThan(700));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('tall table scrolls inside the pane without growing past it', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1000, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final controller = UiTableController(
+      snapshot: TableSnapshot(
+        id: 't1',
+        title: 'People',
+        revision: 1,
+        columns: const [
+          TableColumn(id: 'name', label: 'Name', type: 'text'),
+          TableColumn(id: 'age', label: 'Age', type: 'number'),
+        ],
+        rows: [
+          for (var i = 0; i < 40; i++)
+            TableRowData(id: 'r$i', cells: ['Row $i', i]),
+        ],
+        filters: [],
+        visibleColumns: ['name', 'age'],
+        totalRows: 40,
+        filteredRows: 40,
+        offset: 0,
+        limit: 50,
+      ),
+    );
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(visualDensity: VisualDensity.compact),
+        home: Scaffold(body: UiDataTable(controller: controller)),
+      ),
+    );
+    expect(
+      tester.getSize(find.byType(UiDataTable)).height,
+      lessThanOrEqualTo(800),
+    );
+    expect(find.text('Row 0'), findsOneWidget);
+    final verticalScrollable = find.byWidgetPredicate(
+      (widget) =>
+          widget is Scrollable && widget.axisDirection == AxisDirection.down,
+    );
+    await tester.scrollUntilVisible(
+      find.text('Row 39'),
+      300,
+      scrollable: verticalScrollable,
+    );
+    expect(find.text('Row 39'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('table fills editor width and uses compact rows', (tester) async {
     tester.view.physicalSize = const Size(1000, 800);
     tester.view.devicePixelRatio = 1;

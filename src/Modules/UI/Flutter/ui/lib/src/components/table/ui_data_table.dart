@@ -37,326 +37,353 @@ class UiDataTable extends StatelessWidget {
         color: colors.surface,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (showTitle || onActivate != null)
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 12,
-                  children: [
-                    if (showTitle)
-                      Text(
-                        table.title,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    if (onActivate != null)
-                      TextButton.icon(
-                        onPressed: activate,
-                        icon: Icon(
-                          active
-                              ? Icons.check_circle_outline
-                              : Icons.chat_bubble_outline,
-                          size: 16,
-                        ),
-                        label: Text(active ? 'Active table' : 'Use in chat'),
-                      ),
-                  ],
-                ),
-              Wrap(
-                spacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
+          child: LayoutBuilder(
+            builder: (context, viewport) {
+              final fillHeight = viewport.hasBoundedHeight;
+              final minWidth = viewport.maxWidth.isFinite
+                  ? viewport.maxWidth
+                  : 0.0;
+              final tableBody = columns.isEmpty
+                  ? null
+                  : _grid(
+                      context: context,
+                      table: table,
+                      columns: columns,
+                      sortIndex: sortIndex,
+                      canEdit: canEdit,
+                      compact: compact,
+                      minWidth: minWidth,
+                      scrollVertically: fillHeight,
+                      activate: activate,
+                    );
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: fillHeight ? MainAxisSize.max : MainAxisSize.min,
                 children: [
-                  TextButton.icon(
-                    onPressed: canEdit && table.filters.length < 64
-                        ? () async {
-                            activate();
-                            final filter = await showDialog<TableFilter>(
-                              context: context,
-                              builder: (_) =>
-                                  _FilterDialog(columns: table.columns),
-                            );
-                            if (filter != null) {
-                              await controller.change(
-                                filters: [
-                                  ...controller.snapshot.filters,
-                                  filter,
-                                ],
-                              );
-                            }
-                          }
-                        : null,
-                    icon: const Icon(Icons.filter_alt_outlined, size: 18),
-                    label: const Text('Filter'),
-                  ),
-                  TextButton.icon(
-                    onPressed: canEdit
-                        ? () async {
-                            activate();
-                            final visible = await showDialog<List<String>>(
-                              context: context,
-                              builder: (_) => _ColumnsDialog(table: table),
-                            );
-                            if (visible != null) {
-                              await controller.change(visibleColumns: visible);
-                            }
-                          }
-                        : null,
-                    icon: const Icon(Icons.view_column_outlined, size: 18),
-                    label: const Text('Columns'),
-                  ),
-                  ...toolbarActions,
-                  IconButton(
-                    tooltip: 'Refresh table',
-                    onPressed: controller.read != null && !controller.busy
-                        ? () => controller.reload()
-                        : null,
-                    icon: const Icon(Icons.refresh),
-                  ),
-                ],
-              ),
-              if (table.filters.isNotEmpty || table.sort != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Wrap(
+                  if (showTitle || onActivate != null)
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 12,
+                      children: [
+                        if (showTitle)
+                          Text(
+                            table.title,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        if (onActivate != null)
+                          TextButton.icon(
+                            onPressed: activate,
+                            icon: Icon(
+                              active
+                                  ? Icons.check_circle_outline
+                                  : Icons.chat_bubble_outline,
+                              size: 16,
+                            ),
+                            label: Text(
+                              active ? 'Active table' : 'Use in chat',
+                            ),
+                          ),
+                      ],
+                    ),
+                  Wrap(
                     spacing: 8,
-                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      if (table.sort != null)
-                        InputChip(
-                          avatar: Icon(
-                            table.sort!.descending ? Icons.south : Icons.north,
-                            size: 14,
-                          ),
-                          label: Text(
-                            table.columns
-                                .firstWhere((c) => c.id == table.sort!.columnId)
-                                .label,
-                          ),
-                          deleteButtonTooltipMessage: 'Clear sort',
-                          onDeleted: canEdit
-                              ? () {
-                                  activate();
-                                  controller.change(replaceSort: true);
-                                }
-                              : null,
-                        ),
-                      if (table.filters.length > 1)
-                        TextButton(
-                          onPressed: canEdit
-                              ? () {
-                                  activate();
-                                  controller.change(filters: []);
-                                }
-                              : null,
-                          child: const Text('Clear filters'),
-                        ),
-                      for (var i = 0; i < table.filters.length; i++)
-                        InputChip(
-                          label: Text(_filterLabel(table, table.filters[i])),
-                          deleteButtonTooltipMessage: 'Remove filter',
-                          onDeleted: canEdit
-                              ? () {
-                                  activate();
-                                  controller.change(
-                                    filters: [...table.filters]..removeAt(i),
+                      TextButton.icon(
+                        onPressed: canEdit && table.filters.length < 64
+                            ? () async {
+                                activate();
+                                final filter = await showDialog<TableFilter>(
+                                  context: context,
+                                  builder: (_) =>
+                                      _FilterDialog(columns: table.columns),
+                                );
+                                if (filter != null) {
+                                  await controller.change(
+                                    filters: [
+                                      ...controller.snapshot.filters,
+                                      filter,
+                                    ],
                                   );
                                 }
-                              : null,
-                        ),
+                              }
+                            : null,
+                        icon: const Icon(Icons.filter_alt_outlined, size: 18),
+                        label: const Text('Filter'),
+                      ),
+                      TextButton.icon(
+                        onPressed: canEdit
+                            ? () async {
+                                activate();
+                                final visible = await showDialog<List<String>>(
+                                  context: context,
+                                  builder: (_) => _ColumnsDialog(table: table),
+                                );
+                                if (visible != null) {
+                                  await controller.change(
+                                    visibleColumns: visible,
+                                  );
+                                }
+                              }
+                            : null,
+                        icon: const Icon(Icons.view_column_outlined, size: 18),
+                        label: const Text('Columns'),
+                      ),
+                      ...toolbarActions,
+                      IconButton(
+                        tooltip: 'Refresh table',
+                        onPressed: controller.read != null && !controller.busy
+                            ? () => controller.reload()
+                            : null,
+                        icon: const Icon(Icons.refresh),
+                      ),
                     ],
                   ),
-                ),
-              if (controller.busy) const LinearProgressIndicator(minHeight: 2),
-              if (controller.error case final error?)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(
-                    error,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ),
-              if (columns.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text('Choose a column to display.'),
-                )
-              else
-                LayoutBuilder(
-                  builder: (context, available) => ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 360),
-                    child: SingleChildScrollView(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            minWidth: available.maxWidth.isFinite
-                                ? available.maxWidth
-                                : 0,
-                          ),
-                          child: DataTable(
-                            headingRowColor: WidgetStatePropertyAll(
-                              colors.surfaceContainerLow,
-                            ),
-                            dividerThickness: .5,
-                            border: TableBorder(
-                              horizontalInside: BorderSide(
-                                color: colors.outlineVariant.withValues(
-                                  alpha: .45,
-                                ),
-                                width: .5,
+                  if (table.filters.isNotEmpty || table.sort != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          if (table.sort != null)
+                            InputChip(
+                              avatar: Icon(
+                                table.sort!.descending
+                                    ? Icons.south
+                                    : Icons.north,
+                                size: 14,
                               ),
+                              label: Text(
+                                table.columns
+                                    .firstWhere(
+                                      (c) => c.id == table.sort!.columnId,
+                                    )
+                                    .label,
+                              ),
+                              deleteButtonTooltipMessage: 'Clear sort',
+                              onDeleted: canEdit
+                                  ? () {
+                                      activate();
+                                      controller.change(replaceSort: true);
+                                    }
+                                  : null,
                             ),
-                            headingTextStyle: Theme.of(context)
-                                .textTheme
-                                .labelMedium
-                                ?.copyWith(
-                                  color: colors.onSurfaceVariant,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                            sortColumnIndex: sortIndex < 0 ? null : sortIndex,
-                            sortAscending: !(table.sort?.descending ?? false),
-                            headingRowHeight: compact ? 36 : 40,
-                            dataRowMinHeight: compact ? 36 : 42,
-                            dataRowMaxHeight: compact ? 36 : 42,
-                            horizontalMargin: 12,
-                            columnSpacing: 24,
-                            columns: [
-                              for (final column in columns)
-                                DataColumn(
-                                  label: Text(column.label),
-                                  numeric: column.type == 'number',
-                                  onSort: canEdit
-                                      ? (_, ascending) {
-                                          activate();
-                                          controller.change(
-                                            sort: TableSort(
-                                              columnId: column.id,
-                                              descending: !ascending,
-                                            ),
-                                            replaceSort: true,
-                                          );
-                                        }
-                                      : null,
-                                ),
-                            ],
-                            rows: [
-                              for (final row in table.rows)
-                                DataRow(
-                                  key: ValueKey(row.id),
-                                  cells: [
-                                    for (final column in columns)
-                                      DataCell(
-                                        onTap: () => showDialog<void>(
-                                          context: context,
-                                          builder: (context) => AlertDialog(
-                                            title: Text(column.label),
-                                            content: SizedBox(
-                                              width: 480,
-                                              child: SingleChildScrollView(
-                                                child: SelectableText(
-                                                  _cell(
-                                                    row.cells[table.columns
-                                                        .indexWhere(
-                                                          (c) =>
-                                                              c.id == column.id,
-                                                        )],
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () =>
-                                                    Navigator.pop(context),
-                                                child: const Text('Done'),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        ConstrainedBox(
-                                          constraints: const BoxConstraints(
-                                            maxWidth: 280,
-                                          ),
-                                          child: Text(
-                                            _cell(
-                                              row.cells[table.columns
-                                                  .indexWhere(
-                                                    (c) => c.id == column.id,
-                                                  )],
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                            ],
-                          ),
+                          if (table.filters.length > 1)
+                            TextButton(
+                              onPressed: canEdit
+                                  ? () {
+                                      activate();
+                                      controller.change(filters: []);
+                                    }
+                                  : null,
+                              child: const Text('Clear filters'),
+                            ),
+                          for (var i = 0; i < table.filters.length; i++)
+                            InputChip(
+                              label: Text(
+                                _filterLabel(table, table.filters[i]),
+                              ),
+                              deleteButtonTooltipMessage: 'Remove filter',
+                              onDeleted: canEdit
+                                  ? () {
+                                      activate();
+                                      controller.change(
+                                        filters: [...table.filters]
+                                          ..removeAt(i),
+                                      );
+                                    }
+                                  : null,
+                            ),
+                        ],
+                      ),
+                    ),
+                  if (controller.busy)
+                    const LinearProgressIndicator(minHeight: 2),
+                  if (controller.error case final error?)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        error,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
                         ),
                       ),
                     ),
-                  ),
-                ),
-              if (table.rows.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text('No rows match these filters.'),
-                ),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      table.rows.isEmpty
-                          ? '0 rows'
-                          : '${table.offset + 1}–${table.offset + table.rows.length} of ${table.filteredRows}',
+                  if (tableBody == null)
+                    const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text('Choose a column to display.'),
+                    )
+                  else if (fillHeight)
+                    Expanded(child: tableBody)
+                  else
+                    tableBody,
+                  if (table.rows.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text('No rows match these filters.'),
                     ),
-                  ),
-                  IconButton(
-                    tooltip: 'Previous page',
-                    onPressed:
-                        controller.read != null &&
-                            !controller.busy &&
-                            table.offset > 0
-                        ? () {
-                            activate();
-                            controller.reload(
-                              offset: (table.offset - table.limit).clamp(
-                                0,
-                                table.totalRows,
-                              ),
-                            );
-                          }
-                        : null,
-                    icon: const Icon(Icons.chevron_left),
-                  ),
-                  IconButton(
-                    tooltip: 'Next page',
-                    onPressed:
-                        controller.read != null &&
-                            !controller.busy &&
-                            table.offset + table.limit < table.filteredRows
-                        ? () {
-                            activate();
-                            controller.reload(
-                              offset: table.offset + table.limit,
-                            );
-                          }
-                        : null,
-                    icon: const Icon(Icons.chevron_right),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          table.rows.isEmpty
+                              ? '0 rows'
+                              : '${table.offset + 1}–${table.offset + table.rows.length} of ${table.filteredRows}',
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Previous page',
+                        onPressed:
+                            controller.read != null &&
+                                !controller.busy &&
+                                table.offset > 0
+                            ? () {
+                                activate();
+                                controller.reload(
+                                  offset: (table.offset - table.limit).clamp(
+                                    0,
+                                    table.totalRows,
+                                  ),
+                                );
+                              }
+                            : null,
+                        icon: const Icon(Icons.chevron_left),
+                      ),
+                      IconButton(
+                        tooltip: 'Next page',
+                        onPressed:
+                            controller.read != null &&
+                                !controller.busy &&
+                                table.offset + table.limit < table.filteredRows
+                            ? () {
+                                activate();
+                                controller.reload(
+                                  offset: table.offset + table.limit,
+                                );
+                              }
+                            : null,
+                        icon: const Icon(Icons.chevron_right),
+                      ),
+                    ],
                   ),
                 ],
-              ),
-            ],
+              );
+            },
           ),
         ),
       );
     },
   );
+
+  Widget _grid({
+    required BuildContext context,
+    required TableSnapshot table,
+    required List<TableColumn> columns,
+    required int sortIndex,
+    required bool canEdit,
+    required bool compact,
+    required double minWidth,
+    required bool scrollVertically,
+    required VoidCallback activate,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    final grid = SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minWidth: minWidth),
+        child: DataTable(
+          headingRowColor: WidgetStatePropertyAll(colors.surfaceContainerLow),
+          dividerThickness: .5,
+          border: TableBorder(
+            horizontalInside: BorderSide(
+              color: colors.outlineVariant.withValues(alpha: .45),
+              width: .5,
+            ),
+          ),
+          headingTextStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: colors.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+          sortColumnIndex: sortIndex < 0 ? null : sortIndex,
+          sortAscending: !(table.sort?.descending ?? false),
+          headingRowHeight: compact ? 36 : 40,
+          dataRowMinHeight: compact ? 36 : 42,
+          dataRowMaxHeight: compact ? 36 : 42,
+          horizontalMargin: 12,
+          columnSpacing: 24,
+          columns: [
+            for (final column in columns)
+              DataColumn(
+                label: Text(column.label),
+                numeric: column.type == 'number',
+                onSort: canEdit
+                    ? (_, ascending) {
+                        activate();
+                        controller.change(
+                          sort: TableSort(
+                            columnId: column.id,
+                            descending: !ascending,
+                          ),
+                          replaceSort: true,
+                        );
+                      }
+                    : null,
+              ),
+          ],
+          rows: [
+            for (final row in table.rows)
+              DataRow(
+                key: ValueKey(row.id),
+                cells: [
+                  for (final column in columns)
+                    DataCell(
+                      onTap: () => showDialog<void>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: Text(column.label),
+                          content: SizedBox(
+                            width: 480,
+                            child: SingleChildScrollView(
+                              child: SelectableText(
+                                _cell(
+                                  row.cells[table.columns.indexWhere(
+                                    (c) => c.id == column.id,
+                                  )],
+                                ),
+                              ),
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Done'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 280),
+                        child: Text(
+                          _cell(
+                            row.cells[table.columns.indexWhere(
+                              (c) => c.id == column.id,
+                            )],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+    return scrollVertically ? SingleChildScrollView(child: grid) : grid;
+  }
 
   static String _cell(Object? value) => value == null ? '—' : '$value';
   static String _filterLabel(TableSnapshot table, TableFilter filter) {

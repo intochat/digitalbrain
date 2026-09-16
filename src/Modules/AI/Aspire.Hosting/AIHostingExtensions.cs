@@ -269,6 +269,7 @@ public static class AIHostingExtensions
         // Default__Embedding. The provider on the model picks the implementation.
         private const string TranscriptionEnvironmentKey = "DigitalBrain__AI__Default__Transcription";
         private TranscriptionModel? _model;
+        private IResourceBuilder<FoundryLocalModelResource>? _whisper;
 
         internal void SetModel(TranscriptionModel model)
         {
@@ -292,6 +293,20 @@ public static class AIHostingExtensions
             }
 
             builder.WithEnvironment(TranscriptionEnvironmentKey, _model.Marker.Name);
+
+            if (brain.FakesEnabled || _model.Provider is not AiProvider.FoundryLocal)
+            {
+                return;
+            }
+
+            _whisper ??= brain.ApplicationBuilder.AddFoundryLocalModel(
+                ResourceName(_model.Id),
+                _model.Id,
+                brain.Resource.Resource);
+            builder.WithAnnotation(new WaitAnnotation(_whisper.Resource, WaitType.WaitUntilHealthy, exitCode: 0));
         }
+
+        private static string ResourceName(string id)
+            => id.ToLowerInvariant().Replace(':', '-').Replace('.', '-').Replace('/', '-');
     }
 }

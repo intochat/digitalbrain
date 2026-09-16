@@ -49,7 +49,7 @@ public sealed class FoundryLocalTranscriptionService :
         try
         {
             _logger.LogInformation("Initializing Foundry Local for Whisper…");
-            await InitializeFoundryManagerAsync().ConfigureAwait(false);
+            await InitializeFoundryManagerAsync(cancellationToken).ConfigureAwait(false);
 
             var catalog = await FoundryLocalManager.Instance.GetCatalogAsync(cancellationToken)
                 .ConfigureAwait(false);
@@ -223,7 +223,7 @@ public sealed class FoundryLocalTranscriptionService :
         await task.ConfigureAwait(false);
     }
 
-    private async Task InitializeFoundryManagerAsync()
+    private async Task InitializeFoundryManagerAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -234,6 +234,31 @@ public sealed class FoundryLocalTranscriptionService :
             _logger.LogInformation("Creating Foundry Local manager…");
             var config = new Configuration { AppName = "digitalbrain" };
             await FoundryLocalManager.CreateAsync(config, _logger).ConfigureAwait(false);
+        }
+
+        var manager = FoundryLocalManager.Instance;
+        var executionProviders = manager.DiscoverEps();
+        foreach (var provider in executionProviders)
+        {
+            _logger.LogInformation(
+                "Foundry execution provider {Name} registered={Registered}",
+                provider.Name,
+                provider.IsRegistered);
+        }
+
+        _logger.LogInformation("Downloading and registering Foundry execution providers…");
+        await WithTimeout(
+            manager.DownloadAndRegisterEpsAsync(cancellationToken),
+            DownloadTimeout,
+            "Foundry execution provider registration",
+            cancellationToken).ConfigureAwait(false);
+
+        foreach (var provider in manager.DiscoverEps())
+        {
+            _logger.LogInformation(
+                "Foundry execution provider {Name} registered={Registered} after download",
+                provider.Name,
+                provider.IsRegistered);
         }
     }
 

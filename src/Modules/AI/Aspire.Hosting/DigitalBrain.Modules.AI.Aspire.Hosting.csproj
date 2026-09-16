@@ -3,9 +3,11 @@
     <IsPackable>true</IsPackable>
     <Description>Aspire AppHost integration for typed DigitalBrain AI model neurons.</Description>
     <RootNamespace>DigitalBrain.AI.Aspire.Hosting</RootNamespace>
+    <RuntimeIdentifiers Condition="$([MSBuild]::IsOSPlatform('Windows'))">win-x64</RuntimeIdentifiers>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Aspire.Hosting.Ollama" />
+    <PackageReference Include="Microsoft.AI.Foundry.Local" PrivateAssets="contentfiles;analyzers;build;buildTransitive" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../AI/DigitalBrain.Modules.AI.csproj" />

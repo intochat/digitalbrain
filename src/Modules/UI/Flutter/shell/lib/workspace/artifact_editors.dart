@@ -39,7 +39,7 @@ class WorkspaceArtifactEditor extends StatelessWidget {
     'table' =>
       tableController == null
           ? const Center(child: Text('Loading table…'))
-          : SingleChildScrollView(
+          : Padding(
               padding: const EdgeInsets.all(12),
               child: UiDataTable(
                 controller: tableController!,

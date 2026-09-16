@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:archive/archive.dart';
+import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_flutter_shell/workspace/artifact_editors.dart';
 import 'package:digitalbrain_flutter_shell/workspace/workspace_store.dart';
 import 'package:digitalbrain_flutter_shell/workspace/workspace_table_import.dart';
@@ -86,6 +87,46 @@ void main() {
     expect(restored.viewState['quarterTurns'], 1);
     expect(workspaceBrightnessMatrix(.5)[4], 127.5);
     expect(workspaceBrightnessMatrix(0)[4], 0);
+  });
+
+  testWidgets('table editor fills the workspace pane height', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final controller = UiTableController(
+      snapshot: TableSnapshot(
+        id: 'table',
+        title: 'People',
+        revision: 1,
+        columns: const [TableColumn(id: 'name', label: 'Name', type: 'text')],
+        rows: [
+          TableRowData(id: 'r1', cells: ['Alice']),
+        ],
+        filters: [],
+        visibleColumns: ['name'],
+        totalRows: 1,
+        filteredRows: 1,
+        offset: 0,
+        limit: 50,
+      ),
+    );
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: WorkspaceArtifactEditor(
+            artifact: WorkspaceArtifact(
+              id: 'table',
+              title: 'People',
+              kind: 'table',
+            ),
+            tableController: controller,
+            onChanged: (_) {},
+          ),
+        ),
+      ),
+    );
+    expect(tester.getSize(find.byType(UiDataTable)).height, greaterThan(600));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('chart artifacts draw with the shared chart control', (
