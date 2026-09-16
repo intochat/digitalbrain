@@ -23,8 +23,10 @@ public sealed class SupabaseHosting : IDigitalBrainModuleHosting
             // Delay parameter creation until projection, so fake mode works in either fluent order.
             if (brain.FakesEnabled) { return; }
 
-            _connection ??= brain.ApplicationBuilder.AddConnectionString(SupabaseModule.ConnectionName);
-            builder.WithReference(_connection)
+            _connection ??= brain.ApplicationBuilder
+                .AddConnectionString("Supabase")
+                .WithParentRelationship(brain.Resource);
+            builder.WithReference(_connection, connectionName: SupabaseModule.ConnectionName)
                 .WithEnvironment("DigitalBrain__Supabase__Provider", SupabaseModule.ProviderName);
         }
     }

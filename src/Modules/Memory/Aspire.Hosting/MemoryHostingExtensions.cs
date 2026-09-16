@@ -17,7 +17,7 @@ public static class MemoryHostingExtensions
 
     private static MemoryHostingState State(DigitalBrainModuleBuilder<MemoryModule> module)
     {
-        var state = module.Brain.GetOrAddState(static brain => new MemoryHostingState(brain), out var added);
+        var state = module.Brain.GetOrAddState(brain => new MemoryHostingState(brain, module.Resource), out var added);
         if (added)
         {
             module.AddProjection(state);
@@ -26,7 +26,9 @@ public static class MemoryHostingExtensions
         return state;
     }
 
-    private sealed class MemoryHostingState(DigitalBrainBuilder brain) : DigitalBrainModuleProjection
+    private sealed class MemoryHostingState(
+        DigitalBrainBuilder brain,
+        IResourceBuilder<DigitalBrainModuleResource> module) : DigitalBrainModuleProjection
     {
         private IResourceBuilder<QdrantServerResource>? _qdrant;
         private bool _enabled;
@@ -39,7 +41,7 @@ public static class MemoryHostingExtensions
             }
 
             var builder = brain.ApplicationBuilder;
-            _qdrant = builder.AddQdrant("qdrant").WithParentRelationship(brain.Resource);
+            _qdrant = builder.AddQdrant("qdrant").WithParentRelationship(module);
             _enabled = true;
         }
 

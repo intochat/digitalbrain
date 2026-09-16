@@ -53,7 +53,7 @@ public sealed class SupabaseFacts
 
         var brain = builder.AddDigitalBrain("brain").AddModule<SupabaseModule>().AddModule<SupabaseModule>();
         var consumer = builder.AddExecutable("consumer", "unused", ".").WithReference(brain);
-        var parameter = Assert.Single(builder.Resources.OfType<ParameterResource>(), value => value.Name == "supabase");
+        var parameter = Assert.Single(builder.Resources.OfType<ParameterResource>(), value => value.Name == "Supabase");
         Assert.True(parameter.Secret);
         Assert.True(parameter.IsConnectionString);
         var environment = new Dictionary<string, object>();

@@ -12,21 +12,31 @@ public sealed class DigitalBrainBuilder
     private readonly List<IResource> _startupDependencies = [];
     private readonly Dictionary<Type, object> _states = [];
 
+    private readonly Dictionary<string, IResourceBuilder<DigitalBrainModuleResource>> _moduleNodes = new(StringComparer.Ordinal);
+
     internal DigitalBrainBuilder(
         IDistributedApplicationBuilder builder,
         string name,
-        IResourceBuilder<DigitalBrainResource> resource,
-        OrleansService orleans,
-        IResourceBuilder<AzureBlobStorageResource> durableStateStore,
-        IResourceBuilder<AzureBlobStorageResource> grainState)
+        IResourceBuilder<DigitalBrainResource> resource)
     {
         ArgumentNullException.ThrowIfNull(resource);
-        ArgumentNullException.ThrowIfNull(durableStateStore);
-        ArgumentNullException.ThrowIfNull(grainState);
 
         ApplicationBuilder = builder;
         Name = name;
         Resource = resource;
+        Orleans = null!;
+        DurableStateStore = null!;
+        GrainState = null!;
+    }
+
+    internal void AttachRuntime(
+        OrleansService orleans,
+        IResourceBuilder<AzureBlobStorageResource> durableStateStore,
+        IResourceBuilder<AzureBlobStorageResource> grainState)
+    {
+        ArgumentNullException.ThrowIfNull(orleans);
+        ArgumentNullException.ThrowIfNull(durableStateStore);
+        ArgumentNullException.ThrowIfNull(grainState);
         Orleans = orleans;
         DurableStateStore = durableStateStore;
         GrainState = grainState;
@@ -38,11 +48,11 @@ public sealed class DigitalBrainBuilder
 
     public IResourceBuilder<DigitalBrainResource> Resource { get; }
 
-    internal IResourceBuilder<AzureBlobStorageResource> DurableStateStore { get; }
+    internal IResourceBuilder<AzureBlobStorageResource> DurableStateStore { get; private set; }
 
-    internal IResourceBuilder<AzureBlobStorageResource> GrainState { get; }
+    internal IResourceBuilder<AzureBlobStorageResource> GrainState { get; private set; }
 
-    internal OrleansService Orleans { get; }
+    internal OrleansService Orleans { get; private set; }
 
     internal IReadOnlyList<DigitalBrainModuleProjection> Projections => _projections;
 
@@ -105,4 +115,33 @@ public sealed class DigitalBrainBuilder
     }
 
     public DigitalBrainClientReference AsClient() => new(this);
+
+    internal bool HasResource(string name)
+        => ApplicationBuilder.Resources.Any(resource =>
+            string.Equals(resource.Name, name, StringComparison.OrdinalIgnoreCase));
+
+    public IResourceBuilder<DigitalBrainModuleResource> GetOrAddModuleNode(Type moduleType)
+        => GetOrAddModuleNode(DigitalBrainHostingNames.ForModule(moduleType));
+
+    public IResourceBuilder<DigitalBrainModuleResource> GetOrAddModuleNode(string displayName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
+        if (_moduleNodes.TryGetValue(displayName, out var existing))
+        {
+            return existing;
+        }
+
+        var node = ApplicationBuilder.AddResource(new DigitalBrainModuleResource(displayName))
+            .ExcludeFromManifest();
+        node.WithParentRelationship(Resource);
+        node.WithInitialState(new CustomResourceSnapshot
+        {
+            ResourceType = "Module",
+            CreationTimeStamp = DateTime.UtcNow,
+            State = KnownResourceStates.Running,
+            Properties = [new(CustomResourceKnownProperties.Source, displayName)],
+        });
+        _moduleNodes.Add(displayName, node);
+        return node;
+    }
 }

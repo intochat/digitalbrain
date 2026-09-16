@@ -67,7 +67,7 @@ public static class AIHostingExtensions
                 $"{marker.FullName} is not a catalogued transcription model. "
                 + $"Known models: {string.Join(", ", TranscriptionModel.All.Select(static m => m.Marker.Name))}.");
 
-        var voice = module.Brain.GetOrAddState(static brain => new VoiceToTextHostingState(brain), out var added);
+        var voice = module.Brain.GetOrAddState(brain => new VoiceToTextHostingState(brain, module.Resource), out var added);
         if (added)
         {
             module.AddProjection(voice);
@@ -98,7 +98,7 @@ public static class AIHostingExtensions
     private static AIHostingState State(DigitalBrainModuleBuilder<AIModule> module)
     {
         ArgumentNullException.ThrowIfNull(module);
-        var state = module.Brain.GetOrAddState(static brain => new AIHostingState(brain), out var added);
+        var state = module.Brain.GetOrAddState(brain => new AIHostingState(brain, module.Resource), out var added);
         if (added)
         {
             module.AddProjection(state);
@@ -107,7 +107,9 @@ public static class AIHostingExtensions
         return state;
     }
 
-    private sealed class AIHostingState(DigitalBrainBuilder brain) : DigitalBrainModuleProjection
+    private sealed class AIHostingState(
+        DigitalBrainBuilder brain,
+        IResourceBuilder<DigitalBrainModuleResource> module) : DigitalBrainModuleProjection
     {
         private const string OllamaImageTag = "latest";
 
@@ -239,14 +241,15 @@ public static class AIHostingExtensions
                     enableMarkdown: true);
             }
 
-            _providerApiKeys[provider] = apiKey;
+            _providerApiKeys[provider] = apiKey.WithParentRelationship(module);
         }
 
         internal void EnableTavilySearch()
         {
             _tavilyApiKey ??= brain.ApplicationBuilder
                 .AddParameter("tavily-api-key", secret: true)
-                .WithDescription(TavilyApiKeyDescription, enableMarkdown: true);
+                .WithDescription(TavilyApiKeyDescription, enableMarkdown: true)
+                .WithParentRelationship(module);
         }
 
         private static string OllamaResourceName(string id)
@@ -260,10 +263,12 @@ public static class AIHostingExtensions
                 .WithDataVolume()
                 .WithLifetime(ContainerLifetime.Persistent)
                 .WithEnvironment("OLLAMA_KEEP_ALIVE", "-1")
-                .WithParentRelationship(brain.Resource);
+                .WithParentRelationship(module);
     }
 
-    private sealed class VoiceToTextHostingState(DigitalBrainBuilder brain) : DigitalBrainModuleProjection
+    private sealed class VoiceToTextHostingState(
+        DigitalBrainBuilder brain,
+        IResourceBuilder<DigitalBrainModuleResource> module) : DigitalBrainModuleProjection
     {
         // One key for every transcription model, matching Default__Model and
         // Default__Embedding. The provider on the model picks the implementation.
@@ -302,7 +307,7 @@ public static class AIHostingExtensions
             _whisper ??= brain.ApplicationBuilder.AddFoundryLocalModel(
                 ResourceName(_model.Id),
                 _model.Id,
-                brain.Resource.Resource);
+                module.Resource);
             builder.WithAnnotation(new WaitAnnotation(_whisper.Resource, WaitType.WaitUntilHealthy, exitCode: 0));
         }
 

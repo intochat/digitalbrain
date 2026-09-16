@@ -14,7 +14,7 @@ public static class SalesforceHostingExtensions
         Uri? publicOrigin = null)
     {
         ArgumentNullException.ThrowIfNull(module);
-        var state = module.Brain.GetOrAddState(static brain => new SalesforceHostingState(brain), out var added);
+        var state = module.Brain.GetOrAddState(brain => new SalesforceHostingState(brain, module.Resource), out var added);
         if (added)
         {
             module.AddProjection(state);
@@ -24,7 +24,9 @@ public static class SalesforceHostingExtensions
         return module;
     }
 
-    private sealed class SalesforceHostingState(DigitalBrainBuilder brain) : DigitalBrainModuleProjection
+    private sealed class SalesforceHostingState(
+        DigitalBrainBuilder brain,
+        IResourceBuilder<DigitalBrainModuleResource> module) : DigitalBrainModuleProjection
     {
         private const string OAuthRoot = SalesforceModule.OAuthConfigurationRoot;
 
@@ -54,12 +56,14 @@ public static class SalesforceHostingExtensions
                     "Consumer key (client ID) from your existing Salesforce "
                     + "[External Client App](https://developer.salesforce.com/docs/platform/hosted-mcp-servers/guide/create-external-client-app.html). "
                     + "Register http://localhost:5080/integrations/salesforce/callback, enable PKCE and JWT access tokens, and allow mcp_api and refresh_token.",
-                    enableMarkdown: true);
+                    enableMarkdown: true)
+                .WithParentRelationship(module);
             _consumerSecret ??= brain.ApplicationBuilder.AddParameter("salesforce-consumer-secret", secret: true)
                 .WithDescription(
                     "Consumer secret from the same Salesforce External Client App. Enable Require Secret for Web Server Flow. "
                     + "Only the kernel receives this secret; Salesforce login happens in your browser when the assistant needs access.",
-                    enableMarkdown: true);
+                    enableMarkdown: true)
+                .WithParentRelationship(module);
 
             builder
                 .WithEnvironment(SalesforceModule.McpEndpointEnvironmentVariable, (_endpoint ?? SalesforceModule.DefaultMcpEndpoint).AbsoluteUri)

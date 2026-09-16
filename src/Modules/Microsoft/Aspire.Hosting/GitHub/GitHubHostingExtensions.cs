@@ -1,6 +1,7 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Aspire.Hosting;
+using DigitalBrain.Microsoft;
 
 namespace DigitalBrain.Microsoft.Hosting;
 
@@ -70,10 +71,13 @@ public static class GitHubHostingExtensions
             {
                 return;
             }
+            var microsoft = brain.GetOrAddModuleNode(typeof(MicrosoftModule));
             _privateKey ??= brain.ApplicationBuilder.AddParameter($"github-{id}-app-private-key", secret: true)
-                .WithDescription("PEM private key for the configured GitHub App. Only the kernel receives this secret.");
+                .WithDescription("PEM private key for the configured GitHub App. Only the kernel receives this secret.")
+                .WithParentRelationship(microsoft);
             _webhookSecret ??= brain.ApplicationBuilder.AddParameter($"github-{id}-webhook-secret", secret: true)
-                .WithDescription("GitHub webhook HMAC secret (at least 16 characters). Forward only /integrations/github/webhook through HTTPS.");
+                .WithDescription("GitHub webhook HMAC secret (at least 16 characters). Forward only /integrations/github/webhook through HTTPS.")
+                .WithParentRelationship(microsoft);
             var root = $"DigitalBrain:Microsoft:GitHub:Repositories:{id}";
             builder
                 .WithEnvironment(EnvironmentKeys.For(root, "AppId"), appId.ToString(System.Globalization.CultureInfo.InvariantCulture))

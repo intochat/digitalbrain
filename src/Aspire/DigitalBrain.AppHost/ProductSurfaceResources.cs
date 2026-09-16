@@ -1,8 +1,8 @@
 internal static class ProductSurfaceResources
 {
-    public const string Brain = "brain";
+    public const string Modules = "Modules";
 
-    public const string Kernel = "kernel";
+    public const string DigitalBrain = "DigitalBrain";
 
     public const int UiHttpPort = 5080;
 }

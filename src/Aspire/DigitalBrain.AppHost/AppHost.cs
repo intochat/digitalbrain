@@ -28,7 +28,7 @@ var builder = DistributedApplication.CreateBuilder(args);
 var captureGenAiContent = builder.Configuration.GetValue<bool?>("DigitalBrain:AI:Telemetry:EnableSensitiveData")
     ?? (builder.Environment.IsDevelopment() && builder.ExecutionContext.IsRunMode);
 
-var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
+var brain = builder.AddDigitalBrain(ProductSurfaceResources.Modules)
     .AddModule<AIModule>(ai =>
     {
         ai.EnableSensitiveData = captureGenAiContent;
@@ -88,7 +88,7 @@ var developmentClusterId = builder.Environment.IsDevelopment()
     ? $"digitalbrain-{Guid.NewGuid():N}"
     : null;
 
-builder.AddProject<Projects.DigitalBrain_Silo>(ProductSurfaceResources.Kernel)
+builder.AddProject<Projects.DigitalBrain_Silo>(ProductSurfaceResources.DigitalBrain)
     .WithReference(brain)
     .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION", "false")
     .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_HTTPCLIENT_DISABLE_URL_QUERY_REDACTION", "false")

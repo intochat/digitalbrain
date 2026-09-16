@@ -13,7 +13,7 @@ public static class GoogleHostingExtensions
         Uri? publicOrigin = null)
     {
         ArgumentNullException.ThrowIfNull(module);
-        var state = module.Brain.GetOrAddState(static brain => new GmailHostingState(brain), out var added);
+        var state = module.Brain.GetOrAddState(brain => new GmailHostingState(brain, module.Resource), out var added);
         if (added)
         {
             module.AddProjection(state);
@@ -23,7 +23,9 @@ public static class GoogleHostingExtensions
         return module;
     }
 
-    private sealed class GmailHostingState(DigitalBrainBuilder brain) : DigitalBrainModuleProjection
+    private sealed class GmailHostingState(
+        DigitalBrainBuilder brain,
+        IResourceBuilder<DigitalBrainModuleResource> module) : DigitalBrainModuleProjection
     {
         private const string Root = GoogleModule.GmailOAuthConfigurationRoot;
 
@@ -50,12 +52,14 @@ public static class GoogleHostingExtensions
                 .WithDescription(
                     "OAuth client ID for a Google web client configured for the [Gmail MCP server](https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server). "
                     + "Register http://localhost:5080/integrations/gmail/callback. Only the kernel receives this value.",
-                    enableMarkdown: true);
+                    enableMarkdown: true)
+                .WithParentRelationship(module);
             _clientSecret ??= brain.ApplicationBuilder.AddParameter("gmail-client-secret", secret: true)
                 .WithDescription(
                     "OAuth client secret for the same Google web client configured for the [Gmail MCP server](https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server). "
                     + "Only the kernel receives this secret; Gmail sign-in happens in your browser when the assistant needs access.",
-                    enableMarkdown: true);
+                    enableMarkdown: true)
+                .WithParentRelationship(module);
 
             builder
                 .WithEnvironment(EnvironmentKeys.For(Root, "ClientId"), _clientId)

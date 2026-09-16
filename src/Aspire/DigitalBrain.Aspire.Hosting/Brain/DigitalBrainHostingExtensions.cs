@@ -17,27 +17,29 @@ public static class DigitalBrainHostingExtensions
             .ExcludeFromManifest()
             .WithInitialState(new CustomResourceSnapshot
             {
-                ResourceType = "DigitalBrain",
+                ResourceType = "Modules",
                 CreationTimeStamp = DateTime.UtcNow,
                 State = KnownResourceStates.Running,
-                Properties = [new(CustomResourceKnownProperties.Source, "DigitalBrain fabric")],
+                Properties = [new(CustomResourceKnownProperties.Source, "DigitalBrain modules")],
             });
+        var brain = new DigitalBrainBuilder(builder, name, resource);
+        var core = brain.GetOrAddModuleNode(DigitalBrainHostingNames.Core);
         var storage = builder
             .AddAzureStorage(DigitalBrainNames.Storage)
             .RunAsEmulator(static emulator => emulator
                 .WithDataVolume()
                 .WithLifetime(ContainerLifetime.Persistent))
-            .WithParentRelationship(resource);
+            .WithParentRelationship(core);
         var clustering = storage.AddTables(DigitalBrainNames.Clustering);
         var reminders = storage.AddTables(DigitalBrainNames.Reminders);
         var durableStateStore = storage.AddBlobs(DigitalBrainNames.Journal);
         var grainState = storage.AddBlobs(DigitalBrainNames.GrainState);
         var orleans = builder
-            .AddOrleans(name)
+            .AddOrleans(DigitalBrainHostingNames.Orleans)
             .WithClustering(clustering)
             .WithReminders(reminders)
             .WithGrainStorage(DigitalBrainNames.DefaultGrainStorage, grainState);
-        var brain = new DigitalBrainBuilder(builder, name, resource, orleans, durableStateStore, grainState);
+        brain.AttachRuntime(orleans, durableStateStore, grainState);
 
         brain.RequireHealthyBeforeStart(storage.Resource);
         brain.RequireHealthyBeforeStart(clustering.Resource);
@@ -57,7 +59,9 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(brain);
         ArgumentNullException.ThrowIfNull(configure);
         brain.AddModule(typeof(TModule));
-        if (typeof(TModule).GetCustomAttribute<ModuleHostingAttribute>() is { } hosting)
+        var module = new DigitalBrainModuleBuilder<TModule>(brain);
+        var hostingAttribute = typeof(TModule).GetCustomAttribute<ModuleHostingAttribute>();
+        if (hostingAttribute is { } hosting)
         {
             var type = Type.GetType(hosting.TypeName, throwOnError: true)!;
             if (Activator.CreateInstance(type) is not IDigitalBrainModuleHosting defaults)
@@ -67,7 +71,13 @@ public static class DigitalBrainHostingExtensions
 
             defaults.Configure(brain);
         }
-        configure(new DigitalBrainModuleBuilder<TModule>(brain));
+        configure(module);
+        var nodeName = DigitalBrainHostingNames.ForModule(typeof(TModule));
+        if (hostingAttribute is null && !brain.HasResource(nodeName))
+        {
+            brain.GetOrAddModuleNode(nodeName);
+        }
+
         return brain;
     }
 
