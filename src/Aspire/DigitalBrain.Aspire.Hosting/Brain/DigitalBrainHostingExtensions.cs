@@ -12,21 +12,21 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
-        var resource = builder.AddResource(new DigitalBrainResource(name))
+        // This is a dashboard collection; keep the Orleans service identity independent of its label.
+        var resource = builder.AddResource(new DigitalBrainResource("modules"))
             .ExcludeFromManifest()
             .WithInitialState(new CustomResourceSnapshot
             {
-                ResourceType = "DigitalBrain",
+                ResourceType = "Modules",
                 CreationTimeStamp = DateTime.UtcNow,
-                State = KnownResourceStates.Running,
-                Properties = [new(CustomResourceKnownProperties.Source, "DigitalBrain fabric")],
+                State = new ResourceStateSnapshot("Configured", KnownResourceStateStyles.Info),
+                Properties = [new(CustomResourceKnownProperties.Source, "Module integrations")],
             });
         var storage = builder
             .AddAzureStorage(DigitalBrainNames.Storage)
             .RunAsEmulator(static emulator => emulator
                 .WithDataVolume()
-                .WithLifetime(ContainerLifetime.Persistent))
-            .WithParentRelationship(resource);
+                .WithLifetime(ContainerLifetime.Persistent));
         var clustering = storage.AddTables(DigitalBrainNames.Clustering);
         var reminders = storage.AddTables(DigitalBrainNames.Reminders);
         var durableStateStore = storage.AddBlobs(DigitalBrainNames.Journal);
@@ -36,7 +36,7 @@ public static class DigitalBrainHostingExtensions
             .WithClustering(clustering)
             .WithReminders(reminders)
             .WithGrainStorage(DigitalBrainNames.DefaultGrainStorage, grainState);
-        var brain = new DigitalBrainBuilder(builder, name, resource, orleans, durableStateStore, grainState);
+        var brain = new DigitalBrainBuilder(builder, name, resource, orleans, storage, durableStateStore, grainState);
 
         brain.RequireHealthyBeforeStart(storage.Resource);
         brain.RequireHealthyBeforeStart(clustering.Resource);
@@ -91,6 +91,13 @@ public static class DigitalBrainHostingExtensions
         builder.WithReference(brain.Orleans);
         builder.WithReference(brain.DurableStateStore, DigitalBrainNames.JournalConnection);
         builder.WithReference(brain.GrainState, DigitalBrainNames.GrainState);
+
+        // The first hosting kernel is the visual owner of the shared runtime infrastructure.
+        // This relationship is not a startup dependency: the kernel still waits for storage.
+        if (!brain.Storage.Resource.Annotations.OfType<ResourceRelationshipAnnotation>().Any(relation => relation.Type == "Parent"))
+        {
+            brain.Storage.WithParentRelationship(builder.Resource);
+        }
 
         for (var index = 0; index < brain.Modules.Count; index++)
         {

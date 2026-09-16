@@ -11,12 +11,14 @@ public sealed class DigitalBrainBuilder
     private readonly List<DigitalBrainModuleProjection> _projections = [];
     private readonly List<IResource> _startupDependencies = [];
     private readonly Dictionary<Type, object> _states = [];
+    private readonly Dictionary<Type, IResourceBuilder<DigitalBrainModuleResource>> _moduleResources = [];
 
     internal DigitalBrainBuilder(
         IDistributedApplicationBuilder builder,
         string name,
         IResourceBuilder<DigitalBrainResource> resource,
         OrleansService orleans,
+        IResourceBuilder<AzureStorageResource> storage,
         IResourceBuilder<AzureBlobStorageResource> durableStateStore,
         IResourceBuilder<AzureBlobStorageResource> grainState)
     {
@@ -28,6 +30,7 @@ public sealed class DigitalBrainBuilder
         Name = name;
         Resource = resource;
         Orleans = orleans;
+        Storage = storage;
         DurableStateStore = durableStateStore;
         GrainState = grainState;
     }
@@ -38,7 +41,27 @@ public sealed class DigitalBrainBuilder
 
     public IResourceBuilder<DigitalBrainResource> Resource { get; }
 
+    /// <summary>One dashboard group per hosted module. Grouping does not alter startup or resource lifetimes.</summary>
+    public IResourceBuilder<DigitalBrainModuleResource> GetModuleResource<TModule>() where TModule : class
+    {
+        var type = typeof(TModule);
+        if (_moduleResources.TryGetValue(type, out var existing)) { return existing; }
+        var label = type.Name.EndsWith("Module", StringComparison.Ordinal) ? type.Name[..^6] : type.Name;
+        var resource = ApplicationBuilder.AddResource(new DigitalBrainModuleResource(label.ToLowerInvariant(), type))
+            .ExcludeFromManifest()
+            .WithParentRelationship(Resource)
+            .WithInitialState(new CustomResourceSnapshot
+            {
+                ResourceType = "Module",
+                State = new ResourceStateSnapshot("Configured", KnownResourceStateStyles.Info),
+                Properties = [new(CustomResourceKnownProperties.Source, type.Name)],
+            });
+        _moduleResources.Add(type, resource);
+        return resource;
+    }
+
     internal IResourceBuilder<AzureBlobStorageResource> DurableStateStore { get; }
+    internal IResourceBuilder<AzureStorageResource> Storage { get; }
 
     internal IResourceBuilder<AzureBlobStorageResource> GrainState { get; }
 

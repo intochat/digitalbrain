@@ -26,7 +26,7 @@ public sealed partial class TelegramBotApi(HttpClient client) : IDisposable
 
     public Task<bool> SetMenuButtonAsync(string token, string miniAppUrl, CancellationToken cancellationToken) =>
         InvokeAsync(token, "setChatMenuButton", bot => bot.SetChatMenuButtonAsync(
-            menuButton: new MenuButtonWebApp { Text = "Open reminders", WebApp = new WebAppInfo(miniAppUrl) },
+            menuButton: new MenuButtonWebApp { Text = "Open projects", WebApp = new WebAppInfo(miniAppUrl) },
             cancellationToken: cancellationToken));
 
     public Task<WebhookInfo> GetWebhookInfoAsync(string token, CancellationToken cancellationToken) =>

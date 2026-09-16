@@ -13,12 +13,14 @@ class WorkspaceSettings extends StatefulWidget {
     required this.onClose,
     this.kernelBaseUri,
     this.onOpen,
+    this.onLinkTelegram,
   });
   final WorkspaceStore store;
   final String initialSection;
   final VoidCallback onClose;
   final Uri? kernelBaseUri;
   final OpenUrl? onOpen;
+  final Future<String> Function()? onLinkTelegram;
   @override
   State<WorkspaceSettings> createState() => _WorkspaceSettingsState();
 }
@@ -35,6 +37,32 @@ class _WorkspaceSettingsState extends State<WorkspaceSettings> {
   late final TextEditingController _name;
   late final TextEditingController _role;
   bool _saving = false;
+  bool _linking = false;
+  String? _linkCode;
+  String? _linkError;
+
+  Future<void> _linkTelegram() async {
+    setState(() {
+      _linking = true;
+      _linkCode = null;
+      _linkError = null;
+    });
+    try {
+      final code = await widget.onLinkTelegram!();
+      if (mounted) setState(() => _linkCode = code);
+    } catch (error) {
+      if (mounted) {
+        setState(
+          () => _linkError = error is StateError
+              ? error.message.toString()
+              : 'Unable to create a linking code.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _linking = false);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -81,6 +109,7 @@ class _WorkspaceSettingsState extends State<WorkspaceSettings> {
           onClose: widget.onClose,
           kernelBaseUri: widget.kernelBaseUri,
           onOpen: widget.onOpen,
+          onLinkTelegram: widget.onLinkTelegram,
         ),
       ),
     );
@@ -240,6 +269,22 @@ class _WorkspaceSettingsState extends State<WorkspaceSettings> {
               'Connections',
               'Service access is shared across projects. Connection status is not available in this view; a service is not marked connected until verified by the backend.',
             ),
+            if (widget.onLinkTelegram != null) ...[
+              FilledButton.icon(
+                onPressed: _linking ? null : _linkTelegram,
+                icon: const Icon(Icons.telegram),
+                label: Text(_linking ? 'Creating code…' : 'Link Telegram'),
+              ),
+              if (_linkCode != null) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  'Paste this one-use code into the Telegram app within five minutes. It grants access to your owner workspace.',
+                ),
+                SelectableText(_linkCode!),
+              ],
+              if (_linkError != null) Text(_linkError!),
+              const SizedBox(height: 24),
+            ],
             if (widget.kernelBaseUri != null && widget.onOpen != null) ...[
               const Text(
                 'Open a service’s authorization flow to connect your account.',

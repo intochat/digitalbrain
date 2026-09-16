@@ -25,12 +25,12 @@ Future<void> main() async {
   );
 }
 
-@visibleForTesting
 Widget buildShell({
   required String chat,
   required DigitalBrainUiClient? edge,
   String? statusMessage,
   WorkspaceStore? workspaceStore,
+  bool allowLinkTelegram = true,
 }) {
   final scope = base64Url.encode(
     utf8.encode(
@@ -46,6 +46,7 @@ Widget buildShell({
     kernelBaseUri: edge?.baseUri,
     onRun: edge?.runAgent,
     onSalesforceConnected: edge?.salesforceConnected,
+    onLinkTelegram: allowLinkTelegram ? edge?.createTelegramLinkCode : null,
     onCreateArtifact: edge?.createWorkspaceArtifact,
     onReadArtifact: edge?.readWorkspaceArtifact,
     onUpdateArtifact: edge?.updateWorkspaceArtifact,

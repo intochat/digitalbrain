@@ -23,11 +23,11 @@ public sealed class TelegramHttpSurface(TelegramOptions options)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
         var metadata = new ModuleEndpointMetadata(typeof(TelegramModule));
-        endpoints.MapGet("/telegram/health", HandleAsync).WithMetadata(metadata);
-        endpoints.MapPost("/telegram/webhook", HandleAsync).WithMetadata(metadata);
-        endpoints.MapGet("/telegram/miniapp/state", HandleAsync).WithMetadata(metadata);
-        endpoints.MapPost("/telegram/miniapp/notifications/dismiss", HandleAsync).WithMetadata(metadata);
-        endpoints.MapPost("/telegram/miniapp/reminders/cancel", HandleAsync).WithMetadata(metadata);
+        endpoints.MapGet("/telegram/health", HandleAsync).WithMetadata(metadata, new PublicModuleEndpointMetadata()).AllowAnonymous();
+        endpoints.MapPost("/telegram/webhook", HandleAsync).WithMetadata(metadata, new PublicModuleEndpointMetadata()).AllowAnonymous();
+        endpoints.MapGet("/telegram/miniapp/state", HandleAsync).WithMetadata(metadata, new PublicModuleEndpointMetadata()).AllowAnonymous();
+        endpoints.MapPost("/telegram/miniapp/notifications/dismiss", HandleAsync).WithMetadata(metadata, new PublicModuleEndpointMetadata()).AllowAnonymous();
+        endpoints.MapPost("/telegram/miniapp/reminders/cancel", HandleAsync).WithMetadata(metadata, new PublicModuleEndpointMetadata()).AllowAnonymous();
         if (options.Enabled && Directory.Exists(options.MiniAppRoot))
         {
             var root = Path.GetFullPath(options.MiniAppRoot);
@@ -39,10 +39,15 @@ public sealed class TelegramHttpSurface(TelegramOptions options)
                 if (relative.Split('/').Any(segment => segment.StartsWith('.')) ||
                     !types.TryGetContentType(file, out var contentType)) { continue; }
                 var fullPath = Path.GetFullPath(file);
-                endpoints.MapMethods("/telegram/app/" + relative, [HttpMethods.Get, HttpMethods.Head], () => Results.File(fullPath, contentType)).WithMetadata(metadata);
+                IResult Serve(HttpContext context)
+                {
+                    context.Response.Headers.CacheControl = "no-store";
+                    return Results.File(fullPath, contentType);
+                }
+                endpoints.MapMethods("/telegram/app/" + relative, [HttpMethods.Get, HttpMethods.Head], Serve).WithMetadata(metadata, new PublicModuleEndpointMetadata()).AllowAnonymous();
                 if (relative == "index.html")
                 {
-                    endpoints.MapMethods("/telegram/app", [HttpMethods.Get, HttpMethods.Head], () => Results.File(fullPath, contentType)).WithMetadata(metadata);
+                    endpoints.MapMethods("/telegram/app", [HttpMethods.Get, HttpMethods.Head], Serve).WithMetadata(metadata, new PublicModuleEndpointMetadata()).AllowAnonymous();
                 }
             }
         }
@@ -93,8 +98,8 @@ public sealed class TelegramHttpSurface(TelegramOptions options)
         services.GetService<TelegramConnectionStatus>()?.MessageReceived();
         if (message.Text.Split(' ', 2)[0] == "/start" && Uri.TryCreate(options.MiniAppUrl, UriKind.Absolute, out var url) && url.Scheme == "https")
         {
-            await context.Response.WriteAsJsonAsync(new { method = "sendMessage", chat_id = message.UserId, text = "Open your reminders and inbox.",
-                reply_markup = new { inline_keyboard = new[] { new[] { new { text = "Open reminders", web_app = new { url = url.AbsoluteUri } } } } } }, Json, context.RequestAborted).ConfigureAwait(false);
+            await context.Response.WriteAsJsonAsync(new { method = "sendMessage", chat_id = message.UserId, text = "Open your projects and workspace.",
+                reply_markup = new { inline_keyboard = new[] { new[] { new { text = "Open projects", web_app = new { url = url.AbsoluteUri } } } } } }, Json, context.RequestAborted).ConfigureAwait(false);
         }
     }
 

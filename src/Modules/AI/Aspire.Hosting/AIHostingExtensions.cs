@@ -260,7 +260,7 @@ public static class AIHostingExtensions
                 .WithDataVolume()
                 .WithLifetime(ContainerLifetime.Persistent)
                 .WithEnvironment("OLLAMA_KEEP_ALIVE", "-1")
-                .WithParentRelationship(brain.Resource);
+                .WithParentRelationship(brain.GetModuleResource<AIModule>());
     }
 
     private sealed class VoiceToTextHostingState(DigitalBrainBuilder brain) : DigitalBrainModuleProjection

@@ -6,6 +6,7 @@ using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
+using DigitalBrain.Identity;
 
 namespace DigitalBrain.Core.Behaviors;
 /// <summary>A durable lifecycle owner. The existing pending-work journal retries reconciliation.</summary>
@@ -29,6 +30,7 @@ public sealed class BehaviorNeuron : Neuron, IBehavior
 
     public async Task<Accepted<BehaviorVersion>> Save(SaveBehavior command)
     {
+        await RequireAuthorization(command.Definition).ConfigureAwait(true);
         await ClearAbandonedReservation().ConfigureAwait(true);
         return await ExecuteCommandAsync(Descriptor("save"), command, BehaviorJson.Default.SaveBehavior, BehaviorJson.Default.AcceptedBehaviorVersion, args =>
         {
@@ -54,6 +56,7 @@ public sealed class BehaviorNeuron : Neuron, IBehavior
     public Task<Accepted<BehaviorVersion>> Stop(ChangeBehavior command) => Change(command, "stop", Stopping);
     private async Task<Accepted<BehaviorVersion>> Change(ChangeBehavior command, string method, string type)
     {
+        if (type == Starting) { await RequireAuthorization(Current.Definition).ConfigureAwait(true); }
         await ClearAbandonedReservation().ConfigureAwait(true);
         return await ExecuteCommandAsync(Descriptor(method), command, BehaviorJson.Default.ChangeBehavior, BehaviorJson.Default.AcceptedBehaviorVersion, args =>
         {
@@ -78,6 +81,17 @@ public sealed class BehaviorNeuron : Neuron, IBehavior
             return new Accepted<BehaviorVersion>(new(Current.Version), work);
         }).ConfigureAwait(true);
     }
+    private async Task RequireAuthorization(BehaviorDefinition? definition)
+    {
+        if (IdentityCallerContext.Current is not { } caller) { return; }
+        if (definition?.Authorization is not { } authorization
+            || !await ServiceProvider.GetRequiredService<IdentityService>().OwnsAutomationGrantAsync(
+                caller.UserId, authorization.GrantId, authorization.WorkspaceId, Id.ToString()).ConfigureAwait(true))
+        {
+            throw new UnauthorizedAccessException("Behavior authoring requires your active grant for this behavior and workspace.");
+        }
+    }
+
     private async Task ClearAbandonedReservation()
     {
         // CancelReaction removes pending work independently of the lifecycle handler. Once the
@@ -234,7 +248,8 @@ public sealed class BehaviorNeuron : Neuron, IBehavior
                 cancellationToken.ThrowIfCancellationRequested();
                 var id = bindings[node.Role].Neuron;
                 await Ownership(id).Claim(Owner).ConfigureAwait(true);
-                await Processor(id).Configure(new(Owner, node, true)).ConfigureAwait(true);
+                await Processor(id).Configure(new(Owner, node, true, Current.Definition!.Authorization,
+                    Current.Definition.Authorization is null ? null : Id.ToString())).ConfigureAwait(true);
             }
 
             // Internal edges first, then source subscriptions: all downstream processing is ready at ingress.
@@ -280,7 +295,8 @@ public sealed class BehaviorNeuron : Neuron, IBehavior
         {
             cancellationToken.ThrowIfCancellationRequested();
             var id = bindings[node.Role].Neuron;
-            await Processor(id).Configure(new(Owner, node, false)).ConfigureAwait(true);
+            await Processor(id).Configure(new(Owner, node, false, Current.Definition!.Authorization,
+                Current.Definition.Authorization is null ? null : Id.ToString())).ConfigureAwait(true);
             await Ownership(id).Release(Owner).ConfigureAwait(true);
         }
 

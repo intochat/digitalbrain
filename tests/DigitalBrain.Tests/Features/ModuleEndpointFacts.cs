@@ -19,7 +19,7 @@ public sealed class ModuleEndpointFacts
     public async Task Runtime_reuses_the_configured_module_instance_for_endpoint_mapping()
     {
         await using var brain = await BrainSimulation.StartAsync(new() { Modules = new([typeof(ProbeModule)]) });
-        var module = Assert.IsType<ProbeModule>(Assert.Single(brain.SiloServices.GetServices<IModule>()));
+        var module = Assert.Single(brain.SiloServices.GetServices<IModule>().OfType<ProbeModule>());
         Assert.True(module.SiloConfigured);
         var builder = WebApplication.CreateSlimBuilder();
         builder.WebHost.UseTestServer();
@@ -44,6 +44,8 @@ public sealed class ModuleEndpointFacts
     [InlineData("GET", "/agent/connections/telegram", false, true, 200)]
     [InlineData("GET", "/owner", true, false, 401)]
     [InlineData("GET", "/owner", false, true, 200)]
+    [InlineData("GET", "/module-owned", false, false, 401)]
+    [InlineData("GET", "/module-owned", false, true, 200)]
     public async Task Only_selected_module_endpoints_bypass_owner_authentication(string method, string path, bool secret, bool owner, int expected)
     {
         await using var app = BuildApp();
@@ -64,6 +66,7 @@ public sealed class ModuleEndpointFacts
     [InlineData("GET", "/owner", 404)]
     [InlineData("GET", "/health", 404)]
     [InlineData("GET", "/oauth/callback", 404)]
+    [InlineData("GET", "/module-owned", 404)]
     public async Task Module_listener_rejects_other_routes_even_with_owner_credentials(string method, string path, int expected)
     {
         await using var app = BuildApp(publicListener: true);
@@ -130,6 +133,7 @@ public sealed class ModuleEndpointFacts
         app.UseBasicAuthGate();
         app.MapModuleEndpoints();
         app.MapGet("/owner", () => "owner");
+        app.MapGet("/module-owned", () => "owner").WithMetadata(new ModuleEndpointMetadata(typeof(TelegramModule)));
         app.MapGet("/health", () => "healthy");
         return app;
     }

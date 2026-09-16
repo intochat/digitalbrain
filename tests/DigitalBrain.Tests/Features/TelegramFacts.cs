@@ -22,6 +22,22 @@ public sealed class TelegramFacts
     private static readonly DateTimeOffset Now = DateTimeOffset.FromUnixTimeSeconds(1800000000);
 
     [Fact]
+    public async Task Telegram_identity_provider_accepts_only_current_signed_numeric_subject()
+    {
+        var clock = new FakeTimeProvider(Now);
+        var verifier = new TelegramIdentityVerifier(new() { BotToken = "test-token" }, clock);
+        var proof = SignedData(Now.ToUnixTimeSeconds());
+        var identity = await verifier.VerifyAsync(proof, TestContext.Current.CancellationToken);
+        Assert.NotNull(identity);
+        Assert.Equal("telegram", identity.Provider);
+        Assert.Equal("42", identity.Subject);
+        Assert.Null(await verifier.VerifyAsync(proof + "&user=forged", TestContext.Current.CancellationToken));
+        Assert.Null(await verifier.VerifyAsync("user=%ZZ", TestContext.Current.CancellationToken));
+        clock.Advance(TimeSpan.FromHours(2));
+        Assert.Null(await verifier.VerifyAsync(proof, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public void Signed_identity_is_verified_and_hash_covers_signature_field()
     {
         var signed = SignedData(Now.ToUnixTimeSeconds());

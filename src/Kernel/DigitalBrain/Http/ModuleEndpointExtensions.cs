@@ -1,15 +1,23 @@
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Core;
 
-/// <summary>An endpoint whose module owns authentication or deliberately serves a public asset.</summary>
+/// <summary>Identifies endpoint ownership; does not grant access.</summary>
 public sealed record ModuleEndpointMetadata(Type ModuleType);
 
+/// <summary>Explicitly permits a module endpoint on its public listener.</summary>
+public sealed record PublicModuleEndpointMetadata;
+
 /// <summary>A listener restricted to endpoints explicitly exposed by one module.</summary>
-public sealed record ModuleEndpointListener(Type ModuleType, int Port);
+public sealed record ModuleEndpointListener(Type ModuleType, int Port)
+{
+    public IReadOnlyList<Type> AdditionalModuleTypes { get; init; } = [];
+    public bool Exposes(Type moduleType) => moduleType == ModuleType || AdditionalModuleTypes.Contains(moduleType);
+}
 
 public static class ModuleEndpointExtensions
 {
@@ -45,7 +53,11 @@ public static class ModuleEndpointExtensions
         return app.Use(async (context, next) =>
         {
             var listener = listeners.SingleOrDefault(listener => listener.Port == context.Connection.LocalPort);
-            if (listener is not null && context.GetEndpoint()?.Metadata.GetMetadata<ModuleEndpointMetadata>()?.ModuleType != listener.ModuleType)
+            var endpoint = context.GetEndpoint();
+            if (listener is not null && (endpoint?.Metadata.GetMetadata<PublicModuleEndpointMetadata>() is null
+                || endpoint.Metadata.GetMetadata<ModuleEndpointMetadata>() is not { } module
+                || (endpoint.Metadata.GetMetadata<IAllowAnonymous>() is null && endpoint.Metadata.GetMetadata<IAuthorizeData>() is null)
+                || !listener.Exposes(module.ModuleType)))
             {
                 context.Response.StatusCode = StatusCodes.Status404NotFound;
                 return;

@@ -9,7 +9,7 @@ public static class ClickHouseNames
     public const string TableType = "clickhouse-table";
     public const string TableIdPrefix = "chtable-";
 
-    public const string Server = "clickhouse";
+    public const string Server = "clickhouse-server";
     public const string DatabaseResource = "clickhouse-db";
     public const string DatabaseName = "digitalbrain";
 }

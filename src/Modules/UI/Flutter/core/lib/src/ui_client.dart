@@ -21,12 +21,15 @@ final class DigitalBrainUiClient {
     required this.baseUri,
     http.Client? httpClient,
     BasicCredentials? credentials,
-  }) : workspaceIdentity = credentials?.username ?? 'local-owner',
+    String? bearerToken,
+    String? accountId,
+  }) : workspaceIdentity = accountId ?? credentials?.username ?? 'local-owner',
        _http = httpClient is CookieHttpClient
            ? httpClient
            : CookieHttpClient(
                httpClient ?? http.Client(),
                credentials: credentials,
+               bearerToken: bearerToken,
              ),
        _ownsClient = httpClient == null;
 
@@ -71,6 +74,29 @@ final class DigitalBrainUiClient {
   final String workspaceIdentity;
   final CookieHttpClient _http;
   final bool _ownsClient;
+
+  /// Mint a short-lived link code; no owner credentials are sent to Telegram.
+  Future<String> createTelegramLinkCode() async {
+    final bootstrap = await _http.post(
+      baseUri.resolve('/identity/owner/bootstrap'),
+      headers: {'X-DigitalBrain-Session-Transport': 'bearer'},
+    );
+    if (bootstrap.statusCode != 200) {
+      throw StateError(
+        'Sign in to the desktop with the configured owner username and password first.',
+      );
+    }
+    final session = jsonDecode(bootstrap.body) as Map<String, dynamic>;
+    final response = await _http.post(
+      baseUri.resolve('/identity/link'),
+      headers: {'authorization': 'Bearer ${session['token']}'},
+    );
+    if (response.statusCode != 200) {
+      throw StateError('Could not create a linking code. Please try again.');
+    }
+    return (jsonDecode(response.body) as Map<String, dynamic>)['code']
+        as String;
+  }
 
   /// Transcription only: callers review the draft before starting an agent run.
   Future<String> transcribeVoice({

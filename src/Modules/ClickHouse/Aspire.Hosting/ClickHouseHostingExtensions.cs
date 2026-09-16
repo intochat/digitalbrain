@@ -52,10 +52,12 @@ public static class ClickHouseHostingExtensions
             }
 
             var builder = brain.ApplicationBuilder;
+            var module = brain.GetModuleResource<ClickHouseModule>();
             _server = builder.AddClickHouse(ClickHouseNames.Server)
-                .WithDataVolume()
+                // The module keeps the original "clickhouse" name, preserving the existing volume identity.
+                .WithDataVolume(VolumeNameGenerator.Generate(module, "data"))
                 .WithLifetime(ContainerLifetime.Persistent)
-                .WithParentRelationship(brain.Resource)
+                .WithParentRelationship(module)
                 .WithUrlForEndpoint("http", static endpoint => new ResourceUrlAnnotation
                 {
                     Url = "/play",

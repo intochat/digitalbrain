@@ -26,6 +26,7 @@ class WorkspaceApp extends StatefulWidget {
     this.onRun,
     this.onOpenUrl,
     this.onSalesforceConnected,
+    this.onLinkTelegram,
     this.kernelBaseUri,
     this.statusMessage,
     this.onReadTable,
@@ -45,6 +46,7 @@ class WorkspaceApp extends StatefulWidget {
   final AgentRunner? onRun;
   final OpenUrl? onOpenUrl;
   final Future<bool> Function()? onSalesforceConnected;
+  final Future<String> Function()? onLinkTelegram;
   final Uri? kernelBaseUri;
   final String? statusMessage;
   final ReadTable? onReadTable;
@@ -184,6 +186,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
           MaterialPageRoute<void>(
             settings: RouteSettings(name: '/settings/$section'),
             builder: (_) => WorkspaceSettings(
+              onLinkTelegram: widget.onLinkTelegram,
               store: store,
               initialSection: section,
               kernelBaseUri: widget.kernelBaseUri,
@@ -1229,6 +1232,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                           name: '/settings/profile',
                         ),
                         builder: (_) => WorkspaceSettings(
+                          onLinkTelegram: widget.onLinkTelegram,
                           store: store,
                           kernelBaseUri: widget.kernelBaseUri,
                           onOpen: widget.onOpenUrl,

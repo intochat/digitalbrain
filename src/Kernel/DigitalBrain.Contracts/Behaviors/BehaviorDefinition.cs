@@ -22,7 +22,11 @@ public sealed record BehaviorConnection([property: Id(0)] string From, [property
 public sealed record BehaviorDefinition(
     [property: Id(0)] string Name,
     [property: Id(1)] IReadOnlyList<BehaviorNodeDefinition> Nodes,
-    [property: Id(2)] IReadOnlyList<BehaviorConnection> Connections);
+    [property: Id(2)] IReadOnlyList<BehaviorConnection> Connections,
+    [property: Id(3)] BehaviorAuthorization? Authorization = null);
+
+[GenerateSerializer, Alias("db.v2.behavior-authorization")]
+public sealed record BehaviorAuthorization([property: Id(0)] string WorkspaceId, [property: Id(1)] string GrantId);
 
 public enum BehaviorOwnership { Shared, Owned }
 public enum BehaviorStatus { Draft, Starting, Running, Stopping, Stopped, Faulted }
@@ -66,7 +70,9 @@ public sealed record ChangeBehavior(CommandId Id, long? ExpectedVersion = null) 
 public sealed record BehaviorNodeActivation(
     [property: Id(0)] string Owner,
     [property: Id(1)] BehaviorNodeDefinition Definition,
-    [property: Id(2)] bool Enabled);
+    [property: Id(2)] bool Enabled,
+    [property: Id(3)] BehaviorAuthorization? Authorization = null,
+    [property: Id(4)] string? BehaviorId = null);
 
 [GenerateSerializer, Alias("db.v2.behavior-node-status")]
 public sealed record BehaviorNodeStatus(

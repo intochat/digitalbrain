@@ -5,6 +5,7 @@ using DigitalBrain.Abstractions.Behaviors;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Configuration;
+using DigitalBrain.Identity;
 
 namespace DigitalBrain.Telegram;
 
@@ -32,8 +33,15 @@ public sealed class TelegramModule : Core.IModule
         builder.Services.AddHostedService(services => services.GetRequiredService<TelegramBotConnection>());
         builder.Services.TryAddSingleton<ITelegramBehaviorSetup, TelegramBehaviorSetup>();
         builder.Services.TryAddSingleton<TelegramHttpSurface>();
+        builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IExternalIdentityVerifier, TelegramIdentityVerifier>());
         var port = builder.Configuration.GetValue<int>("DigitalBrain:Telegram:PublicPort");
-        if (port != 0) { builder.Services.AddSingleton(new Core.ModuleEndpointListener(typeof(TelegramModule), port)); }
+        if (port != 0)
+        {
+            builder.Services.AddSingleton(new Core.ModuleEndpointListener(typeof(TelegramModule), port)
+            {
+                AdditionalModuleTypes = [typeof(IdentityModule), typeof(DigitalBrain.UI.UIModule)],
+            });
+        }
         builder.Services.AddSingleton(new BehaviorSourceContract("telegram", [new(MessageReceivedSignal,
             """{"type":"object","properties":{"eventId":{"type":"string"},"userId":{"type":"integer"},"text":{"type":"string"},"sentUnixSeconds":{"type":"integer"},"timeZone":{"type":"string"}},"required":["eventId","userId","text","sentUnixSeconds","timeZone"],"additionalProperties":false}""")]));
     }

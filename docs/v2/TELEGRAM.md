@@ -50,7 +50,7 @@ Send `/start` to the bot, open **Open reminders**, then send a private message s
 
 The owner-authenticated endpoint `/agent/connections/telegram` reports setup state, sanitized errors, bot username, verification time and the last accepted message time. `Connected` means provider registration was verified; `lastMessageAt` is separate evidence that an incoming receipt reached DigitalBrain.
 
-Cloudflare is needed only when this local machine lacks a public HTTPS endpoint. For a stable endpoint set **AppHost** `Telegram:PublicUrl=https://your-public-host` and route it to the kernel's named `telegram` endpoint. Set `Telegram:Enabled=false` to omit local onboarding. See [hosting configuration](../../src/Modules/Telegram/Aspire.Hosting/README.md) for executable paths and restart behavior. Quick tunnels are for development; restart the AppHost after a tunnel restart so the new URL is registered. Production requires a stable HTTPS origin or named tunnel.
+Cloudflare is needed only when this local machine lacks a public HTTPS endpoint. For a remotely managed named tunnel, set **AppHost** `Telegram:TunnelMode=Named`, `Telegram:PublicUrl=https://your-public-host`, and `Telegram:PublicPort=5181`, then supply the `cloudflare-tunnel-token` secret parameter. Configure Cloudflare ingress to `http://localhost:5181`. `External` mode uses an already hosted origin without starting cloudflared. Set `Telegram:Enabled=false` to omit local onboarding. See [identity and named tunnels](IDENTITY.md) and [hosting configuration](../../src/Modules/Telegram/Aspire.Hosting/README.md). Quick tunnels are for development; restart the AppHost after a quick-tunnel restart so its new URL is registered.
 
 ### Standalone kernel / deployment
 

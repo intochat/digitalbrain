@@ -96,7 +96,7 @@ public static class ShellHostingExtensions
                 .AddExecutable(resourceName, launch.Command, launch.WorkingDirectory, launch.Args)
                 .WithEnvironment(ShellNames.ShellEnvironmentVariable, shell)
                 .WithEnvironment(ShellNames.ChatEnvironmentVariable, chat)
-                .WithParentRelationship(brain.Resource);
+                .WithParentRelationship(brain.GetModuleResource<UIModule>());
 
             if (kind == FlutterHostKind.Web)
             {

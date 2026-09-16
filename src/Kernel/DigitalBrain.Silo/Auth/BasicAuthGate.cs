@@ -1,4 +1,6 @@
 using DigitalBrain.Core;
+using DigitalBrain.Identity;
+using Microsoft.AspNetCore.Authorization;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -26,16 +28,33 @@ internal static class BasicAuthGate
         ArgumentNullException.ThrowIfNull(app);
 
         var credential = BasicAuthCredential.FromConfiguration(app.Configuration);
-        if (credential is null)
-        {
-            // Unset credentials mean an open kernel — the local and test posture.
-            return app;
-        }
-
         app.Use(async (context, next) =>
         {
-            if (context.GetEndpoint()?.Metadata.GetMetadata<ModuleEndpointMetadata>() is not null
-                || IsAnonymous(context.Request) || credential.Matches(context.Request.Headers.Authorization))
+            var endpoint = context.GetEndpoint();
+            var module = endpoint?.Metadata.GetMetadata<ModuleEndpointMetadata>();
+            var explicitlyAuthorized = endpoint?.Metadata.GetMetadata<IAuthorizeData>() is not null;
+            var explicitlyAnonymous = endpoint?.Metadata.GetMetadata<IAllowAnonymous>() is not null;
+            if (module is not null && endpoint?.Metadata.GetMetadata<WorkspaceEndpointMetadata>() is null
+                && (explicitlyAnonymous || explicitlyAuthorized))
+            {
+                await next(context).ConfigureAwait(false);
+                return;
+            }
+
+            // Application sessions must be owners for all legacy host surfaces. A failed
+            // bearer/cookie authentication never falls back to Basic or local development.
+            if (IdentityAuthentication.HasSessionCredential(context.Request))
+            {
+                if (context.User.Identity?.IsAuthenticated != true) { context.Response.StatusCode = 401; return; }
+                if (!context.User.IsInRole("owner")) { context.Response.StatusCode = 403; return; }
+                await next(context).ConfigureAwait(false);
+                return;
+            }
+
+            var publicListener = context.RequestServices.GetServices<ModuleEndpointListener>()
+                .Any(listener => listener.Port == context.Connection.LocalPort);
+            if (!publicListener && (IsAnonymous(context.Request) || credential is null
+                || credential.Matches(context.Request.Headers.Authorization)))
             {
                 await next(context).ConfigureAwait(false);
                 return;
@@ -47,7 +66,7 @@ internal static class BasicAuthGate
         });
 
         // Inside the gate, so reaching it at all proves the credential is good.
-        app.MapGet(CheckPath, static () => Results.NoContent());
+        if (credential is not null) { app.MapGet(CheckPath, static () => Results.NoContent()); }
 
         return app;
     }

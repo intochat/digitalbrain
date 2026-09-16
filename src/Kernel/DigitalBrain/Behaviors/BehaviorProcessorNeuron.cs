@@ -10,6 +10,7 @@ using DigitalBrain.Abstractions.Signals;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Runtime;
+using DigitalBrain.Identity;
 
 namespace DigitalBrain.Core.Behaviors;
 [GenerateSerializer, Alias("db.v2.processor-state")]
@@ -43,7 +44,9 @@ public abstract class BehaviorProcessorNeuron : Neuron<BehaviorProcessorState>, 
 
             var original = JsonSerializer.SerializeToElement(current.Activation.Definition, BehaviorJson.Default.BehaviorNodeDefinition);
             var requested = JsonSerializer.SerializeToElement(activation.Definition, BehaviorJson.Default.BehaviorNodeDefinition);
-            if (!JsonElement.DeepEquals(original, requested))
+            if (!JsonElement.DeepEquals(original, requested)
+                || current.Activation.Authorization != activation.Authorization
+                || current.Activation.BehaviorId != activation.BehaviorId)
             {
                 throw new InvalidOperationException("A processor definition is immutable within its behavior run.");
             }
@@ -101,7 +104,8 @@ public abstract class BehaviorProcessorNeuron : Neuron<BehaviorProcessorState>, 
         catch (Exception error) when (error is not OperationCanceledException and not NeuronBusyException and not NeuronRecoveringException and not NeuronPersistenceException)
         {
             // Preserve the failed input and stop later work. No invalid model output or uncertain action is emitted.
-            var action = node.Capability == "action" ? BehaviorMapping.ActionId(Id, delivery.SignalId).ToString() : null;
+            var action = node.Capability == "action" && error is not BehaviorPermissionDeniedException
+                ? BehaviorMapping.ActionId(Id, delivery.SignalId).ToString() : null;
             await SaveAsync(current with { Error = error.Message, UncertainAction = action, PausedInput = delivery }, cancellationToken).ConfigureAwait(true);
             return;
         }
@@ -121,6 +125,17 @@ public abstract class BehaviorProcessorNeuron : Neuron<BehaviorProcessorState>, 
         var args = JsonNode.Parse(delivery.Signal.Body);
         long? beforeInvocation = null;
         var firstAttempt = _attempt.Value != commandId.ToString();
+        if (State!.Activation.Authorization is { } authorization
+            && !await ServiceProvider.GetRequiredService<IdentityService>().IsAutomationAuthorizedAsync(
+                authorization.GrantId, authorization.WorkspaceId, State.Activation.BehaviorId ?? "",
+                target.ToString(), $"{iface}.{method}").ConfigureAwait(true))
+        {
+            if (!firstAttempt)
+            {
+                throw new InvalidOperationException("Behavior permission was revoked; a previous action attempt still needs reconciliation.");
+            }
+            throw new BehaviorPermissionDeniedException();
+        }
         if (!descriptor.IsReadOnly)
         {
             if (identity is null || args is not JsonObject command)
@@ -167,6 +182,7 @@ public abstract class BehaviorProcessorNeuron : Neuron<BehaviorProcessorState>, 
     }
 
     private static string? Optional(JsonElement config, string name) => config.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+    private sealed class BehaviorPermissionDeniedException() : Exception("Behavior permission was revoked or does not allow this target and action.");
     private static void RequirePayload(PayloadContract contract, string body)
     {
         var errors = BehaviorSchema.Validate(contract.Schema, body);

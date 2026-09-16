@@ -6,7 +6,9 @@ import 'basic_credentials.dart';
 /// Loopback dev auth does not need cookies once a bootstrap owner exists, but
 /// login/bootstrap cookies keep Flutter working when loopback cannot apply.
 final class CookieHttpClient extends http.BaseClient {
-  CookieHttpClient(this._inner, {this.credentials});
+  CookieHttpClient(this._inner, {this.credentials, this.bearerToken});
+
+  final String? bearerToken;
 
   final http.Client _inner;
   final Map<String, String> _cookies = {};
@@ -21,7 +23,10 @@ final class CookieHttpClient extends http.BaseClient {
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     final credential = credentials;
-    if (credential != null && !request.headers.containsKey('authorization')) {
+    if (bearerToken != null && !request.headers.containsKey('authorization')) {
+      request.headers['authorization'] = 'Bearer $bearerToken';
+    } else if (credential != null &&
+        !request.headers.containsKey('authorization')) {
       request.headers['authorization'] = credential.authorizationHeader;
     }
 

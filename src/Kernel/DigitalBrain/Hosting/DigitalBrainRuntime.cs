@@ -29,6 +29,7 @@ public static class DigitalBrainRuntime
         });
 
         builder.AddJournalStorage();
+        builder.AddIncomingGrainCallFilter<Identity.IdentityNeuronAuthorizationFilter>();
         builder.AddIncomingGrainCallFilter<NeuronActivationGuardFilter>();
         builder.AddOutgoingGrainCallFilter<CommandLocalityFilter>();
         builder.AddOutgoingGrainCallFilter<OutgoingCallerFilter>();
@@ -51,7 +52,7 @@ public static class DigitalBrainRuntime
     }
 
     private static IEnumerable<IModule> ModuleHooksOf(ModuleManifest modules)
-        => modules.Types.Select(static type =>
+        => modules.Types.Prepend(typeof(Identity.IdentityModule)).Distinct().Select(static type =>
         {
             if (type is not { IsClass: true, IsAbstract: false }
                 || !typeof(IModule).IsAssignableFrom(type)

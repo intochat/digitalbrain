@@ -1,5 +1,6 @@
 using DigitalBrain.Aspire;
 using DigitalBrain.Core;
+using DigitalBrain.Identity;
 using DigitalBrain.Kernel;
 using DigitalBrain.Mcp;
 using DigitalBrain.ServiceDefaults;
@@ -15,7 +16,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddDigitalBrain();
 builder.AddConversationalAgent();
 builder.AddKernelCors();
-builder.Services.AddAuthentication();
+builder.Services.AddWorkspaceEndpointAccess();
 builder.Services.AddSingleton<SessionStreamOptions>();
 builder.Services.AddDigitalBrainMcp()
     .WithHttpTransport(options => options.SessionMode = HttpServerSessionMode.Stateless);
@@ -29,14 +30,17 @@ app.UseKernelCors();
 // run before authentication and the Basic gate.
 app.UseModuleHttpSurfaces();
 app.UseAuthentication();
+app.UseIdentityCallerContext();
+app.UseAuthorization();
 app.UseBasicAuthGate();
 app.MapModuleEndpoints();
 app.MapDefaultEndpoints();
 app.MapOrleansDashboard("/orleans");
-app.MapConversationalAgent();
-app.MapWorkspaceEndpoints();
-app.MapUiEndpoints();
-app.MapBrainObservationEndpoints();
+var workspace = app.MapOwnerWorkspace();
+workspace.MapConversationalAgent();
+workspace.MapWorkspaceEndpoints();
+workspace.MapUiEndpoints();
+workspace.MapBrainObservationEndpoints();
 
 // Graph HTTP capabilities are optional; conversation handling stays direct.
 // Table tools use UI neurons independently of these graph routes.

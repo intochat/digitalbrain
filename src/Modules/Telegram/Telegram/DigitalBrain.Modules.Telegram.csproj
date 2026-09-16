@@ -8,8 +8,9 @@
     <ProjectReference Include="../../../Kernel/DigitalBrain/DigitalBrain.csproj" />
     <ProjectReference Include="../../Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <ProjectReference Include="../../UI/DigitalBrain.Modules.UI.Contracts/DigitalBrain.Modules.UI.Contracts.csproj" />
+    <ProjectReference Include="../../UI/DigitalBrain.Modules.UI/DigitalBrain.Modules.UI.csproj" />
   </ItemGroup>
-  <ItemGroup Condition="Exists('../../UI/Flutter/telegram/build/web/index.html')">
-    <Content Include="../../UI/Flutter/telegram/build/web/**/*" Link="telegram-app/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  <ItemGroup Condition="Exists('../../UI/Flutter/shell/build/telegram/index.html')">
+    <Content Include="../../UI/Flutter/shell/build/telegram/**/*" Link="telegram-app/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
