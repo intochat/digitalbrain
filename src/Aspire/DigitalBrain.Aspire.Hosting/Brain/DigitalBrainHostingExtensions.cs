@@ -1,3 +1,4 @@
+using System.Reflection;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 
@@ -56,6 +57,16 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(brain);
         ArgumentNullException.ThrowIfNull(configure);
         brain.AddModule(typeof(TModule));
+        if (typeof(TModule).GetCustomAttribute<ModuleHostingAttribute>() is { } hosting)
+        {
+            var type = Type.GetType(hosting.TypeName, throwOnError: true)!;
+            if (Activator.CreateInstance(type) is not IDigitalBrainModuleHosting defaults)
+            {
+                throw new InvalidOperationException($"{hosting.TypeName} must implement {nameof(IDigitalBrainModuleHosting)}.");
+            }
+
+            defaults.Configure(brain);
+        }
         configure(new DigitalBrainModuleBuilder<TModule>(brain));
         return brain;
     }

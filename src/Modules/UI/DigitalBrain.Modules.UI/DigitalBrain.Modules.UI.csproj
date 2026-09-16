@@ -17,5 +17,6 @@
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Tests" />
     <InternalsVisibleTo Include="DigitalBrain.Modules.ClickHouse" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Supabase" />
   </ItemGroup>
 </Project>

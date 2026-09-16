@@ -5,6 +5,7 @@ using DigitalBrain.AI.FoundryLocal;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.ClickHouse;
 using DigitalBrain.ClickHouse.Aspire.Hosting;
+using DigitalBrain.Supabase;
 using DigitalBrain.Coding.Aspire.Hosting;
 using DigitalBrain.Coding;
 using DigitalBrain.Excel;
@@ -69,6 +70,7 @@ var brain = builder.AddDigitalBrain(ProductSurfaceResources.Brain)
     })
     .AddModule<MemoryModule>(memory => memory.WithQdrant())
     .AddModule<ClickHouseModule>(clickhouse => clickhouse.WithClickHouse(options => options.WithSeed("leads")))
+    .AddModule<SupabaseModule>()
     .AddModule<TimeModule>()
     .AddModule<ExcelModule>()
     .AddModule<GoogleModule>(google => google.WithGmail())

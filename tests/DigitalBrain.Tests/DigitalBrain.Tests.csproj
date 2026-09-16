@@ -19,6 +19,7 @@
     <PackageReference Include="xunit.v3.mtp-v2" />
     <PackageReference Include="ModelContextProtocol.Core" />
     <PackageReference Include="Testcontainers.ClickHouse" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Kernel/DigitalBrain.Silo/DigitalBrain.Silo.csproj" />
@@ -33,6 +34,7 @@
     <ProjectReference Include="../../src/Modules/Memory/Memory/DigitalBrain.Modules.Memory.csproj" />
     <ProjectReference Include="../../src/Modules/ClickHouse/ClickHouse/DigitalBrain.Modules.ClickHouse.csproj" />
     <ProjectReference Include="../../src/Modules/ClickHouse/Contracts/DigitalBrain.Modules.ClickHouse.Contracts.csproj" />
+    <ProjectReference Include="../../src/Modules/Supabase/Aspire.Hosting/DigitalBrain.Modules.Supabase.Aspire.Hosting.csproj" />
     <ProjectReference Include="../../src/Modules/Coding/Coding/DigitalBrain.Modules.Coding.csproj" />
     <ProjectReference Include="../../src/Modules/Coding/Contracts/DigitalBrain.Modules.Coding.Contracts.csproj" />
     <ProjectReference Include="../../src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
