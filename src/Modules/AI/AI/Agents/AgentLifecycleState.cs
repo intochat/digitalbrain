@@ -10,10 +10,10 @@ internal interface IAgentLifecycle : IGrainWithStringKey
 {
     Task Initialize(AgentInitialization initialization);
 
-    Task Retire(StopAgent command);
+    Task Retire(CancelAgent command);
 
     [ReadOnly]
-    Task<AgentWork?> Work(AgentTaskQuery query);
+    Task<AgentWork?> Work(string requestId);
 }
 
 [GenerateSerializer]
@@ -33,7 +33,7 @@ public sealed record AgentManagedState(
 
 [GenerateSerializer]
 public sealed record AgentTaskEntry(
-    [property: Id(0)] AgentTaskSnapshot Snapshot,
+    [property: Id(0)] AgentResponse Snapshot,
     [property: Id(1)] string RequestHash,
     [property: Id(2)] SignalId PumpSignal,
     [property: Id(3)] SignalId? WorkSignal = null,
@@ -47,7 +47,7 @@ public sealed record AgentReceipt([property: Id(0)] CommandId CommandId,
 
 [GenerateSerializer]
 internal sealed record AgentWork([property: Id(0)] AgentSnapshot Agent,
-    [property: Id(1)] AgentTaskSnapshot Task, [property: Id(2)] string HistoryJson);
+    [property: Id(1)] AgentResponse Task, [property: Id(2)] string HistoryJson);
 
 [GenerateSerializer]
 internal sealed record AgentTaskResult([property: Id(0)] string TaskId,

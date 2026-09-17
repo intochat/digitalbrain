@@ -18,21 +18,37 @@ public interface IAgentBuilder : INeuron
     Task Close(CloseAgentBuilder command);
 }
 
+// Durable conversation operations. Awaiting and observation live in AgentConversation
+// so callers never hold the owning neuron's turn while its worker completes.
 [Alias("agent")]
 public interface IAgent : INeuron
 {
     [ReadOnly, Alias("read")]
-    Task<AgentSnapshot> Read();
+    Task<AgentSnapshot> GetState();
 
     [Alias("send")]
-    Task<AgentTaskSnapshot> Send(SendAgentMessage command);
+    Task<AgentResponse> Submit(AgentRequest request);
 
-    [ReadOnly, Alias("task")]
-    Task<AgentTaskSnapshot?> ReadTask(AgentTaskQuery query);
+    [ReadOnly, Alias("response")]
+    Task<AgentResponse?> GetResponse(string requestId);
 
+    // User/assistant text retained as conversation context; excludes internal tool traffic.
+    [ReadOnly, Alias("history")]
+    Task<IReadOnlyList<AgentMessage>> GetHistory();
+
+    // Clears future model context, not the durable request/result ledger. Requires an idle agent.
+    [Alias("clear-history")]
+    Task ClearHistory();
+
+    // A null TaskId retires the agent; a specific TaskId cancels only that request.
     [Alias("stop")]
-    Task<AgentSnapshot> Stop(StopAgent command);
+    Task<AgentSnapshot> Cancel(CancelAgent request);
 }
+
+[GenerateSerializer, Alias("db.ai.message")]
+public sealed record AgentMessage(
+    [property: Id(0)] string Role,
+    [property: Id(1)] string Text);
 
 [GenerateSerializer, Alias("db.ai.build-agent")]
 public sealed record BuildAgent(
@@ -47,17 +63,14 @@ public sealed record BuildAgent(
     [property: Id(7)] bool Retain = false) : Command(Id);
 
 [GenerateSerializer, Alias("db.ai.send-agent")]
-public sealed record SendAgentMessage(CommandId Id, [property: Id(0)] string Message,
+public sealed record AgentRequest(CommandId Id, [property: Id(0)] string Message,
     [property: Id(1)] string? TaskId = null) : Command(Id);
 
 [GenerateSerializer, Alias("db.ai.stop-agent")]
-public sealed record StopAgent(CommandId Id, [property: Id(0)] string? TaskId = null) : Command(Id);
+public sealed record CancelAgent(CommandId Id, [property: Id(0)] string? TaskId = null) : Command(Id);
 
 [GenerateSerializer, Alias("db.ai.close-agent-builder")]
 public sealed record CloseAgentBuilder(CommandId Id) : Command(Id);
-
-[GenerateSerializer, Alias("db.ai.agent-task-query")]
-public sealed record AgentTaskQuery([property: Id(0)] string TaskId);
 
 [GenerateSerializer, Alias("db.ai.agent-build-snapshot")]
 public sealed record AgentBuildSnapshot(
@@ -77,13 +90,13 @@ public sealed record AgentSnapshot(
     [property: Id(4)] string Instructions,
     [property: Id(5)] IReadOnlyList<string> Tools,
     [property: Id(6)] string? Owner,
-    [property: Id(7)] IReadOnlyList<AgentTaskSnapshot> Tasks,
+    [property: Id(7)] IReadOnlyList<AgentResponse> Tasks,
     [property: Id(8)] DateTimeOffset CreatedAt,
     [property: Id(9)] string? InitialTaskId,
     [property: Id(10)] bool Retained);
 
 [GenerateSerializer, Alias("db.ai.agent-task-snapshot")]
-public sealed record AgentTaskSnapshot(
+public sealed record AgentResponse(
     [property: Id(0)] string TaskId,
     [property: Id(1)] string Status,
     [property: Id(2)] string Prompt,

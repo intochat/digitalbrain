@@ -70,14 +70,14 @@ public sealed class ProgramAgents(IGrainFactory grains) : IProgramRunLifecycle
         var agent = grains.GetGrain<IAgent>(address.ToGrainId());
         if (mode == "stop")
         {
-            return JsonSerializer.SerializeToElement(await agent.Stop(new(Command(context, "stop/" + address), ReadText(config, "taskId"))), Json);
+            return JsonSerializer.SerializeToElement(await agent.Cancel(new(Command(context, "stop/" + address), ReadText(config, "taskId"))), Json);
         }
-        AgentTaskSnapshot? task;
+        AgentResponse? task;
         string taskId;
         if (mode == "send")
         {
             taskId = ReadText(config, "taskId") ?? Command(context, "task/" + address).ToString();
-            task = await agent.Send(new(Command(context, "send/" + address), ReadText(config, "prompt")
+            task = await agent.Submit(new(Command(context, "send/" + address), ReadText(config, "prompt")
                 ?? throw new ArgumentException("Message agent requires a prompt."), taskId));
             if (config.TryGetProperty("wait", out var wait) && wait.ValueKind == JsonValueKind.False)
             {
@@ -86,28 +86,22 @@ public sealed class ProgramAgents(IGrainFactory grains) : IProgramRunLifecycle
         }
         else if (mode == "collect")
         {
-            var snapshot = await agent.Read();
+            var snapshot = await agent.GetState();
             taskId = ReadText(config, "taskId") ?? snapshot.InitialTaskId
                 ?? snapshot.Tasks.LastOrDefault()?.TaskId ?? throw new ArgumentException("This agent has no task to collect. Send it a message first.");
-            task = await agent.ReadTask(new(taskId));
         }
         else { throw new ArgumentException($"Unknown agent operation '{mode}'."); }
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(TimeSpan.FromMinutes(5));
         try
         {
-            while (task is null || task.Status is "Queued" or "Running")
-            {
-                await Task.Delay(250, deadline.Token);
-                task = await agent.ReadTask(new(taskId)).WaitAsync(deadline.Token);
-                if (task is null) { throw new InvalidOperationException($"Agent task '{taskId}' does not exist or has expired."); }
-            }
+            task = await agent.WaitForResponse(taskId, deadline.Token);
             if (task.Status != "Completed" && mode != "collect") { throw new InvalidOperationException($"Agent task {task.Status}: {task.Error ?? "No result was produced."}"); }
             return JsonSerializer.SerializeToElement(task, Json);
         }
         catch (OperationCanceledException)
         {
-            await agent.Stop(new(Command(context, "cancel/" + address + "/" + taskId), taskId));
+            await agent.Cancel(new(Command(context, "cancel/" + address + "/" + taskId), taskId));
             if (!cancellationToken.IsCancellationRequested) { throw new TimeoutException("Waiting for the agent exceeded five minutes."); }
             throw;
         }

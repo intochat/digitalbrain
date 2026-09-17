@@ -25,7 +25,7 @@ public sealed class ProgramAgentTools(IGrainFactory grains, ModelProfiles models
             var reference = await grains.GetGrain<IAgentBuilder>(builder).Build(new(Id(requestId), key, instructions,
                 new(modelProfile, provider, model, reasoning, maxOutputTokens, ProgramAgents.Capabilities(capabilities)),
                 tools, initialMessage, name, "builder:" + builder, Retain: true));
-            return await reference.Read();
+            return await reference.GetState();
         });
 
     [McpServerTool(Name = "agent_send"), Description("Send a task or follow-up to a built agent using its agent:name address. Its conversation memory and selected LLM are retained. Supply requestId for safe retries. wait=true waits for the result; false returns the queued task for later agent_read.")]
@@ -34,23 +34,18 @@ public sealed class ProgramAgentTools(IGrainFactory grains, ModelProfiles models
         {
             var target = Resolve(agent);
             var id = Id(requestId);
-            var task = await target.Send(new(id, message, id.ToString()));
+            var task = await target.Submit(new(id, message, id.ToString()));
             if (!wait) { return task; }
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             deadline.CancelAfter(TimeSpan.FromMinutes(5));
             try
             {
-                while (task.Status is "Queued" or "Running")
-                {
-                    await Task.Delay(300, deadline.Token);
-                    task = await target.ReadTask(new(task.TaskId)).WaitAsync(deadline.Token)
-                        ?? throw new InvalidOperationException("The agent task no longer exists.");
-                }
+                task = await target.WaitForResponse(task.TaskId, deadline.Token);
                 return task;
             }
             catch (OperationCanceledException)
             {
-                await target.Stop(new(ProgramAgents.StableCommand("mcp/cancel/" + agent + "/" + task.TaskId), task.TaskId));
+                await target.Cancel(new(ProgramAgents.StableCommand("mcp/cancel/" + agent + "/" + task.TaskId), task.TaskId));
                 if (!cancellationToken.IsCancellationRequested) { throw new TimeoutException("The agent did not finish within five minutes."); }
                 throw;
             }
@@ -58,11 +53,11 @@ public sealed class ProgramAgentTools(IGrainFactory grains, ModelProfiles models
 
     [McpServerTool(Name = "agent_read"), Description("Read a created agent's pinned model, instructions, available tools and task history. Supply taskId to read a specific durable task and its output/error.")]
     public Task<string> Read(string agent, string? taskId = null)
-        => Guard<object?>(async () => taskId is null ? await Resolve(agent).Read() : await Resolve(agent).ReadTask(new(taskId)));
+        => Guard<object?>(async () => taskId is null ? await Resolve(agent).GetState() : await Resolve(agent).GetResponse(taskId));
 
     [McpServerTool(Name = "agent_stop"), Description("Stop a created agent and cancel its outstanding work. Supply taskId to cancel only that task while retaining the agent for future messages.")]
     public Task<string> Stop(string agent, string? taskId = null, string? requestId = null)
-        => Guard(async () => await Resolve(agent).Stop(new(Id(requestId), taskId)));
+        => Guard(async () => await Resolve(agent).Cancel(new(Id(requestId), taskId)));
 
     public IReadOnlyList<AITool> CreateTools() =>
     [

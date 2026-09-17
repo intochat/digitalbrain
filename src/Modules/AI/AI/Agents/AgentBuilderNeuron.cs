@@ -107,7 +107,7 @@ internal sealed class AgentBuilderNeuron(NeuronRuntime runtime,
     {
         foreach (var build in current.Builds.Where(static build => !build.Snapshot.Retained))
         {
-            var stop = new StopAgent(new CommandId(AgentLifecycle.Signal(Id + "/retire/" + build.Snapshot.Key).Value));
+            var stop = new CancelAgent(new CommandId(AgentLifecycle.Signal(Id + "/retire/" + build.Snapshot.Key).Value));
             await GrainFactory.GetGrain<IAgentLifecycle>(build.Snapshot.AgentId.ToGrainId()).Retire(stop).ConfigureAwait(true);
         }
         await SaveAsync(current with { Builds = current.Builds.Select(build => build.Snapshot.Retained ? build

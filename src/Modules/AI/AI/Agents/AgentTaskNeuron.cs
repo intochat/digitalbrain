@@ -24,7 +24,7 @@ internal sealed class AgentTaskNeuron(NeuronRuntime runtime,
         var start = JsonSerializer.Deserialize<AgentTaskStart>(delivery.Signal.Body, AgentLifecycle.Json)
             ?? throw new ArgumentException("Agent task start is empty.");
         if (delivery.Source != start.AgentId || Id != AgentLifecycle.Worker(start.AgentId, start.TaskId)) { return; }
-        var work = await GrainFactory.GetGrain<IAgentLifecycle>(start.AgentId.ToGrainId()).Work(new(start.TaskId)).ConfigureAwait(true);
+        var work = await GrainFactory.GetGrain<IAgentLifecycle>(start.AgentId.ToGrainId()).Work(start.TaskId).ConfigureAwait(true);
         if (work is null)
         {
             await SaveAsync(new(start.TaskId, "Cancelled", null, "The owning agent no longer has an active task.", null), cancellationToken).ConfigureAwait(true);

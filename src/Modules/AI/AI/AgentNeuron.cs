@@ -31,12 +31,31 @@ internal sealed class AgentNeuron(
     private readonly Dictionary<string, AIFunction[]> _typedFunctions = new(StringComparer.Ordinal);
     private readonly HashSet<string> _takenFunctionNames = new(StringComparer.Ordinal);
 
-    public Task<AgentSnapshot> Read() => Task.FromResult(Snapshot(Managed()));
+    public Task<AgentSnapshot> GetState() => Task.FromResult(Snapshot(Managed()));
 
-    public Task<AgentTaskSnapshot?> ReadTask(AgentTaskQuery query)
+    public Task<AgentResponse?> GetResponse(string requestId)
     {
-        ArgumentNullException.ThrowIfNull(query);
-        return Task.FromResult(Managed().Tasks.FirstOrDefault(task => task.Snapshot.TaskId == query.TaskId)?.Snapshot);
+        ArgumentException.ThrowIfNullOrWhiteSpace(requestId);
+        return Task.FromResult(Managed().Tasks.FirstOrDefault(task => task.Snapshot.TaskId == requestId)?.Snapshot);
+    }
+
+    public Task<IReadOnlyList<AgentMessage>> GetHistory()
+    {
+        var history = JsonSerializer.Deserialize<List<ChatMessage>>(Managed().HistoryJson, AgentLifecycle.Json) ?? [];
+        return Task.FromResult<IReadOnlyList<AgentMessage>>(
+            history.Where(message => message.Role == ChatRole.User || message.Role == ChatRole.Assistant)
+                .Where(message => !string.IsNullOrEmpty(message.Text))
+                .Select(message => new AgentMessage(message.Role.ToString(), message.Text)).ToArray());
+    }
+
+    public Task ClearHistory()
+    {
+        var current = Managed();
+        if (current.Tasks.Any(task => task.Snapshot.Status is "Queued" or "Running"))
+        {
+            throw new InvalidOperationException("Cancel or finish outstanding requests before clearing conversation history.");
+        }
+        return SaveManagedAsync(current with { HistoryJson = "[]" });
     }
 
     async Task IAgentLifecycle.Initialize(AgentInitialization initialization)
@@ -61,28 +80,28 @@ internal sealed class AgentNeuron(
         await QueuePendingAsync(current).ConfigureAwait(true);
     }
 
-    async Task IAgentLifecycle.Retire(StopAgent command)
+    async Task IAgentLifecycle.Retire(CancelAgent command)
     {
         if (State?.Managed is null)
         {
             await SaveAsync((State ?? new AgentState([])) with { InitializationStopped = true }).ConfigureAwait(true);
             return;
         }
-        await Stop(command).ConfigureAwait(true);
+        await Cancel(command).ConfigureAwait(true);
     }
 
-    Task<AgentWork?> IAgentLifecycle.Work(AgentTaskQuery query)
+    Task<AgentWork?> IAgentLifecycle.Work(string requestId)
     {
         var current = State?.Managed;
-        var task = current?.Tasks.FirstOrDefault(item => item.Snapshot.TaskId == query.TaskId);
+        var task = current?.Tasks.FirstOrDefault(item => item.Snapshot.TaskId == requestId);
         return Task.FromResult(current is not null && current.Snapshot.Status != "Stopped" && task?.Snapshot.Status == "Running"
             ? new AgentWork(current.Snapshot with { Tasks = [] }, task.Snapshot, current.HistoryJson) : null);
     }
 
-    public async Task<AgentTaskSnapshot> Send(SendAgentMessage command)
+    public async Task<AgentResponse> Submit(AgentRequest command)
     {
         ArgumentNullException.ThrowIfNull(command);
-        if (command.Id.Value == Guid.Empty) { throw new ArgumentException("Send requires a nonempty command id.", nameof(command)); }
+        if (command.Id.Value == Guid.Empty) { throw new ArgumentException("A request requires a nonempty command id.", nameof(command)); }
         AgentLifecycle.RequireText(command.Message, nameof(command.Message), 8_000);
         var taskId = command.TaskId ?? command.Id.ToString();
         AgentLifecycle.RequireText(taskId, nameof(command.TaskId), 128);
@@ -107,10 +126,10 @@ internal sealed class AgentNeuron(
         return task.Snapshot;
     }
 
-    public async Task<AgentSnapshot> Stop(StopAgent command)
+    public async Task<AgentSnapshot> Cancel(CancelAgent command)
     {
         ArgumentNullException.ThrowIfNull(command);
-        if (command.Id.Value == Guid.Empty) { throw new ArgumentException("Stop requires a nonempty command id.", nameof(command)); }
+        if (command.Id.Value == Guid.Empty) { throw new ArgumentException("Cancellation requires a nonempty command id.", nameof(command)); }
         var current = Managed();
         var requestHash = AgentLifecycle.Fingerprint(new { Method = "stop", command.TaskId });
         CheckReceipt(current, command.Id, requestHash);
@@ -370,7 +389,7 @@ internal sealed class AgentNeuron(
                 ? await TurnContextAsync(delivery).ConfigureAwait(true)
                 : Bodies.Text(delivery.Signal.Body);
 
-            AgentResponse response;
+            Microsoft.Agents.AI.AgentResponse response;
             try
             {
                 response = await agent.RunAsync(input, session, options: null, cancellationToken).ConfigureAwait(true);

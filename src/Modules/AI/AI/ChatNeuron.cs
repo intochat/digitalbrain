@@ -223,7 +223,7 @@ internal sealed class ChatNeuron(
 
         public override string? Name => neuron;
 
-        protected override Task<AgentResponse> RunCoreAsync(
+        protected override Task<Microsoft.Agents.AI.AgentResponse> RunCoreAsync(
             IEnumerable<ChatMessage> messages, AgentSession? session, AgentRunOptions? options, CancellationToken cancellationToken)
             => throw NotRun();
 
