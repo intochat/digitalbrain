@@ -18,7 +18,7 @@ internal sealed class RepositoryNeuron(
     private GitHubRepositoryBinding Binding => bindings.GetFor(Id);
 
     public Task<Accepted<RepositoryView>> Connect(ConnectRepository command) => ExecuteCommandAsync(
-        Descriptor("connect"), command, GitHubJson.Default.ConnectRepository, GitHubJson.Default.AcceptedRepositoryView, arguments =>
+        new("github.repository", "connect"), command, GitHubJson.Default.ConnectRepository, GitHubJson.Default.AcceptedRepositoryView, arguments =>
         {
             ArgumentOutOfRangeException.ThrowIfLessThan(arguments.AppId, 1);
             ArgumentOutOfRangeException.ThrowIfLessThan(arguments.InstallationId, 1);
@@ -30,7 +30,7 @@ internal sealed class RepositoryNeuron(
         });
 
     public Task<Accepted<RepositoryView>> Refresh(RefreshRepository command) => ExecuteCommandAsync(
-        Descriptor("refresh"), command, GitHubJson.Default.RefreshRepository, GitHubJson.Default.AcceptedRepositoryView, arguments =>
+        new("github.repository", "refresh"), command, GitHubJson.Default.RefreshRepository, GitHubJson.Default.AcceptedRepositoryView, arguments =>
         {
             // Fast-fail only; the reaction re-validates revocation.
             if (State?.Revoked == true)

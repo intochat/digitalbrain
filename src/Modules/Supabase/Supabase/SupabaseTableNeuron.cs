@@ -28,7 +28,7 @@ internal sealed class SupabaseTableNeuron(
     private ISupabaseProvider Provider => _provider ??= ServiceProvider.GetRequiredService<ISupabaseProvider>();
 
     public Task<Accepted<string>> CreateFromQuery(CreateQueryTableCommand command, CancellationToken cancellationToken = default)
-        => ExecuteCommandAsync(Descriptor("create-query"), command, SupabaseJson.Default.CreateQueryTableCommand, SupabaseJson.Default.AcceptedString, arguments =>
+        => ExecuteCommandAsync(new("supabase.table", "create-query"), command, SupabaseJson.Default.CreateQueryTableCommand, SupabaseJson.Default.AcceptedString, arguments =>
         {
             if (arguments.Table is null || string.IsNullOrWhiteSpace(arguments.Table.Title) || arguments.Table.Title.Length > MaxTitleLength)
             {
@@ -48,11 +48,11 @@ internal sealed class SupabaseTableNeuron(
         });
 
     public Task<Accepted<string>> Create(CreateTableCommand command, CancellationToken cancellationToken = default)
-        => ExecuteCommandAsync(Descriptor("create"), command, UIJson.Default.CreateTableCommand, UIJson.Default.AcceptedString, arguments =>
+        => ExecuteCommandAsync(new("ui.table", "create"), command, UIJson.Default.CreateTableCommand, UIJson.Default.AcceptedString, arguments =>
             throw new CommandRejectedException(arguments.Id, "use create-query", "A Supabase table has no static rows; create it from a query with create-query."));
 
     public Task<Accepted<string>> Update(UpdateTableCommand command, CancellationToken cancellationToken = default)
-        => ExecuteCommandAsync(Descriptor("update"), command, UIJson.Default.UpdateTableCommand, UIJson.Default.AcceptedString, arguments =>
+        => ExecuteCommandAsync(new("ui.table", "update"), command, UIJson.Default.UpdateTableCommand, UIJson.Default.AcceptedString, arguments =>
             new Accepted<string>(Id.Name, Schedule(Signal.FromJson(SupabaseSignals.QueryTableUpdating, arguments, UIJson.Default.UpdateTableCommand))));
 
     [ReadOnly]

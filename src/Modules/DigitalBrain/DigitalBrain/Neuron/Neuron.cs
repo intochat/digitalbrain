@@ -24,7 +24,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
 
     private readonly NeuronActivationComponents _components;
     private readonly PersistenceFence _fence;
-    private readonly DescriptorTable _descriptors;
     private readonly StreamWake? _streamWake;
 
     private readonly CancellationTokenSource _activation = new();
@@ -37,7 +36,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     {
         ArgumentNullException.ThrowIfNull(runtime);
         _streamWake = ServiceProvider.GetService<StreamWake>();
-        _descriptors = ServiceProvider.GetRequiredService<DescriptorTable>();
         _components = runtime.Bind(ServiceProvider, Id);
         _fence = new PersistenceFence(Id, StateManager, _activation.Token,
             () => CommandReconciliation.Reconcile(_components.Commands, _components.CommandOutcomes, TimeProvider.GetUtcNow()),
@@ -471,8 +469,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     }
 
     // ---- for subclasses ----
-
-    protected CommandDescriptor Descriptor(string methodAlias) => _descriptors.DescriptorFor(this.GetGrainId().Type, methodAlias);
 
     protected async Task<TResult> ExecuteCommandAsync<TArguments, TResult>(
         CommandDescriptor command, TArguments arguments,

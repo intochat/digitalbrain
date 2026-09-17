@@ -1,3 +1,4 @@
+using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Abstractions.Neurons;
 using Orleans.Concurrency;
 
@@ -7,6 +8,7 @@ namespace DigitalBrain.Abstractions.Programming;
 public interface IProgram : INeuron
 {
     [ReadOnly, Alias("read")]
+    [NeuronTool(IsReadOnly = true)]
     Task<ProgramSnapshot> Read();
 }
 
@@ -14,6 +16,7 @@ public interface IProgram : INeuron
 public interface IProgramRun : INeuron
 {
     [ReadOnly, Alias("read")]
+    [NeuronTool(IsReadOnly = true)]
     Task<ProgramRunSnapshot?> Read();
 }
 
@@ -21,5 +24,6 @@ public interface IProgramRun : INeuron
 public interface IProgramCatalog : INeuron
 {
     [ReadOnly, Alias("list")]
+    [NeuronTool(IsReadOnly = true)]
     Task<IReadOnlyList<string>> List();
 }

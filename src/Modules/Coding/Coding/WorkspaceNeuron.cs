@@ -23,7 +23,7 @@ internal sealed class WorkspaceNeuron(
     private const int MaxMappingAttempts = 2400;
 
     public Task<Accepted<WorkspaceReceipt>> Open(OpenWorkspace command) => ExecuteCommandAsync(
-        Descriptor("open"), command, CodingJson.Default.OpenWorkspace, CodingJson.Default.AcceptedWorkspaceReceipt, arguments =>
+        new("workspace", "open"), command, CodingJson.Default.OpenWorkspace, CodingJson.Default.AcceptedWorkspaceReceipt, arguments =>
         {
             if (string.IsNullOrWhiteSpace(arguments.SolutionPath))
             {
@@ -42,7 +42,7 @@ internal sealed class WorkspaceNeuron(
         });
 
     public Task<Accepted<WorkspaceReceipt>> Reload(ReloadWorkspace command) => ExecuteCommandAsync(
-        Descriptor("reload"), command, CodingJson.Default.ReloadWorkspace, CodingJson.Default.AcceptedWorkspaceReceipt, arguments =>
+        new("workspace", "reload"), command, CodingJson.Default.ReloadWorkspace, CodingJson.Default.AcceptedWorkspaceReceipt, arguments =>
         {
             if (State is null && workspace.Status.Phase == WorkspacePhase.NotOpened)
             {

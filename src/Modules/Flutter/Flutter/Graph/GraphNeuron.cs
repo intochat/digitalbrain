@@ -14,7 +14,7 @@ internal sealed class GraphNeuron(
     : Neuron<GraphState>(runtime, state), IGraph
 {
     public Task<Accepted<string>> Render(RenderGraph command, CancellationToken cancellationToken = default)
-        => ExecuteCommandAsync(Descriptor("render"), command, UIJson.Default.RenderGraph, UIJson.Default.AcceptedString, arguments =>
+        => ExecuteCommandAsync(new("ui.graph", "render"), command, UIJson.Default.RenderGraph, UIJson.Default.AcceptedString, arguments =>
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.Title);
             ArgumentNullException.ThrowIfNull(arguments.Nodes);

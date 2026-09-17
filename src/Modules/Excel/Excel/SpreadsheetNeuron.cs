@@ -13,7 +13,7 @@ internal sealed class SpreadsheetNeuron(
     : Neuron<SheetState>(runtime, state), ISpreadsheet
 {
     public Task<Accepted<SheetVersion>> Apply(ApplySheetEdit command) => ExecuteCommandAsync(
-        Descriptor("apply"), command, ExcelJson.Default.ApplySheetEdit, ExcelJson.Default.AcceptedSheetVersion, arguments =>
+        new("sheet", "apply"), command, ExcelJson.Default.ApplySheetEdit, ExcelJson.Default.AcceptedSheetVersion, arguments =>
         {
             if (arguments.Replace is null && arguments.Cell is null)
             {

@@ -14,14 +14,14 @@ internal sealed class TableNeuron(NeuronRuntime runtime,
     : Neuron<TableState>(runtime, state), ITable
 {
     public Task<Accepted<string>> Create(CreateTableCommand command, CancellationToken cancellationToken = default)
-        => ExecuteCommandAsync(Descriptor("create"), command, UIJson.Default.CreateTableCommand, UIJson.Default.AcceptedString, arguments =>
+        => ExecuteCommandAsync(new("ui.table", "create"), command, UIJson.Default.CreateTableCommand, UIJson.Default.AcceptedString, arguments =>
         {
             _ = TablePolicy.Create(Id.Name, arguments.Table);
             return new Accepted<string>(Id.Name, Schedule(Signal.FromJson(UIVocabulary.TableCreating, arguments, UIJson.Default.CreateTableCommand)));
         });
 
     public Task<Accepted<string>> Update(UpdateTableCommand command, CancellationToken cancellationToken = default)
-        => ExecuteCommandAsync(Descriptor("update"), command, UIJson.Default.UpdateTableCommand, UIJson.Default.AcceptedString, arguments =>
+        => ExecuteCommandAsync(new("ui.table", "update"), command, UIJson.Default.UpdateTableCommand, UIJson.Default.AcceptedString, arguments =>
             new Accepted<string>(Id.Name, Schedule(Signal.FromJson(UIVocabulary.TableUpdating, arguments, UIJson.Default.UpdateTableCommand))));
 
     [ReadOnly]

@@ -12,7 +12,7 @@ internal sealed class GitHubConnectionsNeuron(NeuronRuntime runtime,
     : Neuron<GitHubConnectionsState>(runtime, state), IGitHubConnections
 {
     public Task<Accepted<GitHubConnectionRecord>> Register(RegisterGitHubConnection command) => ExecuteCommandAsync(
-        Descriptor("register"), command, GitHubJson.Default.RegisterGitHubConnection, GitHubJson.Default.AcceptedGitHubConnectionRecord, arguments =>
+        new("github.connections", "register"), command, GitHubJson.Default.RegisterGitHubConnection, GitHubJson.Default.AcceptedGitHubConnectionRecord, arguments =>
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.ConnectionId);
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.RepositoryOwner);

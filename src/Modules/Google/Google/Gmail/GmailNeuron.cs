@@ -18,7 +18,7 @@ internal sealed class GmailNeuron(
     : Neuron<GmailState>(runtime, state), IGmail
 {
     public Task<Accepted<SignalId>> Connect(ConnectGmailAccount command) => ExecuteCommandAsync(
-        Descriptor("connect"), command, GmailJson.Default.ConnectGmailAccount, GmailJson.Default.AcceptedSignalId, arguments =>
+        new("gmail", "connect"), command, GmailJson.Default.ConnectGmailAccount, GmailJson.Default.AcceptedSignalId, arguments =>
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.Subject);
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.Email);
@@ -38,7 +38,7 @@ internal sealed class GmailNeuron(
         });
 
     public Task<Accepted<GmailConnection>> Refresh(RefreshGmailConnection command) => ExecuteCommandAsync(
-        Descriptor("refresh"), command, GmailJson.Default.RefreshGmailConnection, GmailJson.Default.AcceptedGmailConnection, arguments =>
+        new("gmail", "refresh"), command, GmailJson.Default.RefreshGmailConnection, GmailJson.Default.AcceptedGmailConnection, arguments =>
         {
             if (RequireConnection().RefreshToken is null)
             {
@@ -49,14 +49,14 @@ internal sealed class GmailNeuron(
         });
 
     public Task<Accepted<GmailConnection>> Disconnect(DisconnectGmail command) => ExecuteCommandAsync(
-        Descriptor("disconnect"), command, GmailJson.Default.DisconnectGmail, GmailJson.Default.AcceptedGmailConnection, arguments =>
+        new("gmail", "disconnect"), command, GmailJson.Default.DisconnectGmail, GmailJson.Default.AcceptedGmailConnection, arguments =>
         {
             var work = Schedule(Signal.FromJson(GmailSignals.GmailDisconnectionRequested, arguments, GmailJson.Default.DisconnectGmail));
             return new Accepted<GmailConnection>(new(false, null, false, null), work);
         });
 
     public Task<Accepted<GmailDraftPreview>> PrepareDraft(PrepareGmailDraft command) => ExecuteCommandAsync(
-        Descriptor("prepare-draft"), command, GmailJson.Default.PrepareGmailDraft, GmailJson.Default.AcceptedGmailDraftPreview, arguments =>
+        new("gmail", "prepare-draft"), command, GmailJson.Default.PrepareGmailDraft, GmailJson.Default.AcceptedGmailDraftPreview, arguments =>
         {
             var connection = RequireConnection(compose: true);
             GmailContent.ValidateArguments("create_draft", DraftArguments(arguments.To, arguments.Cc, arguments.Bcc, arguments.Subject, arguments.Body));
@@ -68,7 +68,7 @@ internal sealed class GmailNeuron(
         });
 
     public Task<Accepted<GmailDraftPreview>> ConfirmDraft(ConfirmGmailDraft command) => ExecuteCommandAsync(
-        Descriptor("confirm-draft"), command, GmailJson.Default.ConfirmGmailDraft, GmailJson.Default.AcceptedGmailDraftPreview, arguments =>
+        new("gmail", "confirm-draft"), command, GmailJson.Default.ConfirmGmailDraft, GmailJson.Default.AcceptedGmailDraftPreview, arguments =>
         {
             var preview = RequireConnection(compose: true).PendingDraft;
             if (preview is null || preview.PreviewId != arguments.PreviewId || preview.ExpiresAt <= TimeProvider.GetUtcNow()

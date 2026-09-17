@@ -14,7 +14,7 @@ internal sealed class ImageNeuron(
     : Neuron<ImageState>(runtime, state), IImage
 {
     public Task<Accepted<string>> Describe(DescribeImage command, CancellationToken cancellationToken = default)
-        => ExecuteCommandAsync(Descriptor("describe"), command, UIJson.Default.DescribeImage, UIJson.Default.AcceptedString, arguments =>
+        => ExecuteCommandAsync(new("ui.image", "describe"), command, UIJson.Default.DescribeImage, UIJson.Default.AcceptedString, arguments =>
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.Prompt);
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.Model);

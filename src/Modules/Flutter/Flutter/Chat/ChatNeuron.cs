@@ -24,7 +24,7 @@ internal sealed class ChatNeuron(
     private NeuronId Responder => State?.Agent ?? new NeuronId(AIVocabulary.AgentType, Id.Name);
 
     public Task<Accepted<SignalId>> Send(SendMessage message, CancellationToken cancellationToken = default)
-        => ExecuteCommandAsync(Descriptor("send"), message, UIJson.Default.SendMessage, UIJson.Default.AcceptedSignalId, arguments =>
+        => ExecuteCommandAsync(new("ui.chat", "send"), message, UIJson.Default.SendMessage, UIJson.Default.AcceptedSignalId, arguments =>
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.Text);
             RequirePayloadSize(arguments.Text);
@@ -43,7 +43,7 @@ internal sealed class ChatNeuron(
         });
 
     public Task<Accepted<SignalId>> Cancel(CancelTurn command, CancellationToken cancellationToken = default)
-        => ExecuteCommandAsync(Descriptor("cancel"), command, UIJson.Default.CancelTurn, UIJson.Default.AcceptedSignalId, arguments =>
+        => ExecuteCommandAsync(new("ui.chat", "cancel"), command, UIJson.Default.CancelTurn, UIJson.Default.AcceptedSignalId, arguments =>
         {
             _ = Find(arguments.Turn)
                 ?? throw new ArgumentException("The turn does not exist. Read the chat turns and cancel a running turn by its turn id.", nameof(command));

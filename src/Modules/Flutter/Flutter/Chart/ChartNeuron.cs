@@ -14,7 +14,7 @@ internal sealed class ChartNeuron(
     : Neuron<ChartState>(runtime, state), IChart
 {
     public Task<Accepted<string>> Render(RenderChart command, CancellationToken cancellationToken = default)
-        => ExecuteCommandAsync(Descriptor("render"), command, UIJson.Default.RenderChart, UIJson.Default.AcceptedString, arguments =>
+        => ExecuteCommandAsync(new("ui.chart", "render"), command, UIJson.Default.RenderChart, UIJson.Default.AcceptedString, arguments =>
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.Title);
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.ChartKind);
@@ -24,7 +24,7 @@ internal sealed class ChartNeuron(
         });
 
     public Task<Accepted<string>> Append(AppendChartPoint command, CancellationToken cancellationToken = default)
-        => ExecuteCommandAsync(Descriptor("append"), command, UIJson.Default.AppendChartPoint, UIJson.Default.AcceptedString, arguments =>
+        => ExecuteCommandAsync(new("ui.chart", "append"), command, UIJson.Default.AppendChartPoint, UIJson.Default.AcceptedString, arguments =>
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.Title);
             ArgumentNullException.ThrowIfNull(arguments.Point);

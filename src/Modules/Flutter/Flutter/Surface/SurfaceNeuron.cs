@@ -17,7 +17,7 @@ internal sealed class SurfaceNeuron(
     : Neuron<SurfaceState>(runtime, state), ISurface
 {
     public Task<Accepted<SurfaceOpenReceipt>> Open(OpenSurface command, CancellationToken cancellationToken = default)
-        => ExecuteCommandAsync(Descriptor("open"), command, UIJson.Default.OpenSurface, UIJson.Default.AcceptedSurfaceOpenReceipt, arguments =>
+        => ExecuteCommandAsync(new("ui.surface", "open"), command, UIJson.Default.OpenSurface, UIJson.Default.AcceptedSurfaceOpenReceipt, arguments =>
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.SurfaceKey);
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.Title);
@@ -29,7 +29,7 @@ internal sealed class SurfaceNeuron(
         });
 
     public Task<Accepted<ControlActivation>> Activate(ActivateControl command, CancellationToken cancellationToken = default)
-        => ExecuteCommandAsync(Descriptor("activate"), command, UIJson.Default.ActivateControl, UIJson.Default.AcceptedControlActivation, arguments =>
+        => ExecuteCommandAsync(new("ui.surface", "activate"), command, UIJson.Default.ActivateControl, UIJson.Default.AcceptedControlActivation, arguments =>
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.SurfaceKey);
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.ControlId);

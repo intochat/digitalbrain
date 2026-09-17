@@ -28,7 +28,7 @@ internal sealed class ClickHouseTableNeuron(
     private IClickHouseProvider Provider => _provider ??= ServiceProvider.GetRequiredService<IClickHouseProvider>();
 
     public Task<Accepted<string>> CreateFromQuery(CreateQueryTableCommand command, CancellationToken cancellationToken = default)
-        => ExecuteCommandAsync(Descriptor("create-query"), command, ClickHouseJson.Default.CreateQueryTableCommand, ClickHouseJson.Default.AcceptedString, arguments =>
+        => ExecuteCommandAsync(new("clickhouse.table", "create-query"), command, ClickHouseJson.Default.CreateQueryTableCommand, ClickHouseJson.Default.AcceptedString, arguments =>
         {
             if (arguments.Table is null || string.IsNullOrWhiteSpace(arguments.Table.Title) || arguments.Table.Title.Length > MaxTitleLength)
             {
@@ -48,11 +48,11 @@ internal sealed class ClickHouseTableNeuron(
         });
 
     public Task<Accepted<string>> Create(CreateTableCommand command, CancellationToken cancellationToken = default)
-        => ExecuteCommandAsync(Descriptor("create"), command, UIJson.Default.CreateTableCommand, UIJson.Default.AcceptedString, arguments =>
+        => ExecuteCommandAsync(new("ui.table", "create"), command, UIJson.Default.CreateTableCommand, UIJson.Default.AcceptedString, arguments =>
             throw new CommandRejectedException(arguments.Id, "use create-query", "A ClickHouse table has no static rows; create it from a query with create-query."));
 
     public Task<Accepted<string>> Update(UpdateTableCommand command, CancellationToken cancellationToken = default)
-        => ExecuteCommandAsync(Descriptor("update"), command, UIJson.Default.UpdateTableCommand, UIJson.Default.AcceptedString, arguments =>
+        => ExecuteCommandAsync(new("ui.table", "update"), command, UIJson.Default.UpdateTableCommand, UIJson.Default.AcceptedString, arguments =>
             new Accepted<string>(Id.Name, Schedule(Signal.FromJson(ClickHouseSignals.QueryTableUpdating, arguments, UIJson.Default.UpdateTableCommand))));
 
     [ReadOnly]

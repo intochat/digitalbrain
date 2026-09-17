@@ -19,7 +19,7 @@ internal sealed class SalesforceNeuron(
     : Neuron<SalesforceState>(runtime, state), ISalesforce
 {
     public Task<Accepted<SignalId>> Connect(ConnectSalesforceAccount command) => ExecuteCommandAsync(
-        Descriptor("connect"), command, SalesforceJson.Default.ConnectSalesforceAccount, SalesforceJson.Default.AcceptedSignalId, arguments =>
+        new("salesforce", "connect"), command, SalesforceJson.Default.ConnectSalesforceAccount, SalesforceJson.Default.AcceptedSignalId, arguments =>
         {
             if (!Uri.TryCreate(arguments.InstanceUrl, UriKind.Absolute, out var instanceUrl) || instanceUrl.Scheme != Uri.UriSchemeHttps)
             {
@@ -31,7 +31,7 @@ internal sealed class SalesforceNeuron(
         });
 
     public Task<Accepted<SalesforceConnection>> Refresh(RefreshSalesforceConnection command) => ExecuteCommandAsync(
-        Descriptor("refresh"), command, SalesforceJson.Default.RefreshSalesforceConnection, SalesforceJson.Default.AcceptedSalesforceConnection, arguments =>
+        new("salesforce", "refresh"), command, SalesforceJson.Default.RefreshSalesforceConnection, SalesforceJson.Default.AcceptedSalesforceConnection, arguments =>
         {
             if (RequireConnection().RefreshToken is null)
             {
@@ -42,14 +42,14 @@ internal sealed class SalesforceNeuron(
         });
 
     public Task<Accepted<SalesforceConnection>> Disconnect(DisconnectSalesforce command) => ExecuteCommandAsync(
-        Descriptor("disconnect"), command, SalesforceJson.Default.DisconnectSalesforce, SalesforceJson.Default.AcceptedSalesforceConnection, arguments =>
+        new("salesforce", "disconnect"), command, SalesforceJson.Default.DisconnectSalesforce, SalesforceJson.Default.AcceptedSalesforceConnection, arguments =>
         {
             var work = Schedule(Signal.FromJson(SalesforceSignals.SalesforceDisconnectionRequested, arguments, SalesforceJson.Default.DisconnectSalesforce));
             return new Accepted<SalesforceConnection>(new(false, null, null), work);
         });
 
     public Task<Accepted<SalesforceWritePreview>> PrepareWrite(PrepareSalesforceWrite command) => ExecuteCommandAsync(
-        Descriptor("prepare-write"), command, SalesforceJson.Default.PrepareSalesforceWrite, SalesforceJson.Default.AcceptedSalesforceWritePreview, arguments =>
+        new("salesforce", "prepare-write"), command, SalesforceJson.Default.PrepareSalesforceWrite, SalesforceJson.Default.AcceptedSalesforceWritePreview, arguments =>
         {
             var connection = RequireConnection();
             if (arguments.Tool is not ("createRecord" or "updateRecord"))
@@ -80,7 +80,7 @@ internal sealed class SalesforceNeuron(
         });
 
     public Task<Accepted<SalesforceWritePreview>> ConfirmWrite(ConfirmSalesforceWrite command) => ExecuteCommandAsync(
-        Descriptor("confirm-write"), command, SalesforceJson.Default.ConfirmSalesforceWrite, SalesforceJson.Default.AcceptedSalesforceWritePreview, arguments =>
+        new("salesforce", "confirm-write"), command, SalesforceJson.Default.ConfirmSalesforceWrite, SalesforceJson.Default.AcceptedSalesforceWritePreview, arguments =>
         {
             var preview = RequireConnection().PendingWrite;
             if (preview is null || preview.PreviewId != arguments.PreviewId || preview.ExpiresAt <= TimeProvider.GetUtcNow()

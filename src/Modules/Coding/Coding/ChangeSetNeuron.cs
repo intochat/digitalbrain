@@ -20,7 +20,7 @@ internal sealed class ChangeSetNeuron(
     private ChangeSetState Current => State ?? ChangeSetState.Empty;
 
     public Task<Accepted<ChangeSetReceipt>> Propose(ProposeEdit command) => ExecuteCommandAsync(
-        Descriptor("propose"), command, CodingJson.Default.ProposeEdit, CodingJson.Default.AcceptedChangeSetReceipt, arguments =>
+        new("changeset", "propose"), command, CodingJson.Default.ProposeEdit, CodingJson.Default.AcceptedChangeSetReceipt, arguments =>
         {
             RejectWhenClosed(arguments.Id);
             if (arguments.Edit is null)
@@ -39,7 +39,7 @@ internal sealed class ChangeSetNeuron(
         });
 
     public Task<Accepted<ChangeSetReceipt>> Check(CheckChangeSet command) => ExecuteCommandAsync(
-        Descriptor("check"), command, CodingJson.Default.CheckChangeSet, CodingJson.Default.AcceptedChangeSetReceipt, arguments =>
+        new("changeset", "check"), command, CodingJson.Default.CheckChangeSet, CodingJson.Default.AcceptedChangeSetReceipt, arguments =>
         {
             RejectWhenClosed(arguments.Id);
             RejectWhenEmpty(arguments.Id);
@@ -48,7 +48,7 @@ internal sealed class ChangeSetNeuron(
         });
 
     public Task<Accepted<ChangeSetReceipt>> Commit(CommitChangeSet command) => ExecuteCommandAsync(
-        Descriptor("commit"), command, CodingJson.Default.CommitChangeSet, CodingJson.Default.AcceptedChangeSetReceipt, arguments =>
+        new("changeset", "commit"), command, CodingJson.Default.CommitChangeSet, CodingJson.Default.AcceptedChangeSetReceipt, arguments =>
         {
             RejectWhenClosed(arguments.Id);
             RejectWhenEmpty(arguments.Id);
@@ -62,7 +62,7 @@ internal sealed class ChangeSetNeuron(
         });
 
     public Task<Accepted<ChangeSetReceipt>> Discard(DiscardChangeSet command) => ExecuteCommandAsync(
-        Descriptor("discard"), command, CodingJson.Default.DiscardChangeSet, CodingJson.Default.AcceptedChangeSetReceipt, arguments =>
+        new("changeset", "discard"), command, CodingJson.Default.DiscardChangeSet, CodingJson.Default.AcceptedChangeSetReceipt, arguments =>
         {
             RejectWhenClosed(arguments.Id);
             var work = Schedule(Signal.Create(CodingVocabulary.ChangeSetDiscarding, "{}"));

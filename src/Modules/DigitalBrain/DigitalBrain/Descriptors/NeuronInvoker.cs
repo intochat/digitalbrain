@@ -5,31 +5,28 @@ using DigitalBrain.Abstractions.Neurons;
 
 namespace DigitalBrain.Core;
 
-internal sealed class NeuronInvoker(IGrainFactory grains, DescriptorTable table) : INeuronInvoker
+internal sealed class NeuronInvoker(IGrainFactory grains, Func<NeuronToolCatalog> createCatalog) : INeuronInvoker
 {
-    public IReadOnlyList<MethodDescriptor> Describe(NeuronId neuron) => table.For(neuron.ToGrainId().Type);
+    private readonly Lazy<NeuronToolCatalog> _catalog = new(createCatalog);
+    private NeuronToolCatalog Catalog => _catalog.Value;
 
-    public MethodDescriptor Describe(string interfaceAlias, string methodAlias) => table.Get(interfaceAlias, methodAlias);
+    public IReadOnlyList<MethodDescriptor> Describe(NeuronId neuron) => Catalog.For(neuron.ToGrainId().Type);
+
+    public MethodDescriptor Describe(string interfaceAlias, string methodAlias) => Catalog.Method(interfaceAlias, methodAlias).Descriptor;
 
     public ArgumentContract? ArgumentContractOf(string interfaceAlias, string methodAlias)
-        => table.ArgumentContractOf(interfaceAlias, methodAlias);
+        => Catalog.ArgumentContractOf(interfaceAlias, methodAlias);
 
     public async Task<JsonElement?> InvokeAsync(NeuronId neuron, string interfaceAlias, string methodAlias,
         JsonElement arguments, CancellationToken cancellationToken = default)
     {
         var grainId = neuron.ToGrainId();
-        var aliases = table.InterfaceAliasesOf(grainId.Type);
-        if (!aliases.Contains(interfaceAlias, StringComparer.Ordinal))
+        if (!Catalog.For(grainId.Type).Any(method => method.InterfaceAlias == interfaceAlias && method.MethodAlias == methodAlias))
         {
-            if (aliases.Count == 0)
-            {
-                throw new ArgumentException($"Neuron '{neuron}' implements no callable interfaces. The kernel operations are the fire/connect/disconnect/read/cancel tools.", nameof(interfaceAlias));
-            }
-
-            throw new ArgumentException($"Neuron '{neuron}' does not implement interface '{interfaceAlias}'. Use one of: {string.Join(", ", aliases)}.", nameof(interfaceAlias));
+            throw new ArgumentException($"Neuron '{neuron}' does not expose tool '{interfaceAlias}/{methodAlias}'. Use describe to list its tools.", nameof(methodAlias));
         }
 
-        var method = table.Method(interfaceAlias, methodAlias);
+        var method = Catalog.Method(interfaceAlias, methodAlias);
         var proxy = grains.GetGrain(grainId, method.InterfaceType);
         var argument = method.ArgumentsJson is null ? null : JsonSerializer.Deserialize(arguments, method.ArgumentsJson)
             ?? throw new ArgumentException($"Arguments for interface '{interfaceAlias}', method '{methodAlias}' must match the method's schema.", nameof(arguments));

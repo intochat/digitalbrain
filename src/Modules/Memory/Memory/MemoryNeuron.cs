@@ -22,7 +22,7 @@ internal sealed class MemoryNeuron(
     private Lazy<IVectorMemoryStore?>? _store;
 
     public Task<Accepted<MemoryKey>> Remember(Remember command) => ExecuteCommandAsync(
-        Descriptor("remember"), command, MemoryJson.Default.Remember, MemoryJson.Default.AcceptedMemoryKey, arguments =>
+        new("memory", "remember"), command, MemoryJson.Default.Remember, MemoryJson.Default.AcceptedMemoryKey, arguments =>
         {
             var key = RequireWritableKey(arguments.Id, arguments.Namespace, arguments.Key);
 
@@ -37,7 +37,7 @@ internal sealed class MemoryNeuron(
         });
 
     public Task<Accepted<MemoryKey>> Forget(Forget command) => ExecuteCommandAsync(
-        Descriptor("forget"), command, MemoryJson.Default.Forget, MemoryJson.Default.AcceptedMemoryKey, arguments =>
+        new("memory", "forget"), command, MemoryJson.Default.Forget, MemoryJson.Default.AcceptedMemoryKey, arguments =>
         {
             var key = RequireWritableKey(arguments.Id, arguments.Namespace, arguments.Key);
             var work = Schedule(Signal.FromJson(MemorySignals.MemoryForgetting, key, MemoryJson.Default.MemoryKey));

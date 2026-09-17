@@ -23,9 +23,6 @@ public static class DigitalBrainRuntime
                 throw new InvalidOperationException(
                     "Neurons hold a retry reminder for pending work. Configure a reminder service, such as UseAzureTableReminderService.");
             }
-
-            // Building the table here turns a grain class descriptor violation into a silo-start failure.
-            services.GetRequiredService<DescriptorTable>();
             return Task.CompletedTask;
         });
 
@@ -45,8 +42,9 @@ public static class DigitalBrainRuntime
         builder.Services.TryAddSingleton(services => services.GetRequiredService<IOptions<NeuronOptions>>().Value);
         builder.Services.TryAddSingleton<NeuronRuntime>();
         builder.Services.TryAddSingleton<StreamWake>();
-        builder.Services.TryAddSingleton<DescriptorTable>();
-        builder.Services.TryAddSingleton<INeuronInvoker, NeuronInvoker>();
+        builder.Services.TryAddSingleton<NeuronToolCatalog>();
+        builder.Services.TryAddSingleton<INeuronInvoker>(services => new NeuronInvoker(
+            services.GetRequiredService<IGrainFactory>(), () => services.GetRequiredService<NeuronToolCatalog>()));
         builder.Services.TryAddSingleton<Programming.ProgramService>();
 
         foreach (var hook in ModuleHooksOf(modules))

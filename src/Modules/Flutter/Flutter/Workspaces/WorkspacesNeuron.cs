@@ -16,7 +16,7 @@ internal sealed class WorkspacesNeuron(
     : Neuron<WorkspaceIndexState>(runtime, state), IWorkspaces
 {
     public Task<Accepted<WorkspaceRecord>> Ensure(EnsureWorkspace command, CancellationToken cancellationToken = default)
-        => ExecuteCommandAsync(Descriptor("ensure"), command, UIJson.Default.EnsureWorkspace, UIJson.Default.AcceptedWorkspaceRecord, arguments =>
+        => ExecuteCommandAsync(new("ui.workspaces", "ensure"), command, UIJson.Default.EnsureWorkspace, UIJson.Default.AcceptedWorkspaceRecord, arguments =>
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.Name);
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.Title);

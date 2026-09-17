@@ -15,7 +15,7 @@ internal sealed class TimerNeuron(
     private const int RecoveredAfterMinutes = 1;
 
     public Task<Accepted<TimerGeneration>> Schedule(ScheduleTimer command) => ExecuteCommandAsync(
-        Descriptor("schedule"), command, TimeJson.Default.ScheduleTimer, TimeJson.Default.AcceptedTimerGeneration, arguments =>
+        new("timer", "schedule"), command, TimeJson.Default.ScheduleTimer, TimeJson.Default.AcceptedTimerGeneration, arguments =>
         {
             if (arguments.DurationSeconds <= 0)
             {
@@ -40,7 +40,7 @@ internal sealed class TimerNeuron(
         });
 
     public Task<Accepted<TimerGeneration>> Stop(StopTimer command) => ExecuteCommandAsync(
-        Descriptor("stop"), command, TimeJson.Default.StopTimer, TimeJson.Default.AcceptedTimerGeneration, arguments =>
+        new("timer", "stop"), command, TimeJson.Default.StopTimer, TimeJson.Default.AcceptedTimerGeneration, arguments =>
         {
             var generation = State?.Generation ?? 0;
             var work = Schedule(Signal.Create(TimeSignals.TimerStopping, "{}"));
