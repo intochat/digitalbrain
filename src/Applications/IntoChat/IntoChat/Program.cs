@@ -17,10 +17,12 @@ builder.Services.AddIntoChatOptions();
 builder.AddServiceDefaults();
 builder.AddDigitalBrain();
 builder.AddConversationalAgent();
+builder.AddProgramming();
 builder.AddKernelCors();
 builder.Services.AddAuthentication();
 builder.Services.AddDigitalBrainMcp()
-    .WithHttpTransport(options => options.SessionMode = HttpServerSessionMode.Stateless);
+    .WithHttpTransport(options => options.SessionMode = HttpServerSessionMode.Stateless)
+    .WithTools<ProgramTools>();
 
 var app = builder.Build();
 
@@ -33,11 +35,12 @@ app.UseBasicAuthGate();
 app.MapDefaultEndpoints();
 app.MapOrleansDashboard("/orleans");
 app.MapConversationalAgent();
+app.MapProgramming();
 app.MapWorkspaceEndpoints();
 app.MapUiEndpoints();
 app.MapBrainObservationEndpoints();
 
-// Graph HTTP capabilities are optional; conversation handling stays direct.
+// Every conversation is an execution of the editable IntoChat neuron program.
 // Table tools use UI neurons independently of these graph routes.
 if (app.Services.GetRequiredService<IOptions<GraphOptions>>().Value.Enabled)
 {

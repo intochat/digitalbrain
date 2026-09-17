@@ -107,6 +107,25 @@ final class DigitalBrainUiClient {
           as Map)['connected'] ==
       true;
 
+  Future<Object?> programmingRequest(
+    String method,
+    String path, {
+    Map<String, Object?>? body,
+  }) async {
+    try {
+      return await _tableRequest(
+        method,
+        path.isEmpty ? '/programs/' : '/programs$path',
+        body: body,
+        timeout: const Duration(seconds: 135),
+      );
+    } on TableRequestException catch (error) {
+      throw StateError(
+        'Program request failed (${error.statusCode}): ${error.message}',
+      );
+    }
+  }
+
   Future<List<Map<String, dynamic>>> listWorkspaceArtifacts() async =>
       (await _tableRequest('GET', '/workspace/artifacts') as List)
           .map((item) => Map<String, dynamic>.from(item as Map))
@@ -207,6 +226,7 @@ final class DigitalBrainUiClient {
     String method,
     String path, {
     Map<String, Object?>? body,
+    Duration timeout = const Duration(seconds: 40),
   }) async {
     final abort = Completer<void>();
     final request = http.AbortableRequest(
@@ -222,10 +242,10 @@ final class DigitalBrainUiClient {
         .send(request)
         .then(http.Response.fromStream)
         .timeout(
-          const Duration(seconds: 40),
+          timeout,
           onTimeout: () {
             abort.complete();
-            throw TimeoutException('Table request timed out.');
+            throw TimeoutException('$method $path timed out.');
           },
         );
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -241,7 +261,7 @@ final class DigitalBrainUiClient {
       }
       throw TableRequestException(response.statusCode, message);
     }
-    return jsonDecode(response.body);
+    return response.body.isEmpty ? null : jsonDecode(response.body);
   }
 
   /// Sends only the new user message; the server owns conversation history.

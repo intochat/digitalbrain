@@ -514,13 +514,13 @@ class _BrainEditor extends StatelessWidget {
               Text(
                 artifact.data['live'] == true
                     ? 'Live brain'
-                    : 'Scenario draft · not running',
+                    : 'Brain diagram · visual draft',
               ),
               const Spacer(),
               if (artifact.data['live'] != true)
                 TextButton.icon(
                   icon: const Icon(Icons.data_object, size: 18),
-                  label: const Text('Edit source'),
+                  label: const Text('Edit diagram source'),
                   onPressed: () => _editSource(context),
                 ),
             ],
@@ -571,14 +571,14 @@ class _BrainEditor extends StatelessWidget {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('Edit scenario neurons and synapses'),
+          title: const Text('Edit brain diagram'),
           content: SizedBox(
             width: 660,
             height: 420,
             child: Column(
               children: [
                 const Text(
-                  'This changes the saved draft. It does not activate a live automation.',
+                  'This edits a saved visual diagram. Create a Living program to run behavior.',
                 ),
                 const SizedBox(height: 8),
                 Expanded(

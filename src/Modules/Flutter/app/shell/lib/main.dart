@@ -44,6 +44,7 @@ Widget buildShell({
     persistenceKey: 'intocaht.workspace.v1.$scope',
     store: workspaceStore,
     kernelBaseUri: edge?.baseUri,
+    programmingClient: edge,
     onRun: edge?.runAgent,
     onSalesforceConnected: edge?.salesforceConnected,
     onCreateArtifact: edge?.createWorkspaceArtifact,

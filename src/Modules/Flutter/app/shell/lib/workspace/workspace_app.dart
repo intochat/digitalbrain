@@ -16,6 +16,7 @@ import 'workspace_settings.dart';
 import 'workspace_routes.dart';
 import 'workspace_brain_observation.dart';
 import 'workspace_chat.dart';
+import 'workspace_programs.dart';
 import 'artifact_editors.dart';
 
 class WorkspaceApp extends StatefulWidget {
@@ -39,6 +40,7 @@ class WorkspaceApp extends StatefulWidget {
     this.onCreateTable,
     this.onReadBrain,
     this.onWatchBrain,
+    this.programmingClient,
   });
   final WorkspaceStore? store;
   final String persistenceKey;
@@ -52,6 +54,7 @@ class WorkspaceApp extends StatefulWidget {
   final ListTables? onListTables;
   final ReadBrain? onReadBrain;
   final WatchBrain? onWatchBrain;
+  final DigitalBrainUiClient? programmingClient;
   final Future<String> Function(Uint8List, String)? onTranscribe;
   final Future<Map<String, dynamic>> Function({
     required String kind,
@@ -176,6 +179,26 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     if (!_ready || !mounted) return;
     final segments = uri.pathSegments;
     _navigator.currentState?.popUntil((route) => route.isFirst);
+    if (segments.firstOrNull == 'programs' &&
+        widget.programmingClient != null) {
+      void showPrograms() {
+        if (!mounted) return;
+        _navigator.currentState?.push(
+          MaterialPageRoute<void>(
+            settings: const RouteSettings(name: '/programs'),
+            builder: (_) =>
+                WorkspacePrograms(client: widget.programmingClient!),
+          ),
+        );
+      }
+
+      if (_navigator.currentState != null) {
+        showPrograms();
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) => showPrograms());
+      }
+      return;
+    }
     if (segments.firstOrNull == 'settings') {
       void showSettings() {
         if (!mounted) return;
@@ -574,18 +597,22 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
 
   Widget _newWorkMenu(BuildContext context) => PopupMenuButton<String>(
     tooltip: 'New work',
-    onSelected: (kind) => _newWork(context, kind),
+    onSelected: (kind) =>
+        kind == 'program' ? _openPrograms(context) : _newWork(context, kind),
     itemBuilder: (_) => [
       for (final entry in const {
         'diagram': 'Drawing',
-        'brain': 'Brain scenario',
+        'brain': 'Brain diagram (visual draft)',
         'image': 'Import image',
         'table': 'Import table (CSV, TSV, XLSX)',
         'liveBrain': 'Live brain',
+        'program': 'Living program',
       }.entries)
         PopupMenuItem(
           value: entry.key,
-          enabled: entry.key == 'table'
+          enabled: entry.key == 'program'
+              ? widget.programmingClient != null
+              : entry.key == 'table'
               ? widget.onCreateTable != null
               : entry.key == 'liveBrain'
               ? widget.onReadBrain != null
@@ -595,6 +622,18 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     ],
     icon: const Icon(Icons.add, size: 20),
   );
+
+  void _openPrograms(BuildContext context, [Map<String, dynamic>? program]) {
+    final client = widget.programmingClient;
+    if (client == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: '/programs'),
+        builder: (_) =>
+            WorkspacePrograms(client: client, initialProgram: program),
+      ),
+    );
+  }
 
   void _attach(BuildContext context) {
     showDialog<void>(
@@ -1051,6 +1090,9 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                         onArtifact: (result) =>
                             _accept(result, project: project),
                         onAttach: () => _attach(context),
+                        onProgram: widget.programmingClient == null
+                            ? null
+                            : (program) => _openPrograms(context, program),
                         onTranscribe: widget.onTranscribe,
                       ),
                 ],
@@ -1214,6 +1256,12 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
             ],
           ),
           actions: [
+            if (widget.programmingClient != null)
+              IconButton(
+                tooltip: 'Living programs',
+                onPressed: _ready ? () => _openPrograms(context) : null,
+                icon: const Icon(Icons.hub_outlined),
+              ),
             if (_ready && !_directory)
               IconButton(
                 tooltip: 'Search project work',

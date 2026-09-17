@@ -23,7 +23,4 @@
     <ProjectReference Include="../../../Modules/Microsoft/Microsoft/DigitalBrain.Modules.Microsoft.csproj" />
     <ProjectReference Include="../../../Modules/Flutter/Flutter/DigitalBrain.Modules.Flutter.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Agents.AI.Hosting.AGUI.AspNetCore" />
-  </ItemGroup>
 </Project>

@@ -1,41 +1,18 @@
-using DigitalBrain.AI;
-using DigitalBrain.Flutter;
-using Microsoft.Agents.AI.Hosting.AGUI.AspNetCore;
-using Microsoft.Agents.AI.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace IntoChat;
 
 internal static class ConversationalAgentEndpoints
 {
-    private const string AgentName = "IntoChat";
-
     public static void AddConversationalAgent(this IHostApplicationBuilder builder)
     {
-        builder.Services.AddAGUIServer();
         builder.Services.AddSingleton(services => new WorkspaceArtifactStore(
             services.GetRequiredService<IOptions<WorkspaceStorageOptions>>(),
             services.GetRequiredService<IHostEnvironment>()));
-        builder.AddAIAgent(AgentName, static (services, name) => ConversationalAgent.Create(services, name,
-            [.. services.GetService<TableService>() is { } tables ? new TableAgentTools(tables).Create() : [],
-             .. new WorkspaceAgentTools(services.GetRequiredService<WorkspaceArtifactStore>()).Create()]))
-            // The existing BasicAuthGate protects a single-owner host. Do not infer a user
-            // identity from client-supplied thread IDs. Multi-user hosting needs isolation.
-            .WithInMemorySessionStore(withIsolation: false);
+        builder.Services.AddSingleton<ProgramConversationEndpoint>();
     }
 
     public static IEndpointConventionBuilder MapConversationalAgent(this IEndpointRouteBuilder endpoints)
-        => endpoints.MapAGUIServer(AgentName, "/agent")
-            .AddEndpointFilter(static async (context, next) =>
-            {
-                try
-                {
-                    var result = await next(context);
-                    return result is IResult response ? new AgentStreamResult(response) : result;
-                }
-                catch (Exception error) when (!context.HttpContext.RequestAborted.IsCancellationRequested)
-                {
-                    return new AgentStreamResult(error);
-                }
-            });
+        => endpoints.MapPost("/agent", (HttpContext context, ProgramConversationEndpoint conversation)
+            => conversation.RunAsync(context));
 }

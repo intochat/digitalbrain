@@ -81,7 +81,10 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules)
         .WithAspire(Path.Combine(builder.AppHostDirectory, "IntoChat.AppHost.csproj"))
         .WithConfiguredGitHubRepositories(builder.Configuration))
     .AddModule<CodingModule>(module => module.WithSolution(Path.Combine(builder.AppHostDirectory, "..", "..", "..", "..", "DigitalBrain.slnx")))
-    .AddModule<FlutterModule>(module => module.WithWindowHost());
+    .AddModule<FlutterModule>(module =>
+        module.WithWindowHost()
+        //module.WithWebHost()
+        );
 
 // Isolated Aspire runs reuse the persistent Azurite volume while assigning new random silo
 // ports. A per-run development cluster avoids trying to contact a dead membership row from the
@@ -121,6 +124,8 @@ builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.IntoChat)
         if (builder.ExecutionContext.IsRunMode)
         {
             context.EnvironmentVariables["DigitalBrain__Graph__Enabled"] = "true";
+            context.EnvironmentVariables["DigitalBrain__Cors__AllowedOrigin"] =
+                $"http://{ShellNames.FlutterWebHostname}:{ShellNames.FlutterWebPort}";
         }
     });
 
