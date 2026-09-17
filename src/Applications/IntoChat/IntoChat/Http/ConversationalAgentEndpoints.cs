@@ -9,10 +9,10 @@ internal static class ConversationalAgentEndpoints
         builder.Services.AddSingleton(services => new WorkspaceArtifactStore(
             services.GetRequiredService<IOptions<WorkspaceStorageOptions>>(),
             services.GetRequiredService<IHostEnvironment>()));
-        builder.Services.AddSingleton<ProgramConversationEndpoint>();
+        builder.Services.AddSingleton<BehaviorConversationEndpoint>();
     }
 
     public static IEndpointConventionBuilder MapConversationalAgent(this IEndpointRouteBuilder endpoints)
-        => endpoints.MapPost("/agent", (HttpContext context, ProgramConversationEndpoint conversation)
+        => endpoints.MapPost("/agent", (HttpContext context, BehaviorConversationEndpoint conversation)
             => conversation.RunAsync(context));
 }

@@ -17,14 +17,14 @@ builder.Services.AddIntoChatOptions();
 builder.AddServiceDefaults();
 builder.AddDigitalBrain();
 builder.AddConversationalAgent();
-builder.AddProgramming();
+builder.AddBehaviors();
 builder.AddKernelCors();
 builder.Services.AddAuthentication();
 builder.Services.AddDigitalBrainMcp()
     .WithHttpTransport(options => options.SessionMode = HttpServerSessionMode.Stateless)
-    .WithTools<ProgramTools>()
-    .WithTools<ProgramWebTools>()
-    .WithTools<ProgramAgentTools>();
+    .WithTools<BehaviorTools>()
+    .WithTools<BehaviorWebTools>()
+    .WithTools<BehaviorAgentTools>();
 
 var app = builder.Build();
 
@@ -37,7 +37,7 @@ app.UseBasicAuthGate();
 app.MapDefaultEndpoints();
 app.MapOrleansDashboard("/orleans");
 app.MapConversationalAgent();
-app.MapProgramming();
+app.MapBehaviors();
 app.MapWorkspaceEndpoints();
 app.MapUiEndpoints();
 app.MapBrainObservationEndpoints();

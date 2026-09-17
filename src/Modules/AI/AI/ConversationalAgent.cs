@@ -108,7 +108,7 @@ public static class ConversationalAgent
                         Keep the returned agent address for agent_send follow-ups and agent_read status/results.
                         Agents retain their own history and pinned model; creating one does not mean its first
                         task is finished. Read the task result before reporting success. agent_stop cancels work.
-                        Programs can create agents dynamically with mode spawn, message them with mode send,
+                        Behaviors can create agents dynamically with mode spawn, message them with mode send,
                         and wait for initial tasks with mode collect; program_examples includes runnable graphs.
                         Use program_examples to learn the schema and program_compile to draft behavior from intent.
                         Show the proposed behavior for review before deployment. Deploy only after explicit approval

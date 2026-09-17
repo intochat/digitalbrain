@@ -45,7 +45,7 @@ public static class DigitalBrainRuntime
         builder.Services.TryAddSingleton<NeuronToolCatalog>();
         builder.Services.TryAddSingleton<INeuronInvoker>(services => new NeuronInvoker(
             services.GetRequiredService<IGrainFactory>(), () => services.GetRequiredService<NeuronToolCatalog>()));
-        builder.Services.TryAddSingleton<Programming.ProgramService>();
+        builder.Services.TryAddSingleton<Behavior.BehaviorService>();
 
         foreach (var hook in ModuleHooksOf(modules))
         {
