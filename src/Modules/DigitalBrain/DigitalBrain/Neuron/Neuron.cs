@@ -6,7 +6,6 @@ using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Synapses;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Journaling;
 using Orleans.Runtime;
@@ -26,7 +25,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     private readonly NeuronActivationComponents _components;
     private readonly PersistenceFence _fence;
     private readonly DescriptorTable _descriptors;
-    private readonly ILogger? _logger;
     private readonly StreamWake? _streamWake;
 
     private readonly CancellationTokenSource _activation = new();
@@ -38,7 +36,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     protected Neuron(NeuronRuntime runtime)
     {
         ArgumentNullException.ThrowIfNull(runtime);
-        _logger = ServiceProvider.GetService<ILogger<Neuron>>();
         _streamWake = ServiceProvider.GetService<StreamWake>();
         _descriptors = ServiceProvider.GetRequiredService<DescriptorTable>();
         _components = runtime.Bind(ServiceProvider, Id);
@@ -168,15 +165,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     protected virtual Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken) => Task.CompletedTask;
 
     protected T? Body<T>(SignalDelivery delivery, JsonTypeInfo<T> json) where T : class
-    {
-        var body = delivery.Body(json);
-        if (body is null)
-        {
-            DrainTelemetry.BodyUnreadable(_logger, Id, delivery.Signal.Type, delivery.SignalId);
-        }
-
-        return body;
-    }
+        => delivery.Body(json);
 
     // Snapshot hooks let the drain finish saved reactions and their announcements.
     private protected virtual bool HasStoredAnnouncements => false;
@@ -386,13 +375,8 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
             }
             catch (Exception failure)
             {
-                if (_components.Pending.IsCancelled(delivery.SignalId))
+                if (!_components.Pending.IsCancelled(delivery.SignalId))
                 {
-                    DrainTelemetry.Cancelled(_logger, Id, delivery.SignalId);
-                }
-                else
-                {
-                    DrainTelemetry.Failed(_logger, Id, delivery.SignalId, failure);
                     await _fence.DiscardStagedChangesAsync(failure).ConfigureAwait(true);
                     _retry.ArmTimer();
                     return;
@@ -447,9 +431,8 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         {
             return false;
         }
-        catch (Exception failure)
+        catch (Exception)
         {
-            DrainTelemetry.AnnouncementsFailed(_logger, Id, failure);
             return true;
         }
     }
