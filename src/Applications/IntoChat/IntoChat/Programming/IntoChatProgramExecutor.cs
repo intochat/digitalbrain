@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.AI;
+using DigitalBrain.AI.Web;
 using DigitalBrain.Core.Programming;
 using DigitalBrain.Flutter;
 using Microsoft.Agents.AI;
@@ -37,6 +38,16 @@ internal sealed class IntoChatProgramExecutor(IServiceProvider services, INeuron
             case "call":
                 return await CallAsync(context, config, cancellationToken);
             case "agent":
+                if (config.TryGetProperty("mode", out var webMode) && webMode.GetString() == "web")
+                {
+                    var web = services.GetRequiredService<PlaywrightWebAgent>();
+                    if (config.TryGetProperty("operation", out var operation) && operation.GetString() == "company")
+                    {
+                        return await web.LookupCompanyAsync(OptionalText(config, "company")
+                            ?? throw new ArgumentException("Company lookup needs a company name."), OptionalText(config, "website"), cancellationToken);
+                    }
+                    return await web.ResearchAsync(OptionalText(config, "prompt") ?? Text(context.Value), OptionalText(config, "startUrl"), cancellationToken);
+                }
                 if (config.TryGetProperty("mode", out var mode) && mode.GetString() == "conversation")
                 {
                     return await ConverseAsync(context, config, cancellationToken);
@@ -125,6 +136,8 @@ internal sealed class IntoChatProgramExecutor(IServiceProvider services, INeuron
     }
 
     private static string Text(JsonElement value) => value.ValueKind == JsonValueKind.String ? value.GetString()! : value.GetRawText();
+    private static string? OptionalText(JsonElement config, string property) => config.TryGetProperty(property, out var item)
+        && item.ValueKind == JsonValueKind.String ? item.GetString() : null;
 }
 
 internal static class ProgramConversationHistory

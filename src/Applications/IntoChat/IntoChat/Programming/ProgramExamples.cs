@@ -17,6 +17,22 @@ public static class ProgramExamples
 
     public static IReadOnlyList<ProgramDefinition> All { get; } = Array.AsReadOnly<ProgramDefinition>(
     [
+        ProgramBuilder.Define("company-lookup", "Find company address and email")
+            .On("CompanyLookupRequested")
+            .Describe("Research a company's official pages with an isolated Playwright browser. Returns address and public contact email with source URLs; missing details remain null. Example input: {\"companyName\":\"Tailscale\"}. Add \"website\":\"https://tailscale.com\" to disambiguate a company. Browsing can take up to three minutes.")
+            .Node("input", "input")
+            .Node("research", "agent", """{"mode":"web","operation":"company","company":"{{input.companyName}}","website":"{{input.website}}"}""")
+            .Node("output", "output")
+            .Connect("input", "research").Connect("research", "output").Build(),
+
+        ProgramBuilder.Define("web-research", "Research a public website")
+            .On("WebResearchRequested")
+            .Describe("Use a Playwright agent to browse public pages and return structured findings and sources. Example input: {\"task\":\"Extract the product name and main features\",\"url\":\"https://playwright.dev\"}.")
+            .Node("input", "input")
+            .Node("browser", "agent", """{"mode":"web","prompt":"{{input.task}}","startUrl":"{{input.url}}"}""")
+            .Node("output", "output")
+            .Connect("input", "browser").Connect("browser", "output").Build(),
+
         ProgramBuilder.Define("welcome", "Personal greeting")
             .On("WelcomeRequested").Describe("Welcome someone by name. Example input: {\"name\":\"Ada\"}.")
             .Node("input", "input")

@@ -222,6 +222,20 @@ public static partial class ProgramValidator
                 ValidateString(config, "instructions", node.Id, errors);
                 ValidateString(config, "mode", node.Id, errors);
                 ValidateString(config, "prompt", node.Id, errors);
+                if (ProgramBuiltins.TryProperty(config, out var mode, "mode") && mode.ValueKind == JsonValueKind.String && mode.GetString() == "web")
+                {
+                    ValidateString(config, "operation", node.Id, errors);
+                    ValidateString(config, "website", node.Id, errors);
+                    ValidateString(config, "startUrl", node.Id, errors);
+                    if (ProgramBuiltins.TryProperty(config, out var webOperation, "operation"))
+                    {
+                        if (webOperation.ValueKind == JsonValueKind.String && webOperation.GetString() == "company")
+                        {
+                            RequireString(config, "company", node.Id, errors);
+                        }
+                        else { errors.Add($"Node '{node.Id}' web operation must be 'company', or omit it for general web research."); }
+                    }
+                }
                 break;
             case "code":
                 RequireString(config, "source", node.Id, errors);

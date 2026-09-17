@@ -153,7 +153,19 @@ public sealed class ProgramCompiler(IChatClient client, ProgramService programs)
         expressions. It must be obvious in description if a call has side effects.
         agent: {"instructions":"Task for the AI","prompt":"optional text using {{value}}"}; an AI
         transformation returning {"text":"the AI response"}. Do not use an agent for simple
-        deterministic transforms. For the existing IntoChat chat use {"mode":"conversation",
+        deterministic transforms. For real public web browsing use agent {"mode":"web",
+        "prompt":"Research task using {{input.field}}","startUrl":"optional public starting URL"}.
+        It runs an isolated Playwright browser and returns {result:<JSON>,sources:[{url,title}],notes,errors}.
+        For company contact lookup use agent {"mode":"web","operation":"company",
+        "company":"{{input.companyName}}","website":"{{input.website}}"}. Website is optional and
+        may be omitted. Returns {companyName,website,address,email,status,sources,evidence,visitedPages,notes,errors}.
+        Address/email are strings or null, status is found/partial/not_found/ambiguous. Sources are verified
+        visited first-party pages; unknown facts are never guessed. Example company input:
+        {"companyName":"Tailscale","website":"https://tailscale.com"}. Default program id company-lookup.
+        Web agents can read public pages and follow links; they cannot log in or submit forms. Browsing is
+        bounded to three minutes. Use input->agent->output for company lookup, preserving these result fields.
+        Do not use a plain AI transformation for tasks requiring live web evidence.
+        For the existing IntoChat chat use {"mode":"conversation",
         "instructions":"Optional changes to its assistant behavior"}; preserve its conversation input.
         Only when the user explicitly asks to change IntoChat's conversation, use id "intochat",
         name "IntoChat conversation", trigger "ChatMessage", and input->assistant->output, with the

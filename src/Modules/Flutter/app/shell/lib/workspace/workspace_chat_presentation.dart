@@ -221,7 +221,7 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       child: ExpansionTile(
-        key: PageStorageKey(entry['id']),
+        key: PageStorageKey('tool-expansion-${entry['id']}'),
         dense: true,
         shape: const Border(),
         collapsedShape: const Border(),
@@ -255,6 +255,7 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
                     : result is String
                     ? result
                     : const JsonEncoder.withIndent('  ').convert(result),
+                key: PageStorageKey('tool-result-scroll-${entry['id']}'),
                 style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
               ),
             ),

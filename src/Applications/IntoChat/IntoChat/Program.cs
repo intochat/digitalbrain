@@ -22,7 +22,8 @@ builder.AddKernelCors();
 builder.Services.AddAuthentication();
 builder.Services.AddDigitalBrainMcp()
     .WithHttpTransport(options => options.SessionMode = HttpServerSessionMode.Stateless)
-    .WithTools<ProgramTools>();
+    .WithTools<ProgramTools>()
+    .WithTools<ProgramWebTools>();
 
 var app = builder.Build();
 
