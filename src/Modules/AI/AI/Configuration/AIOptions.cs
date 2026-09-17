@@ -14,6 +14,7 @@ public sealed class AIOptions
     public AIProviderOptions XAI { get; set; } = new();
     public OllamaOptions Ollama { get; set; } = new();
     public TavilyOptions Tavily { get; set; } = new();
+    public Dictionary<string, AIModelProfileOptions> ModelProfiles { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     internal AIProviderOptions Provider(AiProvider provider) => provider switch
     {
@@ -57,10 +58,25 @@ public sealed class AIOptions
 
 public sealed class AIDefaultOptions
 {
+    public string? Profile { get; set; }
+    public string? Provider { get; set; }
     public string? Model { get; set; }
+    public string? Reasoning { get; set; }
+    public int? MaxOutputTokens { get; set; }
+    public LlmCapabilities? Capabilities { get; set; }
     public string? Embedding { get; set; }
     public string? Transcription { get; set; }
     public string? Image { get; set; }
+}
+
+public sealed class AIModelProfileOptions
+{
+    public string? Provider { get; set; }
+    public string? Model { get; set; }
+    public string? Endpoint { get; set; }
+    public string? Reasoning { get; set; }
+    public int? MaxOutputTokens { get; set; }
+    public LlmCapabilities? Capabilities { get; set; }
 }
 
 public sealed class AITelemetryOptions

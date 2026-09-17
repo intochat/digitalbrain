@@ -23,7 +23,8 @@ builder.Services.AddAuthentication();
 builder.Services.AddDigitalBrainMcp()
     .WithHttpTransport(options => options.SessionMode = HttpServerSessionMode.Stateless)
     .WithTools<ProgramTools>()
-    .WithTools<ProgramWebTools>();
+    .WithTools<ProgramWebTools>()
+    .WithTools<ProgramAgentTools>();
 
 var app = builder.Build();
 

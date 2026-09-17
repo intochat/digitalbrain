@@ -88,11 +88,14 @@ public sealed class DescriptorTable
                             ?? throw new InvalidOperationException($"Interface '{contract.FullName}', method '{method.Name}' needs a serializable Id property of type CommandId. Put Id in the DTO's source-generated JSON contract.");
                     }
 
-                    var resultJson = TypeInfo(resultType, json, method);
+                    var returnsNeuron = resultType is not null && typeof(INeuron).IsAssignableFrom(resultType);
+                    // A typed neuron reference crosses JSON surfaces as its durable identity.
+                    // Orleans callers still receive the original typed grain proxy.
+                    var resultJson = returnsNeuron ? NeuronReferenceJson.Default.NeuronId : TypeInfo(resultType, json, method);
                     var descriptor = new MethodDescriptor(alias, methodAlias, method.IsDefined(typeof(ReadOnlyAttribute)),
                         Schema(argumentsJson), Schema(resultJson), summaries.For(method));
                     metadata = new(contract, interfaceTypes.GetGrainInterfaceType(contract), argumentsJson, commandIdPropertyName, resultJson,
-                        CompileCall(method), CompileResult(method.ReturnType), descriptor);
+                        CompileCall(method), CompileResult(method.ReturnType), returnsNeuron, descriptor);
                     _methods.Add(key, metadata);
                 }
 
@@ -217,4 +220,9 @@ internal sealed record InvocationMetadata(
     JsonTypeInfo? ResultJson,
     Func<object, object?, CancellationToken, Task> Invoke,
     Func<Task, object?>? Result,
+    bool ReturnsNeuron,
     MethodDescriptor Descriptor);
+
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(NeuronId))]
+internal sealed partial class NeuronReferenceJson : JsonSerializerContext;

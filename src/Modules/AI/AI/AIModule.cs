@@ -19,6 +19,7 @@ public sealed class AIModule : IModule
         var workspace = builder.Configuration.GetSection(AIWorkspaceOptions.SectionName).Get<AIWorkspaceOptions>() ?? new();
 
         AIClients.Add(builder.Services);
+        builder.Services.TryAddSingleton<ModelProfiles>();
         AIClients.AddImageGeneration(builder.Services, options);
         VoiceToTextHosting.Add(builder.Services, options);
         WebSearchHosting.Add(builder.Services, options);

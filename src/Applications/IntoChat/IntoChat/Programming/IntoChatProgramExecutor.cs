@@ -21,7 +21,11 @@ internal sealed class IntoChatProgramExecutor(IServiceProvider services, INeuron
     public async Task<JsonElement> ExecuteAsync(ProgramExecutionContext context, CancellationToken cancellationToken)
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, events.BeginExecution(context.ProgramId, context.RunId));
-        try { return await ExecuteCoreAsync(context, linked.Token); }
+        try
+        {
+            linked.Token.ThrowIfCancellationRequested();
+            return await ExecuteCoreAsync(context, linked.Token);
+        }
         finally { events.EndExecution(context.ProgramId, context.RunId); }
     }
 
@@ -38,6 +42,10 @@ internal sealed class IntoChatProgramExecutor(IServiceProvider services, INeuron
             case "call":
                 return await CallAsync(context, config, cancellationToken);
             case "agent":
+                if (config.TryGetProperty("mode", out var dynamicMode) && dynamicMode.GetString() is "spawn" or "send" or "collect" or "stop")
+                {
+                    return await services.GetRequiredService<ProgramAgents>().ExecuteAsync(context, config, cancellationToken);
+                }
                 if (config.TryGetProperty("mode", out var webMode) && webMode.GetString() == "web")
                 {
                     var web = services.GetRequiredService<PlaywrightWebAgent>();
@@ -90,6 +98,7 @@ internal sealed class IntoChatProgramExecutor(IServiceProvider services, INeuron
         if (services.GetService<TableService>() is { } tables) { tools.AddRange(new TableAgentTools(tables).Create()); }
         tools.AddRange(new WorkspaceAgentTools(services.GetRequiredService<WorkspaceArtifactStore>()).Create());
         tools.AddRange(services.GetRequiredService<ProgramTools>().AgentTools());
+        tools.AddRange(services.GetRequiredService<ProgramAgentTools>().CreateTools());
         var extra = config.TryGetProperty("instructions", out var instruction) ? instruction.GetString() : null;
         var agent = ConversationalAgent.Create(services, "IntoChat", tools, extra);
         var messages = new List<ChatMessage>();

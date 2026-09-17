@@ -1,6 +1,7 @@
 using System.Text.Json;
 using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Neurons;
 
 namespace DigitalBrain.Core;
 
@@ -34,6 +35,12 @@ internal sealed class NeuronInvoker(IGrainFactory grains, DescriptorTable table)
             ?? throw new ArgumentException($"Arguments for interface '{interfaceAlias}', method '{methodAlias}' must match the method's schema.", nameof(arguments));
         var task = method.Invoke(proxy, argument, cancellationToken);
         await task.ConfigureAwait(true);
-        return method.ResultJson is null ? null : JsonSerializer.SerializeToElement(method.Result!(task), method.ResultJson);
+        if (method.ResultJson is null) { return null; }
+        var result = method.Result!(task);
+        if (method.ReturnsNeuron && result is INeuron reference)
+        {
+            result = NeuronId.FromGrainId(reference.GetGrainId());
+        }
+        return JsonSerializer.SerializeToElement(result, method.ResultJson);
     }
 }

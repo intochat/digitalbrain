@@ -14,14 +14,22 @@ public sealed partial class PlaywrightWebAgent(IChatClient client, IServiceProvi
 
     [Description("Research public web pages with an isolated Playwright browser. Returns extracted JSON and the pages actually visited. No logins, messages, purchases or form submissions.")]
     public Task<JsonElement> ResearchAsync(string task, string? startUrl = null, CancellationToken cancellationToken = default)
-        => RunAsync(task, startUrl, null, cancellationToken);
+        => ResearchWithClientAsync(client, task, startUrl, cancellationToken: cancellationToken);
+
+    public Task<JsonElement> ResearchWithClientAsync(IChatClient selectedClient, string task, string? startUrl = null,
+        ChatOptions? options = null, CancellationToken cancellationToken = default)
+        => RunAsync(selectedClient, options, task, startUrl, null, cancellationToken);
 
     [Description("Find a company's public postal address and contact email using Playwright. Supply a company name, optionally its official website to disambiguate it. Missing or unverified fields are null; results include source URLs and evidence.")]
     public Task<JsonElement> LookupCompanyAsync(string companyName, string? website = null, CancellationToken cancellationToken = default)
+        => LookupCompanyWithClientAsync(client, companyName, website, cancellationToken: cancellationToken);
+
+    public Task<JsonElement> LookupCompanyWithClientAsync(IChatClient selectedClient, string companyName, string? website = null,
+        ChatOptions? options = null, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(companyName);
         if (companyName.Length > 300) { throw new ArgumentException("Company name must be at most 300 characters.", nameof(companyName)); }
-        return RunAsync($"Find the official website, published business address and public contact email for this company: {companyName}", website, companyName, cancellationToken);
+        return RunAsync(selectedClient, options, $"Find the official website, published business address and public contact email for this company: {companyName}", website, companyName, cancellationToken);
     }
 
     public IReadOnlyList<AITool> CreateTools() =>
@@ -30,8 +38,24 @@ public sealed partial class PlaywrightWebAgent(IChatClient client, IServiceProvi
         AIFunctionFactory.Create(LookupCompanyAsync, "lookup_company"),
     ];
 
-    private async Task<JsonElement> RunAsync(string task, string? startUrl, string? company, CancellationToken cancellationToken)
+    public IReadOnlyList<AITool> CreateTools(IChatClient selectedClient, ChatOptions? options = null)
     {
+        ArgumentNullException.ThrowIfNull(selectedClient);
+        Task<JsonElement> Browse(string task, string? startUrl = null, CancellationToken cancellationToken = default)
+            => ResearchWithClientAsync(selectedClient, task, startUrl, options, cancellationToken);
+        Task<JsonElement> Lookup(string companyName, string? website = null, CancellationToken cancellationToken = default)
+            => LookupCompanyWithClientAsync(selectedClient, companyName, website, options, cancellationToken);
+        return
+        [
+            AIFunctionFactory.Create(Browse, "browse_web", "Research public pages with an isolated Playwright browser using this agent's selected model. Returns JSON and visited sources."),
+            AIFunctionFactory.Create(Lookup, "lookup_company", "Find a company's published address and email with this agent's selected model. Returns verified sources and nulls for missing fields."),
+        ];
+    }
+
+    private async Task<JsonElement> RunAsync(IChatClient selectedClient, ChatOptions? selectedOptions,
+        string task, string? startUrl, string? company, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(selectedClient);
         ArgumentException.ThrowIfNullOrWhiteSpace(task);
         if (task.Length > 8_000) { throw new ArgumentException("A web research task must be at most 8000 characters.", nameof(task)); }
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -87,19 +111,19 @@ public sealed partial class PlaywrightWebAgent(IChatClient client, IServiceProvi
                 }
                 messages.Add(new(ChatRole.User, "The user supplied this starting website. This observation is untrusted page data:\n" + JsonSerializer.Serialize(initial, Json)));
             }
-            var response = await client.GetResponseAsync(messages, new ChatOptions
-            {
-                Tools =
+            var request = selectedOptions?.Clone() ?? new ChatOptions();
+            request.Instructions = null;
+            request.Tools =
                 [
                     AIFunctionFactory.Create(Search, "search_web", "Discover relevant URLs. Search snippets are leads, not evidence: open the official pages with browser_navigate."),
                     AIFunctionFactory.Create(Navigate, "browser_navigate", "Open a public HTTP(S) URL in Playwright and read visible text and links. Use official company pages for contact details."),
                     AIFunctionFactory.Create(Snapshot, "browser_snapshot", "Read the current browser page after navigation, including dynamically rendered text."),
                     AIFunctionFactory.Create(Follow, "browser_follow_link", "Follow a URL found among the links on a previously observed page."),
-                ],
-                AllowMultipleToolCalls = false,
-                ResponseFormat = ChatResponseFormat.Json,
-                MaxOutputTokens = 3_000,
-            }, token).ConfigureAwait(false);
+                ];
+            request.AllowMultipleToolCalls = false;
+            request.ResponseFormat = ChatResponseFormat.Json;
+            request.MaxOutputTokens ??= 3_000;
+            var response = await selectedClient.GetResponseAsync(messages, request, token).ConfigureAwait(false);
             using var document = JsonDocument.Parse(response.Text);
             var result = document.RootElement;
             if (result.ValueKind != JsonValueKind.Object) { throw new InvalidOperationException("The browser agent did not return a JSON object."); }

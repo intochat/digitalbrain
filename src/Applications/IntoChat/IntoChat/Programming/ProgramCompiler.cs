@@ -153,6 +153,27 @@ public sealed class ProgramCompiler(IChatClient client, ProgramService programs)
         expressions. It must be obvious in description if a call has side effects.
         agent: {"instructions":"Task for the AI","prompt":"optional text using {{value}}"}; an AI
         transformation returning {"text":"the AI response"}. Do not use an agent for simple
+        deterministic transforms. To CREATE a reusable independent agent use agent config
+        {"mode":"spawn","instructions":"Agent role","prompt":"optional first task",
+        "modelProfile":"optional configured profile","provider":"optional provider","model":"optional exact model ID",
+        "tools":["browse_web","lookup_company"],"lifetime":"run"}.
+        Omit model selection fields to use the configured default; never invent model/profile names.
+        Spawn invokes AgentBuilderNeuron.Build and returns the agent reference {type:"agent",name:"..."}.
+        Optional items:"{{input.companies}}" creates one agent per array item (at most 16); instructions,
+        prompt and key expressions use that item as value. It returns an array of agent references.
+        Each child has its own memory and selected LLM. Only selected tools are available.
+        Send another task with agent {"mode":"send","agent":"{{nodes.creator}}","prompt":"Task text","wait":true}.
+        A send returns {taskId,status,prompt,output,error,...}; output is the model's text.
+        Wait for a spawned agent's initial task with agent {"mode":"collect","agent":"{{nodes.creator}}"}.
+        Send and collect also accept arrays of references. Collect returns individual task statuses and results.
+        Optional taskId selects a task to collect. Agent references can also be agent:name addresses.
+        Stop an agent with {"mode":"stop","agent":"{{nodes.creator}}"}.
+        Run-owned agents retire when their program ends. Use lifetime:"workspace" explicitly only when
+        the user wants to retain the agent for later runs. Initial tasks run asynchronously: add collect
+        before output when the user wants their answers, rather than just the created references.
+        Example: input -> creator(spawn items:{{input.companies}},prompt:Research {{value.name}}) ->
+        results(collect agent:{{nodes.creator}}) -> output. No static graph expansion is required.
+        Do not use an agent for simple
         deterministic transforms. For real public web browsing use agent {"mode":"web",
         "prompt":"Research task using {{input.field}}","startUrl":"optional public starting URL"}.
         It runs an isolated Playwright browser and returns {result:<JSON>,sources:[{url,title}],notes,errors}.

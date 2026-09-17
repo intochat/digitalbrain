@@ -91,6 +91,10 @@ internal sealed class ProgramRunNeuron(NeuronRuntime runtime,
             } };
             AnnounceFinished(current.Snapshot);
         }
+        if (current.Snapshot.Status != "Running" && ServiceProvider.GetService<IProgramRunLifecycle>() is { } lifecycle)
+        {
+            await lifecycle.FinishedAsync(current.Definition, current.Snapshot, cancellationToken).ConfigureAwait(true);
+        }
         await SaveAsync(current, cancellationToken).ConfigureAwait(true);
     }
 

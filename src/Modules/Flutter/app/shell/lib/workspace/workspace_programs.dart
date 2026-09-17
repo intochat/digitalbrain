@@ -1256,13 +1256,15 @@ class _WorkspaceProgramsState extends State<WorkspacePrograms> {
   };
 
   String _agentMode(Map<String, dynamic> configuration) =>
-      configuration['mode'] == 'web'
-      ? configuration['operation'] == 'company'
-            ? 'company'
-            : 'web'
-      : configuration['mode'] == 'conversation'
-      ? 'conversation'
-      : 'transform';
+      switch (configuration['mode']) {
+        'web' => configuration['operation'] == 'company' ? 'company' : 'web',
+        'conversation' => 'conversation',
+        'spawn' => 'spawn',
+        'send' => 'send',
+        'collect' => 'collect',
+        'stop' => 'stop',
+        _ => 'transform',
+      };
 
   Map<String, dynamic> _agentDefaults(String mode) => switch (mode) {
     'company' => {
@@ -1276,8 +1278,87 @@ class _WorkspaceProgramsState extends State<WorkspacePrograms> {
       'prompt': 'Research {{value}} and return verified findings with sources.',
     },
     'conversation' => {'mode': 'conversation', 'instructions': ''},
+    'spawn' => {
+      'mode': 'spawn',
+      'instructions': 'You are a helpful assistant. Complete the requested task using your available tools.',
+      'tools': <String>[],
+      'lifetime': 'run',
+    },
+    'send' => {
+      'mode': 'send',
+      'agent': '{{nodes.creator}}',
+      'prompt': '{{input.task}}',
+      'wait': true,
+    },
+    'collect' => {'mode': 'collect', 'agent': '{{nodes.creator}}'},
+    'stop' => {'mode': 'stop', 'agent': '{{nodes.creator}}'},
     _ => _nodeDefaults('agent'),
   };
+
+  List<String> _agentFieldsFor(String mode) => switch (mode) {
+    'company' => ['company', 'website'],
+    'web' => ['prompt', 'startUrl'],
+    'conversation' => ['instructions'],
+    'spawn' => [
+      'instructions',
+      'prompt',
+      'modelProfile',
+      'provider',
+      'model',
+      'tools',
+      'key',
+    ],
+    'send' => ['agent', 'prompt'],
+    'collect' => ['agent', 'taskId'],
+    'stop' => ['agent'],
+    _ => ['instructions', 'prompt'],
+  };
+
+  void _setAgentField(
+    Map<String, dynamic> configuration,
+    String field,
+    String value,
+  ) {
+    if (value.trim().isEmpty &&
+        ([
+              'website',
+              'startUrl',
+              'modelProfile',
+              'provider',
+              'model',
+              'key',
+              'agent',
+              'taskId',
+            ].contains(field) ||
+            (field == 'prompt' &&
+                configuration['mode'] != 'send' &&
+                configuration['mode'] != 'web') ||
+            field == 'instructions')) {
+      configuration.remove(field);
+    } else if (field == 'tools') {
+      final tools = jsonDecode(value);
+      if (tools is! List ||
+          tools.any((tool) => tool is! String || tool.trim().isEmpty)) {
+        throw const FormatException(
+          'Tools must be a JSON list of nonempty tool names, such as ["browse_web"].',
+        );
+      }
+      configuration[field] = tools;
+    } else if (field == 'agent' &&
+        (value.trimLeft().startsWith('{') ||
+            value.trimLeft().startsWith('[')) &&
+        !value.trimLeft().startsWith('{{')) {
+      final reference = jsonDecode(value);
+      if (reference is! Map && reference is! List) {
+        throw const FormatException(
+          'Use an agent reference or a list of agent references.',
+        );
+      }
+      configuration[field] = reference;
+    } else {
+      configuration[field] = value;
+    }
+  }
 
   Future<void> _editMetadata(Map<String, dynamic> definition) async {
     final id = TextEditingController(text: '${definition['id']}');
@@ -1381,16 +1462,36 @@ class _WorkspaceProgramsState extends State<WorkspacePrograms> {
         'startUrl',
         'company',
         'website',
+        'modelProfile',
+        'provider',
+        'model',
+        'tools',
+        'key',
+        'agent',
+        'taskId',
       ])
         field: TextEditingController(),
     };
     var agentMode = 'transform';
+    var waitForAgent = true;
+    var agentLifetime = 'run';
     void syncAgentFields() {
       try {
         final configuration = _map(jsonDecode(config.text));
         agentMode = _agentMode(configuration);
+        waitForAgent = configuration['wait'] != false;
+        agentLifetime =
+            configuration['lifetime'] == 'workspace' ||
+                configuration['retain'] == true
+            ? 'workspace'
+            : 'run';
         for (final entry in agentFields.entries) {
-          final value = '${configuration[entry.key] ?? ''}';
+          final raw = configuration[entry.key];
+          final value = entry.key == 'tools'
+              ? _encoder.convert(raw ?? <String>[])
+              : raw is Map || raw is List
+              ? _encoder.convert(raw)
+              : '${raw ?? ''}';
           if (entry.value.text != value) entry.value.text = value;
         }
       } on FormatException {
@@ -1459,6 +1560,22 @@ class _WorkspaceProgramsState extends State<WorkspacePrograms> {
                           value: 'company',
                           child: Text('Company lookup'),
                         ),
+                        DropdownMenuItem(
+                          value: 'spawn',
+                          child: Text('Create agent'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'send',
+                          child: Text('Message agent'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'collect',
+                          child: Text('Wait for agents'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'stop',
+                          child: Text('Stop agents'),
+                        ),
                       ],
                       onChanged: (value) => update(() {
                         if (value == null || value == agentMode) return;
@@ -1476,20 +1593,82 @@ class _WorkspaceProgramsState extends State<WorkspacePrograms> {
                               : 'Browse pages to answer your prompt and return findings with source URLs.',
                         ),
                       ),
-                    for (final field in switch (agentMode) {
-                      'company' => ['company', 'website'],
-                      'web' => ['prompt', 'startUrl'],
-                      'conversation' => ['instructions'],
-                      _ => ['instructions', 'prompt'],
-                    })
+                    if ([
+                      'spawn',
+                      'send',
+                      'collect',
+                      'stop',
+                    ].contains(agentMode))
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Text(switch (agentMode) {
+                          'spawn' => 'Create an agent with these instructions and tools. Pass its returned reference to another neuron. For one agent per item, set items in the JSON configuration and use {{value.name}} in prompts.',
+                          'send' => 'Send a task to one or more agents. Wait for their response to use the completed results in the next neuron.',
+                          'collect' => 'Wait for the selected agents to finish their tasks and return their results.',
+                          _ => 'Stop the selected agents.',
+                        }),
+                      ),
+                    if (agentMode == 'spawn')
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: DropdownButtonFormField<String>(
+                          key: ValueKey('agent-lifetime-$agentLifetime'),
+                          initialValue: agentLifetime,
+                          decoration: const InputDecoration(
+                            labelText: 'Agent lifetime',
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'run',
+                              child: Text('This run'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'workspace',
+                              child: Text('Workspace · keep for later'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value == null) return;
+                            try {
+                              final configuration = _map(
+                                jsonDecode(config.text),
+                              );
+                              configuration['lifetime'] = value;
+                              configuration.remove('retain');
+                              config.text = _encoder.convert(configuration);
+                              update(() {
+                                agentLifetime = value;
+                                failure = null;
+                              });
+                            } catch (error) {
+                              update(
+                                () => failure =
+                                    'Could not update agent settings: $error',
+                              );
+                            }
+                          },
+                        ),
+                      ),
+                    for (final field in _agentFieldsFor(agentMode))
                       Padding(
                         padding: const EdgeInsets.only(top: 12),
                         child: TextField(
                           controller: agentFields[field],
-                          minLines: field == 'instructions' || field == 'prompt'
+                          minLines:
+                              [
+                                'instructions',
+                                'prompt',
+                                'tools',
+                              ].contains(field)
                               ? 2
                               : 1,
-                          maxLines: field == 'instructions' || field == 'prompt'
+                          maxLines:
+                              [
+                                'instructions',
+                                'prompt',
+                                'tools',
+                                'agent',
+                              ].contains(field)
                               ? 5
                               : 1,
                           decoration: InputDecoration(
@@ -1498,9 +1677,20 @@ class _WorkspaceProgramsState extends State<WorkspacePrograms> {
                               'website' => 'Company website (optional)',
                               'startUrl' => 'Starting URL (optional)',
                               'instructions' => 'Agent instructions',
+                              'modelProfile' => 'Model profile (optional)',
+                              'provider' => 'Provider (optional)',
+                              'model' => 'Model (optional)',
+                              'tools' => 'Tools (JSON list)',
+                              'key' => 'Agent key (optional)',
+                              'agent' => 'Agent reference',
+                              'taskId' => 'Task ID (optional)',
                               _ =>
                                 agentMode == 'web'
                                     ? 'Research prompt'
+                                    : agentMode == 'spawn'
+                                    ? 'Initial message (optional)'
+                                    : agentMode == 'send'
+                                    ? 'Message to agent'
                                     : 'Agent prompt',
                             },
                             helperText: field == 'company'
@@ -1509,6 +1699,16 @@ class _WorkspaceProgramsState extends State<WorkspacePrograms> {
                                 ? 'For example: https://openai.com or {{input.website}}'
                                 : field == 'startUrl'
                                 ? 'Start on this page, or leave blank to search.'
+                                : field == 'tools'
+                                ? 'JSON tool names or neuron addresses. Examples: browse_web, lookup_company, websearch. Use [] for no tools.'
+                                : field == 'agent'
+                                ? 'Use {{nodes.creator}}, an agent address, or JSON references. Leave blank to use the previous neuron’s result.'
+                                : field == 'taskId'
+                                ? 'Leave blank to wait for the initial task, or the latest task if none was supplied.'
+                                : field == 'modelProfile'
+                                ? 'Leave model settings blank to use the configured default.'
+                                : field == 'key'
+                                ? 'Stable within this run. Use a retained agent’s returned reference in later runs.'
                                 : null,
                             border: const OutlineInputBorder(),
                           ),
@@ -1517,21 +1717,42 @@ class _WorkspaceProgramsState extends State<WorkspacePrograms> {
                               final configuration = _map(
                                 jsonDecode(config.text),
                               );
-                              if (value.trim().isEmpty &&
-                                  (field == 'website' || field == 'startUrl')) {
-                                configuration.remove(field);
-                              } else {
-                                configuration[field] = value;
-                              }
+                              _setAgentField(configuration, field, value);
                               config.text = _encoder.convert(configuration);
                               if (failure != null) update(() => failure = null);
-                            } catch (_) {
+                            } catch (error) {
                               update(
-                                () => failure = 'Fix the configuration JSON, or choose an agent mode to reset it.',
+                                () => failure =
+                                    'Could not update agent settings: $error',
                               );
                             }
                           },
                         ),
+                      ),
+                    if (agentMode == 'send')
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Wait for agent response'),
+                        subtitle: const Text(
+                          'Turn off to return as soon as the task has been accepted.',
+                        ),
+                        value: waitForAgent,
+                        onChanged: (value) {
+                          try {
+                            final configuration = _map(jsonDecode(config.text));
+                            configuration['wait'] = value ?? true;
+                            config.text = _encoder.convert(configuration);
+                            update(() {
+                              waitForAgent = value ?? true;
+                              failure = null;
+                            });
+                          } catch (error) {
+                            update(
+                              () => failure =
+                                  'Could not update agent settings: $error',
+                            );
+                          }
+                        },
                       ),
                   ],
                   if (kind == 'code')
@@ -1611,12 +1832,22 @@ class _WorkspaceProgramsState extends State<WorkspacePrograms> {
                       )) {
                     throw const FormatException('Choose a unique neuron ID.');
                   }
+                  final configuration = _map(jsonDecode(config.text));
+                  if (kind == 'agent') {
+                    for (final field in _agentFieldsFor(agentMode)) {
+                      _setAgentField(
+                        configuration,
+                        field,
+                        agentFields[field]!.text,
+                      );
+                    }
+                  }
                   Navigator.pop(context, {
                     'id': newId,
                     'kind': kind,
                     'inputType': inputType.text.trim(),
                     'outputType': outputType.text.trim(),
-                    'config': _map(jsonDecode(config.text)),
+                    'config': configuration,
                   });
                 } catch (error) {
                   update(() => failure = '$error');

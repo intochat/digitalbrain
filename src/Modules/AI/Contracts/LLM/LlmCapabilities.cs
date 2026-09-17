@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace DigitalBrain.AI;
 
 /// <summary>
@@ -10,6 +12,7 @@ namespace DigitalBrain.AI;
 /// about a feature nobody has verified for it.
 /// </remarks>
 [Flags]
+[JsonConverter(typeof(JsonStringEnumConverter<LlmCapabilities>))]
 public enum LlmCapabilities
 {
     None = 0,

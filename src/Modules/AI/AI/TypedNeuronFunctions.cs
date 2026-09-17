@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using DigitalBrain.Abstractions.Descriptors;
@@ -39,8 +41,25 @@ internal static class TypedNeuronFunctions
                         : default,
                     ExcludeResultSchema = true,
                 });
-            yield return descriptor.ArgsSchema is { } schema ? new DescriptorFunction(function, schema) : function;
+            yield return descriptor.ArgsSchema is { } schema
+                ? new DescriptorFunction(function, ToolParameters(schema, contract?.CommandIdPropertyName)) : function;
         }
+    }
+
+    private static JsonElement ToolParameters(JsonElement schema, string? commandId)
+    {
+        var parameters = JsonNode.Parse(schema.GetRawText())!.AsObject();
+        // A function receives an argument object even when the DTO's standalone schema allows null.
+        // OpenAI's adapter binds this root type as a string; nested nullable schemas remain valid.
+        parameters["type"] = "object";
+        if (commandId is not null && parameters["required"] is JsonArray required)
+        {
+            for (var index = required.Count - 1; index >= 0; index--)
+            {
+                if (required[index]?.GetValue<string>() == commandId) { required.RemoveAt(index); }
+            }
+        }
+        return JsonSerializer.SerializeToElement(parameters);
     }
 
     private static string UniqueName(NeuronId neuron, string methodAlias, ISet<string> takenNames)
@@ -48,12 +67,19 @@ internal static class TypedNeuronFunctions
         var sanitised = new string($"{neuron}_{methodAlias}"
             .Select(static character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-' ? character : '_').ToArray());
 
+        if (sanitised.Length > 60)
+        {
+            var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{neuron}/{methodAlias}")))[..16];
+            sanitised = sanitised[..43] + "_" + hash;
+        }
+
         // No separator can settle this on its own: both '_' and '-' are legal inside a neuron
         // name, so two different neurons can sanitise to the same prefix.
         var unique = sanitised;
         for (var suffix = 1; !takenNames.Add(unique); suffix++)
         {
-            unique = $"{sanitised}_{suffix.ToString(CultureInfo.InvariantCulture)}";
+            var ending = "_" + suffix.ToString(CultureInfo.InvariantCulture);
+            unique = sanitised[..Math.Min(sanitised.Length, 64 - ending.Length)] + ending;
         }
 
         return unique;

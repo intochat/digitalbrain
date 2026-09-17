@@ -13,6 +13,11 @@ public interface IProgramRunCancellation
     void Cancel(string programId, string runId);
 }
 
+public interface IProgramRunLifecycle
+{
+    Task FinishedAsync(ProgramDefinition definition, ProgramRunSnapshot run, CancellationToken cancellationToken);
+}
+
 public sealed record ProgramExecutionContext(
     string ProgramId, string RunId, long Version, ProgramNode Node,
     JsonElement Input, JsonElement Value, IReadOnlyDictionary<string, JsonElement> Outputs);

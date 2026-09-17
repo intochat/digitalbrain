@@ -11,8 +11,11 @@ internal static class ProgramEndpoints
         builder.Services.AddSingleton<ProgramCompiler>();
         builder.Services.AddSingleton<ProgramCodeRunner>();
         builder.Services.AddSingleton<ProgramLiveEvents>();
+        builder.Services.AddSingleton<ProgramAgents>();
+        builder.Services.AddSingleton<IProgramRunLifecycle>(services => services.GetRequiredService<ProgramAgents>());
         builder.Services.AddSingleton<IProgramRunCancellation>(services => services.GetRequiredService<ProgramLiveEvents>());
         builder.Services.AddSingleton<ProgramTools>();
+        builder.Services.AddSingleton<ProgramAgentTools>();
         builder.Services.AddSingleton<IProgramNodeExecutor, IntoChatProgramExecutor>();
     }
 
@@ -33,6 +36,7 @@ internal static class ProgramEndpoints
         });
         group.MapGet("/", (ProgramService programs, CancellationToken ct) => programs.ListAsync(ct));
         group.MapGet("/examples", () => ProgramExamples.All);
+        group.MapGet("/agent-models", (DigitalBrain.AI.ModelProfiles models) => models.List());
         group.MapPost("/compile", (CompileProgramRequest request, ProgramCompiler compiler, CancellationToken ct)
             => compiler.CompileAsync(request.Intent, ct));
         group.MapPost("/validate", (ValidateProgramRequest request, ProgramService programs) => programs.Validate(request.Definition));

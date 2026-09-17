@@ -219,9 +219,57 @@ public static partial class ProgramValidator
                 }
                 break;
             case "agent":
+                ValidateTemplate(node.Id, config, errors);
                 ValidateString(config, "instructions", node.Id, errors);
                 ValidateString(config, "mode", node.Id, errors);
                 ValidateString(config, "prompt", node.Id, errors);
+                foreach (var field in new[] { "modelProfile", "provider", "model", "reasoning", "capabilities", "name", "key", "lifetime", "taskId" })
+                {
+                    ValidateString(config, field, node.Id, errors);
+                }
+                if (ProgramBuiltins.TryProperty(config, out var agentMode, "mode") && agentMode.ValueKind == JsonValueKind.String)
+                {
+                    if (agentMode.GetString() is not ("conversation" or "web" or "spawn" or "send" or "collect" or "stop" or "transform"))
+                    {
+                        errors.Add($"Node '{node.Id}' has an unknown agent mode.");
+                    }
+                    if (agentMode.GetString() is "send" or "collect" or "stop" && config.TryGetProperty("agent", out var reference))
+                    {
+                        if (reference.ValueKind is not (JsonValueKind.String or JsonValueKind.Object or JsonValueKind.Array))
+                        {
+                            errors.Add($"Node '{node.Id}' requires an agent address, reference or array of references.");
+                        }
+                    }
+                    if (agentMode.GetString() == "send") { RequireString(config, "prompt", node.Id, errors); }
+                    if (agentMode.GetString() == "spawn" && config.TryGetProperty("items", out var items)
+                        && !IsReferenceTemplate(items)
+                        && (items.ValueKind != JsonValueKind.Array || items.GetArrayLength() > 16))
+                    {
+                        errors.Add($"Node '{node.Id}' items must be an array of at most 16 values, or a whole-value expression returning an array.");
+                    }
+                }
+                if (config.TryGetProperty("maxOutputTokens", out var maxTokens) && !IsReferenceTemplate(maxTokens)
+                    && (maxTokens.ValueKind != JsonValueKind.Number || !maxTokens.TryGetInt32(out var tokens) || tokens is < 1 or > 1_000_000))
+                {
+                    errors.Add($"Node '{node.Id}' maxOutputTokens must be an integer from 1 to 1000000, or a whole-value expression returning one.");
+                }
+                if (config.TryGetProperty("tools", out var tools) && (tools.ValueKind != JsonValueKind.Array
+                    || tools.GetArrayLength() > 32 || tools.EnumerateArray().Any(tool => tool.ValueKind != JsonValueKind.String)))
+                {
+                    errors.Add($"Node '{node.Id}' tools must be an array of at most 32 tool names.");
+                }
+                foreach (var flag in new[] { "wait", "retain" })
+                {
+                    if (config.TryGetProperty(flag, out var boolean) && boolean.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                    {
+                        errors.Add($"Node '{node.Id}' {flag} must be a boolean.");
+                    }
+                }
+                if (config.TryGetProperty("lifetime", out var lifetime) && lifetime.ValueKind == JsonValueKind.String
+                    && lifetime.GetString() is not ("run" or "workspace"))
+                {
+                    errors.Add($"Node '{node.Id}' lifetime must be run or workspace.");
+                }
                 if (ProgramBuiltins.TryProperty(config, out var mode, "mode") && mode.ValueKind == JsonValueKind.String && mode.GetString() == "web")
                 {
                     ValidateString(config, "operation", node.Id, errors);
@@ -329,6 +377,9 @@ public static partial class ProgramValidator
         }
     }
 
+    private static bool IsReferenceTemplate(JsonElement value)
+        => value.ValueKind == JsonValueKind.String && ReferenceTemplate().IsMatch(value.GetString()!);
+
     private static void RequireString(JsonElement config, string property, string id, List<string> errors)
     {
         if (!ProgramBuiltins.TryProperty(config, out var value, property)
@@ -346,4 +397,7 @@ public static partial class ProgramValidator
 
     [GeneratedRegex("^[A-Za-z]{1,64}$", RegexOptions.CultureInvariant)]
     private static partial Regex SignalType();
+
+    [GeneratedRegex(@"^\{\{\s*[^{}]+?\s*\}\}\z", RegexOptions.CultureInvariant)]
+    private static partial Regex ReferenceTemplate();
 }

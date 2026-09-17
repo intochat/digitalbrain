@@ -57,25 +57,34 @@ internal static class AIClients
         services.AddHostedService<LlmWarmupHostedService>();
     }
 
+    internal static ILlmProviderFactory Factory(AiProvider provider)
+        => Factories.GetValueOrDefault(provider)
+            ?? throw new ArgumentException($"Provider '{provider}' does not support runtime chat model selection.", nameof(provider));
+
     private static IChatClient BuildChatPipeline(IServiceProvider provider, LLMModel model)
         => BuildChatPipeline(provider, model, Factories[model.Provider].CreateChatClient(
             model, provider.GetRequiredService<IOptions<AIOptions>>().Value));
 
     internal static IChatClient BuildChatPipeline(IServiceProvider provider, LLMModel model, IChatClient innerClient)
+        => BuildChatPipeline(provider, model.SupportsTools, model.Marker.Name, innerClient);
+
+    internal static IChatClient BuildChatPipeline(IServiceProvider provider, bool supportsTools, string telemetryName,
+        IChatClient innerClient, bool rejectUnsupportedTools = false)
     {
         var configuration = provider.GetRequiredService<IOptions<AIOptions>>().Value;
         var captureContent = configuration.Telemetry.EnableSensitiveData
             ?? false;
         var loggerFactory = provider.GetService<ILoggerFactory>();
         var pipeline = new ChatClientBuilder(innerClient);
-        if (!model.SupportsTools)
+        if (!supportsTools)
         {
             // Models that cannot emit tool calls must never be told about tools —
             // the assistant then answers capability questions honestly with "no".
-            pipeline = pipeline.Use(static async (messages, options, next, cancellationToken) =>
+            pipeline = pipeline.Use(async (messages, options, next, cancellationToken) =>
             {
                 if (options?.Tools is { Count: > 0 })
                 {
+                    if (rejectUnsupportedTools) { throw new InvalidOperationException("The pinned model does not declare tool support."); }
                     options = options.Clone();
                     options.Tools = null;
                     options.ToolMode = null;
@@ -88,7 +97,7 @@ internal static class AIClients
             .UseFunctionInvocation()
             .UseOpenTelemetry(
                 loggerFactory: loggerFactory,
-                sourceName: $"{TelemetrySource}.{model.Marker.Name}",
+                sourceName: $"{TelemetrySource}.{telemetryName}",
                 configure: telemetry => telemetry.EnableSensitiveData = captureContent)
             .Build(provider);
     }
@@ -96,6 +105,13 @@ internal static class AIClients
     private static IChatClient DefaultChatClient(IServiceProvider provider)
     {
         var configuration = provider.GetRequiredService<IOptions<AIOptions>>().Value;
+        if (!string.IsNullOrWhiteSpace(configuration.Default.Profile)
+            || !string.IsNullOrWhiteSpace(configuration.Default.Provider)
+            || configuration.Default.Reasoning is not null || configuration.Default.MaxOutputTokens is not null)
+        {
+            var profiles = provider.GetRequiredService<ModelProfiles>();
+            return profiles.CreateClient(profiles.Resolve(null));
+        }
         var model = configuration.Default.Model is { Length: > 0 } markerName
             ? LLMModel.FindByMarkerName(markerName)
                 ?? throw UnknownMarker(DefaultModelKey, markerName, LLMModel.All.Select(static m => m.Marker.Name))

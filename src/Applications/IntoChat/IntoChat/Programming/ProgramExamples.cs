@@ -17,6 +17,25 @@ public static class ProgramExamples
 
     public static IReadOnlyList<ProgramDefinition> All { get; } = Array.AsReadOnly<ProgramDefinition>(
     [
+        ProgramBuilder.Define("spawn-researchers", "Create a research team")
+            .On("ResearchTeamRequested")
+            .Describe("Create an independent agent for each company, collect their sourced results, and retire them after the run. Example input: {\"companies\":[{\"name\":\"JetBrains\"},{\"name\":\"37signals\"}]}. Each agent uses its selected LLM and lookup_company tool; model selection is optional.")
+            .Node("input", "input")
+            .Node("creator", "agent", """{"mode":"spawn","items":"{{input.companies}}","name":"Research {{value.name}}","instructions":"Find published company contact details. Use lookup_company and return its address, email, sources and missing-field notes as JSON. Never guess.","prompt":"Research {{value.name}}","tools":["lookup_company"],"lifetime":"run"}""")
+            .Node("results", "agent", """{"mode":"collect","agent":"{{nodes.creator}}"}""")
+            .Node("output", "output")
+            .Connect("input", "creator").Connect("creator", "results").Connect("results", "output").Build(),
+
+        ProgramBuilder.Define("agent-memory", "Create an agent and follow up")
+            .On("AgentMemoryRequested")
+            .Describe("Build a dedicated assistant, give it a fact, then ask a follow-up using the same memory. Example input: {\"name\":\"Ada\",\"favoriteColor\":\"violet\"}.")
+            .Node("input", "input")
+            .Node("creator", "agent", """{"mode":"spawn","instructions":"Remember information given in this conversation. Answer follow-up questions concisely.","prompt":"My name is {{input.name}} and my favorite color is {{input.favoriteColor}}.","lifetime":"run"}""")
+            .Node("remembered", "agent", """{"mode":"collect","agent":"{{nodes.creator}}"}""")
+            .Node("followup", "agent", """{"mode":"send","agent":"{{nodes.creator}}","prompt":"What is my name and favorite color?","wait":true}""")
+            .Node("output", "output")
+            .Connect("input", "creator").Connect("creator", "remembered").Connect("remembered", "followup").Connect("followup", "output").Build(),
+
         ProgramBuilder.Define("company-lookup", "Find company address and email")
             .On("CompanyLookupRequested")
             .Describe("Research a company's official pages with an isolated Playwright browser. Returns address and public contact email with source URLs; missing details remain null. Example input: {\"companyName\":\"Tailscale\"}. Add \"website\":\"https://tailscale.com\" to disambiguate a company. Browsing can take up to three minutes.")

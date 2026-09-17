@@ -5,7 +5,9 @@ namespace DigitalBrain.AI;
 [GenerateSerializer]
 [Alias("db.ai.agent-state")]
 public sealed record AgentState(
-    [property: Id(0)] List<AgentSessionEntry> Sessions)
+    [property: Id(0)] List<AgentSessionEntry> Sessions,
+    [property: Id(1)] AgentManagedState? Managed = null,
+    [property: Id(2)] bool InitializationStopped = false)
 {
     // How many conversations an agent keeps before it forgets the oldest.
     public const int MaxSessions = 32;

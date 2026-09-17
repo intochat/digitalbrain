@@ -45,7 +45,8 @@ internal static class DescriptorRules
             }
 
             if (type.IsEnum && contract.GetJsonSchemaAsNode() is JsonObject schema
-                && schema["enum"] is JsonArray values && values.All(value => value is JsonValue scalar && scalar.TryGetValue<string>(out _)))
+                && (schema["enum"] is JsonArray values && values.All(value => value is JsonValue scalar && scalar.TryGetValue<string>(out _))
+                    || type.IsDefined(typeof(FlagsAttribute)) && schema["type"]?.GetValue<string>() == "string"))
             {
                 return;
             }

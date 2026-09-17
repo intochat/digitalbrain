@@ -14,6 +14,8 @@ internal interface ILlmProviderFactory
 
     IChatClient CreateChatClient(LLMModel model, AIOptions configuration);
 
+    IChatClient CreateChatClient(string model, AIOptions configuration);
+
     IEmbeddingGenerator<string, Embedding<float>> CreateEmbeddingGenerator(
         EmbeddingModel model,
         AIOptions configuration);
@@ -26,7 +28,10 @@ internal abstract class ApiKeyProviderFactory : ILlmProviderFactory
     public bool IsConfigured(AIOptions configuration)
         => !string.IsNullOrEmpty(configuration.Provider(Provider).ApiKey);
 
-    public abstract IChatClient CreateChatClient(LLMModel model, AIOptions configuration);
+    public virtual IChatClient CreateChatClient(LLMModel model, AIOptions configuration)
+        => CreateChatClient(model.Id, configuration);
+
+    public abstract IChatClient CreateChatClient(string model, AIOptions configuration);
 
     public abstract IEmbeddingGenerator<string, Embedding<float>> CreateEmbeddingGenerator(
         EmbeddingModel model,
@@ -35,11 +40,14 @@ internal abstract class ApiKeyProviderFactory : ILlmProviderFactory
     protected string ApiKeyConfigurationKey => $"{AIClients.ConfigurationRoot}:{Provider}:ApiKey";
 
     protected string RequireApiKey(AIOptions configuration, Type marker, string hostingMethod)
+        => RequireApiKey(configuration, marker.Name, hostingMethod);
+
+    protected string RequireApiKey(AIOptions configuration, string model, string hostingMethod)
         => configuration.Provider(Provider).ApiKey is { Length: > 0 } apiKey
             ? apiKey
             : throw new InvalidOperationException(
-                $"{marker.Name} requires {ApiKeyConfigurationKey}. Configure the model through "
-                + $"AIModule.{hostingMethod}<{marker.Name}>() in AppHost and supply the "
+                $"{model} requires {ApiKeyConfigurationKey}. Configure the provider through "
+                + $"AIModule.{hostingMethod} in AppHost and supply the "
                 + $"{Provider.ToString().ToLowerInvariant()}-api-key secret parameter.");
 }
 
@@ -49,12 +57,12 @@ internal abstract class OpenAICompatibleProviderFactory : ApiKeyProviderFactory
 
     protected abstract Uri? DefaultEndpoint { get; }
 
-    public override IChatClient CreateChatClient(LLMModel model, AIOptions configuration)
+    public override IChatClient CreateChatClient(string model, AIOptions configuration)
     {
         var builder = new ChatClientBuilder(
-            CreateClient(configuration, model.Marker, "WithLlm").GetChatClient(model.Id).AsIChatClient());
+            CreateClient(configuration, model, "WithLlm").GetChatClient(model).AsIChatClient());
 
-        if (Provider is AiProvider.OpenAI)
+        if (Provider is AiProvider.OpenAI && model.StartsWith("gpt-5.6", StringComparison.OrdinalIgnoreCase))
         {
             builder.ConfigureOptions(static options =>
             {
@@ -76,9 +84,9 @@ internal abstract class OpenAICompatibleProviderFactory : ApiKeyProviderFactory
     public override IEmbeddingGenerator<string, Embedding<float>> CreateEmbeddingGenerator(
         EmbeddingModel model,
         AIOptions configuration)
-        => CreateClient(configuration, model.Marker, "WithEmbedding").GetEmbeddingClient(model.Id).AsIEmbeddingGenerator();
+        => CreateClient(configuration, model.Marker.Name, "WithEmbedding").GetEmbeddingClient(model.Id).AsIEmbeddingGenerator();
 
-    private OpenAIClient CreateClient(AIOptions configuration, Type marker, string hostingMethod)
+    private OpenAIClient CreateClient(AIOptions configuration, string model, string hostingMethod)
     {
         var options = new OpenAIClientOptions { NetworkTimeout = RequestTimeout };
         var endpoint = configuration.Provider(Provider).Endpoint is { Length: > 0 } configured
@@ -89,7 +97,7 @@ internal abstract class OpenAICompatibleProviderFactory : ApiKeyProviderFactory
             options.Endpoint = endpoint;
         }
 
-        return new OpenAIClient(new ApiKeyCredential(RequireApiKey(configuration, marker, hostingMethod)), options);
+        return new OpenAIClient(new ApiKeyCredential(RequireApiKey(configuration, model, hostingMethod)), options);
     }
 }
 
@@ -119,12 +127,13 @@ internal sealed class AnthropicProviderFactory : ApiKeyProviderFactory
 {
     public override AiProvider Provider => AiProvider.Anthropic;
 
-    public override IChatClient CreateChatClient(LLMModel model, AIOptions configuration)
+    public override IChatClient CreateChatClient(string model, AIOptions configuration)
         => new AnthropicClient
         {
-            ApiKey = RequireApiKey(configuration, model.Marker, "WithLlm"),
+            ApiKey = RequireApiKey(configuration, model, "WithLlm"),
+            BaseUrl = configuration.Anthropic.Endpoint ?? "https://api.anthropic.com",
             Timeout = TimeSpan.FromMinutes(5),
-        }.AsIChatClient(model.Id);
+        }.AsIChatClient(model);
 
     public override IEmbeddingGenerator<string, Embedding<float>> CreateEmbeddingGenerator(
         EmbeddingModel model,
@@ -142,7 +151,10 @@ internal sealed class OllamaProviderFactory : ILlmProviderFactory
         => !string.IsNullOrEmpty(configuration.Ollama.Endpoint);
 
     public IChatClient CreateChatClient(LLMModel model, AIOptions configuration)
-        => new ChatClientBuilder(CreateApiClient(configuration, model.Marker, model.Id, "WithLlm"))
+        => CreateChatClient(configuration.Ollama.Models.GetValueOrDefault(model.Marker.Name)?.Model ?? model.Id, configuration);
+
+    public IChatClient CreateChatClient(string model, AIOptions configuration)
+        => new ChatClientBuilder(CreateApiClient(configuration, model, model, "WithLlm", useMarkerOverride: false))
             .ConfigureOptions(static options =>
             {
                 options.AdditionalProperties ??= [];
@@ -156,17 +168,18 @@ internal sealed class OllamaProviderFactory : ILlmProviderFactory
     public IEmbeddingGenerator<string, Embedding<float>> CreateEmbeddingGenerator(
         EmbeddingModel model,
         AIOptions configuration)
-        => CreateApiClient(configuration, model.Marker, model.Id, "WithEmbedding");
+        => CreateApiClient(configuration, model.Marker.Name, model.Id, "WithEmbedding");
 
     private static string EndpointConfigurationKey => $"{AIClients.ConfigurationRoot}:Ollama:Endpoint";
 
     private static OllamaApiClient CreateApiClient(
         AIOptions configuration,
-        Type marker,
+        string marker,
         string defaultTag,
-        string hostingMethod)
+        string hostingMethod,
+        bool useMarkerOverride = true)
     {
-        var tag = configuration.Ollama.Models.GetValueOrDefault(marker.Name)?.Model ?? defaultTag;
+        var tag = useMarkerOverride ? configuration.Ollama.Models.GetValueOrDefault(marker)?.Model ?? defaultTag : defaultTag;
         var http = new HttpClient
         {
             BaseAddress = RequireEndpoint(configuration, marker, hostingMethod),
@@ -176,7 +189,7 @@ internal sealed class OllamaProviderFactory : ILlmProviderFactory
         return new OllamaApiClient(http, tag);
     }
 
-    private static Uri RequireEndpoint(AIOptions configuration, Type marker, string hostingMethod)
+    private static Uri RequireEndpoint(AIOptions configuration, string marker, string hostingMethod)
     {
         var endpoint = configuration.Ollama.Endpoint;
         if (Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri)
@@ -187,7 +200,7 @@ internal sealed class OllamaProviderFactory : ILlmProviderFactory
         }
 
         throw new InvalidOperationException(
-            $"{marker.Name} requires {EndpointConfigurationKey} to be an absolute HTTP(S) URI. "
-            + $"Configure it through AIModule.{hostingMethod}<{marker.Name}>() in AppHost.");
+            $"{marker} requires {EndpointConfigurationKey} to be an absolute HTTP(S) URI. "
+            + $"Configure it through AIModule.{hostingMethod} in AppHost.");
     }
 }

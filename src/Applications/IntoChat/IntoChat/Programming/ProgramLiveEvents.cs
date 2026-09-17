@@ -10,9 +10,16 @@ public sealed class ProgramLiveEvents : IProgramRunCancellation
 {
     private readonly ConcurrentDictionary<string, Channel<object>> _streams = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _executions = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, byte> _cancelled = new(StringComparer.Ordinal);
+    private readonly ConcurrentQueue<string> _cancellationOrder = new();
 
     public CancellationToken BeginExecution(string programId, string runId)
-        => _executions.GetOrAdd(programId + "/" + runId, static _ => new CancellationTokenSource()).Token;
+    {
+        var key = programId + "/" + runId;
+        var cancellation = _executions.GetOrAdd(key, static _ => new CancellationTokenSource());
+        if (_cancelled.ContainsKey(key)) { cancellation.Cancel(); }
+        return cancellation.Token;
+    }
 
     public void EndExecution(string programId, string runId)
     {
@@ -21,7 +28,13 @@ public sealed class ProgramLiveEvents : IProgramRunCancellation
 
     public void Cancel(string programId, string runId)
     {
-        if (_executions.TryGetValue(programId + "/" + runId, out var cancellation))
+        var key = programId + "/" + runId;
+        if (_cancelled.TryAdd(key, 0))
+        {
+            _cancellationOrder.Enqueue(key);
+            while (_cancelled.Count > 4096 && _cancellationOrder.TryDequeue(out var expired)) { _cancelled.TryRemove(expired, out _); }
+        }
+        if (_executions.TryGetValue(key, out var cancellation))
         {
             try { cancellation.Cancel(); }
             catch (ObjectDisposedException) { }
