@@ -15,14 +15,6 @@ internal static class NeuronConcurrency
         nameof(INeuron.ReadPendingCount),
     };
 
-    static NeuronConcurrency()
-    {
-        if (KernelInterleavedMethods.Count != 5)
-        {
-            throw new InvalidOperationException("Exactly five kernel operations may interleave. Revisit the specification before changing this set.");
-        }
-    }
-
     internal static void RequireSerializedTurns(Type neuronType)
     {
         ArgumentNullException.ThrowIfNull(neuronType);

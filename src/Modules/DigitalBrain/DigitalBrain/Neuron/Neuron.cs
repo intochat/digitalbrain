@@ -162,9 +162,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     // Override to react. The default neuron does nothing: the signal is already journaled and remembered.
     protected virtual Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken) => Task.CompletedTask;
 
-    protected T? Body<T>(SignalDelivery delivery, JsonTypeInfo<T> json) where T : class
-        => delivery.Body(json);
-
     // Snapshot hooks let the drain finish saved reactions and their announcements.
     private protected virtual bool HasStoredAnnouncements => false;
 
@@ -192,7 +189,13 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     public Task<FireOutcome> Fire(Signal signal, NeuronId? to, CorrelationId? correlation, CancellationToken cancellationToken = default)
     {
         Guard();
-        return FireAsync(signal, to, correlation, cancellationToken);
+        if (ExecutingCommand is { } id)
+        {
+            throw new InvalidOperationException(
+                $"Neuron '{Id}' cannot fire while executing command '{id}': fire from a reaction, not a command. Schedule the work instead.");
+        }
+
+        return FireCoreAsync(signal, to, correlation, cancellationToken);
     }
 
     public async Task Connect(NeuronId target, string signalType)
@@ -487,21 +490,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         {
             _turnWork.Clear();
         }
-    }
-
-    protected Task<FireOutcome> FireAsync(
-        Signal signal,
-        NeuronId? to = null,
-        CorrelationId? correlation = null,
-        CancellationToken cancellationToken = default)
-    {
-        if (ExecutingCommand is { } id)
-        {
-            throw new InvalidOperationException(
-                $"Neuron '{Id}' cannot fire while executing command '{id}': fire from a reaction, not a command. Schedule the work instead.");
-        }
-
-        return FireCoreAsync(signal, to, correlation, cancellationToken);
     }
 
     internal Task<FireOutcome> FireAnnouncementAsync(Announcement announcement, CancellationToken cancellationToken)
