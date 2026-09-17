@@ -154,6 +154,11 @@ internal static class ProgramConversationHistory
     internal const int InputBudget = 8_000;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
+    internal static string Answer(JsonElement output)
+        => output.ValueKind == JsonValueKind.Object && output.TryGetProperty("text", out var text)
+            ? text.GetString() ?? string.Empty
+            : output.ValueKind == JsonValueKind.String ? output.GetString()! : output.GetRawText();
+
     internal static List<ChatMessage> Read(JsonElement value)
     {
         var messages = new List<ChatMessage>();

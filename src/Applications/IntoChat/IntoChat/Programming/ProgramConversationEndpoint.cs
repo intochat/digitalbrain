@@ -2,10 +2,7 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Programming;
-using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Core.Programming;
 using Microsoft.Extensions.AI;
 
@@ -75,10 +72,7 @@ internal sealed class ProgramConversationEndpoint(ProgramService programs, IGrai
             {
                 RequireBinding(existing, threadId, requestHash, supplied);
             }
-            var historyId = NeuronId.Plain("conversation-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(threadId)))[..32]);
-            var historyNeuron = grains.GetGrain<INeuron>(historyId.ToGrainId());
-            var historySignal = (await historyNeuron.ReadState()).FirstOrDefault(item => item.Signal.Type == "ConversationHistory");
-            var history = ReadHistory(historySignal?.Signal.Body);
+            var conversation = grains.GetGrain<IConversation>(threadId);
             List<ChatMessage> messages;
             JsonElement input;
             if (existing is null)
@@ -92,9 +86,8 @@ internal sealed class ProgramConversationEndpoint(ProgramService programs, IGrai
                         if ((await programs.ReadAsync("intochat", cancellationToken)).Definition is null) { throw; }
                     }
                 }
-                messages = [.. history.Messages, .. supplied];
-                ProgramConversationHistory.Trim(messages, ProgramConversationHistory.InputBudget);
-                input = JsonSerializer.SerializeToElement(new { threadId, requestHash, messages }, Json);
+                input = await conversation.PrepareInput(requestHash, JsonSerializer.SerializeToElement(supplied, Json));
+                messages = ProgramConversationHistory.Read(input.GetProperty("messages"));
             }
             else
             {
@@ -133,9 +126,7 @@ internal sealed class ProgramConversationEndpoint(ProgramService programs, IGrai
             {
                 throw new InvalidOperationException(result.Error ?? $"The IntoChat program ended with status {result.Status}.");
             }
-            var answer = result.Output.ValueKind == JsonValueKind.Object && result.Output.TryGetProperty("text", out var answerText)
-                ? answerText.GetString() ?? string.Empty
-                : result.Output.ValueKind == JsonValueKind.String ? result.Output.GetString()! : result.Output.GetRawText();
+            var answer = ProgramConversationHistory.Answer(result.Output);
             if (streamed.Length == 0 || !string.Equals(streamed.ToString(), answer, StringComparison.Ordinal))
             {
                 var messageId = runId + "-result";
@@ -152,24 +143,7 @@ internal sealed class ProgramConversationEndpoint(ProgramService programs, IGrai
                 messages = ProgramConversationHistory.Read(canonical);
                 await ReplayMissingToolsAsync(context, messages, previousCalls, receivedResults, runId, cancellationToken);
             }
-            else
-            {
-                messages.Add(new ChatMessage(ChatRole.Assistant, answer));
-            }
-
-            // Replaying an old run must never append the turn twice or replace later history.
-            if (history.LastRunId != runId && (history.CompletedAt is null || result.CompletedAt > history.CompletedAt))
-            {
-                ProgramConversationHistory.Trim(messages, 16_000);
-                var updated = new ConversationHistory(runId, result.CompletedAt, messages);
-                var source = grains.GetGrain<INeuron>(NeuronId.Plain("intochat-history").ToGrainId());
-                using var save = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                var outcome = await source.Fire(Signal.Create("ConversationHistory", JsonSerializer.Serialize(updated, Json)), historyId, null, save.Token);
-                if (outcome.Busy > 0)
-                {
-                    throw new NeuronBusyException("The reply completed, but conversation history is busy. Retry with the same run id to save it without running tools again.");
-                }
-            }
+            await conversation.CompleteRun(result);
             await WriteAsync(context, new { type = "RUN_FINISHED", threadId, runId, programVersion = result.Version }, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -192,15 +166,6 @@ internal sealed class ProgramConversationEndpoint(ProgramService programs, IGrai
             if (ownsStream) { events.Close(runId); }
             if (ownsThread) { _activeThreads.TryRemove(threadId, out _); }
         }
-    }
-
-    private static ConversationHistory ReadHistory(string? body)
-    {
-        if (body is null) { return new(null, null, []); }
-        using var document = JsonDocument.Parse(body);
-        return document.RootElement.ValueKind == JsonValueKind.Array
-            ? new(null, null, ProgramConversationHistory.Read(document.RootElement))
-            : JsonSerializer.Deserialize<ConversationHistory>(body, Json) ?? new(null, null, []);
     }
 
     private static void RequireBinding(ProgramRunSnapshot run, string threadId, string hash, List<ChatMessage> supplied)
@@ -254,6 +219,4 @@ internal sealed class ProgramConversationEndpoint(ProgramService programs, IGrai
         await context.Response.WriteAsync("data: " + JsonSerializer.Serialize(item, Json) + "\n\n", cancellationToken);
         await context.Response.Body.FlushAsync(cancellationToken);
     }
-
-    private sealed record ConversationHistory(string? LastRunId, DateTimeOffset? CompletedAt, List<ChatMessage> Messages);
 }
