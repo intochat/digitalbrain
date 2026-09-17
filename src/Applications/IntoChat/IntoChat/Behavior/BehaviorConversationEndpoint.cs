@@ -101,7 +101,7 @@ internal sealed class BehaviorConversationEndpoint(BehaviorService programs, IGr
             var admitted = existing ?? await programs.RunAsync("intochat", input, runId, cancellationToken);
             RequireBinding(admitted, threadId, requestHash, supplied);
             var finished = admitted.Status == "Running"
-                ? programs.WaitAsync("intochat", runId, cancellationToken)
+                ? WaitForOutputAsync(programs, runId, cancellationToken)
                 : Task.FromResult(admitted);
             var streamed = new StringBuilder();
             var receivedResults = new HashSet<string>(StringComparer.Ordinal);
@@ -165,6 +165,19 @@ internal sealed class BehaviorConversationEndpoint(BehaviorService programs, IGr
         {
             if (ownsStream) { events.Close(runId); }
             if (ownsThread) { _activeThreads.TryRemove(threadId, out _); }
+        }
+    }
+
+    private static async Task<BehaviorRunSnapshot> WaitForOutputAsync(BehaviorService programs, string runId, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            var run = await programs.ReadRunAsync("intochat", runId, cancellationToken);
+            if (run is { Status: not "Running" })
+            {
+                return run;
+            }
+            await Task.Delay(40, cancellationToken);
         }
     }
 

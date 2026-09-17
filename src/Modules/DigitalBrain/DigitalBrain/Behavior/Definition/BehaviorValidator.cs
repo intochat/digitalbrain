@@ -29,8 +29,7 @@ public static partial class BehaviorValidator
 
     private static readonly HashSet<string> ReservedSignals = new(StringComparer.Ordinal)
     {
-        "BehaviorChange", "BehaviorRegistered", "BehaviorStart", "BehaviorStep", "BehaviorCompleted",
-        "BehaviorCancel", "BehaviorFinished", "BehaviorRejected",
+        "Value",
     };
 
     public static BehaviorValidation Validate(BehaviorDefinition definition)

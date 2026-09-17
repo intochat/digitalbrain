@@ -17,6 +17,7 @@ internal static class BehaviorEndpoints
         builder.Services.AddSingleton<BehaviorTools>();
         builder.Services.AddSingleton<BehaviorAgentTools>();
         builder.Services.AddSingleton<IBehaviorNodeExecutor, IntoChatBehaviorExecutor>();
+        builder.Services.AddSingleton<IBehaviorDefaults, IntoChatBehaviorDefaults>();
     }
 
     public static void MapBehaviors(this IEndpointRouteBuilder endpoints)
