@@ -8,7 +8,7 @@ internal sealed record NeuronActivationComponents(
     NeuronOptions Options,
     NeuronJournals Journals,
     CommandJournal Commands,
-    CommandDedup Dedup,
+    CommandOutcomeStore CommandOutcomes,
     CommandExecution Execution,
     NeuronSynapses Synapses,
     IDurableDictionary<string, SignalDelivery> Latest,
@@ -26,7 +26,7 @@ internal sealed record NeuronActivationComponents(
     {
         Journals.NoteReloaded();
         Commands.NoteReloaded();
-        Dedup.NoteReloaded();
+        CommandOutcomes.NoteReloaded();
         Pending.NoteReloaded();
     }
 }

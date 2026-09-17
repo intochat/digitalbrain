@@ -43,7 +43,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         _descriptors = ServiceProvider.GetRequiredService<DescriptorTable>();
         _components = runtime.Bind(ServiceProvider, Id);
         _fence = new PersistenceFence(Id, StateManager, _activation.Token,
-            () => CommandReconciliation.Reconcile(_components.Commands, _components.Dedup, TimeProvider.GetUtcNow()),
+            () => CommandReconciliation.Reconcile(_components.Commands, _components.CommandOutcomes, TimeProvider.GetUtcNow()),
             DeactivateOnIdle, _components);
         _retry = new RetryScheduler(this, _ => ((INeuronInbox)this).Drain(), _components.Options.RetryReminderPeriod,
             () => _components.Pending.Count > 0 || HasStoredAnnouncements, _activation.Token);
@@ -122,7 +122,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         await base.OnActivateAsync(cancellationToken).ConfigureAwait(true);
         _components.NoteReloaded();
         _fence.NoteStoredState(StorageHoldsState());
-        if (CommandReconciliation.Reconcile(_components.Commands, _components.Dedup, TimeProvider.GetUtcNow()))
+        if (CommandReconciliation.Reconcile(_components.Commands, _components.CommandOutcomes, TimeProvider.GetUtcNow()))
         {
             await PersistAsync().ConfigureAwait(true);
         }

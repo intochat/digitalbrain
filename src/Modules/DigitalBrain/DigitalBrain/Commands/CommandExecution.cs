@@ -10,7 +10,7 @@ using DigitalBrain.Abstractions.Signals;
 
 namespace DigitalBrain.Core;
 
-internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedup, TimeProvider clock,
+internal sealed class CommandExecution(CommandJournal journal, CommandOutcomeStore outcomes, TimeProvider clock,
     ICommandCrashPoint? crashPoint)
 {
     internal async Task<TResult> RunAsync<TArguments, TResult>(
@@ -33,15 +33,15 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
                 $"Neuron '{host.Id}' already holds {PendingWork.MaxPending} pending signals. Retry after pending work finishes.");
         }
 
-        if (dedup.IsFullOfUnresolved)
+        if (outcomes.IsFullOfUnresolved)
         {
             throw new NeuronBusyException(
-                $"Neuron '{host.Id}' already holds {CommandDedup.MaxResolved} unresolved commands. Retry after pending commands resolve.");
+                $"Neuron '{host.Id}' already holds {CommandOutcomeStore.MaxUnresolved} unresolved commands. Retry after pending commands resolve.");
         }
 
         var bytes = Encoding.UTF8.GetBytes(argumentsText);
         var hash = Convert.ToHexStringLower(SHA256.HashData(bytes));
-        var existing = dedup.Find(arguments.Id);
+        var existing = outcomes.Find(arguments.Id);
         record = record with { Incarnation = existing is null ? 1 : existing.Incarnation + 1 };
         if (bytes.Length > CommandLimits.MaxArgumentBytes)
         {
@@ -60,7 +60,7 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
         var outcome = new CommandOutcome(
             CommandPhase.Attempted, record.Incarnation, caller, command.InterfaceAlias, command.MethodAlias,
             hash, null, null, record.Sequence);
-        dedup.Record(arguments.Id, outcome);
+        outcomes.Record(arguments.Id, outcome);
         await host.PersistAsync().ConfigureAwait(true);
 
         TResult result = default!;
@@ -182,7 +182,7 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
         };
         crashPoint?.BeforeTerminalRecord(record.Id);
         terminal = journal.Append(terminal);
-        dedup.Record(record.Id, outcome with
+        outcomes.Record(record.Id, outcome with
         {
             Phase = terminal.Phase,
             ResultJson = terminal.ResultJson,
@@ -194,7 +194,7 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
     private async Task<TResult> RejectAsync<TResult>(ICommandHost host, CommandRecord record, string hash,
         CommandRejectedException error)
     {
-        var existing = dedup.Find(error.Id);
+        var existing = outcomes.Find(error.Id);
         // Remember repeated permanent rejections by reason; a fresh attempt replaces the outcome and clears the rejection.
         if (existing?.RepeatsRejection(error.Reason) == true)
         {
@@ -203,7 +203,7 @@ internal sealed class CommandExecution(CommandJournal journal, CommandDedup dedu
 
         record = journal.Append(record with { Error = TruncateError(error.Message) });
         var rejection = new CommandRejection(record.Incarnation, error.Reason, error.Message);
-        dedup.Record(error.Id, existing is not null
+        outcomes.Record(error.Id, existing is not null
             ? existing with { Rejection = rejection }
             : new CommandOutcome(CommandPhase.Rejected, record.Incarnation, record.Caller, record.Interface,
                 record.Method, hash, null, null, record.Sequence, rejection));
