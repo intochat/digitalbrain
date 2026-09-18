@@ -1,3 +1,5 @@
+using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Signals;
 using Orleans.Journaling;
 
@@ -6,7 +8,8 @@ namespace DigitalBrain.Core;
 internal sealed record NeuronActivationComponents(
     TimeProvider Clock,
     NeuronOptions Options,
-    NeuronJournals Journals,
+    JournalWindow Incoming,
+    JournalWindow Outgoing,
     CommandJournal Commands,
     CommandOutcomeStore CommandOutcomes,
     CommandExecution Execution,
@@ -14,21 +17,42 @@ internal sealed record NeuronActivationComponents(
     IDurableDictionary<string, SignalDelivery> Latest,
     PendingWork Pending)
 {
-    internal NeuronCommitBoundary CaptureCommitBoundary() => new(Journals.CaptureCommitBoundary(), Commands.CaptureCommitBoundary());
+    internal long IncomingNextSequence => Incoming.NextSequence;
+
+    internal long OutgoingNextSequence => Outgoing.NextSequence;
+
+    internal JournalRead Read(JournalKind kind, long afterSequence) => kind switch
+    {
+        JournalKind.Incoming => Incoming.Read(afterSequence),
+        JournalKind.Outgoing => Outgoing.Read(afterSequence),
+        _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+    };
+
+    internal void AppendIncoming(SignalDelivery delivery) => Incoming.Append(delivery);
+
+    internal void AppendOutgoing(SignalDelivery delivery) => Outgoing.Append(delivery);
+
+    internal bool RetainsOutgoing(SignalId signalId) => Outgoing.Retains(signalId);
+
+    internal NeuronCommitBoundary CaptureCommitBoundary()
+        => new(Incoming.CaptureCommitBoundary(), Outgoing.CaptureCommitBoundary(), Commands.CaptureCommitBoundary());
 
     internal void NoteCommitted(NeuronCommitBoundary boundary)
     {
-        Journals.NoteCommitted(boundary.Journals);
+        Incoming.NoteCommitted(boundary.Incoming);
+        Outgoing.NoteCommitted(boundary.Outgoing);
         Commands.NoteCommitted(boundary.Commands);
     }
 
     internal void NoteReloaded()
     {
-        Journals.NoteReloaded();
+        Incoming.NoteReloaded();
+        Outgoing.NoteReloaded();
         Commands.NoteReloaded();
         CommandOutcomes.NoteReloaded();
         Pending.NoteReloaded();
     }
 }
 
-internal readonly record struct NeuronCommitBoundary(NeuronJournalsBoundary Journals, JournalCommitBoundary Commands);
+internal readonly record struct NeuronCommitBoundary(
+    JournalWindowBoundary Incoming, JournalWindowBoundary Outgoing, JournalCommitBoundary Commands);

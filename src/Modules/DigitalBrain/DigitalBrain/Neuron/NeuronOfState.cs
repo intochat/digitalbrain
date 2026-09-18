@@ -24,9 +24,7 @@ public abstract class Neuron<TState> : Neuron where TState : class
 
     private SnapshotEnvelope<TState> Envelope => _state.RecordExists ? _state.State : Empty;
 
-    internal int StoredAnnouncementCount => Envelope.Announcements.Count;
-
-    private protected override bool HasStoredAnnouncements => StoredAnnouncementCount > 0;
+    private protected override bool HasStoredAnnouncements => Envelope.Announcements.Count > 0;
 
     private protected override bool IsAppliedBy(SignalId delivery) => Envelope.AppliedBy == delivery;
 

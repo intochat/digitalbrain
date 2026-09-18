@@ -35,7 +35,8 @@ public sealed class NeuronRuntime(TimeProvider clock, NeuronOptions options)
         return new(
             Clock,
             Options,
-            new NeuronJournals(Window("incoming"), Window("outgoing")),
+            Window("incoming"),
+            Window("outgoing"),
             commands,
             outcomes,
             new CommandExecution(commands, outcomes, Clock),

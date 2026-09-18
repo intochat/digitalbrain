@@ -10,7 +10,7 @@ using Orleans.Runtime;
 
 namespace DigitalBrain.Core;
 
-public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable, ICommandHost
+public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable
 {
     public const int MaxSignalTypesPerNeuron = 256;
 
@@ -39,7 +39,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
 
     protected TimeProvider TimeProvider => _components.Clock;
 
-    protected Task PersistAsync() => _fence.PersistAsync();
+    protected internal Task PersistAsync() => _fence.PersistAsync();
 
     protected new Task WriteStateAsync(CancellationToken cancellationToken = default)
         => throw new InvalidOperationException($"Neuron '{Id}' must call PersistAsync to write through the persistence fence.");
@@ -50,25 +50,19 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
 
     protected ReactionContext? ReactionContext { get; private set; }
 
-    internal CommandId? ExecutingCommand => (ReactionContext as CommandReaction)?.Command;
-
-    NeuronId ICommandHost.Id => Id;
-
-    bool ICommandHost.HasPendingRoom => _components.Pending.HasRoomFor(0);
-
-    ReactionContext? ICommandHost.ReactionContext
+    internal ReactionContext? TurnReaction
     {
         get => ReactionContext;
         set => ReactionContext = value;
     }
 
-    Task ICommandHost.PersistAsync() => PersistAsync();
+    internal CommandId? ExecutingCommand => (ReactionContext as CommandReaction)?.Command;
 
-    Task ICommandHost.DiscardStagedChangesAsync(Exception cause) => _fence.DiscardStagedChangesAsync(cause);
+    internal bool HasPendingRoom => _components.Pending.HasRoomFor(0);
 
-    void ICommandHost.AdmitTurnWork() => AdmitTurnWork();
+    internal Task DiscardStagedChangesAsync(Exception cause) => _fence.DiscardStagedChangesAsync(cause);
 
-    private void AdmitTurnWork()
+    internal void AdmitTurnWork()
     {
         if (_turnWork.Count == 0)
         {
@@ -90,7 +84,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         _turnWork.Clear();
     }
 
-    Task ICommandHost.WakeTurnWorkAsync()
+    internal Task WakeTurnWorkAsync()
     {
         return _components.Pending.Count == 0 ? Task.CompletedTask : EnsureReminderAndWakeAsync();
 
@@ -122,8 +116,8 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     }
 
     private bool StorageHoldsState()
-        => _components.Journals.IncomingNextSequence > 1
-            || _components.Journals.OutgoingNextSequence > 1
+        => _components.IncomingNextSequence > 1
+            || _components.OutgoingNextSequence > 1
             || _components.Commands.LastSequence > 0
             || _components.Synapses.All().Count > 0
             || _components.Pending.Count > 0
@@ -238,7 +232,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
 
         signal = Signal.Create(signal.Type, signal.Body);
         RequireSignalTypeCapacity(signal.Type);
-        var delivery = SignalDelivery.Create(signal, Id, _components.Journals.IncomingNextSequence, TimeProvider, (ReactionContext as DeliveryReaction)?.Delivery, correlation);
+        var delivery = SignalDelivery.Create(signal, Id, _components.IncomingNextSequence, TimeProvider, (ReactionContext as DeliveryReaction)?.Delivery, correlation);
         if (!_components.Pending.HasRoomFor(_turnWork.Count))
         {
             throw new NeuronBusyException($"Neuron '{Id}' already holds {PendingWork.MaxPending} pending signals. Retry after pending work finishes.");
@@ -263,7 +257,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
 
     private void AdmitAndStageDelivery(SignalDelivery delivery)
     {
-        delivery = delivery with { Sequence = _components.Journals.IncomingNextSequence };
+        delivery = delivery with { Sequence = _components.IncomingNextSequence };
         if (_components.Pending.Classify(delivery) == DeliveryAdmission.Duplicate)
         {
             throw new InvalidOperationException($"Freshly minted scheduled signal id '{delivery.SignalId}' must never be a duplicate.");
@@ -275,7 +269,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
 
     private void StageAdmitted(SignalDelivery delivery)
     {
-        _components.Journals.AppendIncoming(delivery);
+        _components.AppendIncoming(delivery);
         _components.Latest[delivery.Signal.Type] = delivery;
     }
 
@@ -438,7 +432,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     public Task<JournalRead> ReadJournal(JournalKind kind, long afterSequence)
     {
         Guard();
-        return Task.FromResult(_components.Journals.Read(kind, afterSequence));
+        return Task.FromResult(_components.Read(kind, afterSequence));
     }
 
     public Task<CommandJournalRead> ReadCommands(long afterSequence)
@@ -492,16 +486,16 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
             _components.Synapses.Connect(single, signal.Type);
         }
 
-        var delivery = SignalDelivery.Create(signal, Id, _components.Journals.OutgoingNextSequence, TimeProvider, (ReactionContext as DeliveryReaction)?.Delivery, correlation);
+        var delivery = SignalDelivery.Create(signal, Id, _components.OutgoingNextSequence, TimeProvider, (ReactionContext as DeliveryReaction)?.Delivery, correlation);
         if (fixedId is { } announcementId)
         {
             delivery = delivery with { SignalId = announcementId, CausationId = fixedCausation };
         }
 
         // A re-fire is the same signal, so the journal keeps one entry for it.
-        if (fixedId is null || !_components.Journals.RetainsOutgoing(delivery.SignalId))
+        if (fixedId is null || !_components.RetainsOutgoing(delivery.SignalId))
         {
-            _components.Journals.AppendOutgoing(delivery);
+            _components.AppendOutgoing(delivery);
         }
         await PersistAsync().ConfigureAwait(true);
 

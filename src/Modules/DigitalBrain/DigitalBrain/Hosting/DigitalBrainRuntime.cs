@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using System.Text.Json.Serialization.Metadata;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
+using Orleans.Serialization;
 
 namespace DigitalBrain.Core;
 
@@ -33,7 +34,7 @@ public static class DigitalBrainRuntime
         builder.AddOutgoingGrainCallFilter<OutgoingCallerFilter>();
         builder.AddActivityPropagation();
         builder.UseJsonJournalFormat(new DefaultJsonTypeInfoResolver());
-        ModelPayloadSerialization.AddModelPayloadSerialization(builder.Services);
+        AddModelPayloadSerialization(builder.Services);
         builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         builder.Services.AddOptions<NeuronOptions>()
             .BindConfiguration(NeuronOptions.SectionName)
@@ -68,6 +69,12 @@ public static class DigitalBrainRuntime
     {
         ArgumentNullException.ThrowIfNull(builder);
         AddInvoker(builder.Services);
+    }
+
+    public static void AddModelPayloadSerialization(IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.AddSerializer(serializer => serializer.AddJsonSerializer(static type => type == typeof(System.Text.Json.JsonElement)));
     }
 
     private static void AddInvoker(IServiceCollection services)

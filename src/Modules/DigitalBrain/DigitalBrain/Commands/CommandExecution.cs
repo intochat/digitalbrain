@@ -13,12 +13,12 @@ namespace DigitalBrain.Core;
 internal sealed class CommandExecution(CommandJournal journal, CommandOutcomeStore outcomes, TimeProvider clock)
 {
     internal async Task<TResult> RunAsync<TArguments, TResult>(
-        ICommandHost host, CommandDescriptor command, TArguments arguments,
+        Neuron host, CommandDescriptor command, TArguments arguments,
         JsonTypeInfo<TArguments> argumentsJson, JsonTypeInfo<TResult> resultJson,
         Func<TArguments, TResult> execute) where TArguments : Command
     {
         var caller = CallerContext.Current();
-        var cause = (host.ReactionContext as DeliveryReaction)?.Delivery;
+        var cause = (host.TurnReaction as DeliveryReaction)?.Delivery;
         var record = new CommandRecord(
             0, arguments.Id, 1, command.InterfaceAlias, command.MethodAlias, CommandPhase.Rejected,
             caller, cause?.CorrelationId ?? CallerContext.CurrentCorrelation() ?? CorrelationId.New(),
@@ -67,8 +67,8 @@ internal sealed class CommandExecution(CommandJournal journal, CommandOutcomeSto
         try
         {
             IReadOnlyList<SignalId>? scheduledWork = null;
-            var previous = host.ReactionContext;
-            host.ReactionContext = new CommandReaction(arguments.Id, []);
+            var previous = host.TurnReaction;
+            host.TurnReaction = new CommandReaction(arguments.Id, []);
             try
             {
                 result = execute(arguments);
@@ -79,12 +79,12 @@ internal sealed class CommandExecution(CommandJournal journal, CommandOutcomeSto
             }
             finally
             {
-                if (host.ReactionContext is CommandReaction { ScheduledWork.Count: > 0 } reaction)
+                if (host.TurnReaction is CommandReaction { ScheduledWork.Count: > 0 } reaction)
                 {
                     scheduledWork = reaction.ScheduledWork;
                 }
 
-                host.ReactionContext = previous;
+                host.TurnReaction = previous;
             }
 
             string? resultText = null;
@@ -133,7 +133,7 @@ internal sealed class CommandExecution(CommandJournal journal, CommandOutcomeSto
     }
 
     private async Task<(bool Applies, TResult Result)> TryReplay<TResult>(
-        ICommandHost host, CommandRecord record, CommandOutcome? existing, string hash, JsonTypeInfo<TResult> resultJson)
+        Neuron host, CommandRecord record, CommandOutcome? existing, string hash, JsonTypeInfo<TResult> resultJson)
     {
         if (existing is null)
         {
@@ -189,7 +189,7 @@ internal sealed class CommandExecution(CommandJournal journal, CommandOutcomeSto
         });
     }
 
-    private async Task<TResult> RejectAsync<TResult>(ICommandHost host, CommandRecord record, string hash,
+    private async Task<TResult> RejectAsync<TResult>(Neuron host, CommandRecord record, string hash,
         CommandRejectedException error)
     {
         var existing = outcomes.Find(error.Id);

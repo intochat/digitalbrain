@@ -44,7 +44,7 @@ public sealed class BrainSimulation : IAsyncDisposable
             builder.ConfigureHost(host => host.Configuration.AddInMemoryCollection(configuration));
         }
         builder.ConfigureSilo((_, silo) => ConfigureSilo(silo, options));
-        builder.ConfigureClient(client => ModelPayloadSerialization.AddModelPayloadSerialization(client.Services));
+        builder.ConfigureClient(client => DigitalBrainRuntime.AddModelPayloadSerialization(client.Services));
         var cluster = builder.Build();
         await cluster.DeployAsync().ConfigureAwait(false);
         return new(cluster);
