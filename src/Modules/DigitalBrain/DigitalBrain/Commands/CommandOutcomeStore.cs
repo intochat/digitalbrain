@@ -64,6 +64,33 @@ internal sealed class CommandOutcomeStore(IDurableDictionary<CommandId, CommandO
     internal IReadOnlyList<KeyValuePair<CommandId, CommandOutcome>> Unresolved()
         => [.. outcomes.Where(entry => entry.Value.Phase == CommandPhase.Attempted)];
 
+    internal bool Reconcile(CommandJournal journal, DateTimeOffset at)
+    {
+        var unresolved = Unresolved();
+        if (unresolved.Count == 0)
+        {
+            return false;
+        }
+
+        var terminal = journal.TerminalRecords();
+        var changed = false;
+        foreach (var (id, outcome) in unresolved)
+        {
+            if (terminal.Contains((id, outcome.Incarnation)))
+            {
+                continue;
+            }
+
+            var record = journal.Append(new(
+                0, id, outcome.Incarnation, outcome.Interface, outcome.Method, CommandPhase.Unknown,
+                outcome.Caller, CorrelationId.New(), null, null, null, null, at));
+            Record(id, outcome with { Phase = CommandPhase.Unknown, Sequence = record.Sequence });
+            changed = true;
+        }
+
+        return changed;
+    }
+
     private void AdjustCount(CommandOutcome outcome, int delta)
     {
         if (outcome.Phase == CommandPhase.Attempted)

@@ -1,9 +1,6 @@
 using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions.Commands;
-using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Excel;
-
-[assembly: NeuronJsonContext(typeof(ExcelJson))]
 
 namespace DigitalBrain.Excel;
 

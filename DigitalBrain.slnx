@@ -28,6 +28,7 @@
     <Project Path="src/Modules/DigitalBrain/Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
     <Project Path="src/Modules/DigitalBrain/Aspire/DigitalBrain.Aspire.csproj" />
     <Project Path="src/Modules/DigitalBrain/Contracts/DigitalBrain.Contracts.csproj" />
+    <Project Path="src/Modules/DigitalBrain/BehaviorRuntime/DigitalBrain.Behavior.csproj" />
     <Project Path="src/Modules/DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
     <Project Path="src/Modules/DigitalBrain/Http/DigitalBrain.Http.csproj" />
     <Project Path="src/Modules/DigitalBrain/Mcp/DigitalBrain.Mcp.csproj" />

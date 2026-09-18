@@ -8,6 +8,7 @@ internal static class BehaviorEndpoints
 {
     public static void AddBehaviors(this IHostApplicationBuilder builder)
     {
+        builder.Services.AddSingleton<BehaviorService>();
         builder.Services.AddSingleton<BehaviorCompiler>();
         builder.Services.AddSingleton<BehaviorCodeRunner>();
         builder.Services.AddSingleton<BehaviorLiveEvents>();

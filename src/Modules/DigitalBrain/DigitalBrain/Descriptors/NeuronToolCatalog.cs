@@ -24,7 +24,6 @@ internal sealed class NeuronToolCatalog
 
     public NeuronToolCatalog(IOptions<GrainTypeOptions> options, GrainTypeResolver grainTypes, GrainInterfaceTypeResolver interfaceTypes)
     {
-        Dictionary<Assembly, JsonSerializerOptions> contexts = [];
         foreach (var grainClass in options.Value.Classes.Where(type => type is { IsClass: true, IsAbstract: false }))
         {
             List<MethodDescriptor> descriptors = [];
@@ -43,7 +42,7 @@ internal sealed class NeuronToolCatalog
                     if (!_methods.TryGetValue(key, out var metadata))
                     {
                         metadata = Build(method, interfaceAlias, methodAlias, interfaceTypes.GetGrainInterfaceType(contract),
-                            JsonOptions(contract.Assembly, contexts));
+                            JsonOptions());
                         _methods.Add(key, metadata);
                     }
                     else if (metadata.Method != method)
@@ -135,18 +134,14 @@ internal sealed class NeuronToolCatalog
         return new(method, interfaceType, argumentsJson, commandId, CompileCall(method), CompileResult(returnType), returnsNeuron, descriptor, resultJson);
     }
 
-    private static JsonSerializerOptions JsonOptions(Assembly assembly, Dictionary<Assembly, JsonSerializerOptions> contexts)
+    private static JsonSerializerOptions JsonOptions()
     {
-        if (!contexts.TryGetValue(assembly, out var options))
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
         {
-            var contextType = assembly.GetCustomAttribute<NeuronJsonContextAttribute>()?.ContextType;
-            options = contextType?.GetProperty("Default", BindingFlags.Public | BindingFlags.Static)?.GetValue(null) is JsonSerializerContext context
-                ? new(context.Options) { TypeInfoResolver = context }
-                : new(JsonSerializerDefaults.Web) { TypeInfoResolver = new DefaultJsonTypeInfoResolver() };
-            options.RespectRequiredConstructorParameters = true;
-            options.RespectNullableAnnotations = true;
-            contexts.Add(assembly, options);
-        }
+            TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
+            RespectRequiredConstructorParameters = true,
+            RespectNullableAnnotations = true,
+        };
         return options;
     }
 

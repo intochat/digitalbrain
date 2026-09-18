@@ -2,5 +2,6 @@
   <Import Project="../../../Testing/Module.Tests.props" />
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../BehaviorRuntime/DigitalBrain.Behavior.csproj" />
   </ItemGroup>
 </Project>

@@ -1,10 +1,7 @@
 using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Salesforce;
-
-[assembly: NeuronJsonContext(typeof(SalesforceJson))]
 
 namespace DigitalBrain.Salesforce;
 

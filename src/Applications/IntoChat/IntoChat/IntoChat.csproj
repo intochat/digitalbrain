@@ -10,6 +10,7 @@
     <ProjectReference Include="../ServiceDefaults/IntoChat.ServiceDefaults.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Aspire/DigitalBrain.Aspire.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/BehaviorRuntime/DigitalBrain.Behavior.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Http/DigitalBrain.Http.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Mcp/DigitalBrain.Mcp.csproj" />
     <ProjectReference Include="../../../Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />

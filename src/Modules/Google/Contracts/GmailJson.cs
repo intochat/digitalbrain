@@ -1,10 +1,7 @@
 using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Google;
-
-[assembly: NeuronJsonContext(typeof(GmailJson))]
 
 namespace DigitalBrain.Google;
 

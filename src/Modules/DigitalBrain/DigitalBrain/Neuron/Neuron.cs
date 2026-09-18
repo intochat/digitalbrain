@@ -5,8 +5,6 @@ using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Abstractions.Synapses;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Concurrency;
 using Orleans.Journaling;
 using Orleans.Runtime;
 
@@ -24,8 +22,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
 
     private readonly NeuronActivationComponents _components;
     private readonly PersistenceFence _fence;
-    private readonly StreamWake? _streamWake;
-
     private readonly CancellationTokenSource _activation = new();
     private readonly RetryScheduler _retry;
     private (SignalId Id, CancellationTokenSource Cancellation)? _reacting;
@@ -35,10 +31,9 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     protected Neuron(NeuronRuntime runtime)
     {
         ArgumentNullException.ThrowIfNull(runtime);
-        _streamWake = ServiceProvider.GetService<StreamWake>();
         _components = runtime.Bind(ServiceProvider, Id);
         _fence = new PersistenceFence(Id, StateManager, _activation.Token,
-            () => CommandReconciliation.Reconcile(_components.Commands, _components.CommandOutcomes, TimeProvider.GetUtcNow()),
+            () => _components.CommandOutcomes.Reconcile(_components.Commands, TimeProvider.GetUtcNow()),
             DeactivateOnIdle, _components);
         _retry = new RetryScheduler(this, _ => ((INeuronInbox)this).Drain(), _components.Options.RetryReminderPeriod,
             () => _components.Pending.Count > 0 || HasStoredAnnouncements, _activation.Token);
@@ -113,11 +108,10 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
 
     public sealed override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        NeuronConcurrency.RequireSerializedTurns(GetType());
         await base.OnActivateAsync(cancellationToken).ConfigureAwait(true);
         _components.NoteReloaded();
         _fence.NoteStoredState(StorageHoldsState());
-        if (CommandReconciliation.Reconcile(_components.Commands, _components.CommandOutcomes, TimeProvider.GetUtcNow()))
+        if (_components.CommandOutcomes.Reconcile(_components.Commands, TimeProvider.GetUtcNow()))
         {
             await PersistAsync().ConfigureAwait(true);
         }
@@ -239,8 +233,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         await PersistAsync().ConfigureAwait(true);
         // Register after persistence so work that never committed cannot leave an orphan reminder row.
         await _retry.EnsureReminderAsync().ConfigureAwait(true);
-
-        _streamWake?.Publish(Id);
 
         Wake();
         return DeliveryAdmission.Accepted;
@@ -412,7 +404,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         }
 
         await _retry.AfterDrainAsync(remaining).ConfigureAwait(true);
-        _streamWake?.Publish(Id);
         if (remaining)
         {
             _retry.ArmTimer();

@@ -1,8 +1,5 @@
 using System.Text.Json.Serialization;
-using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Abstractions.Behavior;
-
-[assembly: NeuronJsonContext(typeof(BehaviorJson))]
 
 
 namespace DigitalBrain.Abstractions.Behavior;

@@ -28,7 +28,6 @@ public static class DigitalBrainRuntime
 
         builder.AddJournalStorage();
         builder.AddIncomingGrainCallFilter<NeuronActivationGuardFilter>();
-        builder.AddOutgoingGrainCallFilter<CommandLocalityFilter>();
         builder.AddOutgoingGrainCallFilter<OutgoingCallerFilter>();
         builder.AddActivityPropagation();
         builder.UseJsonJournalFormat(DurableStateJson.TypeInfoResolver);
@@ -41,11 +40,9 @@ public static class DigitalBrainRuntime
             .ValidateOnStart();
         builder.Services.TryAddSingleton(services => services.GetRequiredService<IOptions<NeuronOptions>>().Value);
         builder.Services.TryAddSingleton<NeuronRuntime>();
-        builder.Services.TryAddSingleton<StreamWake>();
         builder.Services.TryAddSingleton<NeuronToolCatalog>();
         builder.Services.TryAddSingleton<INeuronInvoker>(services => new NeuronInvoker(
             services.GetRequiredService<IGrainFactory>(), () => services.GetRequiredService<NeuronToolCatalog>()));
-        builder.Services.TryAddSingleton<Behavior.BehaviorService>();
 
         foreach (var hook in ModuleHooksOf(modules))
         {

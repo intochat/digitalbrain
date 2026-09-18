@@ -24,14 +24,14 @@ internal static class ActivityEndpoints
             });
 
         endpoints.MapGet("/activities/events",
-            static async Task (long? afterSequence, IGrainFactory grains, StreamWake wake, IOptions<SessionStreamOptions> options, HttpContext http,
+            static async Task (long? afterSequence, IGrainFactory grains, IOptions<SessionStreamOptions> options, HttpContext http,
                 CancellationToken cancellationToken) =>
             {
                 var id = new NeuronId(UIVocabulary.ActivitiesType, UIVocabulary.ActivitiesInstance);
                 var activities = grains.GetGrain<IActivities>(id.ToGrainId());
                 await SessionStream.RunAsync(http, activities, id, JournalKind.Outgoing,
                     afterSequence.GetValueOrDefault(), ProjectActivity, "activity",
-                    async token => await activities.Read(new ReadActivities()).WaitAsync(token), wake, options.Value, cancellationToken);
+                    async token => await activities.Read(new ReadActivities()).WaitAsync(token), options.Value, cancellationToken);
             });
 
         endpoints.MapGet("/surfaces/{surfaceName}/activities",
@@ -44,14 +44,14 @@ internal static class ActivityEndpoints
             }).AddEndpointFilter(new NeuronNameFilter("surfaceName"));
 
         endpoints.MapGet("/surfaces/{surfaceName}/activities/events",
-            static async Task (string surfaceName, long? afterSequence, IGrainFactory grains, StreamWake wake, IOptions<SessionStreamOptions> options,
+            static async Task (string surfaceName, long? afterSequence, IGrainFactory grains, IOptions<SessionStreamOptions> options,
                 HttpContext http, CancellationToken cancellationToken) =>
             {
                 var id = new NeuronId(UIVocabulary.SurfaceType, surfaceName);
                 var surface = grains.GetGrain<ISurface>(id.ToGrainId());
                 await SessionStream.RunAsync(http, surface, id, JournalKind.Outgoing,
                     afterSequence.GetValueOrDefault(), ProjectActivity, "activity",
-                    async token => await ReadSurfaceAsync(surface, token), wake, options.Value, cancellationToken);
+                    async token => await ReadSurfaceAsync(surface, token), options.Value, cancellationToken);
             }).AddEndpointFilter(new NeuronNameFilter("surfaceName"));
 
         endpoints.MapGet("/surfaces/{surfaceName}/activities/{activityId}/results",

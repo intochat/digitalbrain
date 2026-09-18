@@ -1,8 +1,5 @@
 using System.Text.Json.Serialization;
-using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.AI;
-
-[assembly: NeuronJsonContext(typeof(AIJson))]
 
 namespace DigitalBrain.AI;
 

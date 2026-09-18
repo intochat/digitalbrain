@@ -1,11 +1,8 @@
 using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions.Commands;
-using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Chat;
 using DigitalBrain.Flutter;
-
-[assembly: NeuronJsonContext(typeof(UIJson))]
 
 namespace DigitalBrain.Flutter;
 

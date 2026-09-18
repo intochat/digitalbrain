@@ -1,9 +1,6 @@
 using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions.Commands;
-using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Memory;
-
-[assembly: NeuronJsonContext(typeof(MemoryJson))]
 
 namespace DigitalBrain.Memory;
 

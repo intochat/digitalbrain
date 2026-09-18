@@ -27,14 +27,14 @@ internal static class GraphEndpoints
             }).AddEndpointFilter(new NeuronNameFilter("chatName"));
 
         endpoints.MapGet("/chats/{chatName}/brain/events",
-            static async Task (string chatName, long? afterSequence, IGrainFactory grains, StreamWake wake, IOptions<SessionStreamOptions> options,
+            static async Task (string chatName, long? afterSequence, IGrainFactory grains, IOptions<SessionStreamOptions> options,
                 HttpContext http, IOptions<BasicAuthOptions> auth, CancellationToken cancellationToken) =>
             {
                 var chat = new NeuronId(UIVocabulary.ChatType, chatName);
                 var session = SessionNeuron.For(auth.Value);
                 await SessionStream.RunSnapshotAsync(http, grains.GetGrain<INeuron>(chat.ToGrainId()), chat,
                     JournalKind.Outgoing, afterSequence.GetValueOrDefault(),
-                    token => BrainGraphProjection.ReadAsync(grains, chat, session, token), "brain-snapshot", wake, options.Value, cancellationToken);
+                    token => BrainGraphProjection.ReadAsync(grains, chat, session, token), "brain-snapshot", options.Value, cancellationToken);
             }).AddEndpointFilter(new NeuronNameFilter("chatName"));
 
         return endpoints;

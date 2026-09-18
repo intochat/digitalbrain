@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Behavior graphs: definition, node grains, and deploy/run over neuron synapses.</Description>
+    <RootNamespace>DigitalBrain.Core.Behavior</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Runtime.Tests" />
+  </ItemGroup>
+</Project>

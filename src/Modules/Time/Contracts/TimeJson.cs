@@ -1,9 +1,6 @@
 using System.Text.Json.Serialization;
 using DigitalBrain.Abstractions.Commands;
-using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Time;
-
-[assembly: NeuronJsonContext(typeof(TimeJson))]
 
 namespace DigitalBrain.Time;
 

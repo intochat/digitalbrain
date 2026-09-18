@@ -26,7 +26,11 @@ public sealed class BehaviorMailboxFacts
         await using var simulation = await BrainSimulation.StartAsync(new()
         {
             Modules = new([]),
-            ConfigureSilo = silo => silo.Services.AddSingleton<IBehaviorNodeExecutor, StubNodeExecutor>(),
+            ConfigureSilo = silo =>
+            {
+                silo.Services.AddSingleton<BehaviorService>();
+                silo.Services.AddSingleton<IBehaviorNodeExecutor, StubNodeExecutor>();
+            },
         });
         var programs = simulation.SiloServices.GetRequiredService<BehaviorService>();
         var definition = Graph(name);
@@ -67,7 +71,11 @@ public sealed class BehaviorMailboxFacts
         await using var simulation = await BrainSimulation.StartAsync(new()
         {
             Modules = new([]),
-            ConfigureSilo = silo => silo.Services.AddSingleton<IBehaviorNodeExecutor, SlowNodeExecutor>(),
+            ConfigureSilo = silo =>
+            {
+                silo.Services.AddSingleton<BehaviorService>();
+                silo.Services.AddSingleton<IBehaviorNodeExecutor, SlowNodeExecutor>();
+            },
         });
         var programs = simulation.SiloServices.GetRequiredService<BehaviorService>();
         await programs.DeployAsync(Graph("agent-memory"), cancellationToken: cancel);
