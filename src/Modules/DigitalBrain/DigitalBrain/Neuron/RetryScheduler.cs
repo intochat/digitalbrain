@@ -2,10 +2,13 @@ using Orleans.Runtime;
 
 namespace DigitalBrain.Core;
 
-internal sealed class RetryScheduler(IGrainBase grain, Func<CancellationToken, Task> retry, TimeSpan period,
+internal sealed class RetryScheduler(IGrainBase grain, Func<CancellationToken, Task> retry,
     Func<bool> hasPendingWork, CancellationToken activation) : IDisposable
 {
     internal const string ReminderName = "retry";
+
+    // Orleans' minimum reminder period; the grain timer, not the reminder, is the fast path.
+    private static readonly TimeSpan ReminderPeriod = TimeSpan.FromMinutes(1);
 
     private IGrainTimer? _timer;
     private readonly SemaphoreSlim _reminderGate = new(1, 1);
@@ -18,7 +21,7 @@ internal sealed class RetryScheduler(IGrainBase grain, Func<CancellationToken, T
         await _reminderGate.WaitAsync(activation).ConfigureAwait(true);
         try
         {
-            _reminder ??= await grain.RegisterOrUpdateReminder(ReminderName, dueTime: period, period: period).ConfigureAwait(true);
+            _reminder ??= await grain.RegisterOrUpdateReminder(ReminderName, dueTime: ReminderPeriod, period: ReminderPeriod).ConfigureAwait(true);
         }
         finally
         {

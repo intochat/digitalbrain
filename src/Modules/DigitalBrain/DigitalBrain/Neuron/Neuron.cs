@@ -31,7 +31,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable
         _fence = new PersistenceFence(Id, StateManager, _activation.Token,
             () => _components.CommandOutcomes.Reconcile(_components.Commands, TimeProvider.GetUtcNow()),
             DeactivateOnIdle, _components);
-        _retry = new RetryScheduler(this, _ => ((INeuronInbox)this).Drain(), _components.Options.RetryReminderPeriod,
+        _retry = new RetryScheduler(this, _ => ((INeuronInbox)this).Drain(),
             () => _components.Pending.Count > 0 || HasStoredAnnouncements, _activation.Token);
     }
 

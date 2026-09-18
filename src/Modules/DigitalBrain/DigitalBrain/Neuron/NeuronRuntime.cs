@@ -9,10 +9,9 @@ using Orleans.Serialization.Session;
 
 namespace DigitalBrain.Core;
 
-public sealed class NeuronRuntime(TimeProvider clock, NeuronOptions options)
+public sealed class NeuronRuntime(TimeProvider clock)
 {
     internal TimeProvider Clock { get; } = clock;
-    internal NeuronOptions Options { get; } = options;
 
     internal NeuronActivationComponents Bind(IServiceProvider services, NeuronId neuronId)
     {
@@ -34,7 +33,6 @@ public sealed class NeuronRuntime(TimeProvider clock, NeuronOptions options)
 
         return new(
             Clock,
-            Options,
             Window("incoming"),
             Window("outgoing"),
             commands,

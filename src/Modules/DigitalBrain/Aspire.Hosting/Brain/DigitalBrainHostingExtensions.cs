@@ -1,8 +1,6 @@
 using System.Reflection;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
-using Microsoft.Extensions.Configuration;
-using System.Globalization;
 
 namespace DigitalBrain.Aspire.Hosting;
 
@@ -11,21 +9,9 @@ public static class DigitalBrainHostingExtensions
     public static string DurableStateConnectionName => DigitalBrainNames.JournalConnection;
 
     public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name)
-        => builder.AddDigitalBrain(name, static options => { });
-
-    public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name,
-        Action<DigitalBrainHostingOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentNullException.ThrowIfNull(configure);
-        var options = builder.Configuration.GetSection(DigitalBrainHostingOptions.SectionName)
-            .Get<DigitalBrainHostingOptions>() ?? new();
-        configure(options);
-        if (options.RetryReminderPeriod <= TimeSpan.Zero)
-        {
-            throw new ArgumentException("Neuron retry reminder period must be positive.", nameof(configure));
-        }
 
         var resource = builder.AddResource(new DigitalBrainResource(name))
             .ExcludeFromManifest()
@@ -37,10 +23,6 @@ public static class DigitalBrainHostingExtensions
                 Properties = [new(CustomResourceKnownProperties.Source, "DigitalBrain modules")],
             });
         var brain = new DigitalBrainBuilder(builder, name, resource);
-        if (options.RetryReminderPeriod is not null)
-        {
-            brain.AddProjection(new NeuronConfigurationProjection(options.RetryReminderPeriod));
-        }
         var kernel = brain.GetOrAddModuleNode(DigitalBrainHostingNames.Kernel);
         var storage = builder
             .AddAzureStorage(DigitalBrainNames.Storage)
@@ -148,17 +130,4 @@ public static class DigitalBrainHostingExtensions
             builder.WithAnnotation(new WaitAnnotation(dependency, WaitType.WaitUntilHealthy, exitCode: 0));
         }
     }
-
-    private sealed class NeuronConfigurationProjection(TimeSpan? retryPeriod) : DigitalBrainModuleProjection
-    {
-        public override void Apply<TResource>(IResourceBuilder<TResource> builder)
-        {
-            ArgumentNullException.ThrowIfNull(builder);
-            if (retryPeriod is { } period)
-            {
-                builder.WithEnvironment("DigitalBrain__Neuron__RetryReminderPeriod", period.ToString("c", CultureInfo.InvariantCulture));
-            }
-        }
-    }
-
 }

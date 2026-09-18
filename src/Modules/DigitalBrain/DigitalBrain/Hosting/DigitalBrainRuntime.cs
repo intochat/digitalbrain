@@ -3,7 +3,6 @@ using DigitalBrain.Abstractions.Descriptors;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
-using Microsoft.Extensions.Options;
 using System.Text.Json.Serialization.Metadata;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
@@ -36,12 +35,6 @@ public static class DigitalBrainRuntime
         builder.UseJsonJournalFormat(new DefaultJsonTypeInfoResolver());
         AddModelPayloadSerialization(builder.Services);
         builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
-        builder.Services.AddOptions<NeuronOptions>()
-            .BindConfiguration(NeuronOptions.SectionName)
-            .Validate(options => options.RetryReminderPeriod > TimeSpan.Zero,
-                "Neuron retry reminder period must be positive.")
-            .ValidateOnStart();
-        builder.Services.TryAddSingleton(services => services.GetRequiredService<IOptions<NeuronOptions>>().Value);
         builder.Services.TryAddSingleton<NeuronRuntime>();
         AddInvoker(builder.Services);
 

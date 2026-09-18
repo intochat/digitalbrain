@@ -7,7 +7,6 @@ namespace DigitalBrain.Core;
 
 internal sealed record NeuronActivationComponents(
     TimeProvider Clock,
-    NeuronOptions Options,
     JournalWindow Incoming,
     JournalWindow Outgoing,
     CommandJournal Commands,
