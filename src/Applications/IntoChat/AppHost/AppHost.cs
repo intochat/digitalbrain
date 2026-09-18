@@ -23,6 +23,7 @@ using DigitalBrain.Flutter;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using OpenAIModels = DigitalBrain.AI.OpenAI;
+using OllamaModels = DigitalBrain.AI.Ollama;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
@@ -37,7 +38,7 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules)
         //module.WithLlm<OpenAIModels.IGpt56Sol>();
         //module.WithLlm<OpenAIModels.IGpt56Terra>();
         module.WithLlm<OpenAIModels.IGpt56Luna>();
-        module.WithDefaultLlm<OpenAIModels.IGpt56Luna>();
+        //module.WithDefaultLlm<OpenAIModels.IGpt56Luna>();
         module.WithEmbedding<OpenAIModels.ITextEmbedding3Small>();
         module.WithDefaultEmbedding<OpenAIModels.ITextEmbedding3Small>();
 
@@ -59,7 +60,9 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules)
         // module.WithDefaultLlm<XaiModels.IGrok46>();
 
         // --- Ollama ---
-        // module.WithLlm<OllamaModels.IGemma4>();
+        module.WithLlm<OllamaModels.IGemma4>();
+        module.WithDefaultLlm<OllamaModels.IGemma4>();
+
         // module.WithLlm<OllamaModels.IQwen35>();
         // module.WithDefaultLlm<OllamaModels.IQwen35>();
         // module.WithEmbedding<OllamaModels.IEmbeddingGemma>();

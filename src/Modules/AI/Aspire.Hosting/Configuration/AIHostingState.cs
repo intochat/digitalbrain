@@ -162,7 +162,7 @@ public static partial class AIHostingExtensions
                 .WithGPUSupport()
                 .WithDataVolume()
                 .WithLifetime(ContainerLifetime.Persistent)
-                .WithEnvironment("OLLAMA_KEEP_ALIVE", "-1")
+                .WithOpenWebUI(openwebui=>openwebui.WithLifetime(ContainerLifetime.Persistent))
                 .WithParentRelationship(module);
     }
 
