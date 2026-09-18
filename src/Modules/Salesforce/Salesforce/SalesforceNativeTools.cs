@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Core;
+using DigitalBrain.Http;
 using DigitalBrain.Abstractions.Identity;
 using Microsoft.Extensions.AI;
 

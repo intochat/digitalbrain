@@ -1,10 +1,10 @@
 using ModelContextProtocol.Client;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Http;
 
-internal static class McpHttpSession
+public static class McpHttpSession
 {
-    internal static async Task<T> RunAsync<T>(Uri endpoint, string accessToken,
+    public static async Task<T> RunAsync<T>(Uri endpoint, string accessToken,
         Func<McpClient, CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -18,7 +18,7 @@ internal static class McpHttpSession
         return await operation(client, timeout.Token).ConfigureAwait(false);
     }
 
-    internal static Task<IList<McpClientTool>> ReadCatalogAsync(Uri endpoint, string accessToken, CancellationToken cancellationToken)
+    public static Task<IList<McpClientTool>> ReadCatalogAsync(Uri endpoint, string accessToken, CancellationToken cancellationToken)
         => RunAsync(endpoint, accessToken,
             static (client, token) => client.ListToolsAsync(cancellationToken: token).AsTask(), cancellationToken);
 }

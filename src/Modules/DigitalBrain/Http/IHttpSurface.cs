@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Http;
 
 // A module's slice of the kernel's HTTP pipeline (browser callbacks, webhooks). Registered as a
 // singleton from IModule.Configure; the kernel maps every surface in one place, before its gates.

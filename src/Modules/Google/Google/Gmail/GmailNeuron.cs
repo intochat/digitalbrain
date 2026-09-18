@@ -3,6 +3,7 @@ using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Core;
+using DigitalBrain.Http;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Google;

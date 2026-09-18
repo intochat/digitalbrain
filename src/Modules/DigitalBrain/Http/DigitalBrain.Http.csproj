@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Browser login, module HTTP surfaces, and outbound MCP HTTP for DigitalBrain modules.</Description>
+    <RootNamespace>DigitalBrain.Http</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="ModelContextProtocol.Core" />
+  </ItemGroup>
+</Project>

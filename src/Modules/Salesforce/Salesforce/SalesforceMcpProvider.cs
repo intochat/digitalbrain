@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using DigitalBrain.Core;
+using DigitalBrain.Http;
 using ModelContextProtocol;
 
 namespace DigitalBrain.Salesforce;

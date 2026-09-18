@@ -1,5 +1,6 @@
 using DigitalBrain.Aspire;
 using DigitalBrain.Core;
+using DigitalBrain.Http;
 using DigitalBrain.Mcp;
 using IntoChat.ServiceDefaults;
 using IntoChat;

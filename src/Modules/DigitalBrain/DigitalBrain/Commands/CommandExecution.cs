@@ -10,8 +10,7 @@ using DigitalBrain.Abstractions.Signals;
 
 namespace DigitalBrain.Core;
 
-internal sealed class CommandExecution(CommandJournal journal, CommandOutcomeStore outcomes, TimeProvider clock,
-    ICommandCrashPoint? crashPoint)
+internal sealed class CommandExecution(CommandJournal journal, CommandOutcomeStore outcomes, TimeProvider clock)
 {
     internal async Task<TResult> RunAsync<TArguments, TResult>(
         ICommandHost host, CommandDescriptor command, TArguments arguments,
@@ -180,7 +179,6 @@ internal sealed class CommandExecution(CommandJournal journal, CommandOutcomeSto
             At = clock.GetUtcNow(),
             ScheduledWork = scheduledWork,
         };
-        crashPoint?.BeforeTerminalRecord(record.Id);
         terminal = journal.Append(terminal);
         outcomes.Record(record.Id, outcome with
         {

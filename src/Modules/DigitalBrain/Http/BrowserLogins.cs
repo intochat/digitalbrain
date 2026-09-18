@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Http;
 
 public abstract class BrowserLogins(BrowserLoginDefinition definition)
 {

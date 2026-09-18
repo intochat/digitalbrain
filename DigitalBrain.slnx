@@ -29,6 +29,7 @@
     <Project Path="src/Modules/DigitalBrain/Aspire/DigitalBrain.Aspire.csproj" />
     <Project Path="src/Modules/DigitalBrain/Contracts/DigitalBrain.Contracts.csproj" />
     <Project Path="src/Modules/DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Http/DigitalBrain.Http.csproj" />
     <Project Path="src/Modules/DigitalBrain/Mcp/DigitalBrain.Mcp.csproj" />
   </Folder>
   <Folder Name="/Modules/Excel/">

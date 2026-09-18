@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.Core;
+using DigitalBrain.Http;
 using ModelContextProtocol;
 using ModelContextProtocol.Client;
 

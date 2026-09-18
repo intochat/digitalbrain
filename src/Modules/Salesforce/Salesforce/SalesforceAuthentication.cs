@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Core;
+using DigitalBrain.Http;
 using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;

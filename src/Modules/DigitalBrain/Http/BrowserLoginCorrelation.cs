@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Http;
 
 // Keep the framework's state, browser correlation and PKCE implementation. Add only a
 // server-side one-use claim after correlation succeeds, before any authorization-code exchange.

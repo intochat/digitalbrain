@@ -1,6 +1,5 @@
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Signals;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Core;
@@ -13,14 +12,12 @@ public abstract class Neuron<TState> : Neuron where TState : class
     private static readonly SnapshotEnvelope<TState> Empty = new(null, null, []);
     private readonly IPersistentState<SnapshotEnvelope<TState>> _state;
     private readonly AnnouncementDrain _announcements;
-    private readonly IReactionCrashPoint? _crashPoint;
 
     protected Neuron(NeuronRuntime runtime, IPersistentState<SnapshotEnvelope<TState>> state) : base(runtime)
     {
         ArgumentNullException.ThrowIfNull(state);
         _state = state;
         _announcements = new AnnouncementDrain(FireAnnouncementAsync);
-        _crashPoint = ServiceProvider.GetService<IReactionCrashPoint>();
     }
 
     protected TState? State => Envelope.State;
@@ -69,7 +66,6 @@ public abstract class Neuron<TState> : Neuron where TState : class
         await WriteEnvelopeAsync(envelope, cancellationToken).ConfigureAwait(true);
         NoteSnapshotSaved();
         _announcements.Clear();
-        _crashPoint?.AfterSnapshotSave(Id);
     }
 
     protected SignalId Announce(Signal signal, NeuronId? to = null, CorrelationId? correlation = null)

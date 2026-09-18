@@ -1,5 +1,6 @@
 using DigitalBrain.AI;
 using DigitalBrain.Core;
+using DigitalBrain.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 

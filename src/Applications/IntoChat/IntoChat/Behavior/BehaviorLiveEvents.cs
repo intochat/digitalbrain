@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
-using DigitalBrain.Core.Behavior;
+using DigitalBrain.Abstractions.Behavior;
 
 namespace IntoChat;
 

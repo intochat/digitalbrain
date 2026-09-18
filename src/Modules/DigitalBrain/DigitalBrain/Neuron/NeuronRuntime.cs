@@ -38,7 +38,7 @@ public sealed class NeuronRuntime(TimeProvider clock, NeuronOptions options)
             new NeuronJournals(Window("incoming"), Window("outgoing")),
             commands,
             outcomes,
-            new CommandExecution(commands, outcomes, Clock, services.GetService<ICommandCrashPoint>()),
+            new CommandExecution(commands, outcomes, Clock),
             new NeuronSynapses(services.GetRequiredKeyedService<IDurableDictionary<string, Synapse>>("synapses"), neuronId, Clock),
             services.GetRequiredKeyedService<IDurableDictionary<string, SignalDelivery>>("latest"),
             new PendingWork(

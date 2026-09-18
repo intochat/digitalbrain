@@ -5,22 +5,16 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="ModelContextProtocol.Core" />
     <PackageReference Include="Microsoft.Orleans.Journaling" />
     <PackageReference Include="Microsoft.Orleans.Reminders" />
     <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
     <PackageReference Include="Microsoft.Orleans.Server" />
   </ItemGroup>
   <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Google" />
     <InternalsVisibleTo Include="DigitalBrain.Modules.Flutter" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Salesforce" />
     <InternalsVisibleTo Include="DigitalBrain.Mcp" />
   </ItemGroup>
   <ItemGroup>

@@ -1,4 +1,5 @@
 using DigitalBrain.Core;
+using DigitalBrain.Http;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Net.Http.Headers;

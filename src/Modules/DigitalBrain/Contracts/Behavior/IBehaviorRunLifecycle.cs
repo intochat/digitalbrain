@@ -1,8 +1,4 @@
-using System.Text.Json;
-using DigitalBrain.Abstractions.Behavior;
-
-
-namespace DigitalBrain.Core.Behavior;
+namespace DigitalBrain.Abstractions.Behavior;
 
 public interface IBehaviorRunLifecycle
 {

@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Http;
 
 // The two exact login and callback paths carry their own one-use request capability and OAuth
 // correlation checks, so the kernel maps this surface before its authentication gate.

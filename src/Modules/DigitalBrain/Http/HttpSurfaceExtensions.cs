@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Http;
 
 public static class HttpSurfaceExtensions
 {
