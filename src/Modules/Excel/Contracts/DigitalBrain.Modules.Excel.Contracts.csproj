@@ -3,7 +3,6 @@
     <IsPackable>true</IsPackable>
     <Description>Excel module contracts: spreadsheet edits, reads and change signals.</Description>
     <RootNamespace>DigitalBrain.Excel</RootNamespace>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>

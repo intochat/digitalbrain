@@ -1,5 +1,4 @@
 using DigitalBrain.Abstractions.Commands;
-using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
 using Orleans.Concurrency;
@@ -30,24 +29,19 @@ public interface ITable : INeuron
 {
     /// <summary>Schedules creation of a typed table.</summary>
     [Alias("create")]
-    [NeuronTool]
     Task<Accepted<string>> Create(CreateTableCommand command, CancellationToken cancellationToken = default);
 
     /// <summary>Schedules replacement of the table view at an expected revision.</summary>
     [Alias("update")]
-    [NeuronTool]
     Task<Accepted<string>> Update(UpdateTableCommand command, CancellationToken cancellationToken = default);
 
     [ReadOnly, Alias("read")]
-    [NeuronTool(IsReadOnly = true)]
     Task<TableSnapshot?> Read(ReadTable query);
 
     [ReadOnly, Alias("operation")]
-    [NeuronTool(IsReadOnly = true)]
     Task<TableOperationResult?> ReadOperation(ReadTableOperation query);
 
     /// <summary>Reads id, title and revision from saved state without touching the table's rows or their source.</summary>
     [ReadOnly, Alias("summary")]
-    [NeuronTool(IsReadOnly = true)]
     Task<TableSummary?> ReadSummary();
 }

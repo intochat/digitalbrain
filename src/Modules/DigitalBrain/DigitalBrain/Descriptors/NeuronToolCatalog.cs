@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text.Json;
@@ -9,13 +10,13 @@ using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
 using Microsoft.Extensions.Options;
+using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.Metadata;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Core;
 
-// JSON metadata belongs to explicitly exported tools, never to grain activation or command execution.
 internal sealed class NeuronToolCatalog
 {
     private readonly Dictionary<GrainType, MethodDescriptor[]> _descriptors = [];
@@ -24,15 +25,14 @@ internal sealed class NeuronToolCatalog
     public NeuronToolCatalog(IOptions<GrainTypeOptions> options, GrainTypeResolver grainTypes, GrainInterfaceTypeResolver interfaceTypes)
     {
         Dictionary<Assembly, JsonSerializerOptions> contexts = [];
-        var summaries = new XmlDocSummaries();
         foreach (var grainClass in options.Value.Classes.Where(type => type is { IsClass: true, IsAbstract: false }))
         {
             List<MethodDescriptor> descriptors = [];
-            foreach (var contract in grainClass.GetInterfaces().Where(type => typeof(IGrain).IsAssignableFrom(type)))
+            foreach (var contract in grainClass.GetInterfaces().Where(IsModuleContract))
             {
                 foreach (var method in contract.GetMethods())
                 {
-                    if (method.GetCustomAttribute<NeuronToolAttribute>() is not { } tool)
+                    if (!IsToolShape(method))
                     {
                         continue;
                     }
@@ -42,8 +42,8 @@ internal sealed class NeuronToolCatalog
                     var key = (interfaceAlias, methodAlias);
                     if (!_methods.TryGetValue(key, out var metadata))
                     {
-                        metadata = Build(method, tool, interfaceAlias, methodAlias, interfaceTypes.GetGrainInterfaceType(contract),
-                            JsonOptions(contract.Assembly, contexts), summaries.For(method));
+                        metadata = Build(method, interfaceAlias, methodAlias, interfaceTypes.GetGrainInterfaceType(contract),
+                            JsonOptions(contract.Assembly, contexts));
                         _methods.Add(key, metadata);
                     }
                     else if (metadata.Method != method)
@@ -65,7 +65,7 @@ internal sealed class NeuronToolCatalog
     internal InvocationMetadata Method(string interfaceAlias, string methodAlias)
         => _methods.TryGetValue((interfaceAlias, methodAlias), out var method)
             ? method
-            : throw new ArgumentException($"Unknown tool '{interfaceAlias}/{methodAlias}'. Only methods marked [NeuronTool] are callable.");
+            : throw new ArgumentException($"Unknown tool '{interfaceAlias}/{methodAlias}'.");
 
     internal ArgumentContract? ArgumentContractOf(string interfaceAlias, string methodAlias)
     {
@@ -73,19 +73,48 @@ internal sealed class NeuronToolCatalog
         return method.ArgumentsJson is { } arguments ? new(arguments.Options, method.CommandIdPropertyName) : null;
     }
 
-    private static InvocationMetadata Build(MethodInfo method, NeuronToolAttribute tool, string interfaceAlias,
-        string methodAlias, GrainInterfaceType interfaceType, JsonSerializerOptions json, string? summary)
+    private static bool IsModuleContract(Type contract)
+        => typeof(INeuron).IsAssignableFrom(contract) && contract != typeof(INeuron) && contract != typeof(IGrain);
+
+    private static bool IsToolShape(MethodInfo method)
+    {
+        if (method.ContainsGenericParameters)
+        {
+            return false;
+        }
+
+        var parameters = method.GetParameters();
+        if (parameters.Any(parameter => parameter.ParameterType.IsByRef))
+        {
+            return false;
+        }
+
+        var arguments = parameters.Where(parameter => parameter.ParameterType != typeof(CancellationToken)).ToArray();
+        if (arguments.Length > 1)
+        {
+            return false;
+        }
+
+        if (arguments.Length == 1)
+        {
+            var argument = arguments[0].ParameterType;
+            if (argument == typeof(string) || argument.IsPrimitive || argument.IsEnum || argument.IsValueType)
+            {
+                return false;
+            }
+        }
+
+        var returnType = method.ReturnType;
+        return returnType == typeof(Task)
+            || returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(Task<>);
+    }
+
+    private static InvocationMetadata Build(MethodInfo method, string interfaceAlias,
+        string methodAlias, GrainInterfaceType interfaceType, JsonSerializerOptions json)
     {
         var parameters = method.GetParameters();
         var arguments = parameters.Where(parameter => parameter.ParameterType != typeof(CancellationToken)).ToArray();
         var returnType = method.ReturnType;
-        // This is the tool adapter's wire shape, not a restriction on ordinary grain methods.
-        if (method.ContainsGenericParameters || arguments.Length > 1 || parameters.Any(parameter => parameter.ParameterType.IsByRef)
-            || (returnType != typeof(Task) && (!returnType.IsGenericType || returnType.GetGenericTypeDefinition() != typeof(Task<>))))
-        {
-            throw new InvalidOperationException($"Tool '{interfaceAlias}/{methodAlias}' must return Task or Task<T> and accept at most one JSON argument plus cancellation. Use an adapter method for other signatures.");
-        }
-
         var argumentsJson = arguments.Length == 0 ? null : json.GetTypeInfo(arguments[0].ParameterType);
         if (argumentsJson is not null && argumentsJson.Kind != JsonTypeInfoKind.Object)
         {
@@ -99,7 +128,9 @@ internal sealed class NeuronToolCatalog
         var resultType = returnType == typeof(Task) ? null : returnType.GenericTypeArguments[0];
         var returnsNeuron = resultType is not null && typeof(INeuron).IsAssignableFrom(resultType);
         var resultJson = returnsNeuron ? NeuronReferenceJson.Default.NeuronId : resultType is null ? null : json.GetTypeInfo(resultType);
-        var descriptor = new MethodDescriptor(interfaceAlias, methodAlias, tool.IsReadOnly,
+        var readOnly = method.GetCustomAttribute<Orleans.Concurrency.ReadOnlyAttribute>() is not null;
+        var summary = method.GetCustomAttribute<DescriptionAttribute>()?.Description;
+        var descriptor = new MethodDescriptor(interfaceAlias, methodAlias, readOnly,
             Schema(argumentsJson), Schema(resultJson), summary);
         return new(method, interfaceType, argumentsJson, commandId, CompileCall(method), CompileResult(returnType), returnsNeuron, descriptor, resultJson);
     }

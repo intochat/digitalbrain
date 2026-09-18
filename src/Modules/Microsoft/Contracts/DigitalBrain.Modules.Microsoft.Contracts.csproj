@@ -2,7 +2,6 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>Microsoft neuron contracts.</Description>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <RootNamespace>DigitalBrain.Microsoft</RootNamespace>
   </PropertyGroup>

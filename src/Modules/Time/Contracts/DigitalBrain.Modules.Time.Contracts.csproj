@@ -3,7 +3,6 @@
     <IsPackable>true</IsPackable>
     <Description>Time module contracts: schedule and stop commands, timer snapshots, and signal bodies.</Description>
     <RootNamespace>DigitalBrain.Time</RootNamespace>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>

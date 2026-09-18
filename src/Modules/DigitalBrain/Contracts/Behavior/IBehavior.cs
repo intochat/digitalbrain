@@ -1,4 +1,3 @@
-using DigitalBrain.Abstractions.Descriptors;
 using Orleans.Concurrency;
 
 namespace DigitalBrain.Abstractions.Behavior;
@@ -7,7 +6,6 @@ namespace DigitalBrain.Abstractions.Behavior;
 public interface IBehavior : IGrainWithStringKey
 {
     [ReadOnly, Alias("read")]
-    [NeuronTool(IsReadOnly = true)]
     Task<BehaviorSnapshot> Read();
 
     [Alias("write")]
