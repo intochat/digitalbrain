@@ -38,8 +38,8 @@ public static class DigitalBrainRuntime
         builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         builder.Services.AddOptions<NeuronOptions>()
             .BindConfiguration(NeuronOptions.SectionName)
-            .Validate(options => options.StorageOperationBudget > TimeSpan.Zero && options.RetryReminderPeriod > TimeSpan.Zero,
-                "Neuron storage budget and retry reminder period must be positive.")
+            .Validate(options => options.RetryReminderPeriod > TimeSpan.Zero,
+                "Neuron retry reminder period must be positive.")
             .ValidateOnStart();
         builder.Services.TryAddSingleton(services => services.GetRequiredService<IOptions<NeuronOptions>>().Value);
         builder.Services.TryAddSingleton<NeuronRuntime>();

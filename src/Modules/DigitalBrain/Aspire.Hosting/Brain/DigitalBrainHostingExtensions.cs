@@ -22,9 +22,9 @@ public static class DigitalBrainHostingExtensions
         var options = builder.Configuration.GetSection(DigitalBrainHostingOptions.SectionName)
             .Get<DigitalBrainHostingOptions>() ?? new();
         configure(options);
-        if (options.StorageOperationBudget <= TimeSpan.Zero || options.RetryReminderPeriod <= TimeSpan.Zero)
+        if (options.RetryReminderPeriod <= TimeSpan.Zero)
         {
-            throw new ArgumentException("Neuron storage budget and retry reminder period must be positive.", nameof(configure));
+            throw new ArgumentException("Neuron retry reminder period must be positive.", nameof(configure));
         }
 
         var resource = builder.AddResource(new DigitalBrainResource(name))
@@ -37,9 +37,9 @@ public static class DigitalBrainHostingExtensions
                 Properties = [new(CustomResourceKnownProperties.Source, "DigitalBrain modules")],
             });
         var brain = new DigitalBrainBuilder(builder, name, resource);
-        if (options.StorageOperationBudget is not null || options.RetryReminderPeriod is not null)
+        if (options.RetryReminderPeriod is not null)
         {
-            brain.AddProjection(new NeuronConfigurationProjection(options.StorageOperationBudget, options.RetryReminderPeriod));
+            brain.AddProjection(new NeuronConfigurationProjection(options.RetryReminderPeriod));
         }
         var kernel = brain.GetOrAddModuleNode(DigitalBrainHostingNames.Kernel);
         var storage = builder
@@ -149,15 +149,11 @@ public static class DigitalBrainHostingExtensions
         }
     }
 
-    private sealed class NeuronConfigurationProjection(TimeSpan? storageBudget, TimeSpan? retryPeriod) : DigitalBrainModuleProjection
+    private sealed class NeuronConfigurationProjection(TimeSpan? retryPeriod) : DigitalBrainModuleProjection
     {
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {
             ArgumentNullException.ThrowIfNull(builder);
-            if (storageBudget is { } budget)
-            {
-                builder.WithEnvironment("DigitalBrain__Neuron__StorageOperationBudget", budget.ToString("c", CultureInfo.InvariantCulture));
-            }
             if (retryPeriod is { } period)
             {
                 builder.WithEnvironment("DigitalBrain__Neuron__RetryReminderPeriod", period.ToString("c", CultureInfo.InvariantCulture));

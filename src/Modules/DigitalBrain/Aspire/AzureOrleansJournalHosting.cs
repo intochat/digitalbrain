@@ -1,5 +1,4 @@
 using DigitalBrain.Abstractions;
-using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
 using Orleans.Journaling;
 
@@ -21,6 +20,6 @@ internal static class AzureOrleansJournalHosting
         {
             options.ContainerName = "digitalbrain-v2-journal";
             options.ConfigureBlobServiceClient(connectionString);
-        }).UseBudgetedJournalStorage();
+        });
     }
 }
