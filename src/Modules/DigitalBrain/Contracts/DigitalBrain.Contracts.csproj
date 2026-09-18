@@ -6,11 +6,4 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Sdk" />
   </ItemGroup>
-  <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain" />
-    <InternalsVisibleTo Include="DigitalBrain.Mcp" />
-  </ItemGroup>
-  <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Testing" />
-  </ItemGroup>
 </Project>

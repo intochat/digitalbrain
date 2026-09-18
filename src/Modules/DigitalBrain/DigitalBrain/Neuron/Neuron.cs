@@ -557,7 +557,4 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     }
 
     private void Wake() => GrainFactory.GetGrain<INeuronInbox>(this.GetGrainId()).Drain().Ignore();
-
-    protected new IDisposable RegisterTimer(Func<object, Task> callback, object state, TimeSpan dueTime, TimeSpan period)
-        => throw new InvalidOperationException($"{nameof(RegisterTimer)} creates interleaving callbacks, but neurons require serialized turns.");
 }
