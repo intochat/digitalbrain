@@ -9,7 +9,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddKeyedAzureTableServiceClient(DigitalBrainNames.Clustering);
-builder.UseOrleansClient(DigitalBrainRuntime.AddClient);
+builder.UseOrleansClient(client =>
+{
+    DigitalBrainRuntime.AddClient(client);
+    client.AddActivityPropagation();
+});
 builder.Services.AddSingleton<BehaviorService>();
 builder.Services.AddSingleton<BehaviorTools>();
 builder.Services.AddDigitalBrainMcp()

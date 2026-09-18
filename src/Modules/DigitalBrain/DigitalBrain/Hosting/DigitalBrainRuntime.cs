@@ -31,7 +31,6 @@ public static class DigitalBrainRuntime
         builder.AddJournalStorage();
         builder.AddIncomingGrainCallFilter<NeuronActivationGuardFilter>();
         builder.AddOutgoingGrainCallFilter<OutgoingCallerFilter>();
-        builder.AddActivityPropagation();
         builder.UseJsonJournalFormat(new DefaultJsonTypeInfoResolver());
         AddModelPayloadSerialization(builder.Services);
         builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
@@ -73,7 +72,6 @@ public static class DigitalBrainRuntime
     private static void AddInvoker(IServiceCollection services)
     {
         services.TryAddSingleton<NeuronToolCatalog>();
-        services.TryAddSingleton<INeuronInvoker>(static services => new NeuronInvoker(
-            services.GetRequiredService<IGrainFactory>(), () => services.GetRequiredService<NeuronToolCatalog>()));
+        services.TryAddSingleton<INeuronInvoker, NeuronInvoker>();
     }
 }

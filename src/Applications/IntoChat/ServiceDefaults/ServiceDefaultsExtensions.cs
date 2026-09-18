@@ -113,6 +113,7 @@ public static class ServiceDefaultsExtensions
                 .AddSource("Microsoft.Extensions.AI")
                 .AddSource("Microsoft.Extensions.AI.*")
                 .AddSource("Microsoft.Orleans.Application")
+                .AddSource("Microsoft.Orleans.Lifecycle")
                 .AddSource("ClickHouse.Driver")
                 .AddAspNetCoreInstrumentation(options =>
                     options.Filter = context =>

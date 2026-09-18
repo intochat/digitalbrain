@@ -3,7 +3,6 @@ using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Storage;
@@ -65,7 +64,6 @@ public sealed class BrainSimulation : IAsyncDisposable
             }
             silo.AddReminders();
             silo.Services.AddSingleton<IReminderTable>(new FileReminderTable(options.PersistenceDirectory));
-            silo.Services.Configure<ReminderOptions>(reminders => reminders.MinimumReminderPeriod = TimeSpan.FromSeconds(1));
             silo.Services.AddKeyedSingleton<IGrainStorage>(DigitalBrainNames.DefaultGrainStorage,
                 (services, _) => new FileGrainStorage(options.PersistenceDirectory,
                     services.GetRequiredService<Orleans.Serialization.Serializer>()));

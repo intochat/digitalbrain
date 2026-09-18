@@ -5,28 +5,25 @@ using DigitalBrain.Abstractions.Neurons;
 
 namespace DigitalBrain.Core;
 
-internal sealed class NeuronInvoker(IGrainFactory grains, Func<NeuronToolCatalog> createCatalog) : INeuronInvoker
+internal sealed class NeuronInvoker(IGrainFactory grains, NeuronToolCatalog catalog) : INeuronInvoker
 {
-    private readonly Lazy<NeuronToolCatalog> _catalog = new(createCatalog);
-    private NeuronToolCatalog Catalog => _catalog.Value;
+    public IReadOnlyList<MethodDescriptor> Describe(NeuronId neuron) => catalog.For(neuron.ToGrainId().Type);
 
-    public IReadOnlyList<MethodDescriptor> Describe(NeuronId neuron) => Catalog.For(neuron.ToGrainId().Type);
-
-    public MethodDescriptor Describe(string interfaceAlias, string methodAlias) => Catalog.Method(interfaceAlias, methodAlias).Descriptor;
+    public MethodDescriptor Describe(string interfaceAlias, string methodAlias) => catalog.Method(interfaceAlias, methodAlias).Descriptor;
 
     public ArgumentContract? ArgumentContractOf(string interfaceAlias, string methodAlias)
-        => Catalog.ArgumentContractOf(interfaceAlias, methodAlias);
+        => catalog.ArgumentContractOf(interfaceAlias, methodAlias);
 
     public async Task<JsonElement?> InvokeAsync(NeuronId neuron, string interfaceAlias, string methodAlias,
         JsonElement arguments, CancellationToken cancellationToken = default)
     {
         var grainId = neuron.ToGrainId();
-        if (!Catalog.For(grainId.Type).Any(method => method.InterfaceAlias == interfaceAlias && method.MethodAlias == methodAlias))
+        if (!catalog.For(grainId.Type).Any(method => method.InterfaceAlias == interfaceAlias && method.MethodAlias == methodAlias))
         {
             throw new ArgumentException($"Neuron '{neuron}' does not expose tool '{interfaceAlias}/{methodAlias}'. Use describe to list its tools.", nameof(methodAlias));
         }
 
-        var method = Catalog.Method(interfaceAlias, methodAlias);
+        var method = catalog.Method(interfaceAlias, methodAlias);
         var proxy = grains.GetGrain(grainId, method.InterfaceType);
         var argument = method.ArgumentsJson is null ? null : JsonSerializer.Deserialize(arguments, method.ArgumentsJson)
             ?? throw new ArgumentException($"Arguments for interface '{interfaceAlias}', method '{methodAlias}' must match the method's schema.", nameof(arguments));

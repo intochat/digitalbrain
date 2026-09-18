@@ -6,8 +6,6 @@ namespace DigitalBrain.Aspire.Hosting;
 
 public static class DigitalBrainHostingExtensions
 {
-    public static string DurableStateConnectionName => DigitalBrainNames.JournalConnection;
-
     public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name)
     {
         ArgumentNullException.ThrowIfNull(builder);

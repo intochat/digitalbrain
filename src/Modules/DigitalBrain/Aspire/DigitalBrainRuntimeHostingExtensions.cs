@@ -39,6 +39,7 @@ public static class DigitalBrainRuntimeHostingExtensions
             silo.Services.AddOptions<AzureBlobStorageOptions>(DigitalBrainNames.DefaultGrainStorage)
                 .Configure(static options => options.ContainerName = "digitalbrain-v2-state");
             silo.AddAzureBlobJournal(builder.Configuration);
+            silo.AddActivityPropagation();
             DigitalBrainRuntime.Add(silo, modules);
             silo.AddDashboard(options =>
             {
