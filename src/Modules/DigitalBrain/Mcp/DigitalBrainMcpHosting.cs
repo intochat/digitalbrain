@@ -10,10 +10,17 @@ public static class DigitalBrainMcpHosting
 {
     // Registers the operations, tools and MCP server. The caller adds a transport:
     // WithHttpTransport for the Silo, WithStreamServerTransport for tests.
-    public static IMcpServerBuilder AddDigitalBrainMcp(this IServiceCollection services)
+    public static IServiceCollection AddBrainOperations(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
         services.TryAddSingleton<BrainOperations>();
+        return services;
+    }
+
+    public static IMcpServerBuilder AddDigitalBrainMcp(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.AddBrainOperations();
         services.AddHttpContextAccessor();
         services.TryAddScoped(sp => SessionPrincipal.FromHttp(sp.GetRequiredService<IHttpContextAccessor>().HttpContext));
         return services.AddMcpServer(options => options.ServerInfo = new() { Name = "brain", Version = "0.1" })

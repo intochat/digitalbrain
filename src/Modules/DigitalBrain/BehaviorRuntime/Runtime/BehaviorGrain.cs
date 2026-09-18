@@ -72,7 +72,7 @@ internal sealed class BehaviorGrain(
     {
         var snapshot = state.RecordExists
             ? state.State
-            : new(this.GetPrimaryKeyString(), 0, false, null, [], [], []);
+            : new(this.GetPrimaryKeyString(), 0, false, null, [], []);
         return snapshot with { Runs = Ids() };
     }
 

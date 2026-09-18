@@ -6,7 +6,6 @@ using IntoChat.ServiceDefaults;
 using IntoChat;
 using Microsoft.Build.Locator;
 using Microsoft.Extensions.Options;
-using ModelContextProtocol.AspNetCore;
 using Orleans.Dashboard;
 
 // No other module may load a Microsoft.Build assembly before the locator registers the real MSBuild.
@@ -21,11 +20,7 @@ builder.AddConversationalAgent();
 builder.AddBehaviors();
 builder.AddKernelCors();
 builder.Services.AddAuthentication();
-builder.Services.AddDigitalBrainMcp()
-    .WithHttpTransport(options => options.SessionMode = HttpServerSessionMode.Stateless)
-    .WithTools<BehaviorTools>()
-    .WithTools<BehaviorWebTools>()
-    .WithTools<BehaviorAgentTools>();
+builder.Services.AddBrainOperations();
 
 var app = builder.Build();
 
@@ -48,7 +43,6 @@ app.MapBrainObservationEndpoints();
 if (app.Services.GetRequiredService<IOptions<GraphOptions>>().Value.Enabled)
 {
     app.UseSessionNeuron();
-    app.MapDigitalBrainMcp("/mcp");
     app.MapSurfaceEndpoints();
     app.MapActivityEndpoints();
     app.MapGraphMutationEndpoints();

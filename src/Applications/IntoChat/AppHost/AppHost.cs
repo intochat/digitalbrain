@@ -93,7 +93,7 @@ var developmentClusterId = builder.Environment.IsDevelopment()
     ? $"digitalbrain-{Guid.NewGuid():N}"
     : null;
 
-builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.IntoChat)
+var intoChat = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.IntoChat)
     .WithReference(digitalBrain)
     .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION", "false")
     .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_HTTPCLIENT_DISABLE_URL_QUERY_REDACTION", "false")
@@ -126,6 +126,19 @@ builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.IntoChat)
             context.EnvironmentVariables["DigitalBrain__Graph__Enabled"] = "true";
             context.EnvironmentVariables["DigitalBrain__Cors__AllowedOrigin"] =
                 $"http://{ShellNames.FlutterWebHostname}:{ShellNames.FlutterWebPort}";
+        }
+    });
+
+builder.AddProject<Projects.DigitalBrain_Mcp>(ProductSurfaceResources.Mcp)
+    .WithReference(digitalBrain.AsClient())
+    .WaitFor(intoChat)
+    .WithHttpEndpoint(port: ProductSurfaceResources.McpHttpPort, name: "http", isProxied: false)
+    .WithHttpHealthCheck("/health", endpointName: "http")
+    .WithEnvironment(context =>
+    {
+        if (developmentClusterId is not null)
+        {
+            context.EnvironmentVariables["Orleans__ClusterId"] = developmentClusterId;
         }
     });
 

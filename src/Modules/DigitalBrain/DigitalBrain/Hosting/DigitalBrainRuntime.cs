@@ -2,6 +2,7 @@ using System.ComponentModel;
 using DigitalBrain.Abstractions.Descriptors;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orleans.Hosting;
 using Microsoft.Extensions.Options;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
@@ -40,9 +41,7 @@ public static class DigitalBrainRuntime
             .ValidateOnStart();
         builder.Services.TryAddSingleton(services => services.GetRequiredService<IOptions<NeuronOptions>>().Value);
         builder.Services.TryAddSingleton<NeuronRuntime>();
-        builder.Services.TryAddSingleton<NeuronToolCatalog>();
-        builder.Services.TryAddSingleton<INeuronInvoker>(services => new NeuronInvoker(
-            services.GetRequiredService<IGrainFactory>(), () => services.GetRequiredService<NeuronToolCatalog>()));
+        AddInvoker(builder.Services);
 
         foreach (var hook in ModuleHooksOf(modules))
         {
@@ -63,4 +62,17 @@ public static class DigitalBrainRuntime
 
             return (IModule)Activator.CreateInstance(type)!;
         });
+
+    public static void AddClient(IClientBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        AddInvoker(builder.Services);
+    }
+
+    private static void AddInvoker(IServiceCollection services)
+    {
+        services.TryAddSingleton<NeuronToolCatalog>();
+        services.TryAddSingleton<INeuronInvoker>(static services => new NeuronInvoker(
+            services.GetRequiredService<IGrainFactory>(), () => services.GetRequiredService<NeuronToolCatalog>()));
+    }
 }

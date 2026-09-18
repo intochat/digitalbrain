@@ -10,6 +10,7 @@ internal static class BehaviorEndpoints
     {
         builder.Services.AddSingleton<BehaviorService>();
         builder.Services.AddSingleton<BehaviorCompiler>();
+        builder.Services.AddSingleton<IBehaviorIntentCompiler>(services => services.GetRequiredService<BehaviorCompiler>());
         builder.Services.AddSingleton<BehaviorCodeRunner>();
         builder.Services.AddSingleton<BehaviorLiveEvents>();
         builder.Services.AddSingleton<BehaviorAgents>();

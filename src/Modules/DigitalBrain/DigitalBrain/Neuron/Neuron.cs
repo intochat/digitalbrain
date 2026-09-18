@@ -10,12 +10,8 @@ using Orleans.Runtime;
 
 namespace DigitalBrain.Core;
 
-// A durable actor with one receive slot. Owns its synapses, three bounded journals, and the
-// latest signal of each type it received. Fire travels along synapses; nothing else routes.
 public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable, ICommandHost
 {
-    // Latest-per-type is keyed by type name, so a caller putting identity in the type would
-    // grow it without bound. The cap turns that mistake into one sentence of advice.
     public const int MaxSignalTypesPerNeuron = 256;
 
     private const string ReactionSaveRule = "a reaction saves once, at the end. Anything after the first save is unreachable on a retry because the applied marker skips it.";
@@ -43,7 +39,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
 
     protected TimeProvider TimeProvider => _components.Clock;
 
-    // A durable write belongs to the activation, so request cancellation cannot interrupt it.
     protected Task PersistAsync() => _fence.PersistAsync();
 
     protected new Task WriteStateAsync(CancellationToken cancellationToken = default)
@@ -134,8 +129,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
             || _components.Pending.Count > 0
             || _components.Latest.Count > 0;
 
-    // Shutting down cancels the reaction in flight. The pending head stays and
-    // the next activation retries the entry.
     public sealed override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
     {
         _retry.Suspend();
@@ -153,13 +146,11 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
 
     protected virtual Task OnNeuronActivatedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    // Override to react. The default neuron does nothing: the signal is already journaled and remembered.
     protected virtual Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken) => Task.CompletedTask;
 
     protected T? Body<T>(SignalDelivery delivery, JsonTypeInfo<T> json) where T : class
         => delivery.Body(json);
 
-    // Snapshot hooks let the drain finish saved reactions and their announcements.
     private protected virtual bool HasStoredAnnouncements => false;
 
     private protected virtual bool HasBufferedAnnouncements => false;
@@ -180,8 +171,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
     private protected virtual void DiscardBufferedAnnouncements() { }
 
     private protected virtual Task<bool> DrainAnnouncementsAsync(CancellationToken cancellationToken) => Task.FromResult(false);
-
-    // ---- INeuron ----
 
     public Task<FireOutcome> Fire(Signal signal, NeuronId? to, CorrelationId? correlation, CancellationToken cancellationToken = default)
     {
@@ -238,7 +227,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         return DeliveryAdmission.Accepted;
     }
 
-    // Commands and reactions buffer scheduled work until their final persist.
     protected SignalId Schedule(Signal signal, CorrelationId? correlation = null)
     {
         ArgumentNullException.ThrowIfNull(signal);
@@ -316,10 +304,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         }
     }
 
-    // ---- INeuronInbox ----
-
-    // Reacts to exactly one pending entry per call, then re-wakes if more remain, so that
-    // accepts interleave with reactions and journal order is preserved.
     async Task INeuronInbox.Drain()
     {
         Guard();
@@ -432,8 +416,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         }
     }
 
-    // ---- INeuron: the reads ----
-
     public Task<IReadOnlyList<SignalDelivery>> ReadState()
     {
         Guard();
@@ -464,8 +446,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         Guard();
         return Task.FromResult(_components.Commands.Read(afterSequence));
     }
-
-    // ---- for subclasses ----
 
     protected async Task<TResult> ExecuteCommandAsync<TArguments, TResult>(
         CommandDescriptor command, TArguments arguments,
@@ -564,10 +544,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         return new FireOutcome(delivery.SignalId, delivery.CorrelationId, delivered, busy);
     }
 
-    // ---- the drain's wake-ups ----
-
-    // The reminder exists only to reactivate a cold neuron; the drain decides whether there is
-    // still work. A tick is also this activation's only proof that a reminder row is out there.
     Task IRemindable.ReceiveReminder(string reminderName, TickStatus status)
     {
         if (reminderName != RetryScheduler.ReminderName)
@@ -580,7 +556,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable,
         return Task.CompletedTask;
     }
 
-    // A one-way call to ourselves: it returns immediately and is queued behind the current turn.
     private void Wake() => GrainFactory.GetGrain<INeuronInbox>(this.GetGrainId()).Drain().Ignore();
 
     protected new IDisposable RegisterTimer(Func<object, Task> callback, object state, TimeSpan dueTime, TimeSpan period)

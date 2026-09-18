@@ -1,8 +1,6 @@
 using System.Text.Json;
 using DigitalBrain.Abstractions.Behavior;
-using DigitalBrain.Core.Behavior;
-
-namespace IntoChat;
+namespace DigitalBrain.Core.Behavior;
 
 public static class BehaviorExamples
 {

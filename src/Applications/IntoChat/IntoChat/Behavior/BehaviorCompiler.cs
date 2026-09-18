@@ -6,9 +6,7 @@ using Microsoft.Extensions.AI;
 
 namespace IntoChat;
 
-public sealed record BehaviorCompilation(BehaviorDefinition Definition, BehaviorValidation Validation);
-
-public sealed class BehaviorCompiler(IChatClient client, BehaviorService programs)
+public sealed class BehaviorCompiler(IChatClient client, BehaviorService programs) : IBehaviorIntentCompiler
 {
     private const int MaximumIntentBytes = 16 * 1024;
     private const int MaximumSourceBytes = 32 * 1024;

@@ -16,6 +16,7 @@
     <ProjectReference Include="../../../Modules/Supabase/Aspire.Hosting/DigitalBrain.Modules.Supabase.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Coding/Aspire.Hosting/DigitalBrain.Modules.Coding.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../IntoChat/IntoChat.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Mcp/DigitalBrain.Mcp.csproj" />
     <ProjectReference Include="../../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Excel/Excel/DigitalBrain.Modules.Excel.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Google/Aspire.Hosting/DigitalBrain.Modules.Google.Aspire.Hosting.csproj" IsAspireProjectResource="false" />

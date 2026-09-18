@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using System.Linq.Expressions;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Schema;
@@ -149,15 +148,12 @@ internal sealed class NeuronToolCatalog
         => typeInfo is null ? null : JsonSerializer.SerializeToElement(typeInfo.GetJsonSchemaAsNode());
 
     private static Func<object, object?, CancellationToken, Task> CompileCall(MethodInfo method)
-    {
-        var proxy = Expression.Parameter(typeof(object));
-        var argument = Expression.Parameter(typeof(object));
-        var cancellation = Expression.Parameter(typeof(CancellationToken));
-        var parameters = method.GetParameters().Select(parameter => parameter.ParameterType == typeof(CancellationToken)
-            ? (Expression)cancellation : Expression.Convert(argument, parameter.ParameterType));
-        var call = Expression.Call(Expression.Convert(proxy, method.DeclaringType!), method, parameters);
-        return Expression.Lambda<Func<object, object?, CancellationToken, Task>>(call, proxy, argument, cancellation).Compile();
-    }
+        => (proxy, argument, cancellation) =>
+        {
+            var values = method.GetParameters().Select(parameter =>
+                parameter.ParameterType == typeof(CancellationToken) ? cancellation : argument).ToArray();
+            return (Task)method.Invoke(proxy, values)!;
+        };
 
     private static Func<Task, object?>? CompileResult(Type returnType)
     {
@@ -165,9 +161,9 @@ internal sealed class NeuronToolCatalog
         {
             return null;
         }
-        var task = Expression.Parameter(typeof(Task));
-        var result = Expression.Property(Expression.Convert(task, returnType), "Result");
-        return Expression.Lambda<Func<Task, object?>>(Expression.Convert(result, typeof(object)), task).Compile();
+
+        var result = returnType.GetProperty("Result")!;
+        return task => result.GetValue(task);
     }
 }
 

@@ -5,10 +5,10 @@ using DigitalBrain.Core.Behavior;
 using Microsoft.Extensions.AI;
 using ModelContextProtocol.Server;
 
-namespace IntoChat;
+namespace DigitalBrain.Core.Behavior;
 
 [McpServerToolType]
-public sealed class BehaviorTools(BehaviorService programs, BehaviorCompiler compiler)
+public sealed class BehaviorTools(BehaviorService programs, IBehaviorIntentCompiler? compiler = null)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -25,7 +25,15 @@ public sealed class BehaviorTools(BehaviorService programs, BehaviorCompiler com
 
     [McpServerTool(Name = "program_compile"), Description("Compile a natural-language behavior to a validated neuron graph draft. This does not deploy; show the draft for user review before program_deploy.")]
     public Task<string> Compile(string intent, CancellationToken cancellationToken = default)
-        => Guard(async () => JsonSerializer.Serialize(await compiler.CompileAsync(intent, cancellationToken), Json));
+        => Guard(async () =>
+        {
+            if (compiler is null)
+            {
+                throw new InvalidOperationException("program_compile needs a language model on the silo host.");
+            }
+
+            return JsonSerializer.Serialize(await compiler.CompileAsync(intent, cancellationToken), Json);
+        });
 
     [McpServerTool(Name = "program_validate"), Description("Validate a JSON program definition: node configuration, typed ports, edges, cycles and execution order. No changes are made.")]
     public string Validate(string definition)
