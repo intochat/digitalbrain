@@ -15,7 +15,6 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Modules.Flutter" />
-    <InternalsVisibleTo Include="DigitalBrain.Mcp" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Testing" />

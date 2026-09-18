@@ -130,7 +130,7 @@ internal sealed class NeuronToolCatalog
         var summary = method.GetCustomAttribute<DescriptionAttribute>()?.Description;
         var descriptor = new MethodDescriptor(interfaceAlias, methodAlias, readOnly,
             Schema(argumentsJson), Schema(resultJson), summary);
-        return new(method, interfaceType, argumentsJson, commandId, CompileCall(method), CompileResult(returnType), returnsNeuron, descriptor, resultJson);
+        return new(method, interfaceType, argumentsJson, commandId, Call(method), ResultOf(returnType), returnsNeuron, descriptor, resultJson);
     }
 
     private static JsonSerializerOptions JsonOptions()
@@ -147,7 +147,7 @@ internal sealed class NeuronToolCatalog
     private static JsonElement? Schema(JsonTypeInfo? typeInfo)
         => typeInfo is null ? null : JsonSerializer.SerializeToElement(typeInfo.GetJsonSchemaAsNode());
 
-    private static Func<object, object?, CancellationToken, Task> CompileCall(MethodInfo method)
+    private static Func<object, object?, CancellationToken, Task> Call(MethodInfo method)
         => (proxy, argument, cancellation) =>
         {
             var values = method.GetParameters().Select(parameter =>
@@ -155,7 +155,7 @@ internal sealed class NeuronToolCatalog
             return (Task)method.Invoke(proxy, values)!;
         };
 
-    private static Func<Task, object?>? CompileResult(Type returnType)
+    private static Func<Task, object?>? ResultOf(Type returnType)
     {
         if (returnType == typeof(Task))
         {

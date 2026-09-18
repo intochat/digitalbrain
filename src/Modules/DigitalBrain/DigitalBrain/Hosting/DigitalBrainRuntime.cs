@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
 using Microsoft.Extensions.Options;
+using System.Text.Json.Serialization.Metadata;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
 
@@ -31,7 +32,7 @@ public static class DigitalBrainRuntime
         builder.AddIncomingGrainCallFilter<NeuronActivationGuardFilter>();
         builder.AddOutgoingGrainCallFilter<OutgoingCallerFilter>();
         builder.AddActivityPropagation();
-        builder.UseJsonJournalFormat(DurableStateJson.TypeInfoResolver);
+        builder.UseJsonJournalFormat(new DefaultJsonTypeInfoResolver());
         ModelPayloadSerialization.AddModelPayloadSerialization(builder.Services);
         builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         builder.Services.AddOptions<NeuronOptions>()
