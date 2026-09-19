@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 
-namespace DigitalBrain.Http;
+namespace DigitalBrain.Sdk;
 
 public sealed class TokenHandoff(TimeProvider clock)
 {

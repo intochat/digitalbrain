@@ -1,6 +1,6 @@
 using ModelContextProtocol.Client;
 
-namespace DigitalBrain.Http;
+namespace DigitalBrain.Sdk;
 
 public static class McpHttpSession
 {

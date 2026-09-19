@@ -1,6 +1,6 @@
 using System.Text.Encodings.Web;
 using DigitalBrain.Core;
-using DigitalBrain.Http;
+using DigitalBrain.Sdk;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.DependencyInjection;

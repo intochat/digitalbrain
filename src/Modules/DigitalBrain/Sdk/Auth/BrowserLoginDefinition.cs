@@ -1,4 +1,4 @@
-namespace DigitalBrain.Http;
+namespace DigitalBrain.Sdk;
 
 public sealed record BrowserLoginDefinition(
     string Provider,

@@ -2,7 +2,7 @@ using System.ComponentModel;
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Core;
-using DigitalBrain.Http;
+using DigitalBrain.Sdk;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.Google;

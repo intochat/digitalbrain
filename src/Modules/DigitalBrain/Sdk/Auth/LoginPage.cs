@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Http;
 
-namespace DigitalBrain.Http;
+namespace DigitalBrain.Sdk;
 
 // Only fixed application strings are rendered. Never reflect an OAuth response or URL.
 public static class LoginPage

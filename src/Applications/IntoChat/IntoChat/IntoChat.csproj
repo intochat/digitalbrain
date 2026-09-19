@@ -31,7 +31,7 @@
     <ProjectReference Include="../../../Modules/DigitalBrain/Aspire/DigitalBrain.Aspire.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/BehaviorRuntime/DigitalBrain.Behavior.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
-    <ProjectReference Include="../../../Modules/DigitalBrain/Http/DigitalBrain.Http.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Sdk/DigitalBrain.Sdk.csproj" />
     <ProjectReference Include="../../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
     <ProjectReference Include="../../../Modules/Flutter/Flutter/DigitalBrain.Modules.Flutter.csproj" />
   </ItemGroup>

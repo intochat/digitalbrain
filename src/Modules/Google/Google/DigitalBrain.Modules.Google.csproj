@@ -14,7 +14,7 @@
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Google.Contracts.csproj" />
     <ProjectReference Include="../../AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="../../DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
-    <ProjectReference Include="../../DigitalBrain/Http/DigitalBrain.Http.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Sdk/DigitalBrain.Sdk.csproj" />
   </ItemGroup>
 
 </Project>

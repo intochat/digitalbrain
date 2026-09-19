@@ -1,5 +1,5 @@
 using DigitalBrain.Aspire;
-using DigitalBrain.Http;
+using DigitalBrain.Sdk;
 using IntoChat;
 using IntoChat.ServiceDefaults;
 using Orleans.Dashboard;
