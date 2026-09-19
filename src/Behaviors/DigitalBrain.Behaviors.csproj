@@ -6,9 +6,14 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="ElonBitcoin.cs" />
+    <Compile Include="Fakes/TwitterFakes.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Modules/DigitalBrain/BehaviorRuntime/DigitalBrain.Behavior.csproj" />
-    <ProjectReference Include="../Testing/DigitalBrain.NeuronTesting/DigitalBrain.NeuronTesting.csproj" />
+    <ProjectReference Include="../Modules/Flutter/Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
   </ItemGroup>
 </Project>

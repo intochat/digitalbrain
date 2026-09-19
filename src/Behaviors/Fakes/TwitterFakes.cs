@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Orleans;
 
-namespace DigitalBrain.Testing;
+namespace DigitalBrain.Behaviors;
 
 public interface ITwitterAccount : INeuron
 {
@@ -16,12 +16,6 @@ public interface IBitcoin : INeuron
 {
     Task SetPrice(decimal usd);
     Task<decimal> GetPrice();
-}
-
-public interface INotification : INeuron
-{
-    Task Notify(string message);
-    Task<IReadOnlyList<string>> Read();
 }
 
 [GenerateSerializer, Alias("test.posted")]
@@ -53,12 +47,4 @@ public sealed class Bitcoin : Neuron, IBitcoin
     private decimal _usd;
     public Task SetPrice(decimal usd) { _usd = usd; return Task.CompletedTask; }
     public Task<decimal> GetPrice() => Task.FromResult(_usd);
-}
-
-[GrainType("notification")]
-public sealed class Notification : Neuron, INotification
-{
-    private readonly List<string> _sent = [];
-    public Task Notify(string message) { _sent.Add(message); return Task.CompletedTask; }
-    public Task<IReadOnlyList<string>> Read() => Task.FromResult<IReadOnlyList<string>>(_sent.ToArray());
 }
