@@ -25,10 +25,8 @@ public static class BrainSimulationExtensions
 
     public static IGrainFactory Grains(this IDigitalBrain brain) => Requires(brain).Grains;
 
-    /// <summary>The production client behind the simulation, so a test can exercise client disposal without stopping the silo.</summary>
     public static IDigitalBrain Client(this IDigitalBrain brain) => Requires(brain).Client;
 
-    /// <summary>The HTTP client for module endpoints; requires <c>UseHttp</c>.</summary>
     public static HttpClient Http(this IDigitalBrain brain) => Requires(brain).Endpoints;
 
     public static Task DeactivateAsync(this IDigitalBrain brain, INeuron neuron, CancellationToken cancellationToken = default)
