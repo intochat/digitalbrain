@@ -2,6 +2,7 @@ using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
@@ -14,6 +15,7 @@ internal sealed class SimulatedBrain(InProcessTestCluster cluster, WebApplicatio
     private readonly IDigitalBrain _brain = cluster.Client.ServiceProvider.GetRequiredService<IDigitalBrain>();
     private readonly List<IAsyncDisposable> _resources = [];
     private int _disposed;
+    internal int BufferCapacity { get; } = cluster.Client.ServiceProvider.GetRequiredService<IOptions<BrainOptions>>().Value.BufferCapacity;
 
     public IGrainFactory Grains => cluster.Client;
 

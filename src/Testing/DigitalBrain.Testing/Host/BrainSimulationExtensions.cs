@@ -10,8 +10,9 @@ public static class BrainSimulationExtensions
     {
         ArgumentNullException.ThrowIfNull(brain);
         var subscription = await brain.SubscribeAsync<T>(source, cancellationToken).ConfigureAwait(false);
-        var probe = new SignalProbe<T>(subscription);
-        if (brain is SimulatedBrain simulated) { simulated.Track(probe); }
+        var simulated = brain as SimulatedBrain;
+        var probe = new SignalProbe<T>(subscription, simulated?.BufferCapacity ?? new BrainOptions().BufferCapacity);
+        simulated?.Track(probe);
         return probe;
     }
 

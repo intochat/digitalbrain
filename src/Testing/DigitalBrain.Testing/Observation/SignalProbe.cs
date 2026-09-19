@@ -7,14 +7,18 @@ public sealed class SignalProbe<T> : IAsyncDisposable where T : Signal
 {
     private readonly ISignalSubscription<T> _subscription;
     private readonly CancellationTokenSource _cancel = new();
-    private readonly Channel<T> _pending = Channel.CreateBounded<T>(TestLimits.Buffer);
+    private readonly Channel<T> _pending;
     private readonly Queue<T> _recent = new();
     private readonly Lock _gate = new();
+    private readonly int _buffer;
     private readonly Task _worker;
     private int _disposed;
-    internal SignalProbe(ISignalSubscription<T> subscription)
+    internal SignalProbe(ISignalSubscription<T> subscription, int buffer)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(buffer);
         _subscription = subscription;
+        _buffer = buffer;
+        _pending = Channel.CreateBounded<T>(buffer);
         _worker = ObserveAsync();
     }
     public IReadOnlyList<T> Snapshot { get { lock (_gate) { return _recent.ToArray(); } } }
@@ -26,7 +30,7 @@ public sealed class SignalProbe<T> : IAsyncDisposable where T : Signal
             {
                 lock (_gate)
                 {
-                    if (_recent.Count == TestLimits.Buffer) { _recent.Dequeue(); }
+                    if (_recent.Count == _buffer) { _recent.Dequeue(); }
                     _recent.Enqueue(value);
                 }
                 if (!_pending.Writer.TryWrite(value)) { throw new InvalidOperationException("Signal probe buffer overflowed."); }
