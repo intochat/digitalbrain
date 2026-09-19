@@ -13,4 +13,5 @@ public sealed record SimulationOptions
     public string? PersistenceDirectory { get; init; }
     public StorageFaults? StorageFaults { get; init; }
     public bool UseReminders { get; init; }
+    public bool UseHttp { get; init; }
 }

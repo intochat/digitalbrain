@@ -1,5 +1,7 @@
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -60,24 +62,43 @@ public static class DigitalBrainSimulation
         });
         builder.ConfigureClient(client => { client.AddDigitalBrain(); options.ConfigureClient?.Invoke(client); });
         InProcessTestCluster? cluster = null;
+        WebApplication? web = null;
+        HttpClient? http = null;
         try
         {
             cluster = builder.Build();
             await cluster.DeployAsync(cancellationToken).ConfigureAwait(false);
-            return new SimulatedBrain(cluster, lease, temporary, options.StorageFaults);
+            if (options.UseHttp)
+            {
+                var webBuilder = WebApplication.CreateBuilder();
+                webBuilder.WebHost.UseUrls("http://127.0.0.1:0");
+                webBuilder.Logging.ClearProviders();
+                webBuilder.Services.AddSingleton<IGrainFactory>(cluster.Client);
+                webBuilder.Services.AddSingleton<IClusterClient>(cluster.Client);
+                web = webBuilder.Build();
+                foreach (var module in options.Modules) { module.Configure(web); }
+                await web.StartAsync(cancellationToken).ConfigureAwait(false);
+                http = new HttpClient { BaseAddress = new Uri(web.Urls.Single() + "/") };
+            }
+            return new SimulatedBrain(cluster, web, http, lease, temporary, options.StorageFaults);
         }
         catch
         {
             options.StorageFaults?.Dispose();
-            try { if (cluster is not null) { await cluster.DisposeAsync().ConfigureAwait(false); } }
-            finally { lease?.Dispose(); if (temporary is not null) { Directory.Delete(temporary, true); } }
+            http?.Dispose();
+            try { if (web is not null) { await web.DisposeAsync().ConfigureAwait(false); } }
+            finally
+            {
+                try { if (cluster is not null) { await cluster.DisposeAsync().ConfigureAwait(false); } }
+                finally { lease?.Dispose(); if (temporary is not null) { Directory.Delete(temporary, true); } }
+            }
             throw;
         }
     }
 }
 
-internal sealed class SimulatedBrain(InProcessTestCluster cluster, FileStream? storeLease, string? temporaryStore, StorageFaults? faults)
-    : IDigitalBrain
+internal sealed class SimulatedBrain(InProcessTestCluster cluster, WebApplication? web, HttpClient? http,
+    FileStream? storeLease, string? temporaryStore, StorageFaults? faults) : IDigitalBrain
 {
     private readonly IDigitalBrain _brain = cluster.Client.ServiceProvider.GetRequiredService<IDigitalBrain>();
     private readonly List<IAsyncDisposable> _resources = [];
@@ -86,6 +107,8 @@ internal sealed class SimulatedBrain(InProcessTestCluster cluster, FileStream? s
     public IGrainFactory Grains => cluster.Client;
 
     internal IDigitalBrain Client => _brain;
+
+    internal HttpClient Endpoints => http ?? throw new InvalidOperationException("Start the simulation with UseHttp to reach module endpoints.");
 
     internal void Track(IAsyncDisposable resource) => _resources.Add(resource);
 
@@ -111,6 +134,12 @@ internal sealed class SimulatedBrain(InProcessTestCluster cluster, FileStream? s
         foreach (var resource in _resources)
         {
             try { await resource.DisposeAsync().ConfigureAwait(false); }
+            catch (Exception error) { failures.Add(error); }
+        }
+        http?.Dispose();
+        if (web is not null)
+        {
+            try { await web.DisposeAsync().ConfigureAwait(false); }
             catch (Exception error) { failures.Add(error); }
         }
         try { await _brain.DisposeAsync().ConfigureAwait(false); }

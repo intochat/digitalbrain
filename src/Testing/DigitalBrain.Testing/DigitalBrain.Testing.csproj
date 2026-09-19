@@ -5,6 +5,7 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.Orleans.TestingHost" /><PackageReference Include="Microsoft.Orleans.Reminders" />
   </ItemGroup>
   <ItemGroup>

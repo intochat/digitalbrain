@@ -43,6 +43,21 @@ test. Timeout output omits complex payloads. Teardown cancels behaviors, joins t
 deadline, disposes observations and the client, then stops Orleans. A behavior that ignores cancellation
 is reported as a cleanup failure; an in-process task cannot be forcibly terminated.
 
+## Module endpoints
+
+A module may map HTTP endpoints by overriding `IModule.Configure(IEndpointRouteBuilder)`, for example a
+webhook endpoint. HTTP is opt-in: start the simulation with `UseHttp = true` and reach the mapped routes
+through `brain.Http()`. Ordinary grain tests never start Kestrel.
+
+```csharp
+await using var brain = await DigitalBrainSimulation.StartAsync(new()
+{
+    Modules = [new WebhookModule()],
+    UseHttp = true,
+}, ct);
+var response = await brain.Http().PostAsJsonAsync("/twitter/webhook", payload, ct);
+```
+
 ## State recovery and failures
 
 Set `PersistenceDirectory` to a test-owned temporary directory. Dispose a simulation before opening the
