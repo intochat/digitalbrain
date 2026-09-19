@@ -7,7 +7,7 @@ namespace DigitalBrain.Core;
 
 public sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObserver where T : Signal
 {
-    private readonly IClusterClient _client;
+    private readonly IGrainFactory _grains;
     private readonly INeuron _source;
     private readonly BrainOptions _options;
     private readonly ILogger _logger;
@@ -22,10 +22,10 @@ public sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObser
     private Task? _cleanup;
     private int _reader;
 
-    internal SignalSubscription(IClusterClient client, INeuron source, BrainOptions options,
+    internal SignalSubscription(IGrainFactory grains, INeuron source, BrainOptions options,
         ILogger logger, Action<IAsyncDisposable> closed, CancellationToken cancellationToken)
     {
-        _client = client;
+        _grains = grains;
         _source = source;
         _options = options;
         _logger = logger;
@@ -43,7 +43,7 @@ public sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObser
         try
         {
             var token = _lifetime.Token;
-            _reference = _client.CreateObjectReference<INeuronObserver>(this);
+            _reference = _grains.CreateObjectReference<INeuronObserver>(this);
             var activation = await WatchAsync(token).ConfigureAwait(false);
             lock (_gate)
             {
@@ -139,7 +139,7 @@ public sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObser
             if (_watch is { IsCompleted: false }) { _ = CleanupLateWatchAsync(_watch); }
             else { _ = _watch?.Exception; }
             try { await UnwatchAsync().ConfigureAwait(false); }
-            finally { _client.DeleteObjectReference<INeuronObserver>(_reference); }
+            finally { _grains.DeleteObjectReference<INeuronObserver>(_reference); }
         }
         finally
         {

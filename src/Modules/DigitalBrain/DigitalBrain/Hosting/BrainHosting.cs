@@ -7,15 +7,19 @@ public static class BrainHosting
 {
     public static ISiloBuilder AddDigitalBrain(this ISiloBuilder silo)
     {
-        AddOptions(silo.Services);
+        AddBrainClient(silo.Services);
         return silo;
     }
     public static IClientBuilder AddDigitalBrain(this IClientBuilder client)
     {
-        AddOptions(client.Services);
-        client.Services.TryAddSingleton<BrainClient>();
-        client.Services.TryAddSingleton<IDigitalBrain>(services => services.GetRequiredService<BrainClient>());
+        AddBrainClient(client.Services);
         return client;
+    }
+    private static void AddBrainClient(IServiceCollection services)
+    {
+        AddOptions(services);
+        services.TryAddSingleton<BrainClient>();
+        services.TryAddSingleton<IDigitalBrain>(sp => sp.GetRequiredService<BrainClient>());
     }
     private static void AddOptions(IServiceCollection services) => services.AddOptions<BrainOptions>()
         .Validate(o => o.BufferCapacity > 0 && o.RenewEvery > TimeSpan.Zero && o.OperationTimeout > TimeSpan.Zero
