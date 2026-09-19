@@ -1,4 +1,5 @@
 using DigitalBrain.Core;
+using DigitalBrain.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -9,6 +10,8 @@ public sealed class BrainTestHost : IAsyncDisposable
 {
     private readonly InProcessTestCluster _cluster;
     private readonly BrainClient _brain;
+    private readonly List<BehaviorRun> _behaviors = [];
+    private readonly List<IAsyncDisposable> _probes = [];
     private BrainTestHost(InProcessTestCluster cluster)
     {
         _cluster = cluster;
@@ -16,6 +19,18 @@ public sealed class BrainTestHost : IAsyncDisposable
     }
     public IDigitalBrain Brain => _brain;
     public IGrainFactory Grains => _cluster.Client;
+    public BehaviorRun RunBehavior(Func<IDigitalBrain, CancellationToken, Task> body, CancellationToken ct = default)
+    {
+        var run = new BehaviorRun(Brain, body, ct);
+        _behaviors.Add(run);
+        return run;
+    }
+    public async Task<SignalProbe<T>> ObserveAsync<T>(INeuron source, CancellationToken ct = default) where T : Signal
+    {
+        var probe = new SignalProbe<T>(await Brain.SubscribeAsync<T>(source, ct).ConfigureAwait(false));
+        _probes.Add(probe);
+        return probe;
+    }
     public static async Task<BrainTestHost> StartAsync(BrainTestOptions? options = null, CancellationToken cancellationToken = default)
     {
         options ??= new();
@@ -38,7 +53,14 @@ public sealed class BrainTestHost : IAsyncDisposable
     }
     public async ValueTask DisposeAsync()
     {
-        try { await _brain.DisposeAsync().ConfigureAwait(false); }
-        finally { await _cluster.DisposeAsync().ConfigureAwait(false); }
+        List<Exception> failures = [];
+        foreach (var resource in _behaviors.Cast<IAsyncDisposable>().Concat(_probes).Append(_brain))
+        {
+            try { await resource.DisposeAsync().ConfigureAwait(false); }
+            catch (Exception error) { failures.Add(error); }
+        }
+        try { await _cluster.DisposeAsync().ConfigureAwait(false); }
+        catch (Exception error) { failures.Add(error); }
+        if (failures.Count > 0) { throw new AggregateException("Brain test cleanup failed.", failures); }
     }
 }
