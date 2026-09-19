@@ -1,10 +1,11 @@
 namespace DigitalBrain.Flutter.Aspire.Hosting;
 
-internal enum FlutterHostKind
+public enum FlutterHostKind
 {
     Window = 0,
     Headless = 1,
     Web = 2,
+    None = 3,
 }
 
 internal static class FlutterHostLaunch

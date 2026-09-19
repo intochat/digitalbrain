@@ -40,6 +40,7 @@ public static class ShellHostingExtensions
         }
 
         module.DigitalBrainBuilder.ApplicationBuilder.Configuration.GetSection(FlutterHostOptions.SectionName).Bind(options);
+        options.Kind = kind;
         configure?.Invoke(options);
         GetOrCreateState(module).EnsureFlutterHost(kind, options);
         return module;

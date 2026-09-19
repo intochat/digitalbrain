@@ -11,15 +11,27 @@ var builder = DistributedApplication.CreateBuilder(args);
 var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules)
     .AddModule<TimeModule>();
 
-var elonSurface = string.Equals(
-    builder.Configuration["Testing:Surface"],
-    "elon",
-    StringComparison.OrdinalIgnoreCase);
-if (!builder.Configuration.GetValue("Testing:SkipFlutterHost", false)
-    && (elonSurface || builder.Configuration["Testing:Surface"] is null or ""))
+digitalBrain.AddModule<FlutterModule>(module =>
 {
-    digitalBrain.AddModule<FlutterModule>(module => module.WithWindowHost());
-}
+    var kind = builder.Configuration.GetValue("DigitalBrain:Flutter:Hosting:Kind", FlutterHostKind.Window);
+    if (kind == FlutterHostKind.None)
+    {
+        return;
+    }
+
+    if (kind == FlutterHostKind.Web)
+    {
+        module.WithWebHost();
+    }
+    else if (kind == FlutterHostKind.Headless)
+    {
+        module.WithHeadlessHost();
+    }
+    else
+    {
+        module.WithWindowHost();
+    }
+});
 
 var developmentClusterId = builder.Environment.IsDevelopment()
     ? $"digitalbrain-{Guid.NewGuid():N}"

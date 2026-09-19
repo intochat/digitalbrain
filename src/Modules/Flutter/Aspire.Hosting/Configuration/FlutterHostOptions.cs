@@ -4,6 +4,8 @@ public sealed class FlutterHostOptions
 {
     public const string SectionName = "DigitalBrain:Flutter:Hosting";
 
+    public FlutterHostKind Kind { get; set; } = FlutterHostKind.Window;
+
     public string ResourceName { get; set; } = ShellNames.DefaultFlutterResourceName;
 
     public string DeviceTarget { get; set; } = ShellNames.DefaultDeviceTarget;
