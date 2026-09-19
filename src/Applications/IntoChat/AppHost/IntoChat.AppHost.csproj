@@ -11,6 +11,7 @@
     <ProjectReference Include="../../../Behaviors/DigitalBrain.Behaviors.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../IntoChat/IntoChat.csproj" />
     <ProjectReference Include="../../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Google/Google/DigitalBrain.Modules.Google.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Flutter/Aspire.Hosting/DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
   </ItemGroup>
 </Project>

@@ -33,6 +33,7 @@
     <ProjectReference Include="../../../Modules/DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Sdk/DigitalBrain.Sdk.csproj" />
     <ProjectReference Include="../../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
+    <ProjectReference Include="../../../Modules/Google/Google/DigitalBrain.Modules.Google.csproj" />
     <ProjectReference Include="../../../Modules/Flutter/Flutter/DigitalBrain.Modules.Flutter.csproj" />
   </ItemGroup>
 </Project>
