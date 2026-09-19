@@ -5,7 +5,7 @@ using Orleans.Journaling;
 namespace DigitalBrain.Core;
 
 internal sealed class PersistenceFence(NeuronId neuron, IJournaledStateManager stateManager,
-    CancellationToken activation, Func<bool> reconcile, Action deactivateOnIdle, NeuronActivationComponents components)
+    CancellationToken activation, Action deactivateOnIdle, NeuronActivationComponents components)
 {
     private bool _faulted;
     private bool _storageHoldsJournal;
@@ -98,23 +98,6 @@ internal sealed class PersistenceFence(NeuronId neuron, IJournaledStateManager s
             deactivateOnIdle();
             throw new NeuronRecoveringException(neuron,
                 $"Neuron '{neuron}' could not revert in place because storage holds no journal for it yet. Retry after it reactivates from storage.", cause);
-        }
-
-        try
-        {
-            if (reconcile())
-            {
-                var boundary = components.CaptureCommitBoundary();
-                await stateManager.WriteStateAsync(activation).ConfigureAwait(true);
-                components.NoteCommitted(boundary);
-                _storageHoldsJournal = true;
-            }
-        }
-        catch (Exception failure)
-        {
-            deactivateOnIdle();
-            throw new NeuronRecoveringException(neuron,
-                $"Neuron '{neuron}' failed to reconcile after reverting pending changes. Retry after it reactivates from storage.", new AggregateException(cause, failure));
         }
 
         _faulted = false;
