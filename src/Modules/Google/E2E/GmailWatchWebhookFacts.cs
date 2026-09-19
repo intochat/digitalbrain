@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
 using DigitalBrain.E2ETesting;
 using DigitalBrain.Google;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,7 +18,7 @@ public sealed class GmailWatchWebhookFacts
         await using var brain = await DigitalBrainSimulation.StartAsync(new() { Modules = [new GoogleModule()] }, ct);
         await using var web = await ModuleWebHost.StartAsync(brain.Cluster(), [new GoogleModule()], ct);
         await using var mail = await brain.Observe<MailReceived>(brain.Get<IGmail>("user@gmail.com"), ct);
-        var response = await web.Client.PostAsJsonAsync("google/gmail/watch", new GmailWatchPush("123", "user@gmail.com"), ct);
+        var response = await web.Client.PostAsJsonAsync("google/gmail/watch", GmailWatchHttp.GmailPubSubBody("123", "user@gmail.com"), ct);
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         Assert.Equal("123", (await mail.NextAsync(ct: ct)).HistoryId);
     }
@@ -35,6 +37,16 @@ public sealed class GmailWatchWebhookFacts
         var response = await web.Client.GetAsync("google/gmail/oauth/callback?code=fake", ct);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("user@gmail.com", (await connected.NextAsync(ct: ct)).EmailAddress);
+    }
+}
+
+file static class GmailWatchHttp
+{
+    public static object GmailPubSubBody(string historyId, string emailAddress)
+    {
+        var data = Convert.ToBase64String(Encoding.UTF8.GetBytes(
+            JsonSerializer.Serialize(new { emailAddress, historyId })));
+        return new { message = new { data, messageId = "m1" }, subscription = "projects/x/subscriptions/gmail" };
     }
 }
 

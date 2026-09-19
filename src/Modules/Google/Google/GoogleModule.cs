@@ -30,8 +30,13 @@ public sealed class GoogleModule : IModule
 
     public void Configure(IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapJsonWebhook<GmailWatchPush>("/google/gmail/watch", async (push, grains, ct) =>
+        endpoints.MapJsonWebhook<GmailPubSubPush>("/google/gmail/watch", async (envelope, grains, ct) =>
         {
+            if (!GmailPubSub.TryUnwrap(envelope, out var push))
+            {
+                return Results.BadRequest();
+            }
+
             await grains.GetGrain<IGmail>(push.EmailAddress).AcceptWatchPush(push);
             return Results.Accepted();
         });
