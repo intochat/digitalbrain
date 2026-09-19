@@ -29,8 +29,11 @@ public sealed class TimerProcessFacts
         var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var start = new ProcessStartInfo("dotnet")
         {
-            WorkingDirectory = root, UseShellExecute = false, CreateNoWindow = true,
-            RedirectStandardOutput = true, RedirectStandardError = true
+            WorkingDirectory = root,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
         };
         foreach (var argument in new[] { "run", "--file", "src/Behaviors/timer-report.cs", "-p:CodeGraphRefresh=false", "--",
             "--Smoke", "true", "--TimerId", "process", "--ClusterId", cluster.Options.ClusterId,

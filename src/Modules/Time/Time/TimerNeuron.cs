@@ -34,9 +34,12 @@ internal class TimerNeuron(
         var now = time.GetUtcNow();
         var next = new TimerState
         {
-            Status = TimerStatus.Scheduled, Generation = checked(state.State.Generation + 1),
-            ScheduledAt = now, DueAt = now.AddSeconds(durationSeconds),
-            DurationSeconds = durationSeconds, Note = note
+            Status = TimerStatus.Scheduled,
+            Generation = checked(state.State.Generation + 1),
+            ScheduledAt = now,
+            DueAt = now.AddSeconds(durationSeconds),
+            DurationSeconds = durationSeconds,
+            Note = note
         };
         await RegisterAsync(next);
         try { await SaveAsync(next); }

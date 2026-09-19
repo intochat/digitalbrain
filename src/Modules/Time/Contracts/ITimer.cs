@@ -1,5 +1,6 @@
 using DigitalBrain.Contracts;
 namespace DigitalBrain.Time;
+
 [Alias("timer")]
 [Orleans.Metadata.DefaultGrainType("timer")]
 public interface ITimer : INeuron

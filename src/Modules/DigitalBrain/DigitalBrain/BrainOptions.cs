@@ -1,4 +1,5 @@
 namespace DigitalBrain.Core;
+
 public sealed class BrainOptions
 {
     public int BufferCapacity { get; set; } = 256;

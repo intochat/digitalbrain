@@ -1,5 +1,6 @@
 using DigitalBrain.Contracts;
 namespace DigitalBrain.Time;
+
 [GenerateSerializer, Alias("time.elapsed")]
 public sealed record TimerElapsed(
     [property: Id(0)] string TimerId,

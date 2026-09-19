@@ -11,7 +11,9 @@ internal static class TimerTestSupport
     public static Task<BrainTestHost> StartAsync(CancellationToken ct, string? directory = null, StorageFaults? faults = null, TimeProvider? time = null, ReminderFaults? reminders = null)
         => BrainTestHost.StartAsync(new()
         {
-            PersistenceDirectory = directory, UseReminders = true, StorageFaults = faults,
+            PersistenceDirectory = directory,
+            UseReminders = true,
+            StorageFaults = faults,
             ConfigureSilo = silo =>
             {
                 silo.AddTime();

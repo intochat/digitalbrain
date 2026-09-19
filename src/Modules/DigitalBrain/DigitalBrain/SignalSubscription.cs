@@ -18,7 +18,9 @@ public sealed class SignalSubscription<T> : IAsyncDisposable where T : Signal
         _lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _messages = Channel.CreateBounded<T>(new BoundedChannelOptions(capacity)
         {
-            SingleReader = true, SingleWriter = false, FullMode = BoundedChannelFullMode.Wait,
+            SingleReader = true,
+            SingleWriter = false,
+            FullMode = BoundedChannelFullMode.Wait,
         });
         _ = _completion.Task.ContinueWith(t => { _ = t.Exception; }, CancellationToken.None,
             TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);

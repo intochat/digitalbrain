@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace DigitalBrain.Core;
+
 public static class BrainHosting
 {
     public static ISiloBuilder AddDigitalBrain(this ISiloBuilder silo)

@@ -1,4 +1,5 @@
 namespace DigitalBrain.Time;
+
 [GenerateSerializer, Alias("time.state")]
 internal sealed record TimerState
 {

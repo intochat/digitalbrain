@@ -95,13 +95,13 @@ public sealed class PersistenceFacts
                 await first.Brain.Get<ICounter>("saved").SetWithoutPublishing(23);
             }
             await using var second = await BrainTestHost.StartAsync(new() { PersistenceDirectory = directory }, ct);
-                var counter = second.Brain.Get<ICounter>("saved");
-                Assert.Equal(23, await counter.Read());
-                await using var probe = await second.ObserveAsync<Number>(counter, ct);
-                await counter.Set(24);
-                Assert.Equal(24, (await probe.NextAsync(ct: ct)).Value);
-                await counter.Deactivate();
-                Assert.Equal(24, await counter.Read());
+            var counter = second.Brain.Get<ICounter>("saved");
+            Assert.Equal(23, await counter.Read());
+            await using var probe = await second.ObserveAsync<Number>(counter, ct);
+            await counter.Set(24);
+            Assert.Equal(24, (await probe.NextAsync(ct: ct)).Value);
+            await counter.Deactivate();
+            Assert.Equal(24, await counter.Read());
         }
         finally { if (Directory.Exists(directory)) { Directory.Delete(directory, recursive: true); } }
     }

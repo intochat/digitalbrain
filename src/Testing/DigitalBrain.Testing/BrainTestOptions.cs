@@ -1,5 +1,6 @@
 using Orleans;
 namespace DigitalBrain.Testing;
+
 public sealed record BrainTestOptions
 {
     public Action<ISiloBuilder>? ConfigureSilo { get; init; }

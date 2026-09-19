@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>DigitalBrain testing SDK: in-process brain simulation and journal waits.</Description>
+    <Description>Real Orleans fixtures, live observations and state-provider fault controls for module tests.</Description>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>

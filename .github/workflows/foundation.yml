@@ -1,0 +1,26 @@
+name: foundation
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  foundation:
+    name: Foundation and Time only — partial migration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - run: dotnet restore DigitalBrain.Foundation.slnx
+      - run: dotnet build DigitalBrain.Foundation.slnx -c Release --no-restore -p:CodeGraphRefresh=false
+      - run: dotnet test --solution DigitalBrain.Foundation.slnx -c Release --no-build
+      - run: dotnet build src/Behaviors/timer-report.cs -c Release -p:CodeGraphRefresh=false
+      - run: dotnet format whitespace DigitalBrain.Foundation.slnx --verify-no-changes --no-restore

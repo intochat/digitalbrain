@@ -1,4 +1,5 @@
 namespace DigitalBrain.Testing;
+
 public static class TestWait
 {
     public static async Task<T> UntilAsync<T>(Func<CancellationToken, Task<T>> read, Func<T, bool> done,

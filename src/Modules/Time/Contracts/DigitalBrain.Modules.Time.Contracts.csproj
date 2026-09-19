@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Time module contracts: schedule and stop commands, timer snapshots, and signal bodies.</Description>
+    <Description>Typed timer operations, snapshots and live elapsed facts.</Description>
     <RootNamespace>DigitalBrain.Time</RootNamespace>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>

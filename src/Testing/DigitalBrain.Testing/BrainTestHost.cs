@@ -8,6 +8,7 @@ using Orleans.TestingHost;
 using Orleans.Storage;
 using Orleans.Runtime;
 namespace DigitalBrain.Testing;
+
 public sealed class BrainTestHost : IAsyncDisposable
 {
     private readonly InProcessTestCluster _cluster;
