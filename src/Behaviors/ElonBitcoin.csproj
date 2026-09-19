@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <Description>Single-file neuron behavior: Elon posts Bitcoin, quote BTC on the UI.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+  </ItemGroup>
+</Project>

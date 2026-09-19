@@ -2,6 +2,9 @@
   <Import Project="../../../Testing/Module.Tests.props" />
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../../../Behaviors/ElonBitcoin.csproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
     <PackageReference Include="Microsoft.Orleans.BroadcastChannel" />
   </ItemGroup>
   <ItemGroup>
