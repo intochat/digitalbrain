@@ -9,7 +9,5 @@ public sealed record SimulationOptions
     public IReadOnlyList<IModule> Modules { get; init; } = [];
     public Action<ISiloBuilder>? ConfigureSilo { get; init; }
     public Action<IClientBuilder>? ConfigureClient { get; init; }
-    public IReadOnlyDictionary<string, string?>? Configuration { get; init; }
     public bool UseReminders { get; init; }
-    public bool UseHttp { get; init; }
 }

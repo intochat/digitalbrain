@@ -28,8 +28,6 @@ public static class BrainSimulationExtensions
 
     public static IDigitalBrain Client(this IDigitalBrain brain) => Requires(brain).Client;
 
-    public static HttpClient Http(this IDigitalBrain brain) => Requires(brain).Endpoints;
-
     public static Task DeactivateAsync(this IDigitalBrain brain, INeuron neuron, CancellationToken cancellationToken = default)
         => Requires(brain).DeactivateAsync(neuron, cancellationToken);
 

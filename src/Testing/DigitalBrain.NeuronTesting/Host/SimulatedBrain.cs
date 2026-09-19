@@ -1,6 +1,5 @@
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans;
@@ -9,8 +8,7 @@ using Orleans.TestingHost;
 
 namespace DigitalBrain.Testing;
 
-internal sealed class SimulatedBrain(InProcessTestCluster cluster, WebApplication? web, HttpClient? http)
-    : IDigitalBrain
+internal sealed class SimulatedBrain(InProcessTestCluster cluster) : IDigitalBrain
 {
     private readonly IDigitalBrain _brain = cluster.Client.ServiceProvider.GetRequiredService<IDigitalBrain>();
     private readonly List<IAsyncDisposable> _resources = [];
@@ -20,8 +18,6 @@ internal sealed class SimulatedBrain(InProcessTestCluster cluster, WebApplicatio
     public IGrainFactory Grains => cluster.Client;
 
     internal IDigitalBrain Client => _brain;
-
-    internal HttpClient Endpoints => http ?? throw new InvalidOperationException("Start the simulation with UseHttp to reach module endpoints.");
 
     internal void Track(IAsyncDisposable resource) => _resources.Add(resource);
 
@@ -42,13 +38,12 @@ internal sealed class SimulatedBrain(InProcessTestCluster cluster, WebApplicatio
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) { return; }
-        var failures = await ReleaseAsync(cluster, web, http, _brain, _resources).ConfigureAwait(false);
+        var failures = await ReleaseAsync(cluster, _brain, _resources).ConfigureAwait(false);
         if (failures.Count > 0) { throw new AggregateException("Brain simulation cleanup failed.", failures); }
     }
 
     internal static async Task<List<Exception>> ReleaseAsync(
-        InProcessTestCluster? cluster, WebApplication? web, HttpClient? http,
-        IDigitalBrain? brain = null, IReadOnlyList<IAsyncDisposable>? resources = null)
+        InProcessTestCluster? cluster, IDigitalBrain? brain = null, IReadOnlyList<IAsyncDisposable>? resources = null)
     {
         List<Exception> failures = [];
         if (resources is not null)
@@ -58,12 +53,6 @@ internal sealed class SimulatedBrain(InProcessTestCluster cluster, WebApplicatio
                 try { await resource.DisposeAsync().ConfigureAwait(false); }
                 catch (Exception error) { failures.Add(error); }
             }
-        }
-        http?.Dispose();
-        if (web is not null)
-        {
-            try { await web.DisposeAsync().ConfigureAwait(false); }
-            catch (Exception error) { failures.Add(error); }
         }
         if (brain is not null)
         {
