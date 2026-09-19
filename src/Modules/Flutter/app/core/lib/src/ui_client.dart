@@ -387,6 +387,18 @@ final class DigitalBrainUiClient {
     return controller.stream;
   }
 
+  Future<List<String>> readInbox() async {
+    final response = await _request('GET', '/ui/inbox', timeout: const Duration(seconds: 10));
+    final decoded = jsonDecode(response.body);
+    if (decoded is! List) {
+      return const [];
+    }
+    return [
+      for (final item in decoded)
+        if (item is String) item,
+    ];
+  }
+
   Future<BrainSnapshot> readBrain({required String chatName}) async {
     final response = await _request(
       'GET',

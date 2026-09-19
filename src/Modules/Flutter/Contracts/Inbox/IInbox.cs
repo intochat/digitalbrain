@@ -1,4 +1,5 @@
 using DigitalBrain.Contracts;
+using Orleans.Concurrency;
 
 namespace DigitalBrain.Flutter;
 
@@ -7,4 +8,7 @@ namespace DigitalBrain.Flutter;
 public interface IInbox : INeuron
 {
     Task Appear(string text);
+
+    [ReadOnly, Alias("read")]
+    Task<IReadOnlyList<string>> Read();
 }

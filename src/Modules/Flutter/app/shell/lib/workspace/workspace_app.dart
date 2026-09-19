@@ -7,6 +7,7 @@ import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 
+import '../inbox_banner.dart';
 import '../integrations/integrations_menu.dart';
 import 'brain_graph_store.dart';
 import 'workspace_table_import.dart';
@@ -1298,6 +1299,8 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                       content: Text(widget.statusMessage!),
                       actions: const [SizedBox.shrink()],
                     ),
+                  if (widget.programmingClient != null)
+                    InboxBanner(client: widget.programmingClient!),
                   if (store.persistenceError != null)
                     Text(
                       store.persistenceError!,
