@@ -16,21 +16,18 @@ public abstract class Neuron : Grain, INeuron
 
     public Task<Guid> Watch(INeuronObserver observer)
     {
-        ArgumentNullException.ThrowIfNull(observer);
         Observers.Subscribe(observer, observer);
         return Task.FromResult(_activation);
     }
 
     public Task Unwatch(INeuronObserver observer)
     {
-        ArgumentNullException.ThrowIfNull(observer);
         Observers.Unsubscribe(observer);
         return Task.CompletedTask;
     }
 
     protected Task PublishAsync(Signal signal)
     {
-        ArgumentNullException.ThrowIfNull(signal);
         return Observers.Notify(observer => observer.OnSignalAsync(signal));
     }
 }

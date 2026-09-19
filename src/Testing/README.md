@@ -13,12 +13,11 @@ await using var host = await BrainTestHost.StartAsync(new()
     UseReminders = true,
     ConfigureSilo = silo => silo.AddTime()
 }, ct);
-var timer = host.Brain.Get<DigitalBrain.Time.ITimer>("tea");
-await using var events = await host.ObserveAsync<TimerElapsed>(timer, ct);
-var scheduled = await timer.Schedule(1, "tea"); // Subscribe first; trigger once.
-var elapsed = await events.NextAsync(ct: ct);
-Assert.Equal(scheduled.Generation, elapsed.Generation);
-Assert.Equal(TimerStatus.Elapsed, (await timer.Read()).Status);
+var timer = host.Brain.Get<DigitalBrain.Time.Timers.ITimer>("tea");
+await using var events = await host.ObserveAsync<TimerTick>(timer, ct);
+await timer.Start(TimeSpan.Zero); // Subscribe first; trigger once.
+var tick = await events.NextAsync(ct: ct);
+Assert.Equal("tea", tick.TimerId);
 ```
 
 Use the actual module registration and production `BrainClient`. Replace provider dependencies
@@ -28,9 +27,14 @@ contains no timer, AI, HTTP, or command/reaction simulator.
 `RunBehavior` owns cancellation and observes errors. Await `run.WaitForSubscriptionAsync<T>(source, ct)`
 before triggering work: readiness belongs to that run, source identity and signal type. Early failures
 surface immediately. `SignalProbe` has one reader, bounded diagnostics and a five-second wait. For
-real reminders, use the subscription directly and a 90-second outer deadline (see `TimerReminderFacts`).
-Most tests use controlled domain time to exercise the production due handler; that does not advance
-the Orleans scheduler. Keep the small actual-reminder suite to validate real wiring.
+long-running scenarios, use the subscription directly with an explicit outer deadline. Time tests use
+controlled delivery through real Orleans timers, plus native timer/reminder scenarios. Their controlled
+timestamps do not advance the Orleans scheduler. Reminder integration tests explicitly lower the native
+minimum period; production retains the native one-minute default.
+
+`DeactivateAsync(neuron, ct)` awaits activation teardown through the native test cluster. Use it to
+verify module lifetime without adding test-only methods to production contracts. An active timer is
+discarded; a persistent reminder can autonomously reactivate its neuron on a later tick.
 
 `TestWait.UntilAsync` bounds each read and the overall deadline. It never retries the action under
 test. Timeout output omits complex payloads. Teardown cancels behaviors, joins them with a five-second

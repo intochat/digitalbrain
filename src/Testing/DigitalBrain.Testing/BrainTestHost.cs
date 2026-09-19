@@ -94,6 +94,10 @@ public sealed class BrainTestHost : IAsyncDisposable
             throw;
         }
     }
+    /// <summary>Deactivate a module and await teardown without adding test methods to its contract.</summary>
+    public Task DeactivateAsync(INeuron neuron, CancellationToken cancellationToken = default)
+        => _cluster.DeactivateAsync(neuron.GetGrainId()).WaitAsync(cancellationToken);
+
     public async Task RestartSiloAsync(CancellationToken cancellationToken = default)
     {
         await _cluster.RestartSiloAsync(_cluster.GetActiveSilos().Single()).WaitAsync(cancellationToken).ConfigureAwait(false);

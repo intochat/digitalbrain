@@ -109,7 +109,7 @@ public sealed class CodingNativeTools
         => GuardedAsync(() => _workspace.FindSymbolsAsync(new SymbolSearch(query, limit), cancellationToken));
 
     private Task<JsonElement> References(
-        [Description("A symbol id from code_find_symbols, such as T:DigitalBrain.Time.ITimer")] string symbolId,
+        [Description("A symbol id from code_find_symbols, such as T:DigitalBrain.Time.Timers.ITimer")] string symbolId,
         [Description("Maximum hits, default 50")] int limit = 50,
         CancellationToken cancellationToken = default)
         => GuardedAsync(() => _workspace.ReferencesAsync(new ReferenceSearch(symbolId, limit), cancellationToken));

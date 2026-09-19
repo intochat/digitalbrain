@@ -42,7 +42,7 @@ try
     await host.StartAsync(stopping.Token);
     await TimerReport.RunAsync(host.Services.GetRequiredService<IDigitalBrain>(), timerId, fact =>
     {
-        Console.WriteLine($"TimerElapsed {fact.TimerId} {fact.Generation} {fact.Resolution}");
+        Console.WriteLine($"TimerTick {fact.TimerId} {fact.ObservedAt:O}");
         if (smoke) { stopping.Cancel(); }
         return Task.CompletedTask;
     }, stopping.Token);

@@ -56,11 +56,11 @@ public sealed class TimerProcessFacts
             var exit = process.WaitForExitAsync(ct);
             var winner = await Task.WhenAny(ready.Task, exit).WaitAsync(TimeSpan.FromSeconds(90), ct);
             Assert.True(winner == ready.Task, string.Join(Environment.NewLine, output));
-            var scheduled = await cluster.Client.GetGrain<ITimer>("process").Schedule(1, "tea");
+            await cluster.Client.GetGrain<ITimer>("process").Start(TimeSpan.Zero);
             await exit.WaitAsync(TimeSpan.FromSeconds(90), ct);
             process.WaitForExit();
             Assert.True(process.ExitCode == 0, string.Join(Environment.NewLine, output));
-            Assert.Single(output, line => line.StartsWith($"TimerElapsed process {scheduled.Generation} ", StringComparison.Ordinal));
+            Assert.Single(output, line => line.StartsWith("TimerTick process ", StringComparison.Ordinal));
         }
         catch (TimeoutException error)
         { throw new TimeoutException(string.Join(Environment.NewLine, output), error); }

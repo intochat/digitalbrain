@@ -9,14 +9,16 @@ The runtime exposes typed grain access, typed live subscriptions and a small pub
 It owns subscription registration, renewal, bounded buffering, cancellation and cleanup. Modules own
 state, validation and provider dependencies. The reusable testing project starts real Orleans and
 uses the production client; it supplies observations, per-behavior readiness, bounded waits,
-persistent test storage and grain-specific storage fault controls. Time owns its state and reminders
-directly. The same timer behavior runs in tests and in a production C# file app.
+persistent test storage, explicit activation teardown and grain-specific storage fault controls. Time
+encapsulates activation-local timers and native persistent reminder registrations. It keeps no duplicate
+schedule state. The same timer behavior runs in tests and in a production C# file app.
 
 State persists. Signals and behaviors do not replay. Save-before-publish deliberately permits lost
 live facts across failure. This is a clean contract/state break, without a compatibility facade.
 
 ## Deletion audit
 
+Original foundation-pilot audit (before the subsequent subscription and Time primitive refactors).
 Physical C# lines, including blanks, excluding generated `bin`/`obj`; baseline above:
 
 | Area | Before files / lines | After files / lines |
@@ -34,6 +36,15 @@ project/package; Time has no BehaviorRuntime or old runtime dependency. Contract
 or test-control APIs. Central package versions used elsewhere remain intact.
 
 ## Verification on Windows, 2026-09-19
+
+Latest Time primitive refactor: Release foundation tests passed, **49 total (27 runtime, 22 Time)**,
+zero failures/skips, 7.4 seconds. Includes the separate production file app, native timers/reminders,
+autonomous persisted-reminder wakeup after fresh-host restart, explicit deactivation, timer loss on
+silo restart, idle collection, stale timer callback injection, provider failure/acknowledgement loss,
+and queued reminder delivery after Stop. Whitespace diff check passed. Details and current guarantees:
+`src/Modules/Time/README.md` and `docs/superpowers/plans/2026-09-19-time-primitives.md`.
+
+The following records the earlier foundation-pilot validation:
 
 SDK: `11.0.100-rc.1.26425.128`; Orleans: `10.3.1`.
 

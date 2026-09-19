@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Typed timers with persisted state and direct Orleans reminders.</Description>
+    <Description>Activation-local timers and persistent periodic reminders with live typed ticks.</Description>
     <RootNamespace>DigitalBrain.Time</RootNamespace>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
