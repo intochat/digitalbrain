@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -76,5 +75,14 @@ internal sealed class FileGrainStorage(string directory, Serializer serializer, 
         return (Encoding.UTF8.GetString(bytes, 4, length), bytes[(4 + length)..]);
     }
     private string PathFor(string stateName, GrainId id)
-        => Path.Combine(directory, Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(stateName + "\0" + id))) + ".state");
+    {
+        var raw = $"{stateName}.{id}";
+        Span<char> name = stackalloc char[raw.Length];
+        for (var i = 0; i < raw.Length; i++)
+        {
+            var c = raw[i];
+            name[i] = c is '/' or '\\' or ':' or '*' or '?' or '"' or '<' or '>' or '|' ? '_' : c;
+        }
+        return Path.Combine(directory, name.ToString() + ".state");
+    }
 }

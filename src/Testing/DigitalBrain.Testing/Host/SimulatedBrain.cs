@@ -40,12 +40,23 @@ internal sealed class SimulatedBrain(InProcessTestCluster cluster, WebApplicatio
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) { return; }
+        var failures = await ReleaseAsync(cluster, web, http, storeLease, temporaryStore, faults, _brain, _resources).ConfigureAwait(false);
+        if (failures.Count > 0) { throw new AggregateException("Brain simulation cleanup failed.", failures); }
+    }
+
+    internal static async Task<List<Exception>> ReleaseAsync(
+        InProcessTestCluster? cluster, WebApplication? web, HttpClient? http, FileStream? lease,
+        string? temporaryStore, StorageFaults? faults, IDigitalBrain? brain = null, IReadOnlyList<IAsyncDisposable>? resources = null)
+    {
         List<Exception> failures = [];
         faults?.Dispose();
-        foreach (var resource in _resources)
+        if (resources is not null)
         {
-            try { await resource.DisposeAsync().ConfigureAwait(false); }
-            catch (Exception error) { failures.Add(error); }
+            foreach (var resource in resources)
+            {
+                try { await resource.DisposeAsync().ConfigureAwait(false); }
+                catch (Exception error) { failures.Add(error); }
+            }
         }
         http?.Dispose();
         if (web is not null)
@@ -53,12 +64,18 @@ internal sealed class SimulatedBrain(InProcessTestCluster cluster, WebApplicatio
             try { await web.DisposeAsync().ConfigureAwait(false); }
             catch (Exception error) { failures.Add(error); }
         }
-        try { await _brain.DisposeAsync().ConfigureAwait(false); }
-        catch (Exception error) { failures.Add(error); }
-        try { await cluster.DisposeAsync().ConfigureAwait(false); }
-        catch (Exception error) { failures.Add(error); }
-        storeLease?.Dispose();
+        if (brain is not null)
+        {
+            try { await brain.DisposeAsync().ConfigureAwait(false); }
+            catch (Exception error) { failures.Add(error); }
+        }
+        if (cluster is not null)
+        {
+            try { await cluster.DisposeAsync().ConfigureAwait(false); }
+            catch (Exception error) { failures.Add(error); }
+        }
+        lease?.Dispose();
         if (temporaryStore is not null) { Directory.Delete(temporaryStore, true); }
-        if (failures.Count > 0) { throw new AggregateException("Brain simulation cleanup failed.", failures); }
+        return failures;
     }
 }

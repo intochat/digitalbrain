@@ -21,7 +21,7 @@ public sealed class BehaviorRun : IAsyncDisposable
     public async Task WaitForSubscriptionAsync<T>(INeuron source, CancellationToken ct = default) where T : Signal
     {
         var ready = _brain.Ready(source.GetGrainId(), typeof(T)).Task;
-        await Task.WhenAny(ready, Completion).WaitAsync(TimeSpan.FromSeconds(5), ct).ConfigureAwait(false);
+        await Task.WhenAny(ready, Completion).WaitAsync(TestLimits.Timeout, ct).ConfigureAwait(false);
         if (!ready.IsCompletedSuccessfully)
         {
             await Completion.ConfigureAwait(false);
@@ -34,7 +34,7 @@ public sealed class BehaviorRun : IAsyncDisposable
         if (Interlocked.Exchange(ref _disposed, 1) != 0) { return; }
         var canceling = _cancel.CancelAsync();
         var shutdown = Task.WhenAll(canceling, Completion);
-        try { await shutdown.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false); }
+        try { await shutdown.WaitAsync(TestLimits.Timeout).ConfigureAwait(false); }
         catch (OperationCanceledException) when (_cancel.IsCancellationRequested && canceling.IsCompletedSuccessfully) { }
         finally
         {

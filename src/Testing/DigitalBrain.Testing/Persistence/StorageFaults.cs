@@ -5,11 +5,11 @@ namespace DigitalBrain.Testing;
 
 public sealed class StorageFaults : IDisposable
 {
-    private readonly ConcurrentDictionary<GrainId, byte> _writes = new();
-    private readonly ConcurrentDictionary<GrainId, byte> _reads = new();
+    private readonly ConcurrentDictionary<GrainId, bool> _writes = new();
+    private readonly ConcurrentDictionary<GrainId, bool> _reads = new();
     private readonly ConcurrentDictionary<GrainId, ReadHold> _holds = new();
-    public void FailNextWrite(GrainId id) => _writes[id] = 1;
-    public void FailNextRead(GrainId id) => _reads[id] = 1;
+    public void FailNextWrite(GrainId id) => _writes[id] = true;
+    public void FailNextRead(GrainId id) => _reads[id] = true;
     public ReadHold HoldNextRead(GrainId id)
     {
         var hold = new ReadHold();

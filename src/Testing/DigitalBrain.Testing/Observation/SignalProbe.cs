@@ -7,7 +7,7 @@ public sealed class SignalProbe<T> : IAsyncDisposable where T : Signal
 {
     private readonly ISignalSubscription<T> _subscription;
     private readonly CancellationTokenSource _cancel = new();
-    private readonly Channel<T> _pending = Channel.CreateBounded<T>(256);
+    private readonly Channel<T> _pending = Channel.CreateBounded<T>(TestLimits.Buffer);
     private readonly Queue<T> _recent = new();
     private readonly Lock _gate = new();
     private readonly Task _worker;
@@ -26,7 +26,7 @@ public sealed class SignalProbe<T> : IAsyncDisposable where T : Signal
             {
                 lock (_gate)
                 {
-                    if (_recent.Count == 256) { _recent.Dequeue(); }
+                    if (_recent.Count == TestLimits.Buffer) { _recent.Dequeue(); }
                     _recent.Enqueue(value);
                 }
                 if (!_pending.Writer.TryWrite(value)) { throw new InvalidOperationException("Signal probe buffer overflowed."); }
@@ -39,7 +39,7 @@ public sealed class SignalProbe<T> : IAsyncDisposable where T : Signal
     public async Task<T> NextAsync(Func<T, bool>? predicate = null, CancellationToken ct = default)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        deadline.CancelAfter(TimeSpan.FromSeconds(5));
+        deadline.CancelAfter(TestLimits.Timeout);
         try
         {
             while (true)
@@ -50,14 +50,14 @@ public sealed class SignalProbe<T> : IAsyncDisposable where T : Signal
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            throw new TimeoutException($"No matching {typeof(T).Name} within 5 seconds; observed {Snapshot.Count} facts (payloads omitted).");
+            throw new TimeoutException($"No matching {typeof(T).Name} within {TestLimits.Timeout}; observed {Snapshot.Count} facts (payloads omitted).");
         }
     }
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) { return; }
         await _cancel.CancelAsync().ConfigureAwait(false);
-        try { await _worker.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false); }
+        try { await _worker.WaitAsync(TestLimits.Timeout).ConfigureAwait(false); }
         finally { await _subscription.DisposeAsync().ConfigureAwait(false); _cancel.Dispose(); }
     }
 }

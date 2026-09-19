@@ -30,6 +30,7 @@ public static class DigitalBrainSimulation
             lease = new FileStream(Path.Combine(directory, ".owner"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         }
         var builder = new InProcessTestClusterBuilder(1);
+        builder.Options.ConfigureFileLogging = false;
         builder.ConfigureHost(host =>
         {
             host.Logging.SetMinimumLevel(LogLevel.Warning);
@@ -84,14 +85,7 @@ public static class DigitalBrainSimulation
         }
         catch
         {
-            options.StorageFaults?.Dispose();
-            http?.Dispose();
-            try { if (web is not null) { await web.DisposeAsync().ConfigureAwait(false); } }
-            finally
-            {
-                try { if (cluster is not null) { await cluster.DisposeAsync().ConfigureAwait(false); } }
-                finally { lease?.Dispose(); if (temporary is not null) { Directory.Delete(temporary, true); } }
-            }
+            await SimulatedBrain.ReleaseAsync(cluster, web, http, lease, temporary, options.StorageFaults).ConfigureAwait(false);
             throw;
         }
     }

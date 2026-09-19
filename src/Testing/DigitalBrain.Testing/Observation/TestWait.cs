@@ -17,7 +17,7 @@ public static class TestWait
                 deadline.Token.ThrowIfCancellationRequested();
                 last = await read(deadline.Token).WaitAsync(deadline.Token).ConfigureAwait(false);
                 if (done(last)) { return last; }
-                await Task.Delay(20, deadline.Token).ConfigureAwait(false);
+                await Task.Delay(TestLimits.Poll, deadline.Token).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
