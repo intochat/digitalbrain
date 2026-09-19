@@ -1,7 +1,7 @@
 <Solution>
   <Project Path="src/Modules/DigitalBrain/Contracts/DigitalBrain.Contracts.csproj" />
   <Project Path="src/Modules/DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
-  <Project Path="src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+  <Project Path="src/Testing/DigitalBrain.NeuronTesting/DigitalBrain.NeuronTesting.csproj" />
   <Project Path="src/Modules/DigitalBrain/Tests/DigitalBrain.Runtime.Tests.csproj" />
   <Project Path="src/Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
   <Project Path="src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />

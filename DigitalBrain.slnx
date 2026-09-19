@@ -84,7 +84,8 @@
     <File Path="Directory.Packages.props" />
   </Folder>
   <Folder Name="/Testing/">
-    <Project Path="src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+    <Project Path="src/Testing/DigitalBrain.NeuronTesting/DigitalBrain.NeuronTesting.csproj" />
+    <Project Path="src/Testing/DigitalBrain.E2ETesting/DigitalBrain.E2ETesting.csproj" />
     <File Path="src/Testing/Module.Tests.props" />
   </Folder>
 </Solution>

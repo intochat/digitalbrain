@@ -13,6 +13,6 @@
   <ItemGroup>
     <PackageReference Include="xunit.v3.mtp-v2" />
     <Using Include="DigitalBrain.Testing" />
-    <ProjectReference Include="$(MSBuildThisFileDirectory)DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)DigitalBrain.NeuronTesting/DigitalBrain.NeuronTesting.csproj" />
   </ItemGroup>
 </Project>

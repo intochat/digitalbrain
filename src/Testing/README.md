@@ -1,8 +1,10 @@
-# Testing the migrated foundation
+# Testing
 
-Run `dotnet test --solution DigitalBrain.Foundation.slnx -p:CodeGraphRefresh=false`.
-This partial solution covers the live runtime, reusable simulation and Time module.
-The original full solution still contains unmigrated consumers.
+**Neuron tests** (`DigitalBrain.NeuronTesting`): in-process Orleans via `DigitalBrainSimulation`. Time and kernel use this. No Docker.
+
+**E2E tests** (`DigitalBrain.E2ETesting`): real Aspire AppHost, Orleans cluster, Azure Storage emulator in Docker. IntoChat uses this. Time has no e2e project.
+
+Run neuron tests: `dotnet test --solution DigitalBrain.Foundation.slnx -p:CodeGraphRefresh=false`.
 
 ## Test a real module
 
@@ -22,7 +24,9 @@ Assert.Equal("tea", tick.TimerId);
 
 `DigitalBrainSimulation.StartAsync` returns the production `IDigitalBrain`; pass real module instances
 through `Modules`. Replace provider dependencies through `ConfigureSilo`; keep provider-specific test
-controls with the module. The common simulation contains no timer, AI, HTTP, or command/reaction fake.
+controls with the module.
+
+E2E: `await using var app = await E2EDigitalBrain.StartAsync<Projects.IntoChat_AppHost>(ct);` then `CreateHttpClient` / `WaitHealthyAsync`. That path uses the AppHost graph (Azurite tables/blobs, real silo), not `InProcessTestCluster`.
 
 `brain.RunBehavior` owns cancellation and observes errors. Await `run.WaitForSubscriptionAsync<T>(source, ct)`
 before triggering work: readiness belongs to that run, source identity and signal type. Early failures

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Real Orleans fixtures, live observations and state-provider fault controls for module tests.</Description>
+    <Description>In-process Orleans neuron tests: DigitalBrainSimulation, probes, and behavior runs.</Description>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
