@@ -45,11 +45,17 @@ public sealed class BrainOperations(IGrainFactory grains, INeuronInvoker invoker
     public async Task<SendSignalResult> SendSignalAsync(string session, SendSignalRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var from = Session(session);
+        var source = Neuron(Session(session));
         var signal = Signal.Create(request.Type, request.Body);
-        var correlation = ParseCorrelation(request.Correlation);
-        var outcome = await Neuron(from).SendSignal(signal, correlation, cancellationToken).ConfigureAwait(false);
-        return new(outcome.SignalId.ToString(), outcome.CorrelationId.ToString(), outcome.Handled, outcome.Busy);
+        var delivery = SignalDelivery.Create(signal, source, 1, TimeProvider.System, correlation: ParseCorrelation(request.Correlation));
+        var admission = await source.HandleSignal(delivery, cancellationToken).ConfigureAwait(false);
+        if (admission == SignalAdmission.Busy)
+        {
+            return new(delivery.SignalId.ToString(), delivery.CorrelationId.ToString(), 0, 1);
+        }
+
+        var handled = await Scenario().Route(delivery, cancellationToken).ConfigureAwait(false);
+        return new(delivery.SignalId.ToString(), delivery.CorrelationId.ToString(), handled, 0);
     }
 
     public Task CancelAsync(CancelRequest request, CancellationToken cancellationToken = default)

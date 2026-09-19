@@ -138,7 +138,7 @@ public abstract partial class Neuron : DurableGrain, INeuron, INeuronInbox, IRem
 
     private protected virtual Task<bool> DrainAnnouncementsAsync(CancellationToken cancellationToken) => Task.FromResult(false);
 
-    public async Task<SignalOutcome> SendSignal(Signal signal, CorrelationId? correlation = null, CancellationToken cancellationToken = default)
+    protected async Task<SignalOutcome> SendSignal(Signal signal, CorrelationId? correlation = null, CancellationToken cancellationToken = default)
     {
         Guard();
         var (outcome, _) = await EmitAsync(signal, correlation, cancellationToken).ConfigureAwait(true);
