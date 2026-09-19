@@ -1,3 +1,6 @@
+using DigitalBrain.Contracts;
+using DigitalBrain.Testing;
+using DigitalBrain.Time;
 using DigitalBrain.Time.Timers.Signals;
 using Orleans;
 using Xunit;
@@ -11,9 +14,9 @@ public sealed class TimerFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var control = new ControlledTimers();
-        await using var host = await TimerTestSupport.StartAsync(ct, timers: control);
-        var timer = host.Brain.Get<ITimer>("once");
-        await using var ticks = await host.ObserveAsync<TimerTick>(timer, ct);
+        await using var brain = await StartAsync(ct, control);
+        var timer = brain.Get<ITimer>("once");
+        await using var ticks = await brain.Observe<TimerTick>(timer, ct);
         await timer.Start(TimeSpan.FromDays(1));
         var registration = control.For(timer.GetGrainId());
         Assert.Equal(TimeSpan.FromDays(1), registration.Options.DueTime);
@@ -34,9 +37,9 @@ public sealed class TimerFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var control = new ControlledTimers();
-        await using var host = await TimerTestSupport.StartAsync(ct, timers: control);
-        var timer = host.Brain.Get<ITimer>("replace");
-        await using var ticks = await host.ObserveAsync<TimerTick>(timer, ct);
+        await using var brain = await StartAsync(ct, control);
+        var timer = brain.Get<ITimer>("replace");
+        await using var ticks = await brain.Observe<TimerTick>(timer, ct);
         await timer.Start(TimeSpan.FromDays(1));
         var previous = control.For(timer.GetGrainId());
         await timer.Start(TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(3));
@@ -60,9 +63,9 @@ public sealed class TimerFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var control = new ControlledTimers();
-        await using var host = await TimerTestSupport.StartAsync(ct, timers: control);
-        var timer = host.Brain.Get<ITimer>("invalid");
-        await using var ticks = await host.ObserveAsync<TimerTick>(timer, ct);
+        await using var brain = await StartAsync(ct, control);
+        var timer = brain.Get<ITimer>("invalid");
+        await using var ticks = await brain.Observe<TimerTick>(timer, ct);
         await timer.Start(TimeSpan.Zero);
         var original = control.For(timer.GetGrainId());
         foreach (var due in new[] { TimeSpan.FromTicks(-1), Timeout.InfiniteTimeSpan, TimeSpan.MaxValue })
@@ -81,17 +84,17 @@ public sealed class TimerFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var control = new ControlledTimers();
-        await using var host = await TimerTestSupport.StartAsync(ct, timers: control);
-        var timer = host.Brain.Get<ITimer>("deactivate");
+        await using var brain = await StartAsync(ct, control);
+        var timer = brain.Get<ITimer>("deactivate");
         await timer.Start(TimeSpan.FromDays(1));
         var original = control.For(timer.GetGrainId());
-        if (restartSilo) { await host.RestartSiloAsync(ct); }
-        else { await host.DeactivateAsync(timer, ct); }
+        if (restartSilo) { await brain.RestartSiloAsync(ct); }
+        else { await brain.DeactivateAsync(timer, ct); }
         Assert.True(original.IsDisposed);
         // Stop activates a fresh grain but must not recreate the discarded timer.
         await timer.Stop();
         Assert.Same(original, control.For(timer.GetGrainId()));
-        await using var ticks = await host.ObserveAsync<TimerTick>(timer, ct);
+        await using var ticks = await brain.Observe<TimerTick>(timer, ct);
         await timer.Start(TimeSpan.Zero);
         var current = control.For(timer.GetGrainId());
         Assert.NotSame(original, current);
@@ -104,13 +107,13 @@ public sealed class TimerFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var control = new ControlledTimers();
-        await using var host = await TimerTestSupport.StartAsync(ct, timers: control);
-        var timer = host.Brain.Get<ITimer>("live-only");
+        await using var brain = await StartAsync(ct, control);
+        var timer = brain.Get<ITimer>("live-only");
         await timer.Start(TimeSpan.Zero, TimeSpan.FromSeconds(1));
         var registration = control.For(timer.GetGrainId());
         await registration.FireAsync(ct);
         var subscribedAt = control.UtcNow += TimeSpan.FromSeconds(1);
-        await using var ticks = await host.ObserveAsync<TimerTick>(timer, ct);
+        await using var ticks = await brain.Observe<TimerTick>(timer, ct);
         await registration.FireAsync(ct);
         Assert.True((await ticks.NextAsync(ct: ct)).ObservedAt >= subscribedAt);
         await timer.Stop();
@@ -122,9 +125,9 @@ public sealed class TimerFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var control = new ControlledTimers();
-        await using var host = await TimerTestSupport.StartAsync(ct, timers: control);
-        var timer = host.Brain.Get<ITimer>("obsolete");
-        await using var ticks = await host.ObserveAsync<TimerTick>(timer, ct);
+        await using var brain = await StartAsync(ct, control);
+        var timer = brain.Get<ITimer>("obsolete");
+        await using var ticks = await brain.Observe<TimerTick>(timer, ct);
         await timer.Start(TimeSpan.FromDays(1));
         var old = control.For(timer.GetGrainId());
         await timer.Start(TimeSpan.Zero, TimeSpan.FromSeconds(1));
@@ -144,11 +147,16 @@ public sealed class TimerFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var control = new ControlledTimers();
-        await using var host = await TimerTestSupport.StartAsync(ct, timers: control, fastCollection: true);
-        var timer = host.Brain.Get<ITimer>("long-delay");
+        await using var brain = await DigitalBrainSimulation.StartAsync(new()
+        {
+            Modules = [new TimeModule()],
+            UseReminders = true,
+            ConfigureSilo = silo => { silo.UseControlledTimers(control); silo.UseFastCollection(); },
+        }, ct);
+        var timer = brain.Get<ITimer>("long-delay");
         await timer.Start(TimeSpan.FromDays(1));
         var active = control.For(timer.GetGrainId());
-        var sentinel = host.Brain.Get<ITimer>("idle-sentinel");
+        var sentinel = brain.Get<ITimer>("idle-sentinel");
         await sentinel.Start(TimeSpan.Zero);
         var completed = control.For(sentinel.GetGrainId());
         await completed.FireAsync(ct);
@@ -163,8 +171,8 @@ public sealed class TimerFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var control = new ControlledTimers();
-        await using var host = await TimerTestSupport.StartAsync(ct, timers: control);
-        var timer = host.Brain.Get<ITimer>("bounds");
+        await using var brain = await StartAsync(ct, control);
+        var timer = brain.Get<ITimer>("bounds");
         var maximum = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
         foreach (var duration in new[] { TimeSpan.FromTicks(1), maximum })
         {
@@ -180,12 +188,20 @@ public sealed class TimerFacts
     public async Task RealPeriodicTimerCanBeStopped()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var host = await TimerTestSupport.StartAsync(ct);
-        var timer = host.Brain.Get<ITimer>("periodic");
-        await using var ticks = await host.ObserveAsync<TimerTick>(timer, ct);
+        await using var brain = await StartAsync(ct);
+        var timer = brain.Get<ITimer>("periodic");
+        await using var ticks = await brain.Observe<TimerTick>(timer, ct);
         await timer.Start(TimeSpan.Zero, TimeSpan.FromMilliseconds(20));
         await ticks.NextAsync(ct: ct);
         await ticks.NextAsync(ct: ct);
         await timer.Stop();
     }
+
+    private static Task<IDigitalBrain> StartAsync(CancellationToken ct, ControlledTimers? timers = null)
+        => DigitalBrainSimulation.StartAsync(new()
+        {
+            Modules = [new TimeModule()],
+            UseReminders = true,
+            ConfigureSilo = timers is null ? null : silo => silo.UseControlledTimers(timers),
+        }, ct);
 }

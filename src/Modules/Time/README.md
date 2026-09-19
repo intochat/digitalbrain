@@ -42,7 +42,7 @@ Failures reach the caller. A storage/network failure can be ambiguous: registrat
 
 Call `silo.AddTime()` and configure an Orleans reminder provider. `AddTime()` validates that the provider exists at startup. The in-memory provider is for development/tests and does not survive a process restart.
 
-Use the shared `BrainTestHost`, `ObserveAsync`, `RunBehavior`, and `DeactivateAsync` methods. The Time tests decorate Orleans' ITimerRegistry to arm real timers on demand; callbacks execute on Orleans turns. Controlled timestamps and obsolete-callback injection are explicit test controls, not a virtual Orleans clock. These helpers stay local to Time tests because other modules do not yet need them.
+Use the shared `DigitalBrainSimulation` with the real `TimeModule`, and the `Observe`, `RunBehavior`, and `DeactivateAsync` methods. The Time tests decorate Orleans' ITimerRegistry to arm real timers on demand; callbacks execute on Orleans turns. Controlled timestamps and obsolete-callback injection are explicit test controls, not a virtual Orleans clock. These helpers stay local to Time tests because other modules do not yet need them.
 
 Separate integration scenarios exercise native timers, native reminders, idle collection, explicit deactivation, silo restart, persistent reminders in a fresh host, and the production file app. The restart test waits for an incoming reminder-call recorder before making any grain call, so it verifies autonomous reactivation.
 

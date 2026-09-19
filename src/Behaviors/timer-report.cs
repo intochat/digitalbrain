@@ -4,6 +4,7 @@
 #:include TimerReport.cs
 #:property PublishAot=false
 
+using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

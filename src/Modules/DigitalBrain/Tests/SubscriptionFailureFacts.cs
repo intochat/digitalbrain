@@ -54,9 +54,9 @@ public sealed class SubscriptionFailureFacts
     public async Task RenewalFailureIsReportedBeforeRemoteCleanupFinishes()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var host = await BrainTestHost.StartAsync(SubscriptionLifetimeFacts.Options(), ct);
-        var source = host.Brain.Get<IControlledSource>("slow-cleanup");
-        await using var subscription = await host.Brain.SubscribeAsync<Number>(source, ct);
+        await using var brain = await DigitalBrainSimulation.StartAsync(SubscriptionLifetimeFacts.Options(), ct);
+        var source = brain.Get<IControlledSource>("slow-cleanup");
+        await using var subscription = await brain.SubscribeAsync<Number>(source, ct);
         await source.Configure("watch-fail-held-cleanup");
         try
         {
@@ -72,12 +72,12 @@ public sealed class SubscriptionFailureFacts
     public async Task FailedOrCanceledRegistrationIsCleanedUp(string mode)
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var host = await BrainTestHost.StartAsync(SubscriptionLifetimeFacts.Options(), ct);
-        var source = host.Brain.Get<IControlledSource>("registration");
+        await using var brain = await DigitalBrainSimulation.StartAsync(SubscriptionLifetimeFacts.Options(), ct);
+        var source = brain.Get<IControlledSource>("registration");
         await source.Configure(mode);
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(ct);
         if (mode == "late") { cancel.CancelAfter(50); }
-        await Assert.ThrowsAnyAsync<Exception>(() => host.Brain.SubscribeAsync<Number>(source, cancel.Token));
+        await Assert.ThrowsAnyAsync<Exception>(() => brain.SubscribeAsync<Number>(source, cancel.Token));
         Assert.Equal(0, await source.Members());
         Assert.InRange(await source.Cleanups(), 1, 2);
     }
@@ -86,14 +86,14 @@ public sealed class SubscriptionFailureFacts
     public async Task RenewalFailureIsVisibleAndCleanupFailureDoesNotReplaceIt()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var host = await BrainTestHost.StartAsync(SubscriptionLifetimeFacts.Options(), ct);
-        var source = host.Brain.Get<IControlledSource>("renew-failure");
-        await using var stream = await host.Brain.SubscribeAsync<Number>(source, ct);
+        await using var brain = await DigitalBrainSimulation.StartAsync(SubscriptionLifetimeFacts.Options(), ct);
+        var source = brain.Get<IControlledSource>("renew-failure");
+        await using var stream = await brain.SubscribeAsync<Number>(source, ct);
         await source.Configure("watch");
         await Assert.ThrowsAsync<IOException>(() => stream.Completion.WaitAsync(TimeSpan.FromSeconds(3), ct));
         Assert.Equal(0, await source.Members());
         await source.Configure("unwatch");
-        var next = await host.Brain.SubscribeAsync<Number>(source, ct);
+        var next = await brain.SubscribeAsync<Number>(source, ct);
         await next.DisposeAsync();
         Assert.Equal(0, await source.Members());
     }

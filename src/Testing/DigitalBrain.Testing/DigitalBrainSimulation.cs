@@ -1,45 +1,19 @@
-using DigitalBrain.Core;
 using DigitalBrain.Contracts;
+using DigitalBrain.Core;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Hosting;
-using Orleans.TestingHost;
-using Orleans.Storage;
 using Orleans.Runtime;
+using Orleans.Storage;
+using Orleans.TestingHost;
+
 namespace DigitalBrain.Testing;
 
-public sealed class BrainTestHost : IAsyncDisposable
+public static class DigitalBrainSimulation
 {
-    private readonly InProcessTestCluster _cluster;
-    private readonly BrainClient _brain;
-    private readonly List<BehaviorRun> _behaviors = [];
-    private readonly List<IAsyncDisposable> _probes = [];
-    private readonly FileStream? _storeLease;
-    private readonly string? _temporaryStore;
-    private readonly StorageFaults? _faults;
-    private int _disposed;
-    private BrainTestHost(InProcessTestCluster cluster, FileStream? storeLease, string? temporaryStore, StorageFaults? faults)
-    {
-        _cluster = cluster;
-        _brain = cluster.Client.ServiceProvider.GetRequiredService<BrainClient>();
-        _storeLease = storeLease; _temporaryStore = temporaryStore; _faults = faults;
-    }
-    public IDigitalBrain Brain => _brain;
-    public IGrainFactory Grains => _cluster.Client;
-    public BehaviorRun RunBehavior(Func<IDigitalBrain, CancellationToken, Task> body, CancellationToken ct = default)
-    {
-        var run = new BehaviorRun(Brain, body, ct);
-        _behaviors.Add(run);
-        return run;
-    }
-    public async Task<SignalProbe<T>> ObserveAsync<T>(INeuron source, CancellationToken ct = default) where T : Signal
-    {
-        var probe = new SignalProbe<T>(await Brain.SubscribeAsync<T>(source, ct).ConfigureAwait(false));
-        _probes.Add(probe);
-        return probe;
-    }
-    public static async Task<BrainTestHost> StartAsync(BrainTestOptions? options = null, CancellationToken cancellationToken = default)
+    public static async Task<IDigitalBrain> StartAsync(SimulationOptions? options = null, CancellationToken cancellationToken = default)
     {
         options ??= new();
         var temporary = options.PersistenceDirectory is null && options.StorageFaults is not null
@@ -54,10 +28,16 @@ public sealed class BrainTestHost : IAsyncDisposable
             lease = new FileStream(Path.Combine(directory, ".owner"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         }
         var builder = new InProcessTestClusterBuilder(1);
-        builder.ConfigureHost(host => host.Logging.SetMinimumLevel(LogLevel.Warning));
+        builder.ConfigureHost(host =>
+        {
+            host.Logging.SetMinimumLevel(LogLevel.Warning);
+            if (options.Configuration is { Count: > 0 } configuration)
+            { host.Configuration.AddInMemoryCollection(configuration); }
+        });
         builder.ConfigureSilo((_, silo) =>
         {
             silo.AddDigitalBrain();
+            foreach (var module in options.Modules) { module.Configure(silo); }
             if (directory is null) { silo.AddMemoryGrainStorage("Default"); }
             else
             {
@@ -84,7 +64,7 @@ public sealed class BrainTestHost : IAsyncDisposable
         {
             cluster = builder.Build();
             await cluster.DeployAsync(cancellationToken).ConfigureAwait(false);
-            return new(cluster, lease, temporary, options.StorageFaults);
+            return new SimulatedBrain(cluster, lease, temporary, options.StorageFaults);
         }
         catch
         {
@@ -94,29 +74,51 @@ public sealed class BrainTestHost : IAsyncDisposable
             throw;
         }
     }
-    /// <summary>Deactivate a module and await teardown without adding test methods to its contract.</summary>
+}
+
+internal sealed class SimulatedBrain(InProcessTestCluster cluster, FileStream? storeLease, string? temporaryStore, StorageFaults? faults)
+    : IDigitalBrain
+{
+    private readonly IDigitalBrain _brain = cluster.Client.ServiceProvider.GetRequiredService<IDigitalBrain>();
+    private readonly List<IAsyncDisposable> _resources = [];
+    private int _disposed;
+
+    public IGrainFactory Grains => cluster.Client;
+
+    internal IDigitalBrain Client => _brain;
+
+    internal void Track(IAsyncDisposable resource) => _resources.Add(resource);
+
+    public T Get<T>(string id) where T : class, IGrainWithStringKey => _brain.Get<T>(id);
+
+    public Task<ISignalSubscription<T>> SubscribeAsync<T>(INeuron source, CancellationToken cancellationToken = default) where T : Signal
+        => _brain.SubscribeAsync<T>(source, cancellationToken);
+
     public Task DeactivateAsync(INeuron neuron, CancellationToken cancellationToken = default)
-        => _cluster.DeactivateAsync(neuron.GetGrainId()).WaitAsync(cancellationToken);
+        => cluster.DeactivateAsync(neuron.GetGrainId()).WaitAsync(cancellationToken);
 
     public async Task RestartSiloAsync(CancellationToken cancellationToken = default)
     {
-        await _cluster.RestartSiloAsync(_cluster.GetActiveSilos().Single()).WaitAsync(cancellationToken).ConfigureAwait(false);
-        await _cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+        await cluster.RestartSiloAsync(cluster.GetActiveSilos().Single()).WaitAsync(cancellationToken).ConfigureAwait(false);
+        await cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
     }
+
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) { return; }
         List<Exception> failures = [];
-        _faults?.Dispose();
-        foreach (var resource in _behaviors.Cast<IAsyncDisposable>().Concat(_probes).Append(_brain))
+        faults?.Dispose();
+        foreach (var resource in _resources)
         {
             try { await resource.DisposeAsync().ConfigureAwait(false); }
             catch (Exception error) { failures.Add(error); }
         }
-        try { await _cluster.DisposeAsync().ConfigureAwait(false); }
+        try { await _brain.DisposeAsync().ConfigureAwait(false); }
         catch (Exception error) { failures.Add(error); }
-        _storeLease?.Dispose();
-        if (_temporaryStore is not null) { Directory.Delete(_temporaryStore, true); }
-        if (failures.Count > 0) { throw new AggregateException("Brain test cleanup failed.", failures); }
+        try { await cluster.DisposeAsync().ConfigureAwait(false); }
+        catch (Exception error) { failures.Add(error); }
+        storeLease?.Dispose();
+        if (temporaryStore is not null) { Directory.Delete(temporaryStore, true); }
+        if (failures.Count > 0) { throw new AggregateException("Brain simulation cleanup failed.", failures); }
     }
 }

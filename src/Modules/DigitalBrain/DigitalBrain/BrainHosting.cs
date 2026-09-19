@@ -1,3 +1,4 @@
+using DigitalBrain.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace DigitalBrain.Core;

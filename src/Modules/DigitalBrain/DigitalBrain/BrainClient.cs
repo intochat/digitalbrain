@@ -13,7 +13,7 @@ public sealed class BrainClient(IClusterClient client, IOptions<BrainOptions> op
 
     public T Get<T>(string id) where T : class, IGrainWithStringKey => client.GetGrain<T>(id);
 
-    public async Task<SignalSubscription<T>> SubscribeAsync<T>(INeuron source, CancellationToken cancellationToken = default) where T : Signal
+    public async Task<ISignalSubscription<T>> SubscribeAsync<T>(INeuron source, CancellationToken cancellationToken = default) where T : Signal
     {
         ArgumentNullException.ThrowIfNull(source);
         cancellationToken.ThrowIfCancellationRequested();

@@ -49,10 +49,10 @@ public sealed class PersistenceFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var faults = new StorageFaults();
-        await using var host = await BrainTestHost.StartAsync(new() { StorageFaults = faults }, ct);
-        var counter = host.Brain.Get<ICounter>("refuse");
+        await using var brain = await DigitalBrainSimulation.StartAsync(new() { StorageFaults = faults }, ct);
+        var counter = brain.Get<ICounter>("refuse");
         await counter.SetWithoutPublishing(4);
-        await using var probe = await host.ObserveAsync<Number>(counter, ct);
+        await using var probe = await brain.Observe<Number>(counter, ct);
         faults.FailNextWrite(counter.GetGrainId());
         if (refuseReload) { faults.FailNextRead(counter.GetGrainId()); }
         var error = await Assert.ThrowsAsync<OrleansException>(() => counter.Set(5));
@@ -71,10 +71,10 @@ public sealed class PersistenceFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var faults = new StorageFaults();
-        await using var host = await BrainTestHost.StartAsync(new() { StorageFaults = faults }, ct);
-        var counter = host.Brain.Get<ICounter>("hold");
+        await using var brain = await DigitalBrainSimulation.StartAsync(new() { StorageFaults = faults }, ct);
+        var counter = brain.Get<ICounter>("hold");
         await counter.SetWithoutPublishing(3);
-        await host.RestartSiloAsync(ct);
+        await brain.RestartSiloAsync(ct);
         using var hold = faults.HoldNextRead(counter.GetGrainId());
         var read = counter.Read();
         await hold.Entered.WaitAsync(TimeSpan.FromSeconds(5), ct);
@@ -90,14 +90,14 @@ public sealed class PersistenceFacts
         var directory = Path.Combine(Path.GetTempPath(), "brain-" + Guid.NewGuid().ToString("N"));
         try
         {
-            await using (var first = await BrainTestHost.StartAsync(new() { PersistenceDirectory = directory }, ct))
+            await using (var first = await DigitalBrainSimulation.StartAsync(new() { PersistenceDirectory = directory }, ct))
             {
-                await first.Brain.Get<ICounter>("saved").SetWithoutPublishing(23);
+                await first.Get<ICounter>("saved").SetWithoutPublishing(23);
             }
-            await using var second = await BrainTestHost.StartAsync(new() { PersistenceDirectory = directory }, ct);
-            var counter = second.Brain.Get<ICounter>("saved");
+            await using var second = await DigitalBrainSimulation.StartAsync(new() { PersistenceDirectory = directory }, ct);
+            var counter = second.Get<ICounter>("saved");
             Assert.Equal(23, await counter.Read());
-            await using var probe = await second.ObserveAsync<Number>(counter, ct);
+            await using var probe = await second.Observe<Number>(counter, ct);
             await counter.Set(24);
             Assert.Equal(24, (await probe.NextAsync(ct: ct)).Value);
             await counter.Deactivate();

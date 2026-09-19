@@ -5,14 +5,14 @@ namespace DigitalBrain.Testing;
 
 public sealed class SignalProbe<T> : IAsyncDisposable where T : Signal
 {
-    private readonly SignalSubscription<T> _subscription;
+    private readonly ISignalSubscription<T> _subscription;
     private readonly CancellationTokenSource _cancel = new();
     private readonly Channel<T> _pending = Channel.CreateBounded<T>(256);
     private readonly Queue<T> _recent = new();
     private readonly Lock _gate = new();
     private readonly Task _worker;
     private int _disposed;
-    internal SignalProbe(SignalSubscription<T> subscription)
+    internal SignalProbe(ISignalSubscription<T> subscription)
     {
         _subscription = subscription;
         _worker = ObserveAsync();

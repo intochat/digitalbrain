@@ -1,5 +1,8 @@
+using DigitalBrain.Testing;
+using DigitalBrain.Time;
 using DigitalBrain.Time.Timers.Signals;
 using Xunit;
+
 namespace DigitalBrain.Tests;
 
 public sealed class TimerBehaviorFacts
@@ -8,17 +11,21 @@ public sealed class TimerBehaviorFacts
     public async Task BehaviorSubscribesBeforeTheTriggerAndOnlyReportsItsTimer()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var host = await TimerTestSupport.StartAsync(ct);
-        var timer = host.Brain.Get<ITimer>("behavior");
-        var other = host.Brain.Get<ITimer>("other");
+        await using var brain = await DigitalBrainSimulation.StartAsync(new()
+        {
+            Modules = [new TimeModule()],
+            UseReminders = true,
+        }, ct);
+        var timer = brain.Get<ITimer>("behavior");
+        var other = brain.Get<ITimer>("other");
         var result = new TaskCompletionSource<TimerTick>(TaskCreationOptions.RunContinuationsAsynchronously);
-        await using var run = host.RunBehavior((brain, token) => TimerReport.RunAsync(brain, "behavior", fact =>
+        await using var run = brain.RunBehavior((handle, token) => TimerReport.RunAsync(handle, "behavior", fact =>
         {
             result.TrySetResult(fact);
             return Task.CompletedTask;
         }, token), ct);
         await run.WaitForSubscriptionAsync<TimerTick>(timer, ct);
-        await using var otherTicks = await host.ObserveAsync<TimerTick>(other, ct);
+        await using var otherTicks = await brain.Observe<TimerTick>(other, ct);
         await other.Start(TimeSpan.Zero);
         await otherTicks.NextAsync(ct: ct);
         Assert.False(result.Task.IsCompleted);

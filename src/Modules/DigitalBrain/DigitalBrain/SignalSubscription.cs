@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace DigitalBrain.Core;
 
-public sealed class SignalSubscription<T> : IAsyncDisposable, INeuronObserver where T : Signal
+public sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObserver where T : Signal
 {
     private readonly IClusterClient _client;
     private readonly INeuron _source;

@@ -1,3 +1,5 @@
+using DigitalBrain.Testing;
+using DigitalBrain.Time;
 using DigitalBrain.Time.Timers.Signals;
 using Xunit;
 
@@ -9,9 +11,13 @@ public sealed class TimerPrimitiveFacts
     public async Task RealOneShotPublishesATick()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var host = await TimerTestSupport.StartAsync(ct);
-        var timer = host.Brain.Get<ITimer>("real");
-        await using var ticks = await host.ObserveAsync<TimerTick>(timer, ct);
+        await using var brain = await DigitalBrainSimulation.StartAsync(new()
+        {
+            Modules = [new TimeModule()],
+            UseReminders = true,
+        }, ct);
+        var timer = brain.Get<ITimer>("real");
+        await using var ticks = await brain.Observe<TimerTick>(timer, ct);
         var before = DateTimeOffset.UtcNow;
         await timer.Start(TimeSpan.Zero);
         var tick = await ticks.NextAsync(ct: ct);

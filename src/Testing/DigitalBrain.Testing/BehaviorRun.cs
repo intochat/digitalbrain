@@ -50,11 +50,13 @@ public sealed class BehaviorRun : IAsyncDisposable
         internal TaskCompletionSource Ready(GrainId source, Type type)
             => _ready.GetOrAdd((source, type), _ => new(TaskCreationOptions.RunContinuationsAsynchronously));
         public T Get<T>(string id) where T : class, IGrainWithStringKey => inner.Get<T>(id);
-        public async Task<SignalSubscription<T>> SubscribeAsync<T>(INeuron source, CancellationToken cancellationToken = default) where T : Signal
+        public async Task<ISignalSubscription<T>> SubscribeAsync<T>(INeuron source, CancellationToken cancellationToken = default) where T : Signal
         {
             var subscription = await inner.SubscribeAsync<T>(source, cancellationToken).ConfigureAwait(false);
             Ready(source.GetGrainId(), typeof(T)).TrySetResult();
             return subscription;
         }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

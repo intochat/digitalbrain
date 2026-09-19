@@ -50,19 +50,19 @@ public sealed class LateRegistrationFacts
     public async Task ClientDisposalOwnsAnUnfinishedRegistration()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var host = await BrainTestHost.StartAsync(SubscriptionLifetimeFacts.Options(), ct);
-        var source = host.Brain.Get<ILateSource>("closing-client");
+        await using var brain = await DigitalBrainSimulation.StartAsync(SubscriptionLifetimeFacts.Options(), ct);
+        var source = brain.Get<ILateSource>("closing-client");
         await source.HoldNextWatch();
-        var subscribing = host.Brain.SubscribeAsync<Number>(source, ct);
+        var subscribing = brain.SubscribeAsync<Number>(source, ct);
         try
         {
             await source.WaitForHeldWatch().WaitAsync(TimeSpan.FromSeconds(3), ct);
-            await ((IAsyncDisposable)host.Brain).DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3), ct);
+            await brain.Client().DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3), ct);
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => subscribing);
             await source.ReleaseWatch();
             await source.WaitForCompletedWatch().WaitAsync(TimeSpan.FromSeconds(3), ct);
             await TestWait.UntilAsync(_ => source.Members(), count => count == 0, TimeSpan.FromSeconds(1), ct);
-            await Assert.ThrowsAsync<ObjectDisposedException>(() => host.Brain.SubscribeAsync<Number>(source, ct));
+            await Assert.ThrowsAsync<ObjectDisposedException>(() => brain.SubscribeAsync<Number>(source, ct));
         }
         finally { await source.ReleaseWatch(); }
     }
@@ -73,12 +73,12 @@ public sealed class LateRegistrationFacts
     public async Task LateInitialOrRenewedWatchIsRemovedAfterDisposal(bool renewal)
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var host = await BrainTestHost.StartAsync(SubscriptionLifetimeFacts.Options(), ct);
-        var source = host.Brain.Get<ILateSource>("late");
+        await using var brain = await DigitalBrainSimulation.StartAsync(SubscriptionLifetimeFacts.Options(), ct);
+        var source = brain.Get<ILateSource>("late");
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        SignalSubscription<Number>? stream = renewal ? await host.Brain.SubscribeAsync<Number>(source, ct) : null;
+        ISignalSubscription<Number>? stream = renewal ? await brain.SubscribeAsync<Number>(source, ct) : null;
         await source.HoldNextWatch();
-        var subscribing = renewal ? null : host.Brain.SubscribeAsync<Number>(source, cancel.Token);
+        var subscribing = renewal ? null : brain.SubscribeAsync<Number>(source, cancel.Token);
         try
         {
             await source.WaitForHeldWatch().WaitAsync(TimeSpan.FromSeconds(3), ct);

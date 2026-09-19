@@ -50,13 +50,13 @@ public sealed class StorageAdapterFacts
         try
         {
             var faults = new StorageFaults();
-            await using var host = await BrainTestHost.StartAsync(new() { PersistenceDirectory = directory, StorageFaults = faults }, ct);
-            await Assert.ThrowsAsync<IOException>(() => BrainTestHost.StartAsync(new() { PersistenceDirectory = directory }, ct));
-            var counter = host.Brain.Get<ICounter>("held");
+            await using var brain = await DigitalBrainSimulation.StartAsync(new() { PersistenceDirectory = directory, StorageFaults = faults }, ct);
+            await Assert.ThrowsAsync<IOException>(() => DigitalBrainSimulation.StartAsync(new() { PersistenceDirectory = directory }, ct));
+            var counter = brain.Get<ICounter>("held");
             using var hold = faults.HoldNextRead(counter.GetGrainId());
             var read = counter.Read();
             await hold.Entered.WaitAsync(TimeSpan.FromSeconds(5), ct);
-            await host.DisposeAsync();
+            await brain.DisposeAsync();
             await hold.WaitAsync().WaitAsync(TimeSpan.FromSeconds(1), ct);
             // The client may stop before the released read's RPC response arrives.
             _ = read.ContinueWith(task => { _ = task.Exception; }, CancellationToken.None,

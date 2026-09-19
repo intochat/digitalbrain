@@ -11,7 +11,7 @@ public sealed class HarnessCancellationFacts
         var ct = TestContext.Current.CancellationToken;
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var service = new HeldStartup();
-        var starting = BrainTestHost.StartAsync(new()
+        var starting = DigitalBrainSimulation.StartAsync(new()
         {
             ConfigureSilo = silo => silo.Services.AddSingleton<IHostedService>(service)
         }, cancel.Token);
@@ -35,10 +35,10 @@ public sealed class HarnessCancellationFacts
     public async Task CancellationCallbacksCannotBypassTheShutdownDeadline(bool throws)
     {
         var ct = TestContext.Current.CancellationToken;
-        var host = await BrainTestHost.StartAsync(cancellationToken: ct);
+        var brain = await DigitalBrainSimulation.StartAsync(cancellationToken: ct);
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var release = new ManualResetEventSlim();
-        var run = host.RunBehavior(async (_, token) =>
+        var run = brain.RunBehavior(async (_, token) =>
         {
             using var registration = token.Register(() =>
             {
@@ -52,11 +52,11 @@ public sealed class HarnessCancellationFacts
         Task? disposing = null;
         try
         {
-            disposing = host.DisposeAsync().AsTask();
+            disposing = brain.DisposeAsync().AsTask();
             var failure = await Assert.ThrowsAsync<AggregateException>(() => disposing.WaitAsync(TimeSpan.FromSeconds(7), ct));
             if (throws) { Assert.Contains("callback failed", failure.ToString()); }
             else { Assert.Contains("timed out", failure.ToString(), StringComparison.OrdinalIgnoreCase); }
-            await Assert.ThrowsAnyAsync<Exception>(() => host.Brain.SubscribeAsync<Number>(host.Brain.Get<ITestEmitter>("closed"), ct));
+            await Assert.ThrowsAnyAsync<Exception>(() => brain.SubscribeAsync<Number>(brain.Get<ITestEmitter>("closed"), ct));
         }
         finally
         {

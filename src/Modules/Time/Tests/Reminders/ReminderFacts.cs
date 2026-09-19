@@ -1,3 +1,5 @@
+using DigitalBrain.Contracts;
+using DigitalBrain.Testing;
 using DigitalBrain.Time;
 using DigitalBrain.Time.Reminders;
 using DigitalBrain.Time.Reminders.Signals;
@@ -13,8 +15,8 @@ public sealed class ReminderFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var control = new ReminderControl();
-        await using var host = await TimerTestSupport.StartAsync(ct, reminders: control);
-        var reminder = host.Brain.Get<IReminder>("registration");
+        await using var brain = await StartAsync(ct, control);
+        var reminder = brain.Get<IReminder>("registration");
         await reminder.Start(TimeSpan.FromDays(1), TimeSpan.FromMinutes(1));
         var initial = Assert.Single((await control.Table.ReadRows(reminder.GetGrainId())).Reminders);
         foreach (var due in new[] { TimeSpan.FromTicks(-1), Timeout.InfiniteTimeSpan, TimeSpan.MaxValue })
@@ -39,8 +41,8 @@ public sealed class ReminderFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var control = new ReminderControl { FailRegister = true };
-        await using var host = await TimerTestSupport.StartAsync(ct, reminders: control);
-        var reminder = host.Brain.Get<IReminder>("failures");
+        await using var brain = await StartAsync(ct, control);
+        var reminder = brain.Get<IReminder>("failures");
         await Assert.ThrowsAsync<IOException>(() => reminder.Start(TimeSpan.FromDays(1), TimeSpan.FromMinutes(1)));
         Assert.Empty((await control.Table.ReadRows(reminder.GetGrainId())).Reminders);
         await reminder.Start(TimeSpan.FromDays(1), TimeSpan.FromMinutes(1));
@@ -60,8 +62,8 @@ public sealed class ReminderFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var control = new ReminderControl { FailAfterRegister = true };
-        await using var host = await TimerTestSupport.StartAsync(ct, reminders: control);
-        var reminder = host.Brain.Get<IReminder>("ambiguous");
+        await using var brain = await StartAsync(ct, control);
+        var reminder = brain.Get<IReminder>("ambiguous");
         await Assert.ThrowsAsync<IOException>(() => reminder.Start(TimeSpan.FromDays(1), TimeSpan.FromMinutes(1)));
         Assert.Single((await control.Table.ReadRows(reminder.GetGrainId())).Reminders);
         await reminder.Start(TimeSpan.FromDays(1), TimeSpan.FromMinutes(2));
@@ -79,8 +81,8 @@ public sealed class ReminderFacts
     public async Task NativeDefaultMinimumPeriodIsEnforced()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var host = await TimerTestSupport.StartAsync(ct);
-        var reminder = host.Brain.Get<IReminder>("minimum");
+        await using var brain = await StartAsync(ct);
+        var reminder = brain.Get<IReminder>("minimum");
         await Assert.ThrowsAnyAsync<ArgumentException>(() => reminder.Start(TimeSpan.Zero, TimeSpan.FromSeconds(59)));
         await reminder.Start(TimeSpan.FromDays(1), TimeSpan.FromMinutes(1));
         await reminder.Stop();
@@ -91,9 +93,9 @@ public sealed class ReminderFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var control = new ReminderControl();
-        await using var host = await TimerTestSupport.StartAsync(ct, reminders: control);
-        var reminder = host.Brain.Get<IReminder>("queued");
-        await using var ticks = await host.ObserveAsync<ReminderTick>(reminder, ct);
+        await using var brain = await StartAsync(ct, control);
+        var reminder = brain.Get<IReminder>("queued");
+        await using var ticks = await brain.Observe<ReminderTick>(reminder, ct);
         await reminder.Start(TimeSpan.FromDays(1), TimeSpan.FromMinutes(1));
         await reminder.Stop();
         // Inject already-queued deliveries through Orleans, without invoking a grain object directly.
@@ -112,9 +114,9 @@ public sealed class ReminderFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var control = new ReminderControl();
-        await using var host = await TimerTestSupport.StartAsync(ct, reminders: control);
-        var reminder = host.Brain.Get<IReminder>("live");
-        await using var ticks = await host.ObserveAsync<ReminderTick>(reminder, ct);
+        await using var brain = await StartAsync(ct, control);
+        var reminder = brain.Get<IReminder>("live");
+        await using var ticks = await brain.Observe<ReminderTick>(reminder, ct);
         await reminder.Start(TimeSpan.Zero, TimeSpan.FromMilliseconds(100));
         Assert.Equal("live", (await ticks.NextAsync(ct: ct)).ReminderId);
         Assert.Equal("live", (await ticks.NextAsync(ct: ct)).ReminderId);
@@ -129,17 +131,17 @@ public sealed class ReminderFacts
         try
         {
             Orleans.Runtime.GrainId id;
-            await using (var first = await TimerTestSupport.StartAsync(ct, directory, reminders: new()))
+            await using (var first = await StartAsync(ct, new ReminderControl(), directory))
             {
-                var reminder = first.Brain.Get<IReminder>("restart");
+                var reminder = first.Get<IReminder>("restart");
                 id = reminder.GetGrainId();
                 await reminder.Start(TimeSpan.Zero, TimeSpan.FromMilliseconds(200));
             }
             var control = new ReminderControl();
-            await using var second = await TimerTestSupport.StartAsync(ct, directory, reminders: control);
+            await using var second = await StartAsync(ct, control, directory);
             Assert.Equal(id, (await control.NextDeliveryAsync(ct)).Id);
             // No grain reference/call was used on this host before native reminder delivery.
-            await second.Brain.Get<IReminder>("restart").Stop();
+            await second.Get<IReminder>("restart").Stop();
         }
         finally { Directory.Delete(directory, true); }
     }
@@ -149,11 +151,11 @@ public sealed class ReminderFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var control = new ReminderControl();
-        await using var host = await TimerTestSupport.StartAsync(ct, reminders: control);
-        var reminder = host.Brain.Get<IReminder>("reactivate");
+        await using var brain = await StartAsync(ct, control);
+        var reminder = brain.Get<IReminder>("reactivate");
         await reminder.Start(TimeSpan.Zero, TimeSpan.FromMilliseconds(100));
         var before = await control.NextDeliveryAsync(ct);
-        await host.DeactivateAsync(reminder, ct);
+        await brain.DeactivateAsync(reminder, ct);
         ReminderDelivery after;
         do { after = await control.NextDeliveryAsync(ct); }
         while (ReferenceEquals(before.Activation, after.Activation));
@@ -166,8 +168,20 @@ public sealed class ReminderFacts
     {
         var error = await Assert.ThrowsAnyAsync<Exception>(async () =>
         {
-            await using var host = await BrainTestHost.StartAsync(new() { ConfigureSilo = silo => silo.AddTime() }, TestContext.Current.CancellationToken);
+            await using var brain = await DigitalBrainSimulation.StartAsync(new()
+            {
+                Modules = [new TimeModule()],
+            }, TestContext.Current.CancellationToken);
         });
         Assert.Contains("reminder", error.ToString(), StringComparison.OrdinalIgnoreCase);
     }
+
+    private static Task<IDigitalBrain> StartAsync(CancellationToken ct, ReminderControl? reminders = null, string? directory = null)
+        => DigitalBrainSimulation.StartAsync(new()
+        {
+            Modules = [new TimeModule()],
+            UseReminders = true,
+            PersistenceDirectory = directory,
+            ConfigureSilo = reminders is null ? null : silo => silo.UseReminderControl(reminders),
+        }, ct);
 }
