@@ -1,11 +1,12 @@
 namespace DigitalBrain.Time;
-
-[GenerateSerializer]
-[Alias("time.state")]
-internal sealed record TimerState(
-    [property: Id(0)] TimerStatus Status,
-    [property: Id(1)] long Generation,
-    [property: Id(2)] DateTimeOffset ScheduledAt,
-    [property: Id(3)] DateTimeOffset DueAt,
-    [property: Id(4)] int DurationSeconds,
-    [property: Id(5)] string Note);
+[GenerateSerializer, Alias("time.state")]
+internal sealed record TimerState
+{
+    [Id(0)] public TimerStatus Status { get; init; }
+    [Id(1)] public long Generation { get; init; }
+    [Id(2)] public DateTimeOffset? ScheduledAt { get; init; }
+    [Id(3)] public DateTimeOffset? DueAt { get; init; }
+    [Id(4)] public int? DurationSeconds { get; init; }
+    [Id(5)] public string? Note { get; init; }
+    public TimerSnapshot Snapshot() => new(Status, Generation, ScheduledAt, DueAt, DurationSeconds, Note);
+}

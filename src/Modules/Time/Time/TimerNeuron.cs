@@ -1,133 +1,57 @@
-using DigitalBrain.Abstractions;
-using DigitalBrain.Abstractions.Commands;
-using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Core;
 using Orleans.Runtime;
-
 namespace DigitalBrain.Time;
 
 [GrainType("timer")]
-internal sealed class TimerNeuron(
-    NeuronRuntime runtime,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<TimerState>> state)
-    : Neuron<TimerState>(runtime, state), ITimer
+internal class TimerNeuron(
+    [PersistentState("state", "Default")] IPersistentState<TimerState> state,
+    TimeProvider time) : Neuron, ITimer
 {
-    private const int RecoveredAfterMinutes = 1;
-
-    public Task<Accepted<TimerGeneration>> Schedule(ScheduleTimer command) => ExecuteCommandAsync(
-        new("timer", "schedule"), command, TimeJson.Default.ScheduleTimer, TimeJson.Default.AcceptedTimerGeneration, arguments =>
-        {
-            if (arguments.DurationSeconds <= 0)
-            {
-                throw new CommandRejectedException(arguments.Id, "duration must be positive", "Provide a duration greater than zero seconds.");
-            }
-
-            if (string.IsNullOrWhiteSpace(arguments.Note))
-            {
-                throw new CommandRejectedException(arguments.Id, "note is blank", "Provide a non-blank note for the timer.");
-            }
-
-            var generation = State?.Generation ?? 0;
-            if (arguments.ExpectedVersion is { } expected && expected != generation)
-            {
-                throw new CommandRejectedException(arguments.Id, $"expected generation {expected} but the timer is at {generation}",
-                    "Read the timer and retry with the generation it reports, or stop it first.");
-            }
-
-            var body = new SchedulingBody(arguments.DurationSeconds, arguments.Note);
-            var work = Schedule(Signal.FromJson(TimeSignals.TimerScheduling, body, TimeJson.Default.SchedulingBody));
-            return new Accepted<TimerGeneration>(new TimerGeneration(generation), work);
-        });
-
-    public Task<Accepted<TimerGeneration>> Stop(StopTimer command) => ExecuteCommandAsync(
-        new("timer", "stop"), command, TimeJson.Default.StopTimer, TimeJson.Default.AcceptedTimerGeneration, arguments =>
-        {
-            var generation = State?.Generation ?? 0;
-            var work = Schedule(Signal.Create(TimeSignals.TimerStopping, "{}"));
-            return new Accepted<TimerGeneration>(new TimerGeneration(generation), work);
-        });
-
-    public Task<TimerSnapshot> Read() => Task.FromResult(State is { } current
-        ? new TimerSnapshot(current.Status, current.Generation, current.ScheduledAt, current.DueAt, current.DurationSeconds, current.Note)
-        : new TimerSnapshot(TimerStatus.Unscheduled, 0, null, null, null, null));
-
-    protected override async Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
+    private bool _unavailable;
+    public Task<TimerSnapshot> Read()
     {
-        TimerState? next = null;
-        switch (delivery.Signal.Type)
+        EnsureAvailable();
+        return Task.FromResult(state.State.Snapshot());
+    }
+    public async Task<TimerSnapshot> Schedule(int durationSeconds, string note, long? expectedGeneration = null)
+    {
+        EnsureAvailable();
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(durationSeconds);
+        ArgumentException.ThrowIfNullOrWhiteSpace(note);
+        if (expectedGeneration is { } expected && expected != state.State.Generation)
+        { throw new InvalidOperationException("Timer generation changed."); }
+        if (state.State.Status == TimerStatus.Scheduled)
+        { throw new InvalidOperationException("Timer is already scheduled."); }
+        var now = time.GetUtcNow();
+        var next = new TimerState
         {
-            case TimeSignals.TimerScheduling:
-                {
-                    if (State is { Status: TimerStatus.Scheduled } current)
-                    {
-                        next = current;
-                        Announce(Signal.FromJson(TimeSignals.TimerScheduleRefused, new TimerGeneration(current.Generation),
-                            TimeJson.Default.TimerGeneration));
-                        break;
-                    }
-
-                    if (Body(delivery, TimeJson.Default.SchedulingBody) is not { } body)
-                    {
-                        return;
-                    }
-
-                    var generation = (State?.Generation ?? 0) + 1;
-                    var scheduledAt = TimeProvider.GetUtcNow();
-                    var dueAt = scheduledAt + TimeSpan.FromSeconds(body.DurationSeconds);
-                    next = new TimerState(TimerStatus.Scheduled, generation, scheduledAt, dueAt, body.DurationSeconds, body.Note);
-                    await Alarm(generation).Arm(dueAt - TimeProvider.GetUtcNow()).ConfigureAwait(true);
-                    break;
-                }
-            case TimeSignals.TimerStopping:
-                {
-                    if (State is not { Status: TimerStatus.Scheduled } current)
-                    {
-                        break;
-                    }
-
-                    next = current with { Status = TimerStatus.Cancelled };
-                    await Alarm(current.Generation).Retire().ConfigureAwait(true);
-                    break;
-                }
-            case TimeSignals.TimerDue:
-                {
-                    if (Body(delivery, TimeJson.Default.TimerGeneration) is not { } generationBody)
-                    {
-                        return;
-                    }
-
-                    var generation = generationBody.Value;
-                    if (State is not { Status: TimerStatus.Scheduled } current || current.Generation != generation)
-                    {
-                        await Alarm(generation).Retire().ConfigureAwait(true);
-                        break;
-                    }
-
-                    var observedAt = TimeProvider.GetUtcNow();
-                    if (observedAt < current.DueAt)
-                    {
-                        await Alarm(generation).Arm(current.DueAt - observedAt).ConfigureAwait(true);
-                        break;
-                    }
-
-                    var resolution = observedAt > current.DueAt.AddMinutes(RecoveredAfterMinutes)
-                        ? TimerResolution.Recovered
-                        : TimerResolution.OnTime;
-                    next = current with { Status = TimerStatus.Elapsed };
-                    var body = new TimerElapsedBody(Id, generation, current.ScheduledAt, current.DueAt, observedAt, resolution, current.Note);
-                    Announce(Signal.FromJson(TimeSignals.TimerElapsed, body, TimeJson.Default.TimerElapsedBody));
-                    await Alarm(generation).Retire().ConfigureAwait(true);
-                    break;
-                }
-            default:
-                return;
-        }
-
-        if (next is not null)
+            Status = TimerStatus.Scheduled, Generation = checked(state.State.Generation + 1),
+            ScheduledAt = now, DueAt = now.AddSeconds(durationSeconds),
+            DurationSeconds = durationSeconds, Note = note
+        };
+        await SaveAsync(next);
+        return next.Snapshot();
+    }
+    public async Task<TimerSnapshot> Stop()
+    {
+        EnsureAvailable();
+        if (state.State.Status != TimerStatus.Scheduled) { return state.State.Snapshot(); }
+        await SaveAsync(state.State with { Status = TimerStatus.Cancelled });
+        return state.State.Snapshot();
+    }
+    private async Task SaveAsync(TimerState next)
+    {
+        state.State = next;
+        try { await state.WriteStateAsync(); }
+        catch
         {
-            await SaveAsync(next, cancellationToken).ConfigureAwait(true);
+            try { await state.ReadStateAsync(); }
+            catch { _unavailable = true; DeactivateOnIdle(); }
+            throw;
         }
     }
-
-    private ITimerAlarm Alarm(long generation) => GrainFactory.GetGrain<ITimerAlarm>($"{Id.Name}/{generation}");
+    private void EnsureAvailable()
+    {
+        if (_unavailable) { throw new InvalidOperationException("Timer state is unavailable; activation is stopping."); }
+    }
 }
