@@ -57,7 +57,10 @@ public sealed class StorageAdapterFacts
             var read = counter.Read();
             await hold.Entered.WaitAsync(TimeSpan.FromSeconds(5), ct);
             await host.DisposeAsync();
-            Assert.True(read.IsCompleted);
+            await hold.WaitAsync().WaitAsync(TimeSpan.FromSeconds(1), ct);
+            // The client may stop before the released read's RPC response arrives.
+            _ = read.ContinueWith(task => { _ = task.Exception; }, CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         }
         finally { Directory.Delete(directory, true); }
     }

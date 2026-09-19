@@ -10,7 +10,7 @@
 
 **Spec:** [Approved framework simplification design](../specs/2026-09-19-framework-simplification-design.md).
 
-**Status:** Written for review. Implementation has not started. The user approved the design, not yet this implementation plan or its execution method.
+**Status:** Approved for Native execution and implemented through Tasks 1–8 on `codex/framework-foundation`. Final independent review is recorded in the migration status. See that status for deviations and the intentionally partial build boundary.
 
 ## Global Constraints
 

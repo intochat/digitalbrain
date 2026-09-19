@@ -36,7 +36,8 @@ public sealed class BrainClient(IClusterClient client, IOptions<BrainOptions> op
                     while (true)
                     {
                         await Task.Delay(settings.RenewEvery, token).ConfigureAwait(false);
-                        var current = await source.Watch(reference).WaitAsync(settings.OperationTimeout, token).ConfigureAwait(false);
+                        registering = source.Watch(reference);
+                        var current = await registering.WaitAsync(settings.OperationTimeout, token).ConfigureAwait(false);
                         if (current != activation) { throw new InvalidOperationException("Neuron reactivated; subscribe again. Live signals may have been missed."); }
                     }
                 }
@@ -44,13 +45,14 @@ public sealed class BrainClient(IClusterClient client, IOptions<BrainOptions> op
                 {
                     if (reference is not null)
                     {
-                        if (registering is not null)
+                        if (registering is { IsCompleted: false })
                         {
-                            _ = registering.ContinueWith(t => { _ = t.Exception; }, CancellationToken.None,
-                                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                            // Disposal must not wait indefinitely for a remote call. Observe its
+                            // eventual result and remove membership added after immediate cleanup.
+                            _ = CleanupAfterRegistrationAsync(registering, source, reference, settings.OperationTimeout);
                         }
-                        try { await source.Unwatch(reference).WaitAsync(settings.OperationTimeout).ConfigureAwait(false); }
-                        catch (Exception error) { logger.LogWarning(error, "Subscription cleanup failed; remote membership expires with its lease."); }
+                        else { _ = registering?.Exception; }
+                        try { await UnwatchAsync(source, reference, settings.OperationTimeout).ConfigureAwait(false); }
                         finally { client.DeleteObjectReference<INeuronObserver>(reference); }
                     }
                     GC.KeepAlive(catcher);
@@ -60,6 +62,17 @@ public sealed class BrainClient(IClusterClient client, IOptions<BrainOptions> op
         }
         try { await subscription.Ready.ConfigureAwait(false); return subscription; }
         catch { await subscription.DisposeAsync().ConfigureAwait(false); throw; }
+    }
+    private async Task CleanupAfterRegistrationAsync(Task<Guid> registering, INeuron source, INeuronObserver reference, TimeSpan timeout)
+    {
+        try { await registering.ConfigureAwait(false); }
+        catch { return; }
+        await UnwatchAsync(source, reference, timeout).ConfigureAwait(false);
+    }
+    private async Task UnwatchAsync(INeuron source, INeuronObserver reference, TimeSpan timeout)
+    {
+        try { await source.Unwatch(reference).WaitAsync(timeout).ConfigureAwait(false); }
+        catch (Exception error) { logger.LogWarning(error, "Subscription cleanup failed; remote membership expires with its lease."); }
     }
     public async ValueTask DisposeAsync()
     {

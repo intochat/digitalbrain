@@ -83,7 +83,7 @@ public sealed class BrainTestHost : IAsyncDisposable
         try
         {
             cluster = builder.Build();
-            await cluster.DeployAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+            await cluster.DeployAsync(cancellationToken).ConfigureAwait(false);
             return new(cluster, lease, temporary, options.StorageFaults);
         }
         catch

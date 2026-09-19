@@ -32,10 +32,17 @@ public sealed class BehaviorRun : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) { return; }
-        await _cancel.CancelAsync().ConfigureAwait(false);
-        try { await Completion.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false); }
-        catch (OperationCanceledException) when (_cancel.IsCancellationRequested) { }
-        finally { _cancel.Dispose(); }
+        var canceling = _cancel.CancelAsync();
+        var shutdown = Task.WhenAll(canceling, Completion);
+        try { await shutdown.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (_cancel.IsCancellationRequested && canceling.IsCompletedSuccessfully) { }
+        finally
+        {
+            // A noncooperative task or callback can outlive the deadline. Observe its
+            // eventual fault and release the token source once callbacks have finished.
+            _ = shutdown.ContinueWith(task => { _ = task.Exception; _cancel.Dispose(); }, CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        }
     }
     private sealed class ObservedBrain(IDigitalBrain inner) : IDigitalBrain
     {

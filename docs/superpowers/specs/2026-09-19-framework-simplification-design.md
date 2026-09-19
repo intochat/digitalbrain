@@ -1,7 +1,7 @@
 # DigitalBrain: small framework, reusable testing, C# behaviors
 
 Date: 2026-09-19
-Status: approved by the user on 2026-09-19; detailed implementation plan pending review and execution selection.
+Status: approved by the user on 2026-09-19. Foundation and Time pilot implemented under the approved Native execution plan; remaining modules require follow-on work.
 Target: `E:/intochat/digitalbrain/DigitalBrain.slnx`.
 Reference prototype: `E:/intochat/digitalbrainnew/DigitalBrain.slnx`.
 
