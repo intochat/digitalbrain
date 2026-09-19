@@ -5,16 +5,11 @@ using Orleans.Concurrency;
 
 namespace DigitalBrain.Abstractions.Neurons;
 
-// The object others talk TO. Sending is not a grain call: the neuron broadcasts from inside
-// a reaction (protected SendSignal). Inbound facts arrive here.
+// Observation of a named object. Verbs live on IGmail, IPlaywright, etc.
+// Facts enter through INeuronInbox, not here.
 [Alias("db.v3.neuron")]
 public interface INeuron : IGrainWithStringKey
 {
-    [Alias(nameof(HandleSignal))]
-    [AlwaysInterleave]
-    [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
-    Task<SignalAdmission> HandleSignal(SignalDelivery delivery, CancellationToken cancellationToken = default);
-
     [Alias(nameof(CancelReaction))]
     [AlwaysInterleave]
     Task CancelReaction(SignalId pending);

@@ -61,7 +61,8 @@ public sealed class ScenarioGrain : JournaledGrain<ScenarioState>, IScenario
                 continue;
             }
 
-            var admission = await edge.Target.HandleSignal(delivery, cancellationToken).ConfigureAwait(true);
+            var admission = await GrainFactory.GetGrain<INeuronInbox>(edge.Target.GetGrainId())
+                .HandleSignal(delivery, cancellationToken).ConfigureAwait(true);
             if (admission == SignalAdmission.Accepted)
             {
                 accepted++;

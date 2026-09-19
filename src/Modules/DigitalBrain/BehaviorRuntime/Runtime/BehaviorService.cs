@@ -182,7 +182,7 @@ public sealed partial class BehaviorService(IGrainFactory grains, INeuronInvoker
         {
             var signal = Signal.Create(snapshot.Definition.Trigger, body);
             var delivery = SignalDelivery.Create(signal, grains.GetGrain<INeuron>(NeuronId.Plain("behavior-author").ToGrainId()), 1, TimeProvider.System, correlation: correlation);
-            var admission = await grains.GetGrain<INeuron>(NodeNeuron(id, node.Id).ToGrainId())
+            var admission = await grains.GetGrain<INeuronInbox>(NodeNeuron(id, node.Id).ToGrainId())
                 .HandleSignal(delivery, cancellationToken).ConfigureAwait(false);
             if (admission == SignalAdmission.Busy)
             {

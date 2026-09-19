@@ -72,7 +72,7 @@ internal sealed class GitHubWebhookIngress(GitHubRepositoryBindings bindings, IG
                 var signal = Signal.Create(GitHubSignals.RepositoryEvent, JsonSerializer.Serialize(fact, GitHubJson.Default.RepositoryEvent));
                 try
                 {
-                    var accepted = await grains.GetGrain<INeuron>(new NeuronId("repository", binding.Id).ToGrainId())
+                    var accepted = await grains.GetGrain<INeuronInbox>(new NeuronId("repository", binding.Id).ToGrainId())
                         .HandleSignal(new SignalDelivery(signal, new SignalId(deliveryId), CorrelationId.New(), null,
                             grains.GetGrain<INeuron>(new NeuronId("github", "webhook").ToGrainId()), 1, TimeProvider.System.GetUtcNow()), cancellationToken).ConfigureAwait(false);
                     results.Add(accepted switch

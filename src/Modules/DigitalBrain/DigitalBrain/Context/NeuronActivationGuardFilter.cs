@@ -1,3 +1,5 @@
+using DigitalBrain.Abstractions.Neurons;
+
 namespace DigitalBrain.Core;
 
 internal sealed class NeuronActivationGuardFilter : IIncomingGrainCallFilter

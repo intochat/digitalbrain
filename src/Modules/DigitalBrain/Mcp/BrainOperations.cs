@@ -48,7 +48,7 @@ public sealed class BrainOperations(IGrainFactory grains, INeuronInvoker invoker
         var source = Neuron(Session(session));
         var signal = Signal.Create(request.Type, request.Body);
         var delivery = SignalDelivery.Create(signal, source, 1, TimeProvider.System, correlation: ParseCorrelation(request.Correlation));
-        var admission = await source.HandleSignal(delivery, cancellationToken).ConfigureAwait(false);
+        var admission = await grains.GetGrain<INeuronInbox>(source.GetGrainId()).HandleSignal(delivery, cancellationToken).ConfigureAwait(false);
         if (admission == SignalAdmission.Busy)
         {
             return new(delivery.SignalId.ToString(), delivery.CorrelationId.ToString(), 0, 1);

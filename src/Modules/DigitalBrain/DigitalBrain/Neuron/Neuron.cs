@@ -286,7 +286,8 @@ public abstract partial class Neuron : DurableGrain, INeuron, INeuronInbox, IRem
             return outcome;
         }
 
-        var admission = await receiver.HandleSignal(delivery, cancellationToken).ConfigureAwait(true);
+        var admission = await GrainFactory.GetGrain<INeuronInbox>(receiver.GetGrainId())
+            .HandleSignal(delivery, cancellationToken).ConfigureAwait(true);
         return outcome with
         {
             Handled = admission == SignalAdmission.Accepted ? Math.Max(1, outcome.Handled) : outcome.Handled,
