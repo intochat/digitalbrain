@@ -8,6 +8,7 @@
     <PackageReference Include="Microsoft.Orleans.TestingHost" /><PackageReference Include="Microsoft.Orleans.Reminders" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Runtime.Tests" />
     <ProjectReference Include="../../Modules/DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
   </ItemGroup>
 </Project>

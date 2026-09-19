@@ -1,80 +1,80 @@
 using System.Security.Cryptography;
 using System.Text;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
-
 namespace DigitalBrain.Testing;
 
-internal sealed class FileGrainStorage : IGrainStorage
+// Single-owner test store. The host holds an exclusive directory lease.
+internal sealed class FileGrainStorage(string directory, Serializer serializer, SemaphoreSlim? sharedGate = null) : IGrainStorage
 {
-    private readonly string _directory;
-    private readonly Serializer _serializer;
-
-    public FileGrainStorage(string directory, Serializer serializer)
+    private readonly SemaphoreSlim _gate = sharedGate ?? new(1);
+    public async Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> state)
     {
-        _directory = Path.GetFullPath(directory);
-        _serializer = serializer;
-        Directory.CreateDirectory(_directory);
-    }
-
-    public async Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
-    {
-        var path = PathFor(stateName, grainId);
-        if (File.Exists(path))
-        {
-            var bytes = await File.ReadAllBytesAsync(path).ConfigureAwait(false);
-            var etagLength = BitConverter.ToInt32(bytes, 0);
-            grainState.ETag = Encoding.UTF8.GetString(bytes, sizeof(int), etagLength);
-            grainState.State = _serializer.Deserialize<T>(new ArraySegment<byte>(
-                bytes, sizeof(int) + etagLength, bytes.Length - sizeof(int) - etagLength));
-            grainState.RecordExists = true;
-        }
-        else
-        {
-            grainState.ETag = null;
-            grainState.RecordExists = false;
-        }
-
-    }
-
-    public async Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
-    {
-        var etag = Guid.NewGuid().ToString("N");
-        var etagBytes = Encoding.UTF8.GetBytes(etag);
-        var stateBytes = _serializer.SerializeToArray(grainState.State);
-        var bytes = new byte[sizeof(int) + etagBytes.Length + stateBytes.Length];
-        BitConverter.GetBytes(etagBytes.Length).CopyTo(bytes, 0);
-        etagBytes.CopyTo(bytes, sizeof(int));
-        stateBytes.CopyTo(bytes, sizeof(int) + etagBytes.Length);
-        var path = PathFor(stateName, grainId);
-        var temporaryPath = $"{path}.{Guid.NewGuid():N}.tmp";
+        await _gate.WaitAsync().ConfigureAwait(false);
         try
         {
-            await File.WriteAllBytesAsync(temporaryPath, bytes).ConfigureAwait(false);
-            File.Move(temporaryPath, path, overwrite: true);
+            var path = PathFor(stateName, grainId);
+            if (!File.Exists(path))
+            {
+                state.State = Activator.CreateInstance<T>();
+                state.ETag = null; state.RecordExists = false;
+                return;
+            }
+            var (etag, payload) = Decode(await File.ReadAllBytesAsync(path).ConfigureAwait(false));
+            state.State = serializer.Deserialize<T>(payload);
+            state.ETag = etag; state.RecordExists = true;
         }
-        finally
+        finally { _gate.Release(); }
+    }
+    public async Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> state)
+    {
+        await _gate.WaitAsync().ConfigureAwait(false);
+        try
         {
-            File.Delete(temporaryPath);
+            var path = PathFor(stateName, grainId);
+            await CheckEtag(path, state.ETag).ConfigureAwait(false);
+            var etag = Guid.NewGuid().ToString("N");
+            var tag = Encoding.UTF8.GetBytes(etag);
+            var payload = serializer.SerializeToArray(state.State);
+            var bytes = new byte[4 + tag.Length + payload.Length];
+            BitConverter.GetBytes(tag.Length).CopyTo(bytes, 0);
+            tag.CopyTo(bytes, 4); payload.CopyTo(bytes, 4 + tag.Length);
+            var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                await File.WriteAllBytesAsync(temporary, bytes).ConfigureAwait(false);
+                File.Move(temporary, path, overwrite: true);
+            }
+            finally { File.Delete(temporary); }
+            state.ETag = etag; state.RecordExists = true;
         }
-
-        grainState.ETag = etag;
-        grainState.RecordExists = true;
+        finally { _gate.Release(); }
     }
-
-    public Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
+    public async Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> state)
     {
-        File.Delete(PathFor(stateName, grainId));
-        grainState.ETag = null;
-        grainState.RecordExists = false;
-        return Task.CompletedTask;
+        await _gate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var path = PathFor(stateName, grainId);
+            await CheckEtag(path, state.ETag).ConfigureAwait(false);
+            File.Delete(path);
+            state.State = Activator.CreateInstance<T>(); state.ETag = null; state.RecordExists = false;
+        }
+        finally { _gate.Release(); }
     }
-
-    private string PathFor(string stateName, GrainId grainId)
+    private static async Task CheckEtag(string path, string? expected)
     {
-        var key = Encoding.UTF8.GetBytes($"{stateName}\0{grainId}");
-        return Path.Combine(_directory, $"{Convert.ToHexStringLower(SHA256.HashData(key))}.state");
+        var actual = File.Exists(path) ? Decode(await File.ReadAllBytesAsync(path).ConfigureAwait(false)).Etag : null;
+        if (actual != expected) { throw new InconsistentStateException("Test storage ETag conflict."); }
     }
+    private static (string Etag, byte[] Payload) Decode(byte[] bytes)
+    {
+        if (bytes.Length < 4) { throw new InvalidDataException("Truncated state."); }
+        var length = BitConverter.ToInt32(bytes, 0);
+        if (length <= 0 || length > bytes.Length - 4) { throw new InvalidDataException("Invalid state header."); }
+        return (Encoding.UTF8.GetString(bytes, 4, length), bytes[(4 + length)..]);
+    }
+    private string PathFor(string stateName, GrainId id)
+        => Path.Combine(directory, Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(stateName + "\0" + id))) + ".state");
 }
