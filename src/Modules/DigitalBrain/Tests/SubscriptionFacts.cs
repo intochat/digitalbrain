@@ -7,7 +7,7 @@ namespace DigitalBrain.Tests;
 public sealed class SubscriptionFacts
 {
     [Fact]
-    public async Task ReadySubscribersHearOnePublication()
+    public async Task ReadySubscribersReceiveOnePublication()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var host = await BrainTestHost.StartAsync(cancellationToken: ct);

@@ -28,6 +28,12 @@ public sealed class SubscriptionLifetimeFacts
         await source.Emit(1);
         await source.Emit(2);
         await Assert.ThrowsAsync<InvalidOperationException>(() => stream.Completion.WaitAsync(TimeSpan.FromSeconds(3), ct));
+        await stream.DisposeAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => stream.Completion);
+        await using var reader = stream.ReadAllAsync(ct).GetAsyncEnumerator(ct);
+        Assert.True(await reader.MoveNextAsync());
+        Assert.Equal(1, reader.Current.Value);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => reader.MoveNextAsync().AsTask());
     }
 
     [Fact]

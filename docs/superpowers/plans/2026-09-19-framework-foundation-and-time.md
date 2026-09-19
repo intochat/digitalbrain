@@ -103,7 +103,7 @@ public interface INeuron : IGrainWithStringKey
 }
 public interface INeuronObserver : IGrainObserver
 {
-    Task Hear(Signal signal);
+    Task OnSignalAsync(Signal signal);
 }
 
 // DigitalBrain.Core
@@ -143,7 +143,7 @@ public sealed record BrainTestOptions
 
 ```csharp
 [Fact]
-public async Task ReadySubscribersHearOnePublication()
+public async Task ReadySubscribersReceiveOnePublication()
 {
     var ct = TestContext.Current.CancellationToken;
     await using var host = await BrainTestHost.StartAsync(cancellationToken: ct);

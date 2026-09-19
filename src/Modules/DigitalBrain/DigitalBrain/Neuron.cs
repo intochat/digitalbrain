@@ -31,6 +31,6 @@ public abstract class Neuron : Grain, INeuron
     protected Task PublishAsync(Signal signal)
     {
         ArgumentNullException.ThrowIfNull(signal);
-        return Observers.Notify(observer => observer.Hear(signal));
+        return Observers.Notify(observer => observer.OnSignalAsync(signal));
     }
 }

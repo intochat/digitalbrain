@@ -46,6 +46,27 @@ public sealed class LateSource : Grain, ILateSource
 
 public sealed class LateRegistrationFacts
 {
+    [Fact]
+    public async Task ClientDisposalOwnsAnUnfinishedRegistration()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var host = await BrainTestHost.StartAsync(SubscriptionLifetimeFacts.Options(), ct);
+        var source = host.Brain.Get<ILateSource>("closing-client");
+        await source.HoldNextWatch();
+        var subscribing = host.Brain.SubscribeAsync<Number>(source, ct);
+        try
+        {
+            await source.WaitForHeldWatch().WaitAsync(TimeSpan.FromSeconds(3), ct);
+            await ((IAsyncDisposable)host.Brain).DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3), ct);
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => subscribing);
+            await source.ReleaseWatch();
+            await source.WaitForCompletedWatch().WaitAsync(TimeSpan.FromSeconds(3), ct);
+            await TestWait.UntilAsync(_ => source.Members(), count => count == 0, TimeSpan.FromSeconds(1), ct);
+            await Assert.ThrowsAsync<ObjectDisposedException>(() => host.Brain.SubscribeAsync<Number>(source, ct));
+        }
+        finally { await source.ReleaseWatch(); }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
