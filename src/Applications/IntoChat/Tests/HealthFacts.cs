@@ -7,7 +7,11 @@ public sealed class HealthFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var app = await E2EDigitalBrain.StartAsync<Projects.IntoChat_AppHost>(
-            new E2EOptions { Args = ["DigitalBrain:Flutter:Hosting:Kind=None"] },
+            new E2EOptions
+            {
+                Args = ["DigitalBrain:Flutter:Hosting:Kind=None"],
+                WaitFor = ["IntoChat"],
+            },
             ct);
         using var http = app.CreateHttpClient("IntoChat");
         using var response = await http.GetAsync("/health", ct);

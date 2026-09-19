@@ -7,5 +7,5 @@ public sealed record E2EOptions
         "DigitalBrain:Flutter:Hosting:Kind=Web",
     ];
     public TimeSpan Timeout { get; init; } = TimeSpan.FromMinutes(3);
-    public IReadOnlyList<string> WaitFor { get; init; } = ["IntoChat"];
+    public IReadOnlyList<string> WaitFor { get; init; } = ["IntoChat", "Flutter"];
 }
