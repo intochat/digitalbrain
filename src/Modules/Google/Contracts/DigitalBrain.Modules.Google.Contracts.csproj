@@ -13,6 +13,7 @@
     <Compile Remove="RefreshGmailConnection.cs" />
     <Compile Remove="PrepareGmailDraft.cs" />
     <Compile Remove="GmailJson.cs" />
+    <Compile Remove="GmailConnected.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../DigitalBrain/Contracts/DigitalBrain.Contracts.csproj" />

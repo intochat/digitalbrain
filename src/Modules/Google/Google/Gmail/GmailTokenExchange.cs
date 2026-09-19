@@ -8,6 +8,13 @@ internal sealed class GmailTokenExchange(GmailOAuthConfiguration configuration) 
     private readonly HttpClient _oauth = new(new HttpClientHandler { AllowAutoRedirect = false })
     { Timeout = TimeSpan.FromSeconds(30), MaxResponseContentBufferSize = 65536 };
 
+    public Task<GmailTokenGrant> ExchangeAuthorizationCodeAsync(string authorizationCode, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(authorizationCode);
+        _ = cancellationToken;
+        throw new GmailUnavailableException("Gmail authorization-code exchange is not configured for this host.");
+    }
+
     public async Task<GmailTokenGrant> ExchangeAsync(string refreshToken, CancellationToken cancellationToken)
     {
         configuration.RequireConfigured();
