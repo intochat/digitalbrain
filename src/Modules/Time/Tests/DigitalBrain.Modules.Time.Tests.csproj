@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <Import Project="../../../Testing/Module.Tests.props" />
   <ItemGroup>
+    <Compile Include="../../../Behaviors/TimerReport.cs" Link="TimerReport.cs" />
     <ProjectReference Include="../Time/DigitalBrain.Modules.Time.csproj" />
   </ItemGroup>
 </Project>
