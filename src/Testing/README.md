@@ -67,21 +67,12 @@ App e2e: `await using var app = await E2EDigitalBrain.StartAsync<Projects.IntoCh
 
 ## State recovery and failures
 
-Set `PersistenceDirectory` to a test-owned temporary directory. Dispose a simulation before opening the
-same directory in another simulation; concurrent ownership is rejected. Reuse the grain ID and state name.
-`UseReminders` also persists reminder rows there. Tests own deletion of explicit directories; the simulation
-removes its internally allocated fault-test directory. This is a single-process serialized test adapter,
-not proof of distributed storage consistency or hard-crash durability.
-
-Pass `StorageFaults` to refuse the next read/write for a specific `GrainId`, or use `HoldNextRead` and
-await its `Entered` task. Release holds explicitly; teardown also releases outstanding holds. Orleans
-wraps provider exceptions in `OrleansException`. Module code must reload after a refused write and
-stop the activation if recovery fails. The simulation does not implement that domain policy for modules.
+Neuron tests use Orleans memory storage; there is no file grain store.
 
 Only committed module state persists. Signals are live, bounded, and never replayed. Overflow, failed
 renewal or a changed activation faults the subscription. Behaviors may restart and subscribe again;
 there is no automatic retry, resume cursor, inbox or outbox. A crash after a state commit but before
-publication may lose the fact. Tests cover that allowed gap and state recovery independently.
+publication may lose the fact. Tests cover that allowed gap independently of any file-backed grain store.
 
 ## File-based behavior
 
