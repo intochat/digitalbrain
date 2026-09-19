@@ -11,8 +11,11 @@
     <PackageReference Include="ModelContextProtocol.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Remove="Gmail/GmailNativeTools.cs" />
+    <Compile Remove="Gmail/GmailAuthentication.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Google.Contracts.csproj" />
-    <ProjectReference Include="../../AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="../../DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
     <ProjectReference Include="../../DigitalBrain/Sdk/DigitalBrain.Sdk.csproj" />
   </ItemGroup>
