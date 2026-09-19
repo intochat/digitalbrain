@@ -29,11 +29,13 @@ public static class DigitalBrainSimulation
         {
             silo.AddDigitalBrain();
             foreach (var module in options.Modules) { module.Configure(silo); }
-            silo.AddMemoryGrainStorage("Default");
             if (options.StorageFaults is { } faults)
             {
-                DecorateKeyed<IGrainStorage>(silo.Services, "Default", inner => new FaultingGrainStorage(inner, faults));
+                silo.AddMemoryGrainStorage("memory");
+                silo.Services.AddKeyedSingleton<IGrainStorage>("Default", (services, _) =>
+                    new FaultingGrainStorage(services.GetRequiredKeyedService<IGrainStorage>("memory"), faults));
             }
+            else { silo.AddMemoryGrainStorage("Default"); }
             if (options.UseReminders) { silo.UseInMemoryReminderService(); }
             options.ConfigureSilo?.Invoke(silo);
         });
@@ -64,19 +66,5 @@ public static class DigitalBrainSimulation
             await SimulatedBrain.ReleaseAsync(cluster, web, http, options.StorageFaults).ConfigureAwait(false);
             throw;
         }
-    }
-
-    private static void DecorateKeyed<T>(IServiceCollection services, object key, Func<T, T> decorate) where T : class
-    {
-        var descriptor = services.Last(d => d.IsKeyedService && d.ServiceType == typeof(T) && Equals(d.ServiceKey, key));
-        services.Remove(descriptor);
-        services.AddKeyedSingleton<T>(key, (provider, k) =>
-        {
-            var inner = descriptor.KeyedImplementationFactory is not null
-                ? (T)descriptor.KeyedImplementationFactory(provider, k)!
-                : descriptor.KeyedImplementationInstance is T instance ? instance
-                : (T)ActivatorUtilities.CreateInstance(provider, descriptor.KeyedImplementationType!);
-            return decorate(inner);
-        });
     }
 }
