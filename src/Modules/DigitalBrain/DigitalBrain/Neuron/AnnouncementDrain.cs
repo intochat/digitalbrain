@@ -2,7 +2,7 @@ using DigitalBrain.Abstractions.Signals;
 
 namespace DigitalBrain.Core;
 
-internal sealed class AnnouncementDrain(Func<Announcement, CancellationToken, Task<FireOutcome>> fire)
+internal sealed class AnnouncementDrain(Func<Announcement, CancellationToken, Task<SignalOutcome>> fire)
 {
     private readonly List<Announcement> _buffered = [];
 

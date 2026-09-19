@@ -9,26 +9,24 @@ public sealed class BrainTools(BrainOperations operations, SessionPrincipal sess
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
-    [McpServerTool(Name = "fire"), Description(
-        "Emit a signal from your Session neuron. A signal is a `type` (letters only, vocabulary such as Note) "
-        + "and a JSON `body` up to 64 KB. Routing is the scenario graph (connect), not a target on fire. "
-        + "Put identity in the neuron name, never in the type. Returns the signal id, correlation, and how many listeners accepted it.")]
-    public Task<string> Fire(
+    [McpServerTool(Name = "send_signal"), Description(
+        "Send a signal from your Session neuron. Type is letters only (Note). Body is JSON up to 64 KB. "
+        + "The scenario graph routes it. Returns signal id, correlation, and how many listeners handled it.")]
+    public Task<string> SendSignal(
         [Description("Signal type: letters only, e.g. Note")] string type,
         [Description("JSON body, e.g. {\"text\":\"run tests before commit\"}. Empty means {}.")] string body,
-        [Description("Target neuron name, e.g. run-tests. Omit to follow all your synapses of this type.")] string? to = null,
         [Description("Optional correlation id (GUID) to tie this to an earlier signal.")] string? correlation = null,
         CancellationToken cancellationToken = default)
         => Guard(async () => JsonSerializer.Serialize(
-            await operations.FireAsync(session.Name, new(type, body, to, correlation), cancellationToken).ConfigureAwait(false), Json));
+            await operations.SendSignalAsync(session.Name, new(type, body, correlation), cancellationToken).ConfigureAwait(false), Json));
 
     [McpServerTool(Name = "cancel"), Description(
         "Cancel a signal on a neuron. Drops pending work that has not been reacted to yet and asks a reaction already running "
         + "to stop at its next cooperative check. It is a no-op if the signal is neither pending nor running. "
-        + "Pass the signalId returned by an earlier fire.")]
+        + "Pass the signalId returned by send_signal.")]
     public Task<string> Cancel(
         [Description("Neuron name holding the work")] string neuron,
-        [Description("Signal id (GUID) returned by an earlier fire")] string signal,
+        [Description("Signal id (GUID) returned by send_signal")] string signal,
         CancellationToken cancellationToken = default)
         => Guard(async () =>
         {

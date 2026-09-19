@@ -281,8 +281,8 @@ internal sealed class AgentNeuron(
     {
         var delivery = new SignalDelivery(Signal.Create(AgentLifecycle.Pump, "{}"), task.PumpSignal,
             new CorrelationId(task.PumpSignal.Value), null, Id, 1, task.Snapshot.QueuedAt);
-        var admission = await Deliver(delivery).ConfigureAwait(true);
-        if (admission == DeliveryAdmission.Busy) { throw new InvalidOperationException("The agent queue is busy. Retry the same command id."); }
+        var admission = await HandleSignal(delivery).ConfigureAwait(true);
+        if (admission == SignalAdmission.Busy) { throw new InvalidOperationException("The agent queue is busy. Retry the same command id."); }
     }
 
     private AgentTaskEntry NewTask(string taskId, string message) => new(

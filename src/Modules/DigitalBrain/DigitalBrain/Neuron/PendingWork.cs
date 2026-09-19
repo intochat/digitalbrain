@@ -37,19 +37,19 @@ internal sealed class PendingWork
 
     internal bool HasRoomFor(int staged) => Count + staged < MaxPending;
 
-    internal DeliveryAdmission Classify(SignalDelivery delivery)
+    internal SignalAdmission Classify(SignalDelivery delivery)
     {
         if (_queuedIds.Contains(delivery.SignalId) || _reacted.Contains(delivery.SignalId))
         {
-            return DeliveryAdmission.Duplicate;
+            return SignalAdmission.Duplicate;
         }
 
         if (!HasRoomFor(0))
         {
-            return DeliveryAdmission.Busy;
+            return SignalAdmission.Busy;
         }
 
-        return DeliveryAdmission.Accepted;
+        return SignalAdmission.Accepted;
     }
 
     internal void Admit(SignalDelivery delivery)

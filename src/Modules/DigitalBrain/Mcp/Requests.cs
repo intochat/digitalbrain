@@ -6,9 +6,9 @@ public sealed record DescribeRequest(string? Neuron = null, string? Interface = 
 
 public sealed record CallRequest(string Neuron, string Interface, string Method, JsonElement Arguments);
 
-public sealed record FireRequest(string Type, string Body, string? To = null, string? Correlation = null);
+public sealed record SendSignalRequest(string Type, string Body, string? Correlation = null);
 
-public sealed record FireResult(string SignalId, string Correlation, int Delivered, int Busy);
+public sealed record SendSignalResult(string SignalId, string Correlation, int Handled, int Busy);
 
 public sealed record CancelRequest(string Neuron, string Signal);
 

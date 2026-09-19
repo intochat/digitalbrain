@@ -17,7 +17,7 @@ public abstract class Neuron<TState> : Neuron where TState : class
     {
         ArgumentNullException.ThrowIfNull(state);
         _state = state;
-        _announcements = new AnnouncementDrain(FireAnnouncementAsync);
+        _announcements = new AnnouncementDrain(SendAnnouncementAsync);
     }
 
     protected TState? State => Envelope.State;

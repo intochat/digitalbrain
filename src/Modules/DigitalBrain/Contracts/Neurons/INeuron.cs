@@ -5,19 +5,17 @@ using Orleans.Concurrency;
 
 namespace DigitalBrain.Abstractions.Neurons;
 
-// A named object: it emits facts, it receives facts, it answers reads.
-// Synapses and routing live on IScenario, not here.
 [Alias("db.v3.neuron")]
 public interface INeuron : IGrainWithStringKey
 {
-    [Alias(nameof(Fire))]
+    [Alias(nameof(SendSignal))]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
-    Task<FireOutcome> Fire(Signal signal, CorrelationId? correlation = null, CancellationToken cancellationToken = default);
+    Task<SignalOutcome> SendSignal(Signal signal, CorrelationId? correlation = null, CancellationToken cancellationToken = default);
 
-    [Alias(nameof(Deliver))]
+    [Alias(nameof(HandleSignal))]
     [AlwaysInterleave]
     [ResponseTimeout(NeuronCallTimeouts.LongRunning)]
-    Task<DeliveryAdmission> Deliver(SignalDelivery delivery, CancellationToken cancellationToken = default);
+    Task<SignalAdmission> HandleSignal(SignalDelivery delivery, CancellationToken cancellationToken = default);
 
     [Alias(nameof(CancelReaction))]
     [AlwaysInterleave]

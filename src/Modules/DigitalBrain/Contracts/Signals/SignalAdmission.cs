@@ -1,8 +1,8 @@
 namespace DigitalBrain.Abstractions.Signals;
 
 [GenerateSerializer]
-[Alias("db.delivery-admission")]
-public enum DeliveryAdmission
+[Alias("db.signal-admission")]
+public enum SignalAdmission
 {
     Accepted,
     Duplicate,

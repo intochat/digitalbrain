@@ -138,21 +138,21 @@ public abstract partial class Neuron : DurableGrain, INeuron, INeuronInbox, IRem
 
     private protected virtual Task<bool> DrainAnnouncementsAsync(CancellationToken cancellationToken) => Task.FromResult(false);
 
-    public async Task<FireOutcome> Fire(Signal signal, CorrelationId? correlation = null, CancellationToken cancellationToken = default)
+    public async Task<SignalOutcome> SendSignal(Signal signal, CorrelationId? correlation = null, CancellationToken cancellationToken = default)
     {
         Guard();
         var (outcome, _) = await EmitAsync(signal, correlation, cancellationToken).ConfigureAwait(true);
         return outcome;
     }
 
-    public async Task<DeliveryAdmission> Deliver(SignalDelivery delivery, CancellationToken cancellationToken = default)
+    public async Task<SignalAdmission> HandleSignal(SignalDelivery delivery, CancellationToken cancellationToken = default)
     {
         Guard();
         ArgumentNullException.ThrowIfNull(delivery);
         cancellationToken.ThrowIfCancellationRequested();
 
         var admission = _components.Pending.Classify(delivery);
-        if (admission != DeliveryAdmission.Accepted)
+        if (admission != SignalAdmission.Accepted)
         {
             return admission;
         }
@@ -165,7 +165,7 @@ public abstract partial class Neuron : DurableGrain, INeuron, INeuronInbox, IRem
         await _retry.EnsureReminderAsync().ConfigureAwait(true);
 
         Wake();
-        return DeliveryAdmission.Accepted;
+        return SignalAdmission.Accepted;
     }
 
     protected SignalId Schedule(Signal signal, CorrelationId? correlation = null)
@@ -200,7 +200,7 @@ public abstract partial class Neuron : DurableGrain, INeuron, INeuronInbox, IRem
     private void AdmitAndStageDelivery(SignalDelivery delivery)
     {
         delivery = delivery with { Sequence = _components.IncomingNextSequence };
-        if (_components.Pending.Classify(delivery) == DeliveryAdmission.Duplicate)
+        if (_components.Pending.Classify(delivery) == SignalAdmission.Duplicate)
         {
             throw new InvalidOperationException($"Freshly minted scheduled signal id '{delivery.SignalId}' must never be a duplicate.");
         }
@@ -272,7 +272,7 @@ public abstract partial class Neuron : DurableGrain, INeuron, INeuronInbox, IRem
         return Task.FromResult(execute(arguments));
     }
 
-    internal async Task<FireOutcome> FireAnnouncementAsync(Announcement announcement, CancellationToken cancellationToken)
+    internal async Task<SignalOutcome> SendAnnouncementAsync(Announcement announcement, CancellationToken cancellationToken)
     {
         if (announcement.To is { } target && target.GetGrainId() == this.GetGrainId())
         {
@@ -286,19 +286,19 @@ public abstract partial class Neuron : DurableGrain, INeuron, INeuronInbox, IRem
             return outcome;
         }
 
-        var admission = await receiver.Deliver(delivery, cancellationToken).ConfigureAwait(true);
+        var admission = await receiver.HandleSignal(delivery, cancellationToken).ConfigureAwait(true);
         return outcome with
         {
-            Delivered = admission == DeliveryAdmission.Accepted ? Math.Max(1, outcome.Delivered) : outcome.Delivered,
-            Busy = admission == DeliveryAdmission.Busy ? 1 : 0,
+            Handled = admission == SignalAdmission.Accepted ? Math.Max(1, outcome.Handled) : outcome.Handled,
+            Busy = admission == SignalAdmission.Busy ? 1 : 0,
         };
     }
 
-    private Task<(FireOutcome Outcome, SignalDelivery Delivery)> EmitAsync(
+    private Task<(SignalOutcome Outcome, SignalDelivery Delivery)> EmitAsync(
         Signal signal, CorrelationId? correlation, CancellationToken cancellationToken)
         => EmitCoreAsync(signal, correlation, cancellationToken);
 
-    private async Task<(FireOutcome Outcome, SignalDelivery Delivery)> EmitCoreAsync(
+    private async Task<(SignalOutcome Outcome, SignalDelivery Delivery)> EmitCoreAsync(
         Signal signal, CorrelationId? correlation, CancellationToken cancellationToken,
         SignalId? fixedId = null, SignalId? fixedCausation = null)
     {
@@ -319,8 +319,8 @@ public abstract partial class Neuron : DurableGrain, INeuron, INeuronInbox, IRem
         }
 
         await PersistAsync().ConfigureAwait(true);
-        var delivered = await ServiceProvider.GetRequiredService<IScenarioSink>()
+        var handled = await ServiceProvider.GetRequiredService<IScenarioSink>()
             .RouteAsync(delivery, cancellationToken).ConfigureAwait(true);
-        return (new FireOutcome(delivery.SignalId, delivery.CorrelationId, delivered, Busy: 0), delivery);
+        return (new SignalOutcome(delivery.SignalId, delivery.CorrelationId, handled, Busy: 0), delivery);
     }
 }

@@ -73,12 +73,12 @@ internal sealed class GitHubWebhookIngress(GitHubRepositoryBindings bindings, IG
                 try
                 {
                     var accepted = await grains.GetGrain<INeuron>(new NeuronId("repository", binding.Id).ToGrainId())
-                        .Deliver(new SignalDelivery(signal, new SignalId(deliveryId), CorrelationId.New(), null,
-                            new NeuronId("github", "webhook"), 1, TimeProvider.System.GetUtcNow()), cancellationToken).ConfigureAwait(false);
+                        .HandleSignal(new SignalDelivery(signal, new SignalId(deliveryId), CorrelationId.New(), null,
+                            grains.GetGrain<INeuron>(new NeuronId("github", "webhook").ToGrainId()), 1, TimeProvider.System.GetUtcNow()), cancellationToken).ConfigureAwait(false);
                     results.Add(accepted switch
                     {
-                        DeliveryAdmission.Accepted => GitHubWebhookAcceptance.Accepted,
-                        DeliveryAdmission.Duplicate => GitHubWebhookAcceptance.Duplicate,
+                        SignalAdmission.Accepted => GitHubWebhookAcceptance.Accepted,
+                        SignalAdmission.Duplicate => GitHubWebhookAcceptance.Duplicate,
                         _ => GitHubWebhookAcceptance.Unavailable,
                     });
                 }

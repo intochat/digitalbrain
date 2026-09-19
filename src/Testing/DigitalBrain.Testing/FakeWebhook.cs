@@ -10,7 +10,7 @@ public sealed class FakeWebhook(IGrainFactory grains, string scenario)
     public async Task PostAsync(INeuron source, Signal signal, CancellationToken cancellationToken = default)
     {
         var delivery = SignalDelivery.Create(signal, source, 1, TimeProvider.System);
-        await source.Deliver(delivery, cancellationToken).ConfigureAwait(false);
+        await source.HandleSignal(delivery, cancellationToken).ConfigureAwait(false);
         await grains.GetGrain<IScenario>(scenario).Route(delivery, cancellationToken).ConfigureAwait(false);
     }
 }

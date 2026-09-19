@@ -1,17 +1,17 @@
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Neurons;
 
 namespace DigitalBrain.Abstractions.Signals;
 
-// What emit minted, and how many scenario listeners accepted the fact.
 [GenerateSerializer]
-[Alias("db.fire-outcome")]
-public sealed record FireOutcome(
+[Alias("db.signal-outcome")]
+public sealed record SignalOutcome(
     [property: Id(0)] SignalId SignalId,
     [property: Id(1)] CorrelationId CorrelationId,
-    [property: Id(2)] int Delivered,
+    [property: Id(2)] int Handled,
     [property: Id(3)] int Busy)
 {
-    public FireOutcome RequireAccepted()
+    public SignalOutcome RequireAccepted()
     {
         if (Busy > 0)
         {
