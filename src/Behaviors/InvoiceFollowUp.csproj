@@ -3,10 +3,10 @@
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <Description>Single-file neuron behavior: Elon posts Bitcoin, quote BTC on the UI.</Description>
+    <Description>Single-file neuron behavior: invoice emails notify the UI.</Description>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="elon-bitcoin.cs" />
+    <Compile Include="invoice-followup.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />

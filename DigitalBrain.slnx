@@ -2,6 +2,8 @@
   <Folder Name="/Behaviors/">
     <Project Path="src/Behaviors/ElonBitcoin.csproj" />
     <File Path="src/Behaviors/elon-bitcoin.cs" />
+    <Project Path="src/Behaviors/InvoiceFollowUp.csproj" />
+    <File Path="src/Behaviors/invoice-followup.cs" />
   </Folder>
   <Folder Name="/Modules/DigitalBrain/">
     <Project Path="src/Modules/DigitalBrain/Tests/DigitalBrain.Runtime.Tests.csproj" />
