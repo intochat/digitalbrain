@@ -1,8 +1,12 @@
 # Testing
 
-**Neuron tests** (`DigitalBrain.NeuronTesting`): in-process Orleans via `DigitalBrainSimulation`. Time and kernel use this. No Docker.
+Three layers, never mixed:
 
-**E2E tests** (`DigitalBrain.E2ETesting`): real Aspire AppHost, Orleans cluster, Azure Storage emulator in Docker. IntoChat uses this. Time has no e2e project.
+**Neuron tests** (`DigitalBrain.NeuronTesting`): in-process Orleans via `DigitalBrainSimulation`. Grains, `PublishAsync`, `Observe<T>`. No HTTP, no Kestrel, no Docker. Time, kernel, Google neuron tests use this.
+
+**Module e2e** (`DigitalBrain.E2ETesting.ModuleWebHost`): same in-process cluster **plus** a Kestrel host that maps `IModule.Configure(endpoints)`. Google webhook/auth stubs use this. Not Aspire.
+
+**App e2e** (`DigitalBrain.E2ETesting.E2EDigitalBrain`): real Aspire AppHost, Orleans cluster, Azure Storage emulator in Docker. IntoChat uses this. Time has no e2e project.
 
 Run neuron tests: `dotnet test --solution DigitalBrain.Foundation.slnx -p:CodeGraphRefresh=false`.
 
@@ -24,9 +28,7 @@ Assert.Equal("tea", tick.TimerId);
 
 `DigitalBrainSimulation.StartAsync` returns the production `IDigitalBrain`; pass real module instances
 through `Modules`. Replace provider dependencies through `ConfigureSilo`; keep provider-specific test
-controls with the module.
-
-E2E: `await using var app = await E2EDigitalBrain.StartAsync<Projects.IntoChat_AppHost>(ct);` then `CreateHttpClient` / `WaitHealthyAsync`. That path uses the AppHost graph (Azurite tables/blobs, real silo), not `InProcessTestCluster`.
+controls with the module. Simulation has no `UseHttp` and does not host Kestrel.
 
 `brain.RunBehavior` owns cancellation and observes errors. Await `run.WaitForSubscriptionAsync<T>(source, ct)`
 before triggering work: readiness belongs to that run, source identity and signal type. Early failures
@@ -50,17 +52,18 @@ is reported as a cleanup failure; an in-process task cannot be forcibly terminat
 ## Module endpoints
 
 A module may map HTTP endpoints by overriding `IModule.Configure(IEndpointRouteBuilder)`, for example a
-webhook endpoint. HTTP is opt-in: start the simulation with `UseHttp = true` and reach the mapped routes
-through `brain.Http()`. Ordinary grain tests never start Kestrel.
+webhook. Neuron simulation never starts Kestrel. Module e2e starts `ModuleWebHost` on the same cluster:
 
 ```csharp
 await using var brain = await DigitalBrainSimulation.StartAsync(new()
 {
-    Modules = [new WebhookModule()],
-    UseHttp = true,
+    Modules = [new GoogleModule()],
 }, ct);
-var response = await brain.Http().PostAsJsonAsync("/twitter/webhook", payload, ct);
+await using var web = await ModuleWebHost.StartAsync(brain.Cluster(), [new GoogleModule()], ct);
+var response = await web.Client.PostAsJsonAsync("google/gmail/watch", payload, ct);
 ```
+
+App e2e: `await using var app = await E2EDigitalBrain.StartAsync<Projects.IntoChat_AppHost>(ct);` then `CreateHttpClient` / `WaitHealthyAsync`. That path uses the AppHost graph (Azurite tables/blobs, real silo), not `InProcessTestCluster`.
 
 ## State recovery and failures
 
