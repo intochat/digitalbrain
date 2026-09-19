@@ -19,4 +19,14 @@ public sealed class GmailWatchWebhookFacts
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         Assert.Equal("123", (await mail.NextAsync(ct: ct)).HistoryId);
     }
+
+    [Fact]
+    public async Task GmailOAuthCallbackReturnsOk()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await DigitalBrainSimulation.StartAsync(new() { Modules = [new GoogleModule()] }, ct);
+        await using var web = await ModuleWebHost.StartAsync(brain.Cluster(), [new GoogleModule()], ct);
+        var response = await web.Client.GetAsync("google/gmail/oauth/callback", ct);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
 }

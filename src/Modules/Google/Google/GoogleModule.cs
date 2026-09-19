@@ -15,9 +15,12 @@ public sealed class GoogleModule : IModule
     public void Configure(ISiloBuilder silo) { }
 
     public void Configure(IEndpointRouteBuilder endpoints)
-        => endpoints.MapJsonWebhook<GmailWatchPush>("/google/gmail/watch", async (push, grains, ct) =>
+    {
+        endpoints.MapJsonWebhook<GmailWatchPush>("/google/gmail/watch", async (push, grains, ct) =>
         {
             await grains.GetGrain<IGmail>(push.EmailAddress).AcceptWatchPush(push);
             return Results.Accepted();
         });
+        endpoints.MapGet("/google/gmail/oauth/callback", () => Results.Ok());
+    }
 }
