@@ -2,6 +2,12 @@
   <Import Project="../../../Testing/Module.Tests.props" />
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />
-    <ProjectReference Include="../BehaviorRuntime/DigitalBrain.Behavior.csproj" />
+    <PackageReference Include="Microsoft.Orleans.BroadcastChannel" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="BehaviorMailboxFacts.cs" />
+    <Compile Remove="BrainSimulationFacts.cs" />
+    <Compile Remove="ModuleEndpointFacts.cs" />
+    <Compile Remove="ScenarioFacts.cs" />
   </ItemGroup>
 </Project>

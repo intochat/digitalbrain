@@ -10,4 +10,12 @@
   <ItemGroup>
     <ProjectReference Include="../../Modules/DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="FakeWebhook.cs" />
+    <Compile Remove="FaultingJournalStorage.cs" />
+    <Compile Remove="FileGrainStorage.cs" />
+    <Compile Remove="FileJournalStorage.cs" />
+    <Compile Remove="FileReminderTable.cs" />
+    <Compile Remove="ReactionWait.cs" />
+  </ItemGroup>
 </Project>

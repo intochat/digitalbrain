@@ -4,6 +4,8 @@
     <Description>The DigitalBrain programming model: signals, synapses, and neurons.</Description>
   </PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.Orleans.Sdk" />
+    <PackageReference Include="Microsoft.Orleans.Server" />
   </ItemGroup>
 </Project>

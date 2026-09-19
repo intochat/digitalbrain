@@ -1,39 +1,31 @@
-using DigitalBrain.Abstractions;
+using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.Hosting;
-using Orleans.Journaling;
-using Orleans.Storage;
 using Orleans.TestingHost;
 
 namespace DigitalBrain.Testing;
 
 public sealed class BrainSimulationOptions
 {
-    public required ModuleManifest Modules { get; init; }
     public Action<ISiloBuilder>? ConfigureSilo { get; init; }
-    public string? PersistenceDirectory { get; init; }
-    public JournalFaultPlan? JournalFaults { get; init; }
     public IReadOnlyDictionary<string, string?>? Configuration { get; init; }
 }
 
-public sealed class BrainSimulation : IAsyncDisposable
+public sealed class BrainSimulation : IDigitalBrain
 {
     private readonly InProcessTestCluster _inProcess;
 
-    private BrainSimulation(InProcessTestCluster cluster)
-    {
-        _inProcess = cluster;
-        Grains = cluster.Client;
-    }
-
-    public IGrainFactory Grains { get; }
+    private BrainSimulation(InProcessTestCluster cluster) => _inProcess = cluster;
 
     public IServiceProvider SiloServices => _inProcess.GetActiveSilos().Single().ServiceProvider;
 
-    public static async Task<BrainSimulation> StartAsync(BrainSimulationOptions options)
+    public T Get<T>(string id) where T : class, IGrainWithStringKey
+        => _inProcess.Client.GetGrain<T>(id);
+
+    public static Task<IDigitalBrain> StartAsync() => StartAsync(new());
+
+    public static async Task<IDigitalBrain> StartAsync(BrainSimulationOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
         var builder = new InProcessTestClusterBuilder(1);
@@ -42,40 +34,16 @@ public sealed class BrainSimulation : IAsyncDisposable
         {
             builder.ConfigureHost(host => host.Configuration.AddInMemoryCollection(configuration));
         }
-        builder.ConfigureSilo((_, silo) => ConfigureSilo(silo, options));
-        builder.ConfigureClient(client => DigitalBrainRuntime.AddModelPayloadSerialization(client.Services));
+
+        builder.ConfigureSilo((_, silo) =>
+        {
+            silo.AddNeuronBroadcast();
+            options.ConfigureSilo?.Invoke(silo);
+        });
+        builder.ConfigureClient(static client => client.AddNeuronBroadcast());
         var cluster = builder.Build();
         await cluster.DeployAsync().ConfigureAwait(false);
-        return new(cluster);
-    }
-
-    private static void ConfigureSilo(ISiloBuilder silo, BrainSimulationOptions options)
-    {
-        if (!string.IsNullOrWhiteSpace(options.PersistenceDirectory))
-        {
-            if (options.JournalFaults is { } faults)
-            {
-                silo.Services.AddSingleton<IJournalStorageProvider>(
-                    new FaultingJournalStorageProvider(new FileJournalStorageProvider(options.PersistenceDirectory), faults));
-            }
-            else
-            {
-                silo.Services.AddSingleton<IJournalStorageProvider>(new FileJournalStorageProvider(options.PersistenceDirectory));
-            }
-            silo.AddReminders();
-            silo.Services.AddSingleton<IReminderTable>(new FileReminderTable(options.PersistenceDirectory));
-            silo.Services.AddKeyedSingleton<IGrainStorage>(DigitalBrainNames.DefaultGrainStorage,
-                (services, _) => new FileGrainStorage(options.PersistenceDirectory,
-                    services.GetRequiredService<Orleans.Serialization.Serializer>()));
-        }
-        else
-        {
-            silo.Services.AddSingleton<IJournalStorageProvider, VolatileJournalStorageProvider>();
-            silo.UseInMemoryReminderService();
-            silo.AddMemoryGrainStorage(DigitalBrainNames.DefaultGrainStorage);
-        }
-        DigitalBrainRuntime.Add(silo, options.Modules);
-        options.ConfigureSilo?.Invoke(silo);
+        return new BrainSimulation(cluster);
     }
 
     public async Task RestartSiloAsync(CancellationToken cancellationToken = default)
