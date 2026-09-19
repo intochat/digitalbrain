@@ -63,11 +63,12 @@ builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.IntoChat)
             context.EnvironmentVariables["Orleans__ClusterId"] = developmentClusterId;
         }
 
-        if (builder.ExecutionContext.IsRunMode)
-        {
-            context.EnvironmentVariables["DigitalBrain__Cors__AllowedOrigin"] =
-                $"http://{ShellNames.FlutterWebHostname}:{ShellNames.FlutterWebPort}";
-        }
+        // Browser shell (aspire run and Playwright e2e) is a different origin than the kernel.
+        // IsRunMode is false under DistributedApplicationTestingBuilder, so the origin must
+        // always be advertised — not only when `aspire run` is driving the host.
+        context.EnvironmentVariables["DigitalBrain__Cors__AllowedOrigin"] =
+            $"http://{ShellNames.FlutterWebHostname}:{ShellNames.FlutterWebPort}";
+
     });
 
 builder.Build().Run();
