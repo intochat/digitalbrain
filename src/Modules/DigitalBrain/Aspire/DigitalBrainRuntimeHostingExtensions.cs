@@ -1,6 +1,7 @@
 using Azure.Data.Tables;
-using DigitalBrain.Abstractions;
+using DigitalBrain.Contracts;
 using DigitalBrain.Core;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -12,22 +13,12 @@ namespace DigitalBrain.Aspire;
 
 public static class DigitalBrainRuntimeHostingExtensions
 {
-    public static IHostApplicationBuilder AddDigitalBrain(
-        this IHostApplicationBuilder builder,
-        ModuleManifest modules)
+    public static IHostApplicationBuilder AddDigitalBrain(this IHostApplicationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        ArgumentNullException.ThrowIfNull(modules);
 
         builder.AddKeyedAzureTableServiceClient(DigitalBrainNames.Clustering);
         builder.AddKeyedAzureTableServiceClient(DigitalBrainNames.Reminders);
-        // AppHost's WithGrainStorage(DefaultGrainStorage, grainState) auto-wires the "Default"
-        // provider through Orleans' own config-driven discovery, which resolves its
-        // BlobServiceClient via GetRequiredKeyedService<BlobServiceClient>("grainstate") — so the
-        // keyed client below is the only piece the runtime needs to supply. Setting
-        // AzureBlobStorageOptions.BlobServiceClient must be registered before Orleans applies
-        // does not work here: the auto-wired provider's own Configure delegate runs afterward and
-        // unconditionally overwrites it, throwing when no keyed client is registered.
         builder.AddKeyedAzureBlobServiceClient(DigitalBrainNames.GrainState);
         builder.UseOrleans(silo =>
         {
@@ -40,7 +31,12 @@ public static class DigitalBrainRuntimeHostingExtensions
                 .Configure(static options => options.ContainerName = "digitalbrain-v2-state");
             silo.AddAzureBlobJournal(builder.Configuration);
             silo.AddActivityPropagation();
-            DigitalBrainRuntime.Add(silo, modules);
+            silo.AddDigitalBrain();
+            foreach (var module in LoadModules(builder.Configuration))
+            {
+                module.Configure(silo);
+                silo.Services.AddSingleton(module);
+            }
             silo.AddDashboard(options =>
             {
                 options.CounterUpdateIntervalMs = 5000;
@@ -50,9 +46,40 @@ public static class DigitalBrainRuntimeHostingExtensions
         return builder;
     }
 
-    // Aspire AppHost (and some Container App configs) inject Orleans:Clustering:ProviderType.
-    // Only wire Azure membership/reminders from ConnectionStrings when that provider is absent,
-    // otherwise Orleans ends up with a duplicate IMembershipTable registration.
+    public static IEndpointRouteBuilder MapDigitalBrainModules(this IEndpointRouteBuilder endpoints)
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+        foreach (var module in endpoints.ServiceProvider.GetServices<IModule>())
+        {
+            module.Configure(endpoints);
+        }
+
+        return endpoints;
+    }
+
+    private static IReadOnlyList<IModule> LoadModules(IConfiguration configuration)
+    {
+        var names = configuration.GetSection("DigitalBrain:Modules").Get<string[]>() ?? [];
+        var modules = new List<IModule>(names.Length);
+        foreach (var name in names)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                continue;
+            }
+
+            var type = Type.GetType(name, throwOnError: true)!;
+            if (Activator.CreateInstance(type) is not IModule module)
+            {
+                throw new InvalidOperationException($"{name} must implement {nameof(IModule)}.");
+            }
+
+            modules.Add(module);
+        }
+
+        return modules;
+    }
+
     private static void ConfigureStandaloneAzureClustering(ISiloBuilder silo, IConfiguration configuration)
     {
         if (!string.IsNullOrWhiteSpace(configuration["Orleans:Clustering:ProviderType"]))

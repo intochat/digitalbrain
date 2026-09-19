@@ -11,7 +11,4 @@
   <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Contracts.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <Using Include="DigitalBrain.Abstractions" />
-  </ItemGroup>
 </Project>

@@ -1,4 +1,4 @@
-using DigitalBrain.Abstractions;
+using DigitalBrain.Contracts;
 using Microsoft.Extensions.Configuration;
 using Orleans.Journaling;
 
