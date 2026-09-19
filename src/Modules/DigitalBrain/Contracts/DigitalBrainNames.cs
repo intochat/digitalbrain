@@ -14,6 +14,7 @@ public static class DigitalBrainNames
 
     public const string JournalConnection = "journal";
     public const string DefaultGrainStorage = "Default";
+    public const string DefaultScenario = "default";
 
     public const string Modules = "DigitalBrain:Modules";
 }

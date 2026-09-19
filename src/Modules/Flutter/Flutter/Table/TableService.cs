@@ -1,5 +1,7 @@
+using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Scenarios;
 
 namespace DigitalBrain.Flutter;
 
@@ -40,7 +42,7 @@ public sealed class TableService(IGrainFactory grains, IEnumerable<ITableSource>
                 $"Table '{table.Name}' cannot be listed as '{table.Type}': ids starting with '{source.IdPrefix}' are served by '{source.GrainType}'.");
         }
 
-        return grains.GetGrain<INeuron>(CatalogId.ToGrainId()).Connect(table, UIVocabulary.TableListed).WaitAsync(cancellationToken);
+        return grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario).Bind(CatalogId, UIVocabulary.TableListed, table).WaitAsync(cancellationToken);
     }
 
     public async Task<TableSnapshot> ReadAsync(string id, int offset = 0, int limit = 50, CancellationToken cancellationToken = default)
@@ -64,9 +66,9 @@ public sealed class TableService(IGrainFactory grains, IEnumerable<ITableSource>
     // source is down or refuses its query still lists and never hides the others.
     public async Task<IReadOnlyList<TableSummary>> ListAsync(CancellationToken cancellationToken = default)
     {
-        var links = await grains.GetGrain<INeuron>(CatalogId.ToGrainId()).ReadSynapses().WaitAsync(cancellationToken).ConfigureAwait(false);
+        var links = await grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario).Read().WaitAsync(cancellationToken).ConfigureAwait(false);
         var result = new List<TableSummary>();
-        foreach (var link in links.Where(link => link.SignalType == UIVocabulary.TableListed && ServesTables(link.Target.Type)))
+        foreach (var link in links.Where(link => link.Source == CatalogId && link.SignalType == UIVocabulary.TableListed && ServesTables(link.Target.Type)))
         {
             var summary = await grains.GetGrain<ITable>(link.Target.ToGrainId()).ReadSummary().WaitAsync(cancellationToken).ConfigureAwait(false);
             if (summary is not null) { result.Add(summary); }

@@ -1,8 +1,10 @@
 using System.Text.Json;
+using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Scenarios;
 using DigitalBrain.Abstractions.Signals;
 
 namespace DigitalBrain.Mcp;
@@ -45,10 +47,8 @@ public sealed class BrainOperations(IGrainFactory grains, INeuronInvoker invoker
         ArgumentNullException.ThrowIfNull(request);
         var from = Session(session);
         var signal = Signal.Create(request.Type, request.Body);
-        NeuronId? to = request.To is null ? null : Parse(request.To, nameof(request));
         var correlation = ParseCorrelation(request.Correlation);
-
-        var outcome = await Neuron(from).Fire(signal, to, correlation, cancellationToken).ConfigureAwait(false);
+        var outcome = await Neuron(from).Fire(signal, to: null, correlation, cancellationToken).ConfigureAwait(false);
         return new(outcome.SignalId.ToString(), outcome.CorrelationId.ToString(), outcome.Delivered, outcome.Busy);
     }
 
@@ -71,14 +71,14 @@ public sealed class BrainOperations(IGrainFactory grains, INeuronInvoker invoker
         cancellationToken.ThrowIfCancellationRequested();
         // A synapse carries a signal type, so the type must be vocabulary before the edge exists.
         _ = Signal.Create(request.Type, "{}");
-        return Neuron(Parse(request.From, nameof(request))).Connect(Parse(request.To, nameof(request)), request.Type);
+        return Scenario().Bind(Parse(request.From, nameof(request)), request.Type, Parse(request.To, nameof(request)));
     }
 
     public Task DisconnectAsync(ConnectRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
-        return Neuron(Parse(request.From, nameof(request))).Disconnect(Parse(request.To, nameof(request)), request.Type);
+        return Scenario().Unbind(Parse(request.From, nameof(request)), request.Type, Parse(request.To, nameof(request)));
     }
 
     public async Task<ReadResult> ReadAsync(ReadRequest request, CancellationToken cancellationToken = default)
@@ -93,8 +93,7 @@ public sealed class BrainOperations(IGrainFactory grains, INeuronInvoker invoker
             "synapses" => ReadView.Synapses,
             "incoming" => ReadView.Incoming,
             "outgoing" => ReadView.Outgoing,
-            "commands" => ReadView.Commands,
-            _ => throw new ArgumentException($"'{request.What}' is not a view. Use state, synapses, incoming, outgoing or commands, or omit it for all but commands.", nameof(request)),
+            _ => throw new ArgumentException($"'{request.What}' is not a view. Use state, synapses, incoming, outgoing, or omit it.", nameof(request)),
         };
 
         // One budget for the whole read: a default read must not wait it out twice.
@@ -125,13 +124,6 @@ public sealed class BrainOperations(IGrainFactory grains, INeuronInvoker invoker
             case ReadView.Outgoing:
                 outgoing = await ReadJournalAsync(query, JournalKind.Outgoing, request.After, deadline, cancellationToken).ConfigureAwait(false);
                 break;
-            case ReadView.Commands:
-                var read = await query.ReadCommands(request.After).ConfigureAwait(false);
-                commands = new(read.ResumeSequence, read.EarliestRetained, read.Gap,
-                    [.. read.Delta.Select(record => new CommandEntryView(
-                        record.Sequence, record.Id.ToString(), record.Incarnation, record.Interface,
-                        record.Method, record.Phase.ToString(), Name(record.Caller), record.Error, record.At))]);
-                break;
         }
 
         return new(Name(id), state, synapses, incoming, outgoing, commands);
@@ -144,14 +136,20 @@ public sealed class BrainOperations(IGrainFactory grains, INeuronInvoker invoker
         Synapses,
         Incoming,
         Outgoing,
-        Commands,
     }
 
     private static async Task<IReadOnlyList<StateEntry>> ReadStateAsync(INeuron query)
         => [.. (await query.ReadState().ConfigureAwait(false)).Select(d => new StateEntry(d.Signal.Type, d.Signal.Body, Name(d.Source), d.Timestamp))];
 
-    private static async Task<IReadOnlyList<SynapseEntry>> ReadSynapsesAsync(INeuron query)
-        => [.. (await query.ReadSynapses().ConfigureAwait(false)).Select(s => new SynapseEntry(Name(s.Source), Name(s.Target), s.SignalType))];
+    private async Task<IReadOnlyList<SynapseEntry>> ReadSynapsesAsync(INeuron query)
+    {
+        var id = NeuronId.FromGrainId(query.GetGrainId());
+        return [.. (await Scenario().Read().ConfigureAwait(false))
+            .Where(s => s.Source == id)
+            .Select(s => new SynapseEntry(Name(s.Source), Name(s.Target), s.SignalType))];
+    }
+
+    private IScenario Scenario() => grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario);
 
     private static async Task<JournalView> ReadJournalAsync(INeuron query, JournalKind kind, long after, DateTimeOffset deadline, CancellationToken cancellationToken)
     {

@@ -1,7 +1,5 @@
-using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Signals;
-using DigitalBrain.Abstractions.Synapses;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Serialization;
@@ -13,7 +11,7 @@ public sealed class NeuronRuntime(TimeProvider clock)
 {
     internal TimeProvider Clock { get; } = clock;
 
-    internal NeuronActivationComponents Bind(IServiceProvider services, NeuronId neuronId)
+    internal NeuronActivationComponents Bind(IServiceProvider services, NeuronId _)
     {
         var entries = services.GetRequiredService<Serializer<JournalEntry>>();
         var sessions = services.GetRequiredService<SerializerSessionPool>();
@@ -24,21 +22,10 @@ public sealed class NeuronRuntime(TimeProvider clock)
             entries,
             sessions);
 
-        var commands = new CommandJournal(
-            services.GetRequiredKeyedService<IDurableList<byte[]>>("commands"),
-            services.GetRequiredKeyedService<IDurableValue<long>>("commands.sequence"),
-            services.GetRequiredService<Serializer<CommandRecord>>(),
-            sessions);
-        var outcomes = new CommandOutcomeStore(services.GetRequiredKeyedService<IDurableDictionary<CommandId, CommandOutcome>>("dedup"));
-
         return new(
             Clock,
             Window("incoming"),
             Window("outgoing"),
-            commands,
-            outcomes,
-            new CommandExecution(commands, outcomes, Clock),
-            new NeuronSynapses(services.GetRequiredKeyedService<IDurableDictionary<string, Synapse>>("synapses"), neuronId, Clock),
             services.GetRequiredKeyedService<IDurableDictionary<string, SignalDelivery>>("latest"),
             new PendingWork(
                 services.GetRequiredKeyedService<IDurableQueue<SignalDelivery>>("pending"),

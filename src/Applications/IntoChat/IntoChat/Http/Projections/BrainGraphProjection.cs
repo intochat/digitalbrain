@@ -1,5 +1,7 @@
 using System.Text.Json.Nodes;
+using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Scenarios;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
@@ -82,12 +84,17 @@ internal static class BrainGraphProjection
         IGrainFactory grains, NeuronId id, CancellationToken cancellationToken)
     {
         var neuron = grains.GetGrain<INeuron>(id.ToGrainId());
-        var synapses = neuron.ReadSynapses().WaitAsync(cancellationToken);
+        var synapses = ReadSynapsesAsync(grains, id, cancellationToken);
         var incoming = ReadRecentAsync(neuron, JournalKind.Incoming, cancellationToken);
         var outgoing = ReadRecentAsync(neuron, JournalKind.Outgoing, cancellationToken);
         await Task.WhenAll(synapses, incoming, outgoing);
         return new NeuronRead(await synapses, await incoming, await outgoing);
     }
+
+    private static async Task<IReadOnlyList<Synapse>> ReadSynapsesAsync(
+        IGrainFactory grains, NeuronId id, CancellationToken cancellationToken)
+        => [.. (await grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario).Read().WaitAsync(cancellationToken))
+            .Where(edge => edge.Source == id)];
 
     private static async Task<JournalRead> ReadRecentAsync(
         INeuron neuron, JournalKind kind, CancellationToken cancellationToken)

@@ -6,6 +6,7 @@ using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Scenarios;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Core;
 using Microsoft.Agents.AI;
@@ -471,14 +472,14 @@ internal sealed class AgentNeuron(
         // A synapse carries a signal type, so the type must be vocabulary before the edge exists.
         _ = Signal.Create(type, "{}");
 
-        if (source == Id)
+        var scenario = GrainFactory.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario);
+        if (connect)
         {
-            await (connect ? Connect(target, type) : Disconnect(target, type)).ConfigureAwait(true);
+            await scenario.Bind(source, type, target).ConfigureAwait(true);
         }
         else
         {
-            var neuron = GrainFactory.GetGrain<INeuron>(source.ToGrainId());
-            await (connect ? neuron.Connect(target, type) : neuron.Disconnect(target, type)).ConfigureAwait(true);
+            await scenario.Unbind(source, type, target).ConfigureAwait(true);
         }
 
         return $"{(connect ? "connected" : "disconnected")} {from} --{type}--> {to}";

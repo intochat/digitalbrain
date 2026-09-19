@@ -48,12 +48,6 @@ public abstract class Neuron<TState> : Neuron where TState : class
     {
         ArgumentNullException.ThrowIfNull(value);
         RequireBeforeReactionSave();
-        if (ExecutingCommand is { } id)
-        {
-            throw new InvalidOperationException(
-                $"Neuron '{Id}' cannot save a snapshot while executing command '{id}': save state from a reaction, not a command.");
-        }
-
         var envelope = new SnapshotEnvelope<TState>(value, (ReactionContext as DeliveryReaction)?.Delivery.SignalId,
             _announcements.WithBuffered(Envelope.Announcements));
         return SaveSnapshotAsync(envelope, cancellationToken);
@@ -69,12 +63,6 @@ public abstract class Neuron<TState> : Neuron where TState : class
     protected SignalId Announce(Signal signal, NeuronId? to = null, CorrelationId? correlation = null)
     {
         ArgumentNullException.ThrowIfNull(signal);
-        if (ExecutingCommand is { } id)
-        {
-            throw new InvalidOperationException(
-                $"Neuron '{Id}' cannot announce while executing command '{id}': announce from a reaction, not a command.");
-        }
-
         if (ReactionContext is not DeliveryReaction reaction)
         {
             throw new InvalidOperationException(

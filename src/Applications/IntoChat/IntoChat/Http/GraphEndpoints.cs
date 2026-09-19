@@ -1,6 +1,8 @@
+using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Scenarios;
 using DigitalBrain.Core;
 using DigitalBrain.Flutter;
 using Microsoft.Extensions.Options;
@@ -54,8 +56,10 @@ internal static class GraphEndpoints
                     return Results.BadRequest();
                 }
 
-                var neuron = grains.GetGrain<INeuron>(source.ToGrainId());
-                await (request.Subscribed ? neuron.Connect(target, request.SignalType) : neuron.Disconnect(target, request.SignalType))
+                var scenario = grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario);
+                await (request.Subscribed
+                    ? scenario.Bind(source, request.SignalType, target)
+                    : scenario.Unbind(source, request.SignalType, target))
                     .WaitAsync(cancellationToken);
                 return Results.Ok(new BrainGraphSubscriptionResult(request.SourceId, request.TargetId,
                     request.SignalType, request.Subscribed));

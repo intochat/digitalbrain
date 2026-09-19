@@ -79,16 +79,16 @@ internal sealed class ChatNeuron(
 
         foreach (var participant in wanted)
         {
-            await Connect(participant, AIVocabulary.Turn).ConfigureAwait(true);
+            await Program.Bind(Id, AIVocabulary.Turn, participant).ConfigureAwait(true);
         }
 
         // Re-instructing a chat is re-wiring it: a participant who is no longer listed stops
         // being invited.
-        foreach (var synapse in await ReadSynapses().ConfigureAwait(true))
+        foreach (var synapse in await Program.Read().ConfigureAwait(true))
         {
-            if (synapse.SignalType == AIVocabulary.Turn && !wanted.Contains(synapse.Target))
+            if (synapse.Source == Id && synapse.SignalType == AIVocabulary.Turn && !wanted.Contains(synapse.Target))
             {
-                await Disconnect(synapse.Target, AIVocabulary.Turn).ConfigureAwait(true);
+                await Program.Unbind(Id, AIVocabulary.Turn, synapse.Target).ConfigureAwait(true);
             }
         }
     }

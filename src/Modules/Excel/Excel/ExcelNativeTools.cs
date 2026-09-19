@@ -1,8 +1,10 @@
 using System.ComponentModel;
 using System.Text.Json;
+using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Scenarios;
 using DigitalBrain.Flutter;
 using Microsoft.Extensions.AI;
 using Microsoft.VisualBasic.FileIO;
@@ -89,7 +91,7 @@ internal sealed class ExcelNativeTools(IGrainFactory grains, INeuronInvoker invo
             var neuron = new NeuronId("sheet", name);
 
             // Connect first so the apply reaction has a chat listener for its card.
-            await grains.GetGrain<INeuron>(neuron.ToGrainId()).Connect(chat, ExcelSignals.SheetChanged).ConfigureAwait(false);
+            await grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario).Bind(neuron, ExcelSignals.SheetChanged, chat).ConfigureAwait(false);
             await invoker.InvokeAsync(neuron, "sheet", "apply",
                 JsonSerializer.SerializeToElement(new ApplySheetEdit(CommandId.New(), grid, null),
                     ExcelJson.Default.ApplySheetEdit), cancellationToken).ConfigureAwait(false);

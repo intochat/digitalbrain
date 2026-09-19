@@ -1,5 +1,7 @@
 using System.Text.Json;
+using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Behavior;
+using DigitalBrain.Core;
 using DigitalBrain.Core.Behavior;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,6 +32,8 @@ public sealed class BehaviorMailboxFacts
             {
                 silo.Services.AddSingleton<BehaviorService>();
                 silo.Services.AddSingleton<IBehaviorNodeExecutor, StubNodeExecutor>();
+                silo.Services.AddSingleton<IScenarioSink>(
+                    services => new ScenarioSink(services.GetRequiredService<IGrainFactory>(), DigitalBrainNames.DefaultScenario));
             },
         });
         var programs = simulation.SiloServices.GetRequiredService<BehaviorService>();
@@ -75,6 +79,8 @@ public sealed class BehaviorMailboxFacts
             {
                 silo.Services.AddSingleton<BehaviorService>();
                 silo.Services.AddSingleton<IBehaviorNodeExecutor, SlowNodeExecutor>();
+                silo.Services.AddSingleton<IScenarioSink>(
+                    services => new ScenarioSink(services.GetRequiredService<IGrainFactory>(), DigitalBrainNames.DefaultScenario));
             },
         });
         var programs = simulation.SiloServices.GetRequiredService<BehaviorService>();

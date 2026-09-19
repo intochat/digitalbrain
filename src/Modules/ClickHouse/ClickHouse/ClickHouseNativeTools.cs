@@ -1,9 +1,11 @@
 using System.ComponentModel;
 using System.Text.Json;
+using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Commands;
 using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Scenarios;
 using DigitalBrain.Chat;
 using DigitalBrain.Flutter;
 using Microsoft.Extensions.AI;
@@ -107,7 +109,7 @@ internal sealed class ClickHouseNativeTools(IGrainFactory grains, INeuronInvoker
             // the table still exists and is listed; the workspace opens it from the tool result.
             if (chat is { } listener)
             {
-                await grains.GetGrain<INeuron>(neuron.ToGrainId()).Connect(listener, UIVocabulary.TableRendered).ConfigureAwait(false);
+                await grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario).Bind(neuron, UIVocabulary.TableRendered, listener).ConfigureAwait(false);
             }
 
             await invoker.InvokeAsync(neuron, "clickhouse.table", "create-query",

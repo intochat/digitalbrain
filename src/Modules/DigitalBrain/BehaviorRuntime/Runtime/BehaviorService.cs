@@ -5,7 +5,9 @@ using System.Text.RegularExpressions;
 using DigitalBrain.Abstractions.Behavior;
 using DigitalBrain.Abstractions.Descriptors;
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Scenarios;
 using DigitalBrain.Abstractions.Signals;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -178,9 +180,11 @@ public sealed partial class BehaviorService(IGrainFactory grains, INeuronInvoker
         var correlation = Correlation(runId);
         foreach (var node in snapshot.Definition.Nodes.Where(node => node.Kind.Equals("input", StringComparison.OrdinalIgnoreCase)))
         {
-            var fired = await Source().Fire(Signal.Create(snapshot.Definition.Trigger, body), NodeNeuron(id, node.Id),
-                correlation, cancellationToken).ConfigureAwait(false);
-            if (fired.Busy > 0)
+            var signal = Signal.Create(snapshot.Definition.Trigger, body);
+            var delivery = SignalDelivery.Create(signal, NeuronId.Plain("behavior-author"), 1, TimeProvider.System, correlation: correlation);
+            var admission = await grains.GetGrain<INeuron>(NodeNeuron(id, node.Id).ToGrainId())
+                .Deliver(delivery, cancellationToken).ConfigureAwait(false);
+            if (admission == DeliveryAdmission.Busy)
             {
                 throw new NeuronBusyException("The behavior mailbox is full. Retry this operation after existing work finishes.");
             }
@@ -228,8 +232,9 @@ public sealed partial class BehaviorService(IGrainFactory grains, INeuronInvoker
 
         foreach (var edge in definition.Synapses)
         {
-            await grains.GetGrain<INeuron>(NodeNeuron(snapshot.Id, edge.From).ToGrainId())
-                .Connect(NodeNeuron(snapshot.Id, edge.To), BehaviorNodeNeuron.ValueType).ConfigureAwait(false);
+            await grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario)
+                .Bind(NodeNeuron(snapshot.Id, edge.From), BehaviorNodeNeuron.ValueType, NodeNeuron(snapshot.Id, edge.To))
+                .ConfigureAwait(false);
         }
     }
 
