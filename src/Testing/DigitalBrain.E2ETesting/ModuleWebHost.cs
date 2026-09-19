@@ -18,6 +18,7 @@ public sealed class ModuleWebHost : IAsyncDisposable
     }
 
     public HttpClient Http { get; }
+    public HttpClient Client => Http;
 
     public static async Task<ModuleWebHost> StartAsync(
         IClusterClient cluster, IEnumerable<IModule> modules, CancellationToken cancellationToken = default)

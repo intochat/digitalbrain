@@ -26,6 +26,8 @@ public static class BrainSimulationExtensions
 
     public static IGrainFactory Grains(this IDigitalBrain brain) => Requires(brain).Grains;
 
+    public static IClusterClient Cluster(this IDigitalBrain brain) => (IClusterClient)Requires(brain).Grains;
+
     public static IDigitalBrain Client(this IDigitalBrain brain) => Requires(brain).Client;
 
     public static Task DeactivateAsync(this IDigitalBrain brain, INeuron neuron, CancellationToken cancellationToken = default)
