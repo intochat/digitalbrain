@@ -30,6 +30,7 @@ app.UseKernelCors();
 app.UseModuleHttpSurfaces();
 app.UseAuthentication();
 app.UseBasicAuthGate();
+app.MapModuleEndpoints();
 app.MapDefaultEndpoints();
 app.MapOrleansDashboard("/orleans");
 app.MapConversationalAgent();
