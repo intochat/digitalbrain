@@ -14,7 +14,7 @@ public abstract class Neuron : Grain, INeuron
         ServiceProvider.GetRequiredService<IOptions<BrainOptions>>().Value.ObserverLease,
         ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Neuron.Observers"));
 
-    public Task<Guid> Watch(INeuronObserver observer)
+    public virtual Task<Guid> Watch(INeuronObserver observer)
     {
         Observers.Subscribe(observer, observer);
         return Task.FromResult(_activation);
@@ -28,6 +28,7 @@ public abstract class Neuron : Grain, INeuron
 
     protected Task PublishAsync(Signal signal)
     {
+        ServiceProvider.GetService<LocalSignalHub>()?.Publish(this.GetGrainId(), signal);
         return Observers.Notify(observer => observer.OnSignalAsync(signal));
     }
 }

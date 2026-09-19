@@ -12,6 +12,7 @@ public sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObser
     private readonly BrainOptions _options;
     private readonly ILogger _logger;
     private readonly Action<IAsyncDisposable> _closed;
+    private readonly LocalSignalHub? _hub;
     private readonly Channel<T> _messages;
     private readonly CancellationTokenSource _lifetime;
     private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -23,13 +24,14 @@ public sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObser
     private int _reader;
 
     internal SignalSubscription(IGrainFactory grains, INeuron source, BrainOptions options,
-        ILogger logger, Action<IAsyncDisposable> closed, CancellationToken cancellationToken)
+        ILogger logger, Action<IAsyncDisposable> closed, LocalSignalHub? hub, CancellationToken cancellationToken)
     {
         _grains = grains;
         _source = source;
         _options = options;
         _logger = logger;
         _closed = closed;
+        _hub = hub;
         _lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _messages = Channel.CreateBounded<T>(new BoundedChannelOptions(options.BufferCapacity) { SingleReader = true });
         _ = _completion.Task.ContinueWith(task => { _ = task.Exception; }, CancellationToken.None,
@@ -43,6 +45,12 @@ public sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObser
         try
         {
             var token = _lifetime.Token;
+            if (_hub is not null)
+            {
+                _hub.Subscribe(_source.GetGrainId(), this);
+                _logger.LogInformation("SubscriptionReady {Source} {SignalType}", _source.GetGrainId(), typeof(T).Name);
+                return;
+            }
             _reference = _grains.CreateObjectReference<INeuronObserver>(this);
             var activation = await WatchAsync(token).ConfigureAwait(false);
             lock (_gate)
@@ -135,6 +143,7 @@ public sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObser
     {
         try
         {
+            _hub?.Unsubscribe(_source.GetGrainId(), this);
             if (_reference is null) { return; }
             if (_watch is { IsCompleted: false }) { _ = CleanupLateWatchAsync(_watch); }
             else { _ = _watch?.Exception; }

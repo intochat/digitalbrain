@@ -8,6 +8,7 @@ public static class BrainHosting
     public static ISiloBuilder AddDigitalBrain(this ISiloBuilder silo)
     {
         AddBrainClient(silo.Services);
+        silo.Services.TryAddSingleton<LocalSignalHub>();
         return silo;
     }
     public static IClientBuilder AddDigitalBrain(this IClientBuilder client)

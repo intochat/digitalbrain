@@ -1,5 +1,6 @@
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 
 namespace DigitalBrain.Tests;
@@ -26,4 +27,39 @@ public sealed class TestEmitter : Neuron, ITestEmitter
 public sealed class OtherEmitter : Neuron, IOtherEmitter
 {
     public Task Emit(int value) => PublishAsync(new Number(value));
+}
+
+public interface ISiloBrainListener : IGrainWithStringKey
+{
+    Task<bool> HubIsPresent();
+    Task Listen(string sourceId);
+    Task<int> Last();
+}
+
+[GrainType("silo-brain-listener")]
+public sealed class SiloBrainListener : Grain, ISiloBrainListener
+{
+    private int _last;
+    private ISignalSubscription<Number>? _subscription;
+
+    public Task<bool> HubIsPresent() => Task.FromResult(ServiceProvider.GetService<LocalSignalHub>() is not null);
+
+    public async Task Listen(string sourceId)
+    {
+        var brain = ServiceProvider.GetRequiredService<IDigitalBrain>();
+        var source = brain.Get<ITestEmitter>(sourceId);
+        _subscription = await brain.SubscribeAsync<Number>(source);
+        _ = Drain();
+    }
+
+    public Task<int> Last() => Task.FromResult(_last);
+
+    private async Task Drain()
+    {
+        if (_subscription is null) { return; }
+        await foreach (var number in _subscription.ReadAllAsync())
+        {
+            _last = number.Value;
+        }
+    }
 }

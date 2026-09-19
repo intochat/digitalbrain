@@ -1,10 +1,11 @@
 using DigitalBrain.Contracts;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Core;
 
-public sealed class BrainClient(IGrainFactory grains, IOptions<BrainOptions> options, ILogger<BrainClient> logger)
+public sealed class BrainClient(IGrainFactory grains, IOptions<BrainOptions> options, ILogger<BrainClient> logger, IServiceProvider services)
     : IDigitalBrain, IAsyncDisposable
 {
     private readonly Lock _gate = new();
@@ -22,7 +23,7 @@ public sealed class BrainClient(IGrainFactory grains, IOptions<BrainOptions> opt
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            subscription = new(grains, source, options.Value, logger, Remove, cancellationToken);
+            subscription = new(grains, source, options.Value, logger, Remove, services.GetService<LocalSignalHub>(), cancellationToken);
             _subscriptions.Add(subscription); // Orleans holds observer targets weakly; this owns the strong reference.
             connecting = subscription.ConnectAsync();
         }
