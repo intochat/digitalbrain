@@ -1,5 +1,6 @@
 using Aspire.Hosting;
 using DigitalBrain.Aspire.Hosting;
+using DigitalBrain.Behaviors;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Time;
@@ -9,7 +10,8 @@ using Microsoft.Extensions.Hosting;
 var builder = DistributedApplication.CreateBuilder(args);
 
 var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules)
-    .AddModule<TimeModule>();
+    .AddModule<TimeModule>()
+    .AddModule<TestTwitterModule>();
 
 digitalBrain.AddModule<FlutterModule>(module =>
 {

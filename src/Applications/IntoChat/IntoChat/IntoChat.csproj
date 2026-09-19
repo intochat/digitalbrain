@@ -23,8 +23,13 @@
     <Compile Remove="IntoChatHost.cs" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Client" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../ServiceDefaults/IntoChat.ServiceDefaults.csproj" />
+    <ProjectReference Include="../../../Behaviors/DigitalBrain.Behaviors.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Aspire/DigitalBrain.Aspire.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/BehaviorRuntime/DigitalBrain.Behavior.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Http/DigitalBrain.Http.csproj" />
     <ProjectReference Include="../../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
