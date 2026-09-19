@@ -83,11 +83,14 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules)
     .AddModule<MicrosoftModule>(module => module
         .WithAspire(Path.Combine(builder.AppHostDirectory, "IntoChat.AppHost.csproj"))
         .WithConfiguredGitHubRepositories(builder.Configuration))
-    .AddModule<CodingModule>(module => module.WithSolution(Path.Combine(builder.AppHostDirectory, "..", "..", "..", "..", "DigitalBrain.slnx")))
-    .AddModule<FlutterModule>(module =>
+    .AddModule<CodingModule>(module => module.WithSolution(Path.Combine(builder.AppHostDirectory, "..", "..", "..", "..", "DigitalBrain.slnx")));
+if (!builder.Configuration.GetValue("Testing:SkipFlutterHost", false))
+{
+    digitalBrain.AddModule<FlutterModule>(module =>
         module.WithWindowHost()
         //module.WithWebHost()
         );
+}
 
 // Isolated Aspire runs reuse the persistent Azurite volume while assigning new random silo
 // ports. A per-run development cluster avoids trying to contact a dead membership row from the

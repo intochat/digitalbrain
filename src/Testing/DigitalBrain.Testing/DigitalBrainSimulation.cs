@@ -7,7 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Hosting;
-using Orleans.Storage;
 using Orleans.TestingHost;
 
 namespace DigitalBrain.Testing;
@@ -29,13 +28,7 @@ public static class DigitalBrainSimulation
         {
             silo.AddDigitalBrain();
             foreach (var module in options.Modules) { module.Configure(silo); }
-            if (options.StorageFaults is { } faults)
-            {
-                silo.AddMemoryGrainStorage("memory");
-                silo.Services.AddKeyedSingleton<IGrainStorage>("Default", (services, _) =>
-                    new FaultingGrainStorage(services.GetRequiredKeyedService<IGrainStorage>("memory"), faults));
-            }
-            else { silo.AddMemoryGrainStorage("Default"); }
+            silo.AddMemoryGrainStorage("Default");
             if (options.UseReminders) { silo.UseInMemoryReminderService(); }
             options.ConfigureSilo?.Invoke(silo);
         });
@@ -59,11 +52,11 @@ public static class DigitalBrainSimulation
                 await web.StartAsync(cancellationToken).ConfigureAwait(false);
                 http = new HttpClient { BaseAddress = new Uri(web.Urls.Single() + "/") };
             }
-            return new SimulatedBrain(cluster, web, http, options.StorageFaults);
+            return new SimulatedBrain(cluster, web, http);
         }
         catch
         {
-            await SimulatedBrain.ReleaseAsync(cluster, web, http, options.StorageFaults).ConfigureAwait(false);
+            await SimulatedBrain.ReleaseAsync(cluster, web, http).ConfigureAwait(false);
             throw;
         }
     }

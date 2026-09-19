@@ -9,7 +9,7 @@ using Orleans.TestingHost;
 
 namespace DigitalBrain.Testing;
 
-internal sealed class SimulatedBrain(InProcessTestCluster cluster, WebApplication? web, HttpClient? http, StorageFaults? faults)
+internal sealed class SimulatedBrain(InProcessTestCluster cluster, WebApplication? web, HttpClient? http)
     : IDigitalBrain
 {
     private readonly IDigitalBrain _brain = cluster.Client.ServiceProvider.GetRequiredService<IDigitalBrain>();
@@ -42,16 +42,15 @@ internal sealed class SimulatedBrain(InProcessTestCluster cluster, WebApplicatio
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) { return; }
-        var failures = await ReleaseAsync(cluster, web, http, faults, _brain, _resources).ConfigureAwait(false);
+        var failures = await ReleaseAsync(cluster, web, http, _brain, _resources).ConfigureAwait(false);
         if (failures.Count > 0) { throw new AggregateException("Brain simulation cleanup failed.", failures); }
     }
 
     internal static async Task<List<Exception>> ReleaseAsync(
-        InProcessTestCluster? cluster, WebApplication? web, HttpClient? http, StorageFaults? faults,
+        InProcessTestCluster? cluster, WebApplication? web, HttpClient? http,
         IDigitalBrain? brain = null, IReadOnlyList<IAsyncDisposable>? resources = null)
     {
         List<Exception> failures = [];
-        faults?.Dispose();
         if (resources is not null)
         {
             foreach (var resource in resources)
