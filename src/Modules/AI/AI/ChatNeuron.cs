@@ -3,6 +3,7 @@ using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
 using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Abstractions.Scenarios;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Core;
 using Microsoft.Agents.AI;
@@ -79,16 +80,18 @@ internal sealed class ChatNeuron(
 
         foreach (var participant in wanted)
         {
-            await Program.Bind(Id, AIVocabulary.Turn, participant).ConfigureAwait(true);
+            await GrainFactory.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario)
+                .Bind(Id, AIVocabulary.Turn, participant).ConfigureAwait(true);
         }
 
         // Re-instructing a chat is re-wiring it: a participant who is no longer listed stops
         // being invited.
-        foreach (var synapse in await Program.Read().ConfigureAwait(true))
+        var scenario = GrainFactory.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario);
+        foreach (var synapse in await scenario.Read().ConfigureAwait(true))
         {
             if (synapse.Source == Id && synapse.SignalType == AIVocabulary.Turn && !wanted.Contains(synapse.Target))
             {
-                await Program.Unbind(Id, AIVocabulary.Turn, synapse.Target).ConfigureAwait(true);
+                await scenario.Unbind(Id, AIVocabulary.Turn, synapse.Target).ConfigureAwait(true);
             }
         }
     }

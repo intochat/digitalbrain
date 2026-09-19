@@ -48,7 +48,7 @@ public sealed class BrainOperations(IGrainFactory grains, INeuronInvoker invoker
         var from = Session(session);
         var signal = Signal.Create(request.Type, request.Body);
         var correlation = ParseCorrelation(request.Correlation);
-        var outcome = await Neuron(from).Fire(signal, to: null, correlation, cancellationToken).ConfigureAwait(false);
+        var outcome = await Neuron(from).Fire(signal, correlation, cancellationToken).ConfigureAwait(false);
         return new(outcome.SignalId.ToString(), outcome.CorrelationId.ToString(), outcome.Delivered, outcome.Busy);
     }
 

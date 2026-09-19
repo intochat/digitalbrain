@@ -10,10 +10,9 @@ public sealed class BrainTools(BrainOperations operations, SessionPrincipal sess
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
     [McpServerTool(Name = "fire"), Description(
-        "Fire a signal from your Session neuron. A signal is a `type` (letters only, vocabulary such as Note, Confirmed, Decision) "
-        + "and a JSON `body` up to 64 KB. With `to`, it goes to exactly that neuron and creates the synapse if missing; "
-        + "without `to`, it follows every synapse of that type you already have. Neurons exist as soon as they are named. "
-        + "Put identity in the neuron name (run-tests-before-commit), never in the type. Returns the signal id, correlation and how many neurons accepted it or were busy.")]
+        "Emit a signal from your Session neuron. A signal is a `type` (letters only, vocabulary such as Note) "
+        + "and a JSON `body` up to 64 KB. Routing is the scenario graph (connect), not a target on fire. "
+        + "Put identity in the neuron name, never in the type. Returns the signal id, correlation, and how many listeners accepted it.")]
     public Task<string> Fire(
         [Description("Signal type: letters only, e.g. Note")] string type,
         [Description("JSON body, e.g. {\"text\":\"run tests before commit\"}. Empty means {}.")] string body,

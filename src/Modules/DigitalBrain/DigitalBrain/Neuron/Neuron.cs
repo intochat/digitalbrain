@@ -1,7 +1,5 @@
 using System.Text.Json.Serialization.Metadata;
-using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Commands;
-using DigitalBrain.Abstractions.Scenarios;
 using Microsoft.Extensions.DependencyInjection;
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Journals;
@@ -39,8 +37,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable
 
     public NeuronId Id => NeuronId.FromGrainId(this.GetGrainId());
 
-    protected IScenario Program => GrainFactory.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario);
-
     protected TimeProvider TimeProvider => _components.Clock;
 
     protected internal Task PersistAsync() => _fence.PersistAsync();
@@ -53,8 +49,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable
     private protected void Guard() => _fence.Guard();
 
     protected ReactionContext? ReactionContext { get; private set; }
-
-    internal bool HasPendingRoom => _components.Pending.HasRoomFor(0);
 
     internal Task DiscardStagedChangesAsync(Exception cause) => _fence.DiscardStagedChangesAsync(cause);
 
@@ -78,17 +72,6 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable
         }
 
         _turnWork.Clear();
-    }
-
-    internal Task WakeTurnWorkAsync()
-    {
-        return _components.Pending.Count == 0 ? Task.CompletedTask : EnsureReminderAndWakeAsync();
-
-        async Task EnsureReminderAndWakeAsync()
-        {
-            await _retry.EnsureReminderAsync().ConfigureAwait(true);
-            Wake();
-        }
     }
 
     public sealed override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -156,15 +139,9 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable
 
     private protected virtual Task<bool> DrainAnnouncementsAsync(CancellationToken cancellationToken) => Task.FromResult(false);
 
-    public Task<FireOutcome> Fire(Signal signal, NeuronId? to, CorrelationId? correlation, CancellationToken cancellationToken = default)
+    public Task<FireOutcome> Fire(Signal signal, CorrelationId? correlation = null, CancellationToken cancellationToken = default)
     {
         Guard();
-        if (to is not null)
-        {
-            throw new InvalidOperationException(
-                $"Neuron '{Id}' can only emit. Bind a synapse on a scenario and Route, or Deliver to a known neuron.");
-        }
-
         return FireCoreAsync(signal, correlation, cancellationToken);
     }
 

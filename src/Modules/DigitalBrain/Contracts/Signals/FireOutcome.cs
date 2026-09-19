@@ -2,7 +2,7 @@ using DigitalBrain.Abstractions.Identity;
 
 namespace DigitalBrain.Abstractions.Signals;
 
-// What a fire is worth telling the caller: the envelope it minted, and how far it reached.
+// What emit minted, and how many scenario listeners accepted the fact.
 [GenerateSerializer]
 [Alias("db.fire-outcome")]
 public sealed record FireOutcome(
