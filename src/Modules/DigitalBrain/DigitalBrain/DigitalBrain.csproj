@@ -1,22 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <IsPackable>true</IsPackable>
-    <Description>The DigitalBrain neuron substrate: journaled neurons, the synapse graph, and typed signal routing on Orleans.</Description>
-    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
-  </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Journaling" />
-    <PackageReference Include="Microsoft.Orleans.Reminders" />
-    <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
-    <PackageReference Include="Microsoft.Orleans.Server" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="../Contracts/DigitalBrain.Contracts.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Flutter" />
-  </ItemGroup>
-  <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Testing" />
-  </ItemGroup>
+  <PropertyGroup><IsPackable>true</IsPackable><Description>Typed neurons and live subscriptions on Orleans.</Description></PropertyGroup>
+  <ItemGroup><PackageReference Include="Microsoft.Orleans.Server" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../Contracts/DigitalBrain.Contracts.csproj" /></ItemGroup>
 </Project>

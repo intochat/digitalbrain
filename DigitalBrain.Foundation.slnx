@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="src/Modules/DigitalBrain/Contracts/DigitalBrain.Contracts.csproj" />
+  <Project Path="src/Modules/DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
+  <Project Path="src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+  <Project Path="src/Modules/DigitalBrain/Tests/DigitalBrain.Runtime.Tests.csproj" />
+</Solution>
