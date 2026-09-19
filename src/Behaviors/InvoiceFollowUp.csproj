@@ -3,6 +3,8 @@
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <BaseOutputPath>bin/invoice-followup/</BaseOutputPath>
+    <BaseIntermediateOutputPath>obj/invoice-followup/</BaseIntermediateOutputPath>
     <Description>Single-file neuron behavior: invoice emails notify the UI.</Description>
   </PropertyGroup>
   <ItemGroup>

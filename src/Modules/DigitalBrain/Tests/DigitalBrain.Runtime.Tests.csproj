@@ -4,6 +4,7 @@
     <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />
     <ProjectReference Include="../../../Behaviors/ElonBitcoin.csproj" />
     <ProjectReference Include="../../../Behaviors/InvoiceFollowUp.csproj" />
+    <ProjectReference Include="../../../Behaviors/MondayInvoices.csproj" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.Orleans.Sdk" />
     <PackageReference Include="Microsoft.Orleans.BroadcastChannel" />

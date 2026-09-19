@@ -4,6 +4,8 @@
     <File Path="src/Behaviors/elon-bitcoin.cs" />
     <Project Path="src/Behaviors/InvoiceFollowUp.csproj" />
     <File Path="src/Behaviors/invoice-followup.cs" />
+    <Project Path="src/Behaviors/MondayInvoices.csproj" />
+    <File Path="src/Behaviors/monday-invoices.cs" />
   </Folder>
   <Folder Name="/Modules/DigitalBrain/">
     <Project Path="src/Modules/DigitalBrain/Tests/DigitalBrain.Runtime.Tests.csproj" />
