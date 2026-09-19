@@ -191,7 +191,7 @@ internal sealed class ChangeSetNeuron(
             Revision = current.Revision + 1,
         };
 
-    private ChangeSetReceipt Receipt(int editCount) => new(Id.Name, editCount, Current.Status);
+    private ChangeSetReceipt Receipt(int editCount) => new(Name, editCount, Current.Status);
 
     private void RejectWhenClosed(CommandId id)
     {
@@ -199,7 +199,7 @@ internal sealed class ChangeSetNeuron(
         {
             var status = Current.Status.ToString().ToLowerInvariant();
             throw new CommandRejectedException(id, "change set closed",
-                $"the change set '{Id.Name}' is {status}; start a new change set with a different id, for example '{Id.Name}-2'.");
+                $"the change set '{Name}' is {status}; start a new change set with a different id, for example '{Name}-2'.");
         }
     }
 

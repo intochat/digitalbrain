@@ -1,5 +1,6 @@
 using DigitalBrain.Abstractions;
 using DigitalBrain.Abstractions.Commands;
+using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Signals;
 using DigitalBrain.Core;
 using Orleans.Runtime;
@@ -114,7 +115,7 @@ internal sealed class TimerNeuron(
                         ? TimerResolution.Recovered
                         : TimerResolution.OnTime;
                     next = current with { Status = TimerStatus.Elapsed };
-                    var body = new TimerElapsedBody(Id, generation, current.ScheduledAt, current.DueAt, observedAt, resolution, current.Note);
+                    var body = new TimerElapsedBody(NeuronId.FromGrainId(this.GetGrainId()), generation, current.ScheduledAt, current.DueAt, observedAt, resolution, current.Note);
                     Announce(Signal.FromJson(TimeSignals.TimerElapsed, body, TimeJson.Default.TimerElapsedBody));
                     await Alarm(generation).Retire().ConfigureAwait(true);
                     break;
@@ -129,5 +130,5 @@ internal sealed class TimerNeuron(
         }
     }
 
-    private ITimerAlarm Alarm(long generation) => GrainFactory.GetGrain<ITimerAlarm>($"{Id.Name}/{generation}");
+    private ITimerAlarm Alarm(long generation) => GrainFactory.GetGrain<ITimerAlarm>($"{this.GetGrainId().Key}/{generation}");
 }

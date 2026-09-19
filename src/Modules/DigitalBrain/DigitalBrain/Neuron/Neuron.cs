@@ -27,15 +27,17 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable
     protected Neuron(NeuronRuntime runtime)
     {
         ArgumentNullException.ThrowIfNull(runtime);
-        _components = runtime.Bind(ServiceProvider, Id);
-        _fence = new PersistenceFence(Id, StateManager, _activation.Token,
+        _components = runtime.Bind(ServiceProvider);
+        _fence = new PersistenceFence(NeuronId.FromGrainId(this.GetGrainId()), StateManager, _activation.Token,
             static () => false,
             DeactivateOnIdle, _components);
         _retry = new RetryScheduler(this, _ => ((INeuronInbox)this).Drain(),
             () => _components.Pending.Count > 0 || HasStoredAnnouncements, _activation.Token);
     }
 
-    public NeuronId Id => NeuronId.FromGrainId(this.GetGrainId());
+    public INeuron Id => GrainFactory.GetGrain<INeuron>(this.GetGrainId());
+
+    protected string Name => this.GetGrainId().Key.ToString()!;
 
     protected TimeProvider TimeProvider => _components.Clock;
 
@@ -262,7 +264,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable
             return;
         }
 
-        RequestContext.Set(NeuronRequestKeys.Caller, delivery.Source.ToString());
+        RequestContext.Set(NeuronRequestKeys.Caller, delivery.Source.GetGrainId().ToString());
         RequestContext.Set(NeuronRequestKeys.Correlation, delivery.CorrelationId.ToString());
         RequestContext.Set(NeuronRequestKeys.Causation, delivery.SignalId.ToString());
 
@@ -416,10 +418,10 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable
     }
 
     private async Task<FireOutcome> AnnounceToAsync(
-        Signal signal, NeuronId? to, CorrelationId? correlation, CancellationToken cancellationToken,
+        Signal signal, INeuron? to, CorrelationId? correlation, CancellationToken cancellationToken,
         SignalId? fixedId, SignalId? fixedCausation)
     {
-        if (to is not { } target || target == Id)
+        if (to is not { } target || target.GetGrainId() == this.GetGrainId())
         {
             throw new SignalRejectedException($"Neuron '{Id}' can only announce to another neuron.");
         }
@@ -439,8 +441,7 @@ public abstract class Neuron : DurableGrain, INeuron, INeuronInbox, IRemindable
         await PersistAsync().ConfigureAwait(true);
         var routed = await ServiceProvider.GetRequiredService<IScenarioSink>()
             .RouteAsync(delivery, cancellationToken).ConfigureAwait(true);
-        var admission = await GrainFactory.GetGrain<INeuron>(target.ToGrainId())
-            .Deliver(delivery, cancellationToken).ConfigureAwait(true);
+        var admission = await target.Deliver(delivery, cancellationToken).ConfigureAwait(true);
         return new FireOutcome(delivery.SignalId, delivery.CorrelationId,
             admission == DeliveryAdmission.Accepted ? Math.Max(1, routed) : routed,
             admission == DeliveryAdmission.Busy ? 1 : 0);

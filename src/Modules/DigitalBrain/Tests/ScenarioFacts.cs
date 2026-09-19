@@ -18,22 +18,21 @@ public sealed class ScenarioFacts
         var cancel = TestContext.Current.CancellationToken;
         await using var simulation = await BrainSimulation.StartAsync(new() { Modules = new([]) });
 
-        var from = NeuronId.Plain("elon");
-        var to = NeuronId.Plain("watch");
+        var from = Plain(simulation, "elon");
+        var to = Plain(simulation, "watch");
         var scenario = simulation.Grains.GetGrain<IScenario>("musk-watch");
         await scenario.Bind(from, "Note", to);
 
         var graph = await scenario.Read();
         Assert.Single(graph);
-        Assert.Equal(from, graph[0].Source);
-        Assert.Equal(to, graph[0].Target);
+        Assert.Equal(from.GetGrainId(), graph[0].Source.GetGrainId());
+        Assert.Equal(to.GetGrainId(), graph[0].Target.GetGrainId());
         Assert.Equal("Note", graph[0].SignalType);
 
-        var webhook = new FakeWebhook(simulation.Grains, "musk-watch");
-        await webhook.PostAsync(from, Signal.Create("Note", """{"text":"posted"}"""), cancel);
+        await new FakeWebhook(simulation.Grains, "musk-watch").PostAsync(from, Signal.Create("Note", """{"text":"posted"}"""), cancel);
 
-        var latest = await simulation.Grains.GetGrain<INeuron>(to.ToGrainId()).ReadState();
-        Assert.Contains(latest, entry => entry.Signal.Type == "Note" && entry.Source == from);
+        var latest = await to.ReadState();
+        Assert.Contains(latest, entry => entry.Signal.Type == "Note" && entry.Source.GetGrainId() == from.GetGrainId());
     }
 
     [Fact]
@@ -41,8 +40,8 @@ public sealed class ScenarioFacts
     {
         await using var simulation = await BrainSimulation.StartAsync(new() { Modules = new([]) });
 
-        var from = NeuronId.Plain("elon");
-        var to = NeuronId.Plain("watch");
+        var from = Plain(simulation, "elon");
+        var to = Plain(simulation, "watch");
         var scenario = simulation.Grains.GetGrain<IScenario>("musk-watch");
         await scenario.Bind(from, "Note", to);
         await scenario.Bind(from, "Note", to);
@@ -64,62 +63,59 @@ public sealed class ScenarioFacts
                 services => new ScenarioSink(services.GetRequiredService<IGrainFactory>(), scenarioName)),
         });
 
-        var timer = NeuronId.Plain("timer-07");
-        var otherTimer = NeuronId.Plain("timer-noon");
-        var downloader = new NeuronId("download", "rates");
-        var archive = new NeuronId("archive", "rates");
-        var clickhouse = new NeuronId("clickhouse", "fx");
-        var mail = new NeuronId("mail", "ops");
-        var gmail = NeuronId.Plain("gmail-work");
-        var inbox = NeuronId.Plain("inbox-watch");
+        var timer = Plain(simulation, "timer-07");
+        var otherTimer = Plain(simulation, "timer-noon");
+        var downloader = Named(simulation, "download", "rates");
+        var archive = Named(simulation, "archive", "rates");
+        var clickhouse = Named(simulation, "clickhouse", "fx");
+        var mail = Named(simulation, "mail", "ops");
+        var gmail = Plain(simulation, "gmail-work");
+        var inbox = Plain(simulation, "inbox-watch");
         var scenario = simulation.Grains.GetGrain<IScenario>(scenarioName);
 
-        // Daily: tick → download zip → unarchive csv → write ClickHouse, and mail ops the csv.
         await scenario.Bind(timer, "Tick", downloader);
         await scenario.Bind(downloader, "Downloaded", archive);
         await scenario.Bind(archive, "CsvReady", clickhouse);
         await scenario.Bind(archive, "CsvReady", mail);
         await scenario.Bind(clickhouse, "Ingested", mail);
-        // Separate trigger on the same program: Gmail webhook, not the zip path.
         await scenario.Bind(gmail, "EmailArrived", inbox);
 
-        var graph = await scenario.Read();
-        Assert.Equal(6, graph.Count);
+        Assert.Equal(6, (await scenario.Read()).Count);
 
         var webhook = new FakeWebhook(simulation.Grains, scenarioName);
 
         await webhook.PostAsync(gmail, Signal.Create("EmailArrived", """{"from":"alerts@bank","subject":"noise"}"""), cancel);
         await ReactionWait.UntilAsync(async () =>
-            (await simulation.Grains.GetGrain<INeuron>(inbox.ToGrainId()).ReadState())
-                .Any(entry => entry.Signal.Type == "EmailArrived"), cancel);
-        Assert.Empty(await simulation.Grains.GetGrain<INeuron>(clickhouse.ToGrainId()).ReadState());
-        Assert.Empty(await simulation.Grains.GetGrain<INeuron>(downloader.ToGrainId()).ReadState());
+            (await inbox.ReadState()).Any(entry => entry.Signal.Type == "EmailArrived"), cancel);
+        Assert.Empty(await clickhouse.ReadState());
+        Assert.Empty(await downloader.ReadState());
 
         await webhook.PostAsync(otherTimer, Signal.Create("Tick", """{"at":"12:00"}"""), cancel);
         await Task.Delay(80, cancel);
-        Assert.Empty(await simulation.Grains.GetGrain<INeuron>(downloader.ToGrainId()).ReadState());
+        Assert.Empty(await downloader.ReadState());
 
-        var tick = Signal.Create("Tick", """{"at":"07:00","url":"https://example/rates.zip"}""");
-        await webhook.PostAsync(timer, tick, cancel);
+        await webhook.PostAsync(timer, Signal.Create("Tick", """{"at":"07:00","url":"https://example/rates.zip"}"""), cancel);
 
         await ReactionWait.UntilAsync(async () =>
         {
-            var house = await simulation.Grains.GetGrain<INeuron>(clickhouse.ToGrainId()).ReadState();
-            var ingested = await simulation.Grains.GetGrain<INeuron>(clickhouse.ToGrainId()).ReadJournal(JournalKind.Outgoing, 0);
-            var ops = await simulation.Grains.GetGrain<INeuron>(mail.ToGrainId()).ReadState();
+            var house = await clickhouse.ReadState();
+            var ingested = await clickhouse.ReadJournal(JournalKind.Outgoing, 0);
+            var ops = await mail.ReadState();
             return house.Any(entry => entry.Signal.Type == "CsvReady" && entry.Signal.Body.Contains("EUR"))
                 && ingested.Delta.Any(entry => entry.Signal.Type == "Ingested" && entry.Signal.Body.Contains("fx"))
                 && ops.Any(entry => entry.Signal.Type == "CsvReady")
                 && ops.Any(entry => entry.Signal.Type == "Ingested");
         }, cancel);
 
-        var clickhouseState = await simulation.Grains.GetGrain<INeuron>(clickhouse.ToGrainId()).ReadState();
-        var tickDelivery = (await simulation.Grains.GetGrain<INeuron>(timer.ToGrainId()).ReadState())
-            .Single(entry => entry.Signal.Type == "Tick");
-        Assert.Contains(clickhouseState, entry => entry.CorrelationId == tickDelivery.CorrelationId && entry.Signal.Type == "CsvReady");
-
-        Assert.DoesNotContain(
-            await simulation.Grains.GetGrain<INeuron>(inbox.ToGrainId()).ReadState(),
-            entry => entry.Signal.Type == "CsvReady");
+        var tickDelivery = (await timer.ReadState()).Single(entry => entry.Signal.Type == "Tick");
+        Assert.Contains(await clickhouse.ReadState(),
+            entry => entry.CorrelationId == tickDelivery.CorrelationId && entry.Signal.Type == "CsvReady");
+        Assert.DoesNotContain(await inbox.ReadState(), entry => entry.Signal.Type == "CsvReady");
     }
+
+    private static INeuron Plain(BrainSimulation simulation, string name)
+        => Named(simulation, NeuronId.PlainType, name);
+
+    private static INeuron Named(BrainSimulation simulation, string type, string name)
+        => simulation.Grains.GetGrain<INeuron>(GrainId.Create(type, name));
 }

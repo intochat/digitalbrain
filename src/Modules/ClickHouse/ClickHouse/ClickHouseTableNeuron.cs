@@ -44,7 +44,7 @@ internal sealed class ClickHouseTableNeuron(
                 throw new CommandRejectedException(arguments.Id, "sql is not read-only", error.Message);
             }
 
-            return new Accepted<string>(Id.Name, Schedule(Signal.FromJson(ClickHouseSignals.QueryTableCreating, arguments, ClickHouseJson.Default.CreateQueryTableCommand)));
+            return new Accepted<string>(Name, Schedule(Signal.FromJson(ClickHouseSignals.QueryTableCreating, arguments, ClickHouseJson.Default.CreateQueryTableCommand)));
         });
 
     public Task<Accepted<string>> Create(CreateTableCommand command, CancellationToken cancellationToken = default)
@@ -53,7 +53,7 @@ internal sealed class ClickHouseTableNeuron(
 
     public Task<Accepted<string>> Update(UpdateTableCommand command, CancellationToken cancellationToken = default)
         => ExecuteCommandAsync(new("ui.table", "update"), command, UIJson.Default.UpdateTableCommand, UIJson.Default.AcceptedString, arguments =>
-            new Accepted<string>(Id.Name, Schedule(Signal.FromJson(ClickHouseSignals.QueryTableUpdating, arguments, UIJson.Default.UpdateTableCommand))));
+            new Accepted<string>(Name, Schedule(Signal.FromJson(ClickHouseSignals.QueryTableUpdating, arguments, UIJson.Default.UpdateTableCommand))));
 
     [ReadOnly]
     public async Task<TableSnapshot?> Read(ReadTable query)
@@ -73,7 +73,7 @@ internal sealed class ClickHouseTableNeuron(
         }
         catch (ClickHouseQueryException error)
         {
-            throw new TableSourceException($"ClickHouse refused the query behind table '{Id.Name}': {error.Message}");
+            throw new TableSourceException($"ClickHouse refused the query behind table '{Name}': {error.Message}");
         }
         catch (ClickHouseUnavailableException error)
         {
@@ -125,7 +125,7 @@ internal sealed class ClickHouseTableNeuron(
                     var view = View(create.Table.Title.Trim(), columns);
                     next = current with { View = view, BaseSql = create.Table.Sql, SourceColumns = columns };
                     result = new(create.Id, "applied");
-                    Announce(Signal.FromJson(UIVocabulary.TableRendered, new UiCard(Id.Name, view.Title), UIJson.Default.UiCard));
+                    Announce(Signal.FromJson(UIVocabulary.TableRendered, new UiCard(Name, view.Title), UIJson.Default.UiCard));
                 }
                 catch (ClickHouseQueryException error)
                 {
@@ -176,7 +176,7 @@ internal sealed class ClickHouseTableNeuron(
                         next = current with { View = changed };
                         result = new(update.Id, "applied");
                         // The chat card re-reads the table on every offer, so the refined view shows up in place.
-                        Announce(Signal.FromJson(UIVocabulary.TableRendered, new UiCard(Id.Name, changed.Title), UIJson.Default.UiCard));
+                        Announce(Signal.FromJson(UIVocabulary.TableRendered, new UiCard(Name, changed.Title), UIJson.Default.UiCard));
                     }
                     catch (TableValidationException error)
                     {
@@ -210,7 +210,7 @@ internal sealed class ClickHouseTableNeuron(
         }
 
         var tableColumns = columns.Select(column => new TableColumn(column.Name, column.Name, column.TableType)).ToArray();
-        return new(Id.Name, title, 1, tableColumns, [], [], null, tableColumns.Select(column => column.Id).ToArray(), 0, 0, 0, 50);
+        return new(Name, title, 1, tableColumns, [], [], null, tableColumns.Select(column => column.Id).ToArray(), 0, 0, 0, 50);
     }
 
     private static int Clamp(long count) => count > int.MaxValue ? int.MaxValue : (int)count;

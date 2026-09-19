@@ -181,7 +181,7 @@ public sealed partial class BehaviorService(IGrainFactory grains, INeuronInvoker
         foreach (var node in snapshot.Definition.Nodes.Where(node => node.Kind.Equals("input", StringComparison.OrdinalIgnoreCase)))
         {
             var signal = Signal.Create(snapshot.Definition.Trigger, body);
-            var delivery = SignalDelivery.Create(signal, NeuronId.Plain("behavior-author"), 1, TimeProvider.System, correlation: correlation);
+            var delivery = SignalDelivery.Create(signal, grains.GetGrain<INeuron>(NeuronId.Plain("behavior-author").ToGrainId()), 1, TimeProvider.System, correlation: correlation);
             var admission = await grains.GetGrain<INeuron>(NodeNeuron(id, node.Id).ToGrainId())
                 .Deliver(delivery, cancellationToken).ConfigureAwait(false);
             if (admission == DeliveryAdmission.Busy)
@@ -233,7 +233,10 @@ public sealed partial class BehaviorService(IGrainFactory grains, INeuronInvoker
         foreach (var edge in definition.Synapses)
         {
             await grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario)
-                .Bind(NodeNeuron(snapshot.Id, edge.From), BehaviorNodeNeuron.ValueType, NodeNeuron(snapshot.Id, edge.To))
+                .Bind(
+                    grains.GetGrain<INeuron>(NodeNeuron(snapshot.Id, edge.From).ToGrainId()),
+                    BehaviorNodeNeuron.ValueType,
+                    grains.GetGrain<INeuron>(NodeNeuron(snapshot.Id, edge.To).ToGrainId()))
                 .ConfigureAwait(false);
         }
     }

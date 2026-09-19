@@ -1,4 +1,4 @@
-using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Synapses;
 
 namespace DigitalBrain.Abstractions.Scenarios;
@@ -29,12 +29,12 @@ public sealed class ScenarioState
         }
     }
 
-    private int Find(NeuronId source, string signalType, NeuronId target)
+    private int Find(INeuron source, string signalType, INeuron target)
     {
         for (var i = 0; i < Synapses.Count; i++)
         {
             var edge = Synapses[i];
-            if (edge.Source == source && edge.Target == target
+            if (Same(edge.Source, source) && Same(edge.Target, target)
                 && string.Equals(edge.SignalType, signalType, StringComparison.Ordinal))
             {
                 return i;
@@ -43,19 +43,21 @@ public sealed class ScenarioState
 
         return -1;
     }
+
+    public static bool Same(INeuron left, INeuron right) => left.GetGrainId() == right.GetGrainId();
 }
 
 [GenerateSerializer]
 [Alias("db.scenario.bound")]
 public sealed record SynapseBound(
-    [property: Id(0)] NeuronId Source,
-    [property: Id(1)] NeuronId Target,
+    [property: Id(0)] INeuron Source,
+    [property: Id(1)] INeuron Target,
     [property: Id(2)] string SignalType,
     [property: Id(3)] DateTimeOffset At);
 
 [GenerateSerializer]
 [Alias("db.scenario.unbound")]
 public sealed record SynapseUnbound(
-    [property: Id(0)] NeuronId Source,
-    [property: Id(1)] NeuronId Target,
+    [property: Id(0)] INeuron Source,
+    [property: Id(1)] INeuron Target,
     [property: Id(2)] string SignalType);

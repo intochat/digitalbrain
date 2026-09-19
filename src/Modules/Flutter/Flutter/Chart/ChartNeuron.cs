@@ -20,7 +20,7 @@ internal sealed class ChartNeuron(
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.ChartKind);
             ArgumentNullException.ThrowIfNull(arguments.Points);
             var work = Schedule(Signal.FromJson(UIVocabulary.ChartRendering, arguments, UIJson.Default.RenderChart));
-            return new Accepted<string>(Id.Name, work);
+            return new Accepted<string>(Name, work);
         });
 
     public Task<Accepted<string>> Append(AppendChartPoint command, CancellationToken cancellationToken = default)
@@ -29,7 +29,7 @@ internal sealed class ChartNeuron(
             ArgumentException.ThrowIfNullOrWhiteSpace(arguments.Title);
             ArgumentNullException.ThrowIfNull(arguments.Point);
             var work = Schedule(Signal.FromJson(UIVocabulary.ChartAppending, arguments, UIJson.Default.AppendChartPoint));
-            return new Accepted<string>(Id.Name, work);
+            return new Accepted<string>(Name, work);
         });
 
     [ReadOnly]
@@ -65,7 +65,7 @@ internal sealed class ChartNeuron(
         }
 
         next = next with { Points = [.. next.Points.TakeLast(ChartState.MaxPoints)] };
-        Announce(Signal.FromJson(UIVocabulary.ChartRendered, new UiCard(Id.Name, next.Title), UIJson.Default.UiCard));
+        Announce(Signal.FromJson(UIVocabulary.ChartRendered, new UiCard(Name, next.Title), UIJson.Default.UiCard));
         await SaveAsync(next, cancellationToken).ConfigureAwait(true);
     }
 }

@@ -38,7 +38,7 @@ internal sealed class WorkspaceNeuron(
             }
 
             var work = Schedule(Signal.FromJson(CodingVocabulary.WorkspaceOpening, new OpeningBody(arguments.SolutionPath), CodingJson.Default.OpeningBody));
-            return new Accepted<WorkspaceReceipt>(new WorkspaceReceipt(Id.Name, generation), work);
+            return new Accepted<WorkspaceReceipt>(new WorkspaceReceipt(Name, generation), work);
         });
 
     public Task<Accepted<WorkspaceReceipt>> Reload(ReloadWorkspace command) => ExecuteCommandAsync(
@@ -50,7 +50,7 @@ internal sealed class WorkspaceNeuron(
             }
 
             var work = Schedule(Signal.Create(CodingVocabulary.WorkspaceReloading, "{}"));
-            return new Accepted<WorkspaceReceipt>(new WorkspaceReceipt(Id.Name, State?.Generation ?? 0), work);
+            return new Accepted<WorkspaceReceipt>(new WorkspaceReceipt(Name, State?.Generation ?? 0), work);
         });
 
     [ReadOnly]

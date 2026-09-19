@@ -1,4 +1,5 @@
 using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Signals;
 using Orleans.Runtime;
 
@@ -59,7 +60,7 @@ public abstract class Neuron<TState> : Neuron where TState : class
         _announcements.Clear();
     }
 
-    protected SignalId Announce(Signal signal, NeuronId? to = null, CorrelationId? correlation = null)
+    protected SignalId Announce(Signal signal, INeuron? to = null, CorrelationId? correlation = null)
     {
         ArgumentNullException.ThrowIfNull(signal);
         if (ReactionContext is not DeliveryReaction reaction)
@@ -69,7 +70,7 @@ public abstract class Neuron<TState> : Neuron where TState : class
         }
 
         signal = Signal.Create(signal.Type, signal.Body);
-        if (to == Id)
+        if (to is not null && to.GetGrainId() == this.GetGrainId())
         {
             throw new SignalRejectedException($"Neuron '{Id}' cannot announce to itself.");
         }

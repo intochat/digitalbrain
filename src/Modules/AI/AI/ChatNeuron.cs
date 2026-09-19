@@ -81,7 +81,7 @@ internal sealed class ChatNeuron(
         foreach (var participant in wanted)
         {
             await GrainFactory.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario)
-                .Bind(Id, AIVocabulary.Turn, participant).ConfigureAwait(true);
+                .Bind(Id, AIVocabulary.Turn, GrainFactory.GetGrain<INeuron>(participant.ToGrainId())).ConfigureAwait(true);
         }
 
         // Re-instructing a chat is re-wiring it: a participant who is no longer listed stops
@@ -89,7 +89,8 @@ internal sealed class ChatNeuron(
         var scenario = GrainFactory.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario);
         foreach (var synapse in await scenario.Read().ConfigureAwait(true))
         {
-            if (synapse.Source == Id && synapse.SignalType == AIVocabulary.Turn && !wanted.Contains(synapse.Target))
+            if (synapse.Source.GetGrainId() == Id.GetGrainId() && synapse.SignalType == AIVocabulary.Turn
+                && !wanted.Any(p => p.ToGrainId() == synapse.Target.GetGrainId()))
             {
                 await scenario.Unbind(Id, AIVocabulary.Turn, synapse.Target).ConfigureAwait(true);
             }

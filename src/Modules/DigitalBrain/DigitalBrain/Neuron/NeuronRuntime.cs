@@ -11,7 +11,7 @@ public sealed class NeuronRuntime(TimeProvider clock)
 {
     internal TimeProvider Clock { get; } = clock;
 
-    internal NeuronActivationComponents Bind(IServiceProvider services, NeuronId _)
+    internal NeuronActivationComponents Bind(IServiceProvider services)
     {
         var entries = services.GetRequiredService<Serializer<JournalEntry>>();
         var sessions = services.GetRequiredService<SerializerSessionPool>();

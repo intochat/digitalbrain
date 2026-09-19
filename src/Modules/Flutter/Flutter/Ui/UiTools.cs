@@ -139,7 +139,8 @@ internal sealed class UiTools(
             var neuron = new NeuronId(UIVocabulary.GraphType, name);
 
             // Connect first: the reaction fires the card signal and needs a chat listener.
-            await grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario).Bind(neuron, UIVocabulary.GraphRendered, chat).ConfigureAwait(false);
+            await grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario)
+                .Bind(grains.GetGrain<INeuron>(neuron.ToGrainId()), UIVocabulary.GraphRendered, grains.GetGrain<INeuron>(chat.ToGrainId())).ConfigureAwait(false);
             await invoker.InvokeAsync(neuron, "ui.graph", "render",
                 JsonSerializer.SerializeToElement(new RenderGraph(CommandId.New(), trimmedTitle, nodes, parsed),
                     UIJson.Default.RenderGraph), cancellationToken).ConfigureAwait(false);
@@ -195,7 +196,8 @@ internal sealed class UiTools(
             if (chat is { } listener)
             {
                 // Connect first: the reaction fires the card signal and needs a chat listener.
-                await grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario).Bind(neuron, UIVocabulary.ChartRendered, listener).ConfigureAwait(false);
+                await grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario)
+                    .Bind(grains.GetGrain<INeuron>(neuron.ToGrainId()), UIVocabulary.ChartRendered, grains.GetGrain<INeuron>(listener.ToGrainId())).ConfigureAwait(false);
             }
 
             await invoker.InvokeAsync(neuron, "ui.chart", "render",
@@ -256,7 +258,8 @@ internal sealed class UiTools(
             var neuron = new NeuronId(UIVocabulary.ImageType, name);
 
             // Connect first: the reaction fires the card signal and needs a chat listener.
-            await grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario).Bind(neuron, UIVocabulary.ImageDescribed, chat).ConfigureAwait(false);
+            await grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario)
+                .Bind(grains.GetGrain<INeuron>(neuron.ToGrainId()), UIVocabulary.ImageDescribed, grains.GetGrain<INeuron>(chat.ToGrainId())).ConfigureAwait(false);
             await invoker.InvokeAsync(neuron, "ui.image", "describe",
                 JsonSerializer.SerializeToElement(new DescribeImage(CommandId.New(), trimmedPrompt, generated.Model, generated.MediaType, blobName),
                     UIJson.Default.DescribeImage), cancellationToken).ConfigureAwait(false);

@@ -244,6 +244,6 @@ internal sealed class RepositoryNeuron(
         Binding.RequireEnabled();
     }
 
-    private RepositoryView View() => new(Id.Name, State is { BindingRevision: not null, Revoked: false },
+    private RepositoryView View() => new(Name, State is { BindingRevision: not null, Revoked: false },
         State?.Revoked ?? false, State?.PullRequests.Values.OrderBy(item => item.Number).ToArray() ?? [], State?.LastWebhookAt);
 }

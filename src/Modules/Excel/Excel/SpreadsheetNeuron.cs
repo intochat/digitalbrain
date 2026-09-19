@@ -83,7 +83,7 @@ internal sealed class SpreadsheetNeuron(
 
         var grid = body.Replace is { } replacement ? replacement : SheetGrid.Normalize(SheetGrid.WithCell(Grid, body.Cell!));
         var version = (State?.Version ?? 0) + 1;
-        var changed = new SheetChangedBody(Id.Name, grid.Title, version);
+        var changed = new SheetChangedBody(Name, grid.Title, version);
         Announce(Signal.FromJson(ExcelSignals.SheetChanged, changed, ExcelJson.Default.SheetChangedBody));
         await SaveAsync(new SheetState(grid, version), cancellationToken).ConfigureAwait(true);
     }

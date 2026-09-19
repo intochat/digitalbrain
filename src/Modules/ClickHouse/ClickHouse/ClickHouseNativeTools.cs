@@ -109,7 +109,8 @@ internal sealed class ClickHouseNativeTools(IGrainFactory grains, INeuronInvoker
             // the table still exists and is listed; the workspace opens it from the tool result.
             if (chat is { } listener)
             {
-                await grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario).Bind(neuron, UIVocabulary.TableRendered, listener).ConfigureAwait(false);
+                await grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario)
+                    .Bind(grains.GetGrain<INeuron>(neuron.ToGrainId()), UIVocabulary.TableRendered, grains.GetGrain<INeuron>(listener.ToGrainId())).ConfigureAwait(false);
             }
 
             await invoker.InvokeAsync(neuron, "clickhouse.table", "create-query",

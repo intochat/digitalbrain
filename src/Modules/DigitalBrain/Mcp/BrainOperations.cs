@@ -71,14 +71,14 @@ public sealed class BrainOperations(IGrainFactory grains, INeuronInvoker invoker
         cancellationToken.ThrowIfCancellationRequested();
         // A synapse carries a signal type, so the type must be vocabulary before the edge exists.
         _ = Signal.Create(request.Type, "{}");
-        return Scenario().Bind(Parse(request.From, nameof(request)), request.Type, Parse(request.To, nameof(request)));
+        return Scenario().Bind(Neuron(Parse(request.From, nameof(request))), request.Type, Neuron(Parse(request.To, nameof(request))));
     }
 
     public Task DisconnectAsync(ConnectRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
-        return Scenario().Unbind(Parse(request.From, nameof(request)), request.Type, Parse(request.To, nameof(request)));
+        return Scenario().Unbind(Neuron(Parse(request.From, nameof(request))), request.Type, Neuron(Parse(request.To, nameof(request))));
     }
 
     public async Task<ReadResult> ReadAsync(ReadRequest request, CancellationToken cancellationToken = default)
@@ -143,9 +143,9 @@ public sealed class BrainOperations(IGrainFactory grains, INeuronInvoker invoker
 
     private async Task<IReadOnlyList<SynapseEntry>> ReadSynapsesAsync(INeuron query)
     {
-        var id = NeuronId.FromGrainId(query.GetGrainId());
+        var id = query.GetGrainId();
         return [.. (await Scenario().Read().ConfigureAwait(false))
-            .Where(s => s.Source == id)
+            .Where(s => s.Source.GetGrainId() == id)
             .Select(s => new SynapseEntry(Name(s.Source), Name(s.Target), s.SignalType))];
     }
 
@@ -180,6 +180,8 @@ public sealed class BrainOperations(IGrainFactory grains, INeuronInvoker invoker
     private INeuron Neuron(NeuronId id) => grains.GetGrain<INeuron>(id.ToGrainId());
 
     // Plain neurons are named the way callers type them; anything else keeps its "type:name".
+    private static string Name(INeuron neuron) => Name(NeuronId.FromGrainId(neuron.GetGrainId()));
+
     private static string Name(NeuronId id) => id.Type == NeuronId.PlainType ? id.Name : id.ToString();
 
     private static CorrelationId? ParseCorrelation(string? text)

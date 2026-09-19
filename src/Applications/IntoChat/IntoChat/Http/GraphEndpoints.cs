@@ -58,8 +58,8 @@ internal static class GraphEndpoints
 
                 var scenario = grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario);
                 await (request.Subscribed
-                    ? scenario.Bind(source, request.SignalType, target)
-                    : scenario.Unbind(source, request.SignalType, target))
+                    ? scenario.Bind(grains.GetGrain<INeuron>(source.ToGrainId()), request.SignalType, grains.GetGrain<INeuron>(target.ToGrainId()))
+                    : scenario.Unbind(grains.GetGrain<INeuron>(source.ToGrainId()), request.SignalType, grains.GetGrain<INeuron>(target.ToGrainId())))
                     .WaitAsync(cancellationToken);
                 return Results.Ok(new BrainGraphSubscriptionResult(request.SourceId, request.TargetId,
                     request.SignalType, request.Subscribed));

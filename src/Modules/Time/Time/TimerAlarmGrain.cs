@@ -53,7 +53,7 @@ internal sealed class TimerAlarmGrain(TimeOptions options, TimeProvider timeProv
 
         var signal = Signal.FromJson(TimeSignals.TimerDue,
             new TimerGeneration(generation), TimeJson.Default.TimerGeneration);
-        var delivery = SignalDelivery.Create(signal, NeuronId.FromGrainId(this.GetGrainId()), EdgeDeliverySequence, timeProvider);
+        var delivery = SignalDelivery.Create(signal, GrainFactory.GetGrain<INeuron>(this.GetGrainId()), EdgeDeliverySequence, timeProvider);
         return GrainFactory.GetGrain<INeuron>(timer.ToGrainId()).Deliver(delivery);
     }
 }

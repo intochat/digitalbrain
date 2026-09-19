@@ -42,7 +42,9 @@ public sealed class TableService(IGrainFactory grains, IEnumerable<ITableSource>
                 $"Table '{table.Name}' cannot be listed as '{table.Type}': ids starting with '{source.IdPrefix}' are served by '{source.GrainType}'.");
         }
 
-        return grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario).Bind(CatalogId, UIVocabulary.TableListed, table).WaitAsync(cancellationToken);
+        return grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario)
+            .Bind(grains.GetGrain<INeuron>(CatalogId.ToGrainId()), UIVocabulary.TableListed, grains.GetGrain<INeuron>(table.ToGrainId()))
+            .WaitAsync(cancellationToken);
     }
 
     public async Task<TableSnapshot> ReadAsync(string id, int offset = 0, int limit = 50, CancellationToken cancellationToken = default)
@@ -68,9 +70,9 @@ public sealed class TableService(IGrainFactory grains, IEnumerable<ITableSource>
     {
         var links = await grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario).Read().WaitAsync(cancellationToken).ConfigureAwait(false);
         var result = new List<TableSummary>();
-        foreach (var link in links.Where(link => link.Source == CatalogId && link.SignalType == UIVocabulary.TableListed && ServesTables(link.Target.Type)))
+        foreach (var link in links.Where(link => link.Source.GetGrainId() == CatalogId.ToGrainId() && link.SignalType == UIVocabulary.TableListed && ServesTables(link.Target.GetGrainId().Type.ToString()!)))
         {
-            var summary = await grains.GetGrain<ITable>(link.Target.ToGrainId()).ReadSummary().WaitAsync(cancellationToken).ConfigureAwait(false);
+            var summary = await grains.GetGrain<ITable>(link.Target.GetGrainId()).ReadSummary().WaitAsync(cancellationToken).ConfigureAwait(false);
             if (summary is not null) { result.Add(summary); }
         }
         return result.OrderBy(table => table.Title, StringComparer.OrdinalIgnoreCase).ThenBy(table => table.Id, StringComparer.Ordinal).ToArray();

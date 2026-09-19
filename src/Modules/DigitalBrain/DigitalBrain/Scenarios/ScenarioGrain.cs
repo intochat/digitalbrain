@@ -1,5 +1,4 @@
 using DigitalBrain.Abstractions;
-using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
 using DigitalBrain.Abstractions.Scenarios;
 using DigitalBrain.Abstractions.Signals;
@@ -16,11 +15,13 @@ public sealed class ScenarioGrain : JournaledGrain<ScenarioState>, IScenario
 {
     public const string LogStorage = "LogStorage";
 
-    public async Task Bind(NeuronId source, string signalType, NeuronId target)
+    public async Task Bind(INeuron source, string signalType, INeuron target)
     {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(target);
         ArgumentException.ThrowIfNullOrWhiteSpace(signalType);
         if (State.Synapses.Any(edge =>
-                edge.Source == source && edge.Target == target
+                ScenarioState.Same(edge.Source, source) && ScenarioState.Same(edge.Target, target)
                 && string.Equals(edge.SignalType, signalType, StringComparison.Ordinal)))
         {
             return;
@@ -30,11 +31,13 @@ public sealed class ScenarioGrain : JournaledGrain<ScenarioState>, IScenario
         await ConfirmEvents();
     }
 
-    public async Task Unbind(NeuronId source, string signalType, NeuronId target)
+    public async Task Unbind(INeuron source, string signalType, INeuron target)
     {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(target);
         ArgumentException.ThrowIfNullOrWhiteSpace(signalType);
         if (!State.Synapses.Any(edge =>
-                edge.Source == source && edge.Target == target
+                ScenarioState.Same(edge.Source, source) && ScenarioState.Same(edge.Target, target)
                 && string.Equals(edge.SignalType, signalType, StringComparison.Ordinal)))
         {
             return;
@@ -52,15 +55,13 @@ public sealed class ScenarioGrain : JournaledGrain<ScenarioState>, IScenario
         var accepted = 0;
         foreach (var edge in State.Synapses)
         {
-            if (edge.Source != delivery.Source
+            if (!ScenarioState.Same(edge.Source, delivery.Source)
                 || !string.Equals(edge.SignalType, delivery.Signal.Type, StringComparison.Ordinal))
             {
                 continue;
             }
 
-            var admission = await GrainFactory.GetGrain<INeuron>(edge.Target.ToGrainId())
-                .Deliver(delivery, cancellationToken)
-                .ConfigureAwait(true);
+            var admission = await edge.Target.Deliver(delivery, cancellationToken).ConfigureAwait(true);
             if (admission == DeliveryAdmission.Accepted)
             {
                 accepted++;

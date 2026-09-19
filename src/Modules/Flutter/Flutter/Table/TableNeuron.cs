@@ -16,13 +16,13 @@ internal sealed class TableNeuron(NeuronRuntime runtime,
     public Task<Accepted<string>> Create(CreateTableCommand command, CancellationToken cancellationToken = default)
         => ExecuteCommandAsync(new("ui.table", "create"), command, UIJson.Default.CreateTableCommand, UIJson.Default.AcceptedString, arguments =>
         {
-            _ = TablePolicy.Create(Id.Name, arguments.Table);
-            return new Accepted<string>(Id.Name, Schedule(Signal.FromJson(UIVocabulary.TableCreating, arguments, UIJson.Default.CreateTableCommand)));
+            _ = TablePolicy.Create(Name, arguments.Table);
+            return new Accepted<string>(Name, Schedule(Signal.FromJson(UIVocabulary.TableCreating, arguments, UIJson.Default.CreateTableCommand)));
         });
 
     public Task<Accepted<string>> Update(UpdateTableCommand command, CancellationToken cancellationToken = default)
         => ExecuteCommandAsync(new("ui.table", "update"), command, UIJson.Default.UpdateTableCommand, UIJson.Default.AcceptedString, arguments =>
-            new Accepted<string>(Id.Name, Schedule(Signal.FromJson(UIVocabulary.TableUpdating, arguments, UIJson.Default.UpdateTableCommand))));
+            new Accepted<string>(Name, Schedule(Signal.FromJson(UIVocabulary.TableUpdating, arguments, UIJson.Default.UpdateTableCommand))));
 
     [ReadOnly]
     public Task<TableSnapshot?> Read(ReadTable query)
@@ -50,7 +50,7 @@ internal sealed class TableNeuron(NeuronRuntime runtime,
                 if (next is not null) { result = new(create.Id, "conflict", "Table already exists."); }
                 else
                 {
-                    try { next = TablePolicy.Create(Id.Name, create.Table); result = new(create.Id, "applied"); }
+                    try { next = TablePolicy.Create(Name, create.Table); result = new(create.Id, "applied"); }
                     catch (TableValidationException error) { result = new(create.Id, "invalid", error.Message); }
                 }
                 break;

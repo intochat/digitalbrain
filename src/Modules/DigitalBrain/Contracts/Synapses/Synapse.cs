@@ -1,15 +1,14 @@
-using DigitalBrain.Abstractions.Identity;
+using DigitalBrain.Abstractions.Neurons;
 
 namespace DigitalBrain.Abstractions.Synapses;
 
-// A directed, typed edge stored on the SOURCE neuron. The only routing fact in the system.
 [GenerateSerializer]
 [Alias("db.synapse")]
-public readonly record struct Synapse(
-    [property: Id(0)] NeuronId Source,
-    [property: Id(1)] NeuronId Target,
+public sealed record Synapse(
+    [property: Id(0)] INeuron Source,
+    [property: Id(1)] INeuron Target,
     [property: Id(2)] string SignalType,
     [property: Id(3)] DateTimeOffset CreatedAt)
 {
-    public override string ToString() => $"{Source} --{SignalType}--> {Target}";
+    public override string ToString() => $"{Source.GetGrainId()} --{SignalType}--> {Target.GetGrainId()}";
 }

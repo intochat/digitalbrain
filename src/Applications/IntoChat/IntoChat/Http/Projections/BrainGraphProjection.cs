@@ -76,7 +76,7 @@ internal static class BrainGraphProjection
         var body = JsonNode.Parse(delivery.Signal.Body) as JsonObject;
         var preview = body?.ToDictionary(pair => pair.Key, pair => pair.Value?.ToJsonString() ?? "null", StringComparer.Ordinal);
         return new BrainGraphActivity($"{neuron}|{direction}|{delivery.SignalId}", neuron.ToString(), direction,
-            delivery.Sequence, delivery.Signal.Type, delivery.Timestamp, delivery.Source.ToString(),
+            delivery.Sequence, delivery.Signal.Type, delivery.Timestamp, delivery.Source.GetGrainId().ToString(),
             delivery.CorrelationId.ToString(), delivery.Signal.Type, preview);
     }
 
@@ -94,7 +94,7 @@ internal static class BrainGraphProjection
     private static async Task<IReadOnlyList<Synapse>> ReadSynapsesAsync(
         IGrainFactory grains, NeuronId id, CancellationToken cancellationToken)
         => [.. (await grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario).Read().WaitAsync(cancellationToken))
-            .Where(edge => edge.Source == id)];
+            .Where(edge => edge.Source.GetGrainId() == id.ToGrainId())];
 
     private static async Task<JournalRead> ReadRecentAsync(
         INeuron neuron, JournalKind kind, CancellationToken cancellationToken)

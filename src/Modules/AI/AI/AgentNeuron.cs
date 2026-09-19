@@ -373,7 +373,7 @@ internal sealed class AgentNeuron(
                 client,
                 new ChatClientAgentOptions
                 {
-                    Name = Id.Name,
+                    Name = Name,
                     ChatOptions = new ChatOptions
                     {
                         Instructions = instruct.System,
@@ -444,11 +444,11 @@ internal sealed class AgentNeuron(
 
     internal Task<string> FireSignalAsync(string type, string body, string? to, string? correlation)
     {
-        NeuronId? target = null;
+        INeuron? target = null;
         if (!string.IsNullOrWhiteSpace(to))
         {
             target = NeuronId.TryParse(to, out var parsed)
-                ? parsed
+                ? GrainFactory.GetGrain<INeuron>(parsed.ToGrainId())
                 : throw new ArgumentException($"'{to}' is not a neuron name. Use a bare name such as 'run-tests' or 'type:name'; no spaces.", nameof(to));
         }
 
@@ -475,11 +475,11 @@ internal sealed class AgentNeuron(
         var scenario = GrainFactory.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario);
         if (connect)
         {
-            await scenario.Bind(source, type, target).ConfigureAwait(true);
+            await scenario.Bind(GrainFactory.GetGrain<INeuron>(source.ToGrainId()), type, GrainFactory.GetGrain<INeuron>(target.ToGrainId())).ConfigureAwait(true);
         }
         else
         {
-            await scenario.Unbind(source, type, target).ConfigureAwait(true);
+            await scenario.Unbind(GrainFactory.GetGrain<INeuron>(source.ToGrainId()), type, GrainFactory.GetGrain<INeuron>(target.ToGrainId())).ConfigureAwait(true);
         }
 
         return $"{(connect ? "connected" : "disconnected")} {from} --{type}--> {to}";

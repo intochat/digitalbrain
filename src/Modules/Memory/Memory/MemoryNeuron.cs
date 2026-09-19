@@ -57,7 +57,7 @@ internal sealed class MemoryNeuron(
         var (embeddings, store) = RequireDependencies();
         var metadataFilter = ToMetadataFilter(query.Tags);
         var generated = await embeddings.GenerateAsync([query.Query]).ConfigureAwait(true);
-        var matches = await store.SearchAsync(Id.Name, query.Namespace, generated[0].Vector.ToArray(), query.Limit,
+        var matches = await store.SearchAsync(Name, query.Namespace, generated[0].Vector.ToArray(), query.Limit,
             metadataFilter, CancellationToken.None).ConfigureAwait(true);
         return new RecallResult(matches);
     }
@@ -76,7 +76,7 @@ internal sealed class MemoryNeuron(
 
                     var (embeddings, store) = RequireDependencies();
                     var generated = await embeddings.GenerateAsync([body.Text], cancellationToken: cancellationToken).ConfigureAwait(true);
-                    await store.UpsertAsync(new VectorMemoryEntry(Id.Name, body.Namespace, body.Key, body.Text, body.Tags,
+                    await store.UpsertAsync(new VectorMemoryEntry(Name, body.Namespace, body.Key, body.Text, body.Tags,
                         body.Payload, generated[0].Vector.ToArray()), cancellationToken).ConfigureAwait(true);
                     next = new MemoryState((State?.RememberedCount ?? 0) + 1, State?.ForgottenCount ?? 0,
                         TimeProvider.GetUtcNow());
@@ -92,7 +92,7 @@ internal sealed class MemoryNeuron(
                     }
 
                     var (_, store) = RequireDependencies();
-                    await store.RemoveAsync(Id.Name, key.Namespace, key.Key, cancellationToken).ConfigureAwait(true);
+                    await store.RemoveAsync(Name, key.Namespace, key.Key, cancellationToken).ConfigureAwait(true);
                     next = new MemoryState(State?.RememberedCount ?? 0, (State?.ForgottenCount ?? 0) + 1,
                         TimeProvider.GetUtcNow());
                     Announce(Signal.FromJson(MemorySignals.Forgotten, key, MemoryJson.Default.MemoryKey));

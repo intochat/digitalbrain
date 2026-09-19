@@ -20,7 +20,7 @@ internal sealed class GraphNeuron(
             ArgumentNullException.ThrowIfNull(arguments.Nodes);
             ArgumentNullException.ThrowIfNull(arguments.Edges);
             var work = Schedule(Signal.FromJson(UIVocabulary.GraphRendering, arguments, UIJson.Default.RenderGraph));
-            return new Accepted<string>(Id.Name, work);
+            return new Accepted<string>(Name, work);
         });
 
     [ReadOnly]
@@ -38,7 +38,7 @@ internal sealed class GraphNeuron(
             return;
         }
 
-        Announce(Signal.FromJson(UIVocabulary.GraphRendered, new UiCard(Id.Name, command.Title), UIJson.Default.UiCard));
+        Announce(Signal.FromJson(UIVocabulary.GraphRendered, new UiCard(Name, command.Title), UIJson.Default.UiCard));
         await SaveAsync(new GraphState(command.Title, command.Nodes, command.Edges), cancellationToken).ConfigureAwait(true);
     }
 }

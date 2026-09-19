@@ -21,7 +21,7 @@ internal sealed class ChatNeuron(
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<ChatState>> state)
     : Neuron<ChatState>(runtime, state), IChat
 {
-    private NeuronId Responder => State?.Agent ?? new NeuronId(AIVocabulary.AgentType, Id.Name);
+    private NeuronId Responder => State?.Agent ?? new NeuronId(AIVocabulary.AgentType, Name);
 
     public Task<Accepted<SignalId>> Send(SendMessage message, CancellationToken cancellationToken = default)
         => ExecuteCommandAsync(new("ui.chat", "send"), message, UIJson.Default.SendMessage, UIJson.Default.AcceptedSignalId, arguments =>

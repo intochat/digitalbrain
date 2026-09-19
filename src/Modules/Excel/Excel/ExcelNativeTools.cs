@@ -91,7 +91,8 @@ internal sealed class ExcelNativeTools(IGrainFactory grains, INeuronInvoker invo
             var neuron = new NeuronId("sheet", name);
 
             // Connect first so the apply reaction has a chat listener for its card.
-            await grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario).Bind(neuron, ExcelSignals.SheetChanged, chat).ConfigureAwait(false);
+            await grains.GetGrain<IScenario>(DigitalBrainNames.DefaultScenario)
+                .Bind(grains.GetGrain<INeuron>(neuron.ToGrainId()), ExcelSignals.SheetChanged, grains.GetGrain<INeuron>(chat.ToGrainId())).ConfigureAwait(false);
             await invoker.InvokeAsync(neuron, "sheet", "apply",
                 JsonSerializer.SerializeToElement(new ApplySheetEdit(CommandId.New(), grid, null),
                     ExcelJson.Default.ApplySheetEdit), cancellationToken).ConfigureAwait(false);
