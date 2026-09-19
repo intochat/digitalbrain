@@ -7,7 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Hosting;
-using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.TestingHost;
 
@@ -18,17 +17,6 @@ public static class DigitalBrainSimulation
     public static async Task<IDigitalBrain> StartAsync(SimulationOptions? options = null, CancellationToken cancellationToken = default)
     {
         options ??= new();
-        var temporary = options.PersistenceDirectory is null && options.StorageFaults is not null
-            ? Path.Combine(Path.GetTempPath(), "brain-" + Guid.NewGuid().ToString("N")) : null;
-        var directory = options.PersistenceDirectory ?? temporary;
-        FileStream? lease = null;
-        var storageGate = new SemaphoreSlim(1);
-        if (directory is not null)
-        {
-            directory = Path.GetFullPath(directory);
-            Directory.CreateDirectory(directory);
-            lease = new FileStream(Path.Combine(directory, ".owner"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-        }
         var builder = new InProcessTestClusterBuilder(1);
         builder.Options.ConfigureFileLogging = false;
         builder.ConfigureHost(host =>
@@ -41,24 +29,12 @@ public static class DigitalBrainSimulation
         {
             silo.AddDigitalBrain();
             foreach (var module in options.Modules) { module.Configure(silo); }
-            if (directory is null) { silo.AddMemoryGrainStorage("Default"); }
-            else
+            silo.AddMemoryGrainStorage("Default");
+            if (options.StorageFaults is { } faults)
             {
-                silo.Services.AddKeyedSingleton<IGrainStorage>("Default", (services, _) =>
-                {
-                    IGrainStorage store = new FileGrainStorage(directory, services.GetRequiredService<Orleans.Serialization.Serializer>(), storageGate);
-                    return options.StorageFaults is { } faults ? new FaultingGrainStorage(store, faults) : store;
-                });
+                DecorateKeyed<IGrainStorage>(silo.Services, "Default", inner => new FaultingGrainStorage(inner, faults));
             }
-            if (options.UseReminders)
-            {
-                if (directory is null) { silo.UseInMemoryReminderService(); }
-                else
-                {
-                    silo.AddReminders();
-                    silo.Services.AddSingleton<IReminderTable>(new FileReminderTable(directory));
-                }
-            }
+            if (options.UseReminders) { silo.UseInMemoryReminderService(); }
             options.ConfigureSilo?.Invoke(silo);
         });
         builder.ConfigureClient(client => { client.AddDigitalBrain(); options.ConfigureClient?.Invoke(client); });
@@ -81,12 +57,26 @@ public static class DigitalBrainSimulation
                 await web.StartAsync(cancellationToken).ConfigureAwait(false);
                 http = new HttpClient { BaseAddress = new Uri(web.Urls.Single() + "/") };
             }
-            return new SimulatedBrain(cluster, web, http, lease, temporary, options.StorageFaults);
+            return new SimulatedBrain(cluster, web, http, options.StorageFaults);
         }
         catch
         {
-            await SimulatedBrain.ReleaseAsync(cluster, web, http, lease, temporary, options.StorageFaults).ConfigureAwait(false);
+            await SimulatedBrain.ReleaseAsync(cluster, web, http, options.StorageFaults).ConfigureAwait(false);
             throw;
         }
+    }
+
+    private static void DecorateKeyed<T>(IServiceCollection services, object key, Func<T, T> decorate) where T : class
+    {
+        var descriptor = services.Last(d => d.IsKeyedService && d.ServiceType == typeof(T) && Equals(d.ServiceKey, key));
+        services.Remove(descriptor);
+        services.AddKeyedSingleton<T>(key, (provider, k) =>
+        {
+            var inner = descriptor.KeyedImplementationFactory is not null
+                ? (T)descriptor.KeyedImplementationFactory(provider, k)!
+                : descriptor.KeyedImplementationInstance is T instance ? instance
+                : (T)ActivatorUtilities.CreateInstance(provider, descriptor.KeyedImplementationType!);
+            return decorate(inner);
+        });
     }
 }

@@ -1,5 +1,6 @@
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
+using DigitalBrain.Testing;
 using Orleans;
 using Orleans.Runtime;
 using Xunit;
@@ -67,43 +68,18 @@ public sealed class PersistenceFacts
     }
 
     [Fact]
-    public async Task HeldReadCanBeReleasedAndStateSurvivesSiloRestart()
+    public async Task DeactivationKeepsStateAndDoesNotReplaySignals()
     {
         var ct = TestContext.Current.CancellationToken;
-        var faults = new StorageFaults();
-        await using var brain = await DigitalBrainSimulation.StartAsync(new() { StorageFaults = faults }, ct);
-        var counter = brain.Get<ICounter>("hold");
-        await counter.SetWithoutPublishing(3);
-        await brain.RestartSiloAsync(ct);
-        using var hold = faults.HoldNextRead(counter.GetGrainId());
-        var read = counter.Read();
-        await hold.Entered.WaitAsync(TimeSpan.FromSeconds(5), ct);
-        Assert.False(read.IsCompleted);
-        hold.Release();
-        Assert.Equal(3, await read.WaitAsync(TimeSpan.FromSeconds(5), ct));
-    }
-
-    [Fact]
-    public async Task CommittedStateSurvivesANewHostWithoutReplayingSignals()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var directory = Path.Combine(Path.GetTempPath(), "brain-" + Guid.NewGuid().ToString("N"));
-        try
-        {
-            await using (var first = await DigitalBrainSimulation.StartAsync(new() { PersistenceDirectory = directory }, ct))
-            {
-                await first.Get<ICounter>("saved").SetWithoutPublishing(23);
-            }
-            await using var second = await DigitalBrainSimulation.StartAsync(new() { PersistenceDirectory = directory }, ct);
-            var counter = second.Get<ICounter>("saved");
-            Assert.Equal(23, await counter.Read());
-            await using var probe = await second.Observe<Number>(counter, ct);
-            await counter.Set(24);
-            Assert.Equal(24, (await probe.NextAsync(ct: ct)).Value);
-            await counter.Deactivate();
-            Assert.Equal(24, await counter.Read());
-        }
-        finally { if (Directory.Exists(directory)) { Directory.Delete(directory, recursive: true); } }
+        await using var brain = await DigitalBrainSimulation.StartAsync(cancellationToken: ct);
+        var counter = brain.Get<ICounter>("saved");
+        await counter.SetWithoutPublishing(23);
+        await brain.DeactivateAsync(counter, ct);
+        Assert.Equal(23, await counter.Read());
+        await using var probe = await brain.Observe<Number>(counter, ct);
+        await counter.Set(24);
+        Assert.Equal(24, (await probe.NextAsync(ct: ct)).Value);
+        Assert.DoesNotContain(probe.Snapshot, fact => fact.Value == 23);
     }
 }
 

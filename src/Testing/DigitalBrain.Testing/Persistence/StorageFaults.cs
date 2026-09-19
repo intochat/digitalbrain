@@ -7,23 +7,12 @@ public sealed class StorageFaults : IDisposable
 {
     private readonly ConcurrentDictionary<GrainId, bool> _writes = new();
     private readonly ConcurrentDictionary<GrainId, bool> _reads = new();
-    private readonly ConcurrentDictionary<GrainId, ReadHold> _holds = new();
     public void FailNextWrite(GrainId id) => _writes[id] = true;
     public void FailNextRead(GrainId id) => _reads[id] = true;
-    public ReadHold HoldNextRead(GrainId id)
+    internal Task BeforeRead(GrainId id)
     {
-        var hold = new ReadHold();
-        if (!_holds.TryAdd(id, hold)) { throw new InvalidOperationException("A read is already held for this grain."); }
-        return hold;
-    }
-    internal async Task BeforeRead(GrainId id)
-    {
-        if (_holds.TryGetValue(id, out var hold))
-        {
-            await hold.WaitAsync().ConfigureAwait(false);
-            _holds.TryRemove(id, out _);
-        }
         if (_reads.TryRemove(id, out _)) { throw new IOException("Test storage refused a read."); }
+        return Task.CompletedTask;
     }
     internal void BeforeWrite(GrainId id)
     {
@@ -31,19 +20,9 @@ public sealed class StorageFaults : IDisposable
     }
     public void Dispose()
     {
-        foreach (var hold in _holds.Values) { hold.Release(); }
-        _holds.Clear();
+        _writes.Clear();
+        _reads.Clear();
     }
-}
-
-public sealed class ReadHold : IDisposable
-{
-    private readonly TaskCompletionSource _entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    public Task Entered => _entered.Task;
-    internal async Task WaitAsync() { _entered.TrySetResult(); await _release.Task.ConfigureAwait(false); }
-    public void Release() => _release.TrySetResult();
-    public void Dispose() => Release();
 }
 
 internal sealed class FaultingGrainStorage(IGrainStorage inner, StorageFaults faults) : IGrainStorage

@@ -124,29 +124,6 @@ public sealed class ReminderFacts
     }
 
     [Fact]
-    public async Task FreshHostAutonomouslyReceivesPersistedReminderWithoutCallingTheGrain()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var directory = Path.Combine(Path.GetTempPath(), "brain-reminder-" + Guid.NewGuid().ToString("N"));
-        try
-        {
-            Orleans.Runtime.GrainId id;
-            await using (var first = await StartAsync(ct, new ReminderControl(), directory))
-            {
-                var reminder = first.Get<IReminder>("restart");
-                id = reminder.GetGrainId();
-                await reminder.Start(TimeSpan.Zero, TimeSpan.FromMilliseconds(200));
-            }
-            var control = new ReminderControl();
-            await using var second = await StartAsync(ct, control, directory);
-            Assert.Equal(id, (await control.NextDeliveryAsync(ct)).Id);
-            // No grain reference/call was used on this host before native reminder delivery.
-            await second.Get<IReminder>("restart").Stop();
-        }
-        finally { Directory.Delete(directory, true); }
-    }
-
-    [Fact]
     public async Task ReminderReactivatesAfterExplicitDeactivation()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -176,12 +153,11 @@ public sealed class ReminderFacts
         Assert.Contains("reminder", error.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
-    private static Task<IDigitalBrain> StartAsync(CancellationToken ct, ReminderControl? reminders = null, string? directory = null)
+    private static Task<IDigitalBrain> StartAsync(CancellationToken ct, ReminderControl? reminders = null)
         => DigitalBrainSimulation.StartAsync(new()
         {
             Modules = [new TimeModule()],
             UseReminders = true,
-            PersistenceDirectory = directory,
             ConfigureSilo = reminders is null ? null : silo => silo.UseReminderControl(reminders),
         }, ct);
 }

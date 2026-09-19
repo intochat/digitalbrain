@@ -9,8 +9,8 @@ using Orleans.TestingHost;
 
 namespace DigitalBrain.Testing;
 
-internal sealed class SimulatedBrain(InProcessTestCluster cluster, WebApplication? web, HttpClient? http,
-    FileStream? storeLease, string? temporaryStore, StorageFaults? faults) : IDigitalBrain
+internal sealed class SimulatedBrain(InProcessTestCluster cluster, WebApplication? web, HttpClient? http, StorageFaults? faults)
+    : IDigitalBrain
 {
     private readonly IDigitalBrain _brain = cluster.Client.ServiceProvider.GetRequiredService<IDigitalBrain>();
     private readonly List<IAsyncDisposable> _resources = [];
@@ -42,13 +42,13 @@ internal sealed class SimulatedBrain(InProcessTestCluster cluster, WebApplicatio
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) { return; }
-        var failures = await ReleaseAsync(cluster, web, http, storeLease, temporaryStore, faults, _brain, _resources).ConfigureAwait(false);
+        var failures = await ReleaseAsync(cluster, web, http, faults, _brain, _resources).ConfigureAwait(false);
         if (failures.Count > 0) { throw new AggregateException("Brain simulation cleanup failed.", failures); }
     }
 
     internal static async Task<List<Exception>> ReleaseAsync(
-        InProcessTestCluster? cluster, WebApplication? web, HttpClient? http, FileStream? lease,
-        string? temporaryStore, StorageFaults? faults, IDigitalBrain? brain = null, IReadOnlyList<IAsyncDisposable>? resources = null)
+        InProcessTestCluster? cluster, WebApplication? web, HttpClient? http, StorageFaults? faults,
+        IDigitalBrain? brain = null, IReadOnlyList<IAsyncDisposable>? resources = null)
     {
         List<Exception> failures = [];
         faults?.Dispose();
@@ -76,8 +76,6 @@ internal sealed class SimulatedBrain(InProcessTestCluster cluster, WebApplicatio
             try { await cluster.DisposeAsync().ConfigureAwait(false); }
             catch (Exception error) { failures.Add(error); }
         }
-        lease?.Dispose();
-        if (temporaryStore is not null) { Directory.Delete(temporaryStore, true); }
         return failures;
     }
 }
