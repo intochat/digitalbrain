@@ -1,16 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Behavior graphs: definition, node grains, and deploy/run over neuron synapses.</Description>
-    <RootNamespace>DigitalBrain.Core.Behavior</RootNamespace>
+    <Description>IBehavior: IDigitalBrain constructor, RunAsync loop. No graph compiler.</Description>
+    <RootNamespace>DigitalBrain.Core</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Sdk" />
-    <PackageReference Include="Microsoft.Extensions.AI" />
-    <PackageReference Include="ModelContextProtocol.Core" />
     <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Runtime.Tests" />
   </ItemGroup>
 </Project>

@@ -6,5 +6,7 @@
   <Project Path="src/Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
   <Project Path="src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
   <Project Path="src/Modules/Time/Tests/DigitalBrain.Modules.Time.Tests.csproj" />
+  <Project Path="src/Behaviors/DigitalBrain.Behaviors.csproj" />
+  <Project Path="src/Behaviors/Tests/DigitalBrain.Behaviors.Tests.csproj" />
 </Solution>
 

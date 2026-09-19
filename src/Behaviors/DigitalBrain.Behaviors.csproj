@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <Description>Compiled behaviors: IBehavior types that program neurons through IDigitalBrain.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="ElonBitcoin.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Modules/DigitalBrain/BehaviorRuntime/DigitalBrain.Behavior.csproj" />
+    <ProjectReference Include="../Testing/DigitalBrain.NeuronTesting/DigitalBrain.NeuronTesting.csproj" />
+  </ItemGroup>
+</Project>

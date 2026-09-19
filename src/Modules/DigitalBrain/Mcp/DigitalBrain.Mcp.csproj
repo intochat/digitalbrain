@@ -14,6 +14,5 @@
     <ProjectReference Include="../../../Applications/IntoChat/ServiceDefaults/IntoChat.ServiceDefaults.csproj" />
     <ProjectReference Include="../Contracts/DigitalBrain.Contracts.csproj" />
     <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />
-    <ProjectReference Include="../BehaviorRuntime/DigitalBrain.Behavior.csproj" />
   </ItemGroup>
 </Project>

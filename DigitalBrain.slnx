@@ -83,6 +83,10 @@
     <File Path=".editorconfig" />
     <File Path="Directory.Packages.props" />
   </Folder>
+  <Folder Name="/Behaviors/">
+    <Project Path="src/Behaviors/DigitalBrain.Behaviors.csproj" />
+    <Project Path="src/Behaviors/Tests/DigitalBrain.Behaviors.Tests.csproj" />
+  </Folder>
   <Folder Name="/Testing/">
     <Project Path="src/Testing/DigitalBrain.NeuronTesting/DigitalBrain.NeuronTesting.csproj" />
     <Project Path="src/Testing/DigitalBrain.E2ETesting/DigitalBrain.E2ETesting.csproj" />

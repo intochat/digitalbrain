@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../Testing/Module.Tests.props" />
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
+    <ProjectReference Include="../DigitalBrain.Behaviors.csproj" />
+  </ItemGroup>
+</Project>
