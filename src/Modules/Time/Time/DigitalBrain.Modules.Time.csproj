@@ -6,6 +6,8 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Reminders" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Time.Tests" />
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <ProjectReference Include="../../DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
   </ItemGroup>

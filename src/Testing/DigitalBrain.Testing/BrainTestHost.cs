@@ -66,6 +66,15 @@ public sealed class BrainTestHost : IAsyncDisposable
                     return options.StorageFaults is { } faults ? new FaultingGrainStorage(store, faults) : store;
                 });
             }
+            if (options.UseReminders)
+            {
+                if (directory is null) { silo.UseInMemoryReminderService(); }
+                else
+                {
+                    silo.AddReminders();
+                    silo.Services.AddSingleton<IReminderTable>(new FileReminderTable(directory));
+                }
+            }
             options.ConfigureSilo?.Invoke(silo);
         });
         builder.ConfigureClient(client => { client.AddDigitalBrain(); options.ConfigureClient?.Invoke(client); });

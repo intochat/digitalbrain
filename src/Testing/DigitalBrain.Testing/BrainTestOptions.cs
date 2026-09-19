@@ -6,4 +6,5 @@ public sealed record BrainTestOptions
     public Action<IClientBuilder>? ConfigureClient { get; init; }
     public string? PersistenceDirectory { get; init; }
     public StorageFaults? StorageFaults { get; init; }
+    public bool UseReminders { get; init; }
 }
