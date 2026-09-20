@@ -61,9 +61,31 @@ public sealed class SupabaseWorkspaceE2EFacts
         var failure = page.GetByText("The request could not be completed. Check the data connection or try again.", new() { Exact = true });
         async Task ExpectFailure(string text)
         {
-            var response = await page.RunAndWaitForResponseAsync(() => Send(text), response => response.Url.EndsWith("/agent", StringComparison.Ordinal) && response.Request.Method == "POST");
-            await response.FinishedAsync().WaitAsync(TimeSpan.FromSeconds(60), ct);
-            await Assertions.Expect(failure).ToBeVisibleAsync();
+            var beforeTable = fixture.Model.BeforeTable;
+            var waiting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var continueResponse = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            fixture.Model.BeforeTable = async token =>
+            {
+                waiting.TrySetResult();
+                await continueResponse.Task.WaitAsync(token);
+                if (beforeTable is not null) { await beforeTable(token); }
+            };
+            try
+            {
+                await Send(text);
+                await waiting.Task.WaitAsync(TimeSpan.FromSeconds(30), ct);
+                await Assertions.Expect(failure).ToBeHiddenAsync();
+                // RUN_ERROR cancels the Flutter stream subscription. Normal HTTP
+                // completion is therefore not the signal that this run finished.
+                continueResponse.TrySetResult();
+                await Assertions.Expect(failure).ToBeVisibleAsync(new() { Timeout = 60000 });
+                await Assertions.Expect(page.GetByRole(AriaRole.Button, new() { Name = "Send" })).ToBeVisibleAsync();
+            }
+            finally
+            {
+                continueResponse.TrySetResult();
+                fixture.Model.BeforeTable = beforeTable;
+            }
         }
         await ExpectFailure("Try an invalid query");
         await Assertions.Expect(window).ToHaveCountAsync(1);

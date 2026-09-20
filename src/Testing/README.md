@@ -42,6 +42,8 @@ configuration class with a property for each module.
 Declarations are copied and resolved in dependency order. Duplicate explicit modules and
 conflicting shared settings fail early. Aspire materializes module resources once, on the first
 runtime or client reference. Later configuration throws. Each test builder starts one session.
+Typed AI declarations reject API keys instead of dropping them. Supply credentials through
+private configuration or Aspire secret parameters; public module overrides never transport them.
 
 Use `ConfigureSilo` and `ConfigureClient` for local callbacks and controlled providers. These
 callbacks are local; they do not cross a process boundary. Native Orleans timers/reminders remain
@@ -141,6 +143,8 @@ Browser options live only in E2E. Explicit Headless/SlowMo values win over the e
 Otherwise `DIGITALBRAIN_E2E_HEADED=1` or an attached debugger requests a visible browser with 250 ms
 slow motion; unattended defaults are headless with no delay. Explicit zero delay is respected.
 One brain owns one launch configuration; each OpenBrowserAsync creates an isolated browser context.
+IntoChat test deployments clear development launch-profile ports and allocate independent runtime
+endpoints, so an existing application instance does not reserve their HTTP port.
 
 Flutter advertises its application's `semantics=true` query and semantics-tree readiness selector
 through browser endpoint metadata. Generic E2E contains no Flutter-specific selectors.
@@ -216,3 +220,7 @@ Run Flutter protocol and widget tests from `src/Modules/Flutter/app/shell` with 
 The shell reconciles workspace revisions after reconnect, restores committed conversation result
 links and exposes explicit reopen actions. Failed refreshes retain the last view with a stale-data
 message; they do not replace it with fabricated rows.
+Table-request cancellation currently stops the HTTP wait and discards stale UI responses, but an
+in-flight database page/count read runs to completion or its provider deadline. Each command has
+a 15-second database timeout and a 20-second operation deadline. Agent-tool cancellation propagates
+to the provider; cancellation through the table-read contract remains a follow-up.

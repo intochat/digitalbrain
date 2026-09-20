@@ -1,6 +1,6 @@
 # Code-first composition and the agent-to-data UI journey
 
-Status: option A and both implementation plans approved on 2026-09-20. Implementation is on `archv2`, unpushed. Composition is complete; the agent data window is in browser acceptance. See the [execution ledger](../plans/code-first-execution-progress.md) for tested behavior, deviations and remaining gates. Interface sketches below record the approved design; current source is authoritative for exact signatures.
+Status: option A and both implementation plans approved on 2026-09-20. Implementation is on `archv2`, unpushed. Both implementation plans are complete and verified, including the final review fixes. See the [execution ledger](../plans/code-first-execution-progress.md) for test evidence, decisions and remaining limitations. Interface sketches below record the approved design; current source is authoritative for exact signatures.
 
 ## Intent
 

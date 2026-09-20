@@ -16,6 +16,37 @@ namespace DigitalBrain.Tests;
 
 public sealed class CompositionHostingFacts
 {
+    [Theory]
+    [InlineData("OpenAI")]
+    [InlineData("Anthropic")]
+    [InlineData("Google")]
+    [InlineData("XAI")]
+    [InlineData("Ollama")]
+    [InlineData("Tavily")]
+    public void TypedCredentialsAreRejectedBeforeCompositionOrOverrideTransport(string provider)
+    {
+        const string secret = "must-not-appear-in-errors";
+        var options = new AIOptions();
+        switch (provider)
+        {
+            case "OpenAI": options.OpenAI.ApiKey = secret; break;
+            case "Anthropic": options.Anthropic.ApiKey = secret; break;
+            case "Google": options.Google.ApiKey = secret; break;
+            case "XAI": options.XAI.ApiKey = secret; break;
+            case "Ollama": options.Ollama.ApiKey = secret; break;
+            case "Tavily": options.Tavily.ApiKey = secret; break;
+        }
+        var composition = Assert.Throws<ArgumentException>(() => new BrainCompositionBuilder()
+            .WithModule<AIModule>(ai => ai.WithOptions(options)).Build());
+        var overrides = Assert.Throws<ArgumentException>(() => new CompositionOverrides()
+            .ConfigureModule<AIModule>(ai => ai.WithOptions(options)).Serialize());
+        foreach (var error in new[] { composition, overrides })
+        {
+            Assert.Contains("private configuration", error.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(secret, error.ToString());
+        }
+    }
+
     [Fact]
     public async Task WebReadinessWaitsForCurrentCompilationInsteadOfCachedAssets()
     {

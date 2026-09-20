@@ -1,10 +1,35 @@
 using Aspire.Hosting.Testing;
+using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Aspire.Hosting;
 
 namespace IntoChat.Tests;
 
 public sealed class ApplicationCompositionFacts
 {
+    [Fact]
+    public async Task TestRuntimeDoesNotInheritDevelopmentPorts()
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.IntoChat_AppHost>(
+            ["DigitalBrain:Testing:Enabled=true"], TestContext.Current.CancellationToken);
+        var runtime = Assert.Single(builder.Resources, resource => resource.Annotations.OfType<BrainEndpointAnnotation>().Any());
+        var http = Assert.Single(runtime.Annotations.OfType<EndpointAnnotation>(), endpoint => endpoint.Name == "http");
+        Assert.Null(http.Port);
+        Assert.Null(http.TargetPort);
+    }
+
+    [Fact(Timeout = 240_000)]
+    public async Task ConcurrentDeploymentsHaveIndependentRuntimePorts()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var firstDeployment = await IntoChatTestDeployment.CreateAsync(ct);
+        await using var secondDeployment = await IntoChatTestDeployment.CreateAsync(ct);
+        await using var first = await firstDeployment.CreateTest().StartAsync(ct);
+        await using var second = await secondDeployment.CreateTest().StartAsync(ct);
+        Assert.NotEqual(first.HttpClient.BaseAddress!.Port, second.HttpClient.BaseAddress!.Port);
+        Assert.NotEqual(5310, first.HttpClient.BaseAddress.Port);
+        Assert.NotEqual(5310, second.HttpClient.BaseAddress.Port);
+    }
+
     [Fact]
     public void ExcelAndFlutterUseDistinctSerializedSheetIdentities()
     {

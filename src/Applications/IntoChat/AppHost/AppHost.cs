@@ -89,4 +89,11 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
 
     });
 
+if (testing)
+{
+    // Null arguments to WithHttpEndpoint retain ports from launchSettings.json.
+    // Clear both inherited ports so each test deployment receives its own endpoint.
+    runtime.WithEndpoint("http", endpoint => { endpoint.Port = null; endpoint.TargetPort = null; });
+}
+
 builder.Build().Run();

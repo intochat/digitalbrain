@@ -9,6 +9,15 @@ public sealed class AIConfigurationContract() : ModuleConfigurationContract<AIMo
     "Ollama.Endpoint", "Ollama.Models", "Tavily.Enabled", "ModelProfiles", "Hosting.Llms", "Hosting.Embeddings")
 {
     protected override ModuleDefinition Compile(AIOptions options) => AIModule.Define(options);
+    protected override void Validate(AIOptions options)
+    {
+        if (options.OpenAI.ApiKey is not null || options.Anthropic.ApiKey is not null
+            || options.Google.ApiKey is not null || options.XAI.ApiKey is not null
+            || options.Ollama.ApiKey is not null || options.Tavily.ApiKey is not null)
+        {
+            throw new ArgumentException("API keys cannot be supplied in module declarations. Use private configuration or Aspire secret parameters instead.", nameof(options));
+        }
+    }
 }
 
 public static class AIModuleConfiguration

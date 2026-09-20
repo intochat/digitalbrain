@@ -227,8 +227,8 @@ Use the actual accessible widget interaction for Flutter dropdowns; if it expose
 
 - [x] Add an explicit live mode controlled by `DIGITALBRAIN_E2E_LIVE_MODEL=1`. The test is separately categorized and skipped with a reason unless selected. When selected but required model credentials are absent, fail with an actionable message. Keep the same fresh database and browser actions; use semantic table assertions, not exact assistant prose or exact tool-call sequence.
 - [x] Do not execute paid/live calls without an explicit user request to run that lane. Deterministic CI remains the default. Do not label the PostgreSQL-backed provider test a test of Supabase Auth, REST or Realtime.
-- [ ] Run the complete solution suite once after affected tests pass, plus Flutter core/shell suites. Check that neither runtime nor UI has duplicate authoritative state or a legacy conversation implementation re-enabled. Investigate any cleanup failure instead of hiding it.
-- [ ] Review the final diff against the approved interface and all five Review Focus cases. Record results and limitations. Commit, leave `archv2` unpushed, and report the test guarantees plainly.
+- [x] Run the complete solution suite once after affected tests pass, plus Flutter core/shell suites. Check that neither runtime nor UI has duplicate authoritative state or a legacy conversation implementation re-enabled. Investigate any cleanup failure instead of hiding it.
+- [x] Review the final diff against the approved interface and all five Review Focus cases. Record results and limitations. Commit, leave `archv2` unpushed, and report the test guarantees plainly.
 
 ## Commands and execution order
 

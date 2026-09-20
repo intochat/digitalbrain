@@ -20,6 +20,7 @@ public abstract class ModuleConfigurationContract<TModule, TOptions>(params stri
     public object Copy(object options) => Decode(Encode(options));
     public ModuleDefinition Compile(object options) => Compile(Require(options));
     protected abstract ModuleDefinition Compile(TOptions options);
+    protected virtual void Validate(TOptions options) { }
     public string WriteReplacement(object configured) => WriteOverride(configured, _members);
 
     public string WriteOverride(object configured, IReadOnlyCollection<string> assignedMembers)
@@ -54,9 +55,14 @@ public abstract class ModuleConfigurationContract<TModule, TOptions>(params stri
         if (!_members.Contains(member)) { throw new ArgumentException($"Unknown public option '{member}' for {typeof(TModule).Name}."); }
     }
 
-    private static TOptions Require(object options) => options as TOptions
-        ?? throw new ArgumentException($"Options must be {typeof(TOptions).Name}.", nameof(options));
-    private static JsonObject Encode(object options) => JsonSerializer.SerializeToNode(Require(options), Json)!.AsObject();
+    private TOptions Require(object options)
+    {
+        var typed = options as TOptions
+            ?? throw new ArgumentException($"Options must be {typeof(TOptions).Name}.", nameof(options));
+        Validate(typed);
+        return typed;
+    }
+    private JsonObject Encode(object options) => JsonSerializer.SerializeToNode(Require(options), Json)!.AsObject();
     private static TOptions Decode(JsonObject options) => options.Deserialize<TOptions>(Json)!;
     private static JsonNode? Read(JsonObject source, string path)
     {
