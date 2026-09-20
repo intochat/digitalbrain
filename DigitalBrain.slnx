@@ -1,10 +1,11 @@
 <Solution>
-  <Folder Name="/Applications/IntoChat/">
-    <Project Path="src/Applications/IntoChat/Tests/IntoChat.Tests.csproj" />
+  <Folder Name="/IntoChat/">
     <Project Path="src/Applications/IntoChat/AppHost/IntoChat.AppHost.csproj" />
-    <Project Path="src/Applications/IntoChat/ServiceDefaults/IntoChat.ServiceDefaults.csproj" />
     <Project Path="src/Applications/IntoChat/IntoChat/IntoChat.csproj" />
+    <Project Path="src/Applications/IntoChat/ServiceDefaults/IntoChat.ServiceDefaults.csproj" />
+    <Project Path="src/Applications/IntoChat/Tests/IntoChat.Tests.csproj" />
   </Folder>
+  <Folder Name="/Modules/" />
   <Folder Name="/Modules/AI/">
     <Project Path="src/Modules/AI/Tests/DigitalBrain.Modules.AI.Tests.Unit.csproj" />
     <Project Path="src/Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
