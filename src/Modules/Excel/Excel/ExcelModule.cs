@@ -1,14 +1,11 @@
-using DigitalBrain.AI;
-using Microsoft.Extensions.DependencyInjection;
+using DigitalBrain.Core;
+using Orleans.Hosting;
 
 namespace DigitalBrain.Excel;
 
-public sealed class ExcelModule : Core.IModule
+public sealed class ExcelModule : IModule
 {
-    public void Configure(ISiloBuilder builder)
-    {
-        ArgumentNullException.ThrowIfNull(builder);
-        builder.Services.AddSingleton<ExcelNativeTools>();
-        builder.Services.AddNativeTool("show_spreadsheet", services => services.GetRequiredService<ExcelNativeTools>().Create());
-    }
+    public static ModuleDefinition Define() => new(typeof(ExcelModule));
+
+    public void Configure(ISiloBuilder silo) { }
 }

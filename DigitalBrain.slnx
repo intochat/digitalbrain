@@ -34,7 +34,7 @@
     <Project Path="src/Modules/DigitalBrain/Mcp/DigitalBrain.Mcp.csproj" />
   </Folder>
   <Folder Name="/Modules/Excel/">
-    <Project Path="src/Modules/Excel/Tests/DigitalBrain.Modules.Excel.Tests.csproj" />
+    <Project Path="src/Modules/Excel/Tests/DigitalBrain.Modules.Excel.Tests.Unit.csproj" />
     <Project Path="src/Modules/Excel/Contracts/DigitalBrain.Modules.Excel.Contracts.csproj" />
     <Project Path="src/Modules/Excel/Excel/DigitalBrain.Modules.Excel.csproj" />
   </Folder>

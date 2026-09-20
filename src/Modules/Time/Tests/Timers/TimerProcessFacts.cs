@@ -76,9 +76,9 @@ public sealed class TimerProcessFacts
     private static string FindRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "DigitalBrain.Foundation.slnx")))
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "DigitalBrain.slnx")))
         { directory = directory.Parent; }
-        return directory?.FullName ?? throw new InvalidOperationException("Cannot find the foundation checkout.");
+        return directory?.FullName ?? throw new InvalidOperationException("Cannot find the repository checkout.");
     }
     public sealed class ProcessSilo : ISiloConfigurator
     {

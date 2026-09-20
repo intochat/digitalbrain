@@ -1,4 +1,4 @@
-namespace DigitalBrain.Excel;
+namespace DigitalBrain.Excel.Spreadsheet;
 
 /// <summary>A query for a rectangular range of cells.</summary>
 [GenerateSerializer]

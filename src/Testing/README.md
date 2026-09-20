@@ -10,7 +10,7 @@ Three layers, never mixed. Each has its own public package and returns a concret
 
 Shared probes, behavior runs, bounded waits, session lifetime and diagnostics live in `DigitalBrain.Testing`.
 
-Run unit tests: `dotnet test --solution DigitalBrain.Foundation.slnx -p:CodeGraphRefresh=false`.
+Run unit tests: `dotnet test --project src/Modules/<Name>/Tests/DigitalBrain.Modules.<Name>.Tests.Unit.csproj -p:CodeGraphRefresh=false`.
 Run the framework and application lanes: `dotnet test --solution DigitalBrain.Testing.slnx -p:CodeGraphRefresh=false`.
 
 ## Test a real module

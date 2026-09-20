@@ -1,4 +1,4 @@
-namespace DigitalBrain.Excel;
+namespace DigitalBrain.Excel.Spreadsheet;
 
 [GenerateSerializer]
 [Alias("excel.cell-edit")]
