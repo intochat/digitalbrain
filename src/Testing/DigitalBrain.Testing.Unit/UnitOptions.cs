@@ -4,7 +4,7 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Testing.Unit;
 
-public sealed record UnitOptions
+internal sealed record UnitOptions
 {
     public IReadOnlyList<ModuleDefinition> Modules { get; init; } = [];
     public TestExecutionOptions Execution { get; init; } = new();

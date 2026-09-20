@@ -10,6 +10,8 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Google;
 
+[ModuleConfiguration(typeof(GoogleConfigurationContract))]
+[ModuleHosting("DigitalBrain.Google.Aspire.Hosting.GoogleModuleHosting, DigitalBrain.Modules.Google.Aspire.Hosting")]
 public sealed class GoogleModule : IModule
 {
     public static ModuleDefinition Define(GoogleModuleOptions options)
@@ -22,6 +24,7 @@ public sealed class GoogleModule : IModule
         {
             [GmailOAuthConfigurationRoot + ":PublicOrigin"] = options.PublicOrigin?.AbsoluteUri ?? "",
             [GmailOAuthConfigurationRoot + ":TokenEndpoint"] = options.TokenEndpoint.AbsoluteUri,
+            [GmailOAuthConfigurationRoot + ":HostGmail"] = options.HostGmail.ToString(),
         });
     }
     public const string GmailOAuthConfigurationRoot = "DigitalBrain:Google:Gmail:OAuth";

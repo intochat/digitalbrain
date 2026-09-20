@@ -3,7 +3,7 @@ using Orleans.Concurrency;
 
 namespace DigitalBrain.Excel.Spreadsheet;
 
-[Alias("sheet")]
+[Alias("excel.spreadsheet")]
 public interface ISpreadsheet : INeuron
 {
     Task<SheetVersion> Apply(ApplySheetEdit edit);

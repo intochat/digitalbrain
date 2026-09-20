@@ -9,6 +9,7 @@ public sealed class ClickHouseHostingOptions
 
     // Dev only: re-run init scripts on every container start instead of only on an empty data dir.
     public bool AlwaysRunInitScripts { get; set; }
+    public bool PersistentStorage { get; set; } = true;
 
     public ClickHouseHostingOptions WithSeed(string name)
     {

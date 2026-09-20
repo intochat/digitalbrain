@@ -18,13 +18,9 @@ public sealed class ModuleRegistrationFacts
     [Fact]
     public async Task TransitiveDependencyRegistersExactlyOnce()
     {
-        var dependency = new ModuleDefinition(typeof(Dependency));
-        var module = new ModuleDefinition(typeof(Dependent), dependencies: [dependency]);
-        await using var brain = await UnitTest.StartAsync(new()
-        {
-            Modules = [module, module],
-            ConfigureSilo = silo => Assert.Single(silo.Services, s => s.ServiceType == typeof(Marker)),
-        }, TestContext.Current.CancellationToken);
+        await using var brain = await UnitTest.Create().WithModule<Dependency>().WithModule<Dependent>()
+            .ConfigureSilo(silo => Assert.Single(silo.Services, s => s.ServiceType == typeof(Marker)))
+            .StartAsync(TestContext.Current.CancellationToken);
     }
 
     public sealed class Marker;
@@ -32,6 +28,7 @@ public sealed class ModuleRegistrationFacts
     {
         public void Configure(ISiloBuilder silo) => silo.Services.AddSingleton<Marker>();
     }
+    [ModuleConfiguration(typeof(DependentContract))]
     public sealed class Dependent : IModule
     {
         public void Configure(ISiloBuilder silo)
@@ -39,5 +36,11 @@ public sealed class ModuleRegistrationFacts
             if (!silo.Services.Any(s => s.ServiceType == typeof(Marker)))
                 { throw new InvalidOperationException("Dependency was not configured before dependent."); }
         }
+    }
+    public sealed class DependentOptions;
+    public sealed class DependentContract() : ModuleConfigurationContract<Dependent, DependentOptions>()
+    {
+        protected override ModuleDefinition Compile(DependentOptions options)
+            => new(typeof(Dependent), dependencies: [new(typeof(Dependency))]);
     }
 }

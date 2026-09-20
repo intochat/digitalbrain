@@ -146,19 +146,14 @@ public sealed class ReminderFacts
     {
         var error = await Assert.ThrowsAnyAsync<Exception>(async () =>
         {
-            await using var brain = await UnitTest.StartAsync(new()
-            {
-                Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(TimeModule))],
-            }, TestContext.Current.CancellationToken);
+            await using var brain = await UnitTest.Create().WithModule<TimeModule>()
+            .StartAsync(TestContext.Current.CancellationToken);
         });
         Assert.Contains("reminder", error.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
     private static Task<UnitBrain> StartAsync(CancellationToken ct, ReminderControl? reminders = null)
-        => UnitTest.StartAsync(new()
-        {
-            Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(TimeModule))],
-            UseReminders = true,
-            ConfigureSilo = reminders is null ? null : silo => silo.UseReminderControl(reminders),
-        }, ct);
+        => UnitTest.Create().WithModule<TimeModule>().WithReminders()
+            .ConfigureSilo(silo => { if (reminders is not null) { silo.UseReminderControl(reminders); } })
+            .StartAsync(ct);
 }

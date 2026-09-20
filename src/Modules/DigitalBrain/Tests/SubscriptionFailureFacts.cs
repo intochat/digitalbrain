@@ -55,7 +55,7 @@ public sealed class SubscriptionFailureFacts
     public async Task RenewalFailureIsReportedBeforeRemoteCleanupFinishes()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(SubscriptionLifetimeFacts.Options(), ct);
+        await using var brain = await SubscriptionLifetimeFacts.Options().StartAsync(ct);
         var source = brain.Get<IControlledSource>("slow-cleanup");
         await using var subscription = await brain.SubscribeAsync<Number>(source, ct);
         await source.Configure("watch-fail-held-cleanup");
@@ -73,7 +73,7 @@ public sealed class SubscriptionFailureFacts
     public async Task FailedOrCanceledRegistrationIsCleanedUp(string mode)
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(SubscriptionLifetimeFacts.Options(), ct);
+        await using var brain = await SubscriptionLifetimeFacts.Options().StartAsync(ct);
         var source = brain.Get<IControlledSource>("registration");
         await source.Configure(mode);
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -87,7 +87,7 @@ public sealed class SubscriptionFailureFacts
     public async Task RenewalFailureIsVisibleAndCleanupFailureDoesNotReplaceIt()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(SubscriptionLifetimeFacts.Options(), ct);
+        await using var brain = await SubscriptionLifetimeFacts.Options().StartAsync(ct);
         var source = brain.Get<IControlledSource>("renew-failure");
         await using var stream = await brain.SubscribeAsync<Number>(source, ct);
         await source.Configure("watch");

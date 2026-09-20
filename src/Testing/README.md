@@ -21,12 +21,11 @@ These remain physical projects, not additional public testing layers.
 
 ```csharp
 var ct = TestContext.Current.CancellationToken;
-await using var brain = await UnitTest.StartAsync(new()
-{
-    Modules = [TimeModule.Define()],
-    UseReminders = true,
-    Execution = new() { AssertionTimeout = TimeSpan.FromSeconds(3) },
-}, ct);
+await using var brain = await UnitTest.Create()
+    .WithModule<TimeModule>()
+    .WithReminders()
+    .WithExecution(new() { AssertionTimeout = TimeSpan.FromSeconds(3) })
+    .StartAsync(ct);
 var timer = brain.Get<DigitalBrain.Time.Timers.ITimer>("tea");
 await using var ticks = await brain.Observe<TimerTick>(timer, ct);
 await timer.Start(TimeSpan.Zero);
@@ -34,13 +33,15 @@ var tick = await ticks.NextAsync(ct: ct);
 Assert.Equal("tea", tick.TimerId);
 ```
 
-Use module-owned `Define` factories for typed settings. A settings-free module can use
-`new ModuleDefinition(typeof(MyModule))`. Definitions are copied, resolved in dependency order
-and configured once. Conflicting repeated definitions or shared configuration keys fail early.
+Use the same `WithModule<T>(options => ...)` declarations in AppHost, Unit and Integration.
+Module-owned methods such as `WithWebHost`, `WithPostgres` and `WithDefaultLlm<T>` expose their
+choices. `WithOptions(value)` explicitly replaces a module's complete options. `ConfigureModule<T>`
+changes an existing declaration; it cannot add a missing module. There is no application-wide
+configuration class with a property for each module.
 
-Aspire's parameterless `AddModule<T>()` applies the module's hosting defaults.
-An explicit `AddModule<T>(callback)` gives that callback control of hosting; automatic defaults
-are not applied before it.
+Declarations are copied and resolved in dependency order. Duplicate explicit modules and
+conflicting shared settings fail early. Aspire materializes module resources once, on the first
+runtime or client reference. Later configuration throws. Each test builder starts one session.
 
 Use `ConfigureSilo` and `ConfigureClient` for local callbacks and controlled providers. These
 callbacks are local; they do not cross a process boundary. Native Orleans timers/reminders remain
@@ -52,13 +53,9 @@ Neither proves persistence through external process death. These capabilities be
 ## Module integration
 
 ```csharp
-await using var brain = await IntegrationTest.StartAsync(new()
-{
-    Modules = [FlutterModule.Define(new()
-    {
-        Hosting = new() { Kind = FlutterHostKind.None },
-    })],
-}, ct);
+await using var brain = await IntegrationTest.Create()
+    .WithModule<FlutterModule>(flutter => flutter.WithoutHost())
+    .StartAsync(ct);
 
 var button = brain.Get<IButton>("go");
 await using var clicks = await brain.Observe<ButtonClicked>(button, ct);
@@ -70,7 +67,7 @@ await clicks.NextAsync(ct: ct);
 
 The runner loads the test build's dependency closure; it never builds/restores at test startup.
 Import `Integration.Tests.props`. Include the selected module's Aspire hosting adapter project
-when that module declares one (Flutter does). For frontend hosts outside an application AppHost,
+when that module declares one. For frontend hosts outside an application AppHost,
 set an explicit Flutter working directory appropriate to the checkout.
 
 `RestartRuntimeAsync` retains the run's storage and identity. Reacquire observations after restart.
@@ -79,17 +76,17 @@ external providers; use a compiled test support module when the replacement is a
 interface inside the external runtime. The framework's provider-loading test exercises this case.
 
 GoogleModuleOptions includes PublicOrigin and TokenEndpoint. Credential-bearing values belong in
-`Execution.PrivateConfiguration`, not ModuleDefinition:
+`WithExecution(new() { PrivateConfiguration = ... })`, outside public module options:
 
 ```csharp
-Execution = new()
+var execution = new TestExecutionOptions
 {
     PrivateConfiguration = new Dictionary<string, string?>
     {
         ["DigitalBrain:Google:Gmail:OAuth:ClientId"] = "integration-client",
         ["DigitalBrain:Google:Gmail:OAuth:ClientSecret"] = "integration-secret",
     },
-}
+};
 ```
 
 Hosted runs transfer these values through an ACL-restricted temporary file, expose only its path
@@ -99,23 +96,39 @@ Use synthetic credentials for protocol stubs. Test-owned identity/connections ca
 ## Application E2E and visible browsers
 
 ```csharp
-await using var brain = await E2ETest.StartAsync<Projects.IntoChat_AppHost>(new()
-{
-    Application = new DigitalBrainConfiguration
-    {
-        Flutter = new() { Hosting = new() { Kind = FlutterHostKind.Web } },
-    },
-    Browser = new() { Headless = false, SlowMoMilliseconds = 250 },
-}, ct);
+await using var deployment = await IntoChatTestDeployment.CreateAsync(ct);
+await using var brain = await deployment.CreateTest(web: true)
+    .WithBrowser(new() { Headless = false, SlowMoMilliseconds = 250 })
+    .StartAsync(ct);
 await using var browser = await brain.OpenBrowserAsync(ct);
 await Assertions.Expect(browser.Page.GetByText("Expected content")).ToBeVisibleAsync();
 ```
 
-Application configuration is required. IntoChat's normal default remains Window; E2E does not
-silently change it. Select Web for browser tests or None for HTTP-only application tests.
-The application snapshot validates exact module slots and public setting keys against the AppHost's
-declared defaults. Unknown/missing slots fail rather than being silently ignored. Module selection
-and hosting projections share `AddModules`; arbitrary subsets belong to Integration.
+The test-owned `IntoChatTestDeployment` configures `E2ETest.For<Projects.IntoChat_AppHost>()`
+with `ConfigureModule<T>` calls for the application's real module inventory. It selects disposable
+Qdrant/ClickHouse/PostgreSQL, local model/OAuth/MCP endpoints, synthetic credentials and a temporary
+coding workspace. The application still declares every module explicitly in AppHost.cs.
+
+E2E offers overrides only: unknown targets fail in the AppHost before resources start. Patches
+preserve unassigned application fields and explicit default/false/null assignments. Whole-options
+replacement is explicit. No delegate or service instance crosses a process boundary. IntoChat's
+ordinary Flutter default remains Window; select Web for browsers or WithoutHost for HTTP-only tests.
+
+For a database integration scenario, select the production provider directly:
+
+```csharp
+await using var brain = await IntegrationTest.Create()
+    .WithModule<SupabaseModule>(database => database.WithPostgres())
+    .StartAsync(ct);
+var database = brain.Get<ISupabase>(SupabaseNames.DefaultNeuron);
+var result = await database.Query(new("select 1 as value"));
+Assert.Equal("1", Assert.Single(Assert.Single(result.Rows)));
+```
+
+Include the Supabase hosting adapter project in this test's dependency closure. The PostgreSQL
+resource is disposable and its generated connection is projected privately. Unit tests can use
+`WithModule<SupabaseModule>(database => database.WithProvider<FakeSupabaseProvider>())` instead;
+that local substitution is rejected by Integration/E2E.
 
 | Flutter hosting | Meaning |
 |---|---|
@@ -136,7 +149,7 @@ frontend readiness and the scenario's own data/subscription readiness are separa
 
 ## Budgets, observations and cleanup
 
-All three layers accept Execution with defaults: startup 3 minutes, signal/behavior assertion
+All three layers accept WithExecution with defaults: startup 3 minutes, signal/behavior assertion
 5 seconds, cleanup 30 seconds. These are per-run values, not global settings.
 BrowserOptions separately defaults startup to 2 minutes and page actions to 60 seconds.
 Native Playwright assertions may supply their own timeout explicitly.
@@ -168,4 +181,4 @@ consumption and Linux/native-asset portability are not certified by this refacto
 shared host/runner preserves process isolation while those packaging concerns remain explicit.
 
 The implementation record is in
-[testing-refactoring-progress.md](../../docs/superpowers/plans/testing-refactoring-progress.md).
+[code-first-execution-progress.md](../../docs/superpowers/plans/code-first-execution-progress.md).

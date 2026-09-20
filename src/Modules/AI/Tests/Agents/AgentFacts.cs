@@ -14,12 +14,9 @@ public sealed class AgentFacts
     public async Task AskReturnsTheModelReplyAndPublishesTheSignal()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(
-            new()
-            {
-                Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(AIModule))],
-                ConfigureSilo = silo => silo.Services.AddSingleton<IChatClient>(new FixedChatClient("pong")),
-            }, ct);
+        await using var brain = await UnitTest.Create().WithModule<AIModule>()
+            .ConfigureSilo(silo => silo.Services.AddSingleton<IChatClient>(new FixedChatClient("pong")))
+            .StartAsync(ct);
 
         var agent = brain.Get<IAgent>("assistant");
         await using var replied = await brain.Observe<AgentReplied>(agent, ct);

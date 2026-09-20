@@ -7,11 +7,9 @@ namespace DigitalBrain.Tests;
 
 public sealed class SubscriptionLifetimeFacts
 {
-    internal static UnitOptions Options(int capacity = 256) => new()
-    {
-        ConfigureSilo = silo => silo.Services.Configure<BrainOptions>(Configure),
-        ConfigureClient = client => client.Services.Configure<BrainOptions>(options => { Configure(options); options.BufferCapacity = capacity; }),
-    };
+    internal static UnitTestBuilder Options(int capacity = 256) => UnitTest.Create()
+        .ConfigureSilo(silo => silo.Services.Configure<BrainOptions>(Configure))
+        .ConfigureClient(client => client.Services.Configure<BrainOptions>(options => { Configure(options); options.BufferCapacity = capacity; }));
     private static void Configure(BrainOptions options)
     {
         options.ObserverLease = TimeSpan.FromSeconds(2);
@@ -23,7 +21,7 @@ public sealed class SubscriptionLifetimeFacts
     public async Task OverflowIsVisibleEvenWithoutDrainingTheBuffer()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(Options(1), ct);
+        await using var brain = await Options(1).StartAsync(ct);
         var source = brain.Get<ITestEmitter>("overflow");
         await using var stream = await brain.SubscribeAsync<Number>(source, ct);
         await source.Emit(1);
@@ -40,7 +38,7 @@ public sealed class SubscriptionLifetimeFacts
     [Fact]
     public async Task CancellationEndsAnIdleSubscriptionAndDisposalIsIdempotent()
     {
-        await using var brain = await UnitTest.StartAsync(Options(), TestContext.Current.CancellationToken);
+        await using var brain = await Options().StartAsync(TestContext.Current.CancellationToken);
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var source = brain.Get<ITestEmitter>("cancel");
         var stream = await brain.SubscribeAsync<Number>(source, cancel.Token);
@@ -55,7 +53,7 @@ public sealed class SubscriptionLifetimeFacts
     public async Task RenewalKeepsAHealthySubscriptionAliveBeyondItsLease()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(Options(), ct);
+        await using var brain = await Options().StartAsync(ct);
         var source = brain.Get<ITestEmitter>("renew");
         await using var stream = await brain.SubscribeAsync<Number>(source, ct);
         await Task.Delay(TimeSpan.FromSeconds(3), ct);
@@ -69,7 +67,7 @@ public sealed class SubscriptionLifetimeFacts
     public async Task ReactivationFaultsTheOldSubscriptionAndANewOneCanObserve()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(Options(), ct);
+        await using var brain = await Options().StartAsync(ct);
         var source = brain.Get<ITestEmitter>("restart");
         await using var old = await brain.SubscribeAsync<Number>(source, ct);
         await source.Deactivate();

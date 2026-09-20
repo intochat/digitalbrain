@@ -63,15 +63,13 @@ public sealed class RepositoryFacts
     }
 
     private static Task<UnitBrain> StartAsync(IGitHubRepositorySource source, CancellationToken ct)
-        => UnitTest.StartAsync(new()
-        {
-            Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(MicrosoftModule))],
-            ConfigureSilo = silo =>
+        => UnitTest.Create().WithModule<MicrosoftModule>()
+            .ConfigureSilo(silo =>
             {
                 silo.Services.AddSingleton(new GitHubRepositoryBindings([Binding()]));
                 silo.Services.AddSingleton(source);
-            },
-        }, ct);
+            })
+            .StartAsync(ct);
 
     private static GitHubRepositoryBinding Binding()
         => new("repo", 11, 9, 7, "intochat", "digitalbrain", "private-key", "0123456789abcdef");

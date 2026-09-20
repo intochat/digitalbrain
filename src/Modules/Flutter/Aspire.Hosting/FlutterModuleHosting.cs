@@ -7,16 +7,26 @@ public sealed class FlutterModuleHosting : IDigitalBrainModuleHosting
 {
     public void Configure(DigitalBrainBuilder brain)
     {
-        var options = brain.ApplicationBuilder.Configuration.GetSection(FlutterHostOptions.SectionName)
+        var options = brain.GetModuleConfiguration<FlutterModule>().GetSection(FlutterHostOptions.SectionName)
             .Get<FlutterHostingOptions>() ?? new();
         var module = new DigitalBrainModuleBuilder<FlutterModule>(brain);
         switch (options.Kind)
         {
             case FlutterHostKind.None: break;
-            case FlutterHostKind.Web: module.WithWebHost(); break;
-            case FlutterHostKind.Window: module.WithWindowHost(); break;
-            case FlutterHostKind.Headless: module.WithHeadlessHost(); break;
+            case FlutterHostKind.Web: module.WithWebHost(Apply); break;
+            case FlutterHostKind.Window: module.WithWindowHost(Apply); break;
+            case FlutterHostKind.Headless: module.WithHeadlessHost(Apply); break;
             default: throw new ArgumentOutOfRangeException(nameof(options));
+        }
+        void Apply(FlutterHostOptions target)
+        {
+            target.ResourceName = options.ResourceName;
+            target.DeviceTarget = options.DeviceTarget;
+            target.ShellName = options.ShellName;
+            target.ChatName = options.ChatName;
+            target.FlutterCommand = options.FlutterCommand;
+            target.DartCommand = options.DartCommand;
+            target.WorkingDirectory = options.WorkingDirectory;
         }
     }
 }

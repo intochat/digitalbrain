@@ -11,7 +11,8 @@ public sealed class CalendarFacts
     public async Task SetWritesMode()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(FlutterModule))] }, ct);
+        await using var brain = await UnitTest.Create().WithModule<FlutterModule>()
+            .StartAsync(ct);
         await brain.Get<ICalendar>("cal").Set("day", ["2026-09-20"]);
         Assert.Equal("day", (await brain.Get<ICalendar>("cal").Read()).Mode);
     }

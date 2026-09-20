@@ -13,8 +13,8 @@ public sealed class ColorHttpFacts
     public async Task GetMatchesSet()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntegrationTest.StartAsync(
-            new() { Modules = [FlutterModule.Define(new() { Hosting = new() { Kind = FlutterHostKind.None } })] }, ct);
+        await using var brain = await IntegrationTest.Create().WithModule<FlutterModule>(flutter => flutter.WithoutHost())
+            .StartAsync(ct);
         await brain.Get<IColor>("accent").Set("#0a84ff");
         var state = await brain.HttpClient.GetFromJsonAsync<ColorState>("/ui/colors/accent", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
         Assert.Equal("#0A84FF", state!.Hex);

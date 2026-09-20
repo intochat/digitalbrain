@@ -4,6 +4,7 @@ public sealed class SalesforceMcpOptions
 {
     public const string SectionName = "DigitalBrain:Salesforce:Mcp";
     public string? Endpoint { get; set; }
+    public bool AllowLoopback { get; set; }
 
     internal Uri? ResolveEndpoint()
     {
@@ -13,6 +14,11 @@ public sealed class SalesforceMcpOptions
             return null;
         }
 
+        if (AllowLoopback && Uri.TryCreate(value, UriKind.Absolute, out var local) && local.IsLoopback
+            && local.Scheme is "http" or "https" && local.UserInfo.Length == 0 && local.Query.Length == 0 && local.Fragment.Length == 0)
+        {
+            return local;
+        }
         if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)
             || uri.Scheme != Uri.UriSchemeHttps || uri.Host != "api.salesforce.com" || !uri.IsDefaultPort
             || !uri.AbsolutePath.StartsWith("/platform/mcp/", StringComparison.Ordinal)

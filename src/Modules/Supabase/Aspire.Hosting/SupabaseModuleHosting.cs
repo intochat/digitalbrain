@@ -9,7 +9,7 @@ public sealed class SupabaseModuleHosting : IDigitalBrainModuleHosting
 {
     public void Configure(DigitalBrainBuilder brain)
     {
-        var options = brain.ApplicationBuilder.Configuration.GetSection(SupabaseModuleOptions.SectionName)
+        var options = brain.GetModuleConfiguration<SupabaseModule>().GetSection(SupabaseModuleOptions.SectionName)
             .Get<SupabaseModuleOptions>() ?? new();
         var module = new DigitalBrainModuleBuilder<SupabaseModule>(brain);
         if (options.Hosting.Kind == SupabaseHostKind.External)

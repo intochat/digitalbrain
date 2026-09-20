@@ -10,7 +10,8 @@ public sealed class UiKitWebFacts
     public async Task ChartVideoAndBrowserAppearInFlutterUi()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await E2ETest.StartAsync<Projects.IntoChat_AppHost>(new() { Application = new DigitalBrainConfiguration { Flutter = new() { Hosting = new() { Kind = DigitalBrain.Flutter.FlutterHostKind.Web } } } }, ct);
+        await using var deployment = await IntoChatTestDeployment.CreateAsync(ct);
+        await using var brain = await deployment.CreateTest(web: true).StartAsync(ct);
 
         using var chart = await brain.HttpClient.PostAsJsonAsync("/ui/charts/e2e/render",
             new { title = "E2E BTC chart", kind = "line", points = new[] { new { eventId = "t0", label = "open", value = 64000 } } },

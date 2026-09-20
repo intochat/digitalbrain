@@ -13,8 +13,8 @@ public sealed class ClockHttpFacts
     public async Task GetMatchesSet()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntegrationTest.StartAsync(
-            new() { Modules = [FlutterModule.Define(new() { Hosting = new() { Kind = FlutterHostKind.None } })] }, ct);
+        await using var brain = await IntegrationTest.Create().WithModule<FlutterModule>(flutter => flutter.WithoutHost())
+            .StartAsync(ct);
         await brain.Get<IClock>("tea").Set("Tea", DateTimeOffset.UnixEpoch);
         var state = await brain.HttpClient.GetFromJsonAsync<ClockState>("/ui/clocks/tea", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
         Assert.Equal("Tea", state!.Label);

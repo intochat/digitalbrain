@@ -11,8 +11,8 @@ public sealed class ElonInboxHttpFacts
     public async Task WebhookFillsUiInbox()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await E2ETest.StartAsync<Projects.IntoChat_AppHost>(
-            new() { Application = new DigitalBrainConfiguration { Flutter = new() { Hosting = new() { Kind = FlutterHostKind.None } } } }, ct);
+        await using var deployment = await IntoChatTestDeployment.CreateAsync(ct);
+        await using var brain = await deployment.CreateTest().StartAsync(ct);
         await brain.Get<IBitcoin>("btc").SetPrice(64_000);
         using var webhook = await brain.HttpClient.PostAsJsonAsync(
             "/twitter/webhook",

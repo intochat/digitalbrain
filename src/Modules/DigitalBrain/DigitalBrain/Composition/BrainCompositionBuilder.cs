@@ -34,7 +34,7 @@ public sealed class BrainCompositionBuilder
     {
         if (_built is not null) { return _built; }
         var modules = ModuleComposition.Resolve(_modules.Values.Select(m => m.Compile()).ToArray());
-        ApplicationConfigurationTransport.ValidatePublicSettings(modules);
+        ModuleSettingsValidation.ValidatePublicSettings(modules);
         return _built = new(modules, _modules.Values.SelectMany(m => m.LocalServices).ToArray());
     }
 
@@ -50,7 +50,7 @@ public sealed class BrainCompositionBuilder
             var draft = existing.Copy();
             var contract = draft.Contract ?? throw new ArgumentException("This module has no configurable options.", nameof(envelope));
             draft.Options = contract.ApplyOverride(draft.Options!, entry.Patch);
-            ApplicationConfigurationTransport.ValidatePublicSettings([draft.Compile()]);
+            ModuleSettingsValidation.ValidatePublicSettings([draft.Compile()]);
             replacements.Add(draft.Type, draft);
         }
         // An invalid envelope never leaves a partially overridden application.

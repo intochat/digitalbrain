@@ -148,12 +148,9 @@ public sealed class TimerFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var control = new ControlledTimers();
-        await using var brain = await UnitTest.StartAsync(new()
-        {
-            Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(TimeModule))],
-            UseReminders = true,
-            ConfigureSilo = silo => { silo.UseControlledTimers(control); silo.UseFastCollection(); },
-        }, ct);
+        await using var brain = await UnitTest.Create().WithModule<TimeModule>().WithReminders()
+            .ConfigureSilo(silo => { silo.UseControlledTimers(control); silo.UseFastCollection(); })
+            .StartAsync(ct);
         var timer = brain.Get<ITimer>("long-delay");
         await timer.Start(TimeSpan.FromDays(1));
         var active = control.For(timer.GetGrainId());
@@ -199,10 +196,7 @@ public sealed class TimerFacts
     }
 
     private static Task<UnitBrain> StartAsync(CancellationToken ct, ControlledTimers? timers = null)
-        => UnitTest.StartAsync(new()
-        {
-            Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(TimeModule))],
-            UseReminders = true,
-            ConfigureSilo = timers is null ? null : silo => silo.UseControlledTimers(timers),
-        }, ct);
+        => UnitTest.Create().WithModule<TimeModule>().WithReminders()
+            .ConfigureSilo(silo => { if (timers is not null) { silo.UseControlledTimers(timers); } })
+            .StartAsync(ct);
 }

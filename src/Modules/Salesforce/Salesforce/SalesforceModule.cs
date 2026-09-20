@@ -6,6 +6,8 @@ using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Salesforce;
 
+[ModuleConfiguration(typeof(SalesforceConfigurationContract))]
+[ModuleHosting("DigitalBrain.Salesforce.Aspire.Hosting.SalesforceModuleHosting, DigitalBrain.Modules.Salesforce.Aspire.Hosting")]
 public sealed class SalesforceModule : IModule
 {
     public const string OAuthConfigurationRoot = "DigitalBrain:Salesforce:OAuth";
@@ -19,7 +21,10 @@ public sealed class SalesforceModule : IModule
         ArgumentNullException.ThrowIfNull(options);
         return new(typeof(SalesforceModule), new Dictionary<string, string?>
         {
-            [McpEndpointConfigurationKey] = options.McpEndpoint?.AbsoluteUri ?? ""
+            [McpEndpointConfigurationKey] = (options.McpEndpoint ?? DefaultMcpEndpoint).AbsoluteUri,
+            ["DigitalBrain:Salesforce:Hosting:HostMcp"] = options.HostMcp.ToString(),
+            ["DigitalBrain:Salesforce:Mcp:AllowLoopback"] = options.UseLocalMcp.ToString(),
+            ["DigitalBrain:Salesforce:Hosting:PublicOrigin"] = options.PublicOrigin?.AbsoluteUri ?? "",
         });
     }
 

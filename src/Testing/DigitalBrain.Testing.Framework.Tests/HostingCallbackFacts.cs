@@ -18,8 +18,11 @@ public sealed class HostingCallbackFacts
             Args = [], DisableDashboard = true,
         });
         var brain = builder.AddDigitalBrain("test", persistentStorage: false);
-        brain.AddModule<FlutterModule>(module => module.WithWebHost(options =>
-            options.WorkingDirectory = Path.Combine(root.FullName, "src/Modules/Flutter/app/core")));
+        brain.WithModule<FlutterModule>(module => module.WithOptions(new()
+        {
+            Hosting = new() { Kind = FlutterHostKind.Web, WorkingDirectory = Path.Combine(root.FullName, "src/Modules/Flutter/app/core") },
+        }));
+        builder.AddExecutable("runtime", "unused", ".").WithReference(brain);
         var browser = Assert.Single(builder.Resources, r => r.Annotations.OfType<BrainBrowserAnnotation>().Any());
         Assert.Equal("FlutterShell", browser.Name);
     }

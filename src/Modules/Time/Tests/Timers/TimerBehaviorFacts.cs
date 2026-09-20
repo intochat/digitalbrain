@@ -12,11 +12,8 @@ public sealed class TimerBehaviorFacts
     public async Task BehaviorSubscribesBeforeTheTriggerAndOnlyReportsItsTimer()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(new()
-        {
-            Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(TimeModule))],
-            UseReminders = true,
-        }, ct);
+        await using var brain = await UnitTest.Create().WithModule<TimeModule>().WithReminders()
+            .StartAsync(ct);
         var timer = brain.Get<ITimer>("behavior");
         var other = brain.Get<ITimer>("other");
         var result = new TaskCompletionSource<TimerTick>(TaskCreationOptions.RunContinuationsAsynchronously);

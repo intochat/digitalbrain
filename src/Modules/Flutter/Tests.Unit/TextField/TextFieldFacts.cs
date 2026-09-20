@@ -11,7 +11,8 @@ public sealed class TextFieldFacts
     public async Task ConfigureAndSetValue()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(FlutterModule))] }, ct);
+        await using var brain = await UnitTest.Create().WithModule<FlutterModule>()
+            .StartAsync(ct);
         var field = brain.Get<ITextField>("name");
         await field.Configure("Name", "text");
         await field.SetValue("Ada");

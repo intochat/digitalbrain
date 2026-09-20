@@ -16,8 +16,8 @@ public sealed class WebBrowserHttpFacts
     public async Task NavigateUpdatesSnapshot()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntegrationTest.StartAsync(
-            new() { Modules = [FlutterModule.Define(new() { Hosting = new() { Kind = FlutterHostKind.None } })] }, ct);
+        await using var brain = await IntegrationTest.Create().WithModule<FlutterModule>(flutter => flutter.WithoutHost())
+            .StartAsync(ct);
         using var navigate = await brain.HttpClient.PostAsJsonAsync("/ui/browsers/docs/navigate",
             new { uri = "https://learn.microsoft.com/", title = "Docs" }, ct);
         Assert.Equal(HttpStatusCode.Accepted, navigate.StatusCode);

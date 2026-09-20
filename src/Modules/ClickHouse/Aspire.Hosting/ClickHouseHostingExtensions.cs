@@ -53,8 +53,6 @@ public static class ClickHouseHostingExtensions
 
             var builder = brain.ApplicationBuilder;
             _server = builder.AddClickHouse(ClickHouseNames.Server)
-                .WithDataVolume()
-                .WithLifetime(ContainerLifetime.Persistent)
                 .WithParentRelationship(brain.Resource)
                 .WithUrlForEndpoint("http", static endpoint => new ResourceUrlAnnotation
                 {
@@ -62,6 +60,7 @@ public static class ClickHouseHostingExtensions
                     DisplayText = "ClickHouse Play",
                     Endpoint = endpoint,
                 });
+            if (options.PersistentStorage) { _server.WithDataVolume().WithLifetime(ContainerLifetime.Persistent); }
             _database = _server.AddDatabase(ClickHouseNames.DatabaseResource, ClickHouseNames.DatabaseName);
 
             if (options.Seeds.Count > 0)

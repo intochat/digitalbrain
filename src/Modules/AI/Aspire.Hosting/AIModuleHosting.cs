@@ -7,7 +7,7 @@ public sealed class AIModuleHosting : IDigitalBrainModuleHosting
 {
     public void Configure(DigitalBrainBuilder brain)
         => AIHostingExtensions.ConfigureDeclaration(brain,
-            brain.ApplicationBuilder.Configuration.GetSection(AIOptions.SectionName).Get<AIOptions>() ?? new());
+            brain.GetModuleConfiguration<AIModule>().GetSection(AIOptions.SectionName).Get<AIOptions>() ?? new());
 }
 
 public static partial class AIHostingExtensions

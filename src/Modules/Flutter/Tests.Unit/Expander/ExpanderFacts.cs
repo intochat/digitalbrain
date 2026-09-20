@@ -11,7 +11,8 @@ public sealed class ExpanderFacts
     public async Task SetThenToggle()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(FlutterModule))] }, ct);
+        await using var brain = await UnitTest.Create().WithModule<FlutterModule>()
+            .StartAsync(ct);
         var expander = brain.Get<IExpander>("more");
         await expander.Set("More", false, []);
         await expander.Toggle();

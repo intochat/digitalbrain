@@ -11,7 +11,7 @@ public sealed class SubscriptionFacts
     public async Task ReadySubscribersReceiveOnePublication()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(cancellationToken: ct);
+        await using var brain = await UnitTest.Create().StartAsync(ct);
         var source = brain.Get<ITestEmitter>("source");
         await using var first = await brain.SubscribeAsync<Number>(source, ct);
         await using var second = await brain.SubscribeAsync<Number>(source, ct);
@@ -28,7 +28,7 @@ public sealed class SubscriptionFacts
     public async Task TypeAndFullGrainIdentityIsolateSubscribers()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(cancellationToken: ct);
+        await using var brain = await UnitTest.Create().StartAsync(ct);
         var source = brain.Get<ITestEmitter>("same");
         var other = brain.Get<IOtherEmitter>("same");
         await using var stream = await brain.SubscribeAsync<Number>(source, ct);

@@ -12,6 +12,13 @@ public sealed class DigitalBrainBuilder
     private readonly BrainCompositionBuilder _composition = new();
     private bool _hasDeclarations;
     private bool _materialized;
+    private readonly Dictionary<Type, IConfiguration> _compiledConfiguration = [];
+
+    internal void SetModuleConfiguration(ModuleDefinition module)
+        => _compiledConfiguration[module.ModuleType] = new ConfigurationBuilder().AddInMemoryCollection(module.Configuration).Build();
+
+    public IConfiguration GetModuleConfiguration<TModule>()
+        => _compiledConfiguration.TryGetValue(typeof(TModule), out var configuration) ? configuration : ApplicationBuilder.Configuration;
 
     public DigitalBrainBuilder WithModule<TModule>(Action<ModuleConfiguration<TModule>>? configure = null)
         where TModule : class, IModule, new()
@@ -104,6 +111,7 @@ public sealed class DigitalBrainBuilder
         if (!_modules.Contains(module))
         {
             _modules.Add(module);
+            Resource.WithAnnotation(new BrainModuleAnnotation(module));
         }
     }
 

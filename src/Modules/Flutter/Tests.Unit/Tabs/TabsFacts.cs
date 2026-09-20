@@ -11,7 +11,8 @@ public sealed class TabsFacts
     public async Task SetThenSelect()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(FlutterModule))] }, ct);
+        await using var brain = await UnitTest.Create().WithModule<FlutterModule>()
+            .StartAsync(ct);
         var tabs = brain.Get<ITabs>("pages");
         await tabs.Set(
             [new TabItem("a", "A", new UiChildRef("text", "about")), new TabItem("b", "B", new UiChildRef("chart", "btc"))],

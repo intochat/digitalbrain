@@ -148,10 +148,8 @@ public sealed class SalesforceFacts
     private static async Task<Fixture> StartAsync(FakeSalesforceProvider provider, FakeTokenExchange? exchange, CancellationToken cancellationToken)
     {
         var handoff = new TokenHandoff(TimeProvider.System);
-        var brain = await UnitTest.StartAsync(new()
-        {
-            Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(SalesforceModule))],
-            ConfigureSilo = silo =>
+        var brain = await UnitTest.Create().WithModule<SalesforceModule>()
+            .ConfigureSilo(silo =>
             {
                 silo.Services.AddSingleton<ISalesforceProvider>(provider);
                 silo.Services.AddSingleton(handoff);
@@ -159,8 +157,8 @@ public sealed class SalesforceFacts
                 {
                     silo.Services.AddSingleton<ISalesforceTokenExchange>(exchange);
                 }
-            },
-        }, cancellationToken);
+            })
+            .StartAsync(cancellationToken);
         return new Fixture(brain, handoff);
     }
 

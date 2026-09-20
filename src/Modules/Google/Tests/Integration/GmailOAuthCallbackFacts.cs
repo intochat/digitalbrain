@@ -16,23 +16,20 @@ public sealed class GmailOAuthCallbackFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var stub = await TokenEndpointStub.StartAsync(ct);
-        var definition = GoogleModule.Define(new()
+        var options = new GoogleModuleOptions
         {
             PublicOrigin = stub.Origin,
             TokenEndpoint = stub.TokenEndpoint,
-        });
-        await using var brain = await IntegrationTest.StartAsync(new()
-        {
-            Modules = [definition],
-            Execution = new()
+        };
+        await using var brain = await IntegrationTest.Create().WithModule<GoogleModule>(google => google.WithOptions(options))
+            .WithExecution(new()
             {
                 PrivateConfiguration = new Dictionary<string, string?>
                 {
                     [GoogleModule.GmailOAuthConfigurationRoot + ":ClientId"] = "integration-client",
                     [GoogleModule.GmailOAuthConfigurationRoot + ":ClientSecret"] = "integration-secret",
                 },
-            },
-        }, ct);
+            }).StartAsync(ct);
         var gmail = brain.Get<IGmail>("gmail");
         await using var connected = await brain.Observe<GmailConnected>(gmail, ct);
         using var response = await brain.HttpClient.GetAsync("google/gmail/oauth/callback?code=fake-code", ct);

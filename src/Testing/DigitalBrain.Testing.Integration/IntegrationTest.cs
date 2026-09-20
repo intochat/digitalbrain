@@ -6,13 +6,13 @@ namespace DigitalBrain.Testing.Integration;
 public static class IntegrationTest
 {
     public static IntegrationTestBuilder Create() => new();
-    public static async Task<IntegrationBrain> StartAsync(IntegrationOptions options, CancellationToken cancellationToken = default)
+    internal static async Task<IntegrationBrain> StartAsync(IntegrationOptions options, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(options);
         cancellationToken.ThrowIfCancellationRequested();
         options.Execution.Validate();
         var modules = ModuleComposition.Resolve(options.Modules);
-        ApplicationConfigurationTransport.ValidatePublicSettings(modules);
+        ModuleSettingsValidation.ValidatePublicSettings(modules);
         if (modules.Count == 0) { throw new ArgumentException("Select at least one integration module.", nameof(options)); }
         var bundle = ModuleBundle.Validate(AppContext.BaseDirectory, modules);
         var identity = "test-" + Guid.NewGuid().ToString("N");

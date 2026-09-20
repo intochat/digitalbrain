@@ -17,8 +17,8 @@ public sealed class ExpanderHttpFacts
     public async Task ToggleHttpFlipsNeuronAndGet()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntegrationTest.StartAsync(
-            new() { Modules = [FlutterModule.Define(new() { Hosting = new() { Kind = FlutterHostKind.None } })] }, ct);
+        await using var brain = await IntegrationTest.Create().WithModule<FlutterModule>(flutter => flutter.WithoutHost())
+            .StartAsync(ct);
         var expander = brain.Get<IExpander>("more");
         await using var changed = await brain.Observe<ExpanderChanged>(expander, ct);
 

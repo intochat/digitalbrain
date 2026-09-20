@@ -14,7 +14,8 @@ public sealed class GmailWatchWebhookFacts
     public async Task GmailWatchHttpPublishesMailReceived()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntegrationTest.StartAsync(new() { Modules = [GoogleModule.Define(new())] }, ct);
+        await using var brain = await IntegrationTest.Create().WithModule<GoogleModule>()
+            .StartAsync(ct);
         var gmail = brain.Get<IGmail>("user@gmail.com");
         await using var mail = await brain.Observe<MailReceived>(gmail, ct);
         var data = Convert.ToBase64String(Encoding.UTF8.GetBytes(

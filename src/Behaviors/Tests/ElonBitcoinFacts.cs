@@ -13,8 +13,8 @@ public sealed class ElonBitcoinFacts
     public async Task BitcoinPostShowsOnTheUiInbox()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(
-            new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(TestTwitterModule)), new DigitalBrain.Core.ModuleDefinition(typeof(FlutterModule))] }, ct);
+        await using var brain = await UnitTest.Create().WithModule<TestTwitterModule>().WithModule<FlutterModule>()
+            .StartAsync(ct);
         await brain.Get<IBitcoin>("btc").SetPrice(64_000);
         await using var run = brain.RunBehavior((live, token) => new ElonBitcoin(live).RunAsync(token), ct);
         var elon = brain.Get<ITwitterAccount>("elonmusk");

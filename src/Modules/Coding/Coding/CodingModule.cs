@@ -5,6 +5,7 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Coding;
 
+[ModuleConfiguration(typeof(CodingConfigurationContract))]
 public sealed class CodingModule : IModule
 {
     public const string ConfigurationRoot = CodingModuleOptions.SectionName;
@@ -20,6 +21,7 @@ public sealed class CodingModule : IModule
             [SolutionPathKey] = options.SolutionPath,
             [WorkspaceKeyKey] = options.WorkspaceKey,
             [TestProjectKey] = options.TestProject,
+            [ConfigurationRoot + ":EditDeadline"] = options.EditDeadline.ToString("c", System.Globalization.CultureInfo.InvariantCulture),
         });
     }
 

@@ -1,39 +1,35 @@
 using DigitalBrain.Core;
 using DigitalBrain.Flutter;
 using DigitalBrain.Google;
-using Microsoft.Extensions.Configuration;
 
 namespace IntoChat.Tests;
 
 public sealed class ConfigurationFacts
 {
     [Fact]
-    public void ExplicitDefaultsMatchApplicationBinding()
+    public void ExplicitDefaultIsNativeWindow()
     {
-        var bound = DigitalBrainConfiguration.Bind(new ConfigurationBuilder().Build());
-        Assert.Equal(FlutterHostKind.Window, bound.Flutter.Hosting.Kind);
-        Assert.Equal(ApplicationConfigurationTransport.Write(new DigitalBrainConfiguration()),
-            ApplicationConfigurationTransport.Write(bound));
+        var composition = new BrainCompositionBuilder().WithModule<FlutterModule>(flutter => flutter.WithWindowHost()).Build();
+        Assert.Equal("Window", Assert.Single(composition.Modules).Configuration["DigitalBrain:Flutter:Hosting:Kind"]);
     }
 
     [Fact]
-    public void DeepSettingsSurviveSnapshotAndApplicationBinding()
+    public void DeepSettingsSurviveModuleOverrideTransport()
     {
-        var original = new DigitalBrainConfiguration
-        {
-            Flutter = new()
+        var app = new BrainCompositionBuilder().WithModule<FlutterModule>().WithModule<GoogleModule>();
+        var overrides = new CompositionOverrides()
+            .ConfigureModule<FlutterModule>(flutter => flutter.WithOptions(new()
             {
                 Hosting = new() { Kind = FlutterHostKind.Web, ChatName = "scenario", ShellName = "visible" },
-            },
-            Google = new() { PublicOrigin = new("http://localhost:1234/"), TokenEndpoint = new("http://localhost:1234/token") },
-        };
-        var resolved = ApplicationConfigurationTransport.Read(
-            ApplicationConfigurationTransport.Write(original), new DigitalBrainConfiguration().Modules);
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(resolved.SelectMany(m => m.Configuration)).Build();
-        var rebound = DigitalBrainConfiguration.Bind(configuration);
-        Assert.Equal("scenario", rebound.Flutter.Hosting.ChatName);
-        Assert.Equal("visible", rebound.Flutter.Hosting.ShellName);
-        Assert.Equal(FlutterHostKind.Web, rebound.Flutter.Hosting.Kind);
-        Assert.Equal("http://localhost:1234/token", rebound.Google.TokenEndpoint.AbsoluteUri);
+            }))
+            .ConfigureModule<GoogleModule>(google => google.WithOptions(new()
+            {
+                PublicOrigin = new("http://localhost:1234/"), TokenEndpoint = new("http://localhost:1234/token"),
+            }));
+        var settings = app.ApplyOverrides(overrides.Serialize()).Build().Modules.SelectMany(m => m.Configuration).ToDictionary(p => p.Key, p => p.Value);
+        Assert.Equal("scenario", settings["DigitalBrain:Flutter:Hosting:ChatName"]);
+        Assert.Equal("visible", settings["DigitalBrain:Flutter:Hosting:ShellName"]);
+        Assert.Equal("Web", settings["DigitalBrain:Flutter:Hosting:Kind"]);
+        Assert.Equal("http://localhost:1234/token", settings[GoogleModule.GmailOAuthConfigurationRoot + ":TokenEndpoint"]);
     }
 }

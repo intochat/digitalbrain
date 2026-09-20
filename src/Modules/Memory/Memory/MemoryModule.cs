@@ -9,6 +9,8 @@ using Qdrant.Client;
 
 namespace DigitalBrain.Memory;
 
+[ModuleConfiguration(typeof(MemoryConfigurationContract))]
+[ModuleHosting("DigitalBrain.Memory.Aspire.Hosting.MemoryModuleHosting, DigitalBrain.Modules.Memory.Aspire.Hosting")]
 public sealed class MemoryModule : IModule
 {
     public const string ProviderConfigurationKey = "DigitalBrain:Memory:Provider";
@@ -20,6 +22,7 @@ public sealed class MemoryModule : IModule
         return new(typeof(MemoryModule), new Dictionary<string, string?>
         {
             [MemoryModuleOptions.SectionName + ":Provider"] = options.Provider,
+            [MemoryModuleOptions.SectionName + ":HostQdrant"] = options.HostQdrant.ToString(),
             [MemoryModuleOptions.SectionName + ":Qdrant:ConnectionName"] = options.Qdrant.ConnectionName,
             [MemoryModuleOptions.SectionName + ":Qdrant:CollectionName"] = options.Qdrant.CollectionName,
         });

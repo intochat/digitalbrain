@@ -7,8 +7,8 @@ public sealed class HealthFacts
     public async Task IntoChatHealthReturnsOk()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await E2ETest.StartAsync<Projects.IntoChat_AppHost>(
-            new() { Application = new DigitalBrainConfiguration { Flutter = new() { Hosting = new() { Kind = FlutterHostKind.None } } } }, ct);
+        await using var deployment = await IntoChatTestDeployment.CreateAsync(ct);
+        await using var brain = await deployment.CreateTest().StartAsync(ct);
         using var response = await brain.HttpClient.GetAsync("/health", ct);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }

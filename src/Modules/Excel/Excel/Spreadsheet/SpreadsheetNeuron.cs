@@ -6,7 +6,7 @@ using Orleans.Runtime;
 
 namespace DigitalBrain.Excel.Spreadsheet;
 
-[GrainType("sheet")]
+[GrainType("excel.spreadsheet")]
 internal sealed class SpreadsheetNeuron(
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SheetState> state)
     : Neuron, ISpreadsheet

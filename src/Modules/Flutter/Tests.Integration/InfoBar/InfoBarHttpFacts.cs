@@ -13,8 +13,8 @@ public sealed class InfoBarHttpFacts
     public async Task GetMatchesShow()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntegrationTest.StartAsync(
-            new() { Modules = [FlutterModule.Define(new() { Hosting = new() { Kind = FlutterHostKind.None } })] }, ct);
+        await using var brain = await IntegrationTest.Create().WithModule<FlutterModule>(flutter => flutter.WithoutHost())
+            .StartAsync(ct);
         await brain.Get<IInfoBar>("warn").Show("warning", "Heads up", "disk");
         var state = await brain.HttpClient.GetFromJsonAsync<InfoBarState>("/ui/infobars/warn", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
         Assert.True(state!.Visible);

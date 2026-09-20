@@ -13,8 +13,8 @@ public sealed class RatingHttpFacts
     public async Task GetMatchesSet()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntegrationTest.StartAsync(
-            new() { Modules = [FlutterModule.Define(new() { Hosting = new() { Kind = FlutterHostKind.None } })] }, ct);
+        await using var brain = await IntegrationTest.Create().WithModule<FlutterModule>(flutter => flutter.WithoutHost())
+            .StartAsync(ct);
         await brain.Get<IRating>("stars").Set(5, 4);
         var state = await brain.HttpClient.GetFromJsonAsync<RatingState>("/ui/ratings/stars", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
         Assert.Equal(4, state!.Value);

@@ -6,6 +6,8 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Microsoft;
 
+[ModuleConfiguration(typeof(MicrosoftConfigurationContract))]
+[ModuleHosting("DigitalBrain.Microsoft.Hosting.MicrosoftModuleHosting, DigitalBrain.Modules.Microsoft.Aspire.Hosting")]
 public sealed class MicrosoftModule : IModule
 {
     public const string AspireConfigurationRoot = "DigitalBrain:Microsoft:Aspire";

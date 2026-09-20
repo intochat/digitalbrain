@@ -12,7 +12,8 @@ public sealed class ChartFacts
     public async Task RenderPublishesChangedAndReadMatches()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(FlutterModule))] }, ct);
+        await using var brain = await UnitTest.Create().WithModule<FlutterModule>()
+            .StartAsync(ct);
         var chart = brain.Get<IChart>("btc");
         await using var frames = await brain.Observe<ChartChanged>(chart, ct);
         await chart.Render("BTC", "line", [new ChartPoint("t0", "open", 64000)]);
@@ -29,7 +30,8 @@ public sealed class ChartFacts
     public async Task AppendIsIdempotentOnEventId()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(FlutterModule))] }, ct);
+        await using var brain = await UnitTest.Create().WithModule<FlutterModule>()
+            .StartAsync(ct);
         var chart = brain.Get<IChart>("series");
         await chart.Render("S", "bar", []);
         await chart.Append(new ChartPoint("e1", "a", 1));

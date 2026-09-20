@@ -12,10 +12,11 @@ public static class DigitalBrainHostingExtensions
     public static DigitalBrainBuilder AddModules(this DigitalBrainBuilder brain, IReadOnlyList<ModuleDefinition> modules)
     {
         var resolved = ModuleComposition.Resolve(modules);
+        foreach (var module in resolved) { brain.SetModuleConfiguration(module); }
         var settings = resolved.SelectMany(m => m.Configuration).DistinctBy(p => p.Key, StringComparer.OrdinalIgnoreCase).ToArray();
         brain.ApplicationBuilder.Configuration.AddInMemoryCollection(settings);
-        foreach (var module in resolved) { brain.AddModuleType(module.ModuleType); }
         brain.AddProjection(new ModuleSettingsProjection(settings));
+        foreach (var module in resolved) { brain.AddModuleType(module.ModuleType); }
         return brain;
     }
 
@@ -70,24 +71,6 @@ public static class DigitalBrainHostingExtensions
         return brain;
     }
 
-    public static DigitalBrainBuilder AddModule<TModule>(this DigitalBrainBuilder brain)
-        where TModule : class
-        => brain.AddModuleType(typeof(TModule));
-
-    public static DigitalBrainBuilder AddModule<TModule>(this DigitalBrainBuilder brain, Action<DigitalBrainModuleBuilder<TModule>> configure)
-        where TModule : class
-    {
-        ArgumentNullException.ThrowIfNull(brain);
-        ArgumentNullException.ThrowIfNull(configure);
-        // An explicit callback owns hosting; defaults must not launch a host before it runs.
-        brain.AddModule(typeof(TModule));
-        var module = new DigitalBrainModuleBuilder<TModule>(brain);
-        configure(module);
-        if (!brain.HasResource(DigitalBrainHostingNames.ForModule(typeof(TModule))))
-            { brain.GetOrAddModuleNode(typeof(TModule)); }
-        return brain;
-    }
-
     public static DigitalBrainBuilder AddModuleType(this DigitalBrainBuilder brain, Type moduleType)
     {
         ArgumentNullException.ThrowIfNull(brain);
@@ -105,7 +88,7 @@ public static class DigitalBrainHostingExtensions
             defaults.Configure(brain);
         }
         var nodeName = DigitalBrainHostingNames.ForModule(moduleType);
-        if (hostingAttribute is null && !brain.HasResource(nodeName))
+        if (!brain.HasResource(nodeName))
         {
             brain.GetOrAddModuleNode(nodeName);
         }

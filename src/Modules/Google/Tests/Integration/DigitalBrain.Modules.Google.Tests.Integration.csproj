@@ -6,5 +6,6 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="../../Google/DigitalBrain.Modules.Google.csproj" />
+    <ProjectReference Include="../../Aspire.Hosting/DigitalBrain.Modules.Google.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>

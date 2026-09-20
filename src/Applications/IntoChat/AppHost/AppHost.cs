@@ -1,5 +1,15 @@
 using Aspire.Hosting;
-using DigitalBrain;
+using DigitalBrain.AI;
+using DigitalBrain.AI.OpenAI;
+using DigitalBrain.AI.Ollama;
+using DigitalBrain.AI.FoundryLocal;
+using DigitalBrain.Memory;
+using DigitalBrain.ClickHouse;
+using DigitalBrain.Supabase;
+using DigitalBrain.Excel;
+using DigitalBrain.Salesforce;
+using DigitalBrain.Microsoft;
+using DigitalBrain.Coding;
 using DigitalBrain.Core;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Behaviors;
@@ -13,12 +23,30 @@ using Aspire.Hosting.ApplicationModel;
 
 var builder = DistributedApplication.CreateBuilder(args);
 var testing = builder.Configuration.GetValue<bool>("DigitalBrain:Testing:Enabled");
-var definitions = builder.Configuration[ApplicationConfigurationTransport.ConfigurationKey] is { } envelope
-    ? ApplicationConfigurationTransport.Read(envelope, new DigitalBrainConfiguration().Modules)
-    : DigitalBrainConfiguration.Bind(builder.Configuration).Modules;
+var repositories = builder.Configuration.GetSection("DigitalBrain:Microsoft:GitHub:Repositories")
+    .Get<Dictionary<string, GitHubRepositoryDeclaration>>() ?? [];
 var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, persistentStorage: !testing)
-    .AddModules(definitions);
-var options = DigitalBrainConfiguration.Bind(builder.Configuration);
+    .WithModule<AIModule>(ai => ai
+        .WithLlm<IGpt56Luna>()
+        .WithDefaultLlm<IGemma4>()
+        .WithDefaultEmbedding<ITextEmbedding3Small>()
+        .WithVoiceToText<IWhisperLargeV3Turbo>()
+        .WithTavilySearch())
+    .WithModule<MemoryModule>(memory => memory.WithQdrant())
+    .WithModule<ClickHouseModule>(database => database.WithClickHouse(options => options.WithSeed("leads")))
+    .WithModule<SupabaseModule>(database => database.WithConnection("supabase"))
+    .WithModule<TimeModule>()
+    .WithModule<ExcelModule>()
+    .WithModule<GoogleModule>(google => google.WithGmail())
+    .WithModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
+    .WithModule<MicrosoftModule>(microsoft => microsoft
+        .WithAspire(Path.Combine(builder.AppHostDirectory, "IntoChat.AppHost.csproj"))
+        .WithGitHubRepositories(repositories))
+    .WithModule<CodingModule>(coding => coding.WithSolution(Path.GetFullPath(
+        Path.Combine(builder.AppHostDirectory, "..", "..", "..", "..", "DigitalBrain.slnx"))))
+    .WithModule<FlutterModule>(flutter => flutter.WithWindowHost())
+    // Existing demo behavior dependency; this is part of the application, not injected by tests.
+    .WithModule<TestTwitterModule>();
 
 var clusterId = builder.Configuration["Orleans:ClusterId"]
     ?? (builder.Environment.IsDevelopment() ? $"digitalbrain-{Guid.NewGuid():N}" : null);
@@ -52,10 +80,11 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
         // Browser shell (aspire run and Playwright e2e) is a different origin than the kernel.
         // IsRunMode is false under DistributedApplicationTestingBuilder, so the origin must
         // always be advertised — not only when `aspire run` is driving the host.
-        if (options.Flutter.Hosting.Kind == FlutterHostKind.Web)
+        var flutter = digitalBrain.GetModuleConfiguration<FlutterModule>().GetSection("DigitalBrain:Flutter:Hosting").Get<FlutterHostingOptions>()!;
+        if (flutter.Kind == FlutterHostKind.Web)
         {
             context.EnvironmentVariables["DigitalBrain__Cors__AllowedOrigin"] =
-                builder.CreateResourceBuilder<ExecutableResource>(options.Flutter.Hosting.ResourceName).GetEndpoint("http");
+                builder.CreateResourceBuilder<ExecutableResource>(flutter.ResourceName).GetEndpoint("http");
         }
 
     });

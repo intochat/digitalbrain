@@ -11,7 +11,8 @@ public sealed class ColorFacts
     public async Task SetNormalizesHex()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(FlutterModule))] }, ct);
+        await using var brain = await UnitTest.Create().WithModule<FlutterModule>()
+            .StartAsync(ct);
         await brain.Get<IColor>("accent").Set("#0a84ff");
         Assert.Equal("#0A84FF", (await brain.Get<IColor>("accent").Read()).Hex);
     }

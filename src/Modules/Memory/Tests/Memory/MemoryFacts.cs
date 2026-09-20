@@ -76,15 +76,13 @@ public sealed class MemoryFacts
     }
 
     private static async Task<UnitBrain> Start(InMemoryVectorMemoryStore store, CancellationToken ct)
-        => await UnitTest.StartAsync(new()
-        {
-            Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(MemoryModule))],
-            ConfigureSilo = silo =>
+        => await UnitTest.Create().WithModule<MemoryModule>()
+            .ConfigureSilo(silo =>
             {
                 silo.Services.AddSingleton<IVectorMemoryStore>(store);
                 silo.Services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new FakeEmbeddings());
-            },
-        }, ct);
+            })
+            .StartAsync(ct);
 }
 
 internal sealed class FakeEmbeddings : IEmbeddingGenerator<string, Embedding<float>>

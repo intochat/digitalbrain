@@ -71,7 +71,8 @@ public sealed class ChangeSetFacts
     public async Task TheNeuronAppendsProposalsAndPublishes()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(CodingModule))] }, ct);
+        await using var brain = await UnitTest.Create().WithModule<CodingModule>()
+            .StartAsync(ct);
         var changeSet = brain.Get<IChangeSet>("change-1");
         await using var changed = await brain.Observe<ChangeSetChanged>(changeSet, ct);
         var receipt = await changeSet.Propose(new ProposeEdit(new EditRequest(EditKind.ReplaceRange, Path: "Sample.cs", Source: "x", StartLine: 1, EndLine: 1)));

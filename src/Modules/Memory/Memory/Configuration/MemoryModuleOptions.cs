@@ -10,6 +10,7 @@ public sealed class MemoryModuleOptions
 
     public string? Provider { get; set; }
     public QdrantMemoryOptions Qdrant { get; set; } = new();
+    public bool HostQdrant { get; set; }
 
     internal void ResolveConnection(IConfiguration configuration)
     {

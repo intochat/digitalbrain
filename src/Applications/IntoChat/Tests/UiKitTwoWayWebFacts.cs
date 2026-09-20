@@ -18,13 +18,8 @@ public sealed class UiKitTwoWayWebFacts
     public async Task NeuronChangeShowsInUiAndTapUpdatesNeuron()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await E2ETest.StartAsync<Projects.IntoChat_AppHost>(new()
-        {
-            Application = new DigitalBrainConfiguration
-            {
-                Flutter = new() { Hosting = new() { Kind = FlutterHostKind.Web } },
-            },
-        }, ct);
+        await using var deployment = await IntoChatTestDeployment.CreateAsync(ct);
+        await using var brain = await deployment.CreateTest(web: true).StartAsync(ct);
 
         var expander = brain.Get<IExpander>("e2e");
         var button = brain.Get<IButton>("e2e");

@@ -4,6 +4,7 @@
     <PackageReference Include="Aspire.Hosting.Testing" />
     <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
     <ProjectReference Include="../../Modules/Google/Google/DigitalBrain.Modules.Google.csproj" />
+    <ProjectReference Include="../../Modules/Google/Aspire.Hosting/DigitalBrain.Modules.Google.Aspire.Hosting.csproj" />
     <ProjectReference Include="../DigitalBrain.Testing.ModuleRunner/DigitalBrain.Testing.ModuleRunner.csproj" />
     <ProjectReference Include="../DigitalBrain.Testing.ModuleAppHost/DigitalBrain.Testing.ModuleAppHost.csproj" IsAspireProjectResource="false" />
   </ItemGroup>

@@ -12,11 +12,8 @@ public sealed class TimerPrimitiveFacts
     public async Task RealOneShotPublishesATick()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(new()
-        {
-            Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(TimeModule))],
-            UseReminders = true,
-        }, ct);
+        await using var brain = await UnitTest.Create().WithModule<TimeModule>().WithReminders()
+            .StartAsync(ct);
         var timer = brain.Get<ITimer>("real");
         await using var ticks = await brain.Observe<TimerTick>(timer, ct);
         var before = DateTimeOffset.UtcNow;
