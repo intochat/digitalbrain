@@ -9,6 +9,20 @@ namespace DigitalBrain.Tests;
 public sealed class SupabaseTableFacts
 {
     [Fact]
+    public async Task OperationCreationReplaysAndRejectsConflictingInput()
+    {
+        await using var brain = await StartAsync(new FakeSupabaseProvider(), TestContext.Current.CancellationToken);
+        var table = brain.Get<ISupabaseTable>("once");
+        var input = new CreateQueryTable("People", "select id from people");
+        var first = await table.CreateFromQueryOnce("operation", input, TestContext.Current.CancellationToken);
+        var replay = await table.CreateFromQueryOnce("operation", input, TestContext.Current.CancellationToken);
+        Assert.Equal(first.Id, replay.Id);
+        Assert.Equal(first.Revision, replay.Revision);
+        await Assert.ThrowsAsync<SupabaseTableValidationException>(() => table.CreateFromQueryOnce("operation", input with { Title = "Different" }, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<SupabaseTableValidationException>(() => table.CreateFromQueryOnce("other", input, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task CreateFromQuerySavesViewAndPublishes()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -91,3 +105,4 @@ public sealed class SupabaseTableFacts
             .ConfigureSilo(silo => silo.Services.AddSingleton<ISupabaseProvider>(provider))
             .StartAsync(ct);
 }
+

@@ -11,5 +11,7 @@ internal sealed record SupabaseTableState(
     [property: Id(1)] string? BaseSql,
     [property: Id(2)] IReadOnlyList<SupabaseColumn> SourceColumns)
 {
+    [Id(3)] public string? CreationOperation { get; init; }
+    [Id(4)] public CreateQueryTable? CreationRequest { get; init; }
     internal static SupabaseTableState Empty { get; } = new(null, null, []);
 }

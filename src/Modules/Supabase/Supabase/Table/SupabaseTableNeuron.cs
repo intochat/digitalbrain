@@ -20,7 +20,17 @@ internal sealed class SupabaseTableNeuron(
     private ISupabaseProvider Provider => _provider ??= ServiceProvider.GetRequiredService<ISupabaseProvider>();
     private SupabaseTableState Current => state.State ?? SupabaseTableState.Empty;
 
-    public async Task<SupabaseTableSnapshot> CreateFromQuery(CreateQueryTable request)
+    public Task<SupabaseTableSnapshot> CreateFromQuery(CreateQueryTable request)
+        => Create(request, null, CancellationToken.None);
+
+    public Task<SupabaseTableSnapshot> CreateFromQueryOnce(string operationId, CreateQueryTable request, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(operationId);
+        if (operationId.Length > 256) { throw new SupabaseTableValidationException("Operation ID is too long."); }
+        return Create(request, operationId, cancellationToken);
+    }
+
+    private async Task<SupabaseTableSnapshot> Create(CreateQueryTable request, string? operationId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (string.IsNullOrWhiteSpace(request.Title) || request.Title.Length > 200)
@@ -40,6 +50,8 @@ internal sealed class SupabaseTableNeuron(
         var current = Current;
         if (current.View is not null)
         {
+            if (operationId is not null && current.CreationOperation == operationId && current.CreationRequest == request)
+                { return current.View; }
             throw new SupabaseTableValidationException("Table already exists.");
         }
 
@@ -47,7 +59,7 @@ internal sealed class SupabaseTableNeuron(
         try
         {
             // Describing runs the query with LIMIT 0, so a wrong column or table fails here, not on first read.
-            columns = await Provider.DescribeAsync(request.Sql, CancellationToken.None);
+            columns = await Provider.DescribeAsync(request.Sql, cancellationToken);
         }
         catch (SupabaseQueryException error)
         {
@@ -59,8 +71,10 @@ internal sealed class SupabaseTableNeuron(
         }
 
         var view = SupabaseTablePolicy.CreateView(this.GetPrimaryKeyString(), request.Title, columns);
-        state.State = current with { View = view, BaseSql = request.Sql, SourceColumns = columns };
-        await state.WriteStateAsync();
+        cancellationToken.ThrowIfCancellationRequested();
+        state.State = current with { View = view, BaseSql = request.Sql, SourceColumns = columns, CreationOperation = operationId, CreationRequest = request };
+        try { await state.WriteStateAsync(); }
+        catch { state.State = current; throw; }
         await PublishAsync(new SupabaseTableChanged(view.Id, view.Title, view.Revision));
         return view;
     }
