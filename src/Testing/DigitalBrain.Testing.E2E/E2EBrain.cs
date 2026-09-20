@@ -10,7 +10,7 @@ public sealed class E2EBrain : HostedBrain
     internal E2EBrain(AspireTestSession session) : base(session) { }
 
     public Task<BrowserSession> OpenBrowserAsync(CancellationToken cancellationToken = default)
-        => OpenBrowserAsync(new(), cancellationToken);
+        => OpenBrowserAsync(BrowserOptions.Default, cancellationToken);
 
     public async Task<BrowserSession> OpenBrowserAsync(BrowserOptions options, CancellationToken cancellationToken = default)
     {
@@ -22,7 +22,12 @@ public sealed class E2EBrain : HostedBrain
             {
                 var playwright = await Playwright.CreateAsync().ConfigureAwait(false);
                 Lifetime.Own("playwright", new AsyncAction(() => { playwright.Dispose(); return ValueTask.CompletedTask; }));
-                _browser = await playwright.Chromium.LaunchAsync(new() { Headless = options.Headless, Timeout = 30_000 }).ConfigureAwait(false);
+                _browser = await playwright.Chromium.LaunchAsync(new()
+                {
+                    Headless = options.Headless,
+                    SlowMo = options.SlowMoMilliseconds,
+                    Timeout = 30_000,
+                }).ConfigureAwait(false);
                 Lifetime.Own("browser", _browser);
             }
             var context = await _browser.NewContextAsync().ConfigureAwait(false);
@@ -49,4 +54,14 @@ public sealed class E2EBrain : HostedBrain
 public sealed record BrowserOptions
 {
     public bool Headless { get; init; } = true;
+    public float SlowMoMilliseconds { get; init; }
+
+    public static bool HeadedRequested =>
+        string.Equals(Environment.GetEnvironmentVariable("DIGITALBRAIN_E2E_HEADED"), "1", StringComparison.OrdinalIgnoreCase);
+
+    public static BrowserOptions Default => new()
+    {
+        Headless = !HeadedRequested,
+        SlowMoMilliseconds = HeadedRequested ? 250 : 0,
+    };
 }

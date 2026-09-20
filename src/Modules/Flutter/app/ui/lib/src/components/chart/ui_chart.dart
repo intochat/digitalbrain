@@ -63,15 +63,18 @@ final class UiChart extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              part.title,
-              style: TextStyle(
-                fontFamily: UiType.bodyFamily,
-                fontFamilyFallback: UiType.bodyFallback,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -0.2,
-                color: tone.ink,
+            Semantics(
+              label: part.title,
+              child: Text(
+                part.title,
+                style: TextStyle(
+                  fontFamily: UiType.bodyFamily,
+                  fontFamilyFallback: UiType.bodyFallback,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.2,
+                  color: tone.ink,
+                ),
               ),
             ),
             const SizedBox(height: 10),

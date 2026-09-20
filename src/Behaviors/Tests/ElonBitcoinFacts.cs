@@ -1,6 +1,7 @@
 using DigitalBrain.Testing.Unit;
 using DigitalBrain.Behaviors;
 using DigitalBrain.Flutter;
+using DigitalBrain.Flutter.Inbox;
 using Xunit;
 
 namespace DigitalBrain.Tests;

@@ -1,8 +1,9 @@
 using DigitalBrain.Core;
+using DigitalBrain.Flutter.Inbox.Signals;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
-namespace DigitalBrain.Flutter;
+namespace DigitalBrain.Flutter.Inbox;
 
 [GrainType("inbox")]
 internal sealed class InboxNeuron : Neuron, IInbox

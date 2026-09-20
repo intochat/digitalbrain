@@ -1,7 +1,7 @@
 using DigitalBrain.Contracts;
 using Orleans.Concurrency;
 
-namespace DigitalBrain.Flutter;
+namespace DigitalBrain.Flutter.Inbox;
 
 [Alias("inbox")]
 [Orleans.Metadata.DefaultGrainType("inbox")]

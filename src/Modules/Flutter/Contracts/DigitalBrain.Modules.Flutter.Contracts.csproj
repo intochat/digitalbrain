@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Flutter module contracts: the live inbox surface.</Description>
+    <Description>Flutter module contracts: inbox and UI kit neurons.</Description>
     <RootNamespace>DigitalBrain.Flutter</RootNamespace>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>

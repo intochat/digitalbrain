@@ -6,6 +6,7 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
   </ItemGroup>
   <ItemGroup>

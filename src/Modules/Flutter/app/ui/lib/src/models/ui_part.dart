@@ -21,6 +21,9 @@ sealed class UiPart {
       UiCardPart.kindName => UiCardPart.fromMetadata(metadata),
       UiTimerPart.kindName => UiTimerPart.fromMetadata(metadata),
       UiSheetPart.kindName => UiSheetPart.fromMetadata(metadata),
+      UiVideoPart.kindName => UiVideoPart.fromMetadata(metadata),
+      UiWebBrowserPart.kindName => UiWebBrowserPart.fromMetadata(metadata),
+      UiExpanderPart.kindName => UiExpanderPart.fromMetadata(metadata),
       _ => null,
     };
   }
@@ -147,7 +150,10 @@ final class UiChartPart extends UiPart {
     return UiChartPart(
       title: metadata['title'] as String? ?? 'Chart',
       points: points,
-      chartKind: metadata['chartKind'] as String? ?? 'bar',
+      chartKind:
+          metadata['chartKind'] as String? ??
+          metadata['kind'] as String? ??
+          'bar',
     );
   }
 
@@ -281,5 +287,118 @@ final class UiSheetPart extends UiPart {
     'rows': [
       for (final row in rows) {'cells': row},
     ],
+  };
+}
+
+final class UiVideoPart extends UiPart {
+  const UiVideoPart({
+    required this.name,
+    required this.url,
+    this.playing = false,
+    this.position = 0,
+    this.duration = 0,
+  });
+
+  static const kindName = 'video';
+
+  final String name;
+  final String url;
+  final bool playing;
+  final double position;
+  final double duration;
+
+  @override
+  String get kind => kindName;
+
+  @override
+  String get copyText => url;
+
+  factory UiVideoPart.fromMetadata(Map<String, dynamic> metadata) =>
+      UiVideoPart(
+        name: metadata['name'] as String? ?? '',
+        url: metadata['url'] as String? ?? '',
+        playing: metadata['playing'] as bool? ?? false,
+        position: (metadata['position'] as num?)?.toDouble() ?? 0,
+        duration: (metadata['duration'] as num?)?.toDouble() ?? 0,
+      );
+
+  @override
+  Map<String, Object?> toMetadata() => {
+    'kind': kindName,
+    'name': name,
+    'url': url,
+    'playing': playing,
+    'position': position,
+    'duration': duration,
+  };
+}
+
+final class UiWebBrowserPart extends UiPart {
+  const UiWebBrowserPart({
+    required this.name,
+    required this.uri,
+    required this.title,
+  });
+
+  static const kindName = 'webbrowser';
+
+  final String name;
+  final String uri;
+  final String title;
+
+  @override
+  String get kind => kindName;
+
+  @override
+  String get copyText => uri;
+
+  factory UiWebBrowserPart.fromMetadata(Map<String, dynamic> metadata) =>
+      UiWebBrowserPart(
+        name: metadata['name'] as String? ?? '',
+        uri: metadata['uri'] as String? ?? '',
+        title: metadata['title'] as String? ?? '',
+      );
+
+  @override
+  Map<String, Object?> toMetadata() => {
+    'kind': kindName,
+    'name': name,
+    'uri': uri,
+    'title': title,
+  };
+}
+
+final class UiExpanderPart extends UiPart {
+  const UiExpanderPart({
+    required this.name,
+    required this.header,
+    required this.expanded,
+  });
+
+  static const kindName = 'expander';
+
+  final String name;
+  final String header;
+  final bool expanded;
+
+  @override
+  String get kind => kindName;
+
+  @override
+  String get copyText => header;
+
+  factory UiExpanderPart.fromMetadata(Map<String, dynamic> metadata) =>
+      UiExpanderPart(
+        name: metadata['name'] as String? ?? '',
+        header: metadata['header'] as String? ?? '',
+        expanded: metadata['expanded'] as bool? ?? false,
+      );
+
+  @override
+  Map<String, Object?> toMetadata() => {
+    'kind': kindName,
+    'name': name,
+    'header': header,
+    'expanded': expanded,
   };
 }

@@ -1,6 +1,6 @@
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
-using DigitalBrain.Flutter;
+using DigitalBrain.Flutter.Inbox;
 
 namespace DigitalBrain.Behaviors;
 

@@ -2,6 +2,7 @@ using DigitalBrain.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Runtime;
 using Orleans.Utilities;
 
 namespace DigitalBrain.Core;
@@ -30,5 +31,28 @@ public abstract class Neuron : Grain, INeuron
     {
         ServiceProvider.GetService<LocalSignalHub>()?.Publish(this.GetGrainId(), signal);
         return Observers.Notify(observer => observer.OnSignalAsync(signal));
+    }
+}
+
+public abstract class Neuron<TState>(IPersistentState<TState> store) : Neuron where TState : class, new()
+{
+    protected TState Snapshot
+    {
+        get
+        {
+            store.State ??= new TState();
+            return store.State;
+        }
+    }
+
+    protected async Task Save(TState next, Signal changed, Signal? acted = null)
+    {
+        store.State = next;
+        await store.WriteStateAsync();
+        await PublishAsync(changed);
+        if (acted is not null)
+        {
+            await PublishAsync(acted);
+        }
     }
 }

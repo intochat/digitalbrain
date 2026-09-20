@@ -1,6 +1,5 @@
 using DigitalBrain.Core;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
+using DigitalBrain.Flutter.Inbox;
 using Microsoft.AspNetCore.Routing;
 
 namespace DigitalBrain.Flutter;
@@ -25,10 +24,7 @@ public sealed class FlutterModule : IModule
     public void Configure(IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
-        endpoints.MapGet(InboxPath, static async Task<IResult> (IGrainFactory grains, CancellationToken cancellationToken) =>
-        {
-            var lines = await grains.GetGrain<IInbox>(InboxGrain).Read().WaitAsync(cancellationToken);
-            return Results.Ok(lines);
-        });
+        endpoints.MapInbox();
+        endpoints.MapUiKit();
     }
 }

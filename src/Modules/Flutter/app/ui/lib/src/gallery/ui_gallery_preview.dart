@@ -9,6 +9,7 @@ import 'package:forui/forui.dart';
 import '../chat/ui_chat.dart';
 import '../components/button/ui_button.dart';
 import '../components/card/ui_card.dart';
+import '../components/browser/ui_web_browser.dart';
 import '../components/chart/ui_chart.dart';
 import '../components/clock/ui_clock.dart';
 import '../components/graph/graph_models.dart';
@@ -17,6 +18,7 @@ import '../components/image/ui_image.dart';
 import '../components/sheet/ui_sheet.dart';
 import '../components/table/ui_data_table.dart';
 import '../components/table/ui_table_controller.dart';
+import '../components/video/ui_video.dart';
 import '../lumen/ino_presence.dart';
 import '../lumen/lumen_brain_graph.dart';
 import '../lumen/lumen_controls.dart';
@@ -207,6 +209,28 @@ const galleryEntries = [
     'UiChart(part: UiChartPart(title: …, points: …))',
     'Empty supplies no points and shows the component’s own “No series” state. This component currently renders bars.',
     ['Normal', 'Empty'],
+    true,
+  ),
+  GalleryEntry(
+    'video',
+    'Video player',
+    'Media',
+    Icons.play_circle_outline,
+    'Live video grain snapshot: source URL and play/pause.',
+    'UiVideo(part: UiVideoPart(…))',
+    'Paused is the default snapshot. Playing flips the status label. No decoder is attached in the gallery.',
+    ['Normal', 'Playing'],
+    true,
+  ),
+  GalleryEntry(
+    'webbrowser',
+    'Web browser',
+    'Media',
+    Icons.language,
+    'Embedded browser grain: title and absolute URI.',
+    'UiWebBrowser(part: UiWebBrowserPart(…))',
+    'The gallery shows the snapshot chrome. The live shell navigates a real grain.',
+    ['Normal'],
     true,
   ),
   GalleryEntry(
@@ -614,6 +638,23 @@ final class _GalleryPreviewState extends State<GalleryPreview> {
                     UiChartPoint(label: 'Thu', value: 9),
                     UiChartPoint(label: 'Fri', value: 6),
                   ],
+          ),
+        );
+      case 'video':
+        return UiVideo(
+          part: UiVideoPart(
+            name: 'gallery',
+            url: 'https://example.com/intro.mp4',
+            playing: _state == 'Playing',
+            duration: 12,
+          ),
+        );
+      case 'webbrowser':
+        return const UiWebBrowser(
+          part: UiWebBrowserPart(
+            name: 'gallery',
+            title: 'WinUI Gallery',
+            uri: 'https://learn.microsoft.com/windows/apps/design/controls/',
           ),
         );
       case 'image':

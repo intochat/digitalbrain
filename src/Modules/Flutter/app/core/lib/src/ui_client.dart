@@ -399,6 +399,19 @@ final class DigitalBrainUiClient {
     ];
   }
 
+  Future<Map<String, dynamic>> readUi(String collection, String name) async {
+    final response = await _request(
+      'GET',
+      '/ui/$collection/${Uri.encodeComponent(name)}',
+      timeout: const Duration(seconds: 10),
+    );
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<void> postUi(String path, {Map<String, Object?>? body}) async {
+    await _request('POST', path, body: body, timeout: const Duration(seconds: 10));
+  }
+
   Future<BrainSnapshot> readBrain({required String chatName}) async {
     final response = await _request(
       'GET',

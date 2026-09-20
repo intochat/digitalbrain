@@ -39,7 +39,8 @@
     <Project Path="src/Modules/Excel/Excel/DigitalBrain.Modules.Excel.csproj" />
   </Folder>
   <Folder Name="/Modules/Flutter/">
-    <Project Path="src/Modules/Flutter/Tests/DigitalBrain.Modules.Flutter.Tests.Unit.csproj" />
+    <Project Path="src/Modules/Flutter/Tests.Unit/DigitalBrain.Modules.Flutter.Tests.Unit.csproj" />
+    <Project Path="src/Modules/Flutter/Tests.Integration/DigitalBrain.Modules.Flutter.Tests.Integration.csproj" />
     <Project Path="src/Modules/Flutter/Aspire.Hosting/DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" />
     <Project Path="src/Modules/Flutter/Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
     <Project Path="src/Modules/Flutter/Flutter/DigitalBrain.Modules.Flutter.csproj" />

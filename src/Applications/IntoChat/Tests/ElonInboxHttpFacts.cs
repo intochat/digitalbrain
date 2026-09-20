@@ -1,4 +1,5 @@
 using DigitalBrain.Flutter;
+using DigitalBrain.Flutter.Inbox;
 using DigitalBrain.Behaviors;
 using System.Net.Http.Json;
 

@@ -70,9 +70,12 @@ Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
 Assert.Equal("123", (await mail.NextAsync(ct: ct)).HistoryId);
 ```
 
-Application e2e: `await using var brain = await E2EDigitalBrainSimulation.StartAsync<Projects.IntoChat_AppHost>(options, ct);`
-then `brain.HttpClient` and `brain.OpenBrowserAsync()`. That path uses the AppHost graph (Azurite
-tables/blobs, real silo), not `InProcessTestCluster`. Flutter web e2e opts into the semantics DOM with
+Application e2e lives in `src/Applications/IntoChat/Tests` (not under the Flutter module). Only the
+AppHost starts Flutter web via `FlutterHostKind.Web`. Module `Tests.Integration` is HTTP-only
+(`Kind = None`) and never opens a browser.
+
+`OpenBrowserAsync()` launches Chromium **headless** by default. Set `DIGITALBRAIN_E2E_HEADED=1` to
+watch the window (Playwright SlowMo). Flutter web e2e opts into the semantics DOM with
 `?semantics=true` so Playwright's native text locators can see canvas-rendered content.
 
 ## State recovery and failures
