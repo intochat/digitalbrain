@@ -22,6 +22,7 @@
   </ItemGroup>
   <ItemGroup>
     <Using Include="System.Net" />
+    <Using Include="DigitalBrain" />
     <Using Include="DigitalBrain.Testing.E2E" />
     <Using Include="DigitalBrain.Testing" />
     <Using Include="Xunit" />

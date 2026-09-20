@@ -51,7 +51,7 @@ public sealed class LateRegistrationFacts
     public async Task ClientDisposalOwnsAnUnfinishedRegistration()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await DigitalBrainSimulation.StartAsync(SubscriptionLifetimeFacts.Options(), ct);
+        await using var brain = await UnitTest.StartAsync(SubscriptionLifetimeFacts.Options(), ct);
         var source = brain.Get<ILateSource>("closing-client");
         await source.HoldNextWatch();
         var subscribing = brain.SubscribeAsync<Number>(source, ct);
@@ -74,7 +74,7 @@ public sealed class LateRegistrationFacts
     public async Task LateInitialOrRenewedWatchIsRemovedAfterDisposal(bool renewal)
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await DigitalBrainSimulation.StartAsync(SubscriptionLifetimeFacts.Options(), ct);
+        await using var brain = await UnitTest.StartAsync(SubscriptionLifetimeFacts.Options(), ct);
         var source = brain.Get<ILateSource>("late");
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(ct);
         ISignalSubscription<Number>? stream = renewal ? await brain.SubscribeAsync<Number>(source, ct) : null;

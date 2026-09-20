@@ -10,7 +10,7 @@ public sealed class MailReceivedFacts
     public async Task WatchPushPublishesMailReceived()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await DigitalBrainSimulation.StartAsync(new() { Modules = [new GoogleModule()] }, ct);
+        await using var brain = await UnitTest.StartAsync(new() { Modules = [new GoogleModule()] }, ct);
         var gmail = brain.Get<IGmail>("me");
         await using var mail = await brain.Observe<MailReceived>(gmail, ct);
         await gmail.AcceptWatchPush(new("123", "user@gmail.com"));

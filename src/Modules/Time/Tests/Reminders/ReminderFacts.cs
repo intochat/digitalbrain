@@ -146,7 +146,7 @@ public sealed class ReminderFacts
     {
         var error = await Assert.ThrowsAnyAsync<Exception>(async () =>
         {
-            await using var brain = await DigitalBrainSimulation.StartAsync(new()
+            await using var brain = await UnitTest.StartAsync(new()
             {
                 Modules = [new TimeModule()],
             }, TestContext.Current.CancellationToken);
@@ -155,7 +155,7 @@ public sealed class ReminderFacts
     }
 
     private static Task<UnitBrain> StartAsync(CancellationToken ct, ReminderControl? reminders = null)
-        => DigitalBrainSimulation.StartAsync(new()
+        => UnitTest.StartAsync(new()
         {
             Modules = [new TimeModule()],
             UseReminders = true,

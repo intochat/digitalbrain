@@ -13,7 +13,7 @@ public sealed class TreeHttpFacts
     public async Task GetMatchesSet()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await ModuleDigitalBrainSimulation.StartAsync(
+        await using var brain = await IntegrationTest.StartAsync(
             new() { Modules = [FlutterModule.Define(new() { Hosting = new() { Kind = FlutterHostKind.None } })] }, ct);
         await brain.Get<ITree>("fs").Set([new TreeNode("root", null, "root")]);
         var state = await brain.HttpClient.GetFromJsonAsync<TreeState>("/ui/trees/fs", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);

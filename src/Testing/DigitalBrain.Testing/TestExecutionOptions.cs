@@ -7,6 +7,7 @@ public sealed record TestExecutionOptions
     public TimeSpan CleanupTimeout { get; init; } = TimeSpan.FromSeconds(30);
     public Action<TestDiagnostic>? Diagnostics { get; init; }
     public string? ArtifactDirectory { get; init; }
+    public BrowserOptions Browser { get; init; } = BrowserOptions.Default;
 
     public void Validate()
     {

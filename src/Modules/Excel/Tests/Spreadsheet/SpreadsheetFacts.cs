@@ -11,7 +11,7 @@ public sealed class SpreadsheetFacts
     public async Task CellEditIncrementsTheVersionAndPublishes()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await DigitalBrainSimulation.StartAsync(
+        await using var brain = await UnitTest.StartAsync(
             new() { Modules = [new ExcelModule()] }, ct);
         var sheet = brain.Get<ISpreadsheet>("book");
         await using var changed = await brain.Observe<SheetChanged>(sheet, ct);
@@ -26,7 +26,7 @@ public sealed class SpreadsheetFacts
     public async Task ReplacementGridReadsBackAndRangeIsSliced()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await DigitalBrainSimulation.StartAsync(
+        await using var brain = await UnitTest.StartAsync(
             new() { Modules = [new ExcelModule()] }, ct);
         var sheet = brain.Get<ISpreadsheet>("book");
         await sheet.Apply(new(
@@ -44,7 +44,7 @@ public sealed class SpreadsheetFacts
     public async Task InvalidEditsAreRejected()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await DigitalBrainSimulation.StartAsync(
+        await using var brain = await UnitTest.StartAsync(
             new() { Modules = [new ExcelModule()] }, ct);
         var sheet = brain.Get<ISpreadsheet>("book");
         await Assert.ThrowsAsync<ArgumentException>(() => sheet.Apply(new(null, null)));

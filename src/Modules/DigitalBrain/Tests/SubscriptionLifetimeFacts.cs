@@ -23,7 +23,7 @@ public sealed class SubscriptionLifetimeFacts
     public async Task OverflowIsVisibleEvenWithoutDrainingTheBuffer()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await DigitalBrainSimulation.StartAsync(Options(1), ct);
+        await using var brain = await UnitTest.StartAsync(Options(1), ct);
         var source = brain.Get<ITestEmitter>("overflow");
         await using var stream = await brain.SubscribeAsync<Number>(source, ct);
         await source.Emit(1);
@@ -40,7 +40,7 @@ public sealed class SubscriptionLifetimeFacts
     [Fact]
     public async Task CancellationEndsAnIdleSubscriptionAndDisposalIsIdempotent()
     {
-        await using var brain = await DigitalBrainSimulation.StartAsync(Options(), TestContext.Current.CancellationToken);
+        await using var brain = await UnitTest.StartAsync(Options(), TestContext.Current.CancellationToken);
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var source = brain.Get<ITestEmitter>("cancel");
         var stream = await brain.SubscribeAsync<Number>(source, cancel.Token);
@@ -55,7 +55,7 @@ public sealed class SubscriptionLifetimeFacts
     public async Task RenewalKeepsAHealthySubscriptionAliveBeyondItsLease()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await DigitalBrainSimulation.StartAsync(Options(), ct);
+        await using var brain = await UnitTest.StartAsync(Options(), ct);
         var source = brain.Get<ITestEmitter>("renew");
         await using var stream = await brain.SubscribeAsync<Number>(source, ct);
         await Task.Delay(TimeSpan.FromSeconds(3), ct);
@@ -69,7 +69,7 @@ public sealed class SubscriptionLifetimeFacts
     public async Task ReactivationFaultsTheOldSubscriptionAndANewOneCanObserve()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await DigitalBrainSimulation.StartAsync(Options(), ct);
+        await using var brain = await UnitTest.StartAsync(Options(), ct);
         var source = brain.Get<ITestEmitter>("restart");
         await using var old = await brain.SubscribeAsync<Number>(source, ct);
         await source.Deactivate();

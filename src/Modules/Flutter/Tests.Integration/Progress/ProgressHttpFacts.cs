@@ -13,7 +13,7 @@ public sealed class ProgressHttpFacts
     public async Task GetMatchesSet()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await ModuleDigitalBrainSimulation.StartAsync(
+        await using var brain = await IntegrationTest.StartAsync(
             new() { Modules = [FlutterModule.Define(new() { Hosting = new() { Kind = FlutterHostKind.None } })] }, ct);
         await brain.Get<IProgress>("load").Set(true, 0.4, "loading");
         var state = await brain.HttpClient.GetFromJsonAsync<ProgressState>("/ui/progress/load", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);

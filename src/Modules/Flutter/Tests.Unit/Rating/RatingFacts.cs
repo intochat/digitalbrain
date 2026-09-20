@@ -11,7 +11,7 @@ public sealed class RatingFacts
     public async Task SetWritesValue()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await DigitalBrainSimulation.StartAsync(new() { Modules = [new FlutterModule()] }, ct);
+        await using var brain = await UnitTest.StartAsync(new() { Modules = [new FlutterModule()] }, ct);
         await brain.Get<IRating>("stars").Set(5, 4);
         Assert.Equal(4, (await brain.Get<IRating>("stars").Read()).Value);
     }

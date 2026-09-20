@@ -13,7 +13,7 @@ public sealed class ImageHttpFacts
     public async Task GetMatchesSet()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await ModuleDigitalBrainSimulation.StartAsync(
+        await using var brain = await IntegrationTest.StartAsync(
             new() { Modules = [FlutterModule.Define(new() { Hosting = new() { Kind = FlutterHostKind.None } })] }, ct);
         await brain.Get<IImage>("logo").Set("https://example.com/a.png", "image/png", "logo");
         var state = await brain.HttpClient.GetFromJsonAsync<ImageState>("/ui/images/logo", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);

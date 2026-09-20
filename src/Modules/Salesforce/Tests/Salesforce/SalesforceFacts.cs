@@ -148,7 +148,7 @@ public sealed class SalesforceFacts
     private static async Task<Fixture> StartAsync(FakeSalesforceProvider provider, FakeTokenExchange? exchange, CancellationToken cancellationToken)
     {
         var handoff = new TokenHandoff(TimeProvider.System);
-        var brain = await DigitalBrainSimulation.StartAsync(new()
+        var brain = await UnitTest.StartAsync(new()
         {
             Modules = [new SalesforceModule()],
             ConfigureSilo = silo =>

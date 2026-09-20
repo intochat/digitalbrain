@@ -17,7 +17,7 @@ public sealed class ChartHttpFacts
     public async Task RenderMatchesRead()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await ModuleDigitalBrainSimulation.StartAsync(
+        await using var brain = await IntegrationTest.StartAsync(
             new() { Modules = [FlutterModule.Define(new() { Hosting = new() { Kind = FlutterHostKind.None } })] }, ct);
         var chart = brain.Get<IChart>("btc");
         await using var frames = await brain.Observe<ChartChanged>(chart, ct);

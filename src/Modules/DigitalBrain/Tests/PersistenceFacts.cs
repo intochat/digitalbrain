@@ -37,7 +37,7 @@ public sealed class PersistenceFacts
     public async Task DeactivationKeepsStateAndDoesNotReplaySignals()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await DigitalBrainSimulation.StartAsync(cancellationToken: ct);
+        await using var brain = await UnitTest.StartAsync(cancellationToken: ct);
         var counter = brain.Get<ICounter>("saved");
         await counter.SetWithoutPublishing(23);
         await brain.DeactivateAsync(counter, ct);

@@ -12,7 +12,7 @@ public sealed class HarnessCancellationFacts
         var ct = TestContext.Current.CancellationToken;
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var service = new HeldStartup();
-        var starting = DigitalBrainSimulation.StartAsync(new()
+        var starting = UnitTest.StartAsync(new()
         {
             ConfigureSilo = silo => silo.Services.AddSingleton<IHostedService>(service)
         }, cancel.Token);
@@ -36,7 +36,7 @@ public sealed class HarnessCancellationFacts
     public async Task CancellationCallbacksCannotBypassTheShutdownDeadline(bool throws)
     {
         var ct = TestContext.Current.CancellationToken;
-        var brain = await DigitalBrainSimulation.StartAsync(cancellationToken: ct);
+        var brain = await UnitTest.StartAsync(cancellationToken: ct);
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var release = new ManualResetEventSlim();
         var run = brain.RunBehavior(async (_, token) =>

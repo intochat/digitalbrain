@@ -11,7 +11,7 @@ public sealed class GmailConnectedFacts
     public async Task AuthorizationCodePublishesGmailConnected()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await DigitalBrainSimulation.StartAsync(new()
+        await using var brain = await UnitTest.StartAsync(new()
         {
             Modules = [new GoogleModule()],
             ConfigureSilo = silo => silo.Services.AddSingleton<IGmailTokenExchange>(new FakeGmailTokens()),

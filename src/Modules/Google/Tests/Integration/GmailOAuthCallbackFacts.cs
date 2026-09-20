@@ -23,7 +23,7 @@ public sealed class GmailOAuthCallbackFacts
             [GoogleModule.GmailOAuthConfigurationRoot + ":PublicOrigin"] = stub.Origin.AbsoluteUri,
             [GoogleModule.GmailOAuthConfigurationRoot + ":TokenEndpoint"] = stub.TokenEndpoint.AbsoluteUri,
         });
-        await using var brain = await ModuleDigitalBrainSimulation.StartAsync(new() { Modules = [definition] }, ct);
+        await using var brain = await IntegrationTest.StartAsync(new() { Modules = [definition] }, ct);
         var gmail = brain.Get<IGmail>("gmail");
         await using var connected = await brain.Observe<GmailConnected>(gmail, ct);
         using var response = await brain.HttpClient.GetAsync("google/gmail/oauth/callback?code=fake-code", ct);

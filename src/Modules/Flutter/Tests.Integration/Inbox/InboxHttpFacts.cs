@@ -12,7 +12,7 @@ public sealed class InboxHttpFacts
     public async Task GetReturnsAppearedLines()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await ModuleDigitalBrainSimulation.StartAsync(
+        await using var brain = await IntegrationTest.StartAsync(
             new() { Modules = [FlutterModule.Define(new() { Hosting = new() { Kind = FlutterHostKind.None } })] }, ct);
         await brain.Get<IInbox>(FlutterModule.InboxGrain).Appear("hello inbox");
         var lines = await brain.HttpClient.GetFromJsonAsync<List<string>>(FlutterModule.InboxPath, ct);

@@ -12,7 +12,7 @@ public sealed class TimerBehaviorFacts
     public async Task BehaviorSubscribesBeforeTheTriggerAndOnlyReportsItsTimer()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await DigitalBrainSimulation.StartAsync(new()
+        await using var brain = await UnitTest.StartAsync(new()
         {
             Modules = [new TimeModule()],
             UseReminders = true,

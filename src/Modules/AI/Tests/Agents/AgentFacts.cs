@@ -14,7 +14,7 @@ public sealed class AgentFacts
     public async Task AskReturnsTheModelReplyAndPublishesTheSignal()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await DigitalBrainSimulation.StartAsync(
+        await using var brain = await UnitTest.StartAsync(
             new()
             {
                 Modules = [new AIModule()],

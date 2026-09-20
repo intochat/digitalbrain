@@ -13,7 +13,7 @@ public sealed class SheetHttpFacts
     public async Task GetMatchesSet()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await ModuleDigitalBrainSimulation.StartAsync(
+        await using var brain = await IntegrationTest.StartAsync(
             new() { Modules = [FlutterModule.Define(new() { Hosting = new() { Kind = FlutterHostKind.None } })] }, ct);
         await brain.Get<ISheet>("budget").Set("Budget", [new SheetCell(0, 0, "100")]);
         var state = await brain.HttpClient.GetFromJsonAsync<SheetState>("/ui/sheets/budget", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);

@@ -63,7 +63,7 @@ public sealed class RepositoryFacts
     }
 
     private static Task<UnitBrain> StartAsync(IGitHubRepositorySource source, CancellationToken ct)
-        => DigitalBrainSimulation.StartAsync(new()
+        => UnitTest.StartAsync(new()
         {
             Modules = [new MicrosoftModule()],
             ConfigureSilo = silo =>

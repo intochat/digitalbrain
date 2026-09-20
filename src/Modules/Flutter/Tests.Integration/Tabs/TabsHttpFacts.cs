@@ -13,7 +13,7 @@ public sealed class TabsHttpFacts
     public async Task GetMatchesSelect()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await ModuleDigitalBrainSimulation.StartAsync(
+        await using var brain = await IntegrationTest.StartAsync(
             new() { Modules = [FlutterModule.Define(new() { Hosting = new() { Kind = FlutterHostKind.None } })] }, ct);
         await brain.Get<ITabs>("pages").Set(
             [new TabItem("a", "A", new UiChildRef("text", "about"))],

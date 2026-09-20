@@ -61,7 +61,7 @@ public sealed class ClickHouseFacts
     }
 
     private static Task<UnitBrain> Start(FakeClickHouseProvider provider, CancellationToken ct)
-        => DigitalBrainSimulation.StartAsync(new()
+        => UnitTest.StartAsync(new()
         {
             Modules = [new ClickHouseModule()],
             ConfigureSilo = silo => silo.Services.AddSingleton<IClickHouseProvider>(provider),

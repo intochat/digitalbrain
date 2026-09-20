@@ -9,7 +9,7 @@ public sealed class LiveTweetFacts
     public async Task LateObserversReceiveOnlyNewTweets()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await DigitalBrainSimulation.StartAsync(new() { Modules = [new TestTwitterModule()] }, ct);
+        await using var brain = await UnitTest.StartAsync(new() { Modules = [new TestTwitterModule()] }, ct);
         var twitter = brain.Get<ITwitterAccount>("late");
         await twitter.Post("old");
         await using var received = await brain.Observe<Posted>(twitter, ct);

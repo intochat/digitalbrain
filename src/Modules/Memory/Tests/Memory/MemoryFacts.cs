@@ -76,7 +76,7 @@ public sealed class MemoryFacts
     }
 
     private static async Task<UnitBrain> Start(InMemoryVectorMemoryStore store, CancellationToken ct)
-        => await DigitalBrainSimulation.StartAsync(new()
+        => await UnitTest.StartAsync(new()
         {
             Modules = [new MemoryModule()],
             ConfigureSilo = silo =>

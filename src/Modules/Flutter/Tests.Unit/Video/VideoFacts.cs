@@ -11,7 +11,7 @@ public sealed class VideoFacts
     public async Task LoadThenPlay()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await DigitalBrainSimulation.StartAsync(new() { Modules = [new FlutterModule()] }, ct);
+        await using var brain = await UnitTest.StartAsync(new() { Modules = [new FlutterModule()] }, ct);
         var video = brain.Get<IVideo>("intro");
         await video.Load("https://example.com/a.mp4", 12);
         await video.Play();

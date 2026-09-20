@@ -87,7 +87,7 @@ public sealed class SupabaseTableFacts
     }
 
     private static Task<UnitBrain> StartAsync(FakeSupabaseProvider provider, CancellationToken ct)
-        => DigitalBrainSimulation.StartAsync(new()
+        => UnitTest.StartAsync(new()
         {
             Modules = [new SupabaseModule()],
             ConfigureSilo = silo => silo.Services.AddSingleton<ISupabaseProvider>(provider),

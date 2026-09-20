@@ -7,7 +7,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Testing.Unit;
 
-public static class DigitalBrainSimulation
+public static class UnitTest
 {
     public static async Task<UnitBrain> StartAsync(UnitOptions? options = null, CancellationToken cancellationToken = default)
     {

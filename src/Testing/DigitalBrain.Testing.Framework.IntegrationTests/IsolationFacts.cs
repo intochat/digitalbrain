@@ -15,9 +15,9 @@ public sealed class IsolationFacts
             Modules = [new(typeof(PersistentValueModule))],
             Execution = new() { StartupTimeout = TimeSpan.FromSeconds(45), Diagnostics = d => File.AppendAllText(Path.Combine(AppContext.BaseDirectory, "restart-progress.log"), d + Environment.NewLine) }
         };
-        await using var first = await ModuleDigitalBrainSimulation.StartAsync(options, ct);
+        await using var first = await IntegrationTest.StartAsync(options, ct);
         await first.Get<IPersistentValue>("same").Set(42);
-        await using var second = await ModuleDigitalBrainSimulation.StartAsync(options, ct);
+        await using var second = await IntegrationTest.StartAsync(options, ct);
         Assert.Equal(0, await second.Get<IPersistentValue>("same").Get());
         await first.RestartRuntimeAsync(ct);
         Assert.Equal(42, await first.Get<IPersistentValue>("same").Get());
@@ -28,7 +28,7 @@ public sealed class IsolationFacts
     {
         using var canceled = new CancellationTokenSource();
         canceled.Cancel();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ModuleDigitalBrainSimulation.StartAsync(
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => IntegrationTest.StartAsync(
             new() { Modules = [new(typeof(PersistentValueModule))] }, canceled.Token));
     }
 }

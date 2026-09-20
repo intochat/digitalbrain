@@ -19,6 +19,6 @@ public static class BrainSimulationExtensions
         => Requires(brain).RestartSiloAsync(cancellationToken);
 
     private static UnitBrain Requires(IDigitalBrain brain)
-        => brain as UnitBrain ?? throw new InvalidOperationException("This operation requires a brain started by DigitalBrainSimulation.");
+        => brain as UnitBrain ?? throw new InvalidOperationException("This operation requires a brain started by UnitTest.");
 }
 

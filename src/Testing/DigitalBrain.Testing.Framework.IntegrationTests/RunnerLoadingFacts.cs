@@ -21,7 +21,7 @@ public sealed class RunnerLoadingFacts
     public async Task GoogleLoadsWithoutAStaticRunnerReference()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var run = await ModuleDigitalBrainSimulation.StartAsync(new() { Modules = [GoogleModule.Define(new())] }, ct);
+        await using var run = await IntegrationTest.StartAsync(new() { Modules = [GoogleModule.Define(new())] }, ct);
         Assert.NotEqual(Environment.ProcessId, await run.HttpClient.GetFromJsonAsync<int>("/process", ct));
         var gmail = run.Get<IGmail>("runner-probe");
         await using var received = await run.Observe<MailReceived>(gmail, ct);

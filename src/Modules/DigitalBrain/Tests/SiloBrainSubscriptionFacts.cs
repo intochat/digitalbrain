@@ -10,7 +10,7 @@ public sealed class SiloBrainSubscriptionFacts
     public async Task SiloHostedBrainClientReceivesPublication()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await DigitalBrainSimulation.StartAsync(cancellationToken: ct);
+        await using var brain = await UnitTest.StartAsync(cancellationToken: ct);
         var listener = brain.Get<ISiloBrainListener>("listener");
         Assert.True(await listener.HubIsPresent());
         await listener.Listen("silo-source");

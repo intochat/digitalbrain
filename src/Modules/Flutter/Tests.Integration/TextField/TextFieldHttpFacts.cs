@@ -13,7 +13,7 @@ public sealed class TextFieldHttpFacts
     public async Task GetMatchesValue()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await ModuleDigitalBrainSimulation.StartAsync(
+        await using var brain = await IntegrationTest.StartAsync(
             new() { Modules = [FlutterModule.Define(new() { Hosting = new() { Kind = FlutterHostKind.None } })] }, ct);
         var field = brain.Get<ITextField>("name");
         await field.Configure("Name", "text");

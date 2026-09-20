@@ -1,4 +1,5 @@
 using Aspire.Hosting;
+using DigitalBrain;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Behaviors;
 using DigitalBrain.Flutter;
@@ -7,12 +8,11 @@ using DigitalBrain.Google;
 using DigitalBrain.Time;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
-using IntoChat;
 using Aspire.Hosting.ApplicationModel;
 
 var builder = DistributedApplication.CreateBuilder(args);
 var testing = builder.Configuration.GetValue<bool>("DigitalBrain:Testing:Enabled");
-var options = new IntoChatOptions
+var options = new DigitalBrainOptions
 {
     Google = new() { PublicOrigin = Uri.TryCreate(builder.Configuration[GoogleModule.GmailOAuthConfigurationRoot + ":PublicOrigin"], UriKind.Absolute, out var origin) ? origin : null },
     Flutter = new() { Hosting = new() { Kind = builder.Configuration.GetValue("DigitalBrain:Flutter:Hosting:Kind", FlutterHostKind.Window) } }

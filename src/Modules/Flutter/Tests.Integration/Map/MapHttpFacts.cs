@@ -13,7 +13,7 @@ public sealed class MapHttpFacts
     public async Task GetMatchesSet()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await ModuleDigitalBrainSimulation.StartAsync(
+        await using var brain = await IntegrationTest.StartAsync(
             new() { Modules = [FlutterModule.Define(new() { Hosting = new() { Kind = FlutterHostKind.None } })] }, ct);
         await brain.Get<IMap>("hq").Set(47.6, -122.3, 10, []);
         var state = await brain.HttpClient.GetFromJsonAsync<MapState>("/ui/maps/hq", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);

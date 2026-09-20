@@ -13,7 +13,7 @@ public sealed class GraphHttpFacts
     public async Task GetMatchesRender()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await ModuleDigitalBrainSimulation.StartAsync(
+        await using var brain = await IntegrationTest.StartAsync(
             new() { Modules = [FlutterModule.Define(new() { Hosting = new() { Kind = FlutterHostKind.None } })] }, ct);
         await brain.Get<IGraph>("net").Render("N", [new GraphNode("a", "A")], []);
         var state = await brain.HttpClient.GetFromJsonAsync<GraphState>("/ui/graphs/net", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);

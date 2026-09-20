@@ -148,7 +148,7 @@ public sealed class TimerFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var control = new ControlledTimers();
-        await using var brain = await DigitalBrainSimulation.StartAsync(new()
+        await using var brain = await UnitTest.StartAsync(new()
         {
             Modules = [new TimeModule()],
             UseReminders = true,
@@ -199,7 +199,7 @@ public sealed class TimerFacts
     }
 
     private static Task<UnitBrain> StartAsync(CancellationToken ct, ControlledTimers? timers = null)
-        => DigitalBrainSimulation.StartAsync(new()
+        => UnitTest.StartAsync(new()
         {
             Modules = [new TimeModule()],
             UseReminders = true,

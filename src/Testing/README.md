@@ -2,11 +2,11 @@
 
 Three layers, never mixed. Each has its own public package and returns a concrete brain that implements the production `IDigitalBrain`.
 
-**Unit tests** (`DigitalBrain.Testing.Unit`): `DigitalBrainSimulation.StartAsync(UnitOptions)` runs the lightweight in-process Orleans test cluster with memory storage. Grains, `PublishAsync`, `Observe<T>`. No HTTP, no Docker. Returns `UnitBrain`; unit-only lifecycle operations (`DeactivateAsync`, `RestartSiloAsync`) are extensions on `UnitBrain`, never on arbitrary brains.
+**Unit tests** (`DigitalBrain.Testing.Unit`): `UnitTest.StartAsync(UnitOptions)` runs the lightweight in-process Orleans test cluster with memory storage. Grains, `PublishAsync`, `Observe<T>`. No HTTP, no Docker. Returns `UnitBrain`; unit-only lifecycle operations (`DeactivateAsync`, `RestartSiloAsync`) are extensions on `UnitBrain`, never on arbitrary brains.
 
-**Module integration** (`DigitalBrain.Testing.Integration`): `ModuleDigitalBrainSimulation.StartAsync(IntegrationOptions)` selects module definitions and starts one shared external module runner with Aspire-managed, isolated, ephemeral infrastructure. Returns `IntegrationBrain` with `HttpClient` and `RestartRuntimeAsync`. No dependency on an application such as IntoChat.
+**Module integration** (`DigitalBrain.Testing.Integration`): `IntegrationTest.StartAsync(IntegrationOptions)` selects module definitions and starts one shared external module runner with Aspire-managed, isolated, ephemeral infrastructure. Returns `IntegrationBrain` with `HttpClient` and `RestartRuntimeAsync`. No dependency on an application such as IntoChat.
 
-**Application e2e** (`DigitalBrain.Testing.E2E`): `E2EDigitalBrainSimulation.StartAsync<TAppHost>(IApplicationConfiguration)` starts the application's actual AppHost with typed options. Returns `E2EBrain` with `HttpClient` and `OpenBrowserAsync`. No named test profiles.
+**Application e2e** (`DigitalBrain.Testing.E2E`): `E2ETest.StartAsync<TAppHost>(DigitalBrainOptions)` starts the application's actual AppHost with typed options (`DigitalBrainOptions.Web` / `Headless`). Returns `E2EBrain` with `HttpClient` and `OpenBrowserAsync`. No named test profiles.
 
 Shared probes, behavior runs, bounded waits, session lifetime and diagnostics live in `DigitalBrain.Testing`.
 
@@ -17,7 +17,7 @@ Run the framework and application lanes: `dotnet test --solution DigitalBrain.sl
 
 ```csharp
 var ct = TestContext.Current.CancellationToken;
-await using var brain = await DigitalBrainSimulation.StartAsync(new()
+await using var brain = await UnitTest.StartAsync(new()
 {
     Modules = [new TimeModule()],
     UseReminders = true,
@@ -29,7 +29,7 @@ var tick = await events.NextAsync(ct: ct);
 Assert.Equal("tea", tick.TimerId);
 ```
 
-`DigitalBrainSimulation.StartAsync` returns a `UnitBrain` that implements the production `IDigitalBrain`; pass
+`UnitTest.StartAsync` returns a `UnitBrain` that implements the production `IDigitalBrain`; pass
 real module instances through `Modules`. Replace provider dependencies through `ConfigureSilo`; keep
 provider-specific test controls with the module. Unit simulation has no `UseHttp` and does not host Kestrel.
 
@@ -60,7 +60,7 @@ drives the module over real HTTP:
 
 ```csharp
 var ct = TestContext.Current.CancellationToken;
-await using var brain = await ModuleDigitalBrainSimulation.StartAsync(
+await using var brain = await IntegrationTest.StartAsync(
     new() { Modules = [GoogleModule.Define(new())] }, ct);
 var gmail = brain.Get<IGmail>("user@gmail.com");
 await using var mail = await brain.Observe<MailReceived>(gmail, ct);
@@ -74,9 +74,10 @@ Application e2e lives in `src/Applications/IntoChat/Tests` (not under the Flutte
 AppHost starts Flutter web via `FlutterHostKind.Web`. Module `Tests.Integration` is HTTP-only
 (`Kind = None`) and never opens a browser.
 
-`OpenBrowserAsync()` launches Chromium **headless** by default. Set `DIGITALBRAIN_E2E_HEADED=1` to
-watch the window (Playwright SlowMo). Flutter web e2e opts into the semantics DOM with
-`?semantics=true` so Playwright's native text locators can see canvas-rendered content.
+`E2ETest.StartAsync(DigitalBrainOptions.Web, ct)` is enough. `TestExecutionOptions` is optional
+(timeouts, diagnostics). Playwright traces/screenshots go under `e2e-artifacts/{cluster-id}`.
+`DigitalBrainOptions.Web` starts Flutter web-server and headed Chromium; `Headless` is kernel-only
+(no browser). `OpenBrowserAsync` loads `?semantics=true` so locators can see canvas text.
 
 ## State recovery and failures
 

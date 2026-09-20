@@ -13,7 +13,7 @@ public sealed class VideoHttpFacts
     public async Task GetMatchesLoad()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await ModuleDigitalBrainSimulation.StartAsync(
+        await using var brain = await IntegrationTest.StartAsync(
             new() { Modules = [FlutterModule.Define(new() { Hosting = new() { Kind = FlutterHostKind.None } })] }, ct);
         await brain.Get<IVideo>("intro").Load("https://example.com/a.mp4", 12);
         var state = await brain.HttpClient.GetFromJsonAsync<VideoState>("/ui/videos/intro", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);

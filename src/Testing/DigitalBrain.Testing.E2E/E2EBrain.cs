@@ -1,6 +1,8 @@
 using DigitalBrain.Testing.Hosting;
 using Microsoft.Playwright;
 
+using BrowserOptions = DigitalBrain.Testing.BrowserOptions;
+
 namespace DigitalBrain.Testing.E2E;
 
 public sealed class E2EBrain : HostedBrain
@@ -10,7 +12,7 @@ public sealed class E2EBrain : HostedBrain
     internal E2EBrain(AspireTestSession session) : base(session) { }
 
     public Task<BrowserSession> OpenBrowserAsync(CancellationToken cancellationToken = default)
-        => OpenBrowserAsync(BrowserOptions.Default, cancellationToken);
+        => OpenBrowserAsync(BrowserOptions.Resolve(Session.Options.Browser.Headless), cancellationToken);
 
     public async Task<BrowserSession> OpenBrowserAsync(BrowserOptions options, CancellationToken cancellationToken = default)
     {
@@ -22,10 +24,11 @@ public sealed class E2EBrain : HostedBrain
             {
                 var playwright = await Playwright.CreateAsync().ConfigureAwait(false);
                 Lifetime.Own("playwright", new AsyncAction(() => { playwright.Dispose(); return ValueTask.CompletedTask; }));
+                var launch = BrowserOptions.Resolve(options.Headless);
                 _browser = await playwright.Chromium.LaunchAsync(new()
                 {
-                    Headless = options.Headless,
-                    SlowMo = options.SlowMoMilliseconds,
+                    Headless = launch.Headless,
+                    SlowMo = launch.SlowMoMilliseconds,
                     Timeout = 30_000,
                 }).ConfigureAwait(false);
                 Lifetime.Own("browser", _browser);
@@ -39,7 +42,20 @@ public sealed class E2EBrain : HostedBrain
                 var page = await context.NewPageAsync().ConfigureAwait(false);
                 session.Page = page;
                 page.SetDefaultTimeout(60_000);
-                await page.GotoAsync(endpoint.AbsoluteUri, new() { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 60_000 }).ConfigureAwait(false);
+                var uri = endpoint.AbsoluteUri.Contains('?', StringComparison.Ordinal)
+                    ? endpoint.AbsoluteUri + "&semantics=true"
+                    : endpoint.AbsoluteUri + "?semantics=true";
+                await page.GotoAsync(uri, new() { WaitUntil = WaitUntilState.Load, Timeout = 60_000 }).ConfigureAwait(false);
+                await page.Locator("flt-glass-pane, flutter-view").First
+                    .WaitForAsync(new() { State = WaitForSelectorState.Attached, Timeout = 60_000 }).ConfigureAwait(false);
+                var placeholder = page.Locator("flt-semantics-placeholder");
+                if (await placeholder.CountAsync().ConfigureAwait(false) > 0)
+                {
+                    await placeholder.First.EvaluateAsync("element => element.click()").ConfigureAwait(false);
+                }
+
+                await page.Locator("flt-semantics").First
+                    .WaitForAsync(new() { State = WaitForSelectorState.Attached, Timeout = 30_000 }).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
                 return session;
             }
@@ -49,19 +65,4 @@ public sealed class E2EBrain : HostedBrain
     }
     private sealed class AsyncAction(Func<ValueTask> action) : IAsyncDisposable
     { public ValueTask DisposeAsync() => action(); }
-}
-
-public sealed record BrowserOptions
-{
-    public bool Headless { get; init; } = true;
-    public float SlowMoMilliseconds { get; init; }
-
-    public static bool HeadedRequested =>
-        string.Equals(Environment.GetEnvironmentVariable("DIGITALBRAIN_E2E_HEADED"), "1", StringComparison.OrdinalIgnoreCase);
-
-    public static BrowserOptions Default => new()
-    {
-        Headless = !HeadedRequested,
-        SlowMoMilliseconds = HeadedRequested ? 250 : 0,
-    };
 }

@@ -3,7 +3,7 @@ using DigitalBrain.Testing.Hosting;
 
 namespace DigitalBrain.Testing.Integration;
 
-public static class ModuleDigitalBrainSimulation
+public static class IntegrationTest
 {
     public static async Task<IntegrationBrain> StartAsync(IntegrationOptions options, CancellationToken cancellationToken = default)
     {

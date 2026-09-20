@@ -13,7 +13,7 @@ public sealed class TextHttpFacts
     public async Task GetMatchesSet()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await ModuleDigitalBrainSimulation.StartAsync(
+        await using var brain = await IntegrationTest.StartAsync(
             new() { Modules = [FlutterModule.Define(new() { Hosting = new() { Kind = FlutterHostKind.None } })] }, ct);
         await brain.Get<IText>("about").Set("hello");
         var state = await brain.HttpClient.GetFromJsonAsync<TextState>("/ui/texts/about", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
