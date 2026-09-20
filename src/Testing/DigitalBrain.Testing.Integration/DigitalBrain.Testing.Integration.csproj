@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>true</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../DigitalBrain.Testing.Hosting/DigitalBrain.Testing.Hosting.csproj" />
+    <ProjectReference Include="../DigitalBrain.Testing.ModuleRunner/DigitalBrain.Testing.ModuleRunner.csproj" />
+    <ProjectReference Include="../DigitalBrain.Testing.ModuleAppHost/DigitalBrain.Testing.ModuleAppHost.csproj" IsAspireProjectResource="false" />
+  </ItemGroup>
+</Project>

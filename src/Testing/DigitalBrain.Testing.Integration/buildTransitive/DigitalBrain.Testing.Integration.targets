@@ -1,0 +1,6 @@
+<Project>
+  <Target Name="WriteModuleBundleManifest" AfterTargets="Build">
+    <WriteLinesToFile File="$(TargetDir)module-bundle.json"
+      Lines="{ &quot;version&quot;: 1, &quot;entry&quot;: &quot;$(AssemblyName)&quot; }" Overwrite="true" />
+  </Target>
+</Project>

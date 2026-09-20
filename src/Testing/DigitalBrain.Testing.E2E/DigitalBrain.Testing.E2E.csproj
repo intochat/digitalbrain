@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Aspire AppHost e2e: real Orleans cluster, Docker emulator storage, HTTP wait-healthy.</Description>
+    <DisableMSBuildAssemblyCopyCheck>true</DisableMSBuildAssemblyCopyCheck>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Aspire.Hosting.Testing" />
+    <PackageReference Include="Microsoft.Orleans.Client" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Modules/DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../DigitalBrain.Testing.Hosting/DigitalBrain.Testing.Hosting.csproj" />
+  </ItemGroup>
+  <ItemGroup><PackageReference Include="Microsoft.Playwright" /></ItemGroup>
+</Project>

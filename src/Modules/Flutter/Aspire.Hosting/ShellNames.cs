@@ -2,7 +2,7 @@ namespace DigitalBrain.Flutter.Aspire.Hosting;
 
 public static class ShellNames
 {
-    public const string DefaultFlutterResourceName = "Flutter";
+    public const string DefaultFlutterResourceName = "FlutterShell";
     public const string UIBaseEnvironmentVariable = "DIGITALBRAIN_UI_BASE";
     public const string ShellEnvironmentVariable = "DIGITALBRAIN_SHELL";
     public const string ChatEnvironmentVariable = "DIGITALBRAIN_CHAT";

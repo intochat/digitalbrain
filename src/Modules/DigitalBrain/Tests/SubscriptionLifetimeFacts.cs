@@ -1,3 +1,4 @@
+using DigitalBrain.Testing.Unit;
 using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -6,7 +7,7 @@ namespace DigitalBrain.Tests;
 
 public sealed class SubscriptionLifetimeFacts
 {
-    internal static SimulationOptions Options(int capacity = 256) => new()
+    internal static UnitOptions Options(int capacity = 256) => new()
     {
         ConfigureSilo = silo => silo.Services.Configure<BrainOptions>(Configure),
         ConfigureClient = client => client.Services.Configure<BrainOptions>(options => { Configure(options); options.BufferCapacity = capacity; }),

@@ -1,13 +1,5 @@
 namespace DigitalBrain.Flutter.Aspire.Hosting;
 
-public enum FlutterHostKind
-{
-    Window = 0,
-    Headless = 1,
-    Web = 2,
-    None = 3,
-}
-
 internal static class FlutterHostLaunch
 {
     private const string ShellPackageDirectoryName = "shell";
@@ -160,7 +152,6 @@ internal static class FlutterHostLaunch
             args.Add("--release");
         }
 
-        args.Add($"--web-port={ShellNames.FlutterWebPort}");
         args.Add($"--web-hostname={ShellNames.FlutterWebHostname}");
         return new Result(ResolveFlutterCommand(options, configuration), workDir, [.. args], deviceTarget);
     }

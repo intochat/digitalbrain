@@ -7,11 +7,15 @@ using Orleans;
 
 namespace DigitalBrain.Behaviors;
 
+[Alias("twitter")]
+[Orleans.Metadata.DefaultGrainType("twitter")]
 public interface ITwitterAccount : INeuron
 {
     Task Post(string text);
 }
 
+[Alias("bitcoin")]
+[Orleans.Metadata.DefaultGrainType("bitcoin")]
 public interface IBitcoin : INeuron
 {
     Task SetPrice(decimal usd);
@@ -40,7 +44,6 @@ public sealed class TwitterAccount : Neuron, ITwitterAccount
 {
     public Task Post(string text) => PublishAsync(new Posted(this.GetPrimaryKeyString(), text));
 }
-
 [GrainType("bitcoin")]
 public sealed class Bitcoin : Neuron, IBitcoin
 {

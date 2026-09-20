@@ -1,3 +1,4 @@
+using DigitalBrain.Testing.Unit;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Xunit;

@@ -1,0 +1,9 @@
+<Project>
+  <Import Project="TestRunner.props" />
+  <ItemGroup>
+    <Using Include="DigitalBrain.Testing" />
+    <Using Include="DigitalBrain.Testing.Integration" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)DigitalBrain.Testing.Integration/DigitalBrain.Testing.Integration.csproj" />
+  </ItemGroup>
+  <Import Project="DigitalBrain.Testing.Integration/buildTransitive/DigitalBrain.Testing.Integration.targets" />
+</Project>

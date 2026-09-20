@@ -13,6 +13,9 @@ internal sealed class GmailOAuthConfiguration(IOptions<GmailOAuthOptions> option
     internal const string ComposeScope = "https://www.googleapis.com/auth/gmail.compose";
     internal string ClientId => options.Value.ClientId ?? "";
     internal string ClientSecret => options.Value.ClientSecret ?? "";
+    internal string TokenEndpoint => string.IsNullOrWhiteSpace(options.Value.TokenEndpoint)
+        ? "https://oauth2.googleapis.com/token"
+        : options.Value.TokenEndpoint;
     internal bool IsConfigured => !string.IsNullOrWhiteSpace(ClientId) && !string.IsNullOrWhiteSpace(ClientSecret)
         && TryOrigin(out _);
     internal Uri PublicOrigin => TryOrigin(out var origin) ? origin! : throw new GmailUnavailableException("Gmail setup is incomplete. Configure the kernel Gmail OAuth ClientId, ClientSecret and PublicOrigin privately in Aspire.");

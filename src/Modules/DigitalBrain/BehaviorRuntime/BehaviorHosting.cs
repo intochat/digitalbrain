@@ -1,23 +1,36 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using DigitalBrain.Contracts;
 
 namespace DigitalBrain.Core;
 
 public static class BehaviorHosting
 {
-    public static IServiceCollection AddBehavior<T>(this IServiceCollection services) where T : class, IBehavior
+    public static IServiceCollection AddBehavior<T>(this IServiceCollection services,
+        Func<IDigitalBrain, IReadOnlyList<SubscriptionRequirement>>? requirements = null) where T : class, IBehavior
     {
-        services.AddSingleton<T>();
+        services.TryAddSingleton<BehaviorReadiness>();
+        services.AddHealthChecks().AddCheck<BehaviorReadiness>("behavior-subscriptions");
+        services.AddSingleton(new BehaviorRequirements<T>(requirements ?? (_ => [])));
         services.AddHostedService<BehaviorHost<T>>();
         return services;
     }
 }
 
-internal sealed class BehaviorHost<T>(T behavior, IHostApplicationLifetime lifetime) : BackgroundService
+internal sealed record BehaviorRequirements<T>(Func<IDigitalBrain, IReadOnlyList<SubscriptionRequirement>> Resolve);
+
+internal sealed class BehaviorHost<T>(IServiceProvider services, IDigitalBrain brain,
+    BehaviorReadiness readiness, BehaviorRequirements<T> requirements,
+    IHostApplicationLifetime lifetime, ILogger<BehaviorHost<T>> logger) : BackgroundService
     where T : class, IBehavior
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var required = requirements.Resolve(brain);
+        var generation = readiness.Begin(typeof(T).FullName!, required);
+        readiness.End(generation);
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var startedReg = lifetime.ApplicationStarted.Register(() => started.TrySetResult());
         using var stoppingReg = stoppingToken.Register(() => started.TrySetCanceled(stoppingToken));
@@ -37,8 +50,11 @@ internal sealed class BehaviorHost<T>(T behavior, IHostApplicationLifetime lifet
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            generation = readiness.Begin(typeof(T).FullName!, required);
+            await using var scopedBrain = new BehaviorScopedBrain(brain, readiness, generation);
             try
             {
+                var behavior = ActivatorUtilities.CreateInstance<T>(services, scopedBrain);
                 await behavior.RunAsync(stoppingToken).ConfigureAwait(false);
                 return;
             }
@@ -46,8 +62,10 @@ internal sealed class BehaviorHost<T>(T behavior, IHostApplicationLifetime lifet
             {
                 return;
             }
-            catch (Exception)
+            catch (Exception error)
             {
+                readiness.End(generation);
+                logger.LogError(error, "Behavior {Behavior} failed; readiness is withdrawn before retry.", typeof(T).Name);
                 await Task.Delay(TimeSpan.FromMilliseconds(250), stoppingToken).ConfigureAwait(false);
             }
         }

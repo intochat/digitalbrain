@@ -1,14 +1,17 @@
 # Testing
 
-Three layers, never mixed:
+Three layers, never mixed. Each has its own public package and returns a concrete brain that implements the production `IDigitalBrain`.
 
-**Neuron tests** (`DigitalBrain.NeuronTesting`): in-process Orleans via `DigitalBrainSimulation`. Grains, `PublishAsync`, `Observe<T>`. No HTTP, no Kestrel, no Docker. Time, kernel, Google neuron tests use this.
+**Unit tests** (`DigitalBrain.Testing.Unit`): `DigitalBrainSimulation.StartAsync(UnitOptions)` runs the lightweight in-process Orleans test cluster with memory storage. Grains, `PublishAsync`, `Observe<T>`. No HTTP, no Docker. Returns `UnitBrain`; unit-only lifecycle operations (`DeactivateAsync`, `RestartSiloAsync`) are extensions on `UnitBrain`, never on arbitrary brains.
 
-**Module e2e** (`DigitalBrain.E2ETesting.ModuleWebHost`): same in-process cluster **plus** a Kestrel host that maps `IModule.Configure(endpoints)`. Google webhook/auth stubs use this. Not Aspire.
+**Module integration** (`DigitalBrain.Testing.Integration`): `ModuleDigitalBrainSimulation.StartAsync(IntegrationOptions)` selects module definitions and starts one shared external module runner with Aspire-managed, isolated, ephemeral infrastructure. Returns `IntegrationBrain` with `HttpClient` and `RestartRuntimeAsync`. No dependency on an application such as IntoChat.
 
-**App e2e** (`DigitalBrain.E2ETesting.E2EDigitalBrain`): real Aspire AppHost, Orleans cluster, Azure Storage emulator in Docker. IntoChat uses this. Time has no e2e project.
+**Application e2e** (`DigitalBrain.Testing.E2E`): `E2EDigitalBrainSimulation.StartAsync<TAppHost>(IApplicationConfiguration)` starts the application's actual AppHost with typed options. Returns `E2EBrain` with `HttpClient` and `OpenBrowserAsync`. No named test profiles.
 
-Run neuron tests: `dotnet test --solution DigitalBrain.Foundation.slnx -p:CodeGraphRefresh=false`.
+Shared probes, behavior runs, bounded waits, session lifetime and diagnostics live in `DigitalBrain.Testing`.
+
+Run unit tests: `dotnet test --solution DigitalBrain.Foundation.slnx -p:CodeGraphRefresh=false`.
+Run the framework and application lanes: `dotnet test --solution DigitalBrain.Testing.slnx -p:CodeGraphRefresh=false`.
 
 ## Test a real module
 
@@ -26,9 +29,9 @@ var tick = await events.NextAsync(ct: ct);
 Assert.Equal("tea", tick.TimerId);
 ```
 
-`DigitalBrainSimulation.StartAsync` returns the production `IDigitalBrain`; pass real module instances
-through `Modules`. Replace provider dependencies through `ConfigureSilo`; keep provider-specific test
-controls with the module. Simulation has no `UseHttp` and does not host Kestrel.
+`DigitalBrainSimulation.StartAsync` returns a `UnitBrain` that implements the production `IDigitalBrain`; pass
+real module instances through `Modules`. Replace provider dependencies through `ConfigureSilo`; keep
+provider-specific test controls with the module. Unit simulation has no `UseHttp` and does not host Kestrel.
 
 `brain.RunBehavior` owns cancellation and observes errors. Await `run.WaitForSubscriptionAsync<T>(source, ct)`
 before triggering work: readiness belongs to that run, source identity and signal type. Early failures
@@ -52,18 +55,25 @@ is reported as a cleanup failure; an in-process task cannot be forcibly terminat
 ## Module endpoints
 
 A module may map HTTP endpoints by overriding `IModule.Configure(IEndpointRouteBuilder)`, for example a
-webhook. Neuron simulation never starts Kestrel. Module e2e starts `ModuleWebHost` on the same cluster:
+webhook. Unit simulation never starts Kestrel. Module integration starts the shared external runner and
+drives the module over real HTTP:
 
 ```csharp
-await using var brain = await DigitalBrainSimulation.StartAsync(new()
-{
-    Modules = [new GoogleModule()],
-}, ct);
-await using var web = await ModuleWebHost.StartAsync(brain.Cluster(), [new GoogleModule()], ct);
-var response = await web.Client.PostAsJsonAsync("google/gmail/watch", payload, ct);
+var ct = TestContext.Current.CancellationToken;
+await using var brain = await ModuleDigitalBrainSimulation.StartAsync(
+    new() { Modules = [GoogleModule.Define(new())] }, ct);
+var gmail = brain.Get<IGmail>("user@gmail.com");
+await using var mail = await brain.Observe<MailReceived>(gmail, ct);
+using var response = await brain.HttpClient.PostAsJsonAsync(
+    "/google/gmail/watch", payload, ct);
+Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+Assert.Equal("123", (await mail.NextAsync(ct: ct)).HistoryId);
 ```
 
-App e2e: `await using var app = await E2EDigitalBrain.StartAsync<Projects.IntoChat_AppHost>(ct);` then `CreateHttpClient` / `WaitHealthyAsync`. That path uses the AppHost graph (Azurite tables/blobs, real silo), not `InProcessTestCluster`.
+Application e2e: `await using var brain = await E2EDigitalBrainSimulation.StartAsync<Projects.IntoChat_AppHost>(options, ct);`
+then `brain.HttpClient` and `brain.OpenBrowserAsync()`. That path uses the AppHost graph (Azurite
+tables/blobs, real silo), not `InProcessTestCluster`. Flutter web e2e opts into the semantics DOM with
+`?semantics=true` so Playwright's native text locators can see canvas-rendered content.
 
 ## State recovery and failures
 

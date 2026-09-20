@@ -1,3 +1,4 @@
+using DigitalBrain.Flutter;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
@@ -10,17 +11,10 @@ public sealed class GmailWatchFacts
     public async Task GmailWatchReturnsAccepted()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var app = await E2EDigitalBrain.StartAsync<Projects.IntoChat_AppHost>(
-            new E2EOptions
-            {
-                Args = ["DigitalBrain:Flutter:Hosting:Kind=None"],
-                WaitFor = ["IntoChat"],
-            },
-            ct);
-        using var http = app.CreateHttpClient("IntoChat");
+        await using var brain = await E2EDigitalBrainSimulation.StartAsync<Projects.IntoChat_AppHost>(new IntoChatOptions { Flutter = new() { Hosting = new() { Kind = FlutterHostKind.None } } }, ct);
         var data = Convert.ToBase64String(Encoding.UTF8.GetBytes(
             JsonSerializer.Serialize(new { emailAddress = "user@gmail.com", historyId = "123" })));
-        using var response = await http.PostAsJsonAsync(
+        using var response = await brain.HttpClient.PostAsJsonAsync(
             "/google/gmail/watch",
             new { message = new { data, messageId = "m1" }, subscription = "projects/x/subscriptions/gmail" },
             ct);

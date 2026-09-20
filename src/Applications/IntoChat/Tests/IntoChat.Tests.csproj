@@ -11,12 +11,19 @@
   <ItemGroup>
     <PackageReference Include="xunit.v3.mtp-v2" />
     <PackageReference Include="Microsoft.Playwright" />
-    <ProjectReference Include="../../../Testing/DigitalBrain.E2ETesting/DigitalBrain.E2ETesting.csproj" />
+    <ProjectReference Include="../../../Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
     <ProjectReference Include="../AppHost/IntoChat.AppHost.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../Configuration/IntoChat.Configuration.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="testconfig.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Using Include="System.Net" />
-    <Using Include="DigitalBrain.E2ETesting" />
+    <Using Include="DigitalBrain.Testing.E2E" />
+    <Using Include="DigitalBrain.Testing" />
     <Using Include="Xunit" />
   </ItemGroup>
 </Project>

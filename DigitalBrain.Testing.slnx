@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/Framework/">
+    <Project Path="src/Testing/DigitalBrain.Testing.Framework.Tests/DigitalBrain.Testing.Framework.Tests.csproj" />
+    <Project Path="src/Testing/DigitalBrain.Testing.Framework.IntegrationTests/DigitalBrain.Testing.Framework.IntegrationTests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Google/">
+    <Project Path="src/Modules/Google/Integration/DigitalBrain.Modules.Google.Integration.csproj" />
+  </Folder>
+  <Folder Name="/Applications/IntoChat/">
+    <Project Path="src/Applications/IntoChat/Tests/IntoChat.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path="Directory.Packages.props" />
+    <File Path="src/Testing/Integration.Tests.props" />
+  </Folder>
+</Solution>

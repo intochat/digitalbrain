@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../TestRunner.props" />
+  <ItemGroup>
+    <ProjectReference Include="../DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+  </ItemGroup>
+</Project>

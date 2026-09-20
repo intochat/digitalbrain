@@ -111,14 +111,16 @@ public static class ShellHostingExtensions
                 // need the app itself must tolerate one early page load and retry.
                 host
                     .WithHttpEndpoint(
-                        port: ShellNames.FlutterWebPort,
                         name: ShellNames.HttpEndpointName,
+                        env: "DIGITALBRAIN_WEB_PORT",
                         isProxied: false)
                     .WithEndpoint(
                         ShellNames.HttpEndpointName,
                         static endpoint => endpoint.TargetHost = ShellNames.FlutterWebHostname,
                         createIfNotExists: false)
-                    .WithHttpHealthCheck("/");
+                    .WithHttpHealthCheck("/")
+                    .AsBrainBrowser();
+                host.WithArgs(ReferenceExpression.Create($"--web-port={host.GetEndpoint(ShellNames.HttpEndpointName).Property(EndpointProperty.TargetPort)}"));
             }
 
             // Hot reload rides the Dart VM service, which the headless web-server target no

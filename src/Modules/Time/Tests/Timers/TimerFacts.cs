@@ -1,3 +1,4 @@
+using DigitalBrain.Testing.Unit;
 using DigitalBrain.Contracts;
 using DigitalBrain.Testing;
 using DigitalBrain.Time;
@@ -197,7 +198,7 @@ public sealed class TimerFacts
         await timer.Stop();
     }
 
-    private static Task<IDigitalBrain> StartAsync(CancellationToken ct, ControlledTimers? timers = null)
+    private static Task<UnitBrain> StartAsync(CancellationToken ct, ControlledTimers? timers = null)
         => DigitalBrainSimulation.StartAsync(new()
         {
             Modules = [new TimeModule()],

@@ -8,25 +8,38 @@ internal sealed class GmailTokenExchange(GmailOAuthConfiguration configuration) 
     private readonly HttpClient _oauth = new(new HttpClientHandler { AllowAutoRedirect = false })
     { Timeout = TimeSpan.FromSeconds(30), MaxResponseContentBufferSize = 65536 };
 
-    public Task<GmailTokenGrant> ExchangeAuthorizationCodeAsync(string authorizationCode, CancellationToken cancellationToken)
+    public async Task<GmailTokenGrant> ExchangeAuthorizationCodeAsync(string authorizationCode, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(authorizationCode);
-        _ = cancellationToken;
-        throw new GmailUnavailableException("Gmail authorization-code exchange is not configured for this host.");
+        configuration.RequireConfigured();
+        using var response = await _oauth.PostAsync(configuration.TokenEndpoint, new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["client_id"] = configuration.ClientId,
+            ["client_secret"] = configuration.ClientSecret,
+            ["code"] = authorizationCode,
+            ["grant_type"] = "authorization_code",
+            ["redirect_uri"] = new Uri(configuration.PublicOrigin, "google/gmail/oauth/callback").AbsoluteUri,
+        }), cancellationToken).ConfigureAwait(false);
+        return await ReadGrantAsync(response, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<GmailTokenGrant> ExchangeAsync(string refreshToken, CancellationToken cancellationToken)
     {
         configuration.RequireConfigured();
+        using var response = await _oauth.PostAsync(configuration.TokenEndpoint, new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["client_id"] = configuration.ClientId,
+            ["client_secret"] = configuration.ClientSecret,
+            ["refresh_token"] = refreshToken,
+            ["grant_type"] = "refresh_token",
+        }), cancellationToken).ConfigureAwait(false);
+        return await ReadGrantAsync(response, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<GmailTokenGrant> ReadGrantAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
         try
         {
-            using var response = await _oauth.PostAsync("https://oauth2.googleapis.com/token", new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                ["client_id"] = configuration.ClientId,
-                ["client_secret"] = configuration.ClientSecret,
-                ["refresh_token"] = refreshToken,
-                ["grant_type"] = "refresh_token",
-            }), cancellationToken).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {
                 if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized)
@@ -37,7 +50,7 @@ internal sealed class GmailTokenExchange(GmailOAuthConfiguration configuration) 
                         throw new GmailNotConnectedException();
                     }
                 }
-                throw new GmailUnreachableException($"Gmail token refresh failed (HTTP {(int)response.StatusCode}). Check OAuth configuration or try again later.");
+                throw new GmailUnreachableException($"Gmail token exchange failed (HTTP {(int)response.StatusCode}). Check OAuth configuration or try again later.");
             }
             using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
             var root = json.RootElement;
@@ -63,7 +76,7 @@ internal sealed class GmailTokenExchange(GmailOAuthConfiguration configuration) 
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception)
         {
-            throw new GmailUnreachableException("Gmail token refresh is unavailable. Try again later; no new consent request was started.");
+            throw new GmailUnreachableException("Gmail token exchange is unavailable. Try again later; no new consent request was started.");
         }
     }
 

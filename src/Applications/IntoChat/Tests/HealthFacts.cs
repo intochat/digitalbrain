@@ -1,3 +1,4 @@
+using DigitalBrain.Flutter;
 namespace IntoChat.Tests;
 
 public sealed class HealthFacts
@@ -6,15 +7,8 @@ public sealed class HealthFacts
     public async Task IntoChatHealthReturnsOk()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var app = await E2EDigitalBrain.StartAsync<Projects.IntoChat_AppHost>(
-            new E2EOptions
-            {
-                Args = ["DigitalBrain:Flutter:Hosting:Kind=None"],
-                WaitFor = ["IntoChat"],
-            },
-            ct);
-        using var http = app.CreateHttpClient("IntoChat");
-        using var response = await http.GetAsync("/health", ct);
+        await using var brain = await E2EDigitalBrainSimulation.StartAsync<Projects.IntoChat_AppHost>(new IntoChatOptions { Flutter = new() { Hosting = new() { Kind = FlutterHostKind.None } } }, ct);
+        using var response = await brain.HttpClient.GetAsync("/health", ct);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 }

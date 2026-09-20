@@ -7,7 +7,7 @@ namespace DigitalBrain.Aspire.Hosting;
 
 public static class DigitalBrainHostingExtensions
 {
-    public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name)
+    public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name, bool persistentStorage = true)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -25,9 +25,10 @@ public static class DigitalBrainHostingExtensions
         var kernel = brain.GetOrAddModuleNode(DigitalBrainHostingNames.Kernel);
         var storage = builder
             .AddAzureStorage(DigitalBrainNames.Storage)
-            .RunAsEmulator(static emulator => emulator
-                .WithDataVolume()
-                .WithLifetime(ContainerLifetime.Persistent))
+            .RunAsEmulator(emulator =>
+            {
+                if (persistentStorage) { emulator.WithDataVolume().WithLifetime(ContainerLifetime.Persistent); }
+            })
             .WithParentRelationship(kernel);
         var clustering = storage.AddTables(DigitalBrainNames.Clustering);
         var reminders = storage.AddTables(DigitalBrainNames.Reminders);
@@ -57,9 +58,18 @@ public static class DigitalBrainHostingExtensions
     {
         ArgumentNullException.ThrowIfNull(brain);
         ArgumentNullException.ThrowIfNull(configure);
-        brain.AddModule(typeof(TModule));
+        brain.AddModuleType(typeof(TModule));
         var module = new DigitalBrainModuleBuilder<TModule>(brain);
-        var hostingAttribute = typeof(TModule).GetCustomAttribute<ModuleHostingAttribute>();
+        configure(module);
+        return brain;
+    }
+
+    public static DigitalBrainBuilder AddModuleType(this DigitalBrainBuilder brain, Type moduleType)
+    {
+        ArgumentNullException.ThrowIfNull(brain);
+        ArgumentNullException.ThrowIfNull(moduleType);
+        brain.AddModule(moduleType);
+        var hostingAttribute = moduleType.GetCustomAttribute<ModuleHostingAttribute>();
         if (hostingAttribute is { } hosting)
         {
             var type = Type.GetType(hosting.TypeName, throwOnError: true)!;
@@ -70,8 +80,7 @@ public static class DigitalBrainHostingExtensions
 
             defaults.Configure(brain);
         }
-        configure(module);
-        var nodeName = DigitalBrainHostingNames.ForModule(typeof(TModule));
+        var nodeName = DigitalBrainHostingNames.ForModule(moduleType);
         if (hostingAttribute is null && !brain.HasResource(nodeName))
         {
             brain.GetOrAddModuleNode(nodeName);

@@ -1,3 +1,4 @@
+using DigitalBrain.Testing.Unit;
 using DigitalBrain.Contracts;
 using DigitalBrain.Testing;
 using DigitalBrain.Time;
@@ -153,7 +154,7 @@ public sealed class ReminderFacts
         Assert.Contains("reminder", error.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
-    private static Task<IDigitalBrain> StartAsync(CancellationToken ct, ReminderControl? reminders = null)
+    private static Task<UnitBrain> StartAsync(CancellationToken ct, ReminderControl? reminders = null)
         => DigitalBrainSimulation.StartAsync(new()
         {
             Modules = [new TimeModule()],

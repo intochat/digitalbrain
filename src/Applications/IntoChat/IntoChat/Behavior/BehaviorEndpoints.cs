@@ -8,7 +8,8 @@ internal static class BehaviorEndpoints
 {
     public static void AddBehaviors(this IHostApplicationBuilder builder)
     {
-        builder.Services.AddBehavior<ElonBitcoin>();
+        builder.Services.AddBehavior<ElonBitcoin>(brain =>
+            [SubscriptionRequirement.For<Posted>(brain.Get<ITwitterAccount>("elonmusk"))]);
     }
 
     public static void MapBehaviors(this IEndpointRouteBuilder _) { }

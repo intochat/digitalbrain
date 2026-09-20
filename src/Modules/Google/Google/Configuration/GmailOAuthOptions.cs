@@ -7,4 +7,5 @@ public sealed class GmailOAuthOptions
     public string ClientId { get; set; } = "";
     public string ClientSecret { get; set; } = "";
     public string PublicOrigin { get; set; } = "";
+    public string TokenEndpoint { get; set; } = "";
 }

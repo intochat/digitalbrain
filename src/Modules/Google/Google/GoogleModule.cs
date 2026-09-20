@@ -12,6 +12,15 @@ namespace DigitalBrain.Google;
 
 public sealed class GoogleModule : IModule
 {
+    public static ModuleDefinition Define(GoogleModuleOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        if (options.PublicOrigin is { IsAbsoluteUri: false }) { throw new ArgumentException("Google PublicOrigin must be absolute.", nameof(options)); }
+        return new(typeof(GoogleModule), new Dictionary<string, string?>
+        {
+            [GmailOAuthConfigurationRoot + ":PublicOrigin"] = options.PublicOrigin?.AbsoluteUri ?? ""
+        });
+    }
     public const string GmailOAuthConfigurationRoot = "DigitalBrain:Google:Gmail:OAuth";
     public static readonly Uri GmailMcpEndpoint = new("https://gmailmcp.googleapis.com/mcp/v1");
 

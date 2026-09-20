@@ -7,6 +7,13 @@ namespace DigitalBrain.Flutter;
 
 public sealed class FlutterModule : IModule
 {
+    public static ModuleDefinition Define(FlutterModuleOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        if (!Enum.IsDefined(options.Hosting.Kind)) { throw new ArgumentOutOfRangeException(nameof(options)); }
+        return new(typeof(FlutterModule), new Dictionary<string, string?>
+        { ["DigitalBrain:Flutter:Hosting:Kind"] = options.Hosting.Kind.ToString() });
+    }
     public const string InboxPath = "/ui/inbox";
     public const string InboxGrain = "ui";
 

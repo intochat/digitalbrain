@@ -7,7 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Modules.Google.Tests" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Google.E2E" />
   </ItemGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

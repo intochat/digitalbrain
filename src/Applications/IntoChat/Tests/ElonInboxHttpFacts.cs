@@ -1,3 +1,5 @@
+using DigitalBrain.Flutter;
+using DigitalBrain.Behaviors;
 using System.Net.Http.Json;
 
 namespace IntoChat.Tests;
@@ -8,15 +10,9 @@ public sealed class ElonInboxHttpFacts
     public async Task WebhookFillsUiInbox()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var app = await E2EDigitalBrain.StartAsync<Projects.IntoChat_AppHost>(
-            new E2EOptions
-            {
-                Args = ["DigitalBrain:Flutter:Hosting:Kind=None"],
-                WaitFor = ["IntoChat"],
-            },
-            ct);
-        using var http = app.CreateHttpClient("IntoChat");
-        using var webhook = await http.PostAsJsonAsync(
+        await using var brain = await E2EDigitalBrainSimulation.StartAsync<Projects.IntoChat_AppHost>(new IntoChatOptions { Flutter = new() { Hosting = new() { Kind = FlutterHostKind.None } } }, ct);
+        await brain.Get<IBitcoin>("btc").SetPrice(64_000);
+        using var webhook = await brain.HttpClient.PostAsJsonAsync(
             "/twitter/webhook",
             new { Account = "elonmusk", Text = "Bitcoin to the moon" },
             ct);
@@ -25,8 +21,8 @@ public sealed class ElonInboxHttpFacts
         deadline.CancelAfter(TimeSpan.FromSeconds(15));
         while (!deadline.Token.IsCancellationRequested)
         {
-            var lines = await http.GetFromJsonAsync<List<string>>("/ui/inbox", deadline.Token) ?? [];
-            if (lines.Exists(line => line.Contains("Bitcoin to the moon", StringComparison.Ordinal)))
+            var lines = await brain.HttpClient.GetFromJsonAsync<List<string>>("/ui/inbox", deadline.Token) ?? [];
+            if (lines.Contains("elonmusk: Bitcoin to the moon  BTC 64000"))
             {
                 return;
             }

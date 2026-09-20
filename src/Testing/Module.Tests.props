@@ -12,7 +12,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="xunit.v3.mtp-v2" />
-    <Using Include="DigitalBrain.Testing" />
-    <ProjectReference Include="$(MSBuildThisFileDirectory)DigitalBrain.NeuronTesting/DigitalBrain.NeuronTesting.csproj" />
+    <Using Include="DigitalBrain.Testing" /><Using Include="DigitalBrain.Testing.Unit" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
   </ItemGroup>
 </Project>
