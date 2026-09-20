@@ -93,13 +93,17 @@
   <Folder Name="/Testing/">
     <Project Path="src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
     <Project Path="src/Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
-    <Project Path="src/Testing/DigitalBrain.Testing.Hosting/DigitalBrain.Testing.Hosting.csproj" />
     <Project Path="src/Testing/DigitalBrain.Testing.Integration/DigitalBrain.Testing.Integration.csproj" />
+    <Project Path="src/Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
+    <File Path="src/Testing/Module.Tests.props" />
+  </Folder>
+  <Folder Name="/Testing/Infrastructure/">
+    <Project Path="src/Testing/DigitalBrain.Testing.Hosting/DigitalBrain.Testing.Hosting.csproj" />
     <Project Path="src/Testing/DigitalBrain.Testing.ModuleRunner/DigitalBrain.Testing.ModuleRunner.csproj" />
     <Project Path="src/Testing/DigitalBrain.Testing.ModuleAppHost/DigitalBrain.Testing.ModuleAppHost.csproj" />
-    <Project Path="src/Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
+  </Folder>
+  <Folder Name="/Testing/Tests/">
     <Project Path="src/Testing/DigitalBrain.Testing.Framework.Tests/DigitalBrain.Testing.Framework.Tests.csproj" />
     <Project Path="src/Testing/DigitalBrain.Testing.Framework.IntegrationTests/DigitalBrain.Testing.Framework.IntegrationTests.csproj" />
-    <File Path="src/Testing/Module.Tests.props" />
   </Folder>
 </Solution>
