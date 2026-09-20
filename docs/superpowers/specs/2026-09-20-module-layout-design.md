@@ -1,6 +1,6 @@
 # Module layout, naming and neuron-model port
 
-Date: 2026-09-20. Status: design approved; refactor in progress.
+Date: 2026-09-20. Status: implemented. Every module is ported to the neuron model, one `DigitalBrain.slnx` remains, and the whole solution builds with all tests green.
 
 ## 1. Why
 
