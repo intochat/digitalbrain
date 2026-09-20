@@ -5,22 +5,34 @@ namespace DigitalBrain.Testing.E2E;
 
 public static class E2ETest
 {
-    public static Task<E2EBrain> StartAsync<TAppHost>(IApplicationConfiguration options, CancellationToken cancellationToken = default)
-        where TAppHost : class => StartAsync<TAppHost>(options, new(), cancellationToken);
+    public const string FlutterHostingKindKey = "DigitalBrain:Flutter:Hosting:Kind";
 
-    public static async Task<E2EBrain> StartAsync<TAppHost>(IApplicationConfiguration options, TestExecutionOptions execution,
+    public static Task<E2EBrain> StartAsync<TAppHost>(CancellationToken cancellationToken = default)
+        where TAppHost : class => StartAsync<TAppHost>(configuration: null, new(), cancellationToken);
+
+    public static Task<E2EBrain> StartAsync<TAppHost>(IApplicationConfiguration configuration, CancellationToken cancellationToken = default)
+        where TAppHost : class => StartAsync<TAppHost>(configuration, new(), cancellationToken);
+
+    public static async Task<E2EBrain> StartAsync<TAppHost>(IApplicationConfiguration? configuration, TestExecutionOptions execution,
         CancellationToken cancellationToken = default) where TAppHost : class
     {
-        ArgumentNullException.ThrowIfNull(options);
-        var snapshot = options.CreateSnapshot();
+        var snapshot = configuration?.CreateSnapshot();
         var identity = "test-" + Guid.NewGuid().ToString("N");
         List<string> args = [];
-        foreach (var (key, value) in snapshot.Configuration)
+        if (snapshot is not null)
         {
-            if (key.StartsWith("Orleans:", StringComparison.OrdinalIgnoreCase) || key.StartsWith("ConnectionStrings:", StringComparison.OrdinalIgnoreCase) || key.StartsWith("DigitalBrain:Testing:", StringComparison.OrdinalIgnoreCase))
-            { throw new ArgumentException("Application options cannot override test-owned connections or identity.", nameof(options)); }
-            args.Add($"{key}={value}");
+            foreach (var (key, value) in snapshot.Configuration)
+            {
+                if (key.StartsWith("Orleans:", StringComparison.OrdinalIgnoreCase) || key.StartsWith("ConnectionStrings:", StringComparison.OrdinalIgnoreCase) || key.StartsWith("DigitalBrain:Testing:", StringComparison.OrdinalIgnoreCase))
+                { throw new ArgumentException("Application options cannot override test-owned connections or identity.", nameof(configuration)); }
+                args.Add($"{key}={value}");
+            }
         }
+        else
+        {
+            args.Add($"{FlutterHostingKindKey}=Web");
+        }
+
         args.Add("DigitalBrain:Testing:Enabled=true");
         args.Add($"Orleans:ClusterId={identity}");
         execution = WithHostedBrowser(snapshot, execution, identity);
@@ -28,7 +40,7 @@ public static class E2ETest
         return new(session);
     }
 
-    private static TestExecutionOptions WithHostedBrowser(ApplicationConfigurationSnapshot snapshot, TestExecutionOptions execution, string identity)
+    private static TestExecutionOptions WithHostedBrowser(ApplicationConfigurationSnapshot? snapshot, TestExecutionOptions execution, string identity)
     {
         if (execution.ArtifactDirectory is null)
         {
@@ -38,11 +50,7 @@ public static class E2ETest
             };
         }
 
-        if (!snapshot.Configuration.TryGetValue("DigitalBrain:Flutter:Hosting:Kind", out var kind) || kind is null)
-        {
-            return execution;
-        }
-
+        var kind = snapshot?.Configuration.GetValueOrDefault(FlutterHostingKindKey) ?? "Web";
         var web = kind.Equals("Web", StringComparison.OrdinalIgnoreCase);
         return execution with { Browser = BrowserOptions.Resolve(headless: !web) };
     }

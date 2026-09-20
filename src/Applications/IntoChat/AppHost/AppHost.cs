@@ -12,10 +12,10 @@ using Aspire.Hosting.ApplicationModel;
 
 var builder = DistributedApplication.CreateBuilder(args);
 var testing = builder.Configuration.GetValue<bool>("DigitalBrain:Testing:Enabled");
-var options = new DigitalBrainOptions
+var options = new DigitalBrainConfiguration
 {
     Google = new() { PublicOrigin = Uri.TryCreate(builder.Configuration[GoogleModule.GmailOAuthConfigurationRoot + ":PublicOrigin"], UriKind.Absolute, out var origin) ? origin : null },
-    Flutter = new() { Hosting = new() { Kind = builder.Configuration.GetValue("DigitalBrain:Flutter:Hosting:Kind", FlutterHostKind.Window) } }
+    Flutter = new() { Hosting = new() { Kind = builder.Configuration.GetValue($"{DigitalBrainConfiguration.SectionName}:Flutter:Hosting:Kind", FlutterHostKind.Window) } }
 };
 
 var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, persistentStorage: !testing)

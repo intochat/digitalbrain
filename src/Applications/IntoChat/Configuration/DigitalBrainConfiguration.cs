@@ -6,20 +6,12 @@ using DigitalBrain.Time;
 
 namespace DigitalBrain;
 
-public sealed record DigitalBrainOptions : IApplicationConfiguration
+public sealed record DigitalBrainConfiguration : IApplicationConfiguration
 {
+    public const string SectionName = "DigitalBrain";
+
     public GoogleModuleOptions Google { get; init; } = new();
     public FlutterModuleOptions Flutter { get; init; } = new();
-
-    public static DigitalBrainOptions Web { get; } = new()
-    {
-        Flutter = new() { Hosting = new() { Kind = FlutterHostKind.Web } },
-    };
-
-    public static DigitalBrainOptions Headless { get; } = new()
-    {
-        Flutter = new() { Hosting = new() { Kind = FlutterHostKind.None } },
-    };
 
     public IReadOnlyList<ModuleDefinition> Modules =>
         [GoogleModule.Define(Google), FlutterModule.Define(Flutter), TimeModule.Define(), new(typeof(TestTwitterModule))];

@@ -11,7 +11,7 @@ public sealed class ElonBitcoinUiFacts
     public async Task WebhookTweetAppearsInFlutterUi()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await E2ETest.StartAsync<Projects.IntoChat_AppHost>(DigitalBrainOptions.Web, ct);
+        await using var brain = await E2ETest.StartAsync<Projects.IntoChat_AppHost>(ct);
         await brain.Get<IBitcoin>("btc").SetPrice(64_000);
         await using var browser = await brain.OpenBrowserAsync(ct);
         using var webhook = await brain.HttpClient.PostAsJsonAsync(
