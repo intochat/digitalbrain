@@ -16,14 +16,23 @@ public sealed class GmailOAuthCallbackFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var stub = await TokenEndpointStub.StartAsync(ct);
-        var definition = new ModuleDefinition(typeof(GoogleModule), new Dictionary<string, string?>
+        var definition = GoogleModule.Define(new()
         {
-            [GoogleModule.GmailOAuthConfigurationRoot + ":ClientId"] = "integration-client",
-            [GoogleModule.GmailOAuthConfigurationRoot + ":ClientSecret"] = "integration-secret",
-            [GoogleModule.GmailOAuthConfigurationRoot + ":PublicOrigin"] = stub.Origin.AbsoluteUri,
-            [GoogleModule.GmailOAuthConfigurationRoot + ":TokenEndpoint"] = stub.TokenEndpoint.AbsoluteUri,
+            PublicOrigin = stub.Origin,
+            TokenEndpoint = stub.TokenEndpoint,
         });
-        await using var brain = await IntegrationTest.StartAsync(new() { Modules = [definition] }, ct);
+        await using var brain = await IntegrationTest.StartAsync(new()
+        {
+            Modules = [definition],
+            Execution = new()
+            {
+                PrivateConfiguration = new Dictionary<string, string?>
+                {
+                    [GoogleModule.GmailOAuthConfigurationRoot + ":ClientId"] = "integration-client",
+                    [GoogleModule.GmailOAuthConfigurationRoot + ":ClientSecret"] = "integration-secret",
+                },
+            },
+        }, ct);
         var gmail = brain.Get<IGmail>("gmail");
         await using var connected = await brain.Observe<GmailConnected>(gmail, ct);
         using var response = await brain.HttpClient.GetAsync("google/gmail/oauth/callback?code=fake-code", ct);

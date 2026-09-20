@@ -1,89 +1,125 @@
+using System.Diagnostics;
 using DigitalBrain.Testing.Hosting;
 using Microsoft.Playwright;
-
-using BrowserOptions = DigitalBrain.Testing.BrowserOptions;
 
 namespace DigitalBrain.Testing.E2E;
 
 public sealed class E2EBrain : HostedBrain
 {
     private readonly SemaphoreSlim _browserGate = new(1);
+    private readonly ResolvedBrowserOptions _options;
     private IBrowser? _browser;
-    internal E2EBrain(AspireTestSession session) : base(session) { }
 
-    public Task<BrowserSession> OpenBrowserAsync(CancellationToken cancellationToken = default)
-        => OpenBrowserAsync(Session.Options.Browser, cancellationToken);
+    internal E2EBrain(AspireTestSession session, ResolvedBrowserOptions options) : base(session) => _options = options;
 
-    public async Task<BrowserSession> OpenBrowserAsync(BrowserOptions options, CancellationToken cancellationToken = default)
+    public async Task<BrowserSession> OpenBrowserAsync(CancellationToken cancellationToken = default)
     {
         var endpoint = Session.BrowserEndpoint ?? throw new InvalidOperationException("This application configuration exposes no browser endpoint.");
-        await _browserGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(_options.StartupTimeout);
+        var watch = Stopwatch.StartNew();
+        var stage = "browser-lock";
+        var acquired = false;
+        BrowserSession? session = null;
         try
         {
+            await _browserGate.WaitAsync(deadline.Token).ConfigureAwait(false);
+            acquired = true;
             if (_browser is null)
             {
-                var playwright = await Playwright.CreateAsync().ConfigureAwait(false);
+                stage = "browser-launch";
+                var playwright = await AcquireAsync(Playwright.CreateAsync(),
+                    value => { value.Dispose(); return Task.CompletedTask; }, deadline.Token).ConfigureAwait(false);
                 Lifetime.Own("playwright", new AsyncAction(() => { playwright.Dispose(); return ValueTask.CompletedTask; }));
-                var launch = BrowserOptions.Resolve(options.Headless);
-                if (options.SlowMoMilliseconds > 0)
-                {
-                    launch = launch with { SlowMoMilliseconds = options.SlowMoMilliseconds };
-                }
-
+                using var cancelLaunch = deadline.Token.Register(playwright.Dispose);
                 _browser = await playwright.Chromium.LaunchAsync(new()
                 {
-                    Headless = launch.Headless,
-                    SlowMo = launch.SlowMoMilliseconds,
-                    Timeout = 30_000,
+                    Headless = _options.Headless,
+                    SlowMo = _options.SlowMoMilliseconds,
+                    Timeout = Remaining(),
                 }).ConfigureAwait(false);
                 Lifetime.Own("browser", _browser);
             }
-            var context = await _browser.NewContextAsync().ConfigureAwait(false);
-            var session = new BrowserSession(context, Session.Options.ArtifactDirectory, cancellationToken);
+            deadline.Token.ThrowIfCancellationRequested();
+            stage = "browser-context";
+            var context = await AcquireAsync(_browser.NewContextAsync(), value => value.CloseAsync(), deadline.Token).ConfigureAwait(false);
+            session = new BrowserSession(context, Session.Options.ArtifactDirectory, cancellationToken);
             Lifetime.Own("browser-context", session);
+            using var cancelStartup = deadline.Token.Register(() => BrowserSession.CloseInBackground(context));
+            await context.Tracing.StartAsync(new() { Screenshots = true, Snapshots = true }).ConfigureAwait(false);
+            var page = await context.NewPageAsync().ConfigureAwait(false);
+            session.Page = page;
+            page.SetDefaultTimeout((float)_options.AssertionTimeout.TotalMilliseconds);
+            stage = "browser-readiness";
+            await PreparePageAsync(page, endpoint, Session.BrowserReadySelector, Remaining, deadline.Token).ConfigureAwait(false);
+            deadline.Token.ThrowIfCancellationRequested();
+            return session;
+        }
+        catch (Exception error)
+        {
+            if (session is not null)
+            {
+                try { await session.DisposeAsync().ConfigureAwait(false); }
+                catch (Exception cleanup) { error.Data["BrowserCleanupFailure"] = cleanup; }
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            if (deadline.IsCancellationRequested)
+                { throw new TimeoutException($"Browser startup timed out at '{stage}' after {_options.StartupTimeout}.", error); }
+            throw new InvalidOperationException($"Browser startup failed at '{stage}'.", error);
+        }
+        finally { if (acquired) { _browserGate.Release(); } }
+
+        float Remaining()
+        {
+            deadline.Token.ThrowIfCancellationRequested();
+            return (float)Math.Max(1, (_options.StartupTimeout - watch.Elapsed).TotalMilliseconds);
+        }
+    }
+
+    internal static async Task PreparePageAsync(IPage page, Uri endpoint, string? readySelector,
+        Func<float> remaining, CancellationToken ct)
+    {
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+            await page.GotoAsync(endpoint.AbsoluteUri, new() { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = remaining() }).ConfigureAwait(false);
+            if (readySelector is null) { return; }
             try
             {
-                await context.Tracing.StartAsync(new() { Screenshots = true, Snapshots = true }).ConfigureAwait(false);
-                var page = await context.NewPageAsync().ConfigureAwait(false);
-                session.Page = page;
-                page.SetDefaultTimeout(60_000);
-                var uri = endpoint.AbsoluteUri.Contains('?', StringComparison.Ordinal)
-                    ? endpoint.AbsoluteUri + "&semantics=true"
-                    : endpoint.AbsoluteUri + "?semantics=true";
-                var view = page.Locator("flt-glass-pane")
-                    .Or(page.Locator("flutter-view"))
-                    .Or(page.Locator("flt-semantics-placeholder"));
-                var until = DateTime.UtcNow + TimeSpan.FromMinutes(2);
-                while (true)
+                await page.Locator(readySelector).First.WaitForAsync(new()
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await page.GotoAsync(uri, new() { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 60_000 }).ConfigureAwait(false);
-                    try
-                    {
-                        await view.First.WaitForAsync(new() { State = WaitForSelectorState.Attached, Timeout = 8_000 }).ConfigureAwait(false);
-                        break;
-                    }
-                    catch (Exception ex) when (DateTime.UtcNow < until && ex is TimeoutException or PlaywrightException)
-                    {
-                        await Task.Delay(2_000, cancellationToken).ConfigureAwait(false);
-                    }
-                }
-
-                var placeholder = page.Locator("flt-semantics-placeholder");
-                if (await placeholder.CountAsync().ConfigureAwait(false) > 0)
-                {
-                    await placeholder.First.EvaluateAsync("element => element.click()").ConfigureAwait(false);
-                }
-
-                await page.Locator("flt-semantics").First
-                    .WaitForAsync(new() { State = WaitForSelectorState.Attached, Timeout = 30_000 }).ConfigureAwait(false);
-                cancellationToken.ThrowIfCancellationRequested();
-                return session;
+                    State = WaitForSelectorState.Attached,
+                    Timeout = Math.Min(8_000, remaining()),
+                }).ConfigureAwait(false);
+                return;
             }
-            catch { await session.DisposeAsync().ConfigureAwait(false); cancellationToken.ThrowIfCancellationRequested(); throw; }
+            catch (TimeoutException) when (!ct.IsCancellationRequested && remaining() > 2_000)
+            {
+                // A healthy development server can answer before its first build is available.
+                await Task.Delay(TimeSpan.FromSeconds(1), ct).ConfigureAwait(false);
+            }
         }
-        finally { _browserGate.Release(); }
     }
+
+    internal static async Task<T> AcquireAsync<T>(Task<T> acquisition, Func<T, Task> release, CancellationToken ct)
+    {
+        try { return await acquisition.WaitAsync(ct).ConfigureAwait(false); }
+        catch
+        {
+            // A browser protocol operation may finish after cancellation; do not leak its result.
+            _ = acquisition.ContinueWith(async completed =>
+            {
+                if (completed.IsCompletedSuccessfully)
+                {
+                    try { await release(completed.Result).ConfigureAwait(false); }
+                    catch { /* Best effort after ownership could not be acquired. */ }
+                }
+                else { _ = completed.Exception; }
+            }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default).Unwrap();
+            throw;
+        }
+    }
+
     private sealed class AsyncAction(Func<ValueTask> action) : IAsyncDisposable
     { public ValueTask DisposeAsync() => action(); }
 }

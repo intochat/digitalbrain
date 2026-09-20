@@ -12,7 +12,7 @@ public sealed class GitHubConnectionsFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.StartAsync(
-            new() { Modules = [new MicrosoftModule()] }, ct);
+            new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(MicrosoftModule))] }, ct);
         var connections = brain.Get<IGitHubConnections>("connections");
         await using var registered = await brain.Observe<GitHubConnectionRegistered>(connections, ct);
         var record = await connections.Register(new("conn-1", 7, 9, 11, "intochat", "digitalbrain", "epoch-1"));
@@ -27,7 +27,7 @@ public sealed class GitHubConnectionsFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.StartAsync(
-            new() { Modules = [new MicrosoftModule()] }, ct);
+            new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(MicrosoftModule))] }, ct);
         var connections = brain.Get<IGitHubConnections>("connections");
         await connections.Register(new("conn-1", 7, 9, 11, "intochat", "digitalbrain", "epoch-1"));
         await connections.Register(new("conn-1", 7, 9, 11, "intochat", "digitalbrain", "epoch-2"));
@@ -39,7 +39,7 @@ public sealed class GitHubConnectionsFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.StartAsync(
-            new() { Modules = [new MicrosoftModule()] }, ct);
+            new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(MicrosoftModule))] }, ct);
         var connections = brain.Get<IGitHubConnections>("connections");
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
             () => connections.Register(new("conn-1", 0, 9, 11, "intochat", "digitalbrain", "epoch-1")));

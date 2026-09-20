@@ -148,7 +148,7 @@ public sealed class ReminderFacts
         {
             await using var brain = await UnitTest.StartAsync(new()
             {
-                Modules = [new TimeModule()],
+                Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(TimeModule))],
             }, TestContext.Current.CancellationToken);
         });
         Assert.Contains("reminder", error.ToString(), StringComparison.OrdinalIgnoreCase);
@@ -157,7 +157,7 @@ public sealed class ReminderFacts
     private static Task<UnitBrain> StartAsync(CancellationToken ct, ReminderControl? reminders = null)
         => UnitTest.StartAsync(new()
         {
-            Modules = [new TimeModule()],
+            Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(TimeModule))],
             UseReminders = true,
             ConfigureSilo = reminders is null ? null : silo => silo.UseReminderControl(reminders),
         }, ct);

@@ -13,8 +13,10 @@ public sealed class SignalProbe<T> : IAsyncDisposable where T : Signal
     private readonly int _buffer;
     private readonly Task _worker;
     private int _disposed;
-    internal SignalProbe(ISignalSubscription<T> subscription, int buffer)
+    private readonly TestExecutionOptions _execution;
+    internal SignalProbe(ISignalSubscription<T> subscription, int buffer, TestExecutionOptions execution)
     {
+        _execution = execution;
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(buffer);
         _subscription = subscription;
         _buffer = buffer;
@@ -43,7 +45,7 @@ public sealed class SignalProbe<T> : IAsyncDisposable where T : Signal
     public async Task<T> NextAsync(Func<T, bool>? predicate = null, CancellationToken ct = default)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        deadline.CancelAfter(TestLimits.Timeout);
+        deadline.CancelAfter(_execution.AssertionTimeout);
         try
         {
             while (true)
@@ -54,14 +56,14 @@ public sealed class SignalProbe<T> : IAsyncDisposable where T : Signal
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            throw new TimeoutException($"No matching {typeof(T).Name} within {TestLimits.Timeout}; observed {Snapshot.Count} facts (payloads omitted).");
+            throw new TimeoutException($"No matching {typeof(T).Name} within {_execution.AssertionTimeout}; observed {Snapshot.Count} facts (payloads omitted).");
         }
     }
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) { return; }
         await _cancel.CancelAsync().ConfigureAwait(false);
-        try { await _worker.WaitAsync(TestLimits.Timeout).ConfigureAwait(false); }
+        try { await _worker.WaitAsync(_execution.CleanupTimeout).ConfigureAwait(false); }
         finally { await _subscription.DisposeAsync().ConfigureAwait(false); _cancel.Dispose(); }
     }
 }

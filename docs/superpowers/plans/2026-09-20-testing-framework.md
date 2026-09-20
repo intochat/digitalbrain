@@ -1,5 +1,7 @@
 # DigitalBrain Testing Framework Implementation Plan
 
+Status: historical plan. Superseded by the approved [testing framework refactoring plan](2026-09-20-testing-framework-refactoring.md); see its [execution ledger](testing-refactoring-progress.md) for implementation and validation results.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. The user has requested a plan, not implementation; no execution method has been selected.
 
 **Goal:** Deliver four coherent testing packages with explicit per-test lifetimes, typed composition, one external module runner, and actual-AppHost E2E tests.

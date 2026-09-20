@@ -2,6 +2,7 @@ using DigitalBrain.Testing.Unit;
 using DigitalBrain.Behaviors;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Inbox;
+using DigitalBrain.Flutter.Inbox.Signals;
 using Xunit;
 
 namespace DigitalBrain.Tests;
@@ -13,7 +14,7 @@ public sealed class ElonBitcoinFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.StartAsync(
-            new() { Modules = [new TestTwitterModule(), new FlutterModule()] }, ct);
+            new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(TestTwitterModule)), new DigitalBrain.Core.ModuleDefinition(typeof(FlutterModule))] }, ct);
         await brain.Get<IBitcoin>("btc").SetPrice(64_000);
         await using var run = brain.RunBehavior((live, token) => new ElonBitcoin(live).RunAsync(token), ct);
         var elon = brain.Get<ITwitterAccount>("elonmusk");

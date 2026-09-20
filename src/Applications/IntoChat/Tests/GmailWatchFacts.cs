@@ -12,7 +12,7 @@ public sealed class GmailWatchFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await E2ETest.StartAsync<Projects.IntoChat_AppHost>(
-            new DigitalBrainConfiguration { Flutter = new() { Hosting = new() { Kind = FlutterHostKind.None } } }.Modules, ct);
+            new() { Application = new DigitalBrainConfiguration { Flutter = new() { Hosting = new() { Kind = FlutterHostKind.None } } } }, ct);
         var data = Convert.ToBase64String(Encoding.UTF8.GetBytes(
             JsonSerializer.Serialize(new { emailAddress = "user@gmail.com", historyId = "123" })));
         using var response = await brain.HttpClient.PostAsJsonAsync(

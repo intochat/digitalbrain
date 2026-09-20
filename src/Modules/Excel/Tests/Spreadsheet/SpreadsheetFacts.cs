@@ -12,7 +12,7 @@ public sealed class SpreadsheetFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.StartAsync(
-            new() { Modules = [new ExcelModule()] }, ct);
+            new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(ExcelModule))] }, ct);
         var sheet = brain.Get<ISpreadsheet>("book");
         await using var changed = await brain.Observe<SheetChanged>(sheet, ct);
         var version = await sheet.Apply(new(null, new CellEdit(0, 0, "42")));
@@ -27,7 +27,7 @@ public sealed class SpreadsheetFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.StartAsync(
-            new() { Modules = [new ExcelModule()] }, ct);
+            new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(ExcelModule))] }, ct);
         var sheet = brain.Get<ISpreadsheet>("book");
         await sheet.Apply(new(
             new ExcelState("Budget", "Sheet1", ["A", "B"], [new ExcelRow(["1", "2"]), new ExcelRow(["3", "4"])]),
@@ -45,7 +45,7 @@ public sealed class SpreadsheetFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.StartAsync(
-            new() { Modules = [new ExcelModule()] }, ct);
+            new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(ExcelModule))] }, ct);
         var sheet = brain.Get<ISpreadsheet>("book");
         await Assert.ThrowsAsync<ArgumentException>(() => sheet.Apply(new(null, null)));
         await Assert.ThrowsAsync<ArgumentException>(() => sheet.Apply(new(

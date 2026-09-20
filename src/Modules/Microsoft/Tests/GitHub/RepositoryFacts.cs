@@ -65,7 +65,7 @@ public sealed class RepositoryFacts
     private static Task<UnitBrain> StartAsync(IGitHubRepositorySource source, CancellationToken ct)
         => UnitTest.StartAsync(new()
         {
-            Modules = [new MicrosoftModule()],
+            Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(MicrosoftModule))],
             ConfigureSilo = silo =>
             {
                 silo.Services.AddSingleton(new GitHubRepositoryBindings([Binding()]));

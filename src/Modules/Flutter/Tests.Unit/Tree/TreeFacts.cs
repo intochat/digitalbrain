@@ -11,7 +11,7 @@ public sealed class TreeFacts
     public async Task SetThenSelect()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(new() { Modules = [new FlutterModule()] }, ct);
+        await using var brain = await UnitTest.StartAsync(new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(FlutterModule))] }, ct);
         var tree = brain.Get<ITree>("fs");
         await tree.Set([new TreeNode("root", null, "root"), new TreeNode("child", "root", "child")]);
         await tree.Select("child");

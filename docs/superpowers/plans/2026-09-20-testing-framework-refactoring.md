@@ -10,7 +10,7 @@
 
 **Spec:** [Testing unification review](../../research/2026-09-20-testing-unification-review.md), refined by the concrete decisions below. [Primary sources](../../research/2026-09-20-testing-primary-sources.md). This plan replaces the execution sequence of the earlier testing plan only after approval.
 
-**Status:** Proposed for user approval. No implementation authorized by this document alone.
+**Status:** Approved by the user and implemented on `codex/testing-refactoring`. See the [execution ledger](testing-refactoring-progress.md) for validation, consolidated commit sequencing and the approved infrastructure-retention fallback. Packaging/native-asset/Linux gate items remain unchecked because those capabilities were not established; the programmatic prototype and pack attempts failed before external-consumer validation.
 
 ## Global constraints
 
@@ -107,9 +107,9 @@ Attempt to eliminate ModuleAppHost using Aspire's programmatic test builder only
 
 **Interfaces:** Consumes the current working tree; produces an isolated implementation baseline preserving its contents.
 
-- [ ] Read local instructions and the research evidence; record `git status --short` and current commit.
-- [ ] Use the worktree skill at execution time. Preserve the existing dirty-tree content explicitly; native worktree creation does not copy it. Never commit unrelated changes or silently start from HEAD without the refactoring changes.
-- [ ] Record the current targeted failures with the commands in Validation. The two-way test currently fails with None/no endpoint; the web sample reproduces the semantics-placeholder race.
+- [x] Read local instructions and the research evidence; record `git status --short` and current commit.
+- [x] Use the worktree skill at execution time. Preserve the existing dirty-tree content explicitly; native worktree creation does not copy it. Never commit unrelated changes or silently start from HEAD without the refactoring changes.
+- [x] Record the current targeted failures with the commands in Validation. The two-way test currently fails with None/no endpoint; the web sample reproduces the semantics-placeholder race.
 
 ## Task 1: Repair browser startup and honor execution preferences
 
@@ -119,7 +119,7 @@ Attempt to eliminate ModuleAppHost using Aspire's programmatic test builder only
 
 **Interfaces:** Produces nullable browser overrides and an internal resolved launch value. Common `TestExecutionOptions` no longer contains Browser. This task may temporarily retain Flutter initialization inside E2E until Task 4 extracts metadata-based readiness.
 
-- [ ] Add pure precedence cases using an internal resolver that takes environment/debugger values as parameters, avoiding mutation of process-wide settings in parallel tests:
+- [x] Add pure precedence cases using an internal resolver that takes environment/debugger values as parameters, avoiding mutation of process-wide settings in parallel tests:
 
 ```csharp
 var resolved = BrowserOptionsResolver.Resolve(
@@ -129,11 +129,11 @@ Assert.True(resolved.Headless);
 Assert.Equal(0, resolved.SlowMoMilliseconds);
 ```
 
-- [ ] Cover omitted preferences, explicit headed, negative/nonfinite slow motion, and invalid browser timeouts. Run the failing cases before implementation.
-- [ ] Remove the count-then-click placeholder path. Keep the current application semantics opt-in and await the semantics tree with the remaining browser startup budget.
-- [ ] Restore Web in the two-way UI test, resolve browser options once, and propagate the resolved values unchanged to launch.
-- [ ] Run both real UI tests. A passing synthetic DOM test alone is insufficient evidence for this bug.
-- [ ] Commit only this coherent fix and its tests after verification.
+- [x] Cover omitted preferences, explicit headed, negative/nonfinite slow motion, and invalid browser timeouts. Run the failing cases before implementation.
+- [x] Remove the count-then-click placeholder path. Keep the current application semantics opt-in and await the semantics tree with the remaining browser startup budget.
+- [x] Restore Web in the two-way UI test, resolve browser options once, and propagate the resolved values unchanged to launch.
+- [x] Run both real UI tests. A passing synthetic DOM test alone is insufficient evidence for this bug.
+- [x] Commit only this coherent fix and its tests after verification.
 
 ## Task 2: Make resolved module composition authoritative
 
@@ -143,12 +143,12 @@ Assert.Equal(0, resolved.SlowMoMilliseconds);
 
 **Interfaces:** `ModuleComposition.Resolve(IReadOnlyList<ModuleDefinition>)` remains the resolver. Add production `AddModules(IReadOnlyList<ModuleDefinition>)` on `DigitalBrainBuilder`; it resolves once, applies definition settings and registers matching hosting/runtime modules. Existing `AddModule<T>` remains for production callers; do not invent a universal options registry.
 
-- [ ] Add a dependency module that registers a marker service and a dependent module that requires it; select only the dependent module. Verify the actual started unit host resolves the marker.
-- [ ] Assert duplicate equal definitions configure once and conflicting definitions fail before cluster startup. Exercise conflicting configuration keys across distinct definitions rather than silently accepting order-dependent values.
-- [ ] Change Unit startup to configure the resolved list, not the original list. Reject configuration overriding harness-owned storage/identity sections consistently across hosted paths.
-- [ ] Wire the shared production AddModules path into ModuleAppHost; preserve its child runtime launch and dependency bundle.
-- [ ] Migrate unit callers from IModule instances to definitions. Retain local callbacks for controlled providers; verify representative Time, Google and Flutter tests.
-- [ ] Commit composition and migrated callers together after tests pass.
+- [x] Add a dependency module that registers a marker service and a dependent module that requires it; select only the dependent module. Verify the actual started unit host resolves the marker.
+- [x] Assert duplicate equal definitions configure once and conflicting definitions fail before cluster startup. Exercise conflicting configuration keys across distinct definitions rather than silently accepting order-dependent values.
+- [x] Change Unit startup to configure the resolved list, not the original list. Reject configuration overriding harness-owned storage/identity sections consistently across hosted paths.
+- [x] Wire the shared production AddModules path into ModuleAppHost; preserve its child runtime launch and dependency bundle.
+- [x] Migrate unit callers from IModule instances to definitions. Retain local callbacks for controlled providers; verify representative Time, Google and Flutter tests.
+- [x] Commit composition and migrated callers together after tests pass.
 
 ## Task 3: Introduce consistent options and typed application configuration
 
@@ -160,13 +160,13 @@ Assert.Equal(0, resolved.SlowMoMilliseconds);
 
 **Interfaces:** `DigitalBrainConfiguration : IApplicationConfiguration`; application-owned `Bind(IConfiguration)` and default configuration share module factories. `ApplicationConfigurationTransport.Write(IApplicationConfiguration)` returns a string envelope; `Read(string, IReadOnlyList<ModuleDefinition> allowedModules)` validates and returns resolved definitions. Transport the envelope through a reserved `DigitalBrain:Testing:Application` setting; reject module settings attempting to set that section. Limit the UTF-8 envelope to 8 KiB and fail before launch if exceeded; configuration contains settings, never test data payloads. Resolve module identities only against the supplied allowlist, not arbitrary type names from the envelope.
 
-- [ ] Add round-trip tests for a non-default Flutter shell/chat and Google PublicOrigin. Assert unknown module identities, missing slots, unsupported envelope versions and forbidden harness keys fail before Aspire startup.
-- [ ] Add default-equivalence tests: ordinary app binding and `new DigitalBrainConfiguration()` select the same defaults; E2E must not secretly change them.
-- [ ] Make application binding and definition factories own validation/key mapping. Consolidate Flutter option definitions so typed public settings cover existing host configuration; keep device/process launch mechanisms in the Aspire adapter.
-- [ ] AppHost either binds normal configuration or consumes the validated complete application envelope. Build its graph from those definitions through AddModules; remove duplicated hard-coded selection and partial remapping.
-- [ ] Implement the E2EOptions overload, migrate every E2E caller, then remove the module-list and implicit-application overloads. Native browser session creation remains explicit.
-- [ ] Verify setting values reach the runtime/hosting adapter, not just the transport DTO. Assert no supplied application field is silently ignored.
-- [ ] Commit the contract, binding and caller migration together after validation.
+- [x] Add round-trip tests for a non-default Flutter shell/chat and Google PublicOrigin. Assert unknown module identities, missing slots, unsupported envelope versions and forbidden harness keys fail before Aspire startup.
+- [x] Add default-equivalence tests: ordinary app binding and `new DigitalBrainConfiguration()` select the same defaults; E2E must not secretly change them.
+- [x] Make application binding and definition factories own validation/key mapping. Consolidate Flutter option definitions so typed public settings cover existing host configuration; keep device/process launch mechanisms in the Aspire adapter.
+- [x] AppHost either binds normal configuration or consumes the validated complete application envelope. Build its graph from those definitions through AddModules; remove duplicated hard-coded selection and partial remapping.
+- [x] Implement the E2EOptions overload, migrate every E2E caller, then remove the module-list and implicit-application overloads. Native browser session creation remains explicit.
+- [x] Verify setting values reach the runtime/hosting adapter, not just the transport DTO. Assert no supplied application field is silently ignored.
+- [x] Commit the contract, binding and caller migration together after validation.
 
 ## Task 4: Share budgets/lifetime and separate frontend readiness
 
@@ -178,14 +178,14 @@ Assert.Equal(0, resolved.SlowMoMilliseconds);
 
 **Interfaces:** Tracked brains supply per-run execution settings to observation helpers. SignalProbe and BehaviorRun receive budgets at construction; ordinary IDigitalBrain callers keep documented defaults. Browser endpoint metadata adds navigation path/query and optional readiness selector. BrowserOptions adds StartupTimeout and AssertionTimeout.
 
-- [ ] Add a real no-signal probe test with a short per-run assertion timeout; verify it expires under that budget rather than the fixed five seconds. Run two differently configured sessions to detect global leakage.
-- [ ] Use a shared lifetime owner in UnitBrain; preserve disposal order, rollback on failed startup, aggregation of cleanup failures and idempotent disposal. Nested owners receive a common absolute cleanup deadline rather than starting fresh full budgets.
-- [ ] Apply one startup deadline to each startup operation. Browser launch/navigation/preparation share the browser deadline; cancellation closes the context so pending Playwright calls terminate.
-- [ ] Have Flutter's hosting annotation advertise the navigation query and `flt-semantics` selector. Retain programmatic semantics initialization in the shell. Remove all Flutter-specific tags/query knowledge from generic E2E.
-- [ ] Test metadata-driven navigation with a tiny local HTML endpoint, then verify the real Flutter shell. Keep application login/data-readiness assertions in application tests.
-- [ ] Capture screenshot and trace independently; ensure one failure does not skip the other. Preserve original startup/action exceptions while attaching cleanup/artifact diagnostics. Bound console/page-error/request summaries and omit sensitive payloads.
-- [ ] Cover cancellation during navigation, failed screenshot capture, repeated disposal and session cleanup after browser preparation fails.
-- [ ] Commit after unit/lifecycle tests and real UI smoke tests pass.
+- [x] Add a real no-signal probe test with a short per-run assertion timeout; verify it expires under that budget rather than the fixed five seconds. Run two differently configured sessions to detect global leakage.
+- [x] Use a shared lifetime owner in UnitBrain; preserve disposal order, rollback on failed startup, aggregation of cleanup failures and idempotent disposal. Nested owners receive a common absolute cleanup deadline rather than starting fresh full budgets.
+- [x] Apply one startup deadline to each startup operation. Browser launch/navigation/preparation share the browser deadline; cancellation closes the context so pending Playwright calls terminate.
+- [x] Have Flutter's hosting annotation advertise the navigation query and `flt-semantics` selector. Retain programmatic semantics initialization in the shell. Remove all Flutter-specific tags/query knowledge from generic E2E.
+- [x] Test metadata-driven navigation with a tiny local HTML endpoint, then verify the real Flutter shell. Keep application login/data-readiness assertions in application tests.
+- [x] Capture screenshot and trace independently; ensure one failure does not skip the other. Preserve original startup/action exceptions while attaching cleanup/artifact diagnostics. Bound console/page-error/request summaries and omit sensitive payloads.
+- [x] Cover cancellation during navigation, failed screenshot capture, repeated disposal and session cleanup after browser preparation fails.
+- [x] Commit after unit/lifecycle tests and real UI smoke tests pass.
 
 ## Task 5: Make external provider overrides typed and process-safe
 
@@ -195,12 +195,12 @@ Assert.Equal(0, resolved.SlowMoMilliseconds);
 
 **Interfaces:** Add typed non-secret `TokenEndpoint` to GoogleModuleOptions and map it to the existing provider setting. Credential handling remains outside public module definitions. Local ConfigureSilo callbacks do not cross processes.
 
-- [ ] Convert the existing token endpoint stub case to typed Google options. Verify the stub receives the exchange and the neuron emits GmailConnected.
-- [ ] Supply synthetic OAuth credentials through a private test-owned configuration channel, not module arguments. Use a restricted run-scoped file with an environment reference, delete it on rollback/disposal, and test diagnostic redaction. Do not add support for live account testing.
-- [ ] Retain in-process interface replacements with existing fake providers. Use explicit DI replacement where registration order otherwise changes behavior.
-- [ ] Demonstrate a compiled test support module registering a provider inside the external child. Assert external PID and actual provider behavior. Do not add generic object serialization or remote delegate execution.
-- [ ] Run the provider scenarios twice with isolated instances and verify no state crosses runs.
-- [ ] Commit typed options, fixtures and provider transport tests together.
+- [x] Convert the existing token endpoint stub case to typed Google options. Verify the stub receives the exchange and the neuron emits GmailConnected.
+- [x] Supply synthetic OAuth credentials through a private test-owned configuration channel, not module arguments. Use a restricted run-scoped file with an environment reference, delete it on rollback/disposal, and test diagnostic redaction. Do not add support for live account testing.
+- [x] Retain in-process interface replacements with existing fake providers. Use explicit DI replacement where registration order otherwise changes behavior.
+- [x] Demonstrate a compiled test support module registering a provider inside the external child. Assert external PID and actual provider behavior. Do not add generic object serialization or remote delegate execution.
+- [x] Run the provider scenarios twice with isolated instances and verify no state crosses runs.
+- [x] Commit typed options, fixtures and provider transport tests together.
 
 ## Task 6: Reduce the exposed project surface and prove packaging
 
@@ -210,13 +210,13 @@ Assert.Equal(0, resolved.SlowMoMilliseconds);
 
 **Interfaces:** Four public packages remain. Shared hosting and runner are implementation dependencies. If the gate passes, Integration constructs the module resource graph programmatically and ModuleAppHost is deleted; consumers still call IntegrationTest.StartAsync unchanged.
 
-- [ ] Group public packages, infrastructure and framework tests separately in the solution. Update misleading package descriptions; restrict implementation visibility where possible.
+- [x] Group public packages, infrastructure and framework tests separately in the solution. Update misleading package descriptions; restrict implementation visibility where possible.
 - [ ] Prove current bundle behavior: selected module absent from runner static references, transitive assembly, representative native asset, separate host adapter, external PID, restart persistence and parallel isolation. Add missing cases before changing packaging.
 - [ ] Prototype programmatic Aspire graph creation within Integration using the pinned SDK support. Verify required `dcpclipath` and runtime assets are available outside the repository checkout.
 - [ ] Pack into a temporary local feed and consume from a minimal external test project with one module. Build, start, call its endpoint, restart, then dispose. Repeat on Windows and Linux CI.
-- [ ] Delete ModuleAppHost only if all checks pass without consumer-specific generated projects, runtime builds, duplicated graphs or hidden references to source-tree paths. Otherwise retain it, remove the prototype, and document the exact failed criterion. This fallback is part of the proposed approved plan.
-- [ ] Keep the external runner and framework tests. Do not merge them into production/runtime projects to satisfy a cosmetic count.
-- [ ] Commit organization separately from a successful packaging deletion so reviewers can assess each independently.
+- [x] Delete ModuleAppHost only if all checks pass without consumer-specific generated projects, runtime builds, duplicated graphs or hidden references to source-tree paths. Otherwise retain it, remove the prototype, and document the exact failed criterion. This fallback is part of the proposed approved plan.
+- [x] Keep the external runner and framework tests. Do not merge them into production/runtime projects to satisfy a cosmetic count.
+- [x] Commit organization separately from a successful packaging deletion so reviewers can assess each independently.
 
 ## Task 7: Finish caller migration, documentation and acceptance
 
@@ -224,11 +224,11 @@ Assert.Equal(0, resolved.SlowMoMilliseconds);
 
 **Interfaces:** Only the finalized entry points remain; no permanent compatibility wrappers for removed in-repository APIs.
 
-- [ ] Search for `TestExecutionOptions.*Browser`, obsolete E2E overloads, IModule lists in UnitOptions, raw provider endpoint keys, placeholder clicks and fixed framework timeout use. Classify legitimate low-level cases rather than replacing blindly.
-- [ ] Document one neuron test, one module HTTP test and one actual application UI test with deep typed settings. Explain Flutter None/Headless/Web/Window versus browser headed/headless.
-- [ ] Document explicit precedence, configuration defaults, provider substitution, process guarantees, cancellation, artifacts and package support requirements.
-- [ ] Run the acceptance matrix below, then the relevant complete suites. Run the solution suite once as the final broad gate; investigate failures and distinguish existing unrelated failures with evidence.
-- [ ] Review the final diff against every approved decision. Record any deviations and measured results. Do not claim a four-project result if internal projects remain.
+- [x] Search for `TestExecutionOptions.*Browser`, obsolete E2E overloads, IModule lists in UnitOptions, raw provider endpoint keys, placeholder clicks and fixed framework timeout use. Classify legitimate low-level cases rather than replacing blindly.
+- [x] Document one neuron test, one module HTTP test and one actual application UI test with deep typed settings. Explain Flutter None/Headless/Web/Window versus browser headed/headless.
+- [x] Document explicit precedence, configuration defaults, provider substitution, process guarantees, cancellation, artifacts and package support requirements.
+- [x] Run the acceptance matrix below, then the relevant complete suites. Run the solution suite once as the final broad gate; investigate failures and distinguish existing unrelated failures with evidence. Executed coverage and platform/package exclusions are recorded in the ledger.
+- [x] Review the final diff against every approved decision. Record any deviations and measured results. Do not claim a four-project result if internal projects remain.
 
 ## Validation commands and acceptance matrix
 
@@ -268,4 +268,4 @@ Repeat the two-way UI scenario three times each in headless/zero and headed/250 
 
 Approval accepts the API/default decisions, ordered tasks and conditional ModuleAppHost-removal gate above. Recommended execution is inline in this task because composition, binding, browser startup and packaging share interfaces and should change sequentially. A final independent review can follow implementation; choose delegated execution only if desired.
 
-No implementation starts until the user approves this plan. No product source was changed while preparing it.
+User approval was received before implementation. No product source was changed while preparing the original plan. See the execution ledger for the resulting changes and verification.

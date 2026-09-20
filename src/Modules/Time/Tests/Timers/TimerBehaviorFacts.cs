@@ -14,7 +14,7 @@ public sealed class TimerBehaviorFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.StartAsync(new()
         {
-            Modules = [new TimeModule()],
+            Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(TimeModule))],
             UseReminders = true,
         }, ct);
         var timer = brain.Get<ITimer>("behavior");

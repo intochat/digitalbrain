@@ -11,6 +11,7 @@ public static class IntegrationTest
         cancellationToken.ThrowIfCancellationRequested();
         options.Execution.Validate();
         var modules = ModuleComposition.Resolve(options.Modules);
+        ApplicationConfigurationTransport.ValidatePublicSettings(modules);
         if (modules.Count == 0) { throw new ArgumentException("Select at least one integration module.", nameof(options)); }
         var bundle = ModuleBundle.Validate(AppContext.BaseDirectory, modules);
         var identity = "test-" + Guid.NewGuid().ToString("N");

@@ -11,7 +11,7 @@ public sealed class InboxFacts
     public async Task InboxReadReturnsAppearedLines()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(new() { Modules = [new FlutterModule()] }, ct);
+        await using var brain = await UnitTest.StartAsync(new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(FlutterModule))] }, ct);
         var inbox = brain.Get<IInbox>(FlutterModule.InboxGrain);
         await inbox.Appear("hello inbox");
         Assert.Contains("hello inbox", await inbox.Read(), StringComparer.Ordinal);

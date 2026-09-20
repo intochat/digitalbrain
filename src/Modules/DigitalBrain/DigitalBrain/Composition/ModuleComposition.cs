@@ -9,6 +9,16 @@ public static class ModuleComposition
         HashSet<string> visiting = new(StringComparer.Ordinal);
         List<ModuleDefinition> ordered = [];
         foreach (var module in modules) { Visit(module); }
+        Dictionary<string, string?> configuration = new(StringComparer.OrdinalIgnoreCase);
+        foreach (var module in ordered)
+        {
+            foreach (var pair in module.Configuration)
+            {
+                if (configuration.TryGetValue(pair.Key, out var value) && value != pair.Value)
+                    { throw new InvalidOperationException($"Conflicting configuration key '{pair.Key}'."); }
+                configuration[pair.Key] = pair.Value;
+            }
+        }
         return ordered.AsReadOnly();
 
         void Visit(ModuleDefinition module)

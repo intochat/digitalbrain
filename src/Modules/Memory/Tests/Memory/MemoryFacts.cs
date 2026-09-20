@@ -78,7 +78,7 @@ public sealed class MemoryFacts
     private static async Task<UnitBrain> Start(InMemoryVectorMemoryStore store, CancellationToken ct)
         => await UnitTest.StartAsync(new()
         {
-            Modules = [new MemoryModule()],
+            Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(MemoryModule))],
             ConfigureSilo = silo =>
             {
                 silo.Services.AddSingleton<IVectorMemoryStore>(store);

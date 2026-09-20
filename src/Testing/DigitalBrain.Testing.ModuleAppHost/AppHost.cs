@@ -1,4 +1,5 @@
 using Aspire.Hosting;
+using DigitalBrain.Core;
 using DigitalBrain.Aspire.Hosting;
 using Microsoft.Extensions.Configuration;
 
@@ -7,10 +8,10 @@ var directory = builder.Configuration["Runner:Directory"] ?? throw new InvalidOp
 var entry = builder.Configuration["Runner:Entry"] ?? throw new InvalidOperationException("Runner dependency entry is required.");
 var brain = builder.AddDigitalBrain("modules", persistentStorage: false);
 builder.Configuration.AddInMemoryCollection(builder.Configuration.GetSection("Runner:Settings").AsEnumerable(true).Where(p => p.Value is not null));
-foreach (var module in builder.Configuration.GetSection("Runner:Modules").GetChildren())
-{
-    brain.AddModuleType(Type.GetType(module.Value!, throwOnError: true)!);
-}
+var settings = builder.Configuration.GetSection("Runner:Settings").AsEnumerable(true)
+    .Where(p => p.Value is not null).ToDictionary(p => p.Key, p => p.Value);
+brain.AddModules(builder.Configuration.GetSection("Runner:Modules").GetChildren()
+    .Select(m => new ModuleDefinition(Type.GetType(m.Value!, throwOnError: true)!, settings)).ToArray());
 var runtime = builder.AddExecutable("runtime", "dotnet", directory,
         "exec", "--runtimeconfig", Path.Combine(directory, entry + ".runtimeconfig.json"),
         "--depsfile", Path.Combine(directory, entry + ".deps.json"),

@@ -12,35 +12,45 @@ public static class UnitTest
     public static async Task<UnitBrain> StartAsync(UnitOptions? options = null, CancellationToken cancellationToken = default)
     {
         options ??= new();
+        options.Execution.Validate();
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(options.Execution.StartupTimeout);
+        deadline.Token.ThrowIfCancellationRequested();
+        var modules = ModuleComposition.Resolve(options.Modules);
+        ApplicationConfigurationTransport.ValidatePublicSettings(modules);
         var builder = new InProcessTestClusterBuilder(1);
         builder.Options.ConfigureFileLogging = false;
         builder.ConfigureHost(host =>
         {
             host.Logging.SetMinimumLevel(LogLevel.Warning);
-            foreach (var definition in ModuleComposition.Resolve(options.Modules.OfType<ModuleDefinition>().ToArray()))
+            foreach (var definition in modules)
             {
                 host.Configuration.AddInMemoryCollection(definition.Configuration);
             }
+            host.Configuration.AddInMemoryCollection(options.Execution.PrivateConfiguration);
         });
         builder.ConfigureSilo((_, silo) =>
         {
             silo.AddDigitalBrain();
-            foreach (var module in options.Modules) { module.Configure(silo); }
+            foreach (var module in modules) { module.Configure(silo); }
             silo.AddMemoryGrainStorage("Default");
             if (options.UseReminders) { silo.UseInMemoryReminderService(); }
             options.ConfigureSilo?.Invoke(silo);
         });
         builder.ConfigureClient(client => { client.AddDigitalBrain(); options.ConfigureClient?.Invoke(client); });
         InProcessTestCluster? cluster = null;
+        var lifetime = new TestSessionLifetime(options.Execution);
         try
         {
             cluster = builder.Build();
-            await cluster.DeployAsync(cancellationToken).ConfigureAwait(false);
-            return new UnitBrain(cluster);
+            lifetime.Own("cluster", cluster);
+            await cluster.DeployAsync(deadline.Token).ConfigureAwait(false);
+            return new UnitBrain(cluster, options.Execution, lifetime);
         }
-        catch
+        catch (Exception error)
         {
-            await UnitBrain.ReleaseAsync(cluster).ConfigureAwait(false);
+            try { await lifetime.DisposeAsync().ConfigureAwait(false); }
+            catch (Exception cleanup) { error.Data["StartupRollbackFailure"] = cleanup; }
             throw;
         }
     }

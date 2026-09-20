@@ -17,7 +17,7 @@ public sealed class AgentFacts
         await using var brain = await UnitTest.StartAsync(
             new()
             {
-                Modules = [new AIModule()],
+                Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(AIModule))],
                 ConfigureSilo = silo => silo.Services.AddSingleton<IChatClient>(new FixedChatClient("pong")),
             }, ct);
 

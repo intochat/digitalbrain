@@ -150,7 +150,7 @@ public sealed class SalesforceFacts
         var handoff = new TokenHandoff(TimeProvider.System);
         var brain = await UnitTest.StartAsync(new()
         {
-            Modules = [new SalesforceModule()],
+            Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(SalesforceModule))],
             ConfigureSilo = silo =>
             {
                 silo.Services.AddSingleton<ISalesforceProvider>(provider);

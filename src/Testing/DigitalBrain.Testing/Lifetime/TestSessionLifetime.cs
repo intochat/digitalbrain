@@ -49,7 +49,9 @@ public sealed class TestSessionLifetime
             }
             catch (Exception error)
             {
-                failures.Add(new InvalidOperationException($"Cleanup failed at '{stage}'.", error));
+                var cause = error is OperationCanceledException && deadline.IsCancellationRequested
+                    ? new TimeoutException("Cleanup timed out.", error) : error;
+                failures.Add(new InvalidOperationException($"Cleanup failed at '{stage}'.", cause));
                 try { _options.Diagnostics?.Invoke(new(stage, "Cleanup failed; remaining resources will still be released.")); }
                 catch { /* Diagnostics cannot interrupt cleanup. */ }
             }

@@ -119,7 +119,7 @@ public static class ShellHostingExtensions
                         static endpoint => endpoint.TargetHost = ShellNames.FlutterWebHostname,
                         createIfNotExists: false)
                     .WithHttpHealthCheck("/")
-                    .AsBrainBrowser();
+                    .AsBrainBrowser(path: "/?semantics=true", readySelector: "flt-semantics");
                 host.WithArgs(ReferenceExpression.Create($"--web-port={host.GetEndpoint(ShellNames.HttpEndpointName).Property(EndpointProperty.TargetPort)}"));
             }
 

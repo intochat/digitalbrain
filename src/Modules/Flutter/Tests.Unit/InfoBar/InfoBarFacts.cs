@@ -11,7 +11,7 @@ public sealed class InfoBarFacts
     public async Task ShowThenDismiss()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(new() { Modules = [new FlutterModule()] }, ct);
+        await using var brain = await UnitTest.StartAsync(new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(FlutterModule))] }, ct);
         var bar = brain.Get<IInfoBar>("warn");
         await bar.Show("warning", "Heads up", "disk");
         Assert.True((await bar.Read()).Visible);

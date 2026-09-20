@@ -1,6 +1,6 @@
 # DigitalBrain testing framework design
 
-Date: 2026-09-20. Status: design and implementation-plan deliverables for review; implementation has not started.
+Date: 2026-09-20. Status: historical design; the approved [refactoring plan](../plans/2026-09-20-testing-framework-refactoring.md) and its [execution ledger](../plans/testing-refactoring-progress.md) supersede implementation details here.
 
 ## 1. Intent and decisions
 

@@ -36,7 +36,7 @@ public sealed class HarnessCancellationFacts
     public async Task CancellationCallbacksCannotBypassTheShutdownDeadline(bool throws)
     {
         var ct = TestContext.Current.CancellationToken;
-        var brain = await UnitTest.StartAsync(cancellationToken: ct);
+        var brain = await UnitTest.StartAsync(new() { Execution = new() { CleanupTimeout = TimeSpan.FromSeconds(2) } }, ct);
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var release = new ManualResetEventSlim();
         var run = brain.RunBehavior(async (_, token) =>

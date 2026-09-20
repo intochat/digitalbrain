@@ -92,6 +92,7 @@ public sealed class SubscriptionFailureFacts
         await using var stream = await brain.SubscribeAsync<Number>(source, ct);
         await source.Configure("watch");
         await Assert.ThrowsAsync<IOException>(() => stream.Completion.WaitAsync(TimeSpan.FromSeconds(3), ct));
+        await stream.DisposeAsync();
         Assert.Equal(0, await source.Members());
         await source.Configure("unwatch");
         var next = await brain.SubscribeAsync<Number>(source, ct);

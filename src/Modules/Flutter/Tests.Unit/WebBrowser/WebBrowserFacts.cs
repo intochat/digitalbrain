@@ -12,7 +12,7 @@ public sealed class WebBrowserFacts
     public async Task NavigatePublishesUri()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(new() { Modules = [new FlutterModule()] }, ct);
+        await using var brain = await UnitTest.StartAsync(new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(FlutterModule))] }, ct);
         var browser = brain.Get<IWebBrowser>("docs");
         await using var nav = await brain.Observe<BrowserNavigated>(browser, ct);
         await browser.Navigate("https://learn.microsoft.com/winui", "WinUI");

@@ -1,11 +1,24 @@
 using DigitalBrain.Core;
 using Orleans;
 using Orleans.Runtime;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Tests;
 
 public sealed class IsolationFacts
 {
+    [Fact(Timeout = 180_000)]
+    public async Task ProviderAdapterIsLoadedInsideExternalRuntime()
+    {
+        await using var brain = await IntegrationTest.StartAsync(new()
+        {
+            Modules = [new(typeof(PersistentValueModule))],
+        }, TestContext.Current.CancellationToken);
+        Assert.Equal(73, await brain.Get<IPersistentValue>("provider").ProviderValue());
+        Assert.NotEqual(Environment.ProcessId,
+            await System.Net.Http.Json.HttpClientJsonExtensions.GetFromJsonAsync<int>(brain.HttpClient, "/process", TestContext.Current.CancellationToken));
+    }
+
     [Fact(Timeout = 180_000)]
     public async Task StateSurvivesRestartButIsNotSharedBetweenRuns()
     {
@@ -35,14 +48,19 @@ public sealed class IsolationFacts
 
 public sealed class PersistentValueModule : IModule
 {
-    public void Configure(Orleans.Hosting.ISiloBuilder silo) { }
+    public void Configure(Orleans.Hosting.ISiloBuilder silo)
+        => silo.Services.AddSingleton<IValueProvider>(new FixedValueProvider());
 }
+
+public interface IValueProvider { int Value { get; } }
+public sealed class FixedValueProvider : IValueProvider { public int Value => 73; }
 
 [Alias("testing.persistent-value")]
 public interface IPersistentValue : DigitalBrain.Contracts.INeuron
 {
     Task Set(int value);
     Task<int> Get();
+    Task<int> ProviderValue();
 }
 
 [GenerateSerializer]
@@ -51,9 +69,10 @@ public sealed class PersistentValueState
     [Id(0)] public int Value { get; set; }
 }
 
-public sealed class PersistentValue([PersistentState("value")] IPersistentState<PersistentValueState> state)
+public sealed class PersistentValue([PersistentState("value")] IPersistentState<PersistentValueState> state, IValueProvider provider)
     : Neuron, IPersistentValue
 {
     public async Task Set(int value) { state.State.Value = value; await state.WriteStateAsync(); }
     public Task<int> Get() => Task.FromResult(state.State.Value);
+    public Task<int> ProviderValue() => Task.FromResult(provider.Value);
 }

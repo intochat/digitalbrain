@@ -8,18 +8,28 @@ using Orleans.TestingHost;
 
 namespace DigitalBrain.Testing.Unit;
 
-public sealed class UnitBrain(InProcessTestCluster cluster) : IDigitalBrain, ITrackedBrain
+public sealed class UnitBrain : IDigitalBrain, ITrackedBrain
 {
-    private readonly IDigitalBrain _brain = cluster.Client.ServiceProvider.GetRequiredService<IDigitalBrain>();
-    private readonly List<IAsyncDisposable> _resources = [];
-    private int _disposed;
-    int ITrackedBrain.BufferCapacity { get; } = cluster.Client.ServiceProvider.GetRequiredService<IOptions<BrainOptions>>().Value.BufferCapacity;
+    private readonly InProcessTestCluster cluster;
+    private readonly IDigitalBrain _brain;
+    private readonly TestSessionLifetime _lifetime;
+    private readonly TestExecutionOptions _execution;
+    internal UnitBrain(InProcessTestCluster cluster, TestExecutionOptions execution, TestSessionLifetime lifetime)
+    {
+        this.cluster = cluster;
+        _execution = execution;
+        _brain = cluster.Client.ServiceProvider.GetRequiredService<IDigitalBrain>();
+        _lifetime = lifetime;
+        _lifetime.Own("client", _brain);
+    }
+    int ITrackedBrain.BufferCapacity => cluster.Client.ServiceProvider.GetRequiredService<IOptions<BrainOptions>>().Value.BufferCapacity;
+    TestExecutionOptions ITrackedBrain.Execution => _execution;
 
     public IGrainFactory Grains => cluster.Client;
 
     internal IDigitalBrain Client => _brain;
 
-    void ITrackedBrain.Track(IAsyncDisposable resource) => _resources.Add(resource);
+    void ITrackedBrain.Track(IAsyncDisposable resource) => _lifetime.Own("observation", resource);
 
     public T Get<T>(string id) where T : class, IGrainWithStringKey => _brain.Get<T>(id);
 
@@ -35,35 +45,6 @@ public sealed class UnitBrain(InProcessTestCluster cluster) : IDigitalBrain, ITr
         await cluster.WaitForLivenessToStabilizeAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0) { return; }
-        var failures = await ReleaseAsync(cluster, _brain, _resources).ConfigureAwait(false);
-        if (failures.Count > 0) { throw new AggregateException("Brain simulation cleanup failed.", failures); }
-    }
+    public ValueTask DisposeAsync() => _lifetime.DisposeAsync();
 
-    internal static async Task<List<Exception>> ReleaseAsync(
-        InProcessTestCluster? cluster, IDigitalBrain? brain = null, IReadOnlyList<IAsyncDisposable>? resources = null)
-    {
-        List<Exception> failures = [];
-        if (resources is not null)
-        {
-            foreach (var resource in resources)
-            {
-                try { await resource.DisposeAsync().ConfigureAwait(false); }
-                catch (Exception error) { failures.Add(error); }
-            }
-        }
-        if (brain is not null)
-        {
-            try { await brain.DisposeAsync().ConfigureAwait(false); }
-            catch (Exception error) { failures.Add(error); }
-        }
-        if (cluster is not null)
-        {
-            try { await cluster.DisposeAsync().ConfigureAwait(false); }
-            catch (Exception error) { failures.Add(error); }
-        }
-        return failures;
-    }
 }

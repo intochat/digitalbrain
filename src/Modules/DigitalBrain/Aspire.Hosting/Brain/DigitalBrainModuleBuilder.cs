@@ -5,7 +5,7 @@ namespace DigitalBrain.Aspire.Hosting;
 public sealed class DigitalBrainModuleBuilder<TModule>
     where TModule : class
 {
-    internal DigitalBrainModuleBuilder(DigitalBrainBuilder digitalBrainBuilder) => DigitalBrainBuilder = digitalBrainBuilder;
+    public DigitalBrainModuleBuilder(DigitalBrainBuilder digitalBrainBuilder) => DigitalBrainBuilder = digitalBrainBuilder;
 
     public DigitalBrainBuilder DigitalBrainBuilder { get; }
 

@@ -26,7 +26,9 @@ public sealed class AspireTestSession : IAsyncDisposable
     public IDigitalBrain Brain => _client!.Services.GetRequiredService<IDigitalBrain>();
     public HttpClient HttpClient { get; private set; } = null!;
     public Uri? BrowserEndpoint { get; private set; }
+    public string? BrowserReadySelector { get; private set; }
     public TestExecutionOptions Options => _options;
+    public TestSessionLifetime Lifetime => _lifetime;
 
     public static async Task<AspireTestSession> StartAsync<TAppHost>(
         IReadOnlyList<string> args, string identity, TestExecutionOptions options, CancellationToken cancellationToken)
@@ -41,12 +43,23 @@ public sealed class AspireTestSession : IAsyncDisposable
         var stage = "builder";
         try
         {
+            PrivateTestConfiguration? privateSettings = null;
+            if (options.PrivateConfiguration.Count > 0)
+            {
+                privateSettings = await PrivateTestConfiguration.CreateAsync(options.PrivateConfiguration, ct).ConfigureAwait(false);
+                lifetime.Own("private-configuration", privateSettings);
+            }
             var builder = await DistributedApplicationTestingBuilder.CreateAsync<TAppHost>(args.ToArray(), ct).ConfigureAwait(false);
             lifetime.Own("builder", builder);
             builder.Services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning));
             var primary = builder.Resources.Where(r => r.Annotations.OfType<BrainEndpointAnnotation>().Any()).ToArray();
             if (primary.Length != 1) { throw new InvalidOperationException("The AppHost must declare exactly one primary brain HTTP endpoint."); }
             var resource = primary[0];
+            if (privateSettings is not null)
+            {
+                resource.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
+                    context.EnvironmentVariables["DigitalBrain__Testing__PrivateConfiguration"] = privateSettings.FilePath));
+            }
             var endpoint = resource.Annotations.OfType<BrainEndpointAnnotation>().Single();
             stage = "build";
             var app = await builder.BuildAsync(ct).ConfigureAwait(false);
@@ -56,12 +69,16 @@ public sealed class AspireTestSession : IAsyncDisposable
             await app.StartAsync(ct).ConfigureAwait(false);
             stage = "readiness";
             await app.ResourceNotifications.WaitForResourceHealthyAsync(resource.Name, ct).ConfigureAwait(false);
-            var browser = builder.Resources.SelectMany(r => r.Annotations.OfType<BrainBrowserAnnotation>().Select(a => (r.Name, a.Endpoint))).ToArray();
+            var browser = builder.Resources.SelectMany(r => r.Annotations.OfType<BrainBrowserAnnotation>().Select(a => (r.Name, a.Endpoint, a.Path, a.ReadySelector))).ToArray();
             if (browser.Length > 1) { throw new InvalidOperationException("The AppHost declares multiple primary browser endpoints."); }
             if (browser.Length == 1)
             {
                 await app.ResourceNotifications.WaitForResourceHealthyAsync(browser[0].Name, ct).ConfigureAwait(false);
-                session.BrowserEndpoint = app.GetEndpoint(browser[0].Name, browser[0].Endpoint);
+                if (!browser[0].Path.StartsWith("/", StringComparison.Ordinal) || browser[0].Path.StartsWith("//", StringComparison.Ordinal)
+                    || browser[0].Path.Contains('\\'))
+                    { throw new InvalidOperationException("Browser navigation must be relative to the advertised endpoint."); }
+                session.BrowserEndpoint = new Uri(app.GetEndpoint(browser[0].Name, browser[0].Endpoint), browser[0].Path);
+                session.BrowserReadySelector = browser[0].ReadySelector;
             }
             stage = "client";
             await session.ConnectAsync(ct).ConfigureAwait(false);

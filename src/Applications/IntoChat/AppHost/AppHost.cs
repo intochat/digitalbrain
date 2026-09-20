@@ -1,5 +1,6 @@
 using Aspire.Hosting;
 using DigitalBrain;
+using DigitalBrain.Core;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Behaviors;
 using DigitalBrain.Flutter;
@@ -12,41 +13,12 @@ using Aspire.Hosting.ApplicationModel;
 
 var builder = DistributedApplication.CreateBuilder(args);
 var testing = builder.Configuration.GetValue<bool>("DigitalBrain:Testing:Enabled");
-var configuredKind = builder.Configuration[$"{DigitalBrainConfiguration.SectionName}:Flutter:Hosting:Kind"];
-var flutterKind = Enum.TryParse<FlutterHostKind>(configuredKind, ignoreCase: true, out var parsedKind)
-    ? parsedKind
-    : testing ? FlutterHostKind.Web : FlutterHostKind.Window;
-var options = new DigitalBrainConfiguration
-{
-    Google = new() { PublicOrigin = Uri.TryCreate(builder.Configuration[GoogleModule.GmailOAuthConfigurationRoot + ":PublicOrigin"], UriKind.Absolute, out var origin) ? origin : null },
-    Flutter = new() { Hosting = new() { Kind = flutterKind } }
-};
-
+var definitions = builder.Configuration[ApplicationConfigurationTransport.ConfigurationKey] is { } envelope
+    ? ApplicationConfigurationTransport.Read(envelope, new DigitalBrainConfiguration().Modules)
+    : DigitalBrainConfiguration.Bind(builder.Configuration).Modules;
 var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, persistentStorage: !testing)
-    .AddModule<TimeModule>()
-    .AddModule<GoogleModule>()
-    .AddModule<TestTwitterModule>()
-    .AddModule<FlutterModule>(module =>
-    {
-        var kind = options.Flutter.Hosting.Kind;
-        if (kind == FlutterHostKind.None)
-        {
-            return;
-        }
-
-        if (kind == FlutterHostKind.Web)
-        {
-            module.WithWebHost();
-        }
-        else if (kind == FlutterHostKind.Headless)
-        {
-            module.WithHeadlessHost();
-        }
-        else
-        {
-            module.WithWindowHost();
-        }
-    });
+    .AddModules(definitions);
+var options = DigitalBrainConfiguration.Bind(builder.Configuration);
 
 var clusterId = builder.Configuration["Orleans:ClusterId"]
     ?? (builder.Environment.IsDevelopment() ? $"digitalbrain-{Guid.NewGuid():N}" : null);
@@ -83,14 +55,9 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
         if (options.Flutter.Hosting.Kind == FlutterHostKind.Web)
         {
             context.EnvironmentVariables["DigitalBrain__Cors__AllowedOrigin"] =
-                builder.CreateResourceBuilder<ExecutableResource>(ShellNames.DefaultFlutterResourceName).GetEndpoint("http");
+                builder.CreateResourceBuilder<ExecutableResource>(options.Flutter.Hosting.ResourceName).GetEndpoint("http");
         }
 
     });
-
-foreach (var module in options.Modules)
-{
-    foreach (var (key, value) in module.Configuration) { runtime.WithEnvironment(key.Replace(":", "__", StringComparison.Ordinal), value ?? ""); }
-}
 
 builder.Build().Run();

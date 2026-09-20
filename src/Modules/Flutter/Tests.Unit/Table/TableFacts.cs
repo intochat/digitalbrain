@@ -11,7 +11,7 @@ public sealed class TableFacts
     public async Task ReplaceAndSetView()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(new() { Modules = [new FlutterModule()] }, ct);
+        await using var brain = await UnitTest.StartAsync(new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(FlutterModule))] }, ct);
         var table = brain.Get<ITable>("grid");
         await table.Replace("T", [new TableColumn("c", "C")], [["1"]]);
         await table.SetView("c", "1");

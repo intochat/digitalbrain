@@ -150,7 +150,7 @@ public sealed class TimerFacts
         var control = new ControlledTimers();
         await using var brain = await UnitTest.StartAsync(new()
         {
-            Modules = [new TimeModule()],
+            Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(TimeModule))],
             UseReminders = true,
             ConfigureSilo = silo => { silo.UseControlledTimers(control); silo.UseFastCollection(); },
         }, ct);
@@ -201,7 +201,7 @@ public sealed class TimerFacts
     private static Task<UnitBrain> StartAsync(CancellationToken ct, ControlledTimers? timers = null)
         => UnitTest.StartAsync(new()
         {
-            Modules = [new TimeModule()],
+            Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(TimeModule))],
             UseReminders = true,
             ConfigureSilo = timers is null ? null : silo => silo.UseControlledTimers(timers),
         }, ct);

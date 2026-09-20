@@ -16,9 +16,12 @@ public sealed class GoogleModule : IModule
     {
         ArgumentNullException.ThrowIfNull(options);
         if (options.PublicOrigin is { IsAbsoluteUri: false }) { throw new ArgumentException("Google PublicOrigin must be absolute.", nameof(options)); }
+        if (!options.TokenEndpoint.IsAbsoluteUri || options.TokenEndpoint.Scheme is not ("http" or "https"))
+            { throw new ArgumentException("Google token endpoint must be an absolute HTTP URL.", nameof(options)); }
         return new(typeof(GoogleModule), new Dictionary<string, string?>
         {
-            [GmailOAuthConfigurationRoot + ":PublicOrigin"] = options.PublicOrigin?.AbsoluteUri ?? ""
+            [GmailOAuthConfigurationRoot + ":PublicOrigin"] = options.PublicOrigin?.AbsoluteUri ?? "",
+            [GmailOAuthConfigurationRoot + ":TokenEndpoint"] = options.TokenEndpoint.AbsoluteUri,
         });
     }
     public const string GmailOAuthConfigurationRoot = "DigitalBrain:Google:Gmail:OAuth";

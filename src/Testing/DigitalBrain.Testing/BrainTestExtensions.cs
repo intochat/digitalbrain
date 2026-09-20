@@ -10,7 +10,7 @@ public static class BrainTestExtensions
         ArgumentNullException.ThrowIfNull(brain);
         var subscription = await brain.SubscribeAsync<T>(source, cancellationToken).ConfigureAwait(false);
         var tracked = brain as ITrackedBrain;
-        var probe = new SignalProbe<T>(subscription, tracked?.BufferCapacity ?? new BrainOptions().BufferCapacity);
+        var probe = new SignalProbe<T>(subscription, tracked?.BufferCapacity ?? new BrainOptions().BufferCapacity, tracked?.Execution ?? new());
         tracked?.Track(probe);
         return probe;
     }

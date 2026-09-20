@@ -11,7 +11,7 @@ public sealed class ImageFacts
     public async Task SetWritesMediaType()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(new() { Modules = [new FlutterModule()] }, ct);
+        await using var brain = await UnitTest.StartAsync(new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(FlutterModule))] }, ct);
         await brain.Get<IImage>("logo").Set("https://example.com/a.png", "image/png", "logo");
         Assert.Equal("image/png", (await brain.Get<IImage>("logo").Read()).MediaType);
     }

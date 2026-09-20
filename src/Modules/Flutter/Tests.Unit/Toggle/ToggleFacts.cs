@@ -11,7 +11,7 @@ public sealed class ToggleFacts
     public async Task SetAndFlipUpdateOn()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.StartAsync(new() { Modules = [new FlutterModule()] }, ct);
+        await using var brain = await UnitTest.StartAsync(new() { Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(FlutterModule))] }, ct);
         var toggle = brain.Get<IToggle>("dark");
         await toggle.Set("Dark", true);
         Assert.True((await toggle.Read()).On);

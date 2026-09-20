@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using DigitalBrain.Core;
 using DigitalBrain.Testing.Hosting;
 
@@ -5,52 +6,24 @@ namespace DigitalBrain.Testing.E2E;
 
 public static class E2ETest
 {
-    public static Task<E2EBrain> StartAsync<TAppHost>(CancellationToken cancellationToken = default)
-        where TAppHost : class => StartAsync<TAppHost>(modules: null, new(), cancellationToken);
-
-    public static Task<E2EBrain> StartAsync<TAppHost>(IReadOnlyList<ModuleDefinition> modules, CancellationToken cancellationToken = default)
-        where TAppHost : class => StartAsync<TAppHost>(modules, new(), cancellationToken);
-
-    public static async Task<E2EBrain> StartAsync<TAppHost>(IReadOnlyList<ModuleDefinition>? modules, TestExecutionOptions execution,
+    public static async Task<E2EBrain> StartAsync<TAppHost>(E2EOptions options,
         CancellationToken cancellationToken = default) where TAppHost : class
     {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(options.Application);
+        cancellationToken.ThrowIfCancellationRequested();
+        options.Execution.Validate();
+        var browser = BrowserOptionsResolver.Resolve(options.Browser,
+            Environment.GetEnvironmentVariable("DIGITALBRAIN_E2E_HEADED") == "1", Debugger.IsAttached);
         var identity = "test-" + Guid.NewGuid().ToString("N");
         List<string> args = ["DigitalBrain:Testing:Enabled=true", $"Orleans:ClusterId={identity}"];
-        string? hostingKind = null;
-        if (modules is not null)
+        args.Add($"{ApplicationConfigurationTransport.ConfigurationKey}={ApplicationConfigurationTransport.Write(options.Application)}");
+        var execution = options.Execution with
         {
-            foreach (var module in ModuleComposition.Resolve(modules))
-            {
-                foreach (var (key, value) in module.Configuration)
-                {
-                    if (key.StartsWith("Orleans:", StringComparison.OrdinalIgnoreCase) || key.StartsWith("ConnectionStrings:", StringComparison.OrdinalIgnoreCase) || key.StartsWith("DigitalBrain:Testing:", StringComparison.OrdinalIgnoreCase))
-                    { throw new ArgumentException("Application options cannot override test-owned connections or identity.", nameof(modules)); }
-                    args.Add($"{key}={value}");
-                    if (key.Equals("DigitalBrain:Flutter:Hosting:Kind", StringComparison.OrdinalIgnoreCase))
-                    {
-                        hostingKind = value;
-                    }
-                }
-            }
-        }
-
-        if (execution.ArtifactDirectory is null)
-        {
-            execution = execution with
-            {
-                ArtifactDirectory = Path.Combine(AppContext.BaseDirectory, "e2e-artifacts", identity),
-            };
-        }
-
-        var web = hostingKind is null || hostingKind.Equals("Web", StringComparison.OrdinalIgnoreCase);
-        var browser = BrowserOptions.Resolve(headless: !web);
-        if (execution.Browser.SlowMoMilliseconds > 0)
-        {
-            browser = browser with { SlowMoMilliseconds = execution.Browser.SlowMoMilliseconds };
-        }
-
-        execution = execution with { Browser = browser };
+            ArtifactDirectory = options.Execution.ArtifactDirectory
+                ?? Path.Combine(AppContext.BaseDirectory, "e2e-artifacts", identity),
+        };
         var session = await AspireTestSession.StartAsync<TAppHost>(args, identity, execution, cancellationToken).ConfigureAwait(false);
-        return new(session);
+        return new(session, browser);
     }
 }

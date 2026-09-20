@@ -18,7 +18,7 @@ public sealed class ExpanderHttpFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await IntegrationTest.StartAsync(
-            new() { Modules = [FlutterModule.Define(new() { Hosting = new() { Kind = FlutterHostKind.Web } })] }, ct);
+            new() { Modules = [FlutterModule.Define(new() { Hosting = new() { Kind = FlutterHostKind.None } })] }, ct);
         var expander = brain.Get<IExpander>("more");
         await using var changed = await brain.Observe<ExpanderChanged>(expander, ct);
 

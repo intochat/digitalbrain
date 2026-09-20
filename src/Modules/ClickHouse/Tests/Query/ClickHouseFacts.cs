@@ -63,7 +63,7 @@ public sealed class ClickHouseFacts
     private static Task<UnitBrain> Start(FakeClickHouseProvider provider, CancellationToken ct)
         => UnitTest.StartAsync(new()
         {
-            Modules = [new ClickHouseModule()],
+            Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(ClickHouseModule))],
             ConfigureSilo = silo => silo.Services.AddSingleton<IClickHouseProvider>(provider),
         }, ct);
 }

@@ -13,7 +13,7 @@ public sealed class GmailConnectedFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.StartAsync(new()
         {
-            Modules = [new GoogleModule()],
+            Modules = [new DigitalBrain.Core.ModuleDefinition(typeof(GoogleModule))],
             ConfigureSilo = silo => silo.Services.AddSingleton<IGmailTokenExchange>(new FakeGmailTokens()),
         }, ct);
         var gmail = brain.Get<IGmail>("gmail");

@@ -2,11 +2,32 @@ using System.Reflection;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Contracts;
+using DigitalBrain.Core;
+using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Aspire.Hosting;
 
 public static class DigitalBrainHostingExtensions
 {
+    public static DigitalBrainBuilder AddModules(this DigitalBrainBuilder brain, IReadOnlyList<ModuleDefinition> modules)
+    {
+        var resolved = ModuleComposition.Resolve(modules);
+        var settings = resolved.SelectMany(m => m.Configuration).DistinctBy(p => p.Key, StringComparer.OrdinalIgnoreCase).ToArray();
+        brain.ApplicationBuilder.Configuration.AddInMemoryCollection(settings);
+        foreach (var module in resolved) { brain.AddModuleType(module.ModuleType); }
+        brain.AddProjection(new ModuleSettingsProjection(settings));
+        return brain;
+    }
+
+    private sealed class ModuleSettingsProjection(KeyValuePair<string, string?>[] settings) : DigitalBrainModuleProjection
+    {
+        public override void Apply<TResource>(IResourceBuilder<TResource> builder)
+        {
+            foreach (var pair in settings)
+                { builder.WithEnvironment(pair.Key.Replace(":", "__", StringComparison.Ordinal), pair.Value ?? ""); }
+        }
+    }
+
     public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name, bool persistentStorage = true)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -51,16 +72,19 @@ public static class DigitalBrainHostingExtensions
 
     public static DigitalBrainBuilder AddModule<TModule>(this DigitalBrainBuilder brain)
         where TModule : class
-        => brain.AddModule<TModule>(static module => { });
+        => brain.AddModuleType(typeof(TModule));
 
     public static DigitalBrainBuilder AddModule<TModule>(this DigitalBrainBuilder brain, Action<DigitalBrainModuleBuilder<TModule>> configure)
         where TModule : class
     {
         ArgumentNullException.ThrowIfNull(brain);
         ArgumentNullException.ThrowIfNull(configure);
-        brain.AddModuleType(typeof(TModule));
+        // An explicit callback owns hosting; defaults must not launch a host before it runs.
+        brain.AddModule(typeof(TModule));
         var module = new DigitalBrainModuleBuilder<TModule>(brain);
         configure(module);
+        if (!brain.HasResource(DigitalBrainHostingNames.ForModule(typeof(TModule))))
+            { brain.GetOrAddModuleNode(typeof(TModule)); }
         return brain;
     }
 

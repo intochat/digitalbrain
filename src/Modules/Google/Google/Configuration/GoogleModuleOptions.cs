@@ -4,4 +4,5 @@ namespace DigitalBrain.Google;
 public sealed record GoogleModuleOptions
 {
     public Uri? PublicOrigin { get; init; }
+    public Uri TokenEndpoint { get; init; } = new("https://oauth2.googleapis.com/token");
 }
