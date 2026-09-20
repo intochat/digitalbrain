@@ -1,6 +1,7 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Aspire.Hosting;
+using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Supabase.Aspire.Hosting;
 
@@ -34,7 +35,7 @@ public static class SupabaseHostingExtensions
         DigitalBrainBuilder brain,
         IResourceBuilder<DigitalBrainModuleResource> module) : DigitalBrainModuleProjection
     {
-        private IResourceBuilder<IResourceWithConnectionString>? _connection;
+        private IResourceBuilder<ParameterResource>? _connection;
         private SupabaseHostingOptions _options = new();
 
         internal void Enable(SupabaseHostingOptions options)
@@ -46,7 +47,8 @@ public static class SupabaseHostingExtensions
 
             _options = options;
             _connection = brain.ApplicationBuilder
-                .AddConnectionString(_options.ParameterName)
+                .AddParameter("supabase-connection", () => brain.ApplicationBuilder.Configuration.GetConnectionString(_options.ParameterName)
+                    ?? throw new InvalidOperationException($"Connection string '{_options.ParameterName}' is required."), secret: true)
                 .WithParentRelationship(module);
         }
 
@@ -58,7 +60,7 @@ public static class SupabaseHostingExtensions
                 return;
             }
 
-            builder.WithReference(_connection, connectionName: _options.ConnectionName)
+            builder.WithEnvironment($"ConnectionStrings__{_options.ConnectionName}", _connection)
                 .WithEnvironment("DigitalBrain__Supabase__Provider", SupabaseModule.ProviderName)
                 .WithEnvironment("DigitalBrain__Supabase__ConnectionName", _options.ConnectionName);
         }

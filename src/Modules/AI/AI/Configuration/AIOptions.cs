@@ -14,6 +14,7 @@ public sealed class AIOptions
     public AIProviderOptions XAI { get; set; } = new();
     public OllamaOptions Ollama { get; set; } = new();
     public TavilyOptions Tavily { get; set; } = new();
+    public AIHostingOptions Hosting { get; set; } = new();
     public Dictionary<string, AIModelProfileOptions> ModelProfiles { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     internal AIProviderOptions Provider(AiProvider provider) => provider switch
@@ -54,6 +55,12 @@ public sealed class AIOptions
         options.Telemetry.EnableSensitiveData ??=
             configuration.GetValue<bool?>("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT");
     }
+}
+
+public sealed class AIHostingOptions
+{
+    public List<string> Llms { get; set; } = [];
+    public List<string> Embeddings { get; set; } = [];
 }
 
 public sealed class AIDefaultOptions

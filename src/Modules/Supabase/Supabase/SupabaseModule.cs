@@ -8,6 +8,8 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Supabase;
 
+[ModuleConfiguration(typeof(SupabaseConfigurationContract))]
+[ModuleHosting("DigitalBrain.Supabase.Aspire.Hosting.SupabaseModuleHosting, DigitalBrain.Modules.Supabase.Aspire.Hosting")]
 public sealed class SupabaseModule : IModule
 {
     public const string ConnectionName = "supabase";
@@ -16,10 +18,13 @@ public sealed class SupabaseModule : IModule
     public static ModuleDefinition Define(SupabaseModuleOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.ConnectionName);
+        if (!Enum.IsDefined(options.Hosting.Kind)) { throw new ArgumentOutOfRangeException(nameof(options)); }
         return new(typeof(SupabaseModule), new Dictionary<string, string?>
         {
             [SupabaseModuleOptions.SectionName + ":Provider"] = options.Provider,
             [SupabaseModuleOptions.SectionName + ":ConnectionName"] = options.ConnectionName,
+            [SupabaseModuleOptions.SectionName + ":Hosting:Kind"] = options.Hosting.Kind.ToString(),
         });
     }
 

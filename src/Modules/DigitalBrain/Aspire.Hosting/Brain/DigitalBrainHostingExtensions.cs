@@ -119,6 +119,7 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(brain);
 
+        brain.Materialize();
         builder.WithReference(brain.Orleans);
         builder.WithReference(brain.DurableStateStore, DigitalBrainNames.JournalConnection);
         builder.WithReference(brain.GrainState, DigitalBrainNames.GrainState);
@@ -147,6 +148,7 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(client);
 
+        client.Brain.Materialize();
         builder.WithReference(client.Brain.Orleans.AsClient());
         WaitUntilHealthy(builder, client.Brain.StartupDependencies);
         return builder;

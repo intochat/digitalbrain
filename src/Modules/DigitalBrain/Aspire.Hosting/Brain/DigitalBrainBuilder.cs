@@ -2,11 +2,39 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Orleans;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Aspire.Hosting;
 
 public sealed class DigitalBrainBuilder
 {
+    private readonly BrainCompositionBuilder _composition = new();
+    private bool _hasDeclarations;
+    private bool _materialized;
+
+    public DigitalBrainBuilder WithModule<TModule>(Action<ModuleConfiguration<TModule>>? configure = null)
+        where TModule : class, IModule, new()
+    {
+        _composition.WithModule(configure);
+        _hasDeclarations = true;
+        return this;
+    }
+
+    public DigitalBrainBuilder ConfigureModule<TModule>(Action<ModuleConfiguration<TModule>> configure)
+        where TModule : class, IModule, new()
+    {
+        _composition.ConfigureModule(configure);
+        return this;
+    }
+
+    internal void Materialize()
+    {
+        if (_materialized) { return; }
+        var composition = _composition.Build();
+        _materialized = true;
+        if (_hasDeclarations) { this.AddModules(composition.Modules); }
+    }
+
     private readonly List<Type> _modules = [];
     private readonly List<DigitalBrainModuleProjection> _projections = [];
     private readonly List<IResource> _startupDependencies = [];

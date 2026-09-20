@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Routing;
 namespace DigitalBrain.Flutter;
 
 [ModuleHosting("DigitalBrain.Flutter.Aspire.Hosting.FlutterModuleHosting, DigitalBrain.Modules.Flutter.Aspire.Hosting")]
+[ModuleConfiguration(typeof(FlutterConfigurationContract))]
 public sealed class FlutterModule : IModule
 {
     public static ModuleDefinition Define(FlutterModuleOptions options)

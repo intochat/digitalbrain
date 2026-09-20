@@ -16,5 +16,5 @@ public sealed record FlutterHostingOptions
 }
 public sealed record FlutterModuleOptions
 {
-    public FlutterHostingOptions Hosting { get; init; } = new();
+    public FlutterHostingOptions Hosting { get; set; } = new();
 }

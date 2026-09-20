@@ -9,6 +9,8 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.AI;
 
+[ModuleConfiguration(typeof(AIConfigurationContract))]
+[ModuleHosting("DigitalBrain.AI.Aspire.Hosting.AIModuleHosting, DigitalBrain.Modules.AI.Aspire.Hosting")]
 public sealed class AIModule : IModule
 {
     public static ModuleDefinition Define(AIOptions options)
@@ -20,6 +22,8 @@ public sealed class AIModule : IModule
         Put(configuration, $"{section}:Default:Provider", options.Default.Provider);
         Put(configuration, $"{section}:Default:Model", options.Default.Model);
         Put(configuration, $"{section}:Default:Reasoning", options.Default.Reasoning);
+        Put(configuration, $"{section}:Default:MaxOutputTokens", options.Default.MaxOutputTokens?.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Put(configuration, $"{section}:Default:Capabilities", options.Default.Capabilities?.ToString());
         Put(configuration, $"{section}:Default:Embedding", options.Default.Embedding);
         Put(configuration, $"{section}:Default:Transcription", options.Default.Transcription);
         Put(configuration, $"{section}:Default:Image", options.Default.Image);
@@ -27,6 +31,32 @@ public sealed class AIModule : IModule
             options.Telemetry.EnableSensitiveData is { } sensitive ? sensitive.ToString() : null);
         Put(configuration, $"{section}:Tavily:Enabled", options.Tavily.Enabled.ToString());
         Put(configuration, $"{section}:Ollama:Endpoint", options.Ollama.Endpoint);
+        foreach (var provider in new[] { AiProvider.OpenAI, AiProvider.Anthropic, AiProvider.Google, AiProvider.XAI })
+            { Put(configuration, $"{section}:{provider}:Endpoint", options.Provider(provider).Endpoint); }
+        for (var i = 0; i < options.Hosting.Llms.Count; i++)
+        {
+            if (LLMModel.FindByMarkerName(options.Hosting.Llms[i]) is null)
+                { throw new ArgumentException("Unknown LLM marker in the module declaration.", nameof(options)); }
+            Put(configuration, $"{section}:Hosting:Llms:{i}", options.Hosting.Llms[i]);
+        }
+        for (var i = 0; i < options.Hosting.Embeddings.Count; i++)
+        {
+            if (EmbeddingModel.FindByMarkerName(options.Hosting.Embeddings[i]) is null)
+                { throw new ArgumentException("Unknown embedding marker in the module declaration.", nameof(options)); }
+            Put(configuration, $"{section}:Hosting:Embeddings:{i}", options.Hosting.Embeddings[i]);
+        }
+        foreach (var (name, model) in options.Ollama.Models)
+            { Put(configuration, $"{section}:Ollama:Models:{name}:Model", model.Model); }
+        foreach (var (name, profile) in options.ModelProfiles)
+        {
+            var prefix = $"{section}:ModelProfiles:{name}";
+            Put(configuration, $"{prefix}:Provider", profile.Provider);
+            Put(configuration, $"{prefix}:Model", profile.Model);
+            Put(configuration, $"{prefix}:Endpoint", profile.Endpoint);
+            Put(configuration, $"{prefix}:Reasoning", profile.Reasoning);
+            Put(configuration, $"{prefix}:MaxOutputTokens", profile.MaxOutputTokens?.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            Put(configuration, $"{prefix}:Capabilities", profile.Capabilities?.ToString());
+        }
         return new(typeof(AIModule), configuration);
     }
 

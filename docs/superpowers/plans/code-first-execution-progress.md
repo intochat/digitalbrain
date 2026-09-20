@@ -15,3 +15,4 @@ Pre-flight: window tasks 2/5/6 share current Dart table contract and server-scop
 Composition task 1: in progress.
 
 Composition task 1: complete. RED: missing new interfaces (composition-task1-red.log). GREEN: framework 38/38 (composition-task1-green.log). Ruling: add a generic module-contract base for copy/explicit-member JSON patch mechanics; concrete module contracts still own allowed members and mapping. Baseline framework 32/32.
+Composition task 2: complete. RED: missing typed module methods (composition-task2-red.log). GREEN: framework 42/42 (composition-task2-green.log), including deferred Postgres and client-first Web finalization. AI optional endpoint/profile fields are compiled explicitly; generated provider secrets remain Aspire parameter references. Ruling: use a distinct supabase-database resource name and supabase-connection parameter name to avoid collision with the module resource; external connection lookup retains its configured name.

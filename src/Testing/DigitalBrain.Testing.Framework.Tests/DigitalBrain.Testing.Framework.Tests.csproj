@@ -5,5 +5,7 @@
     <ProjectReference Include="../DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
     <ProjectReference Include="../DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
     <ProjectReference Include="../../Modules/Flutter/Aspire.Hosting/DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" />
+    <ProjectReference Include="../../Modules/AI/Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" />
+    <ProjectReference Include="../../Modules/Supabase/Aspire.Hosting/DigitalBrain.Modules.Supabase.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>
