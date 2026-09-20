@@ -97,16 +97,25 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
         final text = (turn['userText'] as String)
             .split('\n\n[Conversation agent:')
             .first;
-        if (!_entries.any(
-          (e) =>
-              e['role'] == 'user' && (e['runId'] == run || e['text'] == text),
-        )) {
-          _entries.add({
-            'id': '$run-user',
-            'runId': run,
-            'role': 'user',
-            'text': text,
-          });
+        if (!_entries.any((e) => e['role'] == 'user' && e['runId'] == run)) {
+          final legacy = _entries
+              .where(
+                (e) =>
+                    e['role'] == 'user' &&
+                    e['runId'] == null &&
+                    e['text'] == text,
+              )
+              .firstOrNull;
+          if (legacy != null) {
+            legacy['runId'] = run;
+          } else {
+            _entries.add({
+              'id': '$run-user',
+              'runId': run,
+              'role': 'user',
+              'text': text,
+            });
+          }
         }
         _entry('$run-reply', 'assistant')['text'] = turn['assistantText'];
         for (final id in turn['resultIds'] as List) {
@@ -245,7 +254,12 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
     if (_entries.length == 1) {
       c.title = text.length > 60 ? '${text.substring(0, 60)}…' : text;
     }
-    if (resumeText == null) _composer.clear();
+    if (resumeText == null) {
+      _composer.clear();
+      // Semantic button activation blurs the DOM input without moving Flutter
+      // focus. Release both so the next click reconnects the editing strategy.
+      _composerFocus.unfocus();
+    }
     _sync();
     setState(() {
       _running = true;

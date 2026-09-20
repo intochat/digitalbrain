@@ -146,6 +146,9 @@ Flutter advertises its application's `semantics=true` query and semantics-tree r
 through browser endpoint metadata. Generic E2E contains no Flutter-specific selectors.
 Readiness does not wait for the transient accessibility activation placeholder. Resource health,
 frontend readiness and the scenario's own data/subscription readiness are separate conditions.
+The Flutter web-server host also waits for the current compilation's completion log before
+becoming healthy: an HTTP response can otherwise serve a cached build with an old runtime URL.
+This adapter follows the pinned Flutter CLI output and must be updated if that output changes.
 
 ## Budgets, observations and cleanup
 
@@ -182,3 +185,34 @@ shared host/runner preserves process isolation while those packaging concerns re
 
 The implementation record is in
 [code-first-execution-progress.md](../../docs/superpowers/plans/code-first-execution-progress.md).
+
+## Agent data windows
+
+`SupabaseWorkspaceE2EFacts` submits a chat message through the real Flutter shell. The production
+OpenAI-compatible client calls `supabase_schema` and `show_supabase_query_table`; the application
+opens a durable window in the originating workspace. Filters, sort and paging query PostgreSQL
+through the Supabase module. Logical windows and query views are durable; geometry and focus
+stay local. A closed window stays closed when an old tool operation is replayed.
+
+The default fixture substitutes only the external model HTTP service (plus the full deployment's
+unrelated OAuth/MCP services). It owns a disposable PostgreSQL database, seeds with an owner
+connection, and supplies a separate SELECT-only login to the application. A preflight verifies the
+actual database and schema. This tests the PostgreSQL-backed Supabase provider, not Supabase
+Auth, REST or Realtime. It creates no application windows or tables before the user request.
+
+```powershell
+dotnet test --project src/Applications/IntoChat/Tests/IntoChat.Tests.csproj -p:CodeGraphRefresh=false -- --filter-method '*AskOpensLiveTableWithServerFilteringAndRestoresWindow'
+$env:DIGITALBRAIN_E2E_HEADED = '1' # visible Chromium, 250 ms between actions
+```
+
+For a deliberately selected live run, set `DIGITALBRAIN_E2E_LIVE_MODEL=1` and
+`DIGITALBRAIN_E2E_MODEL_API_KEY` in the process environment, then select
+`*LiveModelOpensAnInteractiveSupabaseTable`. The default endpoint is OpenAI `/v1/`; an optional
+`DIGITALBRAIN_E2E_MODEL_ENDPOINT` selects a compatible endpoint. This lane uses the configured
+GPT-5.6 Luna preset and makes paid model calls. Missing credentials fail explicitly. Without the
+opt-in, this separately categorized test is skipped; ordinary E2E never selects it implicitly.
+
+Run Flutter protocol and widget tests from `src/Modules/Flutter/app/shell` with `flutter test`.
+The shell reconciles workspace revisions after reconnect, restores committed conversation result
+links and exposes explicit reopen actions. Failed refreshes retain the last view with a stale-data
+message; they do not replace it with fabricated rows.

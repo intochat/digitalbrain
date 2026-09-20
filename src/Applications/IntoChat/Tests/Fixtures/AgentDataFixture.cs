@@ -78,5 +78,6 @@ public sealed class AgentDataFixture : IAsyncDisposable
         await using var command = new NpgsqlCommand("REVOKE SELECT ON leads FROM agent_reader", owner);
         await command.ExecuteNonQueryAsync(ct);
     }
+    public Task StopDatabase(CancellationToken ct) => _database!.Application.StopAsync(ct);
 }
 

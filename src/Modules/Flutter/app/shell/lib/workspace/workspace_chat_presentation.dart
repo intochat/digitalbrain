@@ -350,9 +350,9 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
             ),
           ),
         Padding(
+          key: const Key('chat-composer'),
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: Container(
-            key: const Key('chat-composer'),
             decoration: BoxDecoration(
               color: colors.surfaceContainerLow,
               border: Border.all(color: colors.outlineVariant),

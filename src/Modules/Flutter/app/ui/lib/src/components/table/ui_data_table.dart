@@ -169,7 +169,7 @@ class UiDataTable extends StatelessWidget {
                                     }
                                   : null,
                             ),
-                          if (table.filters.length > 1)
+                          if (table.filters.isNotEmpty)
                             TextButton(
                               onPressed: canEdit
                                   ? () {

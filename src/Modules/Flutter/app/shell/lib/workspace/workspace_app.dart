@@ -26,6 +26,7 @@ class WorkspaceApp extends StatefulWidget {
   const WorkspaceApp({
     super.key,
     this.store,
+    this.initialLocation,
     this.persistenceKey = 'intocaht.workspace.v1',
     this.onRun,
     this.onOpenUrl,
@@ -46,6 +47,7 @@ class WorkspaceApp extends StatefulWidget {
     this.programmingClient,
   });
   final WorkspaceStore? store;
+  final Uri? initialLocation;
   final String persistenceKey;
   final AgentRunner? onRun;
   final OpenUrl? onOpenUrl;
@@ -202,6 +204,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   final _messenger = GlobalKey<ScaffoldMessengerState>();
   final _navigator = GlobalKey<NavigatorState>();
   late final WorkspaceRouteBridge _routes;
+  late final Uri _initialLocation;
   final _saveTimers = <String, Timer>{};
   final _saving = <String>{};
   final _saveErrors = <String, String>{};
@@ -210,6 +213,9 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   @override
   void initState() {
     super.initState();
+    _initialLocation =
+        widget.initialLocation ??
+        Uri.parse(WidgetsBinding.instance.platformDispatcher.defaultRouteName);
     _routes = WorkspaceRouteBridge(onNavigate: _navigateRoute);
     store.addListener(_changed);
     _load();
@@ -241,9 +247,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     if (hasLive) {
       _liveGraph();
     }
-    _navigateRoute(
-      Uri.parse(WidgetsBinding.instance.platformDispatcher.defaultRouteName),
-    );
+    _navigateRoute(_initialLocation);
   }
 
   void _navigateRoute(Uri uri) {

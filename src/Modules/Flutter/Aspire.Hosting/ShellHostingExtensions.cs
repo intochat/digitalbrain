@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace DigitalBrain.Flutter.Aspire.Hosting;
 
@@ -103,12 +104,16 @@ public static class ShellHostingExtensions
 
             if (kind == FlutterHostKind.Web)
             {
-                // FlutterHostLaunch.ResolveWeb pins --web-port/--web-hostname to these same
-                // values, so this unproxied endpoint is the address flutter actually serves on.
-                // The health check proves the dev server is up and answering; it cannot prove
-                // the build has landed (the server answers "/" with 200 within seconds of
-                // launch, before the web build completes -- observed live), so consumers that
-                // need the app itself must tolerate one early page load and retry.
+                if (string.Equals(launch.DeviceTarget, ShellNames.DefaultWebDeviceTarget, StringComparison.OrdinalIgnoreCase))
+                {
+                    var buildCheck = resourceName + "-build";
+                    appHost.Services.AddHealthChecks().Add(new HealthCheckRegistration(buildCheck,
+                        services => new FlutterWebBuildHealthCheck(services.GetRequiredService<ResourceLoggerService>(), host.Resource),
+                        failureStatus: null, tags: null));
+                    host.WithHealthCheck(buildCheck);
+                }
+                // HTTP verifies the server; the separate build check rejects old cached
+                // assets until this process reports its current compilation is served.
                 host
                     .WithHttpEndpoint(
                         name: ShellNames.HttpEndpointName,

@@ -26,13 +26,21 @@ Future<void> main() async {
   }
 
   final chat = DigitalBrainHostEnv.resolveChat();
+  // Capture the deep link before the authentication gate builds its Navigator.
+  final initialLocation = Uri.parse(
+    WidgetsBinding.instance.platformDispatcher.defaultRouteName,
+  );
 
   // The gate owns client construction now: it must hold the credentials the
   // kernel accepted before any stream opens.
   runApp(
     BrainSessionGate(
-      builder: (client, status) =>
-          buildShell(chat: chat, edge: client, statusMessage: status),
+      builder: (client, status) => buildShell(
+        chat: chat,
+        edge: client,
+        statusMessage: status,
+        initialLocation: initialLocation,
+      ),
     ),
   );
 }
@@ -43,6 +51,7 @@ Widget buildShell({
   required DigitalBrainUiClient? edge,
   String? statusMessage,
   WorkspaceStore? workspaceStore,
+  Uri? initialLocation,
 }) {
   final scope = base64Url.encode(
     utf8.encode(
@@ -55,6 +64,7 @@ Widget buildShell({
     key: ValueKey(scope),
     persistenceKey: 'intocaht.workspace.v1.$scope',
     store: workspaceStore,
+    initialLocation: initialLocation,
     kernelBaseUri: edge?.baseUri,
     programmingClient: edge,
     onRun: edge?.runAgent,

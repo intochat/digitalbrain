@@ -59,7 +59,7 @@ public interface IWorkspace : INeuron
 
 `WorkspaceChanged` derives from the existing Signal type using its established record/serialization conventions. Define `WorkspaceRevisionConflictException` in the same contract folder. Window IDs are stable view-result IDs. Close retains the descriptor and duplicate-open receipt. Explicit reopen uses a fresh operation ID and current revision. Replaying a prior successful open returns current state without changing revision or open state, even after Close.
 
-- [ ] Write the failing test using the actual Unit host:
+- [x] Write the failing test using the actual Unit host:
 
 ```csharp
 await using var brain = await UnitTest.Create().WithModule<FlutterModule>().StartAsync(ct);
@@ -73,9 +73,9 @@ await workspace.Open(request);
 Assert.False(Assert.Single((await workspace.Read()).Windows).IsOpen);
 ```
 
-- [ ] Add tests for explicit reopen, conflicting reuse of an operation ID, stale revision, empty/overlong identifiers/titles, separate workspace isolation and reactivation persistence. A reused operation ID with a different view is rejected. Name/title limits are 200 characters; operation/window IDs 256. Do not truncate silently.
-- [ ] Implement persisted workspace state and operation receipts in the existing default grain storage. Check duplicate operation before revision comparison. Persist before publishing the signal. Use revision checks to make stale commands visible. Do not add coordinates or window z-order to the neuron.
-- [ ] Verify a subscriber sees a change only after a successful mutation and that duplicate replay produces no extra version. Run Flutter Unit tests; commit the new interface/neuron.
+- [x] Add tests for explicit reopen, conflicting reuse of an operation ID, stale revision, empty/overlong identifiers/titles, separate workspace isolation and reactivation persistence. A reused operation ID with a different view is rejected. Name/title limits are 200 characters; operation/window IDs 256. Do not truncate silently.
+- [x] Implement persisted workspace state and operation receipts in the existing default grain storage. Check duplicate operation before revision comparison. Persist before publishing the signal. Use revision checks to make stale commands visible. Do not add coordinates or window z-order to the neuron.
+- [x] Verify a subscriber sees a change only after a successful mutation and that duplicate replay produces no extra version. Run Flutter Unit tests; commit the new interface/neuron.
 
 ### Task 2: Expose query-backed table and workspace contracts to Flutter
 
@@ -96,12 +96,12 @@ Assert.False(Assert.Single((await workspace.Read()).Windows).IsOpen);
 
 Scope derives the current configured owner and validated workspace ID; client workspace names never become arbitrary fully qualified grain IDs. A table must belong to a window descriptor in that workspace (open or closed) before read/update/reopen. The workspace interface need not know Supabase; application adapters perform this resolution. Keep simple UI-kit `/ui/tables` separate rather than conflating two payload contracts.
 
-- [ ] Write HTTP tests for create/read/filter/sort/page using `ISupabaseTable` and a real disposable PostgreSQL fixture. Verify 404 for an unassociated table and 409 for stale view revision. Add JSON contract tests that decode the response with the real Dart models, including null, number/date/text columns, counts and visible columns.
-- [ ] Implement the application adapter over `ReadSupabaseTable` and `UpdateSupabaseTableView`. Preserve `SupabaseTablePolicy` query caps/validation. Table error mapping: invalid filter/query → 400; missing association/view → 404; revision conflict → 409; source unavailable → 503. Do not expose connection strings or raw provider exception chains.
-- [ ] Make workspace event subscription register before reading its initial snapshot; include a revision so read/subscribe races and coalesced updates reconcile correctly. On reconnect read the latest snapshot rather than replaying window-opening commands.
-- [ ] Add Dart scoped client methods with request cancellation, typed errors and model decoding. On a revision conflict retain the user's visible state, refresh the current snapshot and show the conflict; do not silently overwrite another edit.
-- [ ] Add `flutter_test: { sdk: flutter }` to shell/pubspec.yaml dev_dependencies and update the workspace lockfile with the existing SDK. Put core contract tests under shell/test/core so the production pure-Dart core acquires no Flutter dependency. No standalone core test runner is currently configured.
-- [ ] Run HTTP/contract tests and core Dart tests; commit the transport adapter.
+- [x] Write HTTP tests for create/read/filter/sort/page using `ISupabaseTable` and a real disposable PostgreSQL fixture. Verify 404 for an unassociated table and 409 for stale view revision. Add JSON contract tests that decode the response with the real Dart models, including null, number/date/text columns, counts and visible columns.
+- [x] Implement the application adapter over `ReadSupabaseTable` and `UpdateSupabaseTableView`. Preserve `SupabaseTablePolicy` query caps/validation. Table error mapping: invalid filter/query → 400; missing association/view → 404; revision conflict → 409; source unavailable → 503. Do not expose connection strings or raw provider exception chains.
+- [x] Make workspace event subscription register before reading its initial snapshot; include a revision so read/subscribe races and coalesced updates reconcile correctly. On reconnect read the latest snapshot rather than replaying window-opening commands.
+- [x] Add Dart scoped client methods with request cancellation, typed errors and model decoding. On a revision conflict retain the user's visible state, refresh the current snapshot and show the conflict; do not silently overwrite another edit.
+- [x] Add `flutter_test: { sdk: flutter }` to shell/pubspec.yaml dev_dependencies and update the workspace lockfile with the existing SDK. Put core contract tests under shell/test/core so the production pure-Dart core acquires no Flutter dependency. No standalone core test runner is currently configured.
+- [x] Run HTTP/contract tests and core Dart tests; commit the transport adapter.
 
 ### Task 3: Connect real Supabase tools to an idempotent window-opening operation
 
@@ -113,7 +113,7 @@ Scope derives the current configured owner and validated workspace ID; client wo
 
 Operation identity is a stable hash of the server-resolved scope, run ID and tool call ID. Persist the input fingerprint, result/table ID and stage before side effects. Existing `CreateFromQuery` rejects duplicates: add a narrow idempotent operation-aware creation method to `ISupabaseTable`/`SupabaseTableNeuron`, preserving current validation. Matching operation/fingerprint returns the existing view; different input fails. This handles a crash after table creation but before the coordinator records success.
 
-- [ ] Write a failing recovery test: create the table, inject a failure immediately before workspace Open, resume the same operation, and assert one table identity, one window and the original rows. Repeat after Close and assert no reopening. Use an internal injectable operation-stage hook in tests, not production random failures.
+- [x] Write a failing recovery test: create the table, inject a failure immediately before workspace Open, resume the same operation, and assert one table identity, one window and the original rows. Repeat after Close and assert no reopening. Use an internal injectable operation-stage hook in tests, not production random failures.
 
 ```csharp
 // QueryWindowOperationFacts uses a test-owned failure hook and real persisted neurons.
@@ -124,10 +124,10 @@ Assert.Equal(result.TableId, Assert.Single((await workspace.Read()).Windows).Vie
 
 The fixture supplies `operation`, `workspace`, identifiers and seeded SQL; the hook throws once after the table-create checkpoint. Define that fixture in QueryWindowOperationFacts, not a general public fault-injection framework.
 
-- [ ] Implement input validation, stable identity, stage persistence, idempotent table creation and workspace Open with bounded revision-conflict reconciliation. A conflicting user Close after this operation opened the window is authoritative. Cancellation marks the operation interrupted; resume is explicit. Retain an already-created result reference for recovery instead of deleting it blindly.
-- [ ] Add schema/query/empty/error tests using production provider behavior. Verify SQL write attempts are rejected by existing guards and never create a successful table window. Build tool arguments/results from real neuron responses; never hardcode rows in the model fixture or tool adapter.
-- [ ] Register the tools explicitly for the workspace agent. Keep Supabase/Flutter dependencies in the application integration code, not AI core. Missing selected tools must produce a startup/capability error rather than NativeTools.Resolve silently skipping them.
-- [ ] Run application operation tests and Supabase Unit/provider Integration cases; commit the tool coordinator.
+- [x] Implement input validation, stable identity, stage persistence, idempotent table creation and workspace Open with bounded revision-conflict reconciliation. A conflicting user Close after this operation opened the window is authoritative. Cancellation marks the operation interrupted; resume is explicit. Retain an already-created result reference for recovery instead of deleting it blindly.
+- [x] Add schema/query/empty/error tests using production provider behavior. Verify SQL write attempts are rejected by existing guards and never create a successful table window. Build tool arguments/results from real neuron responses; never hardcode rows in the model fixture or tool adapter.
+- [x] Register the tools explicitly for the workspace agent. Keep Supabase/Flutter dependencies in the application integration code, not AI core. Missing selected tools must produce a startup/capability error rather than NativeTools.Resolve silently skipping them.
+- [x] Run application operation tests and Supabase Unit/provider Integration cases; commit the tool coordinator.
 
 ### Task 4: Restore the production chat path with persisted conversation state
 
@@ -165,12 +165,12 @@ Define AgentTurnEvent as typed records for Started, Text, ToolStarted, ToolCompl
 
 The application resolves an owner/workspace/thread key and selects the configured workspace agent. Tool context is supplied by the runner per invocation, including the actual call ID. No singleton tool captures a first request's scope. Verify the pinned SDK's tool-invocation hooks before implementation; do not assume a new SDK API or add a second automatic tool loop around an existing one.
 
-- [ ] Write AI tests using a scripted `IChatClient` that emits function calls and requires returned function results before producing final text. Assert selected tools execute exactly once, unknown requested tools fail, and two interleaved scopes cannot share context. Preserve AgentFacts' existing Ask behavior through the extracted runner.
-- [ ] Implement per-run tool factories and selected capabilities. Use the production model client and exactly one function-invocation pipeline. Persist completed conversational turns/result references and supply them to later requests; do not manufacture conversational continuity from browser-only history.
-- [ ] Implement `POST /agent` using the current request fields plus workspaceId. Subscribe/run under request cancellation. Emit RUN_STARTED, TEXT_MESSAGE_START/CONTENT/END, TOOL_CALL_START/ARGS/END/RESULT and RUN_FINISHED; failures emit RUN_ERROR. Flush valid SSE frames. Write the durable completed turn before RUN_FINISHED so reconnect can recover committed results.
-- [ ] Keep cancellation in the runtime coordinator/runner's per-run lifetime, not a non-interleaving grain method blocked behind a long model call. The conversation neuron handles short state transitions only. Disconnect aborts the model/tool token and records interruption; completed side effects remain referenced. Explicit retry uses a new run ID unless resuming the same interrupted operation intentionally.
-- [ ] Add HTTP tests for two successive messages, duplicate run submission, disconnected stream, missing tool, delayed tool error and a stale completion after a newer run. Assert no false RUN_FINISHED and no update to a different workspace. Preserve BasicAuth gate behavior and avoid trusting client-supplied owner IDs.
-- [ ] Run AI, HTTP and operation suites; commit the new chat path.
+- [x] Write AI tests using a scripted `IChatClient` that emits function calls and requires returned function results before producing final text. Assert selected tools execute exactly once, unknown requested tools fail, and two interleaved scopes cannot share context. Preserve AgentFacts' existing Ask behavior through the extracted runner.
+- [x] Implement per-run tool factories and selected capabilities. Use the production model client and exactly one function-invocation pipeline. Persist completed conversational turns/result references and supply them to later requests; do not manufacture conversational continuity from browser-only history.
+- [x] Implement `POST /agent` using the current request fields plus workspaceId. Subscribe/run under request cancellation. Emit RUN_STARTED, TEXT_MESSAGE_START/CONTENT/END, TOOL_CALL_START/ARGS/END/RESULT and RUN_FINISHED; failures emit RUN_ERROR. Flush valid SSE frames. Write the durable completed turn before RUN_FINISHED so reconnect can recover committed results.
+- [x] Keep cancellation in the runtime coordinator/runner's per-run lifetime, not a non-interleaving grain method blocked behind a long model call. The conversation neuron handles short state transitions only. Disconnect aborts the model/tool token and records interruption; completed side effects remain referenced. Explicit retry uses a new run ID unless resuming the same interrupted operation intentionally.
+- [x] Add HTTP tests for two successive messages, duplicate run submission, disconnected stream, missing tool, delayed tool error and a stale completion after a newer run. Assert no false RUN_FINISHED and no update to a different workspace. Preserve BasicAuth gate behavior and avoid trusting client-supplied owner IDs.
+- [x] Run AI, HTTP and operation suites; commit the new chat path.
 
 ### Task 5: Project workspace state into the existing Flutter windows
 
@@ -180,12 +180,12 @@ The application resolves an owner/workspace/thread key and selects the configure
 
 **Interfaces:** `WorkspaceRemoteController` owns current workspace snapshot, subscription and request cancellation; it calls the scoped API to close/reopen and exposes snapshots to WorkspaceStore. Store owns geometry/focus only for remotely managed windows. Existing local-only artifacts remain explicitly local. Add a persisted local `remoteManaged` discriminator during migration, so remote open/closed state is never accidentally overwritten by old local presentation JSON.
 
-- [ ] Write widget tests driving real WorkspaceApp with a controlled API client: a WorkspaceChanged update opens a floating result window, preserves unrelated windows, and shows the existing filter/sort/page controls. A duplicate update must not add another window. Switching workspace before completion must not steal focus or append the window to the new workspace.
-- [ ] Implement subscription-before-read with revisions; reconcile from authoritative state after refresh or disconnect. Window geometry stays in local persistence keyed by workspace/window identity. Suppress the old tool-result `store.openArtifact` path for remote-managed results; chat shows a link that invokes explicit reopen instead.
-- [ ] Bind table controls to the scoped query-table adapter. Cancel superseded filter reads and ignore stale responses by request generation/revision. Show loading, empty rows and typed error states; keep the last successful table visible if refresh fails, marked as stale rather than presenting it as a new result.
-- [ ] Add widget tests for stale filter response, revision conflict, schema/type decoding, close/reopen and reload with existing local layout. Keep old local artifacts usable; do not migrate coordinates into backend state.
-- [ ] Add stable accessible labels: `Message`, `Send`, window title, `Filter column`, `Filter value`, `Apply filter`, `Clear filters`, `Next page`, `Previous page`, and column sort buttons. Use visible roles/labels for E2E; retain semantics opt-in from the existing harness.
-- [ ] Run Flutter core and shell tests, then commit the window projection.
+- [x] Write widget tests driving real WorkspaceApp with a controlled API client: a WorkspaceChanged update opens a floating result window, preserves unrelated windows, and shows the existing filter/sort/page controls. A duplicate update must not add another window. Switching workspace before completion must not steal focus or append the window to the new workspace.
+- [x] Implement subscription-before-read with revisions; reconcile from authoritative state after refresh or disconnect. Window geometry stays in local persistence keyed by workspace/window identity. Suppress the old tool-result `store.openArtifact` path for remote-managed results; chat shows a link that invokes explicit reopen instead.
+- [x] Bind table controls to the scoped query-table adapter. Cancel superseded filter reads and ignore stale responses by request generation/revision. Show loading, empty rows and typed error states; keep the last successful table visible if refresh fails, marked as stale rather than presenting it as a new result.
+- [x] Add widget tests for stale filter response, revision conflict, schema/type decoding, close/reopen and reload with existing local layout. Keep old local artifacts usable; do not migrate coordinates into backend state.
+- [x] Add stable accessible labels: `Message`, `Send`, window title, `Filter column`, `Filter value`, `Apply filter`, `Clear filters`, `Next page`, `Previous page`, and column sort buttons. Use visible roles/labels for E2E; retain semantics opt-in from the existing harness.
+- [x] Run Flutter core and shell tests, then commit the window projection.
 
 ### Task 6: Add deterministic database/model fixtures and the real browser journey
 
@@ -195,9 +195,9 @@ The application resolves an owner/workspace/thread key and selects the configure
 
 `AgentDataFixture.StartAsync(ct)` owns the model server, other test deployment fixtures and E2E brain; its `Brain` exposes normal E2EBrain. Start the application using an explicit fixture model/default provider, synthetic API key through PrivateConfiguration, local model endpoint, local databases and Flutter Web. The seeded query table is not created until the user prompt triggers the production tool.
 
-- [ ] Seed a fresh database after its health check but before browser submission. Create a read-only application role; use a separate fixture owner connection for schema/seed. Seed 60 active rows, an inactive control row, and a per-run marker in a company beyond the first 25-row page. Explicit ordering makes page assertions reproducible. Do not interpolate the marker into SQL; use Npgsql parameters.
-- [ ] Implement the model server against the pinned SDK request shape and test it with the actual production client. The second request must include the real schema tool result; the later request must include the real query-window result. Return only the supplied tool result IDs, never invented IDs or database rows.
-- [ ] Write the main E2E through visible controls:
+- [x] Seed a fresh database after its health check but before browser submission. Create a read-only application role; use a separate fixture owner connection for schema/seed. Seed 60 active rows, an inactive control row, and a per-run marker in a company beyond the first 25-row page. Explicit ordering makes page assertions reproducible. Do not interpolate the marker into SQL; use Npgsql parameters.
+- [x] Implement the model server against the pinned SDK request shape and test it with the actual production client. The second request must include the real schema tool result; the later request must include the real query-window result. Return only the supplied tool result IDs, never invented IDs or database rows.
+- [x] Write the main E2E through visible controls:
 
 ```csharp
 await using var fixture = await AgentDataFixture.StartAsync(ct);
@@ -216,17 +216,17 @@ fixture.Model.AssertCompleted();
 
 Use the actual accessible widget interaction for Flutter dropdowns; if it exposes a button/listbox rather than native select, select the same labeled option through roles. Keep the label contract stable rather than forcing a native HTML control into Flutter. `AgentDataFixture.Marker` is the generated company string; `Model` is its ScriptedModelServer.
 
-- [ ] Assert active row count, excluded control row, selected columns, filter result from beyond page one, clearing, sorting and pagination. Refresh the browser and verify one restored window and preserved view settings. Close/reopen from the chat result link and verify no duplicate table. Switch workspaces during a delayed response and verify the result remains attached to the original workspace.
-- [ ] Add empty result, invalid query, unavailable database and cancellation scenarios. Assert clear visible state, no fabricated rows or successful completion, and all owned resources dispose. Keep failure injection confined to test-owned providers/resources.
-- [ ] Run the success scenario three times headless/zero delay and three times headed/250 ms with independent logs. These are separate verification runs, not retry-until-green. Run failure cases headless and inspect trace/screenshots on failures.
-- [ ] Commit the scenario only after it uses the real browser-to-agent-to-provider-to-workspace path. Record exactly which provider is substituted.
+- [x] Assert active row count, excluded control row, selected columns, filter result from beyond page one, clearing, sorting and pagination. Refresh the browser and verify one restored window and preserved view settings. Close/reopen from the chat result link and verify no duplicate table. Switch workspaces during a delayed response and verify the result remains attached to the original workspace.
+- [x] Add empty result, invalid query, unavailable database and cancellation scenarios. Assert clear visible state, no fabricated rows or successful completion, and all owned resources dispose. Keep failure injection confined to test-owned providers/resources.
+- [x] Run the success scenario three times headless/zero delay and three times headed/250 ms with independent logs. These are separate verification runs, not retry-until-green. Run failure cases headless and inspect trace/screenshots on failures.
+- [x] Commit the scenario only after it uses the real browser-to-agent-to-provider-to-workspace path. Record exactly which provider is substituted.
 
 ### Task 7: Add opt-in live-model verification and complete acceptance
 
 **Files:** Extend `AgentDataFixture` and `SupabaseWorkspaceE2EFacts`; update `src/Testing/README.md`, approved spec status and a tracked execution ledger beside these plans.
 
-- [ ] Add an explicit live mode controlled by `DIGITALBRAIN_E2E_LIVE_MODEL=1`. The test is separately categorized and skipped with a reason unless selected. When selected but required model credentials are absent, fail with an actionable message. Keep the same fresh database and browser actions; use semantic table assertions, not exact assistant prose or exact tool-call sequence.
-- [ ] Do not execute paid/live calls without an explicit user request to run that lane. Deterministic CI remains the default. Do not label the PostgreSQL-backed provider test a test of Supabase Auth, REST or Realtime.
+- [x] Add an explicit live mode controlled by `DIGITALBRAIN_E2E_LIVE_MODEL=1`. The test is separately categorized and skipped with a reason unless selected. When selected but required model credentials are absent, fail with an actionable message. Keep the same fresh database and browser actions; use semantic table assertions, not exact assistant prose or exact tool-call sequence.
+- [x] Do not execute paid/live calls without an explicit user request to run that lane. Deterministic CI remains the default. Do not label the PostgreSQL-backed provider test a test of Supabase Auth, REST or Realtime.
 - [ ] Run the complete solution suite once after affected tests pass, plus Flutter core/shell suites. Check that neither runtime nor UI has duplicate authoritative state or a legacy conversation implementation re-enabled. Investigate any cleanup failure instead of hiding it.
 - [ ] Review the final diff against the approved interface and all five Review Focus cases. Record results and limitations. Commit, leave `archv2` unpushed, and report the test guarantees plainly.
 

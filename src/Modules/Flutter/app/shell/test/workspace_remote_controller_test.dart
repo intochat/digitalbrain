@@ -17,6 +17,44 @@ class MemoryPersistence implements WorkspacePersistence {
 }
 
 void main() {
+  test(
+    'reload keeps device layout while remote membership remains authoritative',
+    () async {
+      final persistence = MemoryPersistence();
+      final store = WorkspaceStore(persistence: persistence);
+      final project = store.currentProject;
+      WorkspaceSnapshot snapshot(int revision, bool open) => WorkspaceSnapshot(
+        revision: revision,
+        windows: [
+          WorkspaceWindow(
+            id: 'result',
+            title: 'Leads',
+            tableId: 'table',
+            isOpen: open,
+          ),
+        ],
+      );
+      store.reconcileWorkspace(project, snapshot(1, true));
+      project.presentation.windowBounds['result'] = [100, 80, 700, 400];
+      project.presentation.windowModes['result'] = 'right';
+      await store.save();
+      store.dispose();
+      final restored = WorkspaceStore(persistence: persistence);
+      await restored.load();
+      final layout = restored.currentProject.presentation;
+      expect(restored.currentProject.artifacts.single.remoteManaged, isTrue);
+      restored.reconcileWorkspace(restored.currentProject, snapshot(2, false));
+      expect(layout.openArtifactIds, isEmpty);
+      restored.reconcileWorkspace(restored.currentProject, snapshot(1, true));
+      expect(layout.openArtifactIds, isEmpty);
+      restored.reconcileWorkspace(restored.currentProject, snapshot(3, true));
+      expect(layout.openArtifactIds, ['result']);
+      expect(layout.windowBounds['result'], [100, 80, 700, 400]);
+      expect(layout.windowModes['result'], 'right');
+      expect(restored.currentProject.artifacts, hasLength(1));
+      restored.dispose();
+    },
+  );
   test('remote snapshots preserve local windows and never change workspace selection', () async {
     final store = WorkspaceStore(persistence: MemoryPersistence());
     final project = store.currentProject;
@@ -33,7 +71,7 @@ void main() {
     );
     controller.start(project.id);
     expect(changes.hasListener, isTrue);
-      final selected = store.createProject('Other workspace').id;
+    final selected = store.createProject('Other workspace').id;
     read.complete(
       WorkspaceSnapshot(
         revision: 1,
