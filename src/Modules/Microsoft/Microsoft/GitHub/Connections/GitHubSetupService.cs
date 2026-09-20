@@ -1,4 +1,3 @@
-using DigitalBrain.Abstractions.Identity;
 using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Microsoft.GitHub;
@@ -16,7 +15,7 @@ internal sealed class GitHubSetupService(
         var binding = bindings.FindByRepository(coordinates.Owner, coordinates.Name);
         if (binding is null)
         {
-            var saved = (await grains.GetGrain<IGitHubConnections>(new NeuronId("github", "connections").ToGrainId())
+            var saved = (await grains.GetGrain<IGitHubConnections>("connections")
                 .List().WaitAsync(cancellationToken)).Connections.FirstOrDefault(record =>
                     string.Equals(record.RepositoryOwner, coordinates.Owner, StringComparison.OrdinalIgnoreCase)
                     && string.Equals(record.RepositoryName, coordinates.Name, StringComparison.OrdinalIgnoreCase));
@@ -35,7 +34,7 @@ internal sealed class GitHubSetupService(
 
         var id = binding.Id;
         var view = localView?.BindingId == id ? localView
-            : await grains.GetGrain<IRepository>(new NeuronId("repository", id).ToGrainId()).Read().WaitAsync(cancellationToken);
+            : await grains.GetGrain<IRepository>(id).Read().WaitAsync(cancellationToken);
         if (!binding.Enabled || view.Revoked)
         {
             return new(url, "access_revoked", id, [], "Reconnect repository access before enabling subscriptions.");
@@ -89,7 +88,7 @@ internal sealed class GitHubSetupService(
 
         var prior = bindings.FindByRepository(access.RepositoryOwner, access.RepositoryName);
         var identity = prior?.Id ?? $"r-{access.RepositoryId}";
-        var previous = await grains.GetGrain<IRepository>(new NeuronId("repository", identity).ToGrainId())
+        var previous = await grains.GetGrain<IRepository>(identity)
             .Read().WaitAsync(cancellationToken);
         var record = new GitHubConnectionRecord(identity, access.AppId, access.InstallationId,
             access.RepositoryId, access.RepositoryOwner, access.RepositoryName,
@@ -99,12 +98,12 @@ internal sealed class GitHubSetupService(
         // Installation-token exchange verifies the App can actually read this numeric repository.
         _ = await tokens.GetTokenAsync(binding, true, cancellationToken);
         await tokens.VerifyRepositoryAsync(binding, cancellationToken);
-        await grains.GetGrain<IGitHubConnections>(new NeuronId("github", "connections").ToGrainId())
-            .Register(new RegisterGitHubConnection(CommandId.New(), record.Id, record.AppId, record.InstallationId,
+        await grains.GetGrain<IGitHubConnections>("connections")
+            .Register(new RegisterGitHubConnection(record.Id, record.AppId, record.InstallationId,
                 record.RepositoryId, record.RepositoryOwner, record.RepositoryName, record.Epoch)).WaitAsync(cancellationToken);
         bindings.Add(binding);
-        await grains.GetGrain<IRepository>(new NeuronId("repository", binding.Id).ToGrainId())
-            .Connect(new ConnectRepository(CommandId.New(), binding.AppId, binding.InstallationId,
+        await grains.GetGrain<IRepository>(binding.Id)
+            .Connect(new ConnectRepository(binding.AppId, binding.InstallationId,
                 binding.RepositoryId, binding.RepoOwner, binding.RepoName)).WaitAsync(cancellationToken);
         return await ResolveAsync($"https://github.com/{access.RepositoryOwner}/{access.RepositoryName}", cancellationToken);
     }

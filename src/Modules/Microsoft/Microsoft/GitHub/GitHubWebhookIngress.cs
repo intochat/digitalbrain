@@ -2,9 +2,6 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using DigitalBrain.Abstractions.Identity;
-using DigitalBrain.Abstractions.Neurons;
-using DigitalBrain.Abstractions.Signals;
 
 namespace DigitalBrain.Microsoft.GitHub;
 
@@ -16,7 +13,7 @@ internal sealed class GitHubWebhookIngress(GitHubRepositoryBindings bindings, IG
         cancellationToken.ThrowIfCancellationRequested();
         var delivery = Header(headers, "X-GitHub-Delivery");
         var eventName = Header(headers, "X-GitHub-Event");
-        if (!Guid.TryParse(delivery, out var deliveryId) || string.IsNullOrWhiteSpace(eventName))
+        if (!Guid.TryParse(delivery, out _) || string.IsNullOrWhiteSpace(eventName))
         {
             return GitHubWebhookAcceptance.BadRequest;
         }
@@ -58,7 +55,7 @@ internal sealed class GitHubWebhookIngress(GitHubRepositoryBindings bindings, IG
                     results.Add(failure);
                     continue;
                 }
-                // Refresh no longer targets a single SHA because the signal carries only the body hash.
+                // Refresh no longer targets a single SHA because the receipt carries only the body hash.
                 if (RejectCheckPayloadWithInvalidHeadSha(payload, eventName))
                 {
                     results.Add(GitHubWebhookAcceptance.BadRequest);
@@ -69,18 +66,11 @@ internal sealed class GitHubWebhookIngress(GitHubRepositoryBindings bindings, IG
                 var fact = new RepositoryEvent(delivery!, eventName,
                     classification.Revoke ? "revoked" : GitHubWebhookHandler.String(payload, "action"),
                     classification.Number, Convert.ToHexStringLower(SHA256.HashData(body.Span)));
-                var signal = Signal.Create(GitHubSignals.RepositoryEvent, JsonSerializer.Serialize(fact, GitHubJson.Default.RepositoryEvent));
                 try
                 {
-                    var accepted = await grains.GetGrain<INeuron>(new NeuronId("repository", binding.Id).ToGrainId())
-                        .Deliver(new SignalDelivery(signal, new SignalId(deliveryId), CorrelationId.New(), null,
-                            new NeuronId("github", "webhook"), 1, TimeProvider.System.GetUtcNow()), cancellationToken).ConfigureAwait(false);
-                    results.Add(accepted switch
-                    {
-                        DeliveryAdmission.Accepted => GitHubWebhookAcceptance.Accepted,
-                        DeliveryAdmission.Duplicate => GitHubWebhookAcceptance.Duplicate,
-                        _ => GitHubWebhookAcceptance.Unavailable,
-                    });
+                    var accepted = await grains.GetGrain<IRepository>(binding.Id)
+                        .AcceptRepositoryEvent(fact, cancellationToken).ConfigureAwait(false);
+                    results.Add(accepted ? GitHubWebhookAcceptance.Accepted : GitHubWebhookAcceptance.Duplicate);
                 }
                 catch (Exception error)
                 {

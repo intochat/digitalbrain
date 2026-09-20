@@ -1,18 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Supabase module: read-only query neuron, live query tables and native agent tools.</Description>
+    <Description>Supabase module: read-only query neuron and live query tables.</Description>
     <RootNamespace>DigitalBrain.Supabase</RootNamespace>
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Npgsql" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Supabase.Tests.Unit" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Supabase.Contracts.csproj" />
-    <ProjectReference Include="../../AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
-    <ProjectReference Include="../../Flutter/Flutter/DigitalBrain.Modules.Flutter.csproj" />
     <ProjectReference Include="../../DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
   </ItemGroup>
 </Project>

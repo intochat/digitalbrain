@@ -6,26 +6,10 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="Activities/**" />
-    <Compile Remove="Chart/**" />
-    <Compile Remove="Chat/**" />
-    <Compile Remove="Graph/**" />
-    <Compile Remove="Image/**" />
-    <Compile Remove="Surface/**" />
-    <Compile Remove="Table/**" />
-    <Compile Remove="Ui/**" />
-    <Compile Remove="Workspaces/**" />
-    <Compile Remove="BoundedList.cs" />
-  </ItemGroup>
-  <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
     <ProjectReference Include="../../DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Modules.ClickHouse" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Supabase" />
   </ItemGroup>
 </Project>

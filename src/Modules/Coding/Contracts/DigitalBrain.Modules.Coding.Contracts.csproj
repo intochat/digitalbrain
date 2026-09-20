@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Coding module contracts: workspace commands, symbol, reference, diagnostics and map queries.</Description>
+    <Description>Coding module contracts: workspace open/reload, symbol, reference, diagnostics and map queries, and change sets.</Description>
     <RootNamespace>DigitalBrain.Coding</RootNamespace>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>

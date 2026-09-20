@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>AI module contracts over DigitalBrain abstractions and MEAI messages.</Description>
+    <Description>AI module contracts: typed agent operations, model catalog and native-tool boundary.</Description>
     <RootNamespace>DigitalBrain.AI</RootNamespace>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>

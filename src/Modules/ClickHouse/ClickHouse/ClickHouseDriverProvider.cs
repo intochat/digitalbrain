@@ -4,7 +4,9 @@ using System.Text.Json;
 using ClickHouse.Driver;
 using ClickHouse.Driver.ADO;
 using ClickHouse.Driver.ADO.Parameters;
-using DigitalBrain.Flutter;
+using DigitalBrain.ClickHouse.Query;
+using DigitalBrain.ClickHouse.Tables;
+using QueryConnection = DigitalBrain.ClickHouse.Query.ClickHouseConnection;
 
 namespace DigitalBrain.ClickHouse;
 
@@ -28,7 +30,8 @@ internal sealed class ClickHouseDriverProvider(ClickHouseClient client, string d
         var (columns, rows) = await ReadAsync($"SELECT * FROM ({sql}) AS q LIMIT {{limit:UInt64}}", parameters, maxRows + 1, cancellationToken).ConfigureAwait(false);
         var truncated = rows.Count > maxRows;
         var page = truncated ? rows.Take(maxRows).ToArray() : rows.ToArray();
-        return new(columns, page, page.Length, truncated, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
+        IReadOnlyList<IReadOnlyList<string>> cells = page.Select(row => (IReadOnlyList<string>)row.Select(cell => cell.GetRawText()).ToArray()).ToArray();
+        return new(columns, cells, page.Length, truncated, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
     }
 
     // The page and its counts are independent statements, so they run concurrently and the
@@ -52,7 +55,7 @@ internal sealed class ClickHouseDriverProvider(ClickHouseClient client, string d
             throw;
         }
 
-        var page = pageRead.Result.Rows.Select((cells, index) => new TableRow($"row-{plan.Offset + index}", cells)).ToArray();
+        var page = pageRead.Result.Rows.Select((cells, index) => new ClickHouseTableRow($"row-{plan.Offset + index}", cells.Select(cell => cell.GetRawText()).ToArray())).ToArray();
         return new(page, totalCount.Result, filteredCount.Result);
     }
 
@@ -117,7 +120,7 @@ internal sealed class ClickHouseDriverProvider(ClickHouseClient client, string d
         return new(database, tables);
     }
 
-    public async Task<ClickHouseConnection> PingAsync(CancellationToken cancellationToken)
+    public async Task<QueryConnection> PingAsync(CancellationToken cancellationToken)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(PingTimeout);

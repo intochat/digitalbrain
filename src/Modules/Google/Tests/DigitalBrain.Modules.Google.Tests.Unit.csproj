@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../../Testing/Module.Tests.props" />
+  <ItemGroup>
+    <Compile Remove="Integration/**" />
+    <ProjectReference Include="../Google/DigitalBrain.Modules.Google.csproj" />
+  </ItemGroup>
+</Project>

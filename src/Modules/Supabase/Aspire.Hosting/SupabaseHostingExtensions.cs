@@ -1,3 +1,5 @@
+using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Aspire.Hosting;
 
 namespace DigitalBrain.Supabase.Aspire.Hosting;
@@ -13,7 +15,52 @@ public static class SupabaseHostingExtensions
         configure?.Invoke(options);
         ArgumentException.ThrowIfNullOrWhiteSpace(options.ParameterName);
         ArgumentException.ThrowIfNullOrWhiteSpace(options.ConnectionName);
-        SupabaseHosting.ConfigureOptions(module.DigitalBrainBuilder, options);
+        State(module).Enable(options);
         return module;
+    }
+
+    private static SupabaseHostingState State(DigitalBrainModuleBuilder<SupabaseModule> module)
+    {
+        var state = module.DigitalBrainBuilder.GetOrAddState(brain => new SupabaseHostingState(brain, module.Resource), out var added);
+        if (added)
+        {
+            module.AddProjection(state);
+        }
+
+        return state;
+    }
+
+    private sealed class SupabaseHostingState(
+        DigitalBrainBuilder brain,
+        IResourceBuilder<DigitalBrainModuleResource> module) : DigitalBrainModuleProjection
+    {
+        private IResourceBuilder<IResourceWithConnectionString>? _connection;
+        private SupabaseHostingOptions _options = new();
+
+        internal void Enable(SupabaseHostingOptions options)
+        {
+            if (_connection is not null)
+            {
+                throw new InvalidOperationException("Configure Supabase hosting before projecting it to an application.");
+            }
+
+            _options = options;
+            _connection = brain.ApplicationBuilder
+                .AddConnectionString(_options.ParameterName)
+                .WithParentRelationship(module);
+        }
+
+        public override void Apply<TResource>(IResourceBuilder<TResource> builder)
+        {
+            ArgumentNullException.ThrowIfNull(builder);
+            if (_connection is null)
+            {
+                return;
+            }
+
+            builder.WithReference(_connection, connectionName: _options.ConnectionName)
+                .WithEnvironment("DigitalBrain__Supabase__Provider", SupabaseModule.ProviderName)
+                .WithEnvironment("DigitalBrain__Supabase__ConnectionName", _options.ConnectionName);
+        }
     }
 }

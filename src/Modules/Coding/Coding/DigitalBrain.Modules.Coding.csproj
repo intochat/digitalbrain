@@ -1,17 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Coding module: a Roslyn workspace neuron and the code_* tools.</Description>
+    <Description>Coding module: a Roslyn workspace neuron, change sets and the dotnet/git runners.</Description>
     <RootNamespace>DigitalBrain.Coding</RootNamespace>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
     <!-- Microsoft.CodeAnalysis.Workspaces.MSBuild carries Microsoft.Build.Framework; the SDK refuses to copy it by default. -->
     <DisableMSBuildAssemblyCopyCheck>true</DisableMSBuildAssemblyCopyCheck>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Coding.Tests.Unit" />
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Coding.Contracts.csproj" />
     <ProjectReference Include="../../DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
-    <ProjectReference Include="../../AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
-    <ProjectReference Include="../../Flutter/Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Build.Locator" />

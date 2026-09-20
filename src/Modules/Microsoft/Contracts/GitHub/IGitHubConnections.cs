@@ -1,16 +1,14 @@
-using DigitalBrain.Abstractions.Commands;
-using DigitalBrain.Abstractions.Neurons;
+using DigitalBrain.Contracts;
 using Orleans.Concurrency;
 
 namespace DigitalBrain.Microsoft.GitHub;
 
 [Alias("github.connections")]
+[Orleans.Metadata.DefaultGrainType("github.connections")]
 public interface IGitHubConnections : INeuron
 {
-    [Alias("register")]
-    Task<Accepted<GitHubConnectionRecord>> Register(RegisterGitHubConnection command);
+    Task<GitHubConnectionRecord> Register(RegisterGitHubConnection request);
 
     [ReadOnly]
-    [Alias("list")]
     Task<GitHubConnectionList> List();
 }

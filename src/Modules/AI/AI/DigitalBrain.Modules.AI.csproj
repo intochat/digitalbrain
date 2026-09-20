@@ -16,7 +16,6 @@
     <PackageReference Include="Microsoft.Extensions.AI" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
     <PackageReference Include="Microsoft.Agents.AI" />
-    <PackageReference Include="Microsoft.Agents.AI.Workflows" />
     <PackageReference Include="Microsoft.Playwright" />
     <PackageReference Include="Anthropic" />
     <PackageReference Include="Microsoft.Orleans.Sdk" />
@@ -33,6 +32,5 @@
   <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="../../DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
-    <ProjectReference Include="../../DigitalBrain/Mcp/DigitalBrain.Mcp.csproj" />
   </ItemGroup>
 </Project>

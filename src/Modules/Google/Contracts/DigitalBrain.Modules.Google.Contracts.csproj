@@ -6,16 +6,6 @@
     <RootNamespace>DigitalBrain.Google</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="IGmail.cs" />
-    <Compile Remove="ConnectGmailAccount.cs" />
-    <Compile Remove="DisconnectGmail.cs" />
-    <Compile Remove="ConfirmGmailDraft.cs" />
-    <Compile Remove="RefreshGmailConnection.cs" />
-    <Compile Remove="PrepareGmailDraft.cs" />
-    <Compile Remove="GmailJson.cs" />
-    <Compile Remove="GmailConnected.cs" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="../../DigitalBrain/Contracts/DigitalBrain.Contracts.csproj" />
   </ItemGroup>
 </Project>

@@ -1,63 +1,46 @@
-using DigitalBrain.Abstractions;
-using DigitalBrain.Abstractions.Commands;
-using DigitalBrain.Abstractions.Signals;
+using DigitalBrain.Contracts;
 using DigitalBrain.Core;
+using DigitalBrain.Microsoft.GitHub.Signals;
+using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Microsoft.GitHub;
 
-[GrainType("github")]
-internal sealed class GitHubConnectionsNeuron(NeuronRuntime runtime,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SnapshotEnvelope<GitHubConnectionsState>> state)
-    : Neuron<GitHubConnectionsState>(runtime, state), IGitHubConnections
+[GrainType("github.connections")]
+internal sealed class GitHubConnectionsNeuron(
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<GitHubConnectionsState> state)
+    : Neuron, IGitHubConnections
 {
-    public Task<Accepted<GitHubConnectionRecord>> Register(RegisterGitHubConnection command) => ExecuteCommandAsync(
-        new("github.connections", "register"), command, GitHubJson.Default.RegisterGitHubConnection, GitHubJson.Default.AcceptedGitHubConnectionRecord, arguments =>
-        {
-            ArgumentException.ThrowIfNullOrWhiteSpace(arguments.ConnectionId);
-            ArgumentException.ThrowIfNullOrWhiteSpace(arguments.RepositoryOwner);
-            ArgumentException.ThrowIfNullOrWhiteSpace(arguments.RepositoryName);
-            ArgumentException.ThrowIfNullOrWhiteSpace(arguments.Epoch);
-            ArgumentOutOfRangeException.ThrowIfLessThan(arguments.AppId, 1);
-            ArgumentOutOfRangeException.ThrowIfLessThan(arguments.InstallationId, 1);
-            ArgumentOutOfRangeException.ThrowIfLessThan(arguments.RepositoryId, 1);
-            // Fast-fail only; the reaction re-validates connection capacity.
-            if (State?.Connections.Count(item => item.Id != arguments.ConnectionId) >= 256)
-            {
-                throw new InvalidOperationException("The GitHub connection capacity is full.");
-            }
-            var record = new GitHubConnectionRecord(arguments.ConnectionId, arguments.AppId, arguments.InstallationId,
-                arguments.RepositoryId, arguments.RepositoryOwner, arguments.RepositoryName, arguments.Epoch);
-            var work = Schedule(Signal.FromJson(GitHubSignals.GitHubConnectionRegistered,
-                record, GitHubJson.Default.GitHubConnectionRecord));
-            return new Accepted<GitHubConnectionRecord>(record, work);
-        });
+    private const int MaxConnections = 256;
 
-    public Task<GitHubConnectionList> List() => Task.FromResult(new GitHubConnectionList(State?.Connections ?? []));
-
-    protected override async Task ReceiveAsync(SignalDelivery delivery, CancellationToken cancellationToken)
+    public async Task<GitHubConnectionRecord> Register(RegisterGitHubConnection request)
     {
-        if (delivery.Signal.Type != GitHubSignals.GitHubConnectionRegistered)
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.ConnectionId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.RepositoryOwner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.RepositoryName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.Epoch);
+        ArgumentOutOfRangeException.ThrowIfLessThan(request.AppId, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(request.InstallationId, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(request.RepositoryId, 1);
+
+        var record = new GitHubConnectionRecord(request.ConnectionId, request.AppId, request.InstallationId,
+            request.RepositoryId, request.RepositoryOwner, request.RepositoryName, request.Epoch);
+        var connections = (state.State?.Connections ?? []).Where(item => item.Id != record.Id).ToList();
+        if (connections.Count >= MaxConnections)
         {
-            return;
-        }
-        if (Body(delivery, GitHubJson.Default.GitHubConnectionRecord) is not { } record)
-        {
-            return;
+            await PublishAsync(new RepositoryRefused("The GitHub connection capacity is full."));
+            return record;
         }
 
-        var items = State?.Connections.Where(item => item.Id != record.Id).ToList() ?? [];
-        var next = State ?? new GitHubConnectionsState([]);
-        if (items.Count >= 256)
-        {
-            Announce(Signal.FromJson(GitHubSignals.RepositoryRefused,
-                new RepositoryRefused("The GitHub connection capacity is full."), GitHubJson.Default.RepositoryRefused));
-        }
-        else
-        {
-            items.Add(record);
-            next = new GitHubConnectionsState(items);
-        }
-        await SaveAsync(next, cancellationToken).ConfigureAwait(true);
+        connections.Add(record);
+        state.State = new GitHubConnectionsState(connections);
+        await state.WriteStateAsync();
+        await PublishAsync(new GitHubConnectionRegistered(record));
+        return record;
     }
+
+    [ReadOnly]
+    public Task<GitHubConnectionList> List()
+        => Task.FromResult(new GitHubConnectionList(state.State?.Connections ?? []));
 }

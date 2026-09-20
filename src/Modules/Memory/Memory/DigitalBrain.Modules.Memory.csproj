@@ -6,6 +6,9 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Memory.Tests.Unit" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Memory.Contracts.csproj" />
     <ProjectReference Include="../../DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
   </ItemGroup>

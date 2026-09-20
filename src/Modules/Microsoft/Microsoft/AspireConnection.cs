@@ -45,7 +45,6 @@ public sealed class AspireConnection
                 throw new InvalidOperationException("Aspire evidence exceeds the response budget.");
             }
             var content = JsonNode.Parse(envelope.GetRawText())!.AsObject();
-            // screened at the NativeTools boundary (AI module)
             content["untrustedData"] = true;
             return JsonSerializer.SerializeToElement(content);
         }

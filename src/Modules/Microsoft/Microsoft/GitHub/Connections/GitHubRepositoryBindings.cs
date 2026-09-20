@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using DigitalBrain.Abstractions.Identity;
 using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Microsoft.GitHub;
@@ -43,8 +42,8 @@ internal sealed class GitHubRepositoryBindings
             string.Equals(binding.RepoOwner, repoOwner, StringComparison.OrdinalIgnoreCase)
             && string.Equals(binding.RepoName, repoName, StringComparison.OrdinalIgnoreCase));
     public GitHubRepositoryBinding? Find(string id) => _bindings.GetValueOrDefault(id);
-    public GitHubRepositoryBinding GetFor(NeuronId neuron)
-        => neuron.Type == "repository" && Find(neuron.Name) is { } binding
+    public GitHubRepositoryBinding GetFor(string id)
+        => Find(id) is { } binding
             ? binding
             : throw new GitHubAccessDeniedException("The GitHub repository neuron is not bound to a configured repository.");
 

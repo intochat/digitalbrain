@@ -1,52 +1,63 @@
-using DigitalBrain.Abstractions;
-using DigitalBrain.AI;
 using DigitalBrain.Core;
-using DigitalBrain.Flutter;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using Orleans.Hosting;
 
 namespace DigitalBrain.Supabase;
 
-[ModuleHosting("DigitalBrain.Supabase.Aspire.Hosting.SupabaseHosting, DigitalBrain.Modules.Supabase.Aspire.Hosting")]
 public sealed class SupabaseModule : IModule
 {
-    public const string ConfigurationRoot = SupabaseOptions.SectionName;
     public const string ConnectionName = "supabase";
     public const string ProviderName = "Npgsql";
+
+    public static ModuleDefinition Define(SupabaseModuleOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return new(typeof(SupabaseModule), new Dictionary<string, string?>
+        {
+            [SupabaseModuleOptions.SectionName + ":Provider"] = options.Provider,
+            [SupabaseModuleOptions.SectionName + ":ConnectionName"] = options.ConnectionName,
+        });
+    }
 
     public void Configure(ISiloBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
         var services = builder.Services;
-        services.AddOptions<SupabaseOptions>()
-            .BindConfiguration(ConfigurationRoot)
+        services.AddOptions<SupabaseModuleOptions>()
+            .Bind(builder.Configuration.GetSection(SupabaseModuleOptions.SectionName))
             .PostConfigure<IConfiguration>(static (options, configuration) => options.ResolveConnection(configuration))
             .Validate(static options => string.Equals(options.Provider, ProviderName, StringComparison.OrdinalIgnoreCase),
                 "Supabase requires the Npgsql provider.")
-            .Validate(static options =>
-            {
-                if (string.IsNullOrWhiteSpace(options.ConnectionString)) { return false; }
-                try
-                {
-                    _ = SupabaseConnectionSettings.Parse(options.ConnectionString);
-                    return true;
-                }
-                catch (InvalidOperationException) { return false; }
-            }, "Supabase requires a valid PostgreSQL URI or Npgsql connection string for its configured connection name.")
-            .ValidateOnStart();
-        services.TryAddSingleton(services => NpgsqlDataSource.Create(SupabaseConnectionSettings.Parse(
-            services.GetRequiredService<IOptions<SupabaseOptions>>().Value.ConnectionString!).ConnectionString));
+            .Validate(static options => IsConnectionValid(options.ConnectionString),
+                "Supabase requires a valid PostgreSQL URI or Npgsql connection string for its configured connection name.");
+        services.TryAddSingleton(CreateDataSource);
         services.TryAddSingleton<ISupabaseProvider, SupabaseProvider>();
         services.AddHealthChecks().AddCheck<SupabaseHealthCheck>("supabase", tags: ["ready"]);
+    }
 
-        services.AddSingleton<ITableSource>(new TableSource(SupabaseNames.TableIdPrefix, SupabaseNames.TableType));
-        services.TryAddSingleton<TableService>();
-        services.AddSingleton<SupabaseNativeTools>();
-        services.AddNativeTool("supabase_schema", static services => services.GetRequiredService<SupabaseNativeTools>().CreateSchema());
-        services.AddNativeTool("supabase_query", static services => services.GetRequiredService<SupabaseNativeTools>().CreateQuery());
-        services.AddNativeTool("show_supabase_query_table", static services => services.GetRequiredService<SupabaseNativeTools>().CreateShowQueryTable());
+    private static bool IsConnectionValid(string? connection)
+    {
+        if (string.IsNullOrWhiteSpace(connection)) { return false; }
+        try
+        {
+            _ = SupabaseConnectionSettings.Parse(connection);
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    private static NpgsqlDataSource CreateDataSource(IServiceProvider services)
+    {
+        var connection = services.GetRequiredService<IOptions<SupabaseModuleOptions>>().Value.ConnectionString
+            ?? throw new InvalidOperationException(
+                $"Supabase requires connection string '{ConnectionName}'.");
+        return NpgsqlDataSource.Create(SupabaseConnectionSettings.Parse(connection).ConnectionString);
     }
 }

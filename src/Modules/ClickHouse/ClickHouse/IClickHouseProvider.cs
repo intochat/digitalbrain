@@ -1,4 +1,5 @@
-using DigitalBrain.Flutter;
+using DigitalBrain.ClickHouse.Query;
+using DigitalBrain.ClickHouse.Tables;
 
 namespace DigitalBrain.ClickHouse;
 
@@ -22,9 +23,9 @@ internal interface IClickHouseProvider
 internal sealed record QueryPlan(
     string BaseSql,
     IReadOnlyList<ClickHouseColumn> Columns,
-    IReadOnlyList<TableFilter> Filters,
-    TableSort? Sort,
+    IReadOnlyList<ClickHouseTableFilter> Filters,
+    ClickHouseTableSort? Sort,
     int Offset,
     int Limit);
 
-internal sealed record QueryPage(IReadOnlyList<TableRow> Rows, long Total, long Filtered);
+internal sealed record QueryPage(IReadOnlyList<ClickHouseTableRow> Rows, long Total, long Filtered);

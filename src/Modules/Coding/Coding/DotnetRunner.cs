@@ -21,7 +21,7 @@ public sealed partial class DotnetRunner(IProcessRunner processes)
             errors,
             hits.Count(static hit => hit.Severity == "Warning"),
             result.Duration.TotalSeconds,
-            Command(arguments),
+            Invocation(arguments),
             Detail(result, errors.Length == 0 && result.ExitCode != 0 ? "the build failed without a parsable error; see the output" : null));
     }
 
@@ -47,7 +47,7 @@ public sealed partial class DotnetRunner(IProcessRunner processes)
         return new TestOutcome(
             result.ExitCode == 0 && !result.TimedOut && failed == 0,
             total, passed, failed, skipped, failures, result.Duration.TotalSeconds,
-            Command(arguments),
+            Invocation(arguments),
             Detail(result, total == 0 ? "no test summary was found in the output" : null));
     }
 
@@ -66,7 +66,7 @@ public sealed partial class DotnetRunner(IProcessRunner processes)
         return directory;
     }
 
-    private static string Command(IReadOnlyList<string> arguments)
+    private static string Invocation(IReadOnlyList<string> arguments)
         => "dotnet " + string.Join(' ', arguments.Select(Quote));
 
     private static string Quote(string argument)

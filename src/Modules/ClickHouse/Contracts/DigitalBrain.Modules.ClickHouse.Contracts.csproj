@@ -7,6 +7,5 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../DigitalBrain/Contracts/DigitalBrain.Contracts.csproj" />
-    <ProjectReference Include="../../Flutter/Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
   </ItemGroup>
 </Project>

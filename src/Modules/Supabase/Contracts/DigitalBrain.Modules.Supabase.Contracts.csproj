@@ -1,12 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Supabase neuron contracts: read-only queries, schema reads and live query tables.</Description>
+    <Description>Supabase module contracts: read-only queries, schema reads and live query tables.</Description>
     <RootNamespace>DigitalBrain.Supabase</RootNamespace>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../DigitalBrain/Contracts/DigitalBrain.Contracts.csproj" />
-    <ProjectReference Include="../../Flutter/Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
   </ItemGroup>
 </Project>

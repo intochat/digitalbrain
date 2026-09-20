@@ -1,24 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>UI neuron contracts: typed chat commands, queries, and JSON signal bodies.</Description>
+    <Description>Flutter module contracts: the live inbox surface.</Description>
     <RootNamespace>DigitalBrain.Flutter</RootNamespace>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="Activities/**" />
-    <Compile Remove="Chart/**" />
-    <Compile Remove="Chat/**" />
-    <Compile Remove="Graph/**" />
-    <Compile Remove="Image/**" />
-    <Compile Remove="Surface/**" />
-    <Compile Remove="Table/**" />
-    <Compile Remove="Workspaces/**" />
-    <Compile Remove="UIJson.cs" />
-    <Compile Remove="UiCard.cs" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="../../DigitalBrain/Contracts/DigitalBrain.Contracts.csproj" />
-    <None Include="flutter-wire-contracts.golden.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

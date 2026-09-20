@@ -6,16 +6,12 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Google.Tests" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Google.Tests.Unit" />
   </ItemGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
     <PackageReference Include="ModelContextProtocol.Core" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Remove="Gmail/GmailNativeTools.cs" />
-    <Compile Remove="Gmail/GmailAuthentication.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Google.Contracts.csproj" />
