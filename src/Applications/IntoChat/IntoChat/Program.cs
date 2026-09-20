@@ -1,6 +1,7 @@
 using DigitalBrain.Aspire;
 using DigitalBrain.Sdk;
 using IntoChat;
+using IntoChat.Workspace;
 using IntoChat.ServiceDefaults;
 using Orleans.Dashboard;
 
@@ -23,5 +24,6 @@ app.MapDefaultEndpoints();
 app.MapOrleansDashboard("/orleans");
 app.MapBehaviors();
 app.MapDigitalBrainModules();
+app.MapWorkspaceDataEndpoints();
 
 app.Run();

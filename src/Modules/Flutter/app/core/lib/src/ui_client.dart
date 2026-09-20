@@ -10,6 +10,7 @@ import 'cookie_http_client.dart';
 import 'host_environment.dart';
 import 'models/brain_models.dart';
 import 'models/table_models.dart';
+import 'models/workspace_models.dart';
 
 final class DigitalBrainUiClient {
   static const _uuid = Uuid();
@@ -222,17 +223,155 @@ final class DigitalBrainUiClient {
     ),
   );
 
+  Future<WorkspaceSnapshot> readWorkspace(
+    String workspaceId, {
+    Future<void>? cancelled,
+  }) async => WorkspaceSnapshot.fromJson(
+    Map<String, dynamic>.from(
+      await _tableRequest(
+        'GET',
+        '/workspaces/${Uri.encodeComponent(workspaceId)}',
+        cancelled: cancelled,
+      ) as Map,
+    ),
+  );
+
+  Future<WorkspaceSnapshot> closeWorkspaceWindow(
+    String workspaceId,
+    String windowId,
+    int revision,
+  ) async => WorkspaceSnapshot.fromJson(
+    Map<String, dynamic>.from(
+      await _tableRequest(
+        'POST',
+        '/workspaces/${Uri.encodeComponent(workspaceId)}/windows/${Uri.encodeComponent(windowId)}/close',
+        body: {'expectedRevision': revision},
+      ) as Map,
+    ),
+  );
+
+  Future<WorkspaceSnapshot> reopenWorkspaceWindow(
+    String workspaceId,
+    String windowId,
+    int revision,
+  ) async => WorkspaceSnapshot.fromJson(
+    Map<String, dynamic>.from(
+      await _tableRequest(
+        'POST',
+        '/workspaces/${Uri.encodeComponent(workspaceId)}/windows/${Uri.encodeComponent(windowId)}/reopen',
+        body: {'operationId': _uuid.v4(), 'expectedRevision': revision},
+      ) as Map,
+    ),
+  );
+
+  Future<TableSnapshot> readWorkspaceTable(
+    String workspaceId,
+    String tableId, {
+    int offset = 0,
+    int limit = 25,
+    Future<void>? cancelled,
+  }) async => TableSnapshot.fromJson(
+    Map<String, dynamic>.from(
+      await _tableRequest(
+        'GET',
+        '/workspaces/${Uri.encodeComponent(workspaceId)}/tables/${Uri.encodeComponent(tableId)}?offset=$offset&limit=$limit',
+        cancelled: cancelled,
+      ) as Map,
+    ),
+  );
+
+  Future<TableSnapshot> updateWorkspaceTable(
+    String workspaceId,
+    String tableId,
+    TableViewUpdate update, {
+    Future<void>? cancelled,
+  }) async => TableSnapshot.fromJson(
+    Map<String, dynamic>.from(
+      await _tableRequest(
+        'POST',
+        '/workspaces/${Uri.encodeComponent(workspaceId)}/tables/${Uri.encodeComponent(tableId)}/view',
+        body: update.toJson(),
+        cancelled: cancelled,
+      ) as Map,
+    ),
+  );
+
+  Stream<WorkspaceRevision> watchWorkspace(String workspaceId) {
+    final abort = Completer<void>();
+    StreamSubscription<String>? incoming;
+    late StreamController<WorkspaceRevision> controller;
+    controller = StreamController<WorkspaceRevision>(
+      onListen: () async {
+        try {
+          final request = http.AbortableRequest(
+            'GET',
+            baseUri.resolve(
+              '/workspaces/${Uri.encodeComponent(workspaceId)}/events',
+            ),
+            abortTrigger: abort.future,
+          )..headers['accept'] = 'text/event-stream';
+          final response = await _http.send(request);
+          if (abort.isCompleted || response.statusCode != 200) {
+            await response.stream.listen(null).cancel();
+            if (!abort.isCompleted) {
+              throw TableRequestException(
+                response.statusCode,
+                'Workspace events are unavailable.',
+              );
+            }
+            return;
+          }
+          incoming = response.stream
+              .transform(utf8.decoder)
+              .transform(const LineSplitter())
+              .listen(
+                (line) {
+                  if (!line.startsWith('data:')) return;
+                  try {
+                    controller.add(
+                      WorkspaceRevision.fromJson(
+                        jsonDecode(line.substring(5).trimLeft())
+                            as Map<String, dynamic>,
+                      ),
+                    );
+                  } catch (error, stack) {
+                    controller.addError(error, stack);
+                  }
+                },
+                onError: (Object error, StackTrace stack) {
+                  if (!abort.isCompleted) controller.addError(error, stack);
+                },
+                onDone: controller.close,
+              );
+        } catch (error, stack) {
+          if (!abort.isCompleted) {
+            controller.addError(error, stack);
+            unawaited(controller.close());
+          }
+        }
+      },
+      onCancel: () async {
+        if (!abort.isCompleted) abort.complete();
+        await incoming?.cancel();
+      },
+    );
+    return controller.stream;
+  }
+
   Future<Object?> _tableRequest(
     String method,
     String path, {
     Map<String, Object?>? body,
     Duration timeout = const Duration(seconds: 40),
+    Future<void>? cancelled,
   }) async {
     final abort = Completer<void>();
     final request = http.AbortableRequest(
       method,
       baseUri.resolve(path),
-      abortTrigger: abort.future,
+      abortTrigger: cancelled == null
+          ? abort.future
+          : Future.any([abort.future, cancelled]),
     );
     if (body != null) {
       request.headers['content-type'] = 'application/json';
@@ -388,7 +527,11 @@ final class DigitalBrainUiClient {
   }
 
   Future<List<String>> readInbox() async {
-    final response = await _request('GET', '/ui/inbox', timeout: const Duration(seconds: 10));
+    final response = await _request(
+      'GET',
+      '/ui/inbox',
+      timeout: const Duration(seconds: 10),
+    );
     final decoded = jsonDecode(response.body);
     if (decoded is! List) {
       return const [];
@@ -409,7 +552,12 @@ final class DigitalBrainUiClient {
   }
 
   Future<void> postUi(String path, {Map<String, Object?>? body}) async {
-    await _request('POST', path, body: body, timeout: const Duration(seconds: 10));
+    await _request(
+      'POST',
+      path,
+      body: body,
+      timeout: const Duration(seconds: 10),
+    );
   }
 
   Future<BrainSnapshot> readBrain({required String chatName}) async {

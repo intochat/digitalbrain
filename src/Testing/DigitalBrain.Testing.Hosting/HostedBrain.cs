@@ -1,6 +1,7 @@
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using Orleans;
+using Aspire.Hosting;
 
 namespace DigitalBrain.Testing.Hosting;
 
@@ -14,6 +15,7 @@ public abstract class HostedBrain : IDigitalBrain, ITrackedBrain
     protected AspireTestSession Session { get; }
     protected TestSessionLifetime Lifetime { get; }
     public HttpClient HttpClient => Session.HttpClient;
+    public DistributedApplication Application => Session.App;
     int ITrackedBrain.BufferCapacity => new BrainOptions().BufferCapacity;
     TestExecutionOptions ITrackedBrain.Execution => Session.Options;
     void ITrackedBrain.Track(IAsyncDisposable resource) => Lifetime.Own("observation", resource);
