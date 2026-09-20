@@ -46,7 +46,8 @@ public sealed class IntoChatTestDeployment : IAsyncDisposable
     }
 
     public E2ETestBuilder<Projects.IntoChat_AppHost> Configure(
-        E2ETestBuilder<Projects.IntoChat_AppHost> test, Uri modelEndpoint, string solutionPath)
+        E2ETestBuilder<Projects.IntoChat_AppHost> test, Uri modelEndpoint, string solutionPath,
+        IReadOnlyDictionary<string, string?>? privateConfiguration = null)
         => test
             .ConfigureModule<AIModule>(ai => ai.WithoutLocalModels().WithoutVoiceToText().WithoutWebSearch()
                 .WithDefaultLlm<IGpt56Luna>().WithModelEndpoint(AiProvider.OpenAI, modelEndpoint))
@@ -60,9 +61,9 @@ public sealed class IntoChatTestDeployment : IAsyncDisposable
             .ConfigureModule<FlutterModule>(flutter => flutter.WithWebHost())
             .WithExecution(new()
             {
-                PrivateConfiguration = new Dictionary<string, string?>
+                PrivateConfiguration = new Dictionary<string, string?>(privateConfiguration ?? new Dictionary<string, string?>())
                 {
-                    ["Parameters:openai-api-key"] = "fixture-key",
+                    ["Parameters:openai-api-key"] = privateConfiguration?.GetValueOrDefault("Parameters:openai-api-key") ?? "fixture-key",
                     ["Parameters:gmail-client-id"] = "fixture-client",
                     ["Parameters:gmail-client-secret"] = "fixture-secret",
                     ["Parameters:salesforce-consumer-key"] = "fixture-client",

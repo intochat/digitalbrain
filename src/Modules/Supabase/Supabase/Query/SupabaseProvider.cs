@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using DigitalBrain.Supabase.Tables;
 using Npgsql;
 
@@ -58,7 +59,10 @@ internal sealed class SupabaseProvider(NpgsqlDataSource source) : ISupabaseProvi
             LIMIT 10001
             """, [table is null ? DBNull.Value : table], 10001, cancellationToken).ConfigureAwait(false);
         if (rows.Count > 10000) { throw new SupabaseQueryException("Schema exceeds 10000 columns. Request a specific table."); }
-        var tables = rows.GroupBy(row => row[0], StringComparer.Ordinal)
+        // Row cells are JSON literals for the table wire contract; schema metadata
+        // needs the decoded strings before grouping, type mapping or model use.
+        var metadata = rows.Select(row => row.Select(cell => JsonSerializer.Deserialize<string>(cell)!).ToArray());
+        var tables = metadata.GroupBy(row => row[0], StringComparer.Ordinal)
             .Select(group => new SupabaseTableInfo(group.Key, group.First()[3], null,
                 group.Select(row => new SupabaseColumn(row[1], row[2], SupabaseTypeMap.ToTableType(row[2]))).ToArray()))
             .ToArray();

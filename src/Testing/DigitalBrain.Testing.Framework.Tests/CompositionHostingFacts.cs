@@ -1,4 +1,5 @@
 using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Core;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.AI;
@@ -11,6 +12,19 @@ namespace DigitalBrain.Tests;
 
 public sealed class CompositionHostingFacts
 {
+    [Fact]
+    public async Task ExplicitSupabaseParameterWinsOverAmbientConnection()
+    {
+        var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOptions { Args = [], DisableDashboard = true });
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:supabase"] = "ambient" });
+        var brain = builder.AddDigitalBrain("brain", persistentStorage: false).WithModule<SupabaseModule>(db => db.WithConnection("supabase"));
+        builder.AddExecutable("runtime", "unused", ".").WithReference(brain);
+        // Test secrets arrive after graph construction, before resource evaluation.
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Parameters:supabase-connection"] = "explicit" });
+        var parameter = Assert.IsType<ParameterResource>(Assert.Single(builder.Resources, r => r.Name == "supabase-connection"));
+        Assert.Equal("explicit", await parameter.GetValueAsync(TestContext.Current.CancellationToken));
+    }
+
     [Fact]
     public void WebOverrideCreatesOnlyOneHostWhenClientReferencesFirst()
     {

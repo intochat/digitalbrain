@@ -1,4 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../../Testing/DigitalBrain.Testing.Integration/buildTransitive/DigitalBrain.Testing.Integration.targets" />
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
@@ -9,6 +10,7 @@
     <DisableMSBuildAssemblyCopyCheck>true</DisableMSBuildAssemblyCopyCheck>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../../Testing/DigitalBrain.Testing.Integration/DigitalBrain.Testing.Integration.csproj" />
     <PackageReference Include="xunit.v3.mtp-v2" />
     <PackageReference Include="Microsoft.Playwright" />
     <ProjectReference Include="../../../Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />

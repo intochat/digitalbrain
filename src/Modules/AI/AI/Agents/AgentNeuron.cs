@@ -1,10 +1,7 @@
 using DigitalBrain.AI.Agents.Signals;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
-using Microsoft.Agents.AI;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
 namespace DigitalBrain.AI.Agents;
@@ -19,21 +16,14 @@ internal sealed class AgentNeuron : Neuron, IAgent
         ArgumentNullException.ThrowIfNull(request);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Message);
 
-        var client = Providers.Resolve(ServiceProvider, request.Model?.Provider, request.Model?.Model, out var ownsClient);
-        using var ownedClient = ownsClient ? client : null;
-        var agent = new ChatClientAgent(
-            client,
-            new ChatClientAgentOptions
-            {
-                Name = this.GetPrimaryKeyString(),
-                ChatOptions = new ChatOptions { Instructions = request.System },
-            },
-            ServiceProvider.GetService<ILoggerFactory>(),
-            ServiceProvider);
-
-        var session = await agent.CreateSessionAsync().ConfigureAwait(true);
-        var response = await agent.RunAsync(request.Message, session).ConfigureAwait(true);
-        var text = response.Text ?? string.Empty;
+        var text = string.Empty;
+        var runner = ServiceProvider.GetRequiredService<IAgentTurnRunner>();
+        await foreach (var item in runner.RunAsync(new(this.GetPrimaryKeyString(), Guid.NewGuid().ToString("N"),
+            this.GetPrimaryKeyString(), [], request.Message, request.Model, request.System), CancellationToken.None).ConfigureAwait(true))
+        {
+            if (item is AgentTurnEvent.Text delta) { text += delta.Content; }
+            if (item is AgentTurnEvent.Failed failure) { throw new InvalidOperationException(failure.Message); }
+        }
 
         await PublishAsync(new AgentReplied(this.GetPrimaryKeyString(), text, DateTimeOffset.UtcNow)).ConfigureAwait(true);
         return new AgentReply(text);

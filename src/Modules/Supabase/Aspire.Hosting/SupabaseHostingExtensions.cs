@@ -47,7 +47,8 @@ public static class SupabaseHostingExtensions
 
             _options = options;
             _connection = brain.ApplicationBuilder
-                .AddParameter("supabase-connection", () => brain.ApplicationBuilder.Configuration.GetConnectionString(_options.ParameterName)
+                .AddParameter("supabase-connection", () => brain.ApplicationBuilder.Configuration["Parameters:supabase-connection"]
+                    ?? brain.ApplicationBuilder.Configuration.GetConnectionString(_options.ParameterName)
                     ?? throw new InvalidOperationException($"Connection string '{_options.ParameterName}' is required."), secret: true)
                 .WithParentRelationship(module);
         }
