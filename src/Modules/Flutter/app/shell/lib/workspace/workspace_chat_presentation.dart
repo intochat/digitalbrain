@@ -163,6 +163,13 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
         ),
       );
     }
+    if (map?['remoteManaged'] == true) {
+      return TextButton.icon(
+        onPressed: () => widget.onArtifact(Map<String, dynamic>.from(map!)),
+        icon: const Icon(Icons.table_chart_outlined),
+        label: Text('Open ${map?['title'] ?? 'table'}'),
+      );
+    }
     if ([
       'table',
       'chart',
@@ -427,6 +434,7 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
                     keyboardType: TextInputType.multiline,
                     style: const TextStyle(fontSize: 15, height: 1.5),
                     decoration: InputDecoration(
+                      labelText: 'Message',
                       hintText: widget.onRun == null
                           ? 'Connect to start a conversation'
                           : 'Message ${selected.name}…',
@@ -523,7 +531,7 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
                       ValueListenableBuilder<TextEditingValue>(
                         valueListenable: _composer,
                         builder: (context, value, _) => IconButton.filled(
-                          tooltip: _running ? 'Stop response' : 'Send message',
+                          tooltip: _running ? 'Stop response' : 'Send',
                           style: IconButton.styleFrom(
                             backgroundColor: colors.onSurface,
                             foregroundColor: colors.surface,

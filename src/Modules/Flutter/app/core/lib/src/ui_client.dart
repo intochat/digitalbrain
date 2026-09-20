@@ -404,8 +404,19 @@ final class DigitalBrainUiClient {
   }
 
   /// Sends only the new user message; the server owns conversation history.
+  Future<Map<String, dynamic>> readWorkspaceConversation(
+    String workspaceId,
+    String threadId,
+  ) async => Map<String, dynamic>.from(
+    await _tableRequest(
+      'GET',
+      '/workspaces/${Uri.encodeComponent(workspaceId)}/conversations/${Uri.encodeComponent(threadId)}',
+    ) as Map,
+  );
+
   /// Canceling the subscription aborts both pending HTTP and response streaming.
   Stream<AgentEvent> runAgent({
+    required String workspaceId,
     required String threadId,
     required String runId,
     String? parentRunId,
@@ -429,6 +440,7 @@ final class DigitalBrainUiClient {
                 })
                 ..body = jsonEncode({
                   'threadId': threadId,
+                  'workspaceId': workspaceId,
                   'runId': runId,
                   'parentRunId': ?parentRunId,
                   'messages': [

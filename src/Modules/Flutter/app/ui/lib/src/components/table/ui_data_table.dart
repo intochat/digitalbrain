@@ -472,7 +472,7 @@ class _FilterDialogState extends State<_FilterDialog> {
               isExpanded: true,
               key: const Key('table_filter_column'),
               initialValue: _column.id,
-              decoration: const InputDecoration(labelText: 'Column'),
+              decoration: const InputDecoration(labelText: 'Filter column'),
               items: [
                 for (final column in widget.columns)
                   DropdownMenuItem(
@@ -538,8 +538,8 @@ class _FilterDialogState extends State<_FilterDialog> {
                     : TextInputType.text,
                 decoration: InputDecoration(
                   labelText: _column.type == 'date'
-                      ? 'Value (YYYY-MM-DD)'
-                      : 'Value',
+                      ? 'Filter value (YYYY-MM-DD)'
+                      : 'Filter value',
                   errorText: _error,
                   errorMaxLines: 4,
                 ),
@@ -554,7 +554,7 @@ class _FilterDialogState extends State<_FilterDialog> {
         onPressed: () => Navigator.pop(context),
         child: const Text('Cancel'),
       ),
-      FilledButton(onPressed: _apply, child: const Text('Apply')),
+      FilledButton(onPressed: _apply, child: const Text('Apply filter')),
     ],
   );
 }

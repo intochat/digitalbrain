@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+import 'package:digitalbrain_flutter/digitalbrain_flutter.dart'
+    show WorkspaceSnapshot;
 
 abstract interface class WorkspacePersistence {
   Future<String?> read();
@@ -62,6 +64,7 @@ class WorkspaceArtifact {
     required this.title,
     required this.kind,
     this.content = '',
+    this.remoteManaged = false,
     Map<String, dynamic>? data,
     Map<String, dynamic>? editorState,
     Map<String, dynamic>? viewState,
@@ -71,6 +74,7 @@ class WorkspaceArtifact {
   String title;
   String kind;
   String content;
+  final bool remoteManaged;
   Map<String, dynamic> data;
   Map<String, dynamic> editorState;
   Map<String, dynamic> get viewState => editorState;
@@ -87,6 +91,7 @@ class WorkspaceArtifact {
     title: title ?? this.title,
     kind: kind ?? this.kind,
     content: content ?? this.content,
+    remoteManaged: remoteManaged,
     data: data ?? this.data,
     editorState: editorState ?? viewState ?? this.editorState,
   );
@@ -95,6 +100,7 @@ class WorkspaceArtifact {
     'title': title,
     'kind': kind,
     'content': content,
+    'remoteManaged': remoteManaged,
     'data': data,
     'editorState': editorState,
   };
@@ -104,6 +110,7 @@ class WorkspaceArtifact {
         title: _text(json['title'], 'Untitled work'),
         kind: _text(json['kind'], 'document'),
         content: _text(json['content'], ''),
+        remoteManaged: json['remoteManaged'] == true,
         data: _map(json['data']),
         editorState: _map(json['editorState']),
       );
@@ -302,6 +309,60 @@ class WorkspaceStore extends ChangeNotifier {
   String selectedProjectId = '';
   String? persistenceError;
   bool loaded = false;
+  void Function(String workspaceId, String windowId, bool open)?
+  onRemoteWindowAction;
+  final Map<String, int> remoteRevisions = {};
+
+  void reconcileWorkspace(
+    WorkspaceProject project,
+    WorkspaceSnapshot snapshot,
+  ) {
+    if (snapshot.revision < (remoteRevisions[project.id] ?? -1)) return;
+    remoteRevisions[project.id] = snapshot.revision;
+    final layout = project.presentation;
+    for (final window in snapshot.windows) {
+      var artifact = project.artifacts
+          .where((a) => a.id == window.id)
+          .firstOrNull;
+      if (artifact == null) {
+        artifact = WorkspaceArtifact(
+          id: window.id,
+          title: window.title,
+          kind: 'table',
+          remoteManaged: true,
+          data: {'tableId': window.tableId},
+        );
+        project.artifacts.add(artifact);
+      }
+      artifact.title = window.title;
+      if (window.isOpen) {
+        if (!layout.openArtifactIds.contains(window.id)) {
+          layout.openArtifactIds.add(window.id);
+          layout.windowModes.putIfAbsent(window.id, () => 'floating');
+          if (project.id == selectedProjectId) {
+            layout.activeArtifactId = window.id;
+          }
+        }
+      } else {
+        layout.openArtifactIds.remove(window.id);
+        layout.minimizedArtifactIds.remove(window.id);
+        if (layout.activeArtifactId == window.id) {
+          layout.activeArtifactId = layout.openArtifactIds.lastOrNull;
+        }
+      }
+    }
+    final ids = snapshot.windows.map((w) => w.id).toSet();
+    layout.openArtifactIds.removeWhere(
+      (id) =>
+          project.artifacts.any((a) => a.id == id && a.remoteManaged) &&
+          !ids.contains(id),
+    );
+    if (layout.activeArtifactId == null && layout.openArtifactIds.isNotEmpty) {
+      layout.activeArtifactId = layout.openArtifactIds.last;
+    }
+    save();
+  }
+
   bool _disposed = false;
   Future<void> _writes = Future.value();
   WorkspaceProject get currentProject => projects.firstWhere(
@@ -500,6 +561,10 @@ class WorkspaceStore extends ChangeNotifier {
   }
 
   void openArtifact(String id, {String? placement}) {
+    if (currentProject.artifacts.any((a) => a.id == id && a.remoteManaged)) {
+      onRemoteWindowAction?.call(currentProject.id, id, true);
+      return;
+    }
     if (!currentProject.artifacts.any((a) => a.id == id)) return;
     final p = currentProject.presentation;
     p.materializeWindowModes();
@@ -584,6 +649,10 @@ class WorkspaceStore extends ChangeNotifier {
   }
 
   void closeArtifact(String id) {
+    if (currentProject.artifacts.any((a) => a.id == id && a.remoteManaged)) {
+      onRemoteWindowAction?.call(currentProject.id, id, false);
+      return;
+    }
     final p = currentProject.presentation;
     p.materializeWindowModes();
     p.openArtifactIds.remove(id);

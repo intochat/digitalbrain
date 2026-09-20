@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui' show SemanticsRole;
 
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_ui/digitalbrain_ui.dart';
@@ -12,6 +13,7 @@ import '../integrations/integrations_menu.dart';
 import 'brain_graph_store.dart';
 import 'workspace_table_import.dart';
 import 'workspace_store.dart';
+import 'workspace_remote_controller.dart';
 import 'workspace_desktop.dart';
 import 'workspace_settings.dart';
 import 'workspace_routes.dart';
@@ -92,6 +94,73 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         ),
       );
   final _tables = <String, UiTableController>{};
+  final _remote = <String, WorkspaceRemoteController>{};
+  final _remoteCancelled = Completer<void>();
+  final _tableCancelled = <String, Completer<void>>{};
+
+  void _connectWorkspaces() {
+    final client = widget.programmingClient;
+    if (client == null || !_ready) return;
+    store.onRemoteWindowAction = (workspace, window, open) =>
+        unawaited(_remoteAction(workspace, window, open));
+    for (final project in store.projects) {
+      if (_remote.containsKey(project.id)) continue;
+      final controller = WorkspaceRemoteController(
+        read: (id) =>
+            client.readWorkspace(id, cancelled: _remoteCancelled.future),
+        watch: client.watchWorkspace,
+        apply: (state) {
+          if (mounted) store.reconcileWorkspace(project, state);
+        },
+        onError: (error) {
+          if (mounted) {
+            _messenger.currentState?.showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Workspace connection interrupted. Reconnecting…',
+                ),
+              ),
+            );
+          }
+        },
+      );
+      _remote[project.id] = controller;
+      controller.start(project.id);
+    }
+  }
+
+  Future<void> _remoteAction(String workspace, String window, bool open) async {
+    final client = widget.programmingClient;
+    if (client == null) return;
+    try {
+      final revision = store.remoteRevisions[workspace] ?? 0;
+      final state = open
+          ? await client.reopenWorkspaceWindow(workspace, window, revision)
+          : await client.closeWorkspaceWindow(workspace, window, revision);
+      if (!mounted) return;
+      final project = store.projects.firstWhere((p) => p.id == workspace);
+      store.reconcileWorkspace(project, state);
+      if (open && workspace == store.selectedProjectId) {
+        store.focusWindow(window);
+      }
+    } catch (error) {
+      await _remote[workspace]?.refresh();
+      if (mounted) {
+        _messenger.currentState?.showSnackBar(
+          SnackBar(content: Text('Window changed. Please try again. $error')),
+        );
+      }
+    }
+  }
+
+  Future<void> _cancelPreviousTable(String id) {
+    final previous = _tableCancelled[id];
+    if (previous != null && !previous.isCompleted) previous.complete();
+    final next = Completer<void>();
+    _tableCancelled[id] = next;
+    return next.future;
+  }
+
   final _hydratingTables = <String>{};
   final _tableErrors = <String, String>{};
   BrainGraphStore? _graph;
@@ -168,6 +237,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     }
     if (!mounted) return;
     setState(() => _ready = true);
+    _connectWorkspaces();
     if (hasLive) {
       _liveGraph();
     }
@@ -252,11 +322,20 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   }
 
   void _changed() {
+    _connectWorkspaces();
     if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _remoteCancelled.complete();
+    for (final controller in _remote.values) {
+      controller.dispose();
+    }
+    for (final cancelled in _tableCancelled.values) {
+      if (!cancelled.isCompleted) cancelled.complete();
+    }
+    store.onRemoteWindowAction = null;
     _routes.dispose();
     _graph?.dispose();
     for (final timer in _saveTimers.values) {
@@ -277,6 +356,13 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
 
   void _accept(Map<String, dynamic> result, {WorkspaceProject? project}) {
     final destination = project ?? store.currentProject;
+    if (result['remoteManaged'] == true) {
+      final window = result['windowId'] as String?;
+      if (window != null) {
+        unawaited(_remoteAction(destination.id, window, true));
+      }
+      return;
+    }
     final id = result['id'] as String?;
     if (id == null) return;
     if (result['kind'] == 'table') {
@@ -769,6 +855,33 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     WorkspaceProject project,
   ) async {
     try {
+      if (artifact.remoteManaged && widget.programmingClient != null) {
+        final client = widget.programmingClient!;
+        final tableId = artifact.data['tableId'] as String;
+        final snapshot = await client.readWorkspaceTable(
+          project.id,
+          tableId,
+          cancelled: _cancelPreviousTable(tableId),
+        );
+        if (!mounted) return;
+        _tables[artifact.id] = UiTableController(
+          snapshot: snapshot,
+          read: (id, {offset = 0, limit = 25}) => client.readWorkspaceTable(
+            project.id,
+            id,
+            offset: offset,
+            limit: limit,
+            cancelled: _cancelPreviousTable(id),
+          ),
+          update: (id, update) => client.updateWorkspaceTable(
+            project.id,
+            id,
+            update,
+            cancelled: _cancelPreviousTable(id),
+          ),
+        );
+        return;
+      }
       final snapshot = widget.onReadTable == null
           ? TableSnapshot.fromJson(artifact.data)
           : await widget.onReadTable!(artifact.id);
@@ -808,12 +921,18 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
               ),
       );
     }
-    return WorkspaceArtifactEditor(
-      key: ValueKey(a.id),
-      artifact: a,
-      tableController: _tables[a.id],
-      graph: a.data['_live'] == true ? _liveGraph() : null,
-      onChanged: _editArtifact,
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      role: SemanticsRole.region,
+      label: a.title,
+      child: WorkspaceArtifactEditor(
+        key: ValueKey(a.id),
+        artifact: a,
+        tableController: _tables[a.id],
+        graph: a.data['_live'] == true ? _liveGraph() : null,
+        onChanged: _editArtifact,
+      ),
     );
   }
 
@@ -1086,6 +1205,8 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                             conversation.id == store.currentConversation.id,
                         store: store,
                         onRun: widget.onRun,
+                        onReadConversation:
+                            widget.programmingClient?.readWorkspaceConversation,
                         onOpenUrl: widget.onOpenUrl,
                         onSalesforceConnected: widget.onSalesforceConnected,
                         onArtifact: (result) =>

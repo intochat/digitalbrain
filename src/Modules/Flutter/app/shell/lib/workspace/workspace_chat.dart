@@ -22,6 +22,7 @@ class WorkspaceChat extends StatefulWidget {
     required this.conversation,
     required this.store,
     this.onRun,
+    this.onReadConversation,
     this.onOpenUrl,
     this.onSalesforceConnected,
     required this.onArtifact,
@@ -36,6 +37,11 @@ class WorkspaceChat extends StatefulWidget {
   final WorkspaceProject? project;
   final bool active;
   final AgentRunner? onRun;
+  final Future<Map<String, dynamic>> Function(
+    String workspaceId,
+    String threadId,
+  )?
+  onReadConversation;
   final OpenUrl? onOpenUrl;
   final Future<bool> Function()? onSalesforceConnected;
   final void Function(Map<String, dynamic>) onArtifact;
@@ -65,6 +71,7 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
       widget.conversation.messages.map((e) => Map<String, dynamic>.from(e)),
     );
     _sync(persist: false);
+    unawaited(_restoreConversation());
     _authTimer = Timer.periodic(
       const Duration(seconds: 3),
       (_) => _checkSalesforce(),
@@ -75,6 +82,59 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
     widget.conversation.draft = _composer.text;
     _draftTimer?.cancel();
     _draftTimer = Timer(const Duration(milliseconds: 300), widget.store.save);
+  }
+
+  Future<void> _restoreConversation() async {
+    final read = widget.onReadConversation;
+    final thread = widget.conversation.threadId;
+    if (read == null || thread == null) return;
+    try {
+      final state = await read(_project.id, thread);
+      if (!mounted || _running) return;
+      for (final raw in state['turns'] as List) {
+        final turn = Map<String, dynamic>.from(raw as Map);
+        final run = turn['runId'] as String;
+        final text = (turn['userText'] as String)
+            .split('\n\n[Conversation agent:')
+            .first;
+        if (!_entries.any(
+          (e) =>
+              e['role'] == 'user' && (e['runId'] == run || e['text'] == text),
+        )) {
+          _entries.add({
+            'id': '$run-user',
+            'runId': run,
+            'role': 'user',
+            'text': text,
+          });
+        }
+        _entry('$run-reply', 'assistant')['text'] = turn['assistantText'];
+        for (final id in turn['resultIds'] as List) {
+          if (_entries.any(
+            (e) => e['result'] is Map && (e['result'] as Map)['windowId'] == id,
+          )) {
+            continue;
+          }
+          final artifact = _project.artifacts
+              .where((a) => a.id == id)
+              .firstOrNull;
+          _entries.add({
+            'id': '$run-result-$id',
+            'role': 'tool',
+            'complete': true,
+            'result': {
+              'remoteManaged': true,
+              'windowId': id,
+              'title': artifact?.title ?? 'table',
+            },
+          });
+        }
+      }
+      _sync();
+      setState(() {});
+    } catch (_) {
+      /* Keep the local transcript available during reconnect. */
+    }
   }
 
   Timer? _draftTimer, _authTimer;
@@ -176,7 +236,12 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
     final c = widget.conversation;
     c.threadId ??= const Uuid().v4();
     final runId = const Uuid().v4();
-    _entries.add({'id': const Uuid().v4(), 'role': 'user', 'text': text});
+    _entries.add({
+      'id': const Uuid().v4(),
+      'runId': runId,
+      'role': 'user',
+      'text': text,
+    });
     if (_entries.length == 1) {
       c.title = text.length > 60 ? '${text.substring(0, 60)}…' : text;
     }
@@ -244,6 +309,7 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
     try {
       _subscription =
           run(
+            workspaceId: _project.id,
             threadId: c.threadId!,
             runId: runId,
             parentRunId: c.parentRunId,
@@ -304,7 +370,7 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
     if (event.type.startsWith('TOOL_CALL')) {
       final id = event.string('toolCallId');
       if (id != null) {
-        final e = _entry(id, 'tool');
+        final e = _entry('$_runId/tool/$id', 'tool');
         e['name'] = event.string('toolCallName') ?? e['name'];
         if (event.type == 'TOOL_CALL_RESULT') {
           Object? value = event.data['content'];

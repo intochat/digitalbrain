@@ -43,7 +43,7 @@ final class UiTableController extends ChangeNotifier {
       if (!_disposed && request == _request) accept(next);
     } catch (e) {
       if (!_disposed && request == _request) {
-        error = 'Could not load the table. $e';
+        error = 'Showing previous data. Could not load the table. $e';
       }
     } finally {
       if (!_disposed && request == _request) {

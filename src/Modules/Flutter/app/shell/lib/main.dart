@@ -12,6 +12,8 @@ import 'open_url_io.dart'
     if (dart.library.html) 'open_url_web.dart'
     as open_url;
 
+// Kept for the application lifetime so the test opt-in remains active.
+// ignore: unused_element
 SemanticsHandle? _semantics;
 
 Future<void> main() async {

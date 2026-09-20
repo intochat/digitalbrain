@@ -11,6 +11,7 @@ final class AgentEvent {
 
 /// One AG-UI run: the shell asks for it and consumes the event stream.
 typedef AgentRunner = Stream<AgentEvent> Function({
+  required String workspaceId,
   required String threadId,
   required String runId,
   String? parentRunId,

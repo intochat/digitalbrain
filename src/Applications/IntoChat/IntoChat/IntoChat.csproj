@@ -7,7 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="Http/ActivityEndpoints.cs" />
-    <Compile Remove="Http/ConversationalAgentEndpoints.cs" />
     <Compile Remove="Http/EdgeResults.cs" />
     <Compile Remove="Http/GraphEndpoints.cs" />
     <Compile Remove="Http/NeuronNameFilter.cs" />
