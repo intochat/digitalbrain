@@ -1,4 +1,5 @@
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Core;
 
@@ -7,6 +8,13 @@ public sealed class ModuleConfiguration<TModule> where TModule : class, IModule,
     private readonly ModuleDraft _draft;
     private readonly Action _ensureMutable;
     internal ModuleConfiguration(ModuleDraft draft, Action ensureMutable) { _draft = draft; _ensureMutable = ensureMutable; }
+
+    public void ConfigureLocalServices(Action<IServiceCollection> configure)
+    {
+        _ensureMutable();
+        ArgumentNullException.ThrowIfNull(configure);
+        _draft.LocalServices.Add(configure);
+    }
 
     public void ConfigureOptions<TOptions>(Action<TOptions> configure, params string[] assignedMembers) where TOptions : class, new()
     {
@@ -38,6 +46,7 @@ internal sealed class ModuleDraft
     public object? Options { get; set; }
     public HashSet<string> Assigned { get; } = new(StringComparer.Ordinal);
     public bool Replace { get; set; }
+    public List<Action<IServiceCollection>> LocalServices { get; } = [];
 
     public ModuleDraft(Type type)
     {
@@ -58,6 +67,7 @@ internal sealed class ModuleDraft
     {
         var copy = new ModuleDraft(Type) { Options = Contract?.Copy(Options!), Replace = Replace };
         copy.Assigned.UnionWith(Assigned);
+        copy.LocalServices.AddRange(LocalServices);
         return copy;
     }
 }

@@ -9,6 +9,7 @@ namespace DigitalBrain.Testing.Unit;
 
 public static class UnitTest
 {
+    public static UnitTestBuilder Create() => new();
     public static async Task<UnitBrain> StartAsync(UnitOptions? options = null, CancellationToken cancellationToken = default)
     {
         options ??= new();

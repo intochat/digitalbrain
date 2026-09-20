@@ -10,6 +10,7 @@ public interface IModuleConfigurationContract
     ModuleDefinition Compile(object options);
     object ApplyOverride(object baseline, string json);
     string WriteOverride(object configured, IReadOnlyCollection<string> assignedMembers);
+    string WriteReplacement(object configured);
 }
 
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]

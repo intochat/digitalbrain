@@ -3,7 +3,7 @@ using DigitalBrain.Supabase.Tables;
 namespace DigitalBrain.Supabase;
 
 // The interface between the neurons and a Supabase server.
-internal interface ISupabaseProvider
+public interface ISupabaseProvider
 {
     Task<SupabaseQueryResult> QueryAsync(string sql, int maxRows, CancellationToken cancellationToken);
 
@@ -17,7 +17,7 @@ internal interface ISupabaseProvider
 }
 
 // One page of a live table: the base query plus the ui view, compiled server-side.
-internal sealed record QueryPlan(
+public sealed record QueryPlan(
     string BaseSql,
     IReadOnlyList<SupabaseColumn> Columns,
     IReadOnlyList<SupabaseTableFilter> Filters,
@@ -25,4 +25,4 @@ internal sealed record QueryPlan(
     int Offset,
     int Limit);
 
-internal sealed record QueryPage(IReadOnlyList<SupabaseTableRow> Rows, long Total, long Filtered);
+public sealed record QueryPage(IReadOnlyList<SupabaseTableRow> Rows, long Total, long Filtered);

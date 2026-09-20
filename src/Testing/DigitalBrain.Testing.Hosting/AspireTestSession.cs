@@ -5,6 +5,7 @@ using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
@@ -51,6 +52,10 @@ public sealed class AspireTestSession : IAsyncDisposable
             }
             var builder = await DistributedApplicationTestingBuilder.CreateAsync<TAppHost>(args.ToArray(), ct).ConfigureAwait(false);
             lifetime.Own("builder", builder);
+            // Provider parameters are evaluated when Aspire starts resources. Keep their
+            // values out of command-line arguments and public composition envelopes.
+            builder.Configuration.AddInMemoryCollection(options.PrivateConfiguration
+                .Where(pair => pair.Key.StartsWith("Parameters:", StringComparison.OrdinalIgnoreCase)));
             builder.Services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning));
             var primary = builder.Resources.Where(r => r.Annotations.OfType<BrainEndpointAnnotation>().Any()).ToArray();
             if (primary.Length != 1) { throw new InvalidOperationException("The AppHost must declare exactly one primary brain HTTP endpoint."); }

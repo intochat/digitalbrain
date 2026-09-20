@@ -10,7 +10,7 @@ public sealed class SupabaseQueryFacts
     public async Task QueryReturnsTypedRows()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await StartAsync(new FakeSupabaseProvider(), ct);
+        await using var brain = await UnitTest.Create().WithModule<SupabaseModule>(m => m.WithProvider<FakeSupabaseProvider>()).StartAsync(ct);
         var supabase = brain.Get<ISupabase>(SupabaseNames.DefaultNeuron);
 
         var result = await supabase.Query(new("select id from people"));

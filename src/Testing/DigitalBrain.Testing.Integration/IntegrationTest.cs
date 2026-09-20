@@ -5,6 +5,7 @@ namespace DigitalBrain.Testing.Integration;
 
 public static class IntegrationTest
 {
+    public static IntegrationTestBuilder Create() => new();
     public static async Task<IntegrationBrain> StartAsync(IntegrationOptions options, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(options);

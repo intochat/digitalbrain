@@ -1,4 +1,6 @@
 using DigitalBrain.Core;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace DigitalBrain.Supabase;
 
@@ -10,6 +12,13 @@ public sealed class SupabaseConfigurationContract() : ModuleConfigurationContrac
 
 public static class SupabaseModuleConfiguration
 {
+    public static ModuleConfiguration<SupabaseModule> WithProvider<TProvider>(this ModuleConfiguration<SupabaseModule> module)
+        where TProvider : class, ISupabaseProvider
+    {
+        module.ConfigureLocalServices(services => services.Replace(ServiceDescriptor.Singleton<ISupabaseProvider, TProvider>()));
+        return module;
+    }
+
     public static ModuleConfiguration<SupabaseModule> WithConnection(this ModuleConfiguration<SupabaseModule> module, string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);

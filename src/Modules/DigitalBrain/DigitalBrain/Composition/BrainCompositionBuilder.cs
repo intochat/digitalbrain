@@ -35,7 +35,27 @@ public sealed class BrainCompositionBuilder
         if (_built is not null) { return _built; }
         var modules = ModuleComposition.Resolve(_modules.Values.Select(m => m.Compile()).ToArray());
         ApplicationConfigurationTransport.ValidatePublicSettings(modules);
-        return _built = new(modules);
+        return _built = new(modules, _modules.Values.SelectMany(m => m.LocalServices).ToArray());
+    }
+
+    public BrainCompositionBuilder ApplyOverrides(string envelope)
+    {
+        EnsureMutable();
+        var entries = CompositionOverrideTransport.Read(envelope);
+        var replacements = new Dictionary<Type, ModuleDraft>();
+        foreach (var entry in entries)
+        {
+            var existing = _modules.Values.SingleOrDefault(m => m.Type.FullName == entry.Id)
+                ?? throw new ArgumentException("An override targets a module not declared by the application.", nameof(envelope));
+            var draft = existing.Copy();
+            var contract = draft.Contract ?? throw new ArgumentException("This module has no configurable options.", nameof(envelope));
+            draft.Options = contract.ApplyOverride(draft.Options!, entry.Patch);
+            ApplicationConfigurationTransport.ValidatePublicSettings([draft.Compile()]);
+            replacements.Add(draft.Type, draft);
+        }
+        // An invalid envelope never leaves a partially overridden application.
+        foreach (var (type, draft) in replacements) { _modules[type] = draft; }
+        return this;
     }
 
     private void EnsureMutable()

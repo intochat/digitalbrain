@@ -20,6 +20,7 @@ public abstract class ModuleConfigurationContract<TModule, TOptions>(params stri
     public object Copy(object options) => Decode(Encode(options));
     public ModuleDefinition Compile(object options) => Compile(Require(options));
     protected abstract ModuleDefinition Compile(TOptions options);
+    public string WriteReplacement(object configured) => WriteOverride(configured, _members);
 
     public string WriteOverride(object configured, IReadOnlyCollection<string> assignedMembers)
     {
