@@ -12,7 +12,7 @@ public sealed class E2EBrain : HostedBrain
     internal E2EBrain(AspireTestSession session) : base(session) { }
 
     public Task<BrowserSession> OpenBrowserAsync(CancellationToken cancellationToken = default)
-        => OpenBrowserAsync(BrowserOptions.Resolve(Session.Options.Browser.Headless), cancellationToken);
+        => OpenBrowserAsync(Session.Options.Browser, cancellationToken);
 
     public async Task<BrowserSession> OpenBrowserAsync(BrowserOptions options, CancellationToken cancellationToken = default)
     {
@@ -25,6 +25,11 @@ public sealed class E2EBrain : HostedBrain
                 var playwright = await Playwright.CreateAsync().ConfigureAwait(false);
                 Lifetime.Own("playwright", new AsyncAction(() => { playwright.Dispose(); return ValueTask.CompletedTask; }));
                 var launch = BrowserOptions.Resolve(options.Headless);
+                if (options.SlowMoMilliseconds > 0)
+                {
+                    launch = launch with { SlowMoMilliseconds = options.SlowMoMilliseconds };
+                }
+
                 _browser = await playwright.Chromium.LaunchAsync(new()
                 {
                     Headless = launch.Headless,
@@ -45,9 +50,25 @@ public sealed class E2EBrain : HostedBrain
                 var uri = endpoint.AbsoluteUri.Contains('?', StringComparison.Ordinal)
                     ? endpoint.AbsoluteUri + "&semantics=true"
                     : endpoint.AbsoluteUri + "?semantics=true";
-                await page.GotoAsync(uri, new() { WaitUntil = WaitUntilState.Load, Timeout = 60_000 }).ConfigureAwait(false);
-                await page.Locator("flt-glass-pane, flutter-view").First
-                    .WaitForAsync(new() { State = WaitForSelectorState.Attached, Timeout = 60_000 }).ConfigureAwait(false);
+                var view = page.Locator("flt-glass-pane")
+                    .Or(page.Locator("flutter-view"))
+                    .Or(page.Locator("flt-semantics-placeholder"));
+                var until = DateTime.UtcNow + TimeSpan.FromMinutes(2);
+                while (true)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await page.GotoAsync(uri, new() { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 60_000 }).ConfigureAwait(false);
+                    try
+                    {
+                        await view.First.WaitForAsync(new() { State = WaitForSelectorState.Attached, Timeout = 8_000 }).ConfigureAwait(false);
+                        break;
+                    }
+                    catch (Exception ex) when (DateTime.UtcNow < until && ex is TimeoutException or PlaywrightException)
+                    {
+                        await Task.Delay(2_000, cancellationToken).ConfigureAwait(false);
+                    }
+                }
+
                 var placeholder = page.Locator("flt-semantics-placeholder");
                 if (await placeholder.CountAsync().ConfigureAwait(false) > 0)
                 {

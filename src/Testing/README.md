@@ -6,7 +6,7 @@ Three layers, never mixed. Each has its own public package and returns a concret
 
 **Module integration** (`DigitalBrain.Testing.Integration`): `IntegrationTest.StartAsync(IntegrationOptions)` selects module definitions and starts one shared external module runner with Aspire-managed, isolated, ephemeral infrastructure. Returns `IntegrationBrain` with `HttpClient` and `RestartRuntimeAsync`. No dependency on an application such as IntoChat.
 
-**Application e2e** (`DigitalBrain.Testing.E2E`): `E2ETest.StartAsync<TAppHost>(ct)` starts the AppHost with Flutter **Web** (headed Playwright). Pass `DigitalBrainConfiguration` only to override (for example `FlutterHostKind.None` for HTTP-only e2e). Returns `E2EBrain` with `HttpClient` and `OpenBrowserAsync`.
+**Application e2e** (`DigitalBrain.Testing.E2E`): `E2ETest.StartAsync<TAppHost>(ct)` enables testing; IntoChat AppHost then defaults Flutter to **Web**. Pass `DigitalBrainConfiguration.Modules` to override. Call `OpenBrowserAsync()` to open headed Chromium against that web host. Returns `E2EBrain`.
 
 Shared probes, behavior runs, bounded waits, session lifetime and diagnostics live in `DigitalBrain.Testing`.
 
@@ -74,9 +74,7 @@ Application e2e lives in `src/Applications/IntoChat/Tests` (not under the Flutte
 AppHost starts Flutter web via `FlutterHostKind.Web`. Module `Tests.Integration` is HTTP-only
 (`Kind = None`) and never opens a browser.
 
-`E2ETest.StartAsync<TAppHost>(ct)` defaults to Flutter Web. `TestExecutionOptions` is optional.
-Playwright traces/screenshots go under `e2e-artifacts/{cluster-id}`. `OpenBrowserAsync` loads
-`?semantics=true` so locators can see canvas text.
+To **see** the Flutter UI: `E2ETest.StartAsync<TAppHost>(ct)` then `OpenBrowserAsync()`. AppHost uses Web when testing; Playwright is headed. Debug-test or run that fact — Chromium opens. HTTP-only e2e pass `new DigitalBrainConfiguration { Flutter = None }.Modules` so Flutter never starts.
 
 ## State recovery and failures
 

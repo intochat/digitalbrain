@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using DigitalBrain.Testing;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Button;
 using DigitalBrain.Flutter.Button.Signals;
@@ -17,7 +18,17 @@ public sealed class UiKitTwoWayWebFacts
     public async Task NeuronChangeShowsInUiAndTapUpdatesNeuron()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await E2ETest.StartAsync<Projects.IntoChat_AppHost>(ct);
+        await using var brain = await E2ETest.StartAsync<Projects.IntoChat_AppHost>(
+
+    new DigitalBrainConfiguration
+    {
+        Flutter = new() { Hosting = new() { Kind = FlutterHostKind.None } },
+    }.Modules,
+        new TestExecutionOptions
+            {
+                Browser = new() { SlowMoMilliseconds = 250 },
+            },
+            ct);
 
         var expander = brain.Get<IExpander>("e2e");
         var button = brain.Get<IButton>("e2e");
