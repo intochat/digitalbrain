@@ -1,8 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <Import Project="../../Testing/Module.Tests.props" />
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Sdk" />
-    <ProjectReference Include="../DigitalBrain.Behaviors.csproj" />
-    <ProjectReference Include="../../Modules/Flutter/Flutter/DigitalBrain.Modules.Flutter.csproj" />
-  </ItemGroup>
-</Project>

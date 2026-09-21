@@ -8,12 +8,15 @@ namespace DigitalBrain.Modules.Flutter.Tests.Unit.Card;
 public sealed class CardFacts
 {
     [Fact]
-    public async Task SetWritesTitle()
+    public async Task SetWritesTitleBodyAndChildren()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().WithModule<FlutterModule>()
             .StartAsync(ct);
         await brain.Get<ICard>("hero").Set("Title", "Body", [new UiChildRef("button", "go")]);
-        Assert.Equal("Title", (await brain.Get<ICard>("hero").Read()).Title);
+        var state = await brain.Get<ICard>("hero").Read();
+        Assert.Equal("Title", state.Title);
+        Assert.Equal("Body", state.Body);
+        Assert.Equal(new UiChildRef("button", "go"), Assert.Single(state.Children));
     }
 }

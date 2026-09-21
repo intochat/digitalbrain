@@ -1,7 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <Import Project="../../../Testing/Module.Tests.props" />
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Sdk" />
-    <ProjectReference Include="../../../Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
-  </ItemGroup>
-</Project>

@@ -18,7 +18,7 @@ public sealed record TestExecutionOptions
                 || key.StartsWith("ConnectionStrings:", StringComparison.OrdinalIgnoreCase)
                 || key.StartsWith("DigitalBrain:Testing:", StringComparison.OrdinalIgnoreCase)
                 || key.StartsWith("DigitalBrain:Modules:", StringComparison.OrdinalIgnoreCase))
-                { throw new ArgumentException("Private settings cannot override host-owned configuration."); }
+            { throw new ArgumentException("Private settings cannot override host-owned configuration."); }
         }
         foreach (var timeout in new[] { StartupTimeout, AssertionTimeout, CleanupTimeout })
         {
@@ -29,7 +29,7 @@ public sealed record TestExecutionOptions
     public static void ValidateTimeout(TimeSpan timeout)
     {
         if (timeout <= TimeSpan.Zero || timeout.TotalMilliseconds > int.MaxValue)
-            { throw new ArgumentOutOfRangeException(nameof(timeout), "Test deadlines must be finite and positive."); }
+        { throw new ArgumentOutOfRangeException(nameof(timeout), "Test deadlines must be finite and positive."); }
     }
 }
 

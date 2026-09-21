@@ -2,6 +2,7 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <AspireVersion>13.5.3</AspireVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="Octokit" Version="14.0.0" />
@@ -70,5 +71,13 @@
   <ItemGroup>
     <PackageVersion Include="xunit.v3.mtp-v2" Version="4.0.0" />
     <PackageVersion Include="Microsoft.Orleans.TestingHost" Version="10.3.1" />
+    <!-- Restored, never referenced for assemblies: hosted tests read DCP and dashboard paths
+         out of these packages because they build the Aspire model without an AppHost project. -->
+    <PackageVersion Include="Aspire.Hosting.Orchestration.win-x64" Version="$(AspireVersion)" />
+    <PackageVersion Include="Aspire.Hosting.Orchestration.linux-x64" Version="$(AspireVersion)" />
+    <PackageVersion Include="Aspire.Hosting.Orchestration.osx-arm64" Version="$(AspireVersion)" />
+    <PackageVersion Include="Aspire.Dashboard.Sdk.win-x64" Version="$(AspireVersion)" />
+    <PackageVersion Include="Aspire.Dashboard.Sdk.linux-x64" Version="$(AspireVersion)" />
+    <PackageVersion Include="Aspire.Dashboard.Sdk.osx-arm64" Version="$(AspireVersion)" />
   </ItemGroup>
 </Project>

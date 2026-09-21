@@ -24,6 +24,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Client" />
     <InternalsVisibleTo Include="IntoChat.Tests.E2E" />
+    <InternalsVisibleTo Include="IntoChat.Tests.Unit" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../ServiceDefaults/IntoChat.ServiceDefaults.csproj" />

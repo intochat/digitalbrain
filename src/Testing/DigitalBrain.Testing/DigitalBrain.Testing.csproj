@@ -1,4 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><IsPackable>true</IsPackable></PropertyGroup>
-  <ItemGroup><ProjectReference Include="../../Modules/DigitalBrain/DigitalBrain/DigitalBrain.csproj" /></ItemGroup>
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Signal probes, behavior runs, bounded waits and session lifetime shared by every DigitalBrain test kind.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Modules/DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
+  </ItemGroup>
 </Project>

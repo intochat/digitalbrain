@@ -1,0 +1,49 @@
+<Project>
+  <!-- Aspire normally emits these paths from its AppHost SDK. Hosted tests build the application
+       model in-process instead, so the test assembly carries the metadata and Aspire finds it by
+       walking the call stack. The paths are machine-local and must never be baked into a package,
+       which is why they are stamped onto the consuming test assembly rather than onto this one.
+
+       Imported from the repository's Directory.Build.targets for in-repo test projects, and packed
+       into buildTransitive so a NuGet consumer gets the identical treatment. -->
+  <PropertyGroup>
+    <AspireOrchestrationVersion Condition="'$(AspireOrchestrationVersion)' == ''">$(AspireVersion)</AspireOrchestrationVersion>
+    <AspireOrchestrationVersion Condition="'$(AspireOrchestrationVersion)' == ''">13.5.3</AspireOrchestrationVersion>
+    <AspireOrchestrationRid Condition="'$(AspireOrchestrationRid)' == '' And $([MSBuild]::IsOSPlatform('Windows'))">win-x64</AspireOrchestrationRid>
+    <AspireOrchestrationRid Condition="'$(AspireOrchestrationRid)' == '' And $([MSBuild]::IsOSPlatform('OSX'))">osx-arm64</AspireOrchestrationRid>
+    <AspireOrchestrationRid Condition="'$(AspireOrchestrationRid)' == ''">linux-x64</AspireOrchestrationRid>
+    <_AspireExecutableSuffix Condition="$([MSBuild]::IsOSPlatform('Windows'))">.exe</_AspireExecutableSuffix>
+    <_AspirePackageRoot>$([MSBuild]::EnsureTrailingSlash('$(NuGetPackageRoot)'))</_AspirePackageRoot>
+    <_AspireOrchestrationTools>$(_AspirePackageRoot)aspire.hosting.orchestration.$(AspireOrchestrationRid)/$(AspireOrchestrationVersion)/tools/</_AspireOrchestrationTools>
+    <_AspireDashboardTools>$(_AspirePackageRoot)aspire.dashboard.sdk.$(AspireOrchestrationRid)/$(AspireOrchestrationVersion)/tools/</_AspireDashboardTools>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(ManagePackageVersionsCentrally)' == 'true'">
+    <PackageReference Include="Aspire.Hosting.Orchestration.$(AspireOrchestrationRid)" VersionOverride="$(AspireOrchestrationVersion)" ExcludeAssets="all" PrivateAssets="all" />
+    <PackageReference Include="Aspire.Dashboard.Sdk.$(AspireOrchestrationRid)" VersionOverride="$(AspireOrchestrationVersion)" ExcludeAssets="all" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(ManagePackageVersionsCentrally)' != 'true'">
+    <PackageReference Include="Aspire.Hosting.Orchestration.$(AspireOrchestrationRid)" Version="$(AspireOrchestrationVersion)" ExcludeAssets="all" PrivateAssets="all" />
+    <PackageReference Include="Aspire.Dashboard.Sdk.$(AspireOrchestrationRid)" Version="$(AspireOrchestrationVersion)" ExcludeAssets="all" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadata">
+      <_Parameter1>dcpclipath</_Parameter1>
+      <_Parameter2>$(_AspireOrchestrationTools)dcp$(_AspireExecutableSuffix)</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadata">
+      <_Parameter1>dcpextensionpaths</_Parameter1>
+      <_Parameter2>$(_AspireOrchestrationTools)ext/</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadata">
+      <_Parameter1>aspiredashboardpath</_Parameter1>
+      <_Parameter2>$(_AspireDashboardTools)Aspire.Dashboard$(_AspireExecutableSuffix)</_Parameter2>
+    </AssemblyAttribute>
+    <!-- Without this the application model resolves relative paths against the test bin directory. -->
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadata">
+      <_Parameter1>apphostprojectpath</_Parameter1>
+      <_Parameter2>$(MSBuildProjectDirectory)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

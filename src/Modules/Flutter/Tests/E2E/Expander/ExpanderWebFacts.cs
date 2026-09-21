@@ -10,7 +10,7 @@ public sealed class ExpanderWebFacts
     [Fact(Timeout = 240_000)]
     public async Task BackendCollapseRendersAndTapShowsExpandedState()
     {
-        await using var brain = await E2ETest.Create().WithModule<FlutterModule>()
+        await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.RunWebApp())
             .StartAsync(TestContext.Current.CancellationToken);
         await brain.Get<IExpander>("e2e").Set("More", false, []);
         await Assertions.Expect(brain.Page.GetByRole(AriaRole.Button, new() { Name = "Collapsed More" }))

@@ -242,26 +242,23 @@ public static class ShellHostingExtensions
                     : Path.GetFullPath(Path.Combine(appHostDirectory, configured));
             }
 
-            var candidates = new[]
+            // Walk up rather than guessing a fixed depth: the caller can be an application AppHost
+            // or any test project, and those sit at different depths under the repository root.
+            string[] packagePathsFromRepositoryRoot =
+            [
+                Path.Combine("src", "Modules", "Flutter", "app", "core"),
+                Path.Combine("src", "Modules", "Flutter", "app", "shell"),
+            ];
+            for (var directory = new DirectoryInfo(Path.GetFullPath(appHostDirectory)); directory is not null; directory = directory.Parent)
             {
-                Path.Combine(appHostDirectory, "..", "..", "..", "Modules", "Flutter", "app", "core"),
-                Path.Combine(appHostDirectory, "..", "..", "..", "Modules", "Flutter", "app", "shell"),
-                Path.Combine(appHostDirectory, "..", "..", "Modules", "Flutter", "app", "core"),
-                Path.Combine(appHostDirectory, "..", "..", "Modules", "Flutter", "app", "shell"),
-                Path.Combine(appHostDirectory, "..", "..", "clients", "flutter", "core"),
-                Path.Combine(appHostDirectory, "..", "clients", "flutter", "core"),
-            };
-
-            foreach (var candidate in candidates)
-            {
-                var full = Path.GetFullPath(candidate);
-                if (Directory.Exists(full) && File.Exists(Path.Combine(full, "pubspec.yaml")))
+                foreach (var packagePath in packagePathsFromRepositoryRoot)
                 {
-                    return full;
+                    var candidate = Path.Combine(directory.FullName, packagePath);
+                    if (File.Exists(Path.Combine(candidate, "pubspec.yaml"))) { return candidate; }
                 }
             }
 
-            return Path.GetFullPath(candidates[0]);
+            return Path.GetFullPath(Path.Combine(appHostDirectory, packagePathsFromRepositoryRoot[0]));
         }
     }
 }

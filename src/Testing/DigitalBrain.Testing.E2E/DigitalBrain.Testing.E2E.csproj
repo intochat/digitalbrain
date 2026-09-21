@@ -1,7 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Aspire AppHost e2e: real Orleans cluster, Docker emulator storage, HTTP wait-healthy.</Description>
+    <Description>Tests against a brain in a real process: Aspire-managed storage, real HTTP, and a browser when a module runs a frontend.</Description>
+    <!-- Launched as the module runtime process by ModuleTestHost; never shipped as a native host. -->
+    <OutputType>Exe</OutputType>
+    <UseAppHost>false</UseAppHost>
     <DisableMSBuildAssemblyCopyCheck>true</DisableMSBuildAssemblyCopyCheck>
   </PropertyGroup>
   <ItemGroup>
@@ -9,11 +12,15 @@
     <PackageReference Include="Aspire.Hosting.Testing" />
     <PackageReference Include="Microsoft.Orleans.Client" />
     <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
+    <PackageReference Include="Microsoft.Playwright" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../Modules/DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
-    <ProjectReference Include="../DigitalBrain.Testing.Integration/DigitalBrain.Testing.Integration.csproj" />
-    <ProjectReference Include="../DigitalBrain.Testing.Hosting/DigitalBrain.Testing.Hosting.csproj" />
+    <ProjectReference Include="../DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="../../Modules/DigitalBrain/Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
+    <ProjectReference Include="../../Modules/DigitalBrain/Aspire/DigitalBrain.Aspire.csproj" />
+    <ProjectReference Include="../../Modules/DigitalBrain/Sdk/DigitalBrain.Sdk.csproj" />
   </ItemGroup>
-  <ItemGroup><PackageReference Include="Microsoft.Playwright" /></ItemGroup>
+  <ItemGroup>
+    <None Include="Build/DigitalBrain.Testing.E2E.targets" Pack="true" PackagePath="buildTransitive/" />
+  </ItemGroup>
 </Project>

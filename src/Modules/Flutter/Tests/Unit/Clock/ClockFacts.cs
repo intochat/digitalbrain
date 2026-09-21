@@ -8,12 +8,14 @@ namespace DigitalBrain.Modules.Flutter.Tests.Unit.Clock;
 public sealed class ClockFacts
 {
     [Fact]
-    public async Task SetWritesLabel()
+    public async Task SetWritesLabelAndDueDate()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().WithModule<FlutterModule>()
             .StartAsync(ct);
         await brain.Get<IClock>("tea").Set("Tea", DateTimeOffset.UnixEpoch);
-        Assert.Equal("Tea", (await brain.Get<IClock>("tea").Read()).Label);
+        var state = await brain.Get<IClock>("tea").Read();
+        Assert.Equal("Tea", state.Label);
+        Assert.Equal(DateTimeOffset.UnixEpoch, state.DueAt);
     }
 }

@@ -1,7 +1,5 @@
 using System.Diagnostics;
 using DigitalBrain.Core;
-using DigitalBrain.Testing.Hosting;
-using DigitalBrain.Testing.Integration;
 
 namespace DigitalBrain.Testing.E2E;
 
@@ -16,7 +14,7 @@ public static class E2ETest
         cancellationToken.ThrowIfCancellationRequested();
         options.Validate();
         var browser = Resolve(browserOptions);
-        var identity = "test-" + Guid.NewGuid().ToString("N");
+        var identity = NewIdentity();
         List<string> args = ["DigitalBrain:Testing:Enabled=true", $"Orleans:ClusterId={identity}",
             $"{CompositionOverrideTransport.ConfigurationKey}={overrides}"];
         var session = await AspireTestSession.StartAsync<TAppHost>(args, identity, WithArtifacts(options, identity), cancellationToken).ConfigureAwait(false);
@@ -29,9 +27,12 @@ public static class E2ETest
         cancellationToken.ThrowIfCancellationRequested();
         options.Validate();
         var browser = Resolve(browserOptions);
-        var session = await ModuleTestHost.StartAsync(modules, WithArtifacts(options, "test-" + Guid.NewGuid().ToString("N")), cancellationToken).ConfigureAwait(false);
+        var identity = NewIdentity();
+        var session = await ModuleTestHost.StartAsync(modules, WithArtifacts(options, identity), identity, cancellationToken).ConfigureAwait(false);
         return await ReadyAsync(new E2EBrain(session, browser), brain => brain.StartBrowserAsync(cancellationToken)).ConfigureAwait(false);
     }
+
+    private static string NewIdentity() => "test-" + Guid.NewGuid().ToString("N");
 
     private static ResolvedBrowserOptions Resolve(BrowserOptions options) => BrowserOptionsResolver.Resolve(options,
         Environment.GetEnvironmentVariable("DIGITALBRAIN_E2E_HEADED") == "1", Debugger.IsAttached);

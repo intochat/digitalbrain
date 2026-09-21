@@ -60,7 +60,7 @@ public sealed class BrowserSession : IAsyncDisposable
                 {
                     Directory.CreateDirectory(_artifacts);
                     if (_page is not null && !_page.IsClosed)
-                        { await _page.ScreenshotAsync(new() { Path = prefix + ".png", Timeout = 5_000 }).ConfigureAwait(false); }
+                    { await _page.ScreenshotAsync(new() { Path = prefix + ".png", Timeout = 5_000 }).ConfigureAwait(false); }
                 }).ConfigureAwait(false);
                 await Capture(async () =>
                 {

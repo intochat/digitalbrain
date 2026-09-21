@@ -1,13 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <Import Project="../../../../Testing/Integration.Tests.props" />
-  <PropertyGroup>
-    <DisableMSBuildAssemblyCopyCheck>true</DisableMSBuildAssemblyCopyCheck>
-  </PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.Playwright" />
+    <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
     <ProjectReference Include="../../Flutter/DigitalBrain.Modules.Flutter.csproj" />
     <ProjectReference Include="../../Aspire.Hosting/DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" />
-    <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
-    <PackageReference Include="Microsoft.Playwright" />
-    <Using Include="DigitalBrain.Testing.E2E" />
   </ItemGroup>
 </Project>

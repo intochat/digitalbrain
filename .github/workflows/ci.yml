@@ -57,8 +57,14 @@ jobs:
       - name: Build solution
         run: dotnet build DigitalBrain.slnx -c Release --no-restore -p:CodeGraphRefresh=false
 
+      - name: Build the behavior file app
+        run: dotnet build src/Behaviors/timer-report.cs -c Release -p:CodeGraphRefresh=false
+
+      - name: Validate NuGet packages
+        run: dotnet pack DigitalBrain.slnx -c Release --no-build -o artifacts
+
       - name: Install browser and system dependencies
-        run: pwsh src/Testing/DigitalBrain.Testing.Framework.Tests/bin/Release/net11.0/playwright.ps1 install --with-deps chromium
+        run: pwsh src/Modules/Flutter/Tests/E2E/bin/Release/net11.0/playwright.ps1 install --with-deps chromium
 
       - name: Run tests
         run: dotnet test --solution DigitalBrain.slnx -c Release --no-build --max-parallel-test-modules 1 --ignore-exit-code 8

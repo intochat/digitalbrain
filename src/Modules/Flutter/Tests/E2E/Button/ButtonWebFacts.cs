@@ -10,7 +10,7 @@ public sealed class ButtonWebFacts
     [Fact(Timeout = 240_000)]
     public async Task BackendLabelUpdatesRenderInLiveShell()
     {
-        await using var brain = await E2ETest.Create().WithModule<FlutterModule>()
+        await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.RunWebApp())
             .StartAsync(TestContext.Current.CancellationToken);
         var button = brain.Get<IButton>("e2e");
         await button.Set("Fire e2e", "e2e-click");

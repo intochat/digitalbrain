@@ -6,10 +6,8 @@ namespace DigitalBrain.Flutter;
 
 [ModuleHosting("DigitalBrain.Flutter.Aspire.Hosting.FlutterModuleHosting, DigitalBrain.Modules.Flutter.Aspire.Hosting")]
 [ModuleConfiguration(typeof(FlutterConfigurationContract))]
-public sealed class FlutterModule : IModule, IModuleE2EDefaults<FlutterModule>
+public sealed class FlutterModule : IModule
 {
-    public void ConfigureE2E(ModuleConfiguration<FlutterModule> module) => module.RunWebApp();
-
     public static ModuleDefinition Define(FlutterModuleOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);

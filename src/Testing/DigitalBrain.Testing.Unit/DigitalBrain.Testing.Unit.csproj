@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>In-process Orleans neuron tests with resolved module definitions, probes and behavior runs.</Description>
+    <Description>Neuron tests with the brain in the test process: in-memory storage, controlled providers, silo restart.</Description>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
@@ -10,8 +10,4 @@
     <PackageReference Include="Microsoft.Orleans.Reminders" />
     <PackageReference Include="Microsoft.Orleans.Sdk" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="../../Modules/DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
-  </ItemGroup>
 </Project>
-

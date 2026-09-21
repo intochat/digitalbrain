@@ -12,7 +12,7 @@ public sealed class ComponentRenderingWebFacts
     [Fact(Timeout = 240_000)]
     public async Task ChartVideoAndBrowserRenderTheirBackendContent()
     {
-        await using var brain = await E2ETest.Create().WithModule<FlutterModule>()
+        await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.RunWebApp())
             .StartAsync(TestContext.Current.CancellationToken);
         await brain.Page.SetViewportSizeAsync(1280, 1400);
         await brain.Get<IChart>("e2e").Render("E2E BTC chart", "line",

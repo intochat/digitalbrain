@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
+    <ProjectReference Include="../../Time/DigitalBrain.Modules.Time.csproj" />
+    <Compile Include="../../../../Behaviors/TimerReport.cs" Link="TimerReport.cs" />
+  </ItemGroup>
+</Project>

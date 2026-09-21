@@ -5,6 +5,7 @@
     <RootNamespace>DigitalBrain.Flutter.Aspire.Hosting</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Flutter.Tests.E2E" />
     <ProjectReference Include="../Flutter/DigitalBrain.Modules.Flutter.csproj" />
     <ProjectReference Include="../../DigitalBrain/Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
   </ItemGroup>
