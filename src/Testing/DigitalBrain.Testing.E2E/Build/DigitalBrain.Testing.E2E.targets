@@ -9,9 +9,10 @@
   <PropertyGroup>
     <AspireOrchestrationVersion Condition="'$(AspireOrchestrationVersion)' == ''">$(AspireVersion)</AspireOrchestrationVersion>
     <AspireOrchestrationVersion Condition="'$(AspireOrchestrationVersion)' == ''">13.5.3</AspireOrchestrationVersion>
-    <AspireOrchestrationRid Condition="'$(AspireOrchestrationRid)' == '' And $([MSBuild]::IsOSPlatform('Windows'))">win-x64</AspireOrchestrationRid>
-    <AspireOrchestrationRid Condition="'$(AspireOrchestrationRid)' == '' And $([MSBuild]::IsOSPlatform('OSX'))">osx-arm64</AspireOrchestrationRid>
-    <AspireOrchestrationRid Condition="'$(AspireOrchestrationRid)' == ''">linux-x64</AspireOrchestrationRid>
+    <!-- The SDK already knows the host RID, including linux-arm64 and osx-x64. Inferring it from
+         the OS alone would hand an x64 dcp to an ARM runner. -->
+    <AspireOrchestrationRid Condition="'$(AspireOrchestrationRid)' == ''">$(NETCoreSdkPortableRuntimeIdentifier)</AspireOrchestrationRid>
+    <AspireOrchestrationRid Condition="'$(AspireOrchestrationRid)' == ''">$(NETCoreSdkRuntimeIdentifier)</AspireOrchestrationRid>
     <_AspireExecutableSuffix Condition="$([MSBuild]::IsOSPlatform('Windows'))">.exe</_AspireExecutableSuffix>
     <_AspirePackageRoot>$([MSBuild]::EnsureTrailingSlash('$(NuGetPackageRoot)'))</_AspirePackageRoot>
     <_AspireOrchestrationTools>$(_AspirePackageRoot)aspire.hosting.orchestration.$(AspireOrchestrationRid)/$(AspireOrchestrationVersion)/tools/</_AspireOrchestrationTools>

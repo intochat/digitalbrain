@@ -36,8 +36,9 @@
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
-  <!-- Every test project in the repo. Replaces the per-project boilerplate that used to be
-       copied into each .csproj; package consumers get the same shape from buildTransitive. -->
+  <!-- Every test project in the repo, replacing the boilerplate that used to be copied into each
+       .csproj. This is repository convention only: package consumers choose their own test runner
+       and project shape, and get just the Aspire paths from DigitalBrain.Testing.E2E. -->
   <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests')) Or $(MSBuildProjectName.Contains('.Tests.'))">
     <OutputType>Exe</OutputType>
     <IsTestProject>true</IsTestProject>

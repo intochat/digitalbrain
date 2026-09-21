@@ -75,9 +75,13 @@
          out of these packages because they build the Aspire model without an AppHost project. -->
     <PackageVersion Include="Aspire.Hosting.Orchestration.win-x64" Version="$(AspireVersion)" />
     <PackageVersion Include="Aspire.Hosting.Orchestration.linux-x64" Version="$(AspireVersion)" />
+    <PackageVersion Include="Aspire.Hosting.Orchestration.linux-arm64" Version="$(AspireVersion)" />
     <PackageVersion Include="Aspire.Hosting.Orchestration.osx-arm64" Version="$(AspireVersion)" />
+    <PackageVersion Include="Aspire.Hosting.Orchestration.osx-x64" Version="$(AspireVersion)" />
     <PackageVersion Include="Aspire.Dashboard.Sdk.win-x64" Version="$(AspireVersion)" />
     <PackageVersion Include="Aspire.Dashboard.Sdk.linux-x64" Version="$(AspireVersion)" />
+    <PackageVersion Include="Aspire.Dashboard.Sdk.linux-arm64" Version="$(AspireVersion)" />
     <PackageVersion Include="Aspire.Dashboard.Sdk.osx-arm64" Version="$(AspireVersion)" />
+    <PackageVersion Include="Aspire.Dashboard.Sdk.osx-x64" Version="$(AspireVersion)" />
   </ItemGroup>
 </Project>

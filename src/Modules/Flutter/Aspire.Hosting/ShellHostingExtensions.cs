@@ -258,7 +258,9 @@ public static class ShellHostingExtensions
                 }
             }
 
-            return Path.GetFullPath(Path.Combine(appHostDirectory, packagePathsFromRepositoryRoot[0]));
+            throw new DirectoryNotFoundException(
+                $"No Flutter package above '{appHostDirectory}'. Expected {string.Join(" or ", packagePathsFromRepositoryRoot)} "
+                + "under the repository root, or pass FlutterHostOptions.WorkingDirectory.");
         }
     }
 }

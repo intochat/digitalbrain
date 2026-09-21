@@ -28,7 +28,9 @@ A test project is named `<Owner>.Tests.Unit` or `<Owner>.Tests.E2E` and lives in
 
 Everything else — `OutputType`, `IsTestProject`, the Microsoft.Testing.Platform runner, `xunit.v3.mtp-v2`
 and the global usings — comes from the repository's `Directory.Build.props`, keyed on the `.Tests`
-name. Package consumers get the same shape from `buildTransitive`. Do not restate it per project.
+name. Do not restate it per project. This is a repository convention, not part of the packages:
+a consumer outside this repo picks their own test runner and project shape, and receives only the
+Aspire orchestration paths, from `DigitalBrain.Testing.E2E`'s `buildTransitive`.
 
 ## Neuron tests
 
@@ -166,10 +168,14 @@ fail explicitly.
 ## Ownership
 
 ```text
-src/Modules/<Module>/Tests/Unit/     neuron logic and signals
-src/Modules/<Module>/Tests/E2E/      transport, process behavior and rendering
-src/Applications/IntoChat/Tests/E2E/ connected product behavior only
+src/Modules/<Module>/Tests/Unit/      neuron logic and signals
+src/Modules/<Module>/Tests/E2E/       transport, process behavior and rendering
+src/Applications/IntoChat/Tests/Unit/ application code that needs no host at all
+src/Applications/IntoChat/Tests/E2E/  connected product behavior
 ```
 
-IntoChat has no unit tests of its own: module suites own the constituent behavior and product E2E
-asserts that the composition works. Flutter widget tests cover UI controls in isolation.
+IntoChat owns almost no behavior tests: module suites own the constituent behavior and product E2E
+asserts that the composition works. Its unit suite is only for application code a host cannot make
+more true — image header parsing, edit geometry, the local file store — which would otherwise pay
+for Docker and a browser to assert a pure function. Flutter widget tests cover UI controls in
+isolation.
