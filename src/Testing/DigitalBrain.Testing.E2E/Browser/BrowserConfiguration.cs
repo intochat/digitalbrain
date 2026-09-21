@@ -1,6 +1,5 @@
 namespace DigitalBrain.Testing.E2E;
 
-/// <summary>Process-local browser configuration used inside an E2E module configuration callback.</summary>
 public sealed class BrowserConfiguration
 {
     private BrowserOptions _options;
@@ -15,7 +14,6 @@ public sealed class BrowserConfiguration
     }
 
     private static readonly AsyncLocal<Scope?> Current = new();
-    /// <summary>For module testing adapters. Never serializes browser settings into module options.</summary>
     public static void Configure(Action<BrowserConfiguration> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);

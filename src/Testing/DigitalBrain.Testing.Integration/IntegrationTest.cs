@@ -6,10 +6,9 @@ namespace DigitalBrain.Testing.Integration;
 public static class IntegrationTest
 {
     public static IntegrationTestBuilder Create() => new();
-    internal static async Task<IntegrationBrain> StartAsync(IntegrationOptions options, CancellationToken cancellationToken = default)
-    {
-        return new(await ModuleTestHost.StartAsync(options.Modules, options.Execution, cancellationToken).ConfigureAwait(false));
-    }
+    internal static async Task<IntegrationBrain> StartAsync(
+        IReadOnlyList<ModuleDefinition> modules, TestExecutionOptions execution, CancellationToken cancellationToken = default)
+        => new(await ModuleTestHost.StartAsync(modules, execution, cancellationToken).ConfigureAwait(false));
 }
 
 public sealed class IntegrationBrain : HostedBrain

@@ -3,7 +3,6 @@ using DigitalBrain.Testing.Hosting;
 
 namespace DigitalBrain.Testing.Integration;
 
-/// <summary>Shared module runner and bundle startup for integration and end-to-end tests.</summary>
 public static class ModuleTestHost
 {
     public static async Task<AspireTestSession> StartAsync(IReadOnlyList<ModuleDefinition> selectedModules, TestExecutionOptions execution, CancellationToken cancellationToken = default)

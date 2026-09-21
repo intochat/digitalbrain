@@ -2,7 +2,6 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Testing.E2E;
 
-/// <summary>An isolated module composition using each selected module's E2E defaults.</summary>
 public sealed class E2ETestBuilder
 {
     private readonly BrainCompositionBuilder _composition = new();

@@ -35,7 +35,7 @@ public sealed class IntegrationTestBuilder
         if (composition.RequiresLocalServices)
             { throw new NotSupportedException("Integration tests run in another process. Select a compiled provider or a hosted endpoint fixture."); }
         _started = true;
-        return IntegrationTest.StartAsync(new() { Modules = composition.Modules, Execution = _execution }, cancellationToken);
+        return IntegrationTest.StartAsync(composition.Modules, _execution, cancellationToken);
     }
     private void EnsureMutable()
     {

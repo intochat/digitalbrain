@@ -4,7 +4,6 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Testing.Integration;
 
-/// <summary>Uses the test build's dependency closure; never builds or resolves packages at runtime.</summary>
 public sealed class ModuleBundle
 {
     private ModuleBundle(string directory, string entry) { Directory = directory; Entry = entry; }
