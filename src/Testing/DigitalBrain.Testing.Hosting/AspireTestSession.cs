@@ -19,9 +19,8 @@ public sealed class AspireTestSession : IAsyncDisposable
     private readonly TestExecutionOptions _options;
     private IHost? _client;
     private readonly string _identity;
-    private readonly string _resource;
-    private AspireTestSession(DistributedApplication app, TestSessionLifetime lifetime, TestExecutionOptions options, string identity, string resource)
-    { App = app; _lifetime = lifetime; _options = options; _identity = identity; _resource = resource; }
+    private AspireTestSession(DistributedApplication app, TestSessionLifetime lifetime, TestExecutionOptions options, string identity)
+    { App = app; _lifetime = lifetime; _options = options; _identity = identity; }
 
     public DistributedApplication App { get; }
     public IDigitalBrain Brain => _client!.Services.GetRequiredService<IDigitalBrain>();
@@ -69,7 +68,7 @@ public sealed class AspireTestSession : IAsyncDisposable
             stage = "build";
             var app = await builder.BuildAsync(ct).ConfigureAwait(false);
             lifetime.Own("application", app);
-            var session = new AspireTestSession(app, lifetime, options, identity, resource.Name);
+            var session = new AspireTestSession(app, lifetime, options, identity);
             stage = "start";
             await app.StartAsync(ct).ConfigureAwait(false);
             stage = "readiness";
@@ -127,24 +126,6 @@ public sealed class AspireTestSession : IAsyncDisposable
             await host.StopAsync(deadline.Token).ConfigureAwait(false);
         }
         finally { host.Dispose(); }
-    }
-
-    public async Task RestartRuntimeAsync(CancellationToken ct)
-    {
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        deadline.CancelAfter(_options.StartupTimeout);
-        _options.Diagnostics?.Invoke(new("restart", "Disconnecting client"));
-        await ReleaseClientAsync().ConfigureAwait(false);
-        _options.Diagnostics?.Invoke(new("restart", "Stopping runtime"));
-        await App.ResourceCommands.ExecuteCommandAsync(_resource, KnownResourceCommands.StopCommand, deadline.Token).ConfigureAwait(false);
-        await App.ResourceNotifications.WaitForResourceAsync(_resource, update =>
-        {
-            _options.Diagnostics?.Invoke(new("restart-state", update.Snapshot.State?.Text ?? "unknown"));
-            return update.Snapshot.State?.Text == KnownResourceStates.Exited || update.Snapshot.State?.Text == KnownResourceStates.Finished;
-        }, deadline.Token).ConfigureAwait(false);
-        await App.ResourceCommands.ExecuteCommandAsync(_resource, KnownResourceCommands.StartCommand, deadline.Token).ConfigureAwait(false);
-        await App.ResourceNotifications.WaitForResourceHealthyAsync(_resource, deadline.Token).ConfigureAwait(false);
-        await ConnectAsync(deadline.Token).ConfigureAwait(false);
     }
 
     public ValueTask DisposeAsync() => _lifetime.DisposeAsync();

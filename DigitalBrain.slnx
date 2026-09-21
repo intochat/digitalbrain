@@ -3,8 +3,6 @@
     <Project Path="src/Applications/IntoChat/AppHost/IntoChat.AppHost.csproj" />
     <Project Path="src/Applications/IntoChat/IntoChat/IntoChat.csproj" />
     <Project Path="src/Applications/IntoChat/ServiceDefaults/IntoChat.ServiceDefaults.csproj" />
-  </Folder>
-  <Folder Name="/IntoChat/Tests/">
     <Project Path="src/Applications/IntoChat/Tests/E2E/IntoChat.Tests.E2E.csproj" />
   </Folder>
   <Folder Name="/Modules/" />
@@ -107,9 +105,5 @@
     <Project Path="src/Testing/DigitalBrain.Testing.Hosting/DigitalBrain.Testing.Hosting.csproj" />
     <Project Path="src/Testing/DigitalBrain.Testing.ModuleRunner/DigitalBrain.Testing.ModuleRunner.csproj" />
     <Project Path="src/Testing/DigitalBrain.Testing.ModuleAppHost/DigitalBrain.Testing.ModuleAppHost.csproj" />
-  </Folder>
-  <Folder Name="/Testing/Tests/">
-    <Project Path="src/Testing/DigitalBrain.Testing.Framework.Tests/DigitalBrain.Testing.Framework.Tests.csproj" />
-    <Project Path="src/Testing/DigitalBrain.Testing.Framework.IntegrationTests/DigitalBrain.Testing.Framework.IntegrationTests.csproj" />
   </Folder>
 </Solution>

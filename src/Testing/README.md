@@ -14,8 +14,9 @@ Plain function/object unit tests need no brain harness. Integration verifies mod
 process/storage behavior; module E2E verifies UI behavior and product E2E verifies actual application wiring. Product E2E can run without a browser.
 
 The solution places only these four libraries directly under Testing. Infrastructure contains the
-shared Aspire session, ModuleRunner and ModuleAppHost; Tests contains framework verification.
-These remain physical projects, not additional public testing layers.
+shared Aspire session, ModuleRunner and ModuleAppHost. These remain physical projects, not additional
+public testing layers. Harness invariants live next to Core, Testing, and E2E; a test-assembly module
+loading through the runner is covered by Google integration.
 
 ## Neuron tests
 
@@ -71,10 +72,9 @@ The runner loads the test build's dependency closure; it never builds/restores a
 Import `Integration.Tests.props`. Include the selected module's Aspire hosting adapter project
 when that module declares one. The module host locates the Flutter shell from the repository root; an explicit working directory can override it.
 
-`RestartRuntimeAsync` retains the run's storage and identity. Reacquire observations after restart.
 Independent runs own independent infrastructure. Use HTTP stubs and typed endpoint overrides for
 external providers; use a compiled test support module when the replacement is an in-process
-interface inside the external runtime. The framework's provider-loading test exercises this case.
+interface inside the external runtime.
 
 GoogleModuleOptions includes PublicOrigin and TokenEndpoint. Credential-bearing values belong in
 `WithExecution(new() { PrivateConfiguration = ... })`, outside public module options:

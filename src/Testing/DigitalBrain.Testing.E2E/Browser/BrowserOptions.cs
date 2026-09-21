@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("DigitalBrain.Testing.Framework.Tests")]
+[assembly: InternalsVisibleTo("DigitalBrain.Runtime.Tests")]
 
 namespace DigitalBrain.Testing.E2E;
 

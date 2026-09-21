@@ -14,5 +14,4 @@ public static class IntegrationTest
 public sealed class IntegrationBrain : HostedBrain
 {
     internal IntegrationBrain(AspireTestSession session) : base(session) { }
-    public Task RestartRuntimeAsync(CancellationToken cancellationToken = default) => Session.RestartRuntimeAsync(cancellationToken);
 }

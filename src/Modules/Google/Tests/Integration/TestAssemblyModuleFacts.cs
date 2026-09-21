@@ -1,11 +1,12 @@
 using DigitalBrain.Core;
 using Microsoft.AspNetCore.Builder;
+using Xunit;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Tests;
 
-public sealed class CompositionTransportFacts
+public sealed class TestAssemblyModuleFacts
 {
     [Fact(Timeout = 180_000)]
     public async Task TypedOptionalEndpointReachesExternalRuntime()
@@ -15,6 +16,8 @@ public sealed class CompositionTransportFacts
             .WithModule<EndpointModule>(m => m.ConfigureOptions<EndpointOptions>(o => o.Endpoint = "http://127.0.0.1:8123/v1", "Endpoint"))
             .StartAsync(ct);
         Assert.Equal("http://127.0.0.1:8123/v1", await brain.HttpClient.GetStringAsync("/configured-endpoint", ct));
+        Assert.NotEqual(Environment.ProcessId,
+            await System.Net.Http.Json.HttpClientJsonExtensions.GetFromJsonAsync<int>(brain.HttpClient, "/process", ct));
     }
 }
 

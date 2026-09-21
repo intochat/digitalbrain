@@ -1,4 +1,4 @@
-using DigitalBrain.Testing;
+using Xunit;
 
 namespace DigitalBrain.Tests;
 
@@ -30,6 +30,16 @@ public sealed class LifetimeFacts
     [Fact]
     public void InvalidDeadlinesFailBeforeStartup()
         => Assert.Throws<ArgumentOutOfRangeException>(() => new TestExecutionOptions { StartupTimeout = TimeSpan.Zero }.Validate());
+
+    [Fact]
+    public async Task UnitBuilderPreservesExecutionBudgetsAndStartsOnlyOnce()
+    {
+        var execution = new TestExecutionOptions { AssertionTimeout = TimeSpan.FromMilliseconds(120), CleanupTimeout = TimeSpan.FromSeconds(20) };
+        var builder = UnitTest.Create().WithExecution(execution).WithModule<CompositionFacts.OtherModule>();
+        await using var brain = await builder.StartAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(execution, ((ITrackedBrain)brain).Execution);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => builder.StartAsync(TestContext.Current.CancellationToken));
+    }
 
     private sealed class Resource(Func<ValueTask> dispose) : IAsyncDisposable
     {
