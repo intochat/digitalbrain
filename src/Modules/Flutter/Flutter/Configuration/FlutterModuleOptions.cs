@@ -13,6 +13,7 @@ public sealed record FlutterHostingOptions
     public string ChatName { get; init; } = "main";
     public string? FlutterCommand { get; init; }
     public string? WorkingDirectory { get; init; }
+    public bool ReleaseBuild { get; init; }
 }
 public sealed record FlutterModuleOptions
 {

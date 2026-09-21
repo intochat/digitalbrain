@@ -26,6 +26,7 @@ public sealed class FlutterModule : IModule, IModuleE2EDefaults<FlutterModule>
             ["DigitalBrain:Flutter:Hosting:ChatName"] = options.Hosting.ChatName,
             ["DigitalBrain:Flutter:Hosting:FlutterCommand"] = options.Hosting.FlutterCommand ?? "",
             ["DigitalBrain:Flutter:Hosting:WorkingDirectory"] = options.Hosting.WorkingDirectory ?? "",
+            ["DigitalBrain:Flutter:Hosting:ReleaseBuild"] = options.Hosting.ReleaseBuild.ToString(),
         });
     }
     public const string InboxPath = "/ui/inbox";

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 class PenStroke {
@@ -56,4 +58,6 @@ class ImageRecipe {
           .toList(),
     );
   }
+
+  bool sameAs(ImageRecipe other) => jsonEncode(toJson()) == jsonEncode(other.toJson());
 }

@@ -4,45 +4,45 @@ import 'package:flutter/material.dart';
 
 import 'image_recipe.dart';
 
-void paintImageScene(Canvas canvas, ui.Image image, ImageRecipe recipe) {
-  canvas.drawImage(image, Offset.zero, Paint());
-  for (final stroke in recipe.strokes) {
-    if (stroke.points.isEmpty) continue;
-    final paint = Paint()
+void paintStroke(Canvas canvas, PenStroke stroke) {
+  if (stroke.points.isEmpty) return;
+  if (stroke.points.length == 1) {
+    canvas.drawCircle(
+      stroke.points.first,
+      stroke.width / 2,
+      Paint()..color = stroke.color,
+    );
+    return;
+  }
+  final path = Path()..moveTo(stroke.points.first.dx, stroke.points.first.dy);
+  for (final point in stroke.points.skip(1)) {
+    path.lineTo(point.dx, point.dy);
+  }
+  canvas.drawPath(
+    path,
+    Paint()
       ..color = stroke.color
       ..strokeWidth = stroke.width
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
-      ..style = PaintingStyle.stroke;
-    if (stroke.points.length == 1) {
-      canvas.drawCircle(
-        stroke.points.first,
-        stroke.width / 2,
-        Paint()..color = stroke.color,
-      );
-    } else {
-      final path = Path()
-        ..moveTo(stroke.points.first.dx, stroke.points.first.dy);
-      for (final point in stroke.points.skip(1)) {
-        path.lineTo(point.dx, point.dy);
-      }
-      canvas.drawPath(path, paint);
-    }
+      ..style = PaintingStyle.stroke,
+  );
+}
+
+void paintImageScene(Canvas canvas, ui.Image image, ImageRecipe recipe) {
+  canvas.drawImage(image, Offset.zero, Paint());
+  for (final stroke in recipe.strokes) {
+    paintStroke(canvas, stroke);
   }
 }
 
 class ImageScenePainter extends CustomPainter {
-  ImageScenePainter(this.image, this.recipe, {this.draft});
+  ImageScenePainter(this.image, this.recipe);
   final ui.Image image;
   final ImageRecipe recipe;
-  final PenStroke? draft;
   @override
   void paint(Canvas canvas, Size size) {
-    paintImageScene(
-      canvas,
-      image,
-      ImageRecipe(strokes: [...recipe.strokes, ?draft]),
-    );
+    paintImageScene(canvas, image, recipe);
     if (recipe.crop case final crop?) {
       final outside = Path.combine(
         PathOperation.difference,
@@ -62,5 +62,17 @@ class ImageScenePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(ImageScenePainter old) =>
-      old.image != image || old.recipe != recipe || old.draft != draft;
+      old.image != image || old.recipe != recipe;
+}
+
+class DraftStrokePainter extends CustomPainter {
+  DraftStrokePainter(this.stroke);
+  final PenStroke? stroke;
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (stroke case final current?) paintStroke(canvas, current);
+  }
+
+  @override
+  bool shouldRepaint(DraftStrokePainter old) => old.stroke != stroke;
 }

@@ -129,12 +129,13 @@ public static class ShellHostingExtensions
             // Hot reload rides the Dart VM service, which the headless web-server target no
             // longer exposes (it runs --release; see FlutterHostLaunch.ResolveWeb). Window and
             // browser-driving web targets (e.g. "chrome" via the configure hook) keep it.
-            var hasVmService = kind == FlutterHostKind.Window
-                || (kind == FlutterHostKind.Web
-                    && !string.Equals(
-                        launch.DeviceTarget,
-                        ShellNames.DefaultWebDeviceTarget,
-                        StringComparison.OrdinalIgnoreCase));
+            var hasVmService = !options.ReleaseBuild
+                && (kind == FlutterHostKind.Window
+                    || (kind == FlutterHostKind.Web
+                        && !string.Equals(
+                            launch.DeviceTarget,
+                            ShellNames.DefaultWebDeviceTarget,
+                            StringComparison.OrdinalIgnoreCase)));
             if (appHost.ExecutionContext.IsRunMode && hasVmService)
             {
                 ArmHotReload(host, launch.WorkingDirectory);

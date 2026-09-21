@@ -60,5 +60,6 @@ void main() {
       ],
     );
     expect(ImageRecipe.fromJson(recipe.toJson()).toJson(), recipe.toJson());
+    expect(ImageRecipe.fromJson(recipe.toJson()).sameAs(recipe), isTrue);
   });
 }

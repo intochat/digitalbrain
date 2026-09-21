@@ -64,10 +64,16 @@ internal static class FlutterHostLaunch
                 $"under '{packageRoot}', '{packageRoot}/{ShellPackageDirectoryName}', " +
                 $"or the sibling '../{ShellPackageDirectoryName}' (clients/flutter/shell).");
 
+        var args = new List<string> { "run", "-d", deviceTarget };
+        if (options.ReleaseBuild)
+        {
+            args.Add("--release");
+        }
+
         return new Result(
             ResolveFlutterCommand(options, configuration),
             workDir,
-            ["run", "-d", deviceTarget],
+            [.. args],
             deviceTarget);
     }
 

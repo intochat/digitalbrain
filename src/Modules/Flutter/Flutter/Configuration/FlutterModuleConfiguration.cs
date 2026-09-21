@@ -4,7 +4,7 @@ namespace DigitalBrain.Flutter;
 
 public sealed class FlutterConfigurationContract() : ModuleConfigurationContract<FlutterModule, FlutterModuleOptions>(
     "Hosting.Kind", "Hosting.ResourceName", "Hosting.DeviceTarget", "Hosting.ShellName", "Hosting.ChatName",
-    "Hosting.FlutterCommand", "Hosting.WorkingDirectory")
+    "Hosting.FlutterCommand", "Hosting.WorkingDirectory", "Hosting.ReleaseBuild")
 {
     protected override ModuleDefinition Compile(FlutterModuleOptions options) => FlutterModule.Define(options);
 }
@@ -15,6 +15,20 @@ public static class FlutterModuleConfiguration
         => WithHost(module, FlutterHostKind.Web);
     public static ModuleConfiguration<FlutterModule> RunDesktopApp(this ModuleConfiguration<FlutterModule> module)
         => WithHost(module, FlutterHostKind.Window);
+    public static ModuleConfiguration<FlutterModule> AsReleaseBuild(this ModuleConfiguration<FlutterModule> module)
+    {
+        module.ConfigureOptions<FlutterModuleOptions>(
+            options => options.Hosting = options.Hosting with { ReleaseBuild = true },
+            "Hosting.ReleaseBuild");
+        return module;
+    }
+    public static ModuleConfiguration<FlutterModule> AsDebugBuild(this ModuleConfiguration<FlutterModule> module)
+    {
+        module.ConfigureOptions<FlutterModuleOptions>(
+            options => options.Hosting = options.Hosting with { ReleaseBuild = false },
+            "Hosting.ReleaseBuild");
+        return module;
+    }
     public static ModuleConfiguration<FlutterModule> BackendOnly(this ModuleConfiguration<FlutterModule> module)
         => WithHost(module, FlutterHostKind.None);
     public static ModuleConfiguration<FlutterModule> WithOptions(this ModuleConfiguration<FlutterModule> module, FlutterModuleOptions options)

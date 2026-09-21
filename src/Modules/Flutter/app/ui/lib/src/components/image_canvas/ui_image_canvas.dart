@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -25,6 +26,7 @@ class UiImageCanvas extends StatefulWidget {
     this.onBusyChanged,
     this.session,
     this.exportImage = ImageExporter.renderPng,
+    this.persistDebounce = const Duration(milliseconds: 700),
   });
   final Uint8List bytes;
   final int sourceWidth, sourceHeight;
@@ -35,6 +37,7 @@ class UiImageCanvas extends StatefulWidget {
   final ValueChanged<bool>? onBusyChanged;
   final ImageCanvasSession? session;
   final Future<Uint8List> Function(ui.Image, ImageRecipe) exportImage;
+  final Duration persistDebounce;
   @override
   State<UiImageCanvas> createState() => _UiImageCanvasState();
 }
@@ -48,9 +51,15 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
   Color color = const Color(0xffff6868);
   double width = 5;
   final points = <Offset>[];
+  final draft = ValueNotifier<PenStroke?>(null);
   late final history = widget.session ?? ImageCanvasSession();
   List<ImageRecipe> get undo => history.undo;
   List<ImageRecipe> get redo => history.redo;
+  ImageRecipe? localRecipe;
+  Timer? persistTimer;
+  ImageRecipe? queuedPersist;
+  bool persisting = false;
+  ImageRecipe get displayed => localRecipe ?? widget.recipe;
   bool busy = false;
   String? error;
   Size viewport = Size.zero;
@@ -66,6 +75,9 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
     super.didUpdateWidget(old);
     if (!identical(old.bytes, widget.bytes)) {
       load();
+    }
+    if (localRecipe != null && localRecipe!.sameAs(widget.recipe)) {
+      localRecipe = null;
     }
   }
 
@@ -136,29 +148,44 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
   }
 
   Future<void> commit(ImageRecipe recipe, {bool history = true}) async {
-    if (busy) return;
-    final previous = widget.recipe;
-    final onEdit = widget.onEdit;
-    final onBusyChanged = widget.onBusyChanged;
-    onBusyChanged?.call(true);
-    this.history.pendingEdit = recipe;
+    if (history) {
+      undo.add(displayed);
+      if (undo.length > 100) undo.removeAt(0);
+      redo.clear();
+    }
     setState(() {
-      busy = true;
+      localRecipe = recipe;
       error = null;
     });
+    schedulePersist(recipe);
+  }
+
+  void schedulePersist(ImageRecipe recipe) {
+    persistTimer?.cancel();
+    persistTimer = Timer(widget.persistDebounce, () => persist(recipe));
+  }
+
+  Future<void> persist(ImageRecipe recipe) async {
+    if (persisting) {
+      queuedPersist = recipe;
+      return;
+    }
+    persisting = true;
+    if (mounted) setState(() {});
+    history.pendingEdit = recipe;
     try {
-      await onEdit(recipe);
-      this.history.pendingEdit = null;
-      if (history) {
-        undo.add(previous);
-        if (undo.length > 100) undo.removeAt(0);
-        redo.clear();
-      }
+      await widget.onEdit(recipe);
+      history.pendingEdit = null;
     } catch (e) {
       if (mounted) setState(() => error = 'Could not save edits: $e');
     } finally {
-      onBusyChanged?.call(false);
-      if (mounted) setState(() => busy = false);
+      persisting = false;
+      if (mounted) setState(() {});
+      final queued = queuedPersist;
+      queuedPersist = null;
+      if (queued != null && history.pendingEdit == null) {
+        await persist(queued);
+      }
     }
   }
 
@@ -166,7 +193,7 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
     final img = image;
     if (img == null) return;
     final rect =
-        widget.recipe.crop ??
+        displayed.crop ??
         Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble());
     final values = [
       rect.left,
@@ -242,7 +269,7 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
     );
     // Dialog controllers remain alive until its closing animation has finished.
     if (result != null && mounted) {
-      await commit(ImageRecipe(crop: result, strokes: widget.recipe.strokes));
+      await commit(ImageRecipe(crop: result, strokes: displayed.strokes));
     }
     await Future<void>.delayed(const Duration(milliseconds: 250));
     for (final c in values) {
@@ -298,7 +325,7 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
                   ? null
                   : () => setState(() {
                       tool = 'crop';
-                      cropDraft = widget.recipe.crop;
+                      cropDraft = displayed.crop;
                     }),
               selected: tool == 'crop',
             ),
@@ -309,7 +336,7 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
                   ? null
                   : () async {
                       final previous = undo.last;
-                      final current = widget.recipe;
+                      final current = displayed;
                       await commit(previous, history: false);
                       if (error == null) {
                         undo.removeLast();
@@ -325,7 +352,7 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
                   ? null
                   : () async {
                       final next = redo.last;
-                      final current = widget.recipe;
+                      final current = displayed;
                       await commit(next, history: false);
                       if (error == null) {
                         redo.removeLast();
@@ -387,7 +414,7 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
                       final onSave = widget.onSave;
                       final exportImage = widget.exportImage;
                       final onBusyChanged = widget.onBusyChanged;
-                      final recipe = widget.recipe;
+                      final recipe = displayed;
                       onBusyChanged?.call(true);
                       setState(() {
                         busy = true;
@@ -432,7 +459,7 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
                         await commit(
                           ImageRecipe(
                             crop: cropDraft,
-                            strokes: widget.recipe.strokes,
+                            strokes: displayed.strokes,
                           ),
                         );
                         if (mounted && error == null) {
@@ -485,10 +512,14 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
                         });
                       }
                       if (tool == 'pen' && !busy) {
-                        setState(() {
-                          points.clear();
-                          points.add(point(e.localPosition));
-                        });
+                        points
+                          ..clear()
+                          ..add(point(e.localPosition));
+                        draft.value = PenStroke(
+                          color: color,
+                          width: width,
+                          points: List.of(points),
+                        );
                       }
                     },
                     onPointerMove: (e) {
@@ -510,10 +541,18 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
                         });
                       }
                       if (tool == 'pen' && !busy && points.isNotEmpty) {
-                        setState(() => points.add(point(e.localPosition)));
+                        points.add(point(e.localPosition));
+                        draft.value = PenStroke(
+                          color: color,
+                          width: width,
+                          points: List.of(points),
+                        );
                       }
                     },
-                    onPointerCancel: (_) => setState(points.clear),
+                    onPointerCancel: (_) {
+                      points.clear();
+                      draft.value = null;
+                    },
                     onPointerUp: (_) {
                       cropStart = null;
                       if (tool == 'pen' && !busy && points.isNotEmpty) {
@@ -522,11 +561,12 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
                           width: width,
                           points: List.of(points),
                         );
-                        setState(points.clear);
+                        points.clear();
+                        draft.value = null;
                         commit(
                           ImageRecipe(
-                            crop: widget.recipe.crop,
-                            strokes: [...widget.recipe.strokes, stroke],
+                            crop: displayed.crop,
+                            strokes: [...displayed.strokes, stroke],
                           ),
                         );
                       }
@@ -541,26 +581,42 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
                       maxScale: 16,
                       panEnabled: tool == 'pan',
                       scaleEnabled: tool == 'pan',
-                      child: CustomPaint(
-                        size: Size(
-                          image!.width.toDouble(),
-                          image!.height.toDouble(),
-                        ),
-                        painter: ImageScenePainter(
-                          image!,
-                          cropDraft == null
-                              ? widget.recipe
-                              : ImageRecipe(
-                                  crop: cropDraft,
-                                  strokes: widget.recipe.strokes,
+                      child: SizedBox(
+                        width: image!.width.toDouble(),
+                        height: image!.height.toDouble(),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            RepaintBoundary(
+                              child: CustomPaint(
+                                size: Size(
+                                  image!.width.toDouble(),
+                                  image!.height.toDouble(),
                                 ),
-                          draft: points.isEmpty
-                              ? null
-                              : PenStroke(
-                                  color: color,
-                                  width: width,
-                                  points: List.of(points),
+                                painter: ImageScenePainter(
+                                  image!,
+                                  cropDraft == null
+                                      ? displayed
+                                      : ImageRecipe(
+                                          crop: cropDraft,
+                                          strokes: displayed.strokes,
+                                        ),
                                 ),
+                              ),
+                            ),
+                            RepaintBoundary(
+                              child: ValueListenableBuilder<PenStroke?>(
+                                valueListenable: draft,
+                                builder: (_, stroke, _) => CustomPaint(
+                                  size: Size(
+                                    image!.width.toDouble(),
+                                    image!.height.toDouble(),
+                                  ),
+                                  painter: DraftStrokePainter(stroke),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -583,7 +639,11 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
             ),
             const Spacer(),
             Text(
-              widget.saved ? 'Copy saved' : 'Original preserved',
+              persisting
+                  ? 'Syncing edits…'
+                  : widget.saved
+                  ? 'Copy saved'
+                  : 'Original preserved',
               style: Theme.of(context).textTheme.labelSmall,
             ),
           ],
@@ -594,6 +654,8 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
   @override
   void dispose() {
     generation++;
+    persistTimer?.cancel();
+    draft.dispose();
     transform.dispose();
     image?.dispose();
     super.dispose();

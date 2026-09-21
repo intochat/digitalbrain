@@ -49,4 +49,44 @@ void main() {
       expect(busy, isFalse);
     },
   );
+
+  testWidgets('stroke persist waits for debounce and does not lock drawing', (
+    tester,
+  ) async {
+    final bytes = base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==',
+    );
+    var edits = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: UiImageCanvas(
+            bytes: bytes,
+            recipe: const ImageRecipe(),
+            sourceWidth: 1,
+            sourceHeight: 1,
+            persistDebounce: const Duration(milliseconds: 40),
+            onEdit: (_) async {
+              edits++;
+            },
+            onSave: (_) async {},
+          ),
+        ),
+      ),
+    );
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Draw'));
+    await tester.pump();
+    final canvas = tester.getRect(find.bySemanticsLabel('Image canvas'));
+    final gesture = await tester.startGesture(canvas.center);
+    await gesture.moveBy(const Offset(0.2, 0));
+    await gesture.up();
+    await tester.pump();
+    expect(edits, 0);
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(edits, 1);
+  });
 }

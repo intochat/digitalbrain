@@ -733,10 +733,10 @@ class WorkspaceStore extends ChangeNotifier {
     save();
   }
 
-  void setWindowBounds(String id, List<double> bounds) {
+  void setWindowBounds(String id, List<double> bounds, {bool persist = true}) {
     if (bounds.length == 4 && bounds.every((v) => v.isFinite)) {
       currentProject.presentation.windowBounds[id] = List.of(bounds);
-      save();
+      if (persist) save();
     }
   }
 

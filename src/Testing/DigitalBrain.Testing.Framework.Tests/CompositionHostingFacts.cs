@@ -146,6 +146,31 @@ public sealed class CompositionHostingFacts
     }
 
     [Fact]
+    public void WindowReleaseLaunchAddsReleaseFlagAndDropsDebugVmServiceArgs()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "DigitalBrain.slnx"))) { root = root.Parent; }
+        var package = Path.Combine(root!.FullName, "src", "Modules", "Flutter", "app", "shell");
+        var debug = FlutterHostLaunch.Resolve(FlutterHostKind.Window, package, new FlutterHostOptions());
+        Assert.DoesNotContain("--release", debug.Args);
+        var release = FlutterHostLaunch.Resolve(FlutterHostKind.Window, package, new FlutterHostOptions { ReleaseBuild = true });
+        Assert.Contains("--release", release.Args);
+    }
+
+    [Fact]
+    public void DesktopReleaseBuildCompilesIntoHostingSettings()
+    {
+        var module = Assert.Single(new BrainCompositionBuilder()
+            .WithModule<FlutterModule>(flutter => flutter.RunDesktopApp().AsReleaseBuild())
+            .Build().Modules);
+        Assert.Equal("True", module.Configuration["DigitalBrain:Flutter:Hosting:ReleaseBuild"]);
+        module = Assert.Single(new BrainCompositionBuilder()
+            .WithModule<FlutterModule>(flutter => flutter.RunDesktopApp().AsReleaseBuild().AsDebugBuild())
+            .Build().Modules);
+        Assert.Equal("False", module.Configuration["DigitalBrain:Flutter:Hosting:ReleaseBuild"]);
+    }
+
+    [Fact]
     public void HostDefersModuleResourcesAndFreezesOnFirstReference()
     {
         var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOptions { Args = [], DisableDashboard = true });

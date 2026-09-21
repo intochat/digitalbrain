@@ -25,6 +25,7 @@ public sealed class FlutterModuleHosting : IDigitalBrainModuleHosting
             target.ChatName = options.ChatName;
             target.FlutterCommand = options.FlutterCommand;
             target.WorkingDirectory = options.WorkingDirectory;
+            target.ReleaseBuild = options.ReleaseBuild;
         }
     }
 }

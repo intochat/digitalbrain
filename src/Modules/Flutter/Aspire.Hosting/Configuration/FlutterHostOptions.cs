@@ -17,4 +17,6 @@ public sealed class FlutterHostOptions
     public string? FlutterCommand { get; set; }
 
     public string? WorkingDirectory { get; set; }
+
+    public bool ReleaseBuild { get; set; }
 }

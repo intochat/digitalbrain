@@ -49,9 +49,47 @@ Rect workspaceWindowRect(
 
 class _WorkspaceDesktopState extends State<WorkspaceDesktop> {
   final _surface = GlobalKey();
+  final _liveBounds = <String, List<double>>{};
+  final _frozenEditorTokens = <String, Object>{};
   String? _dragging, _snap;
   bool _resizing = false;
   WorkspaceStore get store => widget.store;
+  bool get _interacting => _dragging != null || _resizing;
+
+  List<double>? _boundsOf(String id) =>
+      _liveBounds[id] ?? store.currentProject.presentation.windowBounds[id];
+
+  Object _editorToken(WorkspaceArtifact artifact) {
+    final fresh = Object.hash(
+      artifact.title,
+      artifact.kind,
+      artifact.content,
+      artifact.data['_dirty'],
+      artifact.data['_revision'],
+    );
+    if (_interacting) {
+      return _frozenEditorTokens[artifact.id] ??= fresh;
+    }
+    _frozenEditorTokens.remove(artifact.id);
+    return fresh;
+  }
+
+  void _freezeEditors() {
+    for (final artifact in store.currentProject.artifacts) {
+      _frozenEditorTokens[artifact.id] = Object.hash(
+        artifact.title,
+        artifact.kind,
+        artifact.content,
+        artifact.data['_dirty'],
+        artifact.data['_revision'],
+      );
+    }
+  }
+
+  void _commitBounds(String id) {
+    final live = _liveBounds.remove(id);
+    if (live != null) store.setWindowBounds(id, live);
+  }
 
   void _toggle(String id) {
     if (store.currentProject.presentation.modeOf(id) == 'maximized') {
@@ -124,24 +162,11 @@ class _WorkspaceDesktopState extends State<WorkspaceDesktop> {
     final id = artifact.id;
     final p = store.currentProject.presentation;
     final mode = p.modeOf(id);
-    final rect = workspaceWindowRect(area, mode, p.windowBounds[id], index);
+    final rect = workspaceWindowRect(area, mode, _boundsOf(id), index);
     final colors = Theme.of(context).colorScheme;
     final active = p.activeArtifactId == id;
     final narrow = area.width < 600;
-    return AnimatedPositioned(
-      key: ValueKey('window-$id'),
-      duration:
-          _dragging != null ||
-              _resizing ||
-              MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : const Duration(milliseconds: 160),
-      curve: Curves.easeOutCubic,
-      left: rect.left,
-      top: rect.top,
-      width: rect.width,
-      height: rect.height,
-      child: Offstage(
+    final chrome = Offstage(
         offstage: hidden,
         child: Listener(
           onPointerDown: (_) => store.focusWindow(id),
@@ -186,21 +211,22 @@ class _WorkspaceDesktopState extends State<WorkspaceDesktop> {
                                       ? null
                                       : (_) {
                                           store.focusWindow(id);
+                                          _freezeEditors();
                                           if (mode != 'floating') {
                                             store.snapWindow(id, 'floating');
                                             final restored =
                                                 workspaceWindowRect(
                                                   area,
                                                   'floating',
-                                                  p.windowBounds[id],
+                                                  _boundsOf(id),
                                                   index,
                                                 );
-                                            store.setWindowBounds(id, [
+                                            _liveBounds[id] = [
                                               restored.left,
                                               restored.top,
                                               restored.width,
                                               restored.height,
-                                            ]);
+                                            ];
                                           }
                                           setState(() => _dragging = id);
                                         },
@@ -210,7 +236,7 @@ class _WorkspaceDesktopState extends State<WorkspaceDesktop> {
                                           final current = workspaceWindowRect(
                                             area,
                                             'floating',
-                                            p.windowBounds[id],
+                                            _boundsOf(id),
                                             index,
                                           );
                                           final moved = workspaceWindowRect(
@@ -224,46 +250,55 @@ class _WorkspaceDesktopState extends State<WorkspaceDesktop> {
                                             ],
                                             index,
                                           );
-                                          store.setWindowBounds(id, [
-                                            moved.left,
-                                            moved.top,
-                                            moved.width,
-                                            moved.height,
-                                          ]);
-                                          final box =
-                                              _surface.currentContext!
-                                                      .findRenderObject()
-                                                  as RenderBox;
-                                          final local = box.globalToLocal(
-                                            details.globalPosition,
-                                          );
-                                          setState(
-                                            () => _snap = local.dy < 24
-                                                ? 'maximized'
-                                                : local.dx < 28
-                                                ? 'left'
-                                                : local.dx > area.width - 28
-                                                ? 'right'
-                                                : null,
-                                          );
+                                          setState(() {
+                                            _liveBounds[id] = [
+                                              moved.left,
+                                              moved.top,
+                                              moved.width,
+                                              moved.height,
+                                            ];
+                                            _snap = () {
+                                              final box =
+                                                  _surface.currentContext!
+                                                          .findRenderObject()
+                                                      as RenderBox;
+                                              final local = box.globalToLocal(
+                                                details.globalPosition,
+                                              );
+                                              return local.dy < 24
+                                                  ? 'maximized'
+                                                  : local.dx < 28
+                                                  ? 'left'
+                                                  : local.dx > area.width - 28
+                                                  ? 'right'
+                                                  : null;
+                                            }();
+                                          });
                                         },
                                   onPanEnd: narrow
                                       ? null
                                       : (_) {
                                           if (_snap == 'maximized') {
+                                            _liveBounds.remove(id);
                                             store.maximizeWindow(id);
                                           } else if (_snap != null) {
+                                            _liveBounds.remove(id);
                                             store.snapWindow(id, _snap!);
+                                          } else {
+                                            _commitBounds(id);
                                           }
                                           setState(() {
                                             _dragging = null;
                                             _snap = null;
                                           });
                                         },
-                                  onPanCancel: () => setState(() {
-                                    _dragging = null;
-                                    _snap = null;
-                                  }),
+                                  onPanCancel: () {
+                                    _commitBounds(id);
+                                    setState(() {
+                                      _dragging = null;
+                                      _snap = null;
+                                    });
+                                  },
                                   child: Padding(
                                     padding: const EdgeInsets.only(left: 12),
                                     child: Row(
@@ -347,7 +382,14 @@ class _WorkspaceDesktopState extends State<WorkspaceDesktop> {
                         height: 1,
                         color: colors.outlineVariant.withValues(alpha: .6),
                       ),
-                      Expanded(child: widget.editorBuilder(artifact)),
+                      Expanded(
+                        child: RepaintBoundary(
+                          child: _PinnedEditor(
+                            token: _editorToken(artifact),
+                            builder: () => widget.editorBuilder(artifact),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                   if (mode == 'floating' && !narrow)
@@ -359,28 +401,39 @@ class _WorkspaceDesktopState extends State<WorkspaceDesktop> {
                         child: GestureDetector(
                           key: ValueKey('window-resize-$id'),
                           behavior: HitTestBehavior.opaque,
-                          onPanStart: (_) => setState(() => _resizing = true),
-                          onPanEnd: (_) => setState(() => _resizing = false),
-                          onPanCancel: () => setState(() => _resizing = false),
+                          onPanStart: (_) {
+                            _freezeEditors();
+                            setState(() => _resizing = true);
+                          },
+                          onPanEnd: (_) {
+                            _commitBounds(id);
+                            setState(() => _resizing = false);
+                          },
+                          onPanCancel: () {
+                            _commitBounds(id);
+                            setState(() => _resizing = false);
+                          },
                           onPanUpdate: (d) {
                             final current = workspaceWindowRect(
                               area,
                               mode,
-                              p.windowBounds[id],
+                              _boundsOf(id),
                               index,
                             );
-                            store.setWindowBounds(id, [
-                              current.left,
-                              current.top,
-                              (current.width + d.delta.dx).clamp(
-                                280,
-                                area.width - current.left,
-                              ),
-                              (current.height + d.delta.dy).clamp(
-                                220,
-                                area.height - current.top,
-                              ),
-                            ]);
+                            setState(() {
+                              _liveBounds[id] = [
+                                current.left,
+                                current.top,
+                                (current.width + d.delta.dx).clamp(
+                                  280,
+                                  area.width - current.left,
+                                ),
+                                (current.height + d.delta.dy).clamp(
+                                  220,
+                                  area.height - current.top,
+                                ),
+                              ];
+                            });
                           },
                           child: SizedBox(
                             width: 24,
@@ -399,7 +452,18 @@ class _WorkspaceDesktopState extends State<WorkspaceDesktop> {
             ),
           ),
         ),
-      ),
+      );
+    return AnimatedPositioned(
+      key: ValueKey('window-$id'),
+      duration: _interacting || MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 160),
+      curve: Curves.easeOutCubic,
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
+      child: chrome,
     );
   }
 
@@ -414,4 +478,24 @@ class _WorkspaceDesktopState extends State<WorkspaceDesktop> {
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
       );
+}
+
+class _PinnedEditor extends StatefulWidget {
+  const _PinnedEditor({required this.token, required this.builder});
+  final Object token;
+  final Widget Function() builder;
+  @override
+  State<_PinnedEditor> createState() => _PinnedEditorState();
+}
+
+class _PinnedEditorState extends State<_PinnedEditor> {
+  late Widget _child = widget.builder();
+  @override
+  void didUpdateWidget(_PinnedEditor old) {
+    super.didUpdateWidget(old);
+    if (old.token != widget.token) _child = widget.builder();
+  }
+
+  @override
+  Widget build(BuildContext context) => _child;
 }
