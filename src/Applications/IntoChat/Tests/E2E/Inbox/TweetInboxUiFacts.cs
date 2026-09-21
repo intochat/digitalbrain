@@ -12,7 +12,7 @@ public sealed class TweetInboxUiFacts
     public async Task WebhookTweetAppearsInFlutterUi()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntoChatE2ETest.Create().ConfigureModule<FlutterModule>(flutter => flutter.RunWebApp()).StartAsync(ct);
+        await using var brain = await IntoChatE2ETest.Create().ConfigureModule<FlutterModule>(flutter => flutter.RunWebApp(browser => browser.Headed().SlowMo(300))).StartAsync(ct);
         await WorkspaceBrowser.CreateProjectAsync(brain.Page, "Tweet inbox");
         await brain.Get<IBitcoin>("btc").SetPrice(64_000);
         using var webhook = await brain.HttpClient.PostAsJsonAsync(
