@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../../../Testing/Integration.Tests.props" />
+  <PropertyGroup>
+    <DisableMSBuildAssemblyCopyCheck>true</DisableMSBuildAssemblyCopyCheck>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../../Flutter/DigitalBrain.Modules.Flutter.csproj" />
+    <ProjectReference Include="../../Aspire.Hosting/DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,3 +1,4 @@
+using IntoChat.Workspace.Queries;
 using DigitalBrain.Aspire;
 using DigitalBrain.Sdk;
 using IntoChat;

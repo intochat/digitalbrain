@@ -1,6 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <Import Project="../TestRunner.props" />
   <ItemGroup>
+    <ProjectReference Include="../../Modules/Excel/Contracts/DigitalBrain.Modules.Excel.Contracts.csproj" />
+    <ProjectReference Include="../../Modules/Google/Google/DigitalBrain.Modules.Google.csproj" />
+    <ProjectReference Include="../../Modules/Flutter/Testing/DigitalBrain.Modules.Flutter.Testing.csproj" />
     <ProjectReference Include="../DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
     <ProjectReference Include="../DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
     <ProjectReference Include="../DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />

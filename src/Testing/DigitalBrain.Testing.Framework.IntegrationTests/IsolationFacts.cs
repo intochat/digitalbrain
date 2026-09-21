@@ -26,6 +26,7 @@ public sealed class IsolationFacts
         await using var first = await Create().StartAsync(ct);
         await first.Get<IPersistentValue>("same").Set(42);
         await using var second = await Create().StartAsync(ct);
+        Assert.NotEqual(first.HttpClient.BaseAddress!.Port, second.HttpClient.BaseAddress!.Port);
         Assert.Equal(0, await second.Get<IPersistentValue>("same").Get());
         await first.RestartRuntimeAsync(ct);
         Assert.Equal(42, await first.Get<IPersistentValue>("same").Get());

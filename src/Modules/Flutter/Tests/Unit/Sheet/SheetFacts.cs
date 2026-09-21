@@ -1,0 +1,19 @@
+using DigitalBrain.Flutter;
+using DigitalBrain.Flutter.Sheet;
+using DigitalBrain.Testing.Unit;
+using Xunit;
+
+namespace DigitalBrain.Modules.Flutter.Tests.Unit.Sheet;
+
+public sealed class SheetFacts
+{
+    [Fact]
+    public async Task SetWritesTitle()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<FlutterModule>()
+            .StartAsync(ct);
+        await brain.Get<ISheet>("budget").Set("Budget", [new SheetCell(0, 0, "100")]);
+        Assert.Equal("Budget", (await brain.Get<ISheet>("budget").Read()).Title);
+    }
+}

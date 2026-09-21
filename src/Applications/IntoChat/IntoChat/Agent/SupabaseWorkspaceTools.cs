@@ -1,3 +1,4 @@
+using IntoChat.Workspace.Queries;
 using System.ComponentModel;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Supabase;

@@ -23,7 +23,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Client" />
-    <InternalsVisibleTo Include="IntoChat.Tests" />
+    <InternalsVisibleTo Include="IntoChat.Tests.E2E" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../ServiceDefaults/IntoChat.ServiceDefaults.csproj" />

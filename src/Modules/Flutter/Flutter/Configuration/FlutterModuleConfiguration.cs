@@ -4,20 +4,18 @@ namespace DigitalBrain.Flutter;
 
 public sealed class FlutterConfigurationContract() : ModuleConfigurationContract<FlutterModule, FlutterModuleOptions>(
     "Hosting.Kind", "Hosting.ResourceName", "Hosting.DeviceTarget", "Hosting.ShellName", "Hosting.ChatName",
-    "Hosting.FlutterCommand", "Hosting.DartCommand", "Hosting.WorkingDirectory")
+    "Hosting.FlutterCommand", "Hosting.WorkingDirectory")
 {
     protected override ModuleDefinition Compile(FlutterModuleOptions options) => FlutterModule.Define(options);
 }
 
 public static class FlutterModuleConfiguration
 {
-    public static ModuleConfiguration<FlutterModule> WithWebHost(this ModuleConfiguration<FlutterModule> module)
+    public static ModuleConfiguration<FlutterModule> RunWebApp(this ModuleConfiguration<FlutterModule> module)
         => WithHost(module, FlutterHostKind.Web);
-    public static ModuleConfiguration<FlutterModule> WithWindowHost(this ModuleConfiguration<FlutterModule> module)
+    public static ModuleConfiguration<FlutterModule> RunDesktopApp(this ModuleConfiguration<FlutterModule> module)
         => WithHost(module, FlutterHostKind.Window);
-    public static ModuleConfiguration<FlutterModule> WithHeadlessHost(this ModuleConfiguration<FlutterModule> module)
-        => WithHost(module, FlutterHostKind.Headless);
-    public static ModuleConfiguration<FlutterModule> WithoutHost(this ModuleConfiguration<FlutterModule> module)
+    public static ModuleConfiguration<FlutterModule> BackendOnly(this ModuleConfiguration<FlutterModule> module)
         => WithHost(module, FlutterHostKind.None);
     public static ModuleConfiguration<FlutterModule> WithOptions(this ModuleConfiguration<FlutterModule> module, FlutterModuleOptions options)
     {

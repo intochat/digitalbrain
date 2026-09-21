@@ -16,6 +16,16 @@ namespace DigitalBrain.Tests;
 
 public sealed class CompositionHostingFacts
 {
+    [Fact]
+    public void ModuleAppHostFindsFlutterWithoutAnApplicationDirectoryOverride()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "DigitalBrain.slnx"))) { root = root.Parent; }
+        Assert.NotNull(root);
+        var package = ShellHostingExtensions.ResolveFlutterWorkingDirectory(
+            Path.Combine(root.FullName, "src/Testing/DigitalBrain.Testing.ModuleAppHost"), null);
+        Assert.True(File.Exists(Path.Combine(package, "pubspec.yaml")), package);
+    }
     [Theory]
     [InlineData("OpenAI")]
     [InlineData("Anthropic")]
@@ -99,7 +109,7 @@ public sealed class CompositionHostingFacts
             {
                 Hosting = new() { Kind = FlutterHostKind.Window, WorkingDirectory = Path.Combine(root.FullName, "src/Modules/Flutter/app/core") },
             }))
-            .ConfigureModule<FlutterModule>(f => f.WithWebHost());
+            .ConfigureModule<FlutterModule>(f => f.RunWebApp());
         Assert.DoesNotContain(builder.Resources, r => r.Name == "FlutterShell");
         builder.AddExecutable("client", "unused", ".").WithReference(brain.AsClient());
         builder.AddExecutable("runtime", "unused", ".").WithReference(brain);
@@ -126,8 +136,8 @@ public sealed class CompositionHostingFacts
             .WithModule<AIModule>(ai => ai.WithDefaultLlm<IGpt56Luna>()
                 .WithModelEndpoint(AiProvider.OpenAI, new("http://localhost:8123/v1")))
             .WithModule<SupabaseModule>(db => db.WithPostgres())
-            .WithModule<FlutterModule>(f => f.WithWindowHost())
-            .ConfigureModule<FlutterModule>(f => f.WithWebHost()).Build().Modules;
+            .WithModule<FlutterModule>(f => f.RunDesktopApp())
+            .ConfigureModule<FlutterModule>(f => f.RunWebApp()).Build().Modules;
         var settings = modules.SelectMany(m => m.Configuration).ToDictionary(p => p.Key, p => p.Value);
         Assert.Equal("Web", settings["DigitalBrain:Flutter:Hosting:Kind"]);
         Assert.Equal("http://localhost:8123/v1", settings["DigitalBrain:AI:OpenAI:Endpoint"]);

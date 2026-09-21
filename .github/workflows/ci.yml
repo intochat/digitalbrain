@@ -21,13 +21,24 @@ jobs:
   dotnet-build-test:
     name: .NET build and test
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
+
+      - name: Install Flutter for module and product browser tests
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.2'
+          cache: true
+
+      - name: Resolve Flutter workspace
+        working-directory: src/Modules/Flutter/app
+        run: flutter pub get --enforce-lockfile
 
       - name: Cache NuGet packages
         uses: actions/cache@v6
@@ -44,10 +55,16 @@ jobs:
         run: dotnet format whitespace DigitalBrain.slnx --verify-no-changes --no-restore --verbosity minimal
 
       - name: Build solution
-        run: dotnet build DigitalBrain.slnx -c Release --no-restore
+        run: dotnet build DigitalBrain.slnx -c Release --no-restore -p:CodeGraphRefresh=false
+
+      - name: Install browser and system dependencies
+        run: pwsh src/Testing/DigitalBrain.Testing.Framework.Tests/bin/Release/net11.0/playwright.ps1 install --with-deps chromium
 
       - name: Run tests
-        run: dotnet test --solution DigitalBrain.slnx -c Release --no-build --ignore-exit-code 8
+        run: dotnet test --solution DigitalBrain.slnx -c Release --no-build --max-parallel-test-modules 1 --ignore-exit-code 8
+        env:
+          DIGITALBRAIN_E2E_LIVE_MODEL: '0'
+          DIGITALBRAIN_E2E_HEADED: '0'
 
   flutter-web-build:
     name: Flutter analyze and web build
@@ -82,3 +99,9 @@ jobs:
 
       - name: Web release build
         run: flutter build web --release --base-href "/" --no-tree-shake-icons --no-pub
+
+      - name: Flutter widget and client tests
+        working-directory: src/Modules/Flutter/app
+        run: |
+          (cd ui && flutter test --no-pub)
+          (cd shell && flutter test --no-pub)

@@ -2,7 +2,8 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Flutter;
 
-public enum FlutterHostKind { Window, Headless, Web, None }
+// Preserve serialized values; 1 belonged to the removed Dart console host.
+public enum FlutterHostKind { Window = 0, Web = 2, None = 3 }
 public sealed record FlutterHostingOptions
 {
     public FlutterHostKind Kind { get; init; } = FlutterHostKind.Window;
@@ -11,7 +12,6 @@ public sealed record FlutterHostingOptions
     public string ShellName { get; init; } = "desk";
     public string ChatName { get; init; } = "main";
     public string? FlutterCommand { get; init; }
-    public string? DartCommand { get; init; }
     public string? WorkingDirectory { get; init; }
 }
 public sealed record FlutterModuleOptions

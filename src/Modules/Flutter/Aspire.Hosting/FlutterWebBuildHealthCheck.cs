@@ -14,7 +14,7 @@ internal sealed class FlutterWebBuildHealthCheck(Func<CancellationToken, IAsyncE
     private static async IAsyncEnumerable<string> ReadLines(ResourceLoggerService logs, IResource resource, [EnumeratorCancellation] CancellationToken ct)
     {
         await foreach (var batch in logs.GetAllAsync(resource).WithCancellation(ct))
-            { foreach (var line in batch) { yield return line.Content; } }
+        { foreach (var line in batch) { yield return line.Content; } }
     }
 
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
@@ -24,9 +24,9 @@ internal sealed class FlutterWebBuildHealthCheck(Func<CancellationToken, IAsyncE
         {
             if (line.Contains("Starting process...", StringComparison.Ordinal)
                 || line.Contains("Launching lib", StringComparison.Ordinal))
-                { ready = false; }
+            { ready = false; }
             else if (line.Contains(" is being served at http", StringComparison.Ordinal))
-                { ready = true; }
+            { ready = true; }
         }
         return ready ? HealthCheckResult.Healthy() : HealthCheckResult.Unhealthy("Waiting for the current Flutter web compilation.");
     }

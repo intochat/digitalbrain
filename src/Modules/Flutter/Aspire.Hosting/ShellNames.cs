@@ -8,15 +8,13 @@ public static class ShellNames
     public const string ChatEnvironmentVariable = "DIGITALBRAIN_CHAT";
     public const string OwnerEnvironmentVariable = "DigitalBrain__Owner";
     public const string FlutterCommandEnvironmentVariable = "FLUTTER_COMMAND";
-    public const string DartCommandEnvironmentVariable = "DART_COMMAND";
-    public const string HeadlessHostEntry = "bin/digitalbrain_host.dart";
     public const string DefaultShellName = "desk";
     public const string DefaultChatName = "main";
     public const string DefaultOwner = "dev";
     public const string DefaultDeviceTarget = "windows";
     // web-server is Flutter's headless web device: it serves the app over HTTP without driving
     // a browser of its own, so the fixed FlutterWebPort below is a real, addressable endpoint.
-    // The "chrome" device never prints or exposes a served URL, which made WithWebHost
+    // The "chrome" device never prints or exposes a served URL, which made RunWebApp
     // unreachable for automation.
     public const string DefaultWebDeviceTarget = "web-server";
     public const string WebPlatformDirectoryName = "web";

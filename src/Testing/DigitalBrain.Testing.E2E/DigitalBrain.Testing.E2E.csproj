@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../Modules/DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../DigitalBrain.Testing.Integration/DigitalBrain.Testing.Integration.csproj" />
     <ProjectReference Include="../DigitalBrain.Testing.Hosting/DigitalBrain.Testing.Hosting.csproj" />
   </ItemGroup>
   <ItemGroup><PackageReference Include="Microsoft.Playwright" /></ItemGroup>

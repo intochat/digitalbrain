@@ -12,6 +12,17 @@ public sealed class E2EBrain : HostedBrain
 
     internal E2EBrain(AspireTestSession session, ResolvedBrowserOptions options) : base(session) => _options = options;
 
+    private BrowserSession? _primaryBrowser;
+    public IPage Page => _primaryBrowser?.Page ?? throw new InvalidOperationException("This test exposes no browser endpoint. Configure a module to run its web app.");
+
+    internal async Task StartBrowserAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (Session.BrowserEndpoint is not null)
+        { _primaryBrowser = await OpenBrowserAsync(cancellationToken).ConfigureAwait(false); }
+        cancellationToken.ThrowIfCancellationRequested();
+    }
+
     public async Task<BrowserSession> OpenBrowserAsync(CancellationToken cancellationToken = default)
     {
         var endpoint = Session.BrowserEndpoint ?? throw new InvalidOperationException("This application configuration exposes no browser endpoint.");
@@ -64,7 +75,7 @@ public sealed class E2EBrain : HostedBrain
             }
             cancellationToken.ThrowIfCancellationRequested();
             if (deadline.IsCancellationRequested)
-                { throw new TimeoutException($"Browser startup timed out at '{stage}' after {_options.StartupTimeout}.", error); }
+            { throw new TimeoutException($"Browser startup timed out at '{stage}' after {_options.StartupTimeout}.", error); }
             throw new InvalidOperationException($"Browser startup failed at '{stage}'.", error);
         }
         finally { if (acquired) { _browserGate.Release(); } }

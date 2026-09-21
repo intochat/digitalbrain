@@ -16,7 +16,5 @@ public sealed class FlutterHostOptions
 
     public string? FlutterCommand { get; set; }
 
-    public string? DartCommand { get; set; }
-
     public string? WorkingDirectory { get; set; }
 }

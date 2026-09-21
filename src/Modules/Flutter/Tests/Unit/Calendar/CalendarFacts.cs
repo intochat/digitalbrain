@@ -1,0 +1,19 @@
+using DigitalBrain.Flutter;
+using DigitalBrain.Flutter.Calendar;
+using DigitalBrain.Testing.Unit;
+using Xunit;
+
+namespace DigitalBrain.Modules.Flutter.Tests.Unit.Calendar;
+
+public sealed class CalendarFacts
+{
+    [Fact]
+    public async Task SetWritesMode()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<FlutterModule>()
+            .StartAsync(ct);
+        await brain.Get<ICalendar>("cal").Set("day", ["2026-09-20"]);
+        Assert.Equal("day", (await brain.Get<ICalendar>("cal").Read()).Mode);
+    }
+}

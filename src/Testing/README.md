@@ -8,10 +8,10 @@ Four public libraries share production module definitions and return concrete br
 | `DigitalBrain.Testing` | Probes, behavior runs, bounded waits, execution options and lifetime |
 | `.Unit` | In-process Orleans neuron/component tests with memory storage and controlled providers |
 | `.Integration` | Selected modules in an external runtime, real HTTP and Aspire-managed ephemeral storage |
-| `.E2E` | Actual application AppHost, application scenarios and optional browser driving |
+| `.E2E` | Selected modules or the actual application AppHost, with automatic browser startup when configured |
 
 Plain function/object unit tests need no brain harness. Integration verifies module transport and
-process/storage behavior; E2E verifies actual application wiring. A browser is optional for E2E.
+process/storage behavior; module E2E verifies UI behavior and product E2E verifies actual application wiring. Product E2E can run without a browser.
 
 The solution places only these four libraries directly under Testing. Infrastructure contains the
 shared Aspire session, ModuleRunner and ModuleAppHost; Tests contains framework verification.
@@ -34,7 +34,7 @@ Assert.Equal("tea", tick.TimerId);
 ```
 
 Use the same `WithModule<T>(options => ...)` declarations in AppHost, Unit and Integration.
-Module-owned methods such as `WithWebHost`, `WithPostgres` and `WithDefaultLlm<T>` expose their
+Module-owned methods such as `RunWebApp`, `WithPostgres` and `WithDefaultLlm<T>` expose their
 choices. `WithOptions(value)` explicitly replaces a module's complete options. `ConfigureModule<T>`
 changes an existing declaration; it cannot add a missing module. There is no application-wide
 configuration class with a property for each module.
@@ -56,7 +56,7 @@ Neither proves persistence through external process death. These capabilities be
 
 ```csharp
 await using var brain = await IntegrationTest.Create()
-    .WithModule<FlutterModule>(flutter => flutter.WithoutHost())
+    .WithModule<FlutterModule>(flutter => flutter.BackendOnly())
     .StartAsync(ct);
 
 var button = brain.Get<IButton>("go");
@@ -69,8 +69,7 @@ await clicks.NextAsync(ct: ct);
 
 The runner loads the test build's dependency closure; it never builds/restores at test startup.
 Import `Integration.Tests.props`. Include the selected module's Aspire hosting adapter project
-when that module declares one. For frontend hosts outside an application AppHost,
-set an explicit Flutter working directory appropriate to the checkout.
+when that module declares one. The module host locates the Flutter shell from the repository root; an explicit working directory can override it.
 
 `RestartRuntimeAsync` retains the run's storage and identity. Reacquire observations after restart.
 Independent runs own independent infrastructure. Use HTTP stubs and typed endpoint overrides for
@@ -95,56 +94,53 @@ Hosted runs transfer these values through an ACL-restricted temporary file, expo
 to the primary runtime, and delete it on rollback/disposal. Unit applies them locally.
 Use synthetic credentials for protocol stubs. Test-owned identity/connections cannot be overridden.
 
-## Application E2E and visible browsers
+## Module and application E2E
 
 ```csharp
-await using var deployment = await IntoChatTestDeployment.CreateAsync(ct);
-await using var brain = await deployment.CreateTest(web: true)
-    .WithBrowser(new() { Headless = false, SlowMoMilliseconds = 250 })
+// Flutter owns its module E2E defaults: web frontend + headless browser.
+await using var brain = await E2ETest.Create()
+    .WithModule<FlutterModule>()
     .StartAsync(ct);
-await using var browser = await brain.OpenBrowserAsync(ct);
-await Assertions.Expect(browser.Page.GetByText("Expected content")).ToBeVisibleAsync();
+await Assertions.Expect(brain.Page.GetByText("Expected content")).ToBeVisibleAsync();
+
+// IntoChat owns its product defaults; the native builder supports explicit overrides.
+await using var product = await IntoChatE2ETest.Create()
+    .ConfigureModule<FlutterModule>(flutter => flutter.RunWebApp(browser => browser.Headed().SlowMo(250)))
+    .StartAsync(ct);
 ```
 
-The test-owned `IntoChatTestDeployment` configures `E2ETest.For<Projects.IntoChat_AppHost>()`
-with `ConfigureModule<T>` calls for the application's real module inventory. It selects disposable
-Qdrant/ClickHouse/PostgreSQL, local model/OAuth/MCP endpoints, synthetic credentials and a temporary
-coding workspace. The application still declares every module explicitly in AppHost.cs.
+Selected modules provide `IModuleE2EDefaults<TModule>`. The framework applies these before the
+caller's callback, so `.WithModule<FlutterModule>(f => f.BackendOnly())` overrides web hosting.
+`DigitalBrain.Modules.Flutter.Testing` supplies the browser callback overload of `RunWebApp`;
+its `BrowserConfiguration` stays in the test process, outside production module options.
 
-E2E offers overrides only: unknown targets fail in the AppHost before resources start. Patches
-preserve unassigned application fields and explicit default/false/null assignments. Whole-options
-replacement is explicit. No delegate or service instance crosses a process boundary. IntoChat's
-ordinary Flutter default remains Window; select Web for browsers or WithoutHost for HTTP-only tests.
+`IntoChatE2ETest.StartAsync(ct)` uses the actual `E2ETest.For<Projects.IntoChat_AppHost>()`
+and defaults to backend-only execution with disposable Qdrant, ClickHouse and PostgreSQL.
+Its configuration is in `Applications/IntoChat/Tests/E2E/IntoChatE2ETest.cs`. Scenarios own seed
+rows and any scripted model endpoint separately. Unused external providers point to an
+unavailable local endpoint, so ordinary tests cannot accidentally call live services.
 
-For a database integration scenario, select the production provider directly:
+Application builders preserve AppHost declarations. `ConfigureModule<T>` patches an existing
+module; it cannot add a missing one. Overrides preserve unassigned application fields,
+including explicit false/null/default assignments. No delegates cross a process boundary.
 
-```csharp
-await using var brain = await IntegrationTest.Create()
-    .WithModule<SupabaseModule>(database => database.WithPostgres())
-    .StartAsync(ct);
-var database = brain.Get<ISupabase>(SupabaseNames.DefaultNeuron);
-var result = await database.Query(new("select 1 as value"));
-Assert.Equal("1", Assert.Single(Assert.Single(result.Rows)));
-```
-
-Include the Supabase hosting adapter project in this test's dependency closure. The PostgreSQL
-resource is disposable and its generated connection is projected privately. Unit tests can use
-`WithModule<SupabaseModule>(database => database.WithProvider<FakeSupabaseProvider>())` instead;
-that local substitution is rejected by Integration/E2E.
-
-| Flutter hosting | Meaning |
+| Flutter call | Meaning |
 |---|---|
-| Web | Web frontend, driven by either a headed or headless browser |
-| Window | Native desktop host |
-| Headless | Pure-Dart host; not a hidden web browser |
-| None | No frontend host; neurons and module HTTP can still run |
+| `BackendOnly()` | Neurons and HTTP endpoints; no Flutter frontend process or browser |
+| `RunWebApp()` | Flutter web frontend; E2E automatically opens a headless browser |
+| `RunWebApp(b => b.Headed().SlowMo(250))` | Same web frontend in a visible browser with delayed browser actions |
+| `RunDesktopApp()` | Native Flutter desktop frontend; no browser |
 
-Browser options live only in E2E. Explicit Headless/SlowMo values win over the environment/debugger.
-Otherwise `DIGITALBRAIN_E2E_HEADED=1` or an attached debugger requests a visible browser with 250 ms
-slow motion; unattended defaults are headless with no delay. Explicit zero delay is respected.
-One brain owns one launch configuration; each OpenBrowserAsync creates an isolated browser context.
-IntoChat test deployments clear development launch-profile ports and allocate independent runtime
-endpoints, so an existing application instance does not reserve their HTTP port.
+The obsolete pure-Dart console host is removed. Flutter VM/DDS hot reload remains supported.
+`SlowMo` affects browser calls, not backend execution. A visible browser proves only what a
+scenario explicitly asserts. Database-to-UI scenarios use typed table/workspace setup; agent
+journeys submit real browser messages and are kept separate.
+
+E2E builders default to headless even with a debugger attached. Explicit `Headed()` or
+`WithBrowser(new() { Headless = false })` opts into visibility. `BrowserOptions` with unspecified
+fields can use `DIGITALBRAIN_E2E_HEADED`/debugger fallback. One brain owns its automatically opened
+`Page`; `OpenBrowserAsync` remains available for additional isolated sessions. Do not open a
+second browser just to drive the default page. Startup failure disposes both browser and host.
 
 Flutter advertises its application's `semantics=true` query and semantics-tree readiness selector
 through browser endpoint metadata. Generic E2E contains no Flutter-specific selectors.
@@ -176,9 +172,11 @@ pending waits. Artifacts can contain application content; use controlled fixture
 ## Running and packaging status
 
 ```powershell
-dotnet test --project src/Modules/Flutter/Tests.Unit/DigitalBrain.Modules.Flutter.Tests.Unit.csproj -p:CodeGraphRefresh=false
-dotnet test --project src/Modules/Flutter/Tests.Integration/DigitalBrain.Modules.Flutter.Tests.Integration.csproj -p:CodeGraphRefresh=false
-dotnet test --solution DigitalBrain.slnx -p:CodeGraphRefresh=false
+dotnet test --project src/Modules/Flutter/Tests/Unit/DigitalBrain.Modules.Flutter.Tests.Unit.csproj -p:CodeGraphRefresh=false
+dotnet test --project src/Modules/Flutter/Tests/Integration/DigitalBrain.Modules.Flutter.Tests.Integration.csproj -p:CodeGraphRefresh=false
+dotnet test --project src/Modules/Flutter/Tests/E2E/DigitalBrain.Modules.Flutter.Tests.E2E.csproj -p:CodeGraphRefresh=false
+dotnet test --project src/Applications/IntoChat/Tests/E2E/IntoChat.Tests.E2E.csproj -p:CodeGraphRefresh=false
+dotnet test --solution DigitalBrain.slnx --max-parallel-test-modules 1 -p:CodeGraphRefresh=false
 ```
 
 Current support is verified through repository project references. Removing ModuleAppHost is gated:
@@ -190,37 +188,42 @@ shared host/runner preserves process isolation while those packaging concerns re
 The implementation record is in
 [code-first-execution-progress.md](../../docs/superpowers/plans/code-first-execution-progress.md).
 
-## Agent data windows
+## Test ownership and product journeys
 
-`SupabaseWorkspaceE2EFacts` submits a chat message through the real Flutter shell. The production
-OpenAI-compatible client calls `supabase_schema` and `show_supabase_query_table`; the application
-opens a durable window in the originating workspace. Filters, sort and paging query PostgreSQL
-through the Supabase module. Logical windows and query views are durable; geometry and focus
-stay local. A closed window stays closed when an old tool operation is replayed.
-
-The default fixture substitutes only the external model HTTP service (plus the full deployment's
-unrelated OAuth/MCP services). It owns a disposable PostgreSQL database, seeds with an owner
-connection, and supplies a separate SELECT-only login to the application. A preflight verifies the
-actual database and schema. This tests the PostgreSQL-backed Supabase provider, not Supabase
-Auth, REST or Realtime. It creates no application windows or tables before the user request.
-
-```powershell
-dotnet test --project src/Applications/IntoChat/Tests/IntoChat.Tests.csproj -p:CodeGraphRefresh=false -- --filter-method '*AskOpensLiveTableWithServerFilteringAndRestoresWindow'
-$env:DIGITALBRAIN_E2E_HEADED = '1' # visible Chromium, 250 ms between actions
+```text
+src/Modules/Flutter/Tests/
+  Unit/<component>/           neuron logic and signals
+  Integration/<component>/    HTTP, transport and neuron flow
+  E2E/<feature>/              real rendering and browser gestures
+src/Modules/Supabase/Tests/Unit/
+src/Applications/IntoChat/Tests/E2E/
+  Composition/               one startup smoke test
+  Workspace/                 data display, isolation, restore and operation recovery
+  Agent/                     protocol workflows and small complete browser journeys
+  Inbox/                     composed webhook-to-inbox workflows
 ```
 
-For a deliberately selected live run, set `DIGITALBRAIN_E2E_LIVE_MODEL=1` and
-`DIGITALBRAIN_E2E_MODEL_API_KEY` in the process environment, then select
-`*LiveModelOpensAnInteractiveSupabaseTable`. The default endpoint is OpenAI `/v1/`; an optional
-`DIGITALBRAIN_E2E_MODEL_ENDPOINT` selects a compatible endpoint. This lane uses the configured
-GPT-5.6 Luna preset and makes paid model calls. Missing credentials fail explicitly. Without the
-opt-in, this separately categorized test is skipped; ordinary E2E never selects it implicitly.
+IntoChat has no Unit or Integration test project. Product E2E asserts connected product behavior;
+module suites own the constituent behavior. Widget tests cover UI controls in isolation. A UI
+E2E can use typed setup, then assert only rendered outcomes; it need not reassert neuron signals.
+Generic configuration, override transport and host isolation checks belong to framework tests.
 
-Run Flutter protocol and widget tests from `src/Modules/Flutter/app/shell` with `flutter test`.
-The shell reconciles workspace revisions after reconnect, restores committed conversation result
-links and exposes explicit reopen actions. Failed refreshes retain the last view with a stale-data
-message; they do not replace it with fabricated rows.
-Table-request cancellation currently stops the HTTP wait and discards stale UI responses, but an
-in-flight database page/count read runs to completion or its provider deadline. Each command has
-a 15-second database timeout and a 20-second operation deadline. Agent-tool cancellation propagates
-to the provider; cancellation through the table-read contract remains a follow-up.
+`SupabaseTableDisplayFacts` seeds the deployment's temporary PostgreSQL, creates a real project
+through the browser, and opens an `ISupabaseTable` through `IWorkspace`. It requires no agent or
+model. `WorkspaceRestoreFacts` covers workspace isolation and restored filtered views.
+`AgentTableJourneyFacts` separately sends a real chat message through the Flutter shell, uses a
+scripted OpenAI protocol endpoint, and checks the rendered table and cancellation. The scripted
+server owns only its protocol; the test owns the app and data.
+
+For paid live coverage, set `DIGITALBRAIN_E2E_LIVE_MODEL=1` and
+`DIGITALBRAIN_E2E_MODEL_API_KEY`, then select `*LiveAgentTableJourneyFacts`.
+`DIGITALBRAIN_E2E_MODEL_ENDPOINT` optionally selects a compatible endpoint. Without opt-in,
+the live test is skipped. Missing credentials fail explicitly.
+
+Run the solution with `--max-parallel-test-modules 1` to avoid competing Flutter compiler
+processes against the shared checkout. Browser assemblies also serialize their browser tests.
+CI installs Flutter and Chromium, runs .NET tests and Flutter UI/shell tests, and disables live
+model calls by default.
+
+Migration decisions and validation results:
+[testing-architecture.md](../../docs/superpowers/plans/2026-09-21-testing-architecture.md).

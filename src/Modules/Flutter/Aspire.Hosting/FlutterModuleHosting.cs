@@ -13,9 +13,8 @@ public sealed class FlutterModuleHosting : IDigitalBrainModuleHosting
         switch (options.Kind)
         {
             case FlutterHostKind.None: break;
-            case FlutterHostKind.Web: module.WithWebHost(Apply); break;
-            case FlutterHostKind.Window: module.WithWindowHost(Apply); break;
-            case FlutterHostKind.Headless: module.WithHeadlessHost(Apply); break;
+            case FlutterHostKind.Web: module.RunWebApp(Apply); break;
+            case FlutterHostKind.Window: module.RunDesktopApp(Apply); break;
             default: throw new ArgumentOutOfRangeException(nameof(options));
         }
         void Apply(FlutterHostOptions target)
@@ -25,7 +24,6 @@ public sealed class FlutterModuleHosting : IDigitalBrainModuleHosting
             target.ShellName = options.ShellName;
             target.ChatName = options.ChatName;
             target.FlutterCommand = options.FlutterCommand;
-            target.DartCommand = options.DartCommand;
             target.WorkingDirectory = options.WorkingDirectory;
         }
     }

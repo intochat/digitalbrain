@@ -44,7 +44,7 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
         .WithGitHubRepositories(repositories))
     .WithModule<CodingModule>(coding => coding.WithSolution(Path.GetFullPath(
         Path.Combine(builder.AppHostDirectory, "..", "..", "..", "..", "DigitalBrain.slnx"))))
-    .WithModule<FlutterModule>(flutter => flutter.WithWindowHost())
+    .WithModule<FlutterModule>(flutter => flutter.RunDesktopApp())
     // Existing demo behavior dependency; this is part of the application, not injected by tests.
     .WithModule<TestTwitterModule>();
 

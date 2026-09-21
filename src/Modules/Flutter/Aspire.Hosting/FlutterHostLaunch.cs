@@ -4,7 +4,6 @@ internal static class FlutterHostLaunch
 {
     private const string ShellPackageDirectoryName = "shell";
     private const string DefaultFlutterCommand = "flutter";
-    private const string DefaultDartCommand = "dart";
 
     internal sealed record Result(
         string Command,
@@ -24,7 +23,6 @@ internal static class FlutterHostLaunch
         return kind switch
         {
             FlutterHostKind.Window => ResolveWindow(packageRoot, options, configuration),
-            FlutterHostKind.Headless => ResolveHeadless(packageRoot, options, configuration),
             FlutterHostKind.Web => ResolveWeb(packageRoot, options, configuration),
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
@@ -64,33 +62,13 @@ internal static class FlutterHostLaunch
             ?? throw new InvalidOperationException(
                 $"Window Flutter host needs lib/main.dart and a '{deviceTarget}/' folder " +
                 $"under '{packageRoot}', '{packageRoot}/{ShellPackageDirectoryName}', " +
-                $"or the sibling '../{ShellPackageDirectoryName}' (clients/flutter/shell). " +
-                $"Use {nameof(ShellHostingExtensions.WithHeadlessHost)}() for the pure-Dart host.");
+                $"or the sibling '../{ShellPackageDirectoryName}' (clients/flutter/shell).");
 
         return new Result(
             ResolveFlutterCommand(options, configuration),
             workDir,
             ["run", "-d", deviceTarget],
             deviceTarget);
-    }
-
-    private static Result ResolveHeadless(
-        string packageRoot,
-        FlutterHostOptions options,
-        Microsoft.Extensions.Configuration.IConfiguration? configuration)
-    {
-        var entry = Path.Combine(packageRoot, ShellNames.HeadlessHostEntry.Replace('/', Path.DirectorySeparatorChar));
-        if (!File.Exists(entry))
-        {
-            throw new InvalidOperationException(
-                $"Headless Flutter host needs '{ShellNames.HeadlessHostEntry}' under '{packageRoot}'. " +
-                $"Use {nameof(ShellHostingExtensions.WithWindowHost)}() for Windows chrome under shell/.");
-        }
-
-        return new Result(
-            ResolveDartCommand(options, configuration),
-            packageRoot,
-            ["run", ShellNames.HeadlessHostEntry]);
     }
 
     private static string? ResolveWebPackageDirectory(string packageRoot)
@@ -132,8 +110,7 @@ internal static class FlutterHostLaunch
                 $"Web Flutter host needs lib/main.dart and a 'web/' folder " +
                 $"under '{packageRoot}', '{packageRoot}/{ShellPackageDirectoryName}', " +
                 $"or the sibling '../{ShellPackageDirectoryName}' (clients/flutter/shell). " +
-                $"Use {nameof(ShellHostingExtensions.WithWindowHost)}() for Windows chrome, " +
-                $"or {nameof(ShellHostingExtensions.WithHeadlessHost)}() for the pure-Dart host.");
+                $"Use {nameof(ShellHostingExtensions.RunDesktopApp)}() for Windows chrome.");
 
         // Both web devices (web-server and chrome) honor the port/hostname flags, so the served
         // address always matches the fixed Aspire endpoint ShellHostingExtensions registers.
@@ -212,38 +189,6 @@ internal static class FlutterHostLaunch
         }
 
         return DefaultFlutterCommand;
-    }
-
-    internal static string ResolveDartCommand(
-        FlutterHostOptions options,
-        Microsoft.Extensions.Configuration.IConfiguration? configuration = null)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-
-        if (TryConfiguredCommand(options.DartCommand, out var fromOptions))
-        {
-            return fromOptions;
-        }
-
-        if (TryConfiguredCommand(FlutterToolchainOptions.Read(configuration).DartCommand, out var fromConfig))
-        {
-            return fromConfig;
-        }
-
-        if (TryConfiguredCommand(
-                Environment.GetEnvironmentVariable(
-                    ShellNames.DartCommandEnvironmentVariable),
-                out var fromEnv))
-        {
-            return fromEnv;
-        }
-
-        if (TryResolveCommandOnPath(DefaultDartCommand, out var fromPath))
-        {
-            return fromPath;
-        }
-
-        return DefaultDartCommand;
     }
 
     private static bool TryConfiguredCommand(string? value, out string command)

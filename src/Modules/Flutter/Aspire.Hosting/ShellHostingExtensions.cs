@@ -12,17 +12,12 @@ namespace DigitalBrain.Flutter.Aspire.Hosting;
 
 public static class ShellHostingExtensions
 {
-    public static DigitalBrainModuleBuilder<FlutterModule> WithHeadlessHost(
-        this DigitalBrainModuleBuilder<FlutterModule> module,
-        Action<FlutterHostOptions>? configure = null)
-        => ConfigureFlutterHost(module, FlutterHostKind.Headless, configure);
-
-    public static DigitalBrainModuleBuilder<FlutterModule> WithWindowHost(
+    public static DigitalBrainModuleBuilder<FlutterModule> RunDesktopApp(
         this DigitalBrainModuleBuilder<FlutterModule> module,
         Action<FlutterHostOptions>? configure = null)
         => ConfigureFlutterHost(module, FlutterHostKind.Window, configure);
 
-    public static DigitalBrainModuleBuilder<FlutterModule> WithWebHost(
+    public static DigitalBrainModuleBuilder<FlutterModule> RunWebApp(
         this DigitalBrainModuleBuilder<FlutterModule> module,
         Action<FlutterHostOptions>? configure = null)
         => ConfigureFlutterHost(module, FlutterHostKind.Web, configure);
@@ -60,6 +55,9 @@ public static class ShellHostingExtensions
         return state;
     }
 
+    internal static string ResolveFlutterWorkingDirectory(string appHostDirectory, string? configured)
+        => ShellHostingState.ResolveFlutterWorkingDirectory(appHostDirectory, configured);
+
     private sealed class ShellHostingState(DigitalBrainBuilder brain) : DigitalBrainModuleProjection
     {
         private IResourceBuilder<ExecutableResource>? _flutterHost;
@@ -72,7 +70,7 @@ public static class ShellHostingExtensions
             {
                 throw new InvalidOperationException(
                     $"Flutter host is already configured on brain '{brain.Name}'. " +
-                    $"Call {nameof(WithHeadlessHost)}, {nameof(WithWindowHost)}, or {nameof(WithWebHost)} exactly once.");
+                    $"Call {nameof(RunDesktopApp)} or {nameof(RunWebApp)} exactly once.");
             }
 
             var appHost = brain.ApplicationBuilder;
@@ -234,7 +232,7 @@ public static class ShellHostingExtensions
             _uiBaseBound = true;
         }
 
-        private static string ResolveFlutterWorkingDirectory(string appHostDirectory, string? configured)
+        internal static string ResolveFlutterWorkingDirectory(string appHostDirectory, string? configured)
         {
             if (!string.IsNullOrWhiteSpace(configured))
             {
@@ -247,6 +245,8 @@ public static class ShellHostingExtensions
             {
                 Path.Combine(appHostDirectory, "..", "..", "..", "Modules", "Flutter", "app", "core"),
                 Path.Combine(appHostDirectory, "..", "..", "..", "Modules", "Flutter", "app", "shell"),
+                Path.Combine(appHostDirectory, "..", "..", "Modules", "Flutter", "app", "core"),
+                Path.Combine(appHostDirectory, "..", "..", "Modules", "Flutter", "app", "shell"),
                 Path.Combine(appHostDirectory, "..", "..", "clients", "flutter", "core"),
                 Path.Combine(appHostDirectory, "..", "clients", "flutter", "core"),
             };

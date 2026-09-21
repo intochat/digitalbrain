@@ -1,3 +1,4 @@
+using IntoChat.Workspace.Queries;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;

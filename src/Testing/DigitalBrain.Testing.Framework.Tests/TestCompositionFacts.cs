@@ -56,7 +56,7 @@ public sealed class TestCompositionFacts
             Hosting = new() { Kind = FlutterHostKind.Web, ShellName = "application-workspace" },
         }));
         var calls = 0;
-        var overrides = new CompositionOverrides().ConfigureModule<FlutterModule>(m => { calls++; m.WithWindowHost(); });
+        var overrides = new CompositionOverrides().ConfigureModule<FlutterModule>(m => { calls++; m.RunDesktopApp(); });
         application.ApplyOverrides(overrides.Serialize());
         var module = Assert.Single(application.Build().Modules);
         Assert.Equal("Window", module.Configuration["DigitalBrain:Flutter:Hosting:Kind"]);
