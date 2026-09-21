@@ -25,7 +25,9 @@ internal static class WorkspaceEndpoints
                 var workspace = GetWorkspace(brain, auth.Value, workspaceId);
                 var state = await workspace.Read().WaitAsync(ct);
                 var window = state.Windows.SingleOrDefault(w => w.Id == windowId) ?? throw new KeyNotFoundException("Window not found.");
-                return Results.Ok(await workspace.Open(new(input.OperationId, window.Id, window.Title, window.View, input.ExpectedRevision)).WaitAsync(ct));
+                return Results.Ok(window.Surface is { } surface
+                    ? await workspace.OpenSurface(new(input.OperationId, window.Id, window.Title, surface, input.ExpectedRevision)).WaitAsync(ct)
+                    : await workspace.Open(new(input.OperationId, window.Id, window.Title, window.View, input.ExpectedRevision)).WaitAsync(ct));
             }));
         routes.MapGet("/workspaces/{workspaceId}/tables/{tableId}",
             (string workspaceId, string tableId, int? offset, int? limit, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct)
@@ -71,7 +73,7 @@ internal static class WorkspaceEndpoints
     private static async Task<ISupabaseTable> ResolveTable(IDigitalBrain brain, BasicAuthOptions auth, string workspaceId, string tableId, CancellationToken ct)
     {
         var state = await GetWorkspace(brain, auth, workspaceId).Read().WaitAsync(ct);
-        if (!state.Windows.Any(w => w.View.Id == tableId)) { throw new KeyNotFoundException("Table not found in this workspace."); }
+        if (!state.Windows.Any(w => w.Surface is null && w.View.Id == tableId)) { throw new KeyNotFoundException("Table not found in this workspace."); }
         return brain.Get<ISupabaseTable>(tableId);
     }
     private static async Task<IResult> Respond(Func<Task<IResult>> action)

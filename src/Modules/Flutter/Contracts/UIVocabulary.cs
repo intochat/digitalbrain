@@ -2,6 +2,10 @@ namespace DigitalBrain.Flutter;
 
 public static class UIVocabulary
 {
+    public const string SurfaceType = "surface";
+    public const string LayoutType = "layout";
+    public const string CollectionType = "collection";
+    public const string ImageCanvasType = "imagecanvas";
     public const string InboxType = "inbox";
     public const string ButtonType = "button";
     public const string ToggleType = "toggle";

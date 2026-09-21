@@ -20,7 +20,6 @@ public sealed class WorkspaceRestoreFacts
         var page = brain.Page;
         await page.SetViewportSizeAsync(1600, 1000);
         var projectId = await WorkspaceBrowser.CreateProjectAsync(page, "Data workspace");
-        await page.GetByRole(AriaRole.Button, new() { Name = "IntoChat", Exact = true }).ClickAsync();
         await WorkspaceBrowser.CreateProjectAsync(page, "Other workspace");
 
         var table = brain.Get<ISupabaseTable>("restored-leads");
@@ -32,8 +31,8 @@ public sealed class WorkspaceRestoreFacts
 
         var window = page.GetByRole(AriaRole.Region, new() { Name = "Active leads", Exact = true });
         await Assertions.Expect(window).ToHaveCountAsync(0);
-        await page.GetByRole(AriaRole.Button, new() { Name = "IntoChat", Exact = true }).ClickAsync();
-        await page.GetByRole(AriaRole.Button, new() { Name = "Data workspace" }).ClickAsync();
+        await page.GetByRole(AriaRole.Button, new() { NameRegex = new System.Text.RegularExpressions.Regex("^Workspaces") }).ClickAsync();
+        await page.GetByRole(AriaRole.Menuitemcheckbox, new() { Name = "Data workspace", Exact = true }).ClickAsync();
         await Assertions.Expect(window.GetByText(marker, new() { Exact = true })).ToBeVisibleAsync();
 
         await page.ReloadAsync();
@@ -41,7 +40,8 @@ public sealed class WorkspaceRestoreFacts
         await Assertions.Expect(window).ToHaveCountAsync(1);
         await page.GetByRole(AriaRole.Button, new() { Name = "Close editor", Exact = true }).ClickAsync();
         await Assertions.Expect(window).ToHaveCountAsync(0);
-        await page.GetByRole(AriaRole.Button, new() { Name = "Project files", Exact = true }).ClickAsync();
+        await page.GetByRole(AriaRole.Button, new() { NameRegex = new System.Text.RegularExpressions.Regex("^Workspaces") }).ClickAsync();
+        await page.GetByRole(AriaRole.Menuitem, new() { Name = "Saved work", Exact = true }).ClickAsync();
         await page.GetByRole(AriaRole.Alertdialog)
             .GetByRole(AriaRole.Button, new() { Name = "Active leads" }).ClickAsync();
         await Assertions.Expect(window).ToHaveCountAsync(1);

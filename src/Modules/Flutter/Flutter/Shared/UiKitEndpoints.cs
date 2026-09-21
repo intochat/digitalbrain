@@ -1,3 +1,7 @@
+using DigitalBrain.Flutter.Surface;
+using DigitalBrain.Flutter.Layout;
+using DigitalBrain.Flutter.Collection;
+using DigitalBrain.Flutter.ImageCanvas;
 using DigitalBrain.Flutter.Button;
 using DigitalBrain.Flutter.Calendar;
 using DigitalBrain.Flutter.Card;
@@ -32,6 +36,10 @@ internal static class UiKitEndpoints
 {
     public static void MapUiKit(this IEndpointRouteBuilder endpoints)
     {
+        UiHttp.MapGet<ISurface, SurfaceState>(endpoints, "surfaces", neuron => neuron.Read());
+        UiHttp.MapGet<ILayout, LayoutState>(endpoints, "layouts", neuron => neuron.Read());
+        UiHttp.MapGet<ICollectionView, CollectionState>(endpoints, "collections", neuron => neuron.Read());
+        UiHttp.MapGet<IImageCanvas, ImageCanvasState>(endpoints, "imagecanvass", neuron => neuron.Read());
         UiHttp.MapGet<IButton, ButtonState>(endpoints, "buttons", neuron => neuron.Read());
         UiHttp.MapPost(endpoints, "buttons/{name}/set", async (string name, ButtonSet body, IGrainFactory grains, CancellationToken ct) =>
         {

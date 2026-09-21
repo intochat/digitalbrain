@@ -171,10 +171,12 @@ final class UiCardPart extends UiPart {
     required this.title,
     required this.body,
     this.fields = const [],
+    this.children = const [],
   });
 
   static const kindName = 'card';
 
+  final List<({String kind, String name})> children;
   final String title;
   final String body;
   final List<({String label, String value})> fields;
@@ -209,6 +211,7 @@ final class UiCardPart extends UiPart {
       title: metadata['title'] as String? ?? '',
       body: metadata['body'] as String? ?? '',
       fields: fields,
+      children: (metadata['children'] as List? ?? []).whereType<Map>().map((c) => (kind: c['kind'] as String, name: c['name'] as String)).toList(),
     );
   }
 
@@ -217,6 +220,7 @@ final class UiCardPart extends UiPart {
     'kind': kindName,
     'title': title,
     'body': body,
+    'children': [for (final c in children) {'kind':c.kind,'name':c.name}],
     'fields': [
       for (final f in fields) {'label': f.label, 'value': f.value},
     ],

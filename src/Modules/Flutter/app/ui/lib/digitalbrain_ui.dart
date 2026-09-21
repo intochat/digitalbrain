@@ -26,3 +26,7 @@ export 'src/lumen/lumen_palette.dart';
 export 'src/lumen/neuron_icon.dart';
 export 'src/models/ui_part.dart';
 export 'src/theme/ui_theme.dart';
+
+export 'src/components/image_canvas/image_recipe.dart';
+export 'src/components/image_canvas/ui_image_canvas.dart';
+export 'src/composition/neuron_view.dart';

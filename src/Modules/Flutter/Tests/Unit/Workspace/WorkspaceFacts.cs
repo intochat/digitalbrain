@@ -8,6 +8,24 @@ namespace DigitalBrain.Modules.Flutter.Tests.Unit.Workspace;
 public sealed class WorkspaceFacts
 {
     [Fact]
+    public async Task SurfaceWindowsCoexistWithLegacyTablesAndKeepReplaySemantics()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().StartAsync(ct);
+        var workspace = brain.Get<IWorkspace>("owner/a");
+        await workspace.Open(new("table-op", "table", "Table", new("legacy-table"), 0));
+        var request = new OpenSurfaceWindow("app-op", "app-files", "Files", new("surface", "owner/a/apps/files/surface"), 1);
+        await workspace.OpenSurface(request);
+        await workspace.Close("app-files", 2);
+        await brain.DeactivateAsync(workspace, ct);
+        var state = await workspace.OpenSurface(request);
+        Assert.Equal(3, state.Revision);
+        Assert.False(state.Windows.Single(w => w.Id == "app-files").IsOpen);
+        Assert.Equal("legacy-table", state.Windows.Single(w => w.Id == "table").View.Id);
+        Assert.Equal("surface", state.Windows.Single(w => w.Id == "app-files").Surface!.Kind);
+    }
+
+    [Fact]
     public async Task ReplayAfterCloseNeverReopensAWindowAndSurvivesReactivation()
     {
         var ct = TestContext.Current.CancellationToken;

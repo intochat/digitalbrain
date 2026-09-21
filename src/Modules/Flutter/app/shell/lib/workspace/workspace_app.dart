@@ -21,6 +21,8 @@ import 'workspace_brain_observation.dart';
 import 'workspace_chat.dart';
 import 'workspace_programs.dart';
 import 'artifact_editors.dart';
+import 'app_surface_host.dart';
+import 'workspace_islands.dart';
 
 class WorkspaceApp extends StatefulWidget {
   const WorkspaceApp({
@@ -208,7 +210,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   final _saveTimers = <String, Timer>{};
   final _saving = <String>{};
   final _saveErrors = <String, String>{};
-  bool _ready = false, _directory = true, _mobileWork = false;
+  bool _ready = false, _directory = false, _mobileWork = false;
   String _query = '';
   @override
   void initState() {
@@ -223,6 +225,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
 
   Future<void> _load() async {
     await store.load();
+    if (store.projects.isEmpty) store.createProject('Personal');
     if (!mounted) return;
     var cleaned = false;
     var hasLive = false;
@@ -320,7 +323,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         store.selectProject(id);
         _directory = false;
       } else {
-        _directory = true;
+        _directory = false;
       }
     });
   }
@@ -552,6 +555,10 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
 
   Future<void> _open(WorkspaceArtifact a) async {
     final destination = store.currentProject;
+    if (a.kind == 'app') {
+      store.launchLocalApp(a.data['app'] as String);
+      return;
+    }
     store.openArtifact(a.id);
     if (!_servedByResult(a.kind) &&
         a.data['_live'] != true &&
@@ -583,27 +590,6 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         } catch (_) {}
       }
     }
-  }
-
-  Future<void> _newProject(
-    BuildContext context, [
-    UiSpecialist specialist = uiCoordinator,
-  ]) async {
-    final result = await showDialog<UiProjectStart>(
-      context: context,
-      builder: (_) => UiProjectStartDialog(specialist: specialist),
-    );
-    if (!mounted || result == null) return;
-    store.createProject(
-      result.name,
-      agentId: result.specialist.id,
-      draft: result.intent,
-    );
-    setState(() {
-      _directory = false;
-
-      _mobileWork = false;
-    });
   }
 
   Future<void> _newWork(BuildContext context, String kind) async {
@@ -771,29 +757,6 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     );
   }
 
-  Widget _projects(BuildContext context) => UiProjectLibrary(
-    onStartTemplate: (specialist) => _newProject(context, specialist),
-    projects: [
-      for (final project in store.projects)
-        UiProjectSummary(
-          id: project.id,
-          title: project.title,
-          conversations: project.conversations.length,
-          savedItems: project.artifacts.length,
-          workKinds: {
-            for (final kind in project.artifacts.map((a) => a.kind).toSet())
-              kind: project.artifacts.where((a) => a.kind == kind).length,
-          },
-        ),
-    ],
-    onCreate: () => _newProject(context),
-    onOpen: (id) {
-      store.selectProject(id);
-      setState(() {
-        _directory = false;
-      });
-    },
-  );
   Future<void> _import(BuildContext context) async {
     final project = store.currentProject;
     try {
@@ -899,6 +862,54 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   }
 
   Widget _editor(WorkspaceArtifact a) {
+    if (a.kind == 'app') {
+      final client = widget.programmingClient;
+      if (client == null) {
+        return const Center(
+          child: Text('Connect to IntoChat to open local apps.'),
+        );
+      }
+      return Semantics(
+        container: true,
+        explicitChildNodes: true,
+        role: SemanticsRole.region,
+        label: a.title,
+        child: AppSurfaceHost(
+          key: ValueKey('${store.currentProject.id}-${a.id}'),
+          client: client,
+          workspace: store.currentProject.id,
+          artifact: a,
+          onImage: (document) {
+            final images = store.launchLocalApp('images');
+            final documents = List<Map<String, dynamic>>.from(
+              (images.data['documents'] as List? ?? []).map(
+                (d) => Map<String, dynamic>.from(d),
+              ),
+            );
+            if (!documents.any((d) => d['id'] == document['id'])) {
+              documents.add({
+                'id': document['id'],
+                'name': document['asset']['name'],
+              });
+            }
+            images.data['documents'] = documents;
+            images.data['selected'] = document['id'];
+            store.save();
+          },
+          onChanged: () => store.save(),
+          onSaved: () {
+            final files = store.currentProject.artifacts
+                .where((a) => a.id == 'app-files')
+                .firstOrNull;
+            if (files != null) {
+              files.data['refresh'] = (files.data['refresh'] as int? ?? 0) + 1;
+              store.save();
+            }
+          },
+        ),
+      );
+    }
+
     if (a.kind == 'table' && _tables[a.id] == null) {
       if (!_hydratingTables.contains(a.id) && !_tableErrors.containsKey(a.id)) {
         _hydratingTables.add(a.id);
@@ -979,7 +990,17 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         var query = '';
         return StatefulBuilder(
           builder: (context, update) => AlertDialog(
-            title: const Text('Project files'),
+            title: Row(
+              children: [
+                const Expanded(child: Text('Saved work')),
+                _newWorkMenu(context),
+                IconButton(
+                  tooltip: 'Import saved work',
+                  onPressed: () => _import(context),
+                  icon: const Icon(Icons.download_outlined),
+                ),
+              ],
+            ),
             content: SizedBox(
               width: 560,
               height: 400,
@@ -1060,67 +1081,11 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     await _open(project.artifacts.firstWhere((a) => a.id == choice.$1));
   }
 
-  Widget _work(BuildContext context) {
-    final p = store.currentProject;
-    return Column(
-      children: [
-        SizedBox(
-          height: 48,
-          child: Row(
-            children: [
-              const SizedBox(width: 8),
-              Tooltip(
-                message: 'Open project work',
-                child: TextButton.icon(
-                  onPressed: () => _projectFiles(context),
-                  icon: const Icon(Icons.folder_open_outlined, size: 19),
-                  label: const Text('Project files'),
-                ),
-              ),
-              _newWorkMenu(context),
-              if (widget.onListTables != null || widget.onListArtifacts != null)
-                IconButton(
-                  tooltip: 'Import saved work',
-                  onPressed: () => _import(context),
-                  icon: const Icon(Icons.download_outlined, size: 19),
-                ),
-              const Spacer(),
-              if (MediaQuery.sizeOf(context).width >= 760)
-                IconButton(
-                  tooltip: p.presentation.chatCollapsed
-                      ? 'Show chat'
-                      : 'Hide chat',
-                  onPressed: store.toggleChat,
-                  icon: Icon(
-                    p.presentation.chatCollapsed
-                        ? Icons.chat_bubble_outline
-                        : Icons.view_sidebar_outlined,
-                    size: 19,
-                  ),
-                ),
-              const SizedBox(width: 8),
-            ],
-          ),
-        ),
-        Expanded(
-          child: WorkspaceDesktop(
-            key: ValueKey('desktop-${p.id}'),
-            store: store,
-            editorBuilder: _pane,
-          ),
-        ),
-        UiArtifactDock(
-          items: [
-            for (final a in p.artifacts.where(
-              (a) => p.presentation.minimizedArtifactIds.contains(a.id),
-            ))
-              UiDockItem(id: a.id, title: a.title, kind: a.kind),
-          ],
-          onRestore: (id) => _open(p.artifacts.firstWhere((a) => a.id == id)),
-        ),
-      ],
-    );
-  }
+  Widget _work(BuildContext context) => WorkspaceDesktop(
+    key: ValueKey('desktop-${store.currentProject.id}'),
+    store: store,
+    editorBuilder: _pane,
+  );
 
   Widget _workspace(BuildContext context) => LayoutBuilder(
     builder: (context, c) {
@@ -1157,7 +1122,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                           children: [
                             Expanded(
                               child: Text(
-                                store.currentConversation.title,
+                                'Assistant',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -1232,7 +1197,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
           children: [
             SegmentedButton<bool>(
               segments: const [
-                ButtonSegment(value: false, label: Text('Conversation')),
+                ButtonSegment(value: false, label: Text('Assistant')),
                 ButtonSegment(value: true, label: Text('Workspace')),
               ],
               selected: {_mobileWork},
@@ -1252,6 +1217,9 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         c.maxWidth * .6,
       );
       return Row(
+        textDirection: store.settings.assistantRight
+            ? TextDirection.rtl
+            : TextDirection.ltr,
         children: [
           Offstage(
             offstage: store.currentProject.presentation.chatCollapsed,
@@ -1324,97 +1292,6 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     },
     home: Builder(
       builder: (context) => Scaffold(
-        appBar: AppBar(
-          toolbarHeight: !_directory && MediaQuery.sizeOf(context).width < 600
-              ? 100
-              : 64,
-          titleSpacing: 16,
-          title: Wrap(
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Tooltip(
-                message: 'Go to homepage',
-                child: TextButton(
-                  onPressed: () => setState(() {
-                    _directory = true;
-                  }),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.onSurface,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 16,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                  child: const Text(
-                    'IntoChat',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 21,
-                      letterSpacing: -0.8,
-                    ),
-                  ),
-                ),
-              ),
-              if (_ready && !_directory) ...[
-                const Text('/', style: TextStyle(fontSize: 16)),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 200),
-                  child: TextButton(
-                    style: TextButton.styleFrom(
-                      minimumSize: Size.zero,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 12,
-                      ),
-                    ),
-                    onPressed: () => setState(() => _mobileWork = false),
-                    child: Text(
-                      store.currentProject.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-          actions: [
-            if (widget.programmingClient != null)
-              IconButton(
-                tooltip: 'Living programs',
-                onPressed: _ready ? () => _openPrograms(context) : null,
-                icon: const Icon(Icons.hub_outlined),
-              ),
-            if (_ready && !_directory)
-              IconButton(
-                tooltip: 'Search project work',
-                onPressed: () => _search(context),
-                icon: const Icon(Icons.search),
-              ),
-            IconButton(
-              tooltip: 'Settings',
-              onPressed: _ready
-                  ? () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        settings: const RouteSettings(
-                          name: '/settings/profile',
-                        ),
-                        builder: (_) => WorkspaceSettings(
-                          store: store,
-                          kernelBaseUri: widget.kernelBaseUri,
-                          onOpen: widget.onOpenUrl,
-                          onClose: () => Navigator.of(context).pop(),
-                        ),
-                      ),
-                    )
-                  : null,
-              icon: const Icon(Icons.settings_outlined),
-            ),
-          ],
-        ),
         body: !_ready
             ? const Center(child: CircularProgressIndicator())
             : Column(
@@ -1433,23 +1310,66 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                         color: Theme.of(context).colorScheme.error,
                       ),
                     ),
+                  if (store.settings.dockTop) _islands(context),
                   Expanded(
-                    child: IndexedStack(
-                      index: _directory ? 0 : 1,
-                      children: [
-                        _projects(context),
-                        if (store.projects.isNotEmpty)
-                          _workspace(context)
-                        else
-                          const SizedBox.shrink(),
-                      ],
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                      child: _workspace(context),
                     ),
                   ),
+                  if (!store.settings.dockTop) _islands(context),
                 ],
               ),
       ),
     ),
   );
+  Widget _islands(BuildContext context) => WorkspaceIslands(
+    store: store,
+    onLaunch: (app) => store.launchLocalApp(app),
+    onRestore: (id) =>
+        _open(store.currentProject.artifacts.firstWhere((a) => a.id == id)),
+    onNewWorkspace: () async {
+      final input = TextEditingController();
+      final name = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('New workspace'),
+          content: TextField(
+            controller: input,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'Workspace name'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, input.text),
+              child: const Text('Create workspace'),
+            ),
+          ],
+        ),
+      );
+      if (name != null && mounted) {
+        store.createProject(name.trim().isEmpty ? 'Untitled workspace' : name);
+      }
+    },
+    onSavedWork: () => _projectFiles(context),
+    onSearch: () => _search(context),
+    onSettings: () => Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: '/settings/profile'),
+        builder: (_) => WorkspaceSettings(
+          store: store,
+          kernelBaseUri: widget.kernelBaseUri,
+          onOpen: widget.onOpenUrl,
+          onClose: () => Navigator.of(context).pop(),
+        ),
+      ),
+    ),
+  );
+
   void _search(BuildContext context) {
     _query = '';
     showDialog<void>(

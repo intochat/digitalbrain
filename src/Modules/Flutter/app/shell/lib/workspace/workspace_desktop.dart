@@ -74,42 +74,6 @@ class _WorkspaceDesktopState extends State<WorkspaceDesktop> {
         key: _surface,
         fit: StackFit.expand,
         children: [
-          if (active == null)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(28),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.space_dashboard_outlined,
-                      size: 32,
-                      color: colors.onSurfaceVariant,
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Space for your work',
-                      style: TextStyle(
-                        fontSize: 23,
-                        fontWeight: FontWeight.w400,
-                        letterSpacing: -.5,
-                        color: colors.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Open something from Project files,\nor create it in your conversation.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 1.6,
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
           for (final id in layout.openArtifactIds)
             if (store.currentProject.artifacts.any((a) => a.id == id))
               _window(

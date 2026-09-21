@@ -276,13 +276,17 @@ class WorkspaceProject {
 class WorkspacePreferences {
   String displayName = '';
   String role = '';
-  String theme = 'light';
+  String theme = 'dark';
+  bool dockTop = false;
+  bool assistantRight = false;
   bool reducedMotion = false;
   bool compactDensity = false;
   Map<String, dynamic> toJson() => {
     'displayName': displayName,
     'role': role,
     'theme': theme,
+    'dockTop': dockTop,
+    'assistantRight': assistantRight,
     'reducedMotion': reducedMotion,
     'compactDensity': compactDensity,
   };
@@ -291,7 +295,9 @@ class WorkspacePreferences {
       WorkspacePreferences()
         ..displayName = _text(json['displayName'], '')
         ..role = _text(json['role'], '')
-        ..theme = _text(json['theme'], 'light')
+        ..theme = _text(json['theme'], 'dark')
+        ..dockTop = json['dockTop'] == true
+        ..assistantRight = json['assistantRight'] == true
         ..reducedMotion = json['reducedMotion'] == true
         ..compactDensity = json['compactDensity'] == true;
 }
@@ -328,11 +334,22 @@ class WorkspaceStore extends ChangeNotifier {
         artifact = WorkspaceArtifact(
           id: window.id,
           title: window.title,
-          kind: 'table',
+          kind: window.surface == null ? 'table' : 'app',
           remoteManaged: true,
-          data: {'tableId': window.tableId},
+          data: window.surface == null ? {'tableId': window.tableId} : {'app':window.id == 'app-files' ? 'files' : 'images'},
         );
         project.artifacts.add(artifact);
+      }
+      if (window.surface != null && window.id == 'app-images') {
+        final name = window.surface!['name'] as String;
+        final parts = name.split('/images/');
+        if (parts.length == 2) {
+          final documentId = parts.last.split('/').first;
+          final documents = List<Map<String,dynamic>>.from((artifact.data['documents'] as List? ?? []).map((d)=>Map<String,dynamic>.from(d)));
+          if (!documents.any((d)=>d['id']==documentId)) { documents.add({'id':documentId,'name':'Image'}); }
+          artifact.data['documents']=documents;
+          artifact.data['selected'] ??= documentId;
+        }
       }
       artifact.title = window.title;
       if (window.isOpen) {
@@ -535,6 +552,31 @@ class WorkspaceStore extends ChangeNotifier {
   void clearAttachments() {
     currentConversation.attachedArtifactIds.clear();
     save();
+  }
+
+  WorkspaceArtifact launchLocalApp(String app) {
+    if (!['files', 'images'].contains(app)) {
+      throw ArgumentError('Application not implemented.');
+    }
+    final id = 'app-$app';
+    final artifact =
+        currentProject.artifacts.where((a) => a.id == id).firstOrNull ??
+        WorkspaceArtifact(
+          id: id,
+          title: app == 'files' ? 'Files' : 'Image Editor',
+          kind: 'app',
+          data: {'app': app},
+        );
+    addArtifact(artifact);
+    final p = currentProject.presentation;
+    final mode = p.windowModes[id] ?? 'maximized';
+    for (final other in p.openArtifactIds.where((other) => other != id)) {
+      if (!p.minimizedArtifactIds.contains(other)) {
+        p.minimizedArtifactIds.add(other);
+      }
+    }
+    openArtifact(id, placement: mode);
+    return artifact;
   }
 
   void addArtifact(WorkspaceArtifact artifact) {

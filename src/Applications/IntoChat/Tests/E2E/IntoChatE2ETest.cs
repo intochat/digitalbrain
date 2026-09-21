@@ -19,7 +19,7 @@ internal static class IntoChatE2ETest
 
     public static Task<E2EBrain> StartAsync(CancellationToken ct) => Create().StartAsync(ct);
 
-    public static E2ETestBuilder<Projects.IntoChat_AppHost> Create(string modelApiKey = "fixture-key")
+    public static E2ETestBuilder<Projects.IntoChat_AppHost> Create(string modelApiKey = "fixture-key", Dictionary<string, string?>? privateConfiguration = null)
         => E2ETest.For<Projects.IntoChat_AppHost>()
             .ConfigureModule<AIModule>(ai => ai.WithoutLocalModels().WithoutVoiceToText().WithoutWebSearch()
                 .WithDefaultLlm<IGpt56Luna>().WithModelEndpoint(AiProvider.OpenAI, new(UnconfiguredProvider, "v1/")))
@@ -39,13 +39,18 @@ internal static class IntoChatE2ETest
             .ConfigureModule<FlutterModule>(flutter => flutter.BackendOnly())
             .WithExecution(new()
             {
-                PrivateConfiguration = new Dictionary<string, string?>
+                PrivateConfiguration = Merge(new Dictionary<string, string?>
                 {
                     ["Parameters:openai-api-key"] = modelApiKey,
                     ["Parameters:gmail-client-id"] = "fixture-client",
                     ["Parameters:gmail-client-secret"] = "fixture-secret",
                     ["Parameters:salesforce-consumer-key"] = "fixture-client",
                     ["Parameters:salesforce-consumer-secret"] = "fixture-secret",
-                },
+                }, privateConfiguration),
             });
+    private static Dictionary<string, string?> Merge(Dictionary<string, string?> defaults, Dictionary<string, string?>? extra)
+    {
+        if (extra is not null) { foreach (var item in extra) { defaults[item.Key] = item.Value; } }
+        return defaults;
+    }
 }

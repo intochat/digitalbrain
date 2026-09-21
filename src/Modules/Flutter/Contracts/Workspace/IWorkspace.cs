@@ -7,6 +7,7 @@ namespace DigitalBrain.Flutter.Workspace;
 public interface IWorkspace : INeuron
 {
     Task<WorkspaceState> Open(OpenWindow request);
+    Task<WorkspaceState> OpenSurface(OpenSurfaceWindow request);
     Task<WorkspaceState> Close(string windowId, long expectedRevision);
     [ReadOnly] Task<WorkspaceState> Read();
 }

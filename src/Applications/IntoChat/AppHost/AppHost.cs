@@ -71,6 +71,11 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
         })
     .WithEnvironment(context =>
     {
+        var downloads = builder.Configuration["IntoChat:LocalFiles:Roots:downloads"];
+        if (downloads is null && !testing) { downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"); }
+        if (downloads is not null) { context.EnvironmentVariables["IntoChat__LocalFiles__Roots__downloads"] = downloads; }
+        var assets = builder.Configuration["IntoChat:LocalFiles:AssetDirectory"];
+        if (assets is not null) { context.EnvironmentVariables["IntoChat__LocalFiles__AssetDirectory"] = assets; }
         if (clusterId is not null)
         {
             context.EnvironmentVariables["Orleans__ClusterId"] = clusterId;

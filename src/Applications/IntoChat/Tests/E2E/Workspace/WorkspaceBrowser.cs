@@ -7,10 +7,12 @@ internal static class WorkspaceBrowser
 {
     public static async Task<string> CreateProjectAsync(IPage page, string title)
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "New IntoChat project" }).ClickAsync();
-        await EnterTextAsync(page.GetByRole(AriaRole.Textbox, new() { Name = "Project name (optional)" }), title);
-        await page.GetByRole(AriaRole.Button, new() { Name = "Start project", Exact = true }).ClickAsync();
-        await page.WaitForURLAsync("**/projects/*/workspace*");
+        await page.GetByRole(AriaRole.Button, new() { NameRegex = new System.Text.RegularExpressions.Regex("^Workspaces") }).ClickAsync();
+        await page.GetByRole(AriaRole.Menuitem, new() { Name = "New workspace", Exact = true }).ClickAsync();
+        await EnterTextAsync(page.GetByRole(AriaRole.Textbox, new() { Name = "Workspace name" }), title);
+        var previousUrl = page.Url;
+        await page.GetByRole(AriaRole.Button, new() { Name = "Create workspace", Exact = true }).ClickAsync();
+        await page.WaitForURLAsync(url => url != previousUrl && url.Contains("/projects/", StringComparison.Ordinal) && url.Contains("/workspace", StringComparison.Ordinal));
         var route = new Uri(page.Url);
         var segments = (route.Fragment.StartsWith("#/", StringComparison.Ordinal)
             ? route.Fragment[1..] : route.AbsolutePath).Split('/', StringSplitOptions.RemoveEmptyEntries);

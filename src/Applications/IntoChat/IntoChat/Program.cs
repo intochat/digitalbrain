@@ -1,3 +1,5 @@
+using IntoChat.Apps;
+using IntoChat.LocalFiles;
 using IntoChat.Workspace.Queries;
 using DigitalBrain.Aspire;
 using DigitalBrain.Sdk;
@@ -16,6 +18,11 @@ builder.AddDigitalBrain();
 builder.AddBehaviors();
 builder.AddKernelCors();
 builder.Services.AddAuthentication();
+builder.Services.AddDataProtection();
+builder.Services.Configure<LocalFilesOptions>(builder.Configuration.GetSection("IntoChat:LocalFiles"));
+builder.Services.AddSingleton<LocalFileStore>();
+builder.Services.AddSingleton<AppSurfaceComposer>();
+builder.Services.AddSingleton<ImageSaveCoordinator>();
 builder.Services.AddSingleton<QueryWindowOperation>();
 builder.Services.AddSingleton<IAgentToolFactory, SupabaseWorkspaceTools>();
 builder.Services.AddSingleton<ConversationCoordinator>();
@@ -32,5 +39,6 @@ app.MapBehaviors();
 app.MapDigitalBrainModules();
 app.MapWorkspaceDataEndpoints();
 app.MapWorkspaceAgent();
+app.MapLocalApps();
 
 app.Run();
