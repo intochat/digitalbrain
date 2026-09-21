@@ -7,6 +7,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Flutter.Video;
+
 [GrainType(UIVocabulary.VideoType)]
 internal sealed class VideoNeuron([PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<VideoState> store)
     : Neuron<VideoState>(store), IVideo
@@ -68,4 +69,3 @@ internal sealed class VideoNeuron([PersistentState("state", DigitalBrainNames.De
         return next;
     }
 }
-

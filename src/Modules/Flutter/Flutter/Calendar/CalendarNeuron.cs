@@ -26,4 +26,3 @@ internal sealed class CalendarNeuron([PersistentState("state", DigitalBrainNames
 
     [ReadOnly] public Task<CalendarState> Read() { Snapshot.Name = this.GetPrimaryKeyString(); return Task.FromResult(Snapshot); }
 }
-

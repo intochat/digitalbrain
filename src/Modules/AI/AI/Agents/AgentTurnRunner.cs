@@ -74,7 +74,7 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
             else { client = Providers.Resolve(services, request.Model?.Provider, request.Model?.Model, out owned); }
             using var ownedClient = owned ? client : null;
             if (client.GetService<FunctionInvokingChatClient>() is null)
-                { client = new ChatClientBuilder(client).UseFunctionInvocation().Build(services); }
+            { client = new ChatClientBuilder(client).UseFunctionInvocation().Build(services); }
             var agent = new ChatClientAgent(client, new ChatClientAgentOptions
             {
                 Name = request.AgentId,
@@ -93,7 +93,7 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
             if (toolFailure is not null) { throw new InvalidOperationException("A required tool failed.", toolFailure); }
             // Unhandled calls must never become a successful conversational turn.
             if (response.Messages.SelectMany(m => m.Contents).OfType<FunctionCallContent>().Any(c => !selected.Contains(c.Name)))
-                { throw new InvalidOperationException("The model requested an unavailable tool."); }
+            { throw new InvalidOperationException("The model requested an unavailable tool."); }
             ct.ThrowIfCancellationRequested();
             events.TryWrite(new AgentTurnEvent.Text(response.Text ?? string.Empty));
             events.TryWrite(new AgentTurnEvent.Finished());

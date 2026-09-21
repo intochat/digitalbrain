@@ -15,7 +15,7 @@ public static class ModuleComposition
             foreach (var pair in module.Configuration)
             {
                 if (configuration.TryGetValue(pair.Key, out var value) && value != pair.Value)
-                    { throw new InvalidOperationException($"Conflicting configuration key '{pair.Key}'."); }
+                { throw new InvalidOperationException($"Conflicting configuration key '{pair.Key}'."); }
                 configuration[pair.Key] = pair.Value;
             }
         }
@@ -29,7 +29,7 @@ public static class ModuleComposition
                 if (previous.ModuleType != module.ModuleType || previous.Configuration.Count != module.Configuration.Count ||
                     previous.Configuration.Any(pair => !module.Configuration.TryGetValue(pair.Key, out var value) || pair.Value != value) ||
                     !previous.Dependencies.Select(d => d.Id).SequenceEqual(module.Dependencies.Select(d => d.Id)))
-                    { throw new InvalidOperationException($"Conflicting definitions for module '{module.Id}'."); }
+                { throw new InvalidOperationException($"Conflicting definitions for module '{module.Id}'."); }
                 foreach (var dependency in module.Dependencies) { Visit(dependency); }
                 return;
             }

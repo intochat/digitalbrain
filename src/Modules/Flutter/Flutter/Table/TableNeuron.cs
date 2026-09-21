@@ -7,6 +7,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Flutter.Table;
+
 [GrainType(UIVocabulary.TableType)]
 internal sealed class TableNeuron([PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<TableState> store)
     : Neuron<TableState>(store), ITable
@@ -39,4 +40,3 @@ internal sealed class TableNeuron([PersistentState("state", DigitalBrainNames.De
 
     [ReadOnly] public Task<TableState> Read() { Snapshot.Name = this.GetPrimaryKeyString(); return Task.FromResult(Snapshot); }
 }
-

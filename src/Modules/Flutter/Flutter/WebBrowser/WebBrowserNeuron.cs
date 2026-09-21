@@ -7,6 +7,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Flutter.WebBrowser;
+
 [GrainType(UIVocabulary.WebBrowserType)]
 internal sealed class WebBrowserNeuron([PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<WebBrowserState> store)
     : Neuron<WebBrowserState>(store), IWebBrowser
@@ -30,4 +31,3 @@ internal sealed class WebBrowserNeuron([PersistentState("state", DigitalBrainNam
 
     [ReadOnly] public Task<WebBrowserState> Read() { Snapshot.Name = this.GetPrimaryKeyString(); return Task.FromResult(Snapshot); }
 }
-

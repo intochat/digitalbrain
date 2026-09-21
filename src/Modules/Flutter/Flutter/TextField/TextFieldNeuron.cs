@@ -7,6 +7,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Flutter.TextField;
+
 [GrainType(UIVocabulary.TextFieldType)]
 internal sealed class TextFieldNeuron([PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<TextFieldState> store)
     : Neuron<TextFieldState>(store), ITextField
@@ -38,4 +39,3 @@ internal sealed class TextFieldNeuron([PersistentState("state", DigitalBrainName
 
     [ReadOnly] public Task<TextFieldState> Read() { Snapshot.Name = this.GetPrimaryKeyString(); return Task.FromResult(Snapshot); }
 }
-

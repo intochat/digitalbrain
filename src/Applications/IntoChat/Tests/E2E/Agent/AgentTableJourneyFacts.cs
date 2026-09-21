@@ -1,3 +1,4 @@
+using System.Text.Json;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Conversations;
 using DigitalBrain.Flutter;
@@ -5,7 +6,6 @@ using IntoChat.Agent;
 using IntoChat.Tests.E2E.Workspace;
 using IntoChat.Workspace;
 using Microsoft.Playwright;
-using System.Text.Json;
 
 namespace IntoChat.Tests.E2E.Agent;
 

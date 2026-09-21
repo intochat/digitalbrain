@@ -21,4 +21,3 @@ public static class BrainSimulationExtensions
     private static UnitBrain Requires(IDigitalBrain brain)
         => brain as UnitBrain ?? throw new InvalidOperationException("This operation requires a brain started by UnitTest.");
 }
-

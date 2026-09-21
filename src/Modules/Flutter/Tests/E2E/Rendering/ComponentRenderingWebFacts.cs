@@ -1,8 +1,8 @@
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Chart;
-using IVideo = DigitalBrain.Flutter.Video.IVideo;
 using DigitalBrain.Flutter.WebBrowser;
 using Microsoft.Playwright;
+using IVideo = DigitalBrain.Flutter.Video.IVideo;
 
 namespace DigitalBrain.Modules.Flutter.Tests.E2E.Rendering;
 

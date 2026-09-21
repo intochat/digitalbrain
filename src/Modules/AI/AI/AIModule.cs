@@ -32,21 +32,21 @@ public sealed class AIModule : IModule
         Put(configuration, $"{section}:Tavily:Enabled", options.Tavily.Enabled.ToString());
         Put(configuration, $"{section}:Ollama:Endpoint", options.Ollama.Endpoint);
         foreach (var provider in new[] { AiProvider.OpenAI, AiProvider.Anthropic, AiProvider.Google, AiProvider.XAI })
-            { Put(configuration, $"{section}:{provider}:Endpoint", options.Provider(provider).Endpoint); }
+        { Put(configuration, $"{section}:{provider}:Endpoint", options.Provider(provider).Endpoint); }
         for (var i = 0; i < options.Hosting.Llms.Count; i++)
         {
             if (LLMModel.FindByMarkerName(options.Hosting.Llms[i]) is null)
-                { throw new ArgumentException("Unknown LLM marker in the module declaration.", nameof(options)); }
+            { throw new ArgumentException("Unknown LLM marker in the module declaration.", nameof(options)); }
             Put(configuration, $"{section}:Hosting:Llms:{i}", options.Hosting.Llms[i]);
         }
         for (var i = 0; i < options.Hosting.Embeddings.Count; i++)
         {
             if (EmbeddingModel.FindByMarkerName(options.Hosting.Embeddings[i]) is null)
-                { throw new ArgumentException("Unknown embedding marker in the module declaration.", nameof(options)); }
+            { throw new ArgumentException("Unknown embedding marker in the module declaration.", nameof(options)); }
             Put(configuration, $"{section}:Hosting:Embeddings:{i}", options.Hosting.Embeddings[i]);
         }
         foreach (var (name, model) in options.Ollama.Models)
-            { Put(configuration, $"{section}:Ollama:Models:{name}:Model", model.Model); }
+        { Put(configuration, $"{section}:Ollama:Models:{name}:Model", model.Model); }
         foreach (var (name, profile) in options.ModelProfiles)
         {
             var prefix = $"{section}:ModelProfiles:{name}";

@@ -7,6 +7,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Flutter.Color;
+
 [GrainType(UIVocabulary.ColorType)]
 internal sealed class ColorNeuron([PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ColorState> store)
     : Neuron<ColorState>(store), IColor

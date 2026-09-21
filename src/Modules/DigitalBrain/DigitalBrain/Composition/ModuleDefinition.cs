@@ -11,7 +11,7 @@ public sealed class ModuleDefinition : IModule
     {
         ArgumentNullException.ThrowIfNull(moduleType);
         if (!typeof(IModule).IsAssignableFrom(moduleType) || moduleType.IsAbstract || moduleType.GetConstructor(Type.EmptyTypes) is null)
-            { throw new ArgumentException("Select a concrete module with a public parameterless constructor.", nameof(moduleType)); }
+        { throw new ArgumentException("Select a concrete module with a public parameterless constructor.", nameof(moduleType)); }
         ModuleType = moduleType;
         Configuration = new ReadOnlyDictionary<string, string?>(new Dictionary<string, string?>(configuration ?? new Dictionary<string, string?>(), StringComparer.OrdinalIgnoreCase));
         Dependencies = Array.AsReadOnly((dependencies ?? []).ToArray());

@@ -66,7 +66,7 @@ public static class AIModuleConfiguration
     {
         ArgumentNullException.ThrowIfNull(endpoint);
         if (!endpoint.IsAbsoluteUri || endpoint.Scheme is not ("http" or "https"))
-            { throw new ArgumentException("A model endpoint must be an absolute HTTP(S) URI.", nameof(endpoint)); }
+        { throw new ArgumentException("A model endpoint must be an absolute HTTP(S) URI.", nameof(endpoint)); }
         module.ConfigureOptions<AIOptions>(o => o.Provider(provider).Endpoint = endpoint.OriginalString, $"{provider}.Endpoint");
         return module;
     }

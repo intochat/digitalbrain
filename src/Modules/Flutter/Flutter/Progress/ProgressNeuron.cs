@@ -7,6 +7,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Flutter.Progress;
+
 [GrainType(UIVocabulary.ProgressType)]
 internal sealed class ProgressNeuron([PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ProgressState> store)
     : Neuron<ProgressState>(store), IProgress
@@ -25,4 +26,3 @@ internal sealed class ProgressNeuron([PersistentState("state", DigitalBrainNames
 
     [ReadOnly] public Task<ProgressState> Read() { Snapshot.Name = this.GetPrimaryKeyString(); return Task.FromResult(Snapshot); }
 }
-

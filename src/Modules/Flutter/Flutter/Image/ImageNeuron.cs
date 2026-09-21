@@ -7,6 +7,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Flutter.Image;
+
 [GrainType(UIVocabulary.ImageType)]
 internal sealed class ImageNeuron([PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ImageState> store)
     : Neuron<ImageState>(store), IImage
@@ -27,4 +28,3 @@ internal sealed class ImageNeuron([PersistentState("state", DigitalBrainNames.De
 
     [ReadOnly] public Task<ImageState> Read() { Snapshot.Name = this.GetPrimaryKeyString(); return Task.FromResult(Snapshot); }
 }
-

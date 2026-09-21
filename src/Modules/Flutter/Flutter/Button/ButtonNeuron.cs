@@ -7,6 +7,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Flutter.Button;
+
 [GrainType(UIVocabulary.ButtonType)]
 internal sealed class ButtonNeuron([PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ButtonState> store)
     : Neuron<ButtonState>(store), IButton
@@ -42,4 +43,3 @@ internal sealed class ButtonNeuron([PersistentState("state", DigitalBrainNames.D
 
     private ButtonState Named(ButtonState state) { state.Name = this.GetPrimaryKeyString(); return state; }
 }
-

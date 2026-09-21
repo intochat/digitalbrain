@@ -1,9 +1,9 @@
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
 using Orleans.TestingHost;
-using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Testing.Unit;
 

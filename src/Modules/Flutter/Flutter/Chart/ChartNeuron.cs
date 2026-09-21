@@ -7,6 +7,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Flutter.Chart;
+
 [GrainType(UIVocabulary.ChartType)]
 internal sealed class ChartNeuron([PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ChartState> store)
     : Neuron<ChartState>(store), IChart
@@ -51,4 +52,3 @@ internal sealed class ChartNeuron([PersistentState("state", DigitalBrainNames.De
 
     [ReadOnly] public Task<ChartState> Read() { Snapshot.Name = this.GetPrimaryKeyString(); return Task.FromResult(Snapshot); }
 }
-

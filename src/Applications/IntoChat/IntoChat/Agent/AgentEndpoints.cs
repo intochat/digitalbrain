@@ -1,8 +1,8 @@
 using System.Text.Json;
-using IntoChat.Workspace;
-using Microsoft.Extensions.Options;
 using DigitalBrain.AI.Conversations;
 using DigitalBrain.Contracts;
+using IntoChat.Workspace;
+using Microsoft.Extensions.Options;
 
 namespace IntoChat.Agent;
 
@@ -36,7 +36,7 @@ internal static class AgentEndpoints
             {
                 http.RequestServices.GetRequiredService<ILogger<ConversationCoordinator>>().LogWarning(error, "Workspace agent run failed");
                 if (!http.RequestAborted.IsCancellationRequested)
-                    { await Emit(new { type = "RUN_ERROR", message = "The request could not be completed. Check the data connection or try again.", code = "AGENT_FAILED" }); }
+                { await Emit(new { type = "RUN_ERROR", message = "The request could not be completed. Check the data connection or try again.", code = "AGENT_FAILED" }); }
             }
         });
     }

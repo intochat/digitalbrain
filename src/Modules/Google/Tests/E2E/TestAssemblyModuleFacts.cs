@@ -1,8 +1,8 @@
 using DigitalBrain.Core;
 using Microsoft.AspNetCore.Builder;
-using Xunit;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
+using Xunit;
 
 namespace DigitalBrain.Tests;
 

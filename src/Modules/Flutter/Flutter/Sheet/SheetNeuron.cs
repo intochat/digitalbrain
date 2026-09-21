@@ -7,6 +7,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Flutter.Sheet;
+
 [GrainType(UIVocabulary.SheetType)]
 internal sealed class SheetNeuron([PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SheetState> store)
     : Neuron<SheetState>(store), ISheet
@@ -25,4 +26,3 @@ internal sealed class SheetNeuron([PersistentState("state", DigitalBrainNames.De
 
     [ReadOnly] public Task<SheetState> Read() { Snapshot.Name = this.GetPrimaryKeyString(); return Task.FromResult(Snapshot); }
 }
-

@@ -7,6 +7,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Flutter.Expander;
+
 [GrainType(UIVocabulary.ExpanderType)]
 internal sealed class ExpanderNeuron([PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ExpanderState> store)
     : Neuron<ExpanderState>(store), IExpander
@@ -34,4 +35,3 @@ internal sealed class ExpanderNeuron([PersistentState("state", DigitalBrainNames
 
     [ReadOnly] public Task<ExpanderState> Read() { Snapshot.Name = this.GetPrimaryKeyString(); return Task.FromResult(Snapshot); }
 }
-

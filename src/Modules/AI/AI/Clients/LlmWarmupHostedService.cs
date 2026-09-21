@@ -1,10 +1,10 @@
 using System.Diagnostics;
 using DigitalBrain.AI.Ollama;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.AI;
 

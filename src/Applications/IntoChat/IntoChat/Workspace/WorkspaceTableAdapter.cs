@@ -7,10 +7,19 @@ internal static class WorkspaceTableAdapter
 {
     public static object ToJson(SupabaseTableSnapshot table) => new
     {
-        table.Id, table.Title, table.Kind, table.Revision, table.Columns,
+        table.Id,
+        table.Title,
+        table.Kind,
+        table.Revision,
+        table.Columns,
         Rows = table.Rows.Select(row => new { row.Id, Cells = row.Cells.Select(Parse).ToArray() }).ToArray(),
         Filters = table.Filters.Select(filter => new { filter.ColumnId, filter.Operator, Value = Parse(filter.Value) }).ToArray(),
-        table.Sort, table.VisibleColumns, table.TotalRows, table.FilteredRows, table.Offset, table.Limit,
+        table.Sort,
+        table.VisibleColumns,
+        table.TotalRows,
+        table.FilteredRows,
+        table.Offset,
+        table.Limit,
     };
     private static JsonElement Parse(string value) => JsonSerializer.Deserialize<JsonElement>(value);
 }

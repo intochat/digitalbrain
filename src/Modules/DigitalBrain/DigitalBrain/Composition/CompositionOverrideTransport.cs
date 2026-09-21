@@ -26,12 +26,12 @@ public static class CompositionOverrideTransport
         try { envelope = JsonSerializer.Deserialize<Envelope>(json, Json) ?? throw new JsonException(); }
         catch (JsonException) { throw new ArgumentException("Invalid composition override envelope.", nameof(json)); }
         if (envelope.Version != 1 || envelope.Modules is null)
-            { throw new ArgumentException("Unsupported composition override version or missing modules.", nameof(json)); }
+        { throw new ArgumentException("Unsupported composition override version or missing modules.", nameof(json)); }
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var entry in envelope.Modules)
         {
             if (entry is null || string.IsNullOrWhiteSpace(entry.Id) || entry.Patch is null || !seen.Add(entry.Id))
-                { throw new ArgumentException("Invalid or duplicate module override.", nameof(json)); }
+            { throw new ArgumentException("Invalid or duplicate module override.", nameof(json)); }
         }
         return envelope.Modules;
     }
@@ -40,6 +40,6 @@ public static class CompositionOverrideTransport
     {
         ArgumentNullException.ThrowIfNull(json);
         if (Encoding.UTF8.GetByteCount(json) > MaximumBytes)
-            { throw new ArgumentException("Composition overrides exceed the 32 KiB limit.", nameof(json)); }
+        { throw new ArgumentException("Composition overrides exceed the 32 KiB limit.", nameof(json)); }
     }
 }

@@ -105,4 +105,3 @@ public sealed class SupabaseTableFacts
             .ConfigureSilo(silo => silo.Services.AddSingleton<ISupabaseProvider>(provider))
             .StartAsync(ct);
 }
-

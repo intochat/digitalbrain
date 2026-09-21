@@ -1,9 +1,9 @@
-using Xunit;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Button;
 using DigitalBrain.Flutter.Button.Signals;
 using DigitalBrain.Testing;
 using DigitalBrain.Testing.Unit;
+using Xunit;
 
 namespace DigitalBrain.Modules.Flutter.Tests.Unit.Button;
 

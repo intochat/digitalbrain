@@ -7,6 +7,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Flutter.Graph;
+
 [GrainType(UIVocabulary.GraphType)]
 internal sealed class GraphNeuron([PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<GraphState> store)
     : Neuron<GraphState>(store), IGraph
@@ -27,4 +28,3 @@ internal sealed class GraphNeuron([PersistentState("state", DigitalBrainNames.De
 
     [ReadOnly] public Task<GraphState> Read() { Snapshot.Name = this.GetPrimaryKeyString(); return Task.FromResult(Snapshot); }
 }
-

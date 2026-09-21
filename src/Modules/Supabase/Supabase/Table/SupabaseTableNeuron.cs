@@ -51,7 +51,7 @@ internal sealed class SupabaseTableNeuron(
         if (current.View is not null)
         {
             if (operationId is not null && current.CreationOperation == operationId && current.CreationRequest == request)
-                { return current.View; }
+            { return current.View; }
             throw new SupabaseTableValidationException("Table already exists.");
         }
 

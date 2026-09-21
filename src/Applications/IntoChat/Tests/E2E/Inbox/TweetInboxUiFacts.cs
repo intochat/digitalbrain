@@ -1,8 +1,8 @@
-using DigitalBrain.Flutter;
-using DigitalBrain.Behaviors;
 using System.Net.Http.Json;
-using Microsoft.Playwright;
+using DigitalBrain.Behaviors;
+using DigitalBrain.Flutter;
 using IntoChat.Tests.E2E.Workspace;
+using Microsoft.Playwright;
 
 namespace IntoChat.Tests.E2E.Inbox;
 

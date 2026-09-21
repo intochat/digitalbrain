@@ -1,12 +1,12 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using DigitalBrain.Time;
 using DigitalBrain.Core;
+using DigitalBrain.Time;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans;
-using Orleans.Hosting;
 using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.TestingHost;
 using Xunit;
 namespace DigitalBrain.Tests;
@@ -90,4 +90,3 @@ public sealed class TimerProcessFacts
         }
     }
 }
-

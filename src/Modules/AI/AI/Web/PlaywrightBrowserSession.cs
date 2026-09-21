@@ -46,7 +46,8 @@ public sealed class PlaywrightBrowserSession : IAsyncDisposable
             UseCookies = false,
             ConnectTimeout = TimeSpan.FromSeconds(10),
             ConnectCallback = ConnectPublicAsync,
-        }) { Timeout = TimeSpan.FromSeconds(15) };
+        })
+        { Timeout = TimeSpan.FromSeconds(15) };
     }
 
     public IReadOnlyList<WebPageObservation> Observations => _observations.AsReadOnly();

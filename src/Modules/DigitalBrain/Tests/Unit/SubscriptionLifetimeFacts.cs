@@ -1,5 +1,5 @@
-using DigitalBrain.Testing.Unit;
 using DigitalBrain.Core;
+using DigitalBrain.Testing.Unit;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -79,4 +79,3 @@ public sealed class SubscriptionLifetimeFacts
         Assert.Equal(8, reader.Current.Value);
     }
 }
-

@@ -1,6 +1,6 @@
+using System.Runtime.CompilerServices;
 using Aspire.Hosting.ApplicationModel;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using System.Runtime.CompilerServices;
 
 namespace DigitalBrain.Flutter.Aspire.Hosting;
 

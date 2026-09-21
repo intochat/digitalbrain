@@ -1,13 +1,13 @@
-using DigitalBrain.AI;
 using System.Net.Http.Json;
 using Aspire.Hosting.Testing;
-using DigitalBrain.Flutter.Workspace;
+using DigitalBrain.AI;
+using DigitalBrain.AI.Conversations;
 using DigitalBrain.Flutter;
+using DigitalBrain.Flutter.Workspace;
+using IntoChat.Agent;
 using IntoChat.Tests.E2E.Workspace;
 using IntoChat.Workspace;
 using Npgsql;
-using DigitalBrain.AI.Conversations;
-using IntoChat.Agent;
 
 namespace IntoChat.Tests.E2E.Agent;
 

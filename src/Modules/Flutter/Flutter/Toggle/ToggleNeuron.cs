@@ -7,6 +7,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Flutter.Toggle;
+
 [GrainType(UIVocabulary.ToggleType)]
 internal sealed class ToggleNeuron([PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ToggleState> store)
     : Neuron<ToggleState>(store), IToggle
@@ -33,4 +34,3 @@ internal sealed class ToggleNeuron([PersistentState("state", DigitalBrainNames.D
 
     [ReadOnly] public Task<ToggleState> Read() { Snapshot.Name = this.GetPrimaryKeyString(); return Task.FromResult(Snapshot); }
 }
-

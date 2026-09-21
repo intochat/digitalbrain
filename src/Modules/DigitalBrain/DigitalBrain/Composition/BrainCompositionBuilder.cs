@@ -10,7 +10,7 @@ public sealed class BrainCompositionBuilder
     {
         EnsureMutable();
         if (_modules.ContainsKey(typeof(TModule)))
-            { throw new InvalidOperationException($"{typeof(TModule).Name} is already declared. Use ConfigureModule to change it."); }
+        { throw new InvalidOperationException($"{typeof(TModule).Name} is already declared. Use ConfigureModule to change it."); }
         var draft = new ModuleDraft(typeof(TModule));
         configure?.Invoke(new(draft, EnsureMutable));
         _modules.Add(typeof(TModule), draft);
@@ -23,7 +23,7 @@ public sealed class BrainCompositionBuilder
         EnsureMutable();
         ArgumentNullException.ThrowIfNull(configure);
         if (!_modules.TryGetValue(typeof(TModule), out var draft))
-            { throw new InvalidOperationException($"{typeof(TModule).Name} is not declared in this application."); }
+        { throw new InvalidOperationException($"{typeof(TModule).Name} is not declared in this application."); }
         var copy = draft.Copy();
         configure(new(copy, EnsureMutable));
         _modules[typeof(TModule)] = copy;

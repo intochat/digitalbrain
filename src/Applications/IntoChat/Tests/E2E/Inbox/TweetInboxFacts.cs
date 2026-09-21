@@ -1,7 +1,7 @@
+using System.Net.Http.Json;
+using DigitalBrain.Behaviors;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Inbox;
-using DigitalBrain.Behaviors;
-using System.Net.Http.Json;
 
 namespace IntoChat.Tests.E2E.Inbox;
 

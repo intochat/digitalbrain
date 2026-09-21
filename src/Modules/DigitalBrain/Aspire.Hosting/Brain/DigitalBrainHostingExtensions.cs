@@ -25,7 +25,7 @@ public static class DigitalBrainHostingExtensions
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {
             foreach (var pair in settings)
-                { builder.WithEnvironment(pair.Key.Replace(":", "__", StringComparison.Ordinal), pair.Value ?? ""); }
+            { builder.WithEnvironment(pair.Key.Replace(":", "__", StringComparison.Ordinal), pair.Value ?? ""); }
         }
     }
 

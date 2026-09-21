@@ -1,9 +1,9 @@
-using IntoChat.Workspace.Queries;
 using Aspire.Hosting.Testing;
 using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Supabase.Tables;
 using IntoChat.Agent;
 using IntoChat.Workspace;
+using IntoChat.Workspace.Queries;
 using Npgsql;
 
 namespace IntoChat.Tests.E2E.Workspace;

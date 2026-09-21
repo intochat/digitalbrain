@@ -12,7 +12,7 @@ public sealed class MicrosoftConfigurationContract() : ModuleConfigurationContra
         foreach (var (id, repo) in options.Repositories)
         {
             if (id.Length is 0 or > 80 || id.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '-'))
-                { throw new ArgumentException("Repository binding IDs must contain letters, numbers or hyphens.", nameof(options)); }
+            { throw new ArgumentException("Repository binding IDs must contain letters, numbers or hyphens.", nameof(options)); }
             var root = $"DigitalBrain:Microsoft:GitHub:Repositories:{id}";
             settings[$"{root}:AppId"] = repo.AppId.ToString(CultureInfo.InvariantCulture);
             settings[$"{root}:InstallationId"] = repo.InstallationId.ToString(CultureInfo.InvariantCulture);

@@ -7,6 +7,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Flutter.Rating;
+
 [GrainType(UIVocabulary.RatingType)]
 internal sealed class RatingNeuron([PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<RatingState> store)
     : Neuron<RatingState>(store), IRating
@@ -24,4 +25,3 @@ internal sealed class RatingNeuron([PersistentState("state", DigitalBrainNames.D
 
     [ReadOnly] public Task<RatingState> Read() { Snapshot.Name = this.GetPrimaryKeyString(); return Task.FromResult(Snapshot); }
 }
-

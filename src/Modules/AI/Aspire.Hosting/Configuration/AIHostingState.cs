@@ -162,7 +162,7 @@ public static partial class AIHostingExtensions
                 .WithGPUSupport()
                 .WithDataVolume()
                 .WithLifetime(ContainerLifetime.Persistent)
-                .WithOpenWebUI(openwebui=>openwebui.WithLifetime(ContainerLifetime.Persistent))
+                .WithOpenWebUI(openwebui => openwebui.WithLifetime(ContainerLifetime.Persistent))
                 .WithParentRelationship(module);
     }
 

@@ -157,13 +157,18 @@ public sealed partial class PlaywrightWebAgent(IChatClient client, IServiceProvi
             : Read(result, "status") == "ambiguous" ? "ambiguous" : "not_found";
         return JsonSerializer.SerializeToElement(new
         {
-            companyName = company, website, address = address?.Value, email = email?.Value, status,
+            companyName = company,
+            website,
+            address = address?.Value,
+            email = email?.Value,
+            status,
             sources = new[] { address?.SourceUrl, email?.SourceUrl }.OfType<string>().Distinct(StringComparer.Ordinal).ToArray(),
             evidence = new { address, email },
             visitedPages = pages.DistinctBy(page => page.Url).Select(page => new { url = page.Url, title = page.Title }).ToArray(),
             notes = string.Join(" ", new[] { Read(result, "notes"),
                 address is null || email is null ? "Only contact details verified against visited first-party pages are returned; missing fields are null." : null }
-                .OfType<string>()), errors = errors.Take(3).ToArray(),
+                .OfType<string>()),
+            errors = errors.Take(3).ToArray(),
         }, Json);
     }
 

@@ -1,13 +1,13 @@
-using IntoChat.Apps;
-using IntoChat.LocalFiles;
-using IntoChat.Workspace.Queries;
+using DigitalBrain.AI.Agents;
 using DigitalBrain.Aspire;
 using DigitalBrain.Sdk;
 using IntoChat;
-using IntoChat.Workspace;
 using IntoChat.Agent;
-using DigitalBrain.AI.Agents;
+using IntoChat.Apps;
+using IntoChat.LocalFiles;
 using IntoChat.ServiceDefaults;
+using IntoChat.Workspace;
+using IntoChat.Workspace.Queries;
 using Orleans.Dashboard;
 
 var builder = WebApplication.CreateBuilder(args);

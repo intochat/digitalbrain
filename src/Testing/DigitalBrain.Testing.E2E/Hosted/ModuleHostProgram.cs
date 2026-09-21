@@ -1,6 +1,6 @@
 using DigitalBrain.Aspire;
-using DigitalBrain.Testing.E2E;
 using DigitalBrain.Sdk;
+using DigitalBrain.Testing.E2E;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

@@ -1,6 +1,6 @@
 using DigitalBrain.Flutter;
-using DigitalBrain.Flutter.Surface;
 using DigitalBrain.Flutter.Layout;
+using DigitalBrain.Flutter.Surface;
 using Xunit;
 
 namespace DigitalBrain.Modules.Flutter.Tests.Unit.Composition;

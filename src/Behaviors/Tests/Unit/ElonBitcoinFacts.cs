@@ -1,8 +1,8 @@
-using DigitalBrain.Testing.Unit;
 using DigitalBrain.Behaviors;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Inbox;
 using DigitalBrain.Flutter.Inbox.Signals;
+using DigitalBrain.Testing.Unit;
 using Xunit;
 
 namespace DigitalBrain.Tests;

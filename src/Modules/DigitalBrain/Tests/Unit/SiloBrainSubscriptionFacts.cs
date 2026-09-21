@@ -1,5 +1,5 @@
-using DigitalBrain.Testing.Unit;
 using DigitalBrain.Testing;
+using DigitalBrain.Testing.Unit;
 using Xunit;
 
 namespace DigitalBrain.Tests;

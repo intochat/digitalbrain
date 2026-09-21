@@ -23,7 +23,7 @@ public sealed class CompositionOverrides
         return _serialized = CompositionOverrideTransport.Write(_modules.Values.Select(draft =>
         {
             if (draft.LocalServices.Count > 0)
-                { throw new NotSupportedException("Local service substitutions cannot cross process boundaries. Use a hosted provider or endpoint fixture."); }
+            { throw new NotSupportedException("Local service substitutions cannot cross process boundaries. Use a hosted provider or endpoint fixture."); }
             var contract = draft.Contract ?? throw new InvalidOperationException($"{draft.Type.Name} has no configurable options.");
             return new CompositionOverrideTransport.Entry(draft.Type.FullName!, draft.Replace
                 ? contract.WriteReplacement(draft.Options!) : contract.WriteOverride(draft.Options!, draft.Assigned));

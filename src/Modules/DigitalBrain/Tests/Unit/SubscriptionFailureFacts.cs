@@ -1,5 +1,5 @@
-using DigitalBrain.Testing.Unit;
 using DigitalBrain.Contracts;
+using DigitalBrain.Testing.Unit;
 using Orleans;
 using Xunit;
 

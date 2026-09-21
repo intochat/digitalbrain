@@ -22,7 +22,7 @@ internal sealed class ConversationNeuron(
     public async Task<ConversationState> Begin(string runId, string message, long expectedRevision, string runtimeId)
     {
         if (string.IsNullOrWhiteSpace(runId) || runId.Length > 200 || string.IsNullOrWhiteSpace(message) || message.Length > 32000 || string.IsNullOrWhiteSpace(runtimeId))
-            { throw new ArgumentException("Provide a run identity and a message of at most 32000 characters."); }
+        { throw new ArgumentException("Provide a run identity and a message of at most 32000 characters."); }
         var current = store.State;
         if (current.Inputs.TryGetValue(runId, out var previous))
         {
@@ -39,8 +39,8 @@ internal sealed class ConversationNeuron(
     {
         var current = store.State;
         if (current.ActiveRun != turn.RunId || !current.Inputs.TryGetValue(turn.RunId, out var input) || input != turn.UserText)
-            { throw new InvalidOperationException("This run is no longer active."); }
-        await Save(current with { Revision = current.Revision + 1, ActiveRun = null, Turns = [..current.Turns, turn with { ResultIds = turn.ResultIds.ToArray() }] });
+        { throw new InvalidOperationException("This run is no longer active."); }
+        await Save(current with { Revision = current.Revision + 1, ActiveRun = null, Turns = [.. current.Turns, turn with { ResultIds = turn.ResultIds.ToArray() }] });
         return Snapshot();
     }
     public async Task<ConversationState> Interrupt(string runId)

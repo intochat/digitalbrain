@@ -1,7 +1,7 @@
-using IntoChat.Workspace.Queries;
 using System.ComponentModel;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Supabase;
+using IntoChat.Workspace.Queries;
 using Microsoft.Extensions.AI;
 
 namespace IntoChat.Agent;

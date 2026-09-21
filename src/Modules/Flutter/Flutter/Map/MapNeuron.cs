@@ -7,6 +7,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Flutter.Map;
+
 [GrainType(UIVocabulary.MapType)]
 internal sealed class MapNeuron([PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<MapState> store)
     : Neuron<MapState>(store), IMap
@@ -27,4 +28,3 @@ internal sealed class MapNeuron([PersistentState("state", DigitalBrainNames.Defa
 
     [ReadOnly] public Task<MapState> Read() { Snapshot.Name = this.GetPrimaryKeyString(); return Task.FromResult(Snapshot); }
 }
-

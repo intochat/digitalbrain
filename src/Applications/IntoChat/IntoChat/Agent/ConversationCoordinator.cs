@@ -1,4 +1,3 @@
-using IntoChat.Workspace.Queries;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
@@ -6,6 +5,7 @@ using System.Text.Json;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.AI.Conversations;
 using DigitalBrain.Contracts;
+using IntoChat.Workspace.Queries;
 
 namespace IntoChat.Agent;
 

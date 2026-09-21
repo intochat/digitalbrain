@@ -7,6 +7,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Flutter.Slider;
+
 [GrainType(UIVocabulary.SliderType)]
 internal sealed class SliderNeuron([PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SliderState> store)
     : Neuron<SliderState>(store), ISlider
@@ -36,4 +37,3 @@ internal sealed class SliderNeuron([PersistentState("state", DigitalBrainNames.D
 
     [ReadOnly] public Task<SliderState> Read() { Snapshot.Name = this.GetPrimaryKeyString(); return Task.FromResult(Snapshot); }
 }
-

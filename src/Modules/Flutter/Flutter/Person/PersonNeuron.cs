@@ -7,6 +7,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Flutter.Person;
+
 [GrainType(UIVocabulary.PersonType)]
 internal sealed class PersonNeuron([PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<PersonState> store)
     : Neuron<PersonState>(store), IPerson
@@ -25,4 +26,3 @@ internal sealed class PersonNeuron([PersistentState("state", DigitalBrainNames.D
 
     [ReadOnly] public Task<PersonState> Read() { Snapshot.Name = this.GetPrimaryKeyString(); return Task.FromResult(Snapshot); }
 }
-

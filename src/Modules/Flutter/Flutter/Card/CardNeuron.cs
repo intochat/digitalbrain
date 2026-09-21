@@ -7,6 +7,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Flutter.Card;
+
 [GrainType(UIVocabulary.CardType)]
 internal sealed class CardNeuron([PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<CardState> store)
     : Neuron<CardState>(store), ICard
@@ -26,4 +27,3 @@ internal sealed class CardNeuron([PersistentState("state", DigitalBrainNames.Def
 
     [ReadOnly] public Task<CardState> Read() { Snapshot.Name = this.GetPrimaryKeyString(); return Task.FromResult(Snapshot); }
 }
-

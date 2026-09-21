@@ -7,6 +7,7 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Flutter.Tree;
+
 [GrainType(UIVocabulary.TreeType)]
 internal sealed class TreeNeuron([PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<TreeState> store)
     : Neuron<TreeState>(store), ITree
@@ -39,4 +40,3 @@ internal sealed class TreeNeuron([PersistentState("state", DigitalBrainNames.Def
 
     [ReadOnly] public Task<TreeState> Read() { Snapshot.Name = this.GetPrimaryKeyString(); return Task.FromResult(Snapshot); }
 }
-
