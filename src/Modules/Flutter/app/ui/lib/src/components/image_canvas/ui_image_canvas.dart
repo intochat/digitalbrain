@@ -54,7 +54,7 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
   bool busy = false;
   String? error;
   Size viewport = Size.zero;
-  int generation = 0;
+  int generation = 0, viewEpoch = 0;
   @override
   void initState() {
     super.initState();
@@ -115,14 +115,24 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
     final scale = ((viewport.width - 48) / img.width)
         .clamp(.01, 8.0)
         .clamp(.01, ((viewport.height - 48) / img.height).clamp(.01, 8.0));
-    transform.value = Matrix4.identity()
-      ..translateByDouble(
-        (viewport.width - img.width * scale) / 2,
-        (viewport.height - img.height * scale) / 2,
-        0,
-        1,
-      )
-      ..scaleByDouble(scale, scale, 1, 1);
+    resetView(
+      Matrix4.identity()
+        ..translateByDouble(
+          (viewport.width - img.width * scale) / 2,
+          (viewport.height - img.height * scale) / 2,
+          0,
+          1,
+        )
+        ..scaleByDouble(scale, scale, 1, 1),
+    );
+  }
+
+  void resetView(Matrix4 value) {
+    // Replacing the viewer disposes its fling animation before applying an explicit view.
+    setState(() => viewEpoch++);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) transform.value = value;
+    });
   }
 
   Future<void> commit(ImageRecipe recipe, {bool history = true}) async {
@@ -231,8 +241,9 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
       ),
     );
     // Dialog controllers remain alive until its closing animation has finished.
-    if (result != null && mounted)
+    if (result != null && mounted) {
       await commit(ImageRecipe(crop: result, strokes: widget.recipe.strokes));
+    }
     await Future<void>.delayed(const Duration(milliseconds: 250));
     for (final c in values) {
       c.dispose();
@@ -330,7 +341,7 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
             ),
             TextButton(onPressed: fit, child: const Text('Fit')),
             TextButton(
-              onPressed: () => transform.value = Matrix4.identity(),
+              onPressed: () => resetView(Matrix4.identity()),
               child: const Text('100%'),
             ),
             if (tool == 'pen') ...[
@@ -385,8 +396,9 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
                       try {
                         await onSave(await exportImage(image!, recipe));
                       } catch (e) {
-                        if (mounted)
+                        if (mounted) {
                           setState(() => error = 'Could not save copy: $e');
+                        }
                       } finally {
                         onBusyChanged?.call(false);
                         if (mounted) setState(() => busy = false);
@@ -423,11 +435,12 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
                             strokes: widget.recipe.strokes,
                           ),
                         );
-                        if (mounted && error == null)
+                        if (mounted && error == null) {
                           setState(() {
                             tool = 'pan';
                             cropDraft = null;
                           });
+                        }
                       },
                 child: const Text('Apply selection'),
               ),
@@ -451,10 +464,11 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             viewport = constraints.biggest;
-            if (image == null)
+            if (image == null) {
               return error == null
                   ? const Center(child: CircularProgressIndicator())
                   : const Center(child: Text('Image unavailable'));
+            }
             return Semantics(
               label: 'Image canvas',
               role: ui.SemanticsRole.region,
@@ -464,19 +478,21 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
                   color: const Color(0xff101516),
                   child: Listener(
                     onPointerDown: (e) {
-                      if (tool == 'crop' && !busy)
+                      if (tool == 'crop' && !busy) {
                         setState(() {
                           cropStart = point(e.localPosition);
                           cropDraft = null;
                         });
-                      if (tool == 'pen' && !busy)
+                      }
+                      if (tool == 'pen' && !busy) {
                         setState(() {
                           points.clear();
                           points.add(point(e.localPosition));
                         });
+                      }
                     },
                     onPointerMove: (e) {
-                      if (tool == 'crop' && !busy && cropStart != null)
+                      if (tool == 'crop' && !busy && cropStart != null) {
                         setState(() {
                           final raw = Rect.fromPoints(
                             cropStart!,
@@ -492,8 +508,10 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
                               ? rect
                               : null;
                         });
-                      if (tool == 'pen' && !busy && points.isNotEmpty)
+                      }
+                      if (tool == 'pen' && !busy && points.isNotEmpty) {
                         setState(() => points.add(point(e.localPosition)));
+                      }
                     },
                     onPointerCancel: (_) => setState(points.clear),
                     onPointerUp: (_) {
@@ -514,6 +532,7 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
                       }
                     },
                     child: InteractiveViewer(
+                      key: ValueKey(viewEpoch),
                       transformationController: transform,
                       constrained: false,
                       alignment: Alignment.topLeft,

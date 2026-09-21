@@ -241,4 +241,4 @@ Deliver a short recording/screenshots of the Files → Image Editor → saved-co
 
 ## Plan self-review
 
-Scope mapped: reusable Flutter neurons (1, 4, 5); IntoChat neurons and filesystem (2, 3); workspace-first visual design and compatibility (6); real cross-app E2E and supplied-file acceptance (7). Review-focus cases have explicit owning tests. Proposed contracts are distinguished from existing APIs; no excluded legacy endpoint is used as a foundation. This document is a plan: implementation, builds, tests and manual image editing have not been performed.
+Scope mapped: reusable Flutter neurons (1, 4, 5); IntoChat neurons and filesystem (2, 3); workspace-first visual design and compatibility (6); real cross-app E2E and supplied-file acceptance (7). Review-focus cases have explicit owning tests. Proposed contracts are distinguished from existing APIs; no excluded legacy endpoint is used as a foundation. This document preserves the approved plan. Execution results, consolidated file organization and verified limitations are recorded in `docs/intochat-local-apps-implementation.md`.

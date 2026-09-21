@@ -44,8 +44,9 @@ class _NeuronViewState extends State<NeuronView> {
     super.didUpdateWidget(old);
     if (old.name != widget.name ||
         old.kind != widget.kind ||
-        old.revision != widget.revision)
+        old.revision != widget.revision) {
       state = widget.load(widget.kind, widget.name);
+    }
   }
 
   Future<void> selectItem(
@@ -66,12 +67,13 @@ class _NeuronViewState extends State<NeuronView> {
   @override
   Widget build(BuildContext context) {
     final identity = '${widget.kind}:${widget.name}';
-    if (widget.ancestors.contains(identity) || widget.ancestors.length >= 16)
+    if (widget.ancestors.contains(identity) || widget.ancestors.length >= 16) {
       return const Center(child: Text('This component cannot be displayed.'));
+    }
     return FutureBuilder<Map<String, dynamic>>(
       future: state,
       builder: (context, snapshot) {
-        if (snapshot.hasError)
+        if (snapshot.hasError) {
           return Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -86,8 +88,10 @@ class _NeuronViewState extends State<NeuronView> {
               ],
             ),
           );
-        if (!snapshot.hasData)
+        }
+        if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
+        }
         final data = snapshot.data!;
         final definition = Map<String, dynamic>.from(
           data['definition'] as Map? ?? data,
@@ -124,8 +128,9 @@ class _NeuronViewState extends State<NeuronView> {
               0.0,
               128.0,
             );
-            if (definition['mode'] == 'stack')
+            if (definition['mode'] == 'stack') {
               return Stack(fit: StackFit.expand, children: children);
+            }
             return Flex(
               direction:
                   definition['mode'] == 'row' || definition['mode'] == 'split'
@@ -252,8 +257,9 @@ class _NeuronViewState extends State<NeuronView> {
             );
           case 'collection':
             final items = (definition['items'] as List? ?? []).cast<Map>();
-            if (items.isEmpty)
+            if (items.isEmpty) {
               return const Center(child: Text('This folder is empty.'));
+            }
             return ListView.separated(
               itemCount: items.length,
               separatorBuilder: (_, _) => const Divider(height: 1),

@@ -28,6 +28,7 @@ public sealed class LocalAppsJourneyFacts
             else
             {
                 await File.WriteAllBytesAsync(original, source, ct);
+                await File.WriteAllBytesAsync(Path.Combine(downloads, "Second.png"), source, ct);
                 await File.WriteAllTextAsync(Path.Combine(downloads, "readme.txt"), "Local file fixture", ct);
             }
             var outputName = Path.GetFileNameWithoutExtension(original) + "-edited.png";
@@ -37,6 +38,8 @@ public sealed class LocalAppsJourneyFacts
                 .ConfigureModule<FlutterModule>(flutter => flutter.RunWebApp()).StartAsync(ct);
             var page = brain.Page;
             page.SetDefaultTimeout(15000);
+            Microsoft.Playwright.IRequest? saveRequest = null;
+            page.Request += (_, request) => { if (request.Method == "POST" && request.Url.Contains("/save/", StringComparison.Ordinal)) { saveRequest = request; } };
             await page.SetViewportSizeAsync(1600, 1000);
             await page.GetByRole(AriaRole.Button, new() { Name = "Applications", Exact = true }).ClickAsync();
             await page.GetByRole(AriaRole.Menuitem, new() { Name = "Files On this computer", Exact = true }).ClickAsync();
@@ -50,6 +53,14 @@ public sealed class LocalAppsJourneyFacts
             var editor = page.GetByRole(AriaRole.Region, new() { Name = "Image Editor", Exact = true });
             await Assertions.Expect(editor).ToBeVisibleAsync();
             await editor.GetByRole(AriaRole.Button, new() { Name = "100%", Exact = true }).ClickAsync();
+            await editor.GetByRole(AriaRole.Button, new() { Name = "Pan", Exact = true }).ClickAsync();
+            var panBox = await editor.GetByRole(AriaRole.Region, new() { Name = "Image canvas", Exact = true }).BoundingBoxAsync() ?? throw new InvalidOperationException("Canvas has no bounds.");
+            await page.Mouse.MoveAsync(panBox.X + 80, panBox.Y + 60);
+            await page.Mouse.WheelAsync(0, -200);
+            await page.Mouse.DownAsync();
+            await page.Mouse.MoveAsync(panBox.X + 110, panBox.Y + 90, new() { Steps = 4 });
+            await page.Mouse.UpAsync();
+            await editor.GetByRole(AriaRole.Button, new() { Name = "100%", Exact = true }).ClickAsync();
             await editor.GetByRole(AriaRole.Button, new() { Name = "Draw", Exact = true }).ClickAsync();
             var canvas = editor.GetByRole(AriaRole.Region, new() { Name = "Image canvas", Exact = true });
             var box = await canvas.BoundingBoxAsync() ?? throw new InvalidOperationException("Image canvas has no bounds.");
@@ -57,6 +68,10 @@ public sealed class LocalAppsJourneyFacts
             await page.Mouse.DownAsync();
             await page.Mouse.MoveAsync(box.X + 40, box.Y + 20, new() { Steps = 5 });
             await page.Mouse.UpAsync();
+            await Assertions.Expect(editor.GetByRole(AriaRole.Button, new() { Name = "Undo", Exact = true })).ToBeEnabledAsync();
+            await editor.GetByRole(AriaRole.Button, new() { Name = "Undo", Exact = true }).ClickAsync();
+            await Assertions.Expect(editor.GetByRole(AriaRole.Button, new() { Name = "Redo", Exact = true })).ToBeEnabledAsync();
+            await editor.GetByRole(AriaRole.Button, new() { Name = "Redo", Exact = true }).ClickAsync();
             await Assertions.Expect(editor.GetByRole(AriaRole.Button, new() { Name = "Undo", Exact = true })).ToBeEnabledAsync();
             await editor.GetByRole(AriaRole.Button, new() { Name = "Crop", Exact = true }).ClickAsync();
             foreach (var (label, value) in new[] { ("X", "10"), ("Y", "10"), ("Width", "60"), ("Height", "40") })
@@ -77,10 +92,33 @@ public sealed class LocalAppsJourneyFacts
                 }
                 """, Convert.ToBase64String(output));
             Assert.Equal(255, pixel[0]); Assert.InRange(pixel[1], 90, 120);
+            Assert.NotNull(saveRequest);
+            var originalResponse = await saveRequest.ResponseAsync() ?? throw new InvalidOperationException("Save had no response.");
+            using var originalReceipt = System.Text.Json.JsonDocument.Parse(await originalResponse.TextAsync());
+            var copiesBefore = Directory.GetFiles(downloads, Path.GetFileNameWithoutExtension(original) + "-edited*.png").Length;
+            var replay = await page.APIRequest.FetchAsync(saveRequest, new() { DataByte = output });
+            Assert.Equal(200, replay.Status);
+            using var replayReceipt = System.Text.Json.JsonDocument.Parse(await replay.TextAsync());
+            Assert.Equal(originalReceipt.RootElement.GetProperty("file").GetProperty("entryId").GetString(), replayReceipt.RootElement.GetProperty("file").GetProperty("entryId").GetString());
+            Assert.Equal(copiesBefore, Directory.GetFiles(downloads, Path.GetFileNameWithoutExtension(original) + "-edited*.png").Length);
+            await page.ReloadAsync();
+            await Assertions.Expect(editor.GetByText("Copy saved", new() { Exact = true })).ToBeVisibleAsync();
+            await editor.GetByRole(AriaRole.Button, new() { Name = "Fit", Exact = true }).ClickAsync();
             var screenshot = Environment.GetEnvironmentVariable("INTOCHAT_LOCAL_ACCEPTANCE_SCREENSHOT");
             if (!string.IsNullOrWhiteSpace(screenshot)) { await page.ScreenshotAsync(new() { Path = screenshot }); }
             await page.GetByRole(AriaRole.Button, new() { Name = "Files", Exact = true }).ClickAsync();
             await Assertions.Expect(page.GetByRole(AriaRole.Button, new() { Name = "Open " + outputName, Exact = true })).ToBeVisibleAsync();
+            await page.GetByRole(AriaRole.Button, new() { Name = "Open " + outputName, Exact = true }).ClickAsync();
+            await Assertions.Expect(editor).ToHaveCountAsync(1);
+            await Assertions.Expect(editor.GetByText("60 × 40", new() { Exact = true })).ToBeVisibleAsync();
+            if (string.IsNullOrWhiteSpace(acceptanceImage))
+            {
+                // Both documents are at revision zero; changing tabs must still reload the composition.
+                await page.GetByRole(AriaRole.Button, new() { Name = "Files", Exact = true }).ClickAsync();
+                await page.GetByRole(AriaRole.Button, new() { Name = "Open Second.png", Exact = true }).ClickAsync();
+                await Assertions.Expect(editor.GetByText("120 × 80", new() { Exact = true })).ToBeVisibleAsync();
+                await Assertions.Expect(editor).ToHaveCountAsync(1);
+            }
             await page.ScreenshotAsync(new() { Path = Path.Combine(root, "local-apps.png") });
         }
         finally { Directory.Delete(root, true); }

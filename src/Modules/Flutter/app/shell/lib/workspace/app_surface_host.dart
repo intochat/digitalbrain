@@ -35,7 +35,8 @@ class _AppSurfaceHostState extends State<AppSurfaceHost> {
   bool editing = false;
   final sessions = <String, ImageCanvasSession>{};
   String sort = 'name', filter = '';
-  int offset = 0, generation = 0;
+  int offset = 0, generation = 0, nodeRevision = 0;
+  String? requestedImage;
   final search = TextEditingController();
   bool loading = false;
   String get app => widget.artifact.data['app'] as String;
@@ -49,7 +50,11 @@ class _AppSurfaceHostState extends State<AppSurfaceHost> {
   @override
   void didUpdateWidget(AppSurfaceHost old) {
     super.didUpdateWidget(old);
-    if (app == 'images' && selected != document?['id'] && !loading) load();
+    if (app == 'images' &&
+        selected != document?['id'] &&
+        (!loading || selected != requestedImage)) {
+      load();
+    }
     if (app == 'files' && widget.artifact.data['refresh'] != _refresh) {
       _refresh = widget.artifact.data['refresh'];
       load();
@@ -59,6 +64,7 @@ class _AppSurfaceHostState extends State<AppSurfaceHost> {
   Object? _refresh;
   Future<void> load() async {
     final request = ++generation;
+    requestedImage = selected;
     setState(() {
       loading = true;
       error = null;
@@ -94,6 +100,7 @@ class _AppSurfaceHostState extends State<AppSurfaceHost> {
         if (selected == null &&
             (tabs['selectedId'] as String? ?? '').isNotEmpty) {
           widget.artifact.data['selected'] = tabs['selectedId'];
+          requestedImage = selected;
           widget.onChanged();
         }
         if (selected == null) return;
@@ -108,6 +115,7 @@ class _AppSurfaceHostState extends State<AppSurfaceHost> {
         if (mounted && request == generation) {
           setState(() {
             document = result;
+            nodeRevision++;
             bytes = source;
             final pending =
                 (widget.artifact.data['pendingEdits'] as Map?)?[result['id']]
@@ -249,7 +257,12 @@ class _AppSurfaceHostState extends State<AppSurfaceHost> {
     pending.remove(id);
     widget.artifact.data['pendingEdits'] = pending;
     await widget.onChanged();
-    if (mounted && document?['id'] == id) setState(() => document = result);
+    if (mounted && document?['id'] == id) {
+      setState(() {
+        document = result;
+        nodeRevision++;
+      });
+    }
   }
 
   Future<void> save(Uint8List png, Map<String, dynamic> current) async {
@@ -336,10 +349,10 @@ class _AppSurfaceHostState extends State<AppSurfaceHost> {
                   load: node,
                   revision: app == 'files'
                       ? listing!['state']['revision'] as int
-                      : document!['revision'] as int,
+                      : nodeRevision,
                   onActivate: activateItem,
                   onAction: dispatch,
-                  enabled: !editing,
+                  enabled: !editing && !loading,
                   imageBuilder: (definition) =>
                       renderedBytes == null ||
                           renderedDocument == null ||

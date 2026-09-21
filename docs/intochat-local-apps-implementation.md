@@ -33,3 +33,18 @@ For an explicit local acceptance run, `INTOCHAT_LOCAL_ACCEPTANCE_IMAGE` can poin
 Verified on Windows, 2026-09-21: Flutter module 37/37, Flutter UI 12/12, shell 16/16; scoped file/save/image validation 7/7; real app-neuron and edit-reducer checks; the browser journey and existing workspace restoration. The supplied 3840 × 2160, 11,875,509-byte `Untitled.png` also passed the browser journey using the actual Downloads root. Its original checksum was unchanged; the acceptance output is a 60 × 40 test crop named `Untitled-edited.png`.
 
 The independent implementation review identified filesystem, retry, orientation, async-document and nested-layout issues. These were repaired and exercised by focused regressions before handoff. The export operation lock was also verified with a failing test when the lock notification was removed, then passing after restoration.
+
+The final browser journey additionally exercises mouse zoom/pan, Undo/Redo, an exact HTTP save retry (same protected file receipt and no extra file), reload recovery, reopening the saved image, and switching between two revision-zero documents. This exposed and fixed continuing fling motion after explicit Fit/100% and ensured document switches refresh the composed surface even when document revisions match.
+
+### Reproduction commands
+
+From the repository root, build the relevant test projects, then use the repository's Microsoft Testing Platform executables:
+
+```powershell
+dotnet build src/Modules/Flutter/Tests/Unit --no-restore
+dotnet src/Modules/Flutter/Tests/Unit/bin/Debug/net11.0/DigitalBrain.Modules.Flutter.Tests.Unit.dll
+dotnet build src/Applications/IntoChat/Tests/E2E --no-restore
+dotnet src/Applications/IntoChat/Tests/E2E/bin/Debug/net11.0/IntoChat.Tests.E2E.dll --filter-class '*LocalApps*' --filter-class '*WorkspaceRestoreFacts'
+```
+
+Run `flutter test` in each of `src/Modules/Flutter/app/ui` and `src/Modules/Flutter/app/shell`. Final runs passed 12/12 and 16/16 respectively; the module executable passed 37/37. The final expanded browser journey passed 1/1; local boundary/PNG/save validation passed 7/7 after correcting malformed-PNG error mapping. The app-neuron, reducer and existing workspace-restoration scenarios passed in the combined run. Dart analysis of the edited app host, canvas and shared renderer reports no issues.
