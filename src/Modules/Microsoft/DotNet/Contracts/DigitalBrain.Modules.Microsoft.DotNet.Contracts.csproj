@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>dotnet CLI neuron contracts.</Description>
+    <RootNamespace>DigitalBrain.Microsoft.DotNet</RootNamespace>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../DigitalBrain/Contracts/DigitalBrain.Contracts.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,3 +1,5 @@
+using DigitalBrain.Microsoft.Roslyn;
+
 namespace DigitalBrain.Coding;
 
 // Detail names the edit a check or commit refused on ("edit 2 (ReplaceMember M:...) left 1 error: ...").

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>dotnet build and test neuron.</Description>
+    <RootNamespace>DigitalBrain.Microsoft.DotNet</RootNamespace>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.DotNet.Tests.Unit" />
+    <ProjectReference Include="../Contracts/DigitalBrain.Modules.Microsoft.DotNet.Contracts.csproj" />
+    <ProjectReference Include="../../../DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
+  </ItemGroup>
+</Project>

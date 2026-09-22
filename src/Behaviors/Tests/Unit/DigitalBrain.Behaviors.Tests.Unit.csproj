@@ -3,6 +3,6 @@
     <PackageReference Include="Microsoft.Orleans.Sdk" />
     <ProjectReference Include="../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
     <ProjectReference Include="../../DigitalBrain.Behaviors.csproj" />
-    <ProjectReference Include="../../../Modules/Flutter/Flutter/DigitalBrain.Modules.Flutter.csproj" />
+    <ProjectReference Include="../../../Modules/Google/Flutter/Flutter/DigitalBrain.Modules.Flutter.csproj" />
   </ItemGroup>
 </Project>

@@ -1,6 +1,7 @@
 using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 
 namespace DigitalBrain.Coding;
@@ -35,13 +36,7 @@ public sealed class CodingModule : IModule
             .Validate(options => !string.IsNullOrWhiteSpace(options.WorkspaceKey), "Coding workspace key must not be empty.")
             .Validate(options => options.EditDeadline > TimeSpan.Zero, "Coding edit deadline must be positive.")
             .ValidateOnStart();
-        services.TryAddSingleton<SolutionWorkspace>();
-        services.TryAddSingleton<ISolutionLoader, MSBuildSolutionLoader>();
-        services.TryAddSingleton<CodeFixCatalog>();
-        services.TryAddSingleton<ChangeSetEditor>();
-        services.TryAddSingleton<SolutionFileWatcher>();
         services.TryAddSingleton<IProcessRunner, ProcessRunner>();
-        services.TryAddSingleton<DotnetRunner>();
         services.TryAddSingleton<GitRunner>();
         services.AddOptions<CodeExecutionOptions>().BindConfiguration(CodeExecutionOptions.SectionName);
         services.PostConfigure<CodeExecutionOptions>(o =>
@@ -50,18 +45,23 @@ public sealed class CodingModule : IModule
             {
                 o.ReferencePaths = Directory.GetFiles(AppContext.BaseDirectory, "*.dll")
                     .Where(p => !Path.GetFileName(p).Contains(".Tests", StringComparison.Ordinal) && IsManagedAssembly(p)).ToArray();
-                foreach (var module in new[] { "Time", "Flutter", "AI", "Google" })
+                foreach (var (module, file) in new (string Module, string File)[]
                 {
-                    var path = Path.Combine(AppContext.BaseDirectory, "DigitalBrain.Modules." + module + ".Contracts.dll");
-                    if (File.Exists(path)) { o.Modules.TryAdd(module.ToLowerInvariant(), [path]); }
+                    ("time", "DigitalBrain.Modules.Time.Contracts.dll"),
+                    ("flutter", "DigitalBrain.Modules.Flutter.Contracts.dll"),
+                    ("ai", "DigitalBrain.Modules.AI.Contracts.dll"),
+                    ("google", "DigitalBrain.Modules.Google.Gmail.Contracts.dll"),
+                })
+                {
+                    var path = Path.Combine(AppContext.BaseDirectory, file);
+                    if (File.Exists(path)) { o.Modules.TryAdd(module, [path]); }
                 }
             }
         });
         services.TryAddSingleton<CodeCheckCoordinator>();
         services.TryAddSingleton<ContractCatalog>();
-        services.TryAddSingleton<ICodeArtifactStore>(sp => new CodeValidationService(sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<CodeExecutionOptions>>().Value).Store());
+        services.TryAddSingleton<ICodeArtifactStore>(sp => new CodeValidationService(sp.GetRequiredService<IOptions<CodeExecutionOptions>>().Value).Store());
         services.AddHostedService(sp => sp.GetRequiredService<CodeCheckCoordinator>());
-        services.AddHostedService<WorkspaceWarmup>();
     }
 
     private static bool IsManagedAssembly(string path)

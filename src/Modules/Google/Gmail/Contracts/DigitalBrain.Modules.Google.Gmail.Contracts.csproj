@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Google neuron contracts.</Description>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <RootNamespace>DigitalBrain.Google.Gmail</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../DigitalBrain/Contracts/DigitalBrain.Contracts.csproj" />
+  </ItemGroup>
+</Project>

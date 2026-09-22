@@ -14,9 +14,12 @@ using DigitalBrain.Core;
 using DigitalBrain.Excel;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
-using DigitalBrain.Google;
+using DigitalBrain.Google.Gmail;
 using DigitalBrain.Memory;
-using DigitalBrain.Microsoft;
+using DigitalBrain.Microsoft.Aspire;
+using DigitalBrain.Microsoft.GitHub;
+using DigitalBrain.Microsoft.DotNet;
+using DigitalBrain.Microsoft.Roslyn;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
 using DigitalBrain.Time;
@@ -39,11 +42,13 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<SupabaseModule>(database => database.WithConnection("supabase"))
     .WithModule<TimeModule>()
     .WithModule<ExcelModule>()
-    .WithModule<GoogleModule>(google => google.WithGmail())
+    .WithModule<GmailModule>(gmail => gmail.WithGmail())
     .WithModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
-    .WithModule<MicrosoftModule>(microsoft => microsoft
-        .WithAspire(Path.Combine(builder.AppHostDirectory, "IntoChat.AppHost.csproj"))
-        .WithGitHubRepositories(repositories))
+    .WithModule<AspireModule>(aspire => aspire
+        .WithAspire(Path.Combine(builder.AppHostDirectory, "IntoChat.AppHost.csproj")))
+    .WithModule<GitHubModule>(github => github.WithGitHubRepositories(repositories))
+    .WithModule<RoslynModule>()
+    .WithModule<DotNetModule>()
     .WithModule<CodingModule>(coding => coding.WithSolution(Path.GetFullPath(
         Path.Combine(builder.AppHostDirectory, "..", "..", "..", "..", "DigitalBrain.slnx"))))
     .WithModule<BehaviorModule>(behavior =>

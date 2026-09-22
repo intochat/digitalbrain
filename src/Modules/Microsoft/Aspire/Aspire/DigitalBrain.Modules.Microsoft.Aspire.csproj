@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Aspire dashboard connection.</Description>
+    <RootNamespace>DigitalBrain.Microsoft.Aspire</RootNamespace>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.Core" />
+    <ProjectReference Include="../Contracts/DigitalBrain.Modules.Microsoft.Aspire.Contracts.csproj" />
+    <ProjectReference Include="../../../DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
+  </ItemGroup>
+</Project>

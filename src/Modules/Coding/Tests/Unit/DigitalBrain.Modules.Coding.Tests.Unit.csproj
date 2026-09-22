@@ -2,6 +2,8 @@
   <ItemGroup>
     <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
     <ProjectReference Include="../../Coding/DigitalBrain.Modules.Coding.csproj" />
+    <ProjectReference Include="../../../Microsoft/Roslyn/Roslyn/DigitalBrain.Modules.Microsoft.Roslyn.csproj" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
     <ProjectReference Include="../../../DigitalBrain/BehaviorRuntime/DigitalBrain.Behavior.csproj" />
     <ProjectReference Include="../../../Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <ProjectReference Include="../../../Flutter/Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />

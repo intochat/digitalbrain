@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Aspire connection contracts.</Description>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <RootNamespace>DigitalBrain.Microsoft.Aspire</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../DigitalBrain/Contracts/DigitalBrain.Contracts.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,3 +1,5 @@
+using DigitalBrain.Microsoft.Roslyn;
+
 namespace DigitalBrain.Coding;
 
 [GenerateSerializer]

@@ -35,8 +35,8 @@
     <ProjectReference Include="../../../Modules/DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Sdk/DigitalBrain.Sdk.csproj" />
     <ProjectReference Include="../../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
-    <ProjectReference Include="../../../Modules/Google/Google/DigitalBrain.Modules.Google.csproj" />
-    <ProjectReference Include="../../../Modules/Flutter/Flutter/DigitalBrain.Modules.Flutter.csproj" />
+    <ProjectReference Include="../../../Modules/Google/Gmail/Gmail/DigitalBrain.Modules.Google.Gmail.csproj" />
+    <ProjectReference Include="../../../Modules/Google/Flutter/Flutter/DigitalBrain.Modules.Flutter.csproj" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../../Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
@@ -45,8 +45,11 @@
     <ProjectReference Include="../../../Modules/Supabase/Supabase/DigitalBrain.Modules.Supabase.csproj" />
     <ProjectReference Include="../../../Modules/Excel/Excel/DigitalBrain.Modules.Excel.csproj" />
     <ProjectReference Include="../../../Modules/Salesforce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
-    <ProjectReference Include="../../../Modules/Microsoft/Microsoft/DigitalBrain.Modules.Microsoft.csproj" />
+    <ProjectReference Include="../../../Modules/Microsoft/GitHub/GitHub/DigitalBrain.Modules.Microsoft.GitHub.csproj" />
+    <ProjectReference Include="../../../Modules/Microsoft/Aspire/Aspire/DigitalBrain.Modules.Microsoft.Aspire.csproj" />
     <ProjectReference Include="../../../Modules/Coding/Coding/DigitalBrain.Modules.Coding.csproj" />
+    <ProjectReference Include="../../../Modules/Microsoft/Roslyn/Roslyn/DigitalBrain.Modules.Microsoft.Roslyn.csproj" />
+    <ProjectReference Include="../../../Modules/Microsoft/DotNet/DotNet/DigitalBrain.Modules.Microsoft.DotNet.csproj" />
     <ProjectReference Include="../../../Modules/Behavior/Behavior/DigitalBrain.Modules.Behavior.csproj" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" />
   </ItemGroup>

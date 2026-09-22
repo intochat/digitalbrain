@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Aspire hosting for the Aspire connection module.</Description>
+    <RootNamespace>DigitalBrain.Microsoft.Aspire</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Aspire/DigitalBrain.Modules.Microsoft.Aspire.csproj" />
+    <ProjectReference Include="../../../DigitalBrain/Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
+  </ItemGroup>
+</Project>

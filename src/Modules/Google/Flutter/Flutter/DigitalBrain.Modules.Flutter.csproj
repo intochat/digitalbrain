@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Flutter module integration for the neuron kernel.</Description>
+    <RootNamespace>DigitalBrain.Flutter</RootNamespace>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
+    <ProjectReference Include="../../../DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Roslyn workspace neuron. MSBuild loads the solution; the grain keeps it.</Description>
+    <RootNamespace>DigitalBrain.Microsoft.Roslyn</RootNamespace>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+    <DisableMSBuildAssemblyCopyCheck>true</DisableMSBuildAssemblyCopyCheck>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.Roslyn.Tests.Unit" />
+    <ProjectReference Include="../Contracts/DigitalBrain.Modules.Microsoft.Roslyn.Contracts.csproj" />
+    <ProjectReference Include="../../../DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Build.Locator" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" />
+  </ItemGroup>
+</Project>

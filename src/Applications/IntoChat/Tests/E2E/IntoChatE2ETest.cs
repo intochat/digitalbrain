@@ -3,9 +3,10 @@ using DigitalBrain.AI.OpenAI;
 using DigitalBrain.ClickHouse;
 using DigitalBrain.Coding;
 using DigitalBrain.Flutter;
-using DigitalBrain.Google;
+using DigitalBrain.Google.Gmail;
 using DigitalBrain.Memory;
-using DigitalBrain.Microsoft;
+using DigitalBrain.Microsoft.Aspire;
+using DigitalBrain.Microsoft.GitHub;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
 
@@ -30,10 +31,10 @@ internal static class IntoChatE2ETest
                 options.WithSeed("leads");
             }))
             .ConfigureModule<SupabaseModule>(database => database.WithPostgres())
-            .ConfigureModule<GoogleModule>(google => google.WithTokenEndpoint(new(UnconfiguredProvider, "token")))
+            .ConfigureModule<GmailModule>(gmail => gmail.WithTokenEndpoint(new(UnconfiguredProvider, "token")))
             .ConfigureModule<SalesforceModule>(salesforce => salesforce.WithLocalMcp(new(UnconfiguredProvider, "mcp")))
-            .ConfigureModule<MicrosoftModule>(microsoft => microsoft.WithoutAspire()
-                .WithGitHubRepositories(new Dictionary<string, GitHubRepositoryDeclaration>()))
+            .ConfigureModule<AspireModule>(aspire => aspire.WithoutAspire())
+            .ConfigureModule<GitHubModule>(github => github.WithGitHubRepositories(new Dictionary<string, GitHubRepositoryDeclaration>()))
             .ConfigureModule<CodingModule>(coding => coding.ConfigureOptions<CodingModuleOptions>(
                 options => options.SolutionPath = null, "SolutionPath"))
             .ConfigureModule<FlutterModule>(flutter => flutter.BackendOnly())

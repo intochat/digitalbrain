@@ -1,5 +1,5 @@
 using System.Text;
-using Microsoft.CodeAnalysis.CSharp;
+using DigitalBrain.Microsoft.Roslyn;
 
 namespace DigitalBrain.Coding;
 
@@ -29,11 +29,6 @@ internal static class DraftRules
         ArgumentException.ThrowIfNullOrWhiteSpace(source);
         if (Encoding.UTF8.GetByteCount(source) > MaximumSourceBytes)
         { throw new ArgumentException("Source must be at most 128 KiB of UTF-8.", nameof(source)); }
-        var root = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview)).GetRoot();
-        foreach (var trivia in root.DescendantTrivia(descendIntoTrivia: true))
-        {
-            if (trivia.IsDirective && trivia.ToFullString().TrimStart().StartsWith("#:", StringComparison.Ordinal))
-            { throw new ArgumentException("Managed drafts cannot contain file-app build directives.", nameof(source)); }
-        }
+        DraftSource.RejectFileAppDirectives(source);
     }
 }

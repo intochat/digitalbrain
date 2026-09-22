@@ -1,5 +1,6 @@
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
+using DigitalBrain.Microsoft.Roslyn;
 using Microsoft.Extensions.Options;
 using Orleans.Concurrency;
 using Orleans.Runtime;
@@ -9,8 +10,6 @@ namespace DigitalBrain.Coding;
 [GrainType("changeset")]
 internal sealed class ChangeSetNeuron(
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ChangeSetState> state,
-    SolutionWorkspace workspace,
-    ChangeSetEditor editor,
     IOptions<CodingModuleOptions> options)
     : Neuron, IChangeSet
 {
@@ -58,7 +57,7 @@ internal sealed class ChangeSetNeuron(
         ChangeSetState next;
         try
         {
-            var outcome = await workspace.QueryAsync((solution, token) => editor.ApplyAsync(solution, current.Edits, token), bounded.Token);
+            var outcome = await Roslyn().CheckEdits(current.Edits, bounded.Token);
             next = current with
             {
                 Status = outcome.HasErrors ? ChangeSetStatus.Draft : ChangeSetStatus.Checked,
@@ -99,27 +98,23 @@ internal sealed class ChangeSetNeuron(
         // Only the edit work is bounded: once the writes begin they run to completion, so a deadline can
         // never abandon a commit halfway through writing files.
         using var bounded = new CancellationTokenSource(editDeadline);
-        EditOutcome? applied = null;
+        EditCommit? applied = null;
         ChangeSetState next;
         try
         {
-            var committed = await workspace.CommitAsync(async (solution, _) =>
-            {
-                applied = await editor.ApplyAsync(solution, current.Edits, bounded.Token);
-                return applied.HasErrors
-                    ? throw new InvalidOperationException(applied.Detail ?? "the change set has errors")
-                    : applied.Changed;
-            }, CancellationToken.None);
-            next = current with
-            {
-                Status = ChangeSetStatus.Committed,
-                Diagnostics = applied!.Diagnostics,
-                Diff = applied.Diff,
-                Detail = null,
-                Files = committed.WrittenPaths,
-                Generation = committed.SnapshotVersion,
-                Revision = current.Revision + 1,
-            };
+            applied = await Roslyn().CommitEdits(current.Edits, bounded.Token);
+            next = applied.HasErrors
+                ? Refused(current, applied.Detail ?? "the change set has errors", applied)
+                : current with
+                {
+                    Status = ChangeSetStatus.Committed,
+                    Diagnostics = applied.Diagnostics,
+                    Diff = applied.Diff,
+                    Detail = null,
+                    Files = applied.WrittenPaths,
+                    Generation = applied.SnapshotVersion,
+                    Revision = current.Revision + 1,
+                };
         }
         catch (OperationCanceledException)
         {
@@ -129,11 +124,7 @@ internal sealed class ChangeSetNeuron(
         catch (Exception error) when (error is not OperationCanceledException)
 #pragma warning restore CA1031
         {
-            // A change set with errors is refused before anything is written; any other failure can have
-            // come after TryApplyChanges, which writes the changed documents itself.
-            next = Refused(current, applied is { HasErrors: true }
-                ? error.Message
-                : error.Message + " Files may already have been written; read the change set and check the tree.", applied);
+            next = Refused(current, error.Message + " Files may already have been written; read the change set and check the tree.", applied);
         }
 
         await PersistAsync(next);
@@ -164,7 +155,9 @@ internal sealed class ChangeSetNeuron(
         await PublishAsync(new ChangeSetChanged(this.GetPrimaryKeyString(), next.Status, next.Edits.Count, next.Revision));
     }
 
-    private static ChangeSetState Refused(ChangeSetState current, string detail, EditOutcome? applied = null)
+    private IRoslyn Roslyn() => GrainFactory.GetGrain<IRoslyn>(options.Value.WorkspaceKey);
+
+    private static ChangeSetState Refused(ChangeSetState current, string detail, EditCheck? applied = null)
         => current with
         {
             Status = ChangeSetStatus.Draft,
@@ -173,6 +166,9 @@ internal sealed class ChangeSetNeuron(
             Detail = detail,
             Revision = current.Revision + 1,
         };
+
+    private static ChangeSetState Refused(ChangeSetState current, string detail, EditCommit? applied)
+        => Refused(current, detail, applied is null ? null : new EditCheck(applied.Diagnostics, applied.Diff, null, applied.Detail, applied.HasErrors));
 
     private ChangeSetReceipt Receipt(ChangeSetState current) => new(this.GetPrimaryKeyString(), current.Edits.Count, current.Status);
 
