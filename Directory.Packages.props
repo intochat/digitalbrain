@@ -69,7 +69,7 @@
     <PackageVersion Include="Microsoft.ML.OnnxRuntime.Gpu" Version="1.29.0" />
   </ItemGroup>
   <ItemGroup>
-    <PackageVersion Include="xunit.v3.mtp-v2" Version="4.0.0" />
+    <PackageVersion Include="xunit.v3.mtp-v2" Version="4.0.1" />
     <PackageVersion Include="Microsoft.Orleans.TestingHost" Version="10.3.1" />
     <!-- Restored, never referenced for assemblies: hosted tests read DCP and dashboard paths
          out of these packages because they build the Aspire model without an AppHost project. -->
