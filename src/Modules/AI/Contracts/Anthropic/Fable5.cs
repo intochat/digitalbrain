@@ -7,4 +7,5 @@ public sealed class Fable5 : LLMModel<IFable5>
     public override AiProvider Provider => AiProvider.Anthropic;
 }
 
+[Orleans.Metadata.DefaultGrainType("ai.llm.fable5")]
 public interface IFable5 : ILLM;

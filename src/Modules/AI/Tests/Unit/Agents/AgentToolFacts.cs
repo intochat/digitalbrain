@@ -9,6 +9,32 @@ namespace DigitalBrain.Tests;
 public sealed class AgentToolFacts
 {
     [Fact]
+    public async Task ToolDoesNotExecuteUntilCallerHasRecordedItsStart()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var tool = new ObservedStartTools();
+        using var services = new ServiceCollection().AddSingleton<IChatClient>(new ScriptedClient())
+            .AddSingleton<IAgentToolFactory>(tool).BuildServiceProvider();
+        await foreach (var item in new AgentTurnRunner(services).RunAsync(new("agent", "run", "scope", [], "ask", null, ToolNames: ["lookup"]), ct))
+        {
+            if (item is AgentTurnEvent.ToolStarted)
+            {
+                Assert.False(tool.Executed);
+                tool.Recorded = true;
+            }
+        }
+        Assert.True(tool.Executed);
+    }
+
+    private sealed class ObservedStartTools : IAgentToolFactory
+    {
+        public bool Recorded { get; set; }
+        public bool Executed { get; private set; }
+        public IReadOnlyList<AIFunction> Create(Func<AgentToolContext> context) =>
+            [AIFunctionFactory.Create(() => { Executed = true; return Recorded ? "recorded" : "unrecorded"; }, "lookup")];
+    }
+
+    [Fact]
     public async Task ToolsUseActualCallIdentityAndNeverShareRunContext()
     {
         var ct = TestContext.Current.CancellationToken;

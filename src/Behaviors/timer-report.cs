@@ -1,62 +1,31 @@
 #!/usr/bin/env dotnet
-#:project ../Modules/DigitalBrain/DigitalBrain/DigitalBrain.csproj
+#:project ../Modules/DigitalBrain/BehaviorRuntime/DigitalBrain.Behavior.csproj
 #:project ../Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj
-#:include TimerReport.cs
 #:property PublishAot=false
 
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
+using DigitalBrain.Time.Timers.Signals;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Orleans.Configuration;
-using Orleans.Hosting;
+using Timer = DigitalBrain.Time.Timers.ITimer;
 
-var builder = Host.CreateApplicationBuilder(args);
-builder.UseOrleansClient(client =>
+// Standalone development: dotnet run --file timer-report.cs -- --LocalDevelopment=true
+// Managed drafts omit the SDK directives: the host supplies approved references.
+var settings = new ConfigurationBuilder().AddEnvironmentVariables().AddCommandLine(args).Build();
+var timerId = settings["TimerId"] ?? "tea";
+await BehaviorApp.RunAsync<TimerReportBehavior>(args,
+    brain => [SubscriptionRequirement.For<TimerTick>(brain.Get<Timer>(timerId))]);
+
+public sealed class TimerReportBehavior(IDigitalBrain brain, IConfiguration configuration) : IBehavior
 {
-    client.AddDigitalBrain();
-    var gateways = builder.Configuration["Gateways"];
-    if (string.IsNullOrWhiteSpace(gateways))
+    public async Task RunAsync(CancellationToken cancellation = default)
     {
-        // Local development only. Deployed clients supply explicit gateways and IDs.
-        client.UseLocalhostClustering();
-    }
-    else
-    {
-        client.UseStaticClustering(options => options.Gateways = gateways.Split(';', StringSplitOptions.RemoveEmptyEntries).Select(value => new Uri(value)).ToList());
-        client.Configure<ClusterOptions>(options =>
+        var timer = brain.Get<Timer>(configuration["TimerId"] ?? "tea");
+        await using var ticks = await brain.SubscribeAsync<TimerTick>(timer, cancellation);
+        await foreach (var tick in ticks.ReadAllAsync(cancellation))
         {
-            options.ClusterId = builder.Configuration["ClusterId"] ?? throw new InvalidOperationException("ClusterId is required.");
-            options.ServiceId = builder.Configuration["ServiceId"] ?? throw new InvalidOperationException("ServiceId is required.");
-        });
+            Console.WriteLine($"TimerTick {tick.TimerId} {tick.ObservedAt:O}");
+            if (configuration.GetValue<bool>("Smoke")) { return; }
+        }
     }
-});
-using var host = builder.Build();
-var logger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("TimerReport");
-using var stopping = CancellationTokenSource.CreateLinkedTokenSource(host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping);
-var smoke = builder.Configuration.GetValue<bool>("Smoke");
-var timerId = builder.Configuration["TimerId"] ?? "tea";
-try
-{
-    await host.StartAsync(stopping.Token);
-    await TimerReport.RunAsync(host.Services.GetRequiredService<IDigitalBrain>(), timerId, fact =>
-    {
-        Console.WriteLine($"TimerTick {fact.TimerId} {fact.ObservedAt:O}");
-        if (smoke) { stopping.Cancel(); }
-        return Task.CompletedTask;
-    }, stopping.Token);
-    return 0;
-}
-catch (OperationCanceledException) when (stopping.IsCancellationRequested) { return 0; }
-catch (Exception error)
-{
-    logger.LogError(error, "Timer behavior failed");
-    return 1;
-}
-finally
-{
-    using var shutdown = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-    await host.StopAsync(shutdown.Token);
 }

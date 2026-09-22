@@ -13,4 +13,5 @@ public sealed class Qwen35 : LLMModel<IQwen35>
     public override LlmCapabilities Capabilities => LlmCapabilities.Tools | LlmCapabilities.Vision;
 }
 
+[Orleans.Metadata.DefaultGrainType("ai.llm.qwen35")]
 public interface IQwen35 : ILLM;

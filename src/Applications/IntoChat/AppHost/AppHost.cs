@@ -8,6 +8,8 @@ using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Behaviors;
 using DigitalBrain.ClickHouse;
 using DigitalBrain.Coding;
+using DigitalBrain.Behavior;
+using DigitalBrain.Behavior.Aspire.Hosting;
 using DigitalBrain.Core;
 using DigitalBrain.Excel;
 using DigitalBrain.Flutter;
@@ -44,6 +46,11 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
         .WithGitHubRepositories(repositories))
     .WithModule<CodingModule>(coding => coding.WithSolution(Path.GetFullPath(
         Path.Combine(builder.AppHostDirectory, "..", "..", "..", "..", "DigitalBrain.slnx"))))
+    .WithModule<BehaviorModule>(behavior =>
+    {
+        if (builder.Configuration["IntoChat:BehaviorAuthoring:Root"] is { Length: > 0 } root)
+        { behavior.WithLocalExecution(root); }
+    })
     .WithModule<FlutterModule>(flutter => flutter.RunDesktopApp())
     // Existing demo behavior dependency; this is part of the application, not injected by tests.
     .WithModule<TestTwitterModule>();
@@ -76,6 +83,11 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
         if (downloads is not null) { context.EnvironmentVariables["IntoChat__LocalFiles__Roots__downloads"] = downloads; }
         var assets = builder.Configuration["IntoChat:LocalFiles:AssetDirectory"];
         if (assets is not null) { context.EnvironmentVariables["IntoChat__LocalFiles__AssetDirectory"] = assets; }
+        foreach (var setting in new[] { "AllowActivation", "ModelProfile" })
+        {
+            if (builder.Configuration["IntoChat:BehaviorAuthoring:" + setting] is { } value)
+            { context.EnvironmentVariables["IntoChat__BehaviorAuthoring__" + setting] = value; }
+        }
         if (clusterId is not null)
         {
             context.EnvironmentVariables["Orleans__ClusterId"] = clusterId;

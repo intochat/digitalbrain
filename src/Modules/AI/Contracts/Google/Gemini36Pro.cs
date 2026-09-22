@@ -7,4 +7,5 @@ public sealed class Gemini36Pro : LLMModel<IGemini36Pro>
     public override AiProvider Provider => AiProvider.Google;
 }
 
+[Orleans.Metadata.DefaultGrainType("ai.llm.gemini36pro")]
 public interface IGemini36Pro : ILLM;

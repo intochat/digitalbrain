@@ -114,6 +114,11 @@ public sealed class ModelProfiles(IServiceProvider services, IOptionsMonitor<AIO
 
     // Callers own these pipelines. Recreating a client never rereads a changed profile or default.
     public IChatClient CreateClient(ResolvedAgentModel resolved)
+        => AIClients.BuildChatPipeline(services, resolved.Capabilities.HasFlag(LlmCapabilities.Tools),
+            resolved.Provider, CreateInferenceClient(resolved), rejectUnsupportedTools: true);
+
+    // Inference returns proposed calls. The agent owns the only tool invocation loop.
+    public IChatClient CreateInferenceClient(ResolvedAgentModel resolved)
     {
         ArgumentNullException.ThrowIfNull(resolved);
         if (!string.Equals(resolved.Revision, Revision(resolved), StringComparison.Ordinal))
@@ -131,8 +136,7 @@ public sealed class ModelProfiles(IServiceProvider services, IOptionsMonitor<AIO
             if (resolved.Reasoning is not null) { request.Reasoning = Reasoning(resolved.Reasoning); }
             if (resolved.MaxOutputTokens is not null) { request.MaxOutputTokens = resolved.MaxOutputTokens; }
         }).Build();
-        return AIClients.BuildChatPipeline(services, resolved.Capabilities.HasFlag(LlmCapabilities.Tools),
-            resolved.Provider, pinned, rejectUnsupportedTools: true);
+        return pinned;
     }
 
     public static ChatOptions CreateOptions(ResolvedAgentModel resolved)

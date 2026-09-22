@@ -9,9 +9,17 @@
   <Folder Name="/Modules/" />
   <Folder Name="/Modules/AI/">
     <Project Path="src/Modules/AI/Tests/Unit/DigitalBrain.Modules.AI.Tests.Unit.csproj" />
+    <Project Path="src/Modules/AI/Tests/E2E/DigitalBrain.Modules.AI.Tests.E2E.csproj" />
     <Project Path="src/Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
     <Project Path="src/Modules/AI/Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" />
     <Project Path="src/Modules/AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Behavior/">
+    <Project Path="src/Modules/Behavior/Tests/E2E/DigitalBrain.Modules.Behavior.Tests.E2E.csproj" />
+    <Project Path="src/Modules/Behavior/Aspire.Hosting/DigitalBrain.Modules.Behavior.Aspire.Hosting.csproj" />
+    <Project Path="src/Modules/Behavior/Contracts/DigitalBrain.Modules.Behavior.Contracts.csproj" />
+    <Project Path="src/Modules/Behavior/Behavior/DigitalBrain.Modules.Behavior.csproj" />
+    <Project Path="src/Modules/Behavior/Tests/Unit/DigitalBrain.Modules.Behavior.Tests.Unit.csproj" />
   </Folder>
   <Folder Name="/Modules/ClickHouse/">
     <Project Path="src/Modules/ClickHouse/Tests/Unit/DigitalBrain.Modules.ClickHouse.Tests.Unit.csproj" />

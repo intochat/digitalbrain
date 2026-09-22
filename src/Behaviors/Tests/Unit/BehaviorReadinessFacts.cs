@@ -6,6 +6,19 @@ namespace DigitalBrain.Tests;
 public sealed class BehaviorReadinessFacts
 {
     [Fact]
+    public async Task RequiredSubscriptionLossNotifiesTheHost()
+    {
+        var readiness = new BehaviorReadiness();
+        var generation = readiness.Begin("behavior", [new("timer", typeof(string))]);
+        readiness.SubscriptionReady(generation, "timer", typeof(string));
+        var lost = readiness.WaitForLossAsync(generation);
+        Assert.False(lost.IsCompleted);
+        readiness.SubscriptionClosed(generation, "timer", typeof(string));
+        await lost.WaitAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
+        Assert.False(readiness.IsReady);
+    }
+
+    [Fact]
     public void OldGenerationsCannotMakeARestartedBehaviorReady()
     {
         var status = new BehaviorReadiness();

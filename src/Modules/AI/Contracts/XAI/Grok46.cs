@@ -7,4 +7,5 @@ public sealed class Grok46 : LLMModel<IGrok46>
     public override AiProvider Provider => AiProvider.XAI;
 }
 
+[Orleans.Metadata.DefaultGrainType("ai.llm.grok46")]
 public interface IGrok46 : ILLM;

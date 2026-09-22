@@ -41,8 +41,8 @@ internal sealed class ConversationCoordinator(IDigitalBrain brain, IAgentTurnRun
             {
                 var finished = false;
                 await foreach (var item in runner.RunAsync(new("workspace-assistant", run, scope, state.Turns, message, null,
-                    "Use supabase_schema to discover tables, then show_supabase_query_table to display requested data. Use read-only SQL. A query result opens an interactive window; never fabricate data or result identifiers.",
-                    ["supabase_schema", "show_supabase_query_table"]), ct))
+                    "Use supabase_schema to discover tables, then show_supabase_query_table to display requested data. Use read-only SQL. A query result opens an interactive window; never fabricate data or result identifiers. For C# behavior requests use code_contracts, then read/save/check a draft. Deploy only a passing artifact when the user requested execution. Read current revisions before mutations. Never claim a behavior is running until behavior_read reports readiness.",
+                    ["supabase_schema", "show_supabase_query_table", .. BehaviorAgentTools.Names]), ct))
                 {
                     switch (item)
                     {

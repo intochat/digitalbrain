@@ -20,15 +20,31 @@ public sealed class BehaviorReadiness : IHealthCheck
     public BehaviorGeneration Begin(string name, IReadOnlyList<SubscriptionRequirement> requirements)
     {
         var generation = new BehaviorGeneration(name, Guid.NewGuid());
-        lock (_gate) { _states[name] = new(generation.Id, requirements.ToHashSet()); }
+        lock (_gate)
+        {
+            if (_states.TryGetValue(name, out var previous)) { previous.Lost.TrySetResult(); }
+            _states[name] = new(generation.Id, requirements.ToHashSet());
+        }
         return generation;
     }
     public void SubscriptionReady(BehaviorGeneration generation, string source, Type signalType)
     { lock (_gate) { if (Current(generation) is { } state) { state.Ready.Add(new(source, signalType)); } } }
     public void SubscriptionClosed(BehaviorGeneration generation, string source, Type signalType)
-    { lock (_gate) { if (Current(generation) is { } state) { state.Ready.Remove(new(source, signalType)); } } }
+    {
+        lock (_gate)
+        {
+            if (Current(generation) is { } state)
+            {
+                var requirement = new SubscriptionRequirement(source, signalType);
+                state.Ready.Remove(requirement);
+                if (state.Required.Contains(requirement)) { state.Lost.TrySetResult(); }
+            }
+        }
+    }
+    public Task WaitForLossAsync(BehaviorGeneration generation)
+    { lock (_gate) { return Current(generation)?.Lost.Task ?? Task.CompletedTask; } }
     public void End(BehaviorGeneration generation)
-    { lock (_gate) { if (Current(generation) is { } state) { state.Active = false; state.Ready.Clear(); } } }
+    { lock (_gate) { if (Current(generation) is { } state) { state.Active = false; state.Ready.Clear(); state.Lost.TrySetResult(); } } }
     private State? Current(BehaviorGeneration generation)
         => _states.TryGetValue(generation.Name, out var state) && state.Generation == generation.Id ? state : null;
     public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
@@ -39,5 +55,6 @@ public sealed class BehaviorReadiness : IHealthCheck
         public HashSet<SubscriptionRequirement> Required { get; } = required;
         public HashSet<SubscriptionRequirement> Ready { get; } = [];
         public bool Active { get; set; } = true;
+        public TaskCompletionSource Lost { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 }

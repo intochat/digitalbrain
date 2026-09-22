@@ -24,5 +24,6 @@
     <ProjectReference Include="../../../Modules/Microsoft/Aspire.Hosting/DigitalBrain.Modules.Microsoft.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Excel/Excel/DigitalBrain.Modules.Excel.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Coding/Coding/DigitalBrain.Modules.Coding.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Behavior/Aspire.Hosting/DigitalBrain.Modules.Behavior.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
   </ItemGroup>
 </Project>

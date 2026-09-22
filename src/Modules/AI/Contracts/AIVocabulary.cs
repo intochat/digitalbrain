@@ -1,9 +1,8 @@
 namespace DigitalBrain.AI;
 
 /// <summary>
-/// The AI module's vocabulary: two grain types and five signal words. This project ships no
-/// C# signal types — a signal is a type name plus a JSON body, and the shapes below are the
-/// documented contract for those bodies.
+/// Legacy signal words retained for existing behavior consumers. New code uses IAgent,
+/// ILLM and the typed lifecycle signals in their contracts.
 /// </summary>
 public static class AIVocabulary
 {

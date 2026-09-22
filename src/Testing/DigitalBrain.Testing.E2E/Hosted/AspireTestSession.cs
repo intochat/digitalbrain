@@ -58,14 +58,16 @@ public sealed class AspireTestSession : IAsyncDisposable
         var stage = "builder";
         try
         {
+            // Aspire's module builder discovers AppHost metadata from the caller stack.
+            // Create it before the first asynchronous file write can detach that stack.
+            var builder = await createBuilder(ct).ConfigureAwait(false);
+            lifetime.Own("builder", builder);
             PrivateTestConfiguration? privateSettings = null;
             if (options.PrivateConfiguration.Count > 0)
             {
                 privateSettings = await PrivateTestConfiguration.CreateAsync(options.PrivateConfiguration, ct).ConfigureAwait(false);
                 lifetime.Own("private-configuration", privateSettings);
             }
-            var builder = await createBuilder(ct).ConfigureAwait(false);
-            lifetime.Own("builder", builder);
             // Provider parameters are evaluated when Aspire starts resources. Keep their
             // values out of command-line arguments and public composition envelopes.
             builder.Configuration.AddInMemoryCollection(options.PrivateConfiguration

@@ -16,4 +16,5 @@ public sealed class Gemma4 : LLMModel<IGemma4>
     public override LlmCapabilities Capabilities => LlmCapabilities.Tools | LlmCapabilities.Vision;
 }
 
+[Orleans.Metadata.DefaultGrainType("ai.llm.gemma4")]
 public interface IGemma4 : ILLM;

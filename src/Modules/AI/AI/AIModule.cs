@@ -1,4 +1,5 @@
 using DigitalBrain.AI.Web;
+using DigitalBrain.AI.Media;
 using DigitalBrain.AI.WebSearch;
 using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
@@ -56,6 +57,12 @@ public sealed class AIModule : IModule
             Put(configuration, $"{prefix}:Reasoning", profile.Reasoning);
             Put(configuration, $"{prefix}:MaxOutputTokens", profile.MaxOutputTokens?.ToString(System.Globalization.CultureInfo.InvariantCulture));
             Put(configuration, $"{prefix}:Capabilities", profile.Capabilities?.ToString());
+            Put(configuration, $"{prefix}:ContextWindowTokens", profile.ContextWindowTokens?.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            Put(configuration, $"{prefix}:MaximumOutputTokens", profile.MaximumOutputTokens?.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            Put(configuration, $"{prefix}:SupportsTemperature", profile.SupportsTemperature?.ToString());
+            Put(configuration, $"{prefix}:SupportsTopP", profile.SupportsTopP?.ToString());
+            for (var i = 0; i < profile.AllowedReasoning?.Count; i++)
+            { Put(configuration, $"{prefix}:AllowedReasoning:{i}", profile.AllowedReasoning[i]); }
         }
         return new(typeof(AIModule), configuration);
     }
@@ -71,6 +78,8 @@ public sealed class AIModule : IModule
         AIClients.Add(builder.Services);
         builder.Services.TryAddSingleton<Agents.IAgentTurnRunner, Agents.AgentTurnRunner>();
         builder.Services.TryAddSingleton<ModelProfiles>();
+        builder.Services.TryAddSingleton<InferenceService>();
+        builder.Services.AddMediaNeurons();
         AIClients.AddImageGeneration(builder.Services, options);
         VoiceToTextHosting.Add(builder.Services, options);
         WebSearchHosting.Add(builder.Services, options);

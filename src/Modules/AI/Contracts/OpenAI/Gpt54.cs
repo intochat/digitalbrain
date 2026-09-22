@@ -7,4 +7,5 @@ public sealed class Gpt54 : LLMModel<IGpt54>
     public override AiProvider Provider => AiProvider.OpenAI;
 }
 
+[Orleans.Metadata.DefaultGrainType("ai.llm.gpt54")]
 public interface IGpt54 : ILLM;

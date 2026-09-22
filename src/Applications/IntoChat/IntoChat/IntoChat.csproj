@@ -25,6 +25,7 @@
     <PackageReference Include="Microsoft.Orleans.Client" />
     <InternalsVisibleTo Include="IntoChat.Tests.E2E" />
     <InternalsVisibleTo Include="IntoChat.Tests.Unit" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Behavior.Tests.E2E" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../ServiceDefaults/IntoChat.ServiceDefaults.csproj" />
@@ -46,5 +47,7 @@
     <ProjectReference Include="../../../Modules/Salesforce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
     <ProjectReference Include="../../../Modules/Microsoft/Microsoft/DigitalBrain.Modules.Microsoft.csproj" />
     <ProjectReference Include="../../../Modules/Coding/Coding/DigitalBrain.Modules.Coding.csproj" />
+    <ProjectReference Include="../../../Modules/Behavior/Behavior/DigitalBrain.Modules.Behavior.csproj" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
   </ItemGroup>
 </Project>

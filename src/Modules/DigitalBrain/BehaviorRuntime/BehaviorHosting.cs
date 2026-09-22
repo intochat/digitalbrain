@@ -52,15 +52,30 @@ internal sealed class BehaviorHost<T>(IServiceProvider services, IDigitalBrain b
         {
             generation = readiness.Begin(typeof(T).FullName!, required);
             await using var scopedBrain = new BehaviorScopedBrain(brain, readiness, generation);
+            using var execution = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
             try
             {
                 var behavior = ActivatorUtilities.CreateInstance<T>(services, scopedBrain);
-                await behavior.RunAsync(stoppingToken).ConfigureAwait(false);
+                var run = behavior.RunAsync(execution.Token);
+                var loss = readiness.WaitForLossAsync(generation);
+                if (await Task.WhenAny(run, loss).ConfigureAwait(false) == loss)
+                {
+                    await execution.CancelAsync().ConfigureAwait(false);
+                    try { await run.WaitAsync(TimeSpan.FromSeconds(15), stoppingToken).ConfigureAwait(false); }
+                    catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested) { }
+                    throw new InvalidOperationException("A required behavior subscription closed.");
+                }
+                await run.ConfigureAwait(false);
                 return;
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
                 return;
+            }
+            catch (TimeoutException)
+            {
+                lifetime.StopApplication();
+                throw;
             }
             catch (Exception error)
             {
@@ -68,6 +83,7 @@ internal sealed class BehaviorHost<T>(IServiceProvider services, IDigitalBrain b
                 logger.LogError(error, "Behavior {Behavior} failed; readiness is withdrawn before retry.", typeof(T).Name);
                 await Task.Delay(TimeSpan.FromMilliseconds(250), stoppingToken).ConfigureAwait(false);
             }
+            finally { readiness.End(generation); }
         }
     }
 }

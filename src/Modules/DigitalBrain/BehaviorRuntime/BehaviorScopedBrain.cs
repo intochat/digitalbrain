@@ -6,11 +6,18 @@ namespace DigitalBrain.Core;
 internal sealed class BehaviorScopedBrain(IDigitalBrain inner, BehaviorReadiness readiness, BehaviorGeneration generation) : IDigitalBrain
 {
     private readonly List<IAsyncDisposable> _subscriptions = [];
+    private bool _disposed;
     public T Get<T>(string id) where T : class, IGrainWithStringKey => inner.Get<T>(id);
     public async Task<ISignalSubscription<T>> SubscribeAsync<T>(INeuron source, CancellationToken cancellationToken = default) where T : Signal
     {
         var subscription = await inner.SubscribeAsync<T>(source, cancellationToken).ConfigureAwait(false);
-        lock (_subscriptions) { _subscriptions.Add(subscription); }
+        bool rejected;
+        lock (_subscriptions) { rejected = _disposed; if (!rejected) { _subscriptions.Add(subscription); } }
+        if (rejected)
+        {
+            await subscription.DisposeAsync().ConfigureAwait(false);
+            throw new ObjectDisposedException(nameof(BehaviorScopedBrain));
+        }
         var identity = source.GetGrainId().ToString();
         readiness.SubscriptionReady(generation, identity, typeof(T));
         _ = subscription.Completion.ContinueWith(task =>
@@ -24,7 +31,7 @@ internal sealed class BehaviorScopedBrain(IDigitalBrain inner, BehaviorReadiness
     {
         readiness.End(generation);
         IAsyncDisposable[] subscriptions;
-        lock (_subscriptions) { subscriptions = [.. _subscriptions]; _subscriptions.Clear(); }
+        lock (_subscriptions) { _disposed = true; subscriptions = [.. _subscriptions]; _subscriptions.Clear(); }
         List<Exception> failures = [];
         foreach (var subscription in subscriptions)
         {

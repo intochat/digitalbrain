@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>true</IsPackable><DisableMSBuildAssemblyCopyCheck>true</DisableMSBuildAssemblyCopyCheck></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Behavior/DigitalBrain.Modules.Behavior.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
+  </ItemGroup>
+</Project>
