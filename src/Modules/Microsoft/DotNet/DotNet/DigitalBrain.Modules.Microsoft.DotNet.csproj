@@ -8,6 +8,6 @@
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.DotNet.Tests.Unit" />
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Microsoft.DotNet.Contracts.csproj" />
-    <ProjectReference Include="../../../DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../../../DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
   </ItemGroup>
 </Project>

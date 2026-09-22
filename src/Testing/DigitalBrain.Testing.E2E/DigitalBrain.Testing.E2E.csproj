@@ -16,9 +16,9 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
-    <ProjectReference Include="../../Modules/DigitalBrain/Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
-    <ProjectReference Include="../../Modules/DigitalBrain/Aspire/DigitalBrain.Aspire.csproj" />
-    <ProjectReference Include="../../Modules/DigitalBrain/Sdk/DigitalBrain.Sdk.csproj" />
+    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
+    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/Aspire/DigitalBrain.Aspire.csproj" />
+    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/Sdk/DigitalBrain.Sdk.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Build/DigitalBrain.Testing.E2E.targets" Pack="true" PackagePath="buildTransitive/" />

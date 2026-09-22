@@ -1,5 +1,5 @@
 #!/usr/bin/env dotnet
-#:project ../Modules/DigitalBrain/BehaviorRuntime/DigitalBrain.Behavior.csproj
+#:project ../Modules/DigitalBrain/Behaviors/Runtime/DigitalBrain.Behavior.csproj
 #:project ../Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj
 #:property PublishAot=false
 

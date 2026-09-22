@@ -1,6 +1,5 @@
 using DigitalBrain.Abstractions.Identity;
 using DigitalBrain.Abstractions.Neurons;
-using DigitalBrain.Excel;
 using DigitalBrain.Flutter;
 
 namespace IntoChat;
@@ -19,8 +18,6 @@ internal static class UiEndpoints
             static neuron => neuron.Read(), static state => state);
         MapRead<IImage, ImageState>(endpoints, "/ui/images/{name}", UIVocabulary.ImageType,
             static neuron => neuron.Read(), static state => new UiImageStateResponse(state.Prompt, state.Model, state.MediaType));
-        MapRead<ISpreadsheet, ExcelState>(endpoints, "/ui/spreadsheets/{name}", ExcelVocabulary.SpreadsheetType,
-            static neuron => neuron.Read(), static state => state);
         MapRead<ISurface, SurfaceState>(endpoints, "/ui/surfaces/{name}", UIVocabulary.SurfaceType,
             static neuron => neuron.Read(), static state => state);
 

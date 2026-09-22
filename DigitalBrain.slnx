@@ -14,12 +14,24 @@
     <Project Path="src/Modules/AI/Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" />
     <Project Path="src/Modules/AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
   </Folder>
-  <Folder Name="/Modules/Behavior/">
-    <Project Path="src/Modules/Behavior/Tests/E2E/DigitalBrain.Modules.Behavior.Tests.E2E.csproj" />
-    <Project Path="src/Modules/Behavior/Aspire.Hosting/DigitalBrain.Modules.Behavior.Aspire.Hosting.csproj" />
-    <Project Path="src/Modules/Behavior/Contracts/DigitalBrain.Modules.Behavior.Contracts.csproj" />
-    <Project Path="src/Modules/Behavior/Behavior/DigitalBrain.Modules.Behavior.csproj" />
-    <Project Path="src/Modules/Behavior/Tests/Unit/DigitalBrain.Modules.Behavior.Tests.Unit.csproj" />
+  <Folder Name="/Modules/DigitalBrain/" />
+  <Folder Name="/Modules/DigitalBrain/Behaviors/">
+    <Project Path="src/Modules/DigitalBrain/Behaviors/Tests/E2E/DigitalBrain.Modules.Behavior.Tests.E2E.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Behaviors/Tests/Unit/DigitalBrain.Modules.Behavior.Tests.Unit.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Behaviors/Aspire.Hosting/DigitalBrain.Modules.Behavior.Aspire.Hosting.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Behaviors/Contracts/DigitalBrain.Modules.Behavior.Contracts.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Behaviors/Behavior/DigitalBrain.Modules.Behavior.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Behaviors/Runtime/DigitalBrain.Behavior.csproj" />
+  </Folder>
+  <Folder Name="/Modules/DigitalBrain/Kernel/">
+    <Project Path="src/Modules/DigitalBrain/Kernel/Tests/Unit/DigitalBrain.Runtime.Tests.Unit.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Kernel/Tests/E2E/DigitalBrain.Runtime.Tests.E2E.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Kernel/Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Kernel/Aspire/DigitalBrain.Aspire.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Kernel/Contracts/DigitalBrain.Contracts.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Kernel/Sdk/DigitalBrain.Sdk.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Kernel/Mcp/DigitalBrain.Mcp.csproj" />
   </Folder>
   <Folder Name="/Modules/ClickHouse/">
     <Project Path="src/Modules/ClickHouse/Tests/Unit/DigitalBrain.Modules.ClickHouse.Tests.Unit.csproj" />
@@ -32,22 +44,6 @@
     <Project Path="src/Modules/Coding/Aspire.Hosting/DigitalBrain.Modules.Coding.Aspire.Hosting.csproj" />
     <Project Path="src/Modules/Coding/Coding/DigitalBrain.Modules.Coding.csproj" />
     <Project Path="src/Modules/Coding/Contracts/DigitalBrain.Modules.Coding.Contracts.csproj" />
-  </Folder>
-  <Folder Name="/Modules/DigitalBrain/">
-    <Project Path="src/Modules/DigitalBrain/Tests/Unit/DigitalBrain.Runtime.Tests.Unit.csproj" />
-    <Project Path="src/Modules/DigitalBrain/Tests/E2E/DigitalBrain.Runtime.Tests.E2E.csproj" />
-    <Project Path="src/Modules/DigitalBrain/Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
-    <Project Path="src/Modules/DigitalBrain/Aspire/DigitalBrain.Aspire.csproj" />
-    <Project Path="src/Modules/DigitalBrain/Contracts/DigitalBrain.Contracts.csproj" />
-    <Project Path="src/Modules/DigitalBrain/BehaviorRuntime/DigitalBrain.Behavior.csproj" />
-    <Project Path="src/Modules/DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
-    <Project Path="src/Modules/DigitalBrain/Sdk/DigitalBrain.Sdk.csproj" />
-    <Project Path="src/Modules/DigitalBrain/Mcp/DigitalBrain.Mcp.csproj" />
-  </Folder>
-  <Folder Name="/Modules/Excel/">
-    <Project Path="src/Modules/Excel/Tests/Unit/DigitalBrain.Modules.Excel.Tests.Unit.csproj" />
-    <Project Path="src/Modules/Excel/Contracts/DigitalBrain.Modules.Excel.Contracts.csproj" />
-    <Project Path="src/Modules/Excel/Excel/DigitalBrain.Modules.Excel.csproj" />
   </Folder>
   <Folder Name="/Modules/Google/" />
   <Folder Name="/Modules/Google/Flutter/">

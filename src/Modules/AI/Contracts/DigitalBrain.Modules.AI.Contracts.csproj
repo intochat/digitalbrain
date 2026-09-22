@@ -8,6 +8,6 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.AI.Abstractions" />
     <PackageReference Include="Microsoft.Orleans.Sdk" />
-    <ProjectReference Include="../../DigitalBrain/Contracts/DigitalBrain.Contracts.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/Contracts/DigitalBrain.Contracts.csproj" />
   </ItemGroup>
 </Project>

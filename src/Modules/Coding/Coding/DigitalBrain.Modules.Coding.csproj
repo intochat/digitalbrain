@@ -11,6 +11,6 @@
     <InternalsVisibleTo Include="DigitalBrain.Modules.Coding.Tests.Unit" />
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Coding.Contracts.csproj" />
     <ProjectReference Include="../../Microsoft/Roslyn/Roslyn/DigitalBrain.Modules.Microsoft.Roslyn.csproj" />
-    <ProjectReference Include="../../DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
   </ItemGroup>
 </Project>

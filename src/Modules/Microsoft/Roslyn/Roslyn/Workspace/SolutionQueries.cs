@@ -283,7 +283,7 @@ internal static class SolutionQueries
         return node is VariableDeclaratorSyntax { Parent.Parent: BaseFieldDeclarationSyntax field } ? field : node;
     }
 
-    // "src/Modules/AI/AI/x.csproj" clusters as "Modules/AI"; "src/Modules/DigitalBrain/DigitalBrain/x.csproj" as "Modules/DigitalBrain";
+    // "src/Modules/AI/AI/x.csproj" clusters as "Modules/AI"; "src/Modules/DigitalBrain/Kernel/Kernel/x.csproj" as "Modules/DigitalBrain";
     // a project outside src clusters by its own folder name.
     private static string ClusterOf(string? root, Project project)
     {

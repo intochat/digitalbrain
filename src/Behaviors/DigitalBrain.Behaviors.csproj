@@ -13,7 +13,7 @@
     <PackageReference Include="Microsoft.Orleans.Sdk" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../Modules/DigitalBrain/BehaviorRuntime/DigitalBrain.Behavior.csproj" />
+    <ProjectReference Include="../Modules/DigitalBrain/Behaviors/Runtime/DigitalBrain.Behavior.csproj" />
     <ProjectReference Include="../Modules/Google/Flutter/Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
   </ItemGroup>
 </Project>

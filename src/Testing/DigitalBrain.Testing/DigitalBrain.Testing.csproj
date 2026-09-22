@@ -4,6 +4,6 @@
     <Description>Signal probes, behavior runs, bounded waits and session lifetime shared by every DigitalBrain test kind.</Description>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../Modules/DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
   </ItemGroup>
 </Project>

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Typed DigitalBrain MCP server: resolve, probe and observe neurons.</Description>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Client" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Contracts/DigitalBrain.Contracts.csproj" />
+    <ProjectReference Include="../Kernel/DigitalBrain.csproj" />
+  </ItemGroup>
+</Project>

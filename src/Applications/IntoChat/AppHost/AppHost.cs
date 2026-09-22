@@ -11,7 +11,6 @@ using DigitalBrain.Coding;
 using DigitalBrain.Behavior;
 using DigitalBrain.Behavior.Aspire.Hosting;
 using DigitalBrain.Core;
-using DigitalBrain.Excel;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Google.Gmail;
@@ -41,7 +40,6 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<ClickHouseModule>(database => database.WithClickHouse(options => options.WithSeed("leads")))
     .WithModule<SupabaseModule>(database => database.WithConnection("supabase"))
     .WithModule<TimeModule>()
-    .WithModule<ExcelModule>()
     .WithModule<GmailModule>(gmail => gmail.WithGmail())
     .WithModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
     .WithModule<AspireModule>(aspire => aspire

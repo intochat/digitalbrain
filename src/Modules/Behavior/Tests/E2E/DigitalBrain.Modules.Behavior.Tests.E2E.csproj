@@ -1,9 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
-    <ProjectReference Include="../../Behavior/DigitalBrain.Modules.Behavior.csproj" />
-    <ProjectReference Include="../../../AI/Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" />
-    <ProjectReference Include="../../../Flutter/Aspire.Hosting/DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" />
-    <ProjectReference Include="../../../../Applications/IntoChat/IntoChat/IntoChat.csproj" />
-  </ItemGroup>
-</Project>

@@ -6,6 +6,6 @@
     <RootNamespace>DigitalBrain.Salesforce</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../DigitalBrain/Contracts/DigitalBrain.Contracts.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/Contracts/DigitalBrain.Contracts.csproj" />
   </ItemGroup>
 </Project>

@@ -9,7 +9,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.Roslyn.Tests.Unit" />
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Microsoft.Roslyn.Contracts.csproj" />
-    <ProjectReference Include="../../../DigitalBrain/DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../../../DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Build.Locator" />
