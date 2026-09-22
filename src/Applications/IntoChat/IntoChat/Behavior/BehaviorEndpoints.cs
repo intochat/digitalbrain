@@ -17,6 +17,8 @@ internal static class BehaviorEndpoints
             [SubscriptionRequirement.For<Posted>(brain.Get<ITwitterAccount>("elonmusk"))]);
         builder.Services.AddOptions<BehaviorAuthoringOptions>().BindConfiguration("IntoChat:BehaviorAuthoring");
         builder.Services.AddSingleton<BehaviorToolService>();
+        builder.Services.AddSingleton<BehaviorCatalogStore>();
+        builder.Services.AddSingleton<BehaviorManagement>();
         builder.Services.AddSingleton<BehaviorAuthoringService>();
         builder.Services.AddSingleton<IAgentToolFactory, BehaviorAgentTools>();
         builder.Services.AddHttpContextAccessor();
@@ -28,7 +30,13 @@ internal static class BehaviorEndpoints
             var scope = WorkspaceScope.Create(auth.Username is { Length: > 0 } owner ? owner : BasicAuthGate.DefaultLogin, workspace);
             return sp.GetRequiredService<BehaviorToolService>().ForScope(scope.Id);
         });
-        builder.Services.AddMcpServer().WithHttpTransport().WithTools<ScopedBehaviorTools>();
+        // WithTools<T> constructs T itself, bypassing our workspace-scoped factory.
+        // Resolve the registered target for each invocation instead.
+        var tools = typeof(ScopedBehaviorTools).GetMethods()
+            .Where(method => method.GetCustomAttributes(typeof(ModelContextProtocol.Server.McpServerToolAttribute), false).Length != 0)
+            .Select(method => ModelContextProtocol.Server.McpServerTool.Create(method,
+                request => request.Services!.GetRequiredService<ScopedBehaviorTools>()));
+        builder.Services.AddMcpServer().WithHttpTransport().WithTools(tools);
     }
 
     public static void MapBehaviors(this IEndpointRouteBuilder routes)
@@ -44,6 +52,11 @@ internal static class BehaviorEndpoints
         });
         static ScopedBehaviorTools Scope(string workspaceId, BehaviorToolService service, IOptions<BasicAuthOptions> auth)
             => service.ForScope(WorkspaceScope.Create(auth.Value.Username is { Length: > 0 } owner ? owner : BasicAuthGate.DefaultLogin, workspaceId).Id);
+        static string ScopeId(string workspaceId, IOptions<BasicAuthOptions> auth)
+            => WorkspaceScope.Create(auth.Value.Username is { Length: > 0 } owner ? owner : BasicAuthGate.DefaultLogin, workspaceId).Id;
+        group.MapGet("/", (string workspaceId, BehaviorManagement management, IOptions<BasicAuthOptions> auth, CancellationToken ct) => management.List(ScopeId(workspaceId, auth), ct));
+        group.MapGet("/{id}/detail", (string workspaceId, string id, BehaviorManagement management, IOptions<BasicAuthOptions> auth, CancellationToken ct) => management.Detail(ScopeId(workspaceId, auth), id, ct));
+        group.MapPost("/{id}/description", (string workspaceId, string id, DescribeBehavior request, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).Describe(id, request, ct));
         group.MapGet("/{id}", (string workspaceId, string id, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).ReadBehavior(id, ct));
         group.MapGet("/{id}/draft", (string workspaceId, string id, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).ReadDraft(id, ct));
         group.MapPost("/{id}/draft", (string workspaceId, string id, SaveCodeDraft request, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).SaveDraft(id, request, ct));

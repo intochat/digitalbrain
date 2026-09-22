@@ -37,6 +37,12 @@ IntoChat's AppHost accepts `IntoChat:BehaviorAuthoring:Root`. It configures sibl
 }
 ```
 
+For the desktop workspace assistant, set `IntoChat:Assistant:Model` to a configured model marker or model ID (for example `IGpt56Luna`). This selects the model for `/agent` independently of the AI module default; it does not provision a provider or credentials. `IntoChat:BehaviorAuthoring:ModelProfile` separately selects the model for the `/author` orchestration endpoint. A model declaring tool support still needs sufficient coding ability to author and repair a behavior.
+
+Contract discovery works even when local execution is disabled. Start with `code_contracts` and `modules=[]`, then use installed module IDs from its response. Native behavior tools return expected validation/configuration failures as `isError=true` results so the assistant can repair arguments or explain the problem. Cancellation and infrastructure failures still stop the run.
+
+The catalog includes the subscription API, signal constructors and a compilable bootstrap template (after replacing its type placeholders). `code_check_read` waits up to 20 seconds for a terminal validation result, while respecting cancellation; call it again if validation remains pending.
+
 Install `CodingModule` and `BehaviorModule` in the same host. Roots are disabled unless configured. `AllowActivation` defaults to false; draft validation executes tests, while deployment/start/rollback additionally require activation policy. Host connection settings default to the silo's advertised gateway, cluster ID and service ID. Explicit `Gateways`, `ClusterId` and `ServiceId` can override them. Standalone examples must supply these settings or explicitly use `LocalDevelopment=true`.
 
 The current worker backend requires Windows and the configured .NET SDK. The default SDK is pinned to the repository's `11.0.100-rc.1.26425.128`; generated test projects use the repository's xUnit 4.0.0/MTP package from the local NuGet cache. A private build directory has fixed SDK and package configuration. User source cannot inject file-app package/project directives.

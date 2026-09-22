@@ -3,13 +3,14 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.AI.Agents;
+using DigitalBrain.AI;
 using DigitalBrain.AI.Conversations;
 using DigitalBrain.Contracts;
 using IntoChat.Workspace.Queries;
 
 namespace IntoChat.Agent;
 
-internal sealed class ConversationCoordinator(IDigitalBrain brain, IAgentTurnRunner runner)
+internal sealed class ConversationCoordinator(IDigitalBrain brain, IAgentTurnRunner runner, IConfiguration configuration)
 {
     private readonly string _runtime = Guid.NewGuid().ToString("N");
     private readonly ConcurrentDictionary<string, byte> _active = new(StringComparer.Ordinal);
@@ -40,8 +41,9 @@ internal sealed class ConversationCoordinator(IDigitalBrain brain, IAgentTurnRun
             else
             {
                 var finished = false;
-                await foreach (var item in runner.RunAsync(new("workspace-assistant", run, scope, state.Turns, message, null,
-                    "Use supabase_schema to discover tables, then show_supabase_query_table to display requested data. Use read-only SQL. A query result opens an interactive window; never fabricate data or result identifiers. For C# behavior requests use code_contracts, then read/save/check a draft. Deploy only a passing artifact when the user requested execution. Read current revisions before mutations. Never claim a behavior is running until behavior_read reports readiness.",
+                var model = configuration["IntoChat:Assistant:Model"] is { Length: > 0 } modelName ? new AgentModelSelection(Model: modelName) : null;
+                await foreach (var item in runner.RunAsync(new("workspace-assistant", run, scope, state.Turns, message, model,
+                    "You are the IntoChat workspace assistant. Choose tools that match the user's request. Only for database requests, use supabase_schema then show_supabase_query_table with read-only SQL; never fabricate data or result identifiers. For new C# behaviors, use behavior_describe to record a readable name, purpose and declared triggers/effects; use behavior_details to get its metadata revision before updating existing descriptions. If a catalog is truncated, request the needed modules separately. Resolve neurons by concrete contracts such as ITimer, never the INeuron base interface. If deployment fails, inspect behavior_logs and repair the source before trying another checked artifact. For C# behavior requests use code_contracts, then code_draft_read, code_draft_save with both source and meaningful xUnit tests, code_draft_check, and code_check_read until terminal status. Repair diagnostics and recheck before deployment. Operation IDs must be fresh UUID strings. Read current revisions before mutations. Tool results with isError=true are failures: repair the arguments or explain the configuration problem; never claim success. Deploy only a passing artifact when the user requested execution. Never use behavior_start to create a new behavior. Never claim a behavior is running until behavior_read reports readiness.",
                     ["supabase_schema", "show_supabase_query_table", .. BehaviorAgentTools.Names]), ct))
                 {
                     switch (item)

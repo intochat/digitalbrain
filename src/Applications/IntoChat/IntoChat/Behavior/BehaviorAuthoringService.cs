@@ -47,7 +47,7 @@ internal sealed class BehaviorAuthoringService(IDigitalBrain brain, BehaviorTool
                 try
                 {
                     var candidate = JsonSerializer.Deserialize<Candidate>(response.Text, Json) ?? throw new JsonException("Expected source, tests and moduleIds.");
-                    var saved = await draft.Save(new(revision, Guid.NewGuid(), candidate.Source, candidate.Tests, candidate.ModuleIds), ct);
+                    var saved = await tools.ForScope(scope).SaveDraft(request.DraftId, new(revision, Guid.NewGuid(), candidate.Source, candidate.Tests, candidate.ModuleIds), ct);
                     revision = saved.Revision;
                     pending = Guid.NewGuid();
                     var check = await draft.Check(new(revision, pending.Value), ct);

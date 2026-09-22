@@ -48,6 +48,7 @@ class WorkspaceIslands extends StatelessWidget {
   IconData appIcon(String kind) => switch (kind) {
     'files' => Icons.folder_outlined,
     'images' => Icons.tune,
+    'behaviors' => Icons.account_tree_outlined,
     'table' => Icons.table_chart_outlined,
     _ => Icons.web_asset_outlined,
   };
@@ -170,7 +171,7 @@ class WorkspaceIslands extends StatelessWidget {
                       children: [
                         IconButton(
                           tooltip: a.title,
-                        onPressed: () => onRestore(id),
+                          onPressed: () => onRestore(id),
                           icon: Icon(
                             appIcon(a.data['app'] as String? ?? a.kind),
                             size: 22,
@@ -223,11 +224,11 @@ class WorkspaceIslands extends StatelessWidget {
                 ),
                 const PopupMenuDivider(),
                 const PopupMenuItem(
-                  enabled: false,
+                  value: 'behaviors',
                   child: ListTile(
                     leading: Icon(Icons.account_tree_outlined),
-                    title: Text('Automations / Dev Studio'),
-                    subtitle: Text('Not implemented'),
+                    title: Text('Behaviors'),
+                    subtitle: Text('Create and manage automations'),
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),

@@ -23,6 +23,7 @@ import 'workspace_programs.dart';
 import 'artifact_editors.dart';
 import 'app_surface_host.dart';
 import 'workspace_islands.dart';
+import 'behaviors/behavior_manager.dart';
 
 class WorkspaceApp extends StatefulWidget {
   const WorkspaceApp({
@@ -869,6 +870,29 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
           child: Text('Connect to IntoChat to open local apps.'),
         );
       }
+      if (a.data['app'] == 'behaviors') {
+        final project = store.currentProject;
+        return BehaviorManager(
+          key: ValueKey('${project.id}-${a.id}'),
+          initialId: a.data['selected'] as String?,
+          active: !project.presentation.minimizedArtifactIds.contains(a.id),
+          request: (path, {body}) =>
+              client.behaviorRequest(project.id, path, body: body),
+          onSelected: (id) {
+            a.data['selected'] = id;
+            store.save();
+          },
+          onAsk: (id, prompt) {
+            final conversation = store.createConversation(
+              title: 'Behavior: $id',
+            );
+            conversation.draft = prompt;
+            project.presentation.chatCollapsed = false;
+            setState(() => _mobileWork = false);
+            store.save();
+          },
+        );
+      }
       return Semantics(
         container: true,
         explicitChildNodes: true,
@@ -1174,6 +1198,21 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                             conversation.id == store.currentConversation.id,
                         store: store,
                         onRun: widget.onRun,
+                        selectedBehaviorId:
+                            project.presentation.activeArtifactId ==
+                                'app-behaviors'
+                            ? project.artifacts
+                                      .where((a) => a.id == 'app-behaviors')
+                                      .firstOrNull
+                                      ?.data['selected']
+                                  as String?
+                            : null,
+                        onOpenBehavior: (id) {
+                          store.selectProject(project.id);
+                          final app = store.launchLocalApp('behaviors');
+                          app.data['selected'] = id;
+                          store.save();
+                        },
                         onReadConversation:
                             widget.programmingClient?.readWorkspaceConversation,
                         onOpenUrl: widget.onOpenUrl,

@@ -83,6 +83,8 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
         if (downloads is not null) { context.EnvironmentVariables["IntoChat__LocalFiles__Roots__downloads"] = downloads; }
         var assets = builder.Configuration["IntoChat:LocalFiles:AssetDirectory"];
         if (assets is not null) { context.EnvironmentVariables["IntoChat__LocalFiles__AssetDirectory"] = assets; }
+        if (builder.Configuration["IntoChat:Assistant:Model"] is { Length: > 0 } assistantModel)
+        { context.EnvironmentVariables["IntoChat__Assistant__Model"] = assistantModel; }
         foreach (var setting in new[] { "AllowActivation", "ModelProfile" })
         {
             if (builder.Configuration["IntoChat:BehaviorAuthoring:" + setting] is { } value)

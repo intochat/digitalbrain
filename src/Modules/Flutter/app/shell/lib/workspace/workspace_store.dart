@@ -336,7 +336,9 @@ class WorkspaceStore extends ChangeNotifier {
           title: window.title,
           kind: window.surface == null ? 'table' : 'app',
           remoteManaged: true,
-          data: window.surface == null ? {'tableId': window.tableId} : {'app':window.id == 'app-files' ? 'files' : 'images'},
+          data: window.surface == null
+              ? {'tableId': window.tableId}
+              : {'app': window.id == 'app-files' ? 'files' : 'images'},
         );
         project.artifacts.add(artifact);
       }
@@ -345,9 +347,15 @@ class WorkspaceStore extends ChangeNotifier {
         final parts = name.split('/images/');
         if (parts.length == 2) {
           final documentId = parts.last.split('/').first;
-          final documents = List<Map<String,dynamic>>.from((artifact.data['documents'] as List? ?? []).map((d)=>Map<String,dynamic>.from(d)));
-          if (!documents.any((d)=>d['id']==documentId)) { documents.add({'id':documentId,'name':'Image'}); }
-          artifact.data['documents']=documents;
+          final documents = List<Map<String, dynamic>>.from(
+            (artifact.data['documents'] as List? ?? []).map(
+              (d) => Map<String, dynamic>.from(d),
+            ),
+          );
+          if (!documents.any((d) => d['id'] == documentId)) {
+            documents.add({'id': documentId, 'name': 'Image'});
+          }
+          artifact.data['documents'] = documents;
           artifact.data['selected'] ??= documentId;
         }
       }
@@ -555,7 +563,7 @@ class WorkspaceStore extends ChangeNotifier {
   }
 
   WorkspaceArtifact launchLocalApp(String app) {
-    if (!['files', 'images'].contains(app)) {
+    if (!['files', 'images', 'behaviors'].contains(app)) {
       throw ArgumentError('Application not implemented.');
     }
     final id = 'app-$app';
@@ -563,7 +571,11 @@ class WorkspaceStore extends ChangeNotifier {
         currentProject.artifacts.where((a) => a.id == id).firstOrNull ??
         WorkspaceArtifact(
           id: id,
-          title: app == 'files' ? 'Files' : 'Image Editor',
+          title: switch (app) {
+            'files' => 'Files',
+            'behaviors' => 'Behaviors',
+            _ => 'Image Editor',
+          },
           kind: 'app',
           data: {'app': app},
         );

@@ -3,5 +3,7 @@
     <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
     <ProjectReference Include="../../Coding/DigitalBrain.Modules.Coding.csproj" />
     <ProjectReference Include="../../../DigitalBrain/BehaviorRuntime/DigitalBrain.Behavior.csproj" />
+    <ProjectReference Include="../../../Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
+    <ProjectReference Include="../../../Flutter/Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
   </ItemGroup>
 </Project>

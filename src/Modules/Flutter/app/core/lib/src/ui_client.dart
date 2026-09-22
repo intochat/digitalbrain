@@ -638,6 +638,22 @@ final class DigitalBrainUiClient {
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
+  Future<Map<String, dynamic>> behaviorRequest(
+    String workspace,
+    String path, {
+    Map<String, Object?>? body,
+  }) async {
+    final response = await _request(
+      body == null ? 'GET' : 'POST',
+      '/workspaces/${Uri.encodeComponent(workspace)}/behaviors/$path',
+      body: body,
+      timeout: const Duration(seconds: 30),
+    );
+    return response.body.isEmpty
+        ? <String, dynamic>{}
+        : Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+  }
+
   Future<Uint8List> appAsset(String workspace, String assetId) async {
     final response = await _request(
       'GET',

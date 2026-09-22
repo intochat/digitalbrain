@@ -46,7 +46,7 @@ public sealed class CodingModule : IModule
         services.AddOptions<CodeExecutionOptions>().BindConfiguration(CodeExecutionOptions.SectionName);
         services.PostConfigure<CodeExecutionOptions>(o =>
         {
-            if (o.Root is not null && o.ReferencePaths.Length == 0)
+            if (o.ReferencePaths.Length == 0)
             {
                 o.ReferencePaths = Directory.GetFiles(AppContext.BaseDirectory, "*.dll")
                     .Where(p => !Path.GetFileName(p).Contains(".Tests", StringComparison.Ordinal) && IsManagedAssembly(p)).ToArray();

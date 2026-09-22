@@ -242,6 +242,16 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
           style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
         ),
         children: [
+          if (entry['behaviorId'] is String && widget.onOpenBehavior != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () =>
+                    widget.onOpenBehavior!(entry['behaviorId'] as String),
+                icon: const Icon(Icons.account_tree_outlined, size: 16),
+                label: const Text('Open behavior'),
+              ),
+            ),
           if (map?['results'] is List)
             for (final source in (map!['results'] as List).whereType<Map>())
               ListTile(
