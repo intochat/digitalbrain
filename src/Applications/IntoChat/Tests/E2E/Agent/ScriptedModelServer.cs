@@ -15,6 +15,9 @@ public sealed class ScriptedModelServer : IAsyncDisposable
     private int _completed;
     public ConcurrentQueue<string> Errors { get; } = new();
     public string Sql { get; set; } = "select id, company, email from public.leads where active = true order by id";
+    public string? RepairSql { get; set; }
+    public int RepairCount { get; private set; }
+    public string? ExpectedValidationError { get; set; }
     public TimeSpan Delay { get; set; }
     public Func<CancellationToken, Task>? BeforeTable { get; set; }
     public TaskCompletionSource ToolRequested { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -67,13 +70,31 @@ public sealed class ScriptedModelServer : IAsyncDisposable
         {
             var content = results[^1].GetProperty("content").GetString()!;
             using var result = JsonDocument.Parse(content);
-            // SDK tool serializer may retain CLR property casing.
-            var window = result.RootElement.EnumerateObject().Single(p => p.Name.Equals("windowId", StringComparison.OrdinalIgnoreCase)).Value.GetString();
-            Assert.StartsWith("table-", window);
-            Interlocked.Increment(ref _completed);
-            Completed.TrySetResult();
-            message = new { role = "assistant", content = "Opened Active leads in your workspace." };
-            reason = "stop";
+            if (result.RootElement.TryGetProperty("isError", out var isError) && isError.GetBoolean())
+            {
+                var error = result.RootElement.GetProperty("message").GetString()!;
+                if (ExpectedValidationError is not null) { Assert.Contains(ExpectedValidationError, error); }
+                if (RepairSql is not null && RepairCount == 0)
+                {
+                    RepairCount++;
+                    message = Call("repair-table-call", "show_supabase_query_table", JsonSerializer.Serialize(new { title = "Active leads", sql = RepairSql }));
+                }
+                else
+                {
+                    message = new { role = "assistant", content = "Could not open the table: " + error };
+                    reason = "stop";
+                }
+            }
+            else
+            {
+                // SDK tool serializer may retain CLR property casing.
+                var window = result.RootElement.EnumerateObject().Single(p => p.Name.Equals("windowId", StringComparison.OrdinalIgnoreCase)).Value.GetString();
+                Assert.StartsWith("table-", window);
+                Interlocked.Increment(ref _completed);
+                Completed.TrySetResult();
+                message = new { role = "assistant", content = "Opened Active leads in your workspace." };
+                reason = "stop";
+            }
         }
         return Results.Json(new { id = "fixture-response", @object = "chat.completion", created = 1, model = "gpt-5.6-luna", choices = new[] { new { index = 0, message, finish_reason = reason } }, usage = new { prompt_tokens = 1, completion_tokens = 1, total_tokens = 2 } });
     }
@@ -87,7 +108,7 @@ public sealed class ScriptedModelServer : IAsyncDisposable
     {
         Assert.Empty(Errors);
         Assert.True(_completed > 0, "The model never received a real query-window tool result.");
-        Assert.Equal(_completed * 3, Requests.Count);
+        Assert.Equal(_completed * 3 + RepairCount, Requests.Count);
     }
     public ValueTask DisposeAsync() => _app.DisposeAsync();
 }

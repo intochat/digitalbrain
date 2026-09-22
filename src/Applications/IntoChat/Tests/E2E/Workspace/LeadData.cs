@@ -6,6 +6,15 @@ namespace IntoChat.Tests.E2E.Workspace;
 /// <summary>Scenario data in the application's own temporary database; owns no deployment.</summary>
 internal static class LeadData
 {
+    public static async Task CreateWideCustomersAsync(E2EBrain brain, CancellationToken ct)
+    {
+        await using var connection = new NpgsqlConnection(await brain.Application.GetConnectionStringAsync("supabase-database", ct));
+        await connection.OpenAsync(ct);
+        var columns = string.Join(", ", Enumerable.Range(1, 58).Select(i => $"{i} AS extra_{i}"));
+        await using var command = new NpgsqlCommand($"CREATE VIEW wide_customers AS SELECT leads.*, {columns} FROM leads", connection);
+        await command.ExecuteNonQueryAsync(ct);
+    }
+
     public static async Task SeedAsync(E2EBrain brain, string marker, CancellationToken ct)
     {
         await using var connection = new NpgsqlConnection(await brain.Application.GetConnectionStringAsync("supabase-database", ct));

@@ -246,8 +246,8 @@ public static class ShellHostingExtensions
             // or any test project, and those sit at different depths under the repository root.
             string[] packagePathsFromRepositoryRoot =
             [
-                Path.Combine("src", "Modules", "Flutter", "app", "core"),
-                Path.Combine("src", "Modules", "Flutter", "app", "shell"),
+                Path.Combine("src", "Modules", "Google", "Flutter", "app", "core"),
+                Path.Combine("src", "Modules", "Google", "Flutter", "app", "shell"),
             ];
             for (var directory = new DirectoryInfo(Path.GetFullPath(appHostDirectory)); directory is not null; directory = directory.Parent)
             {

@@ -16,11 +16,17 @@ public sealed class AgentTableJourneyFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var model = await ScriptedModelServer.StartAsync(ct);
+        // Real models commonly emit a final statement terminator.
+        model.Sql += ";";
+        model.RepairSql = model.Sql;
+        model.Sql = "select * from wide_customers order by id;";
+        model.ExpectedValidationError = "it returns 62";
         await using var brain = await IntoChatE2ETest.Create()
             .ConfigureModule<AIModule>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
             .ConfigureModule<FlutterModule>(flutter => flutter.RunWebApp())
             .StartAsync(ct);
         await LeadData.SeedAsync(brain, "Beyond first page", ct);
+        await LeadData.CreateWideCustomersAsync(brain, ct);
         var page = brain.Page;
         await page.SetViewportSizeAsync(1600, 1000);
         var projectId = await WorkspaceBrowser.CreateProjectAsync(page, "Agent workspace");
@@ -30,6 +36,10 @@ public sealed class AgentTableJourneyFacts
         await Assertions.Expect(window.GetByText("Inactive control", new() { Exact = true })).ToHaveCountAsync(0);
         await model.Completed.Task.WaitAsync(TimeSpan.FromSeconds(30), ct);
         model.AssertCompleted();
+        Assert.Equal(1, model.RepairCount);
+        model.Sql = model.RepairSql;
+        model.RepairSql = null;
+        model.ExpectedValidationError = null;
 
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -47,14 +57,14 @@ public sealed class AgentTableJourneyFacts
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
             deadline.CancelAfter(TimeSpan.FromSeconds(30));
             while ((await conversation.Read()).ActiveRunId is not null) { await Task.Delay(100, deadline.Token); }
-            Assert.Single((await conversation.Read()).Turns);
+            Assert.StartsWith("table-", Assert.Single(Assert.Single((await conversation.Read()).Turns).ResultIds));
             await Assertions.Expect(window).ToHaveCountAsync(1);
         }
         finally { release.TrySetResult(); }
 
         model.BeforeTable = null;
         model.Sql = "select missing_column from leads";
-        var failure = page.GetByText("The request could not be completed. Check the data connection or try again.", new() { Exact = true });
+        var failure = page.GetByText("The table could not be opened: PostgreSQL refused the query (SQLSTATE 42703). Check table/column names, permissions and read-only SQL; narrow expensive queries.", new() { Exact = true });
         await SendAsync(page, "Try an invalid query");
         await Assertions.Expect(failure).ToBeVisibleAsync(new() { Timeout = 60_000 });
         await Assertions.Expect(window).ToHaveCountAsync(1);

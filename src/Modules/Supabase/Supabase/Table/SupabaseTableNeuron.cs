@@ -38,9 +38,10 @@ internal sealed class SupabaseTableNeuron(
             throw new SupabaseTableValidationException("Provide a title of 1–200 characters.");
         }
 
+        string sql;
         try
         {
-            SupabaseQueryGuard.Validate(request.Sql);
+            sql = SupabaseQueryGuard.Normalize(request.Sql);
         }
         catch (ArgumentException error)
         {
@@ -59,7 +60,7 @@ internal sealed class SupabaseTableNeuron(
         try
         {
             // Describing runs the query with LIMIT 0, so a wrong column or table fails here, not on first read.
-            columns = await Provider.DescribeAsync(request.Sql, cancellationToken);
+            columns = await Provider.DescribeAsync(sql, cancellationToken);
         }
         catch (SupabaseQueryException error)
         {
@@ -72,7 +73,7 @@ internal sealed class SupabaseTableNeuron(
 
         var view = SupabaseTablePolicy.CreateView(this.GetPrimaryKeyString(), request.Title, columns);
         cancellationToken.ThrowIfCancellationRequested();
-        state.State = current with { View = view, BaseSql = request.Sql, SourceColumns = columns, CreationOperation = operationId, CreationRequest = request };
+        state.State = current with { View = view, BaseSql = sql, SourceColumns = columns, CreationOperation = operationId, CreationRequest = request };
         try { await state.WriteStateAsync(); }
         catch { state.State = current; throw; }
         await PublishAsync(new SupabaseTableChanged(view.Id, view.Title, view.Revision));

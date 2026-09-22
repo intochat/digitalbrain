@@ -32,6 +32,11 @@ internal static class AgentEndpoints
             }
             try { await coordinator.Run(scope.Id, input.ThreadId, input.RunId, input.Messages[0].Content, Emit, http.RequestAborted); }
             catch (OperationCanceledException) when (http.RequestAborted.IsCancellationRequested) { }
+            catch (WorkspaceQueryException error)
+            {
+                if (!http.RequestAborted.IsCancellationRequested)
+                { await Emit(new { type = "RUN_ERROR", message = "The table could not be opened: " + error.Message, code = "QUERY_INVALID" }); }
+            }
             catch (Exception error)
             {
                 http.RequestServices.GetRequiredService<ILogger<ConversationCoordinator>>().LogWarning(error, "Workspace agent run failed");

@@ -29,16 +29,17 @@ internal sealed class SupabaseNeuron : Neuron, ISupabase
             throw new SupabaseQueryException($"maxRows must be between 1 and {SupabaseQuery.MaxRowsLimit}.");
         }
 
+        string sql;
         try
         {
-            SupabaseQueryGuard.Validate(query.Sql);
+            sql = SupabaseQueryGuard.Normalize(query.Sql);
         }
         catch (ArgumentException error)
         {
             throw new SupabaseQueryException(error.Message);
         }
 
-        return await Provider.QueryAsync(query.Sql, query.MaxRows, CancellationToken.None);
+        return await Provider.QueryAsync(sql, query.MaxRows, CancellationToken.None);
     }
 
     [ReadOnly]

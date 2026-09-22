@@ -8,11 +8,16 @@ internal static partial class SupabaseQueryGuard
 {
     public const string Reason = "Use one read-only PostgreSQL SELECT (or WITH … SELECT). Writes, session control, comments and statement separators are not allowed.";
 
-    public static void Validate(string sql)
+    public static string Normalize(string sql)
     {
         if (string.IsNullOrWhiteSpace(sql) || sql.Length > 20_000) { throw Invalid(); }
+        // Accept the optional statement terminator, but never an embedded separator.
+        // The returned SQL is embedded in subqueries for description, paging and counts.
+        sql = sql.Trim();
+        if (sql.EndsWith(';')) { sql = sql[..^1].TrimEnd(); }
         var syntax = MaskQuoted(sql);
         if (!ReadStatement().IsMatch(syntax) || Forbidden().IsMatch(syntax)) { throw Invalid(); }
+        return sql;
     }
 
     internal static string MaskQuoted(string sql)

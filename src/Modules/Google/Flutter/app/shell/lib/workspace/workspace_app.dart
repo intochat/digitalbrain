@@ -1109,6 +1109,8 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     key: ValueKey('desktop-${store.currentProject.id}'),
     store: store,
     editorBuilder: _pane,
+    editorStateToken: (artifact) =>
+        Object.hash(_tables[artifact.id], _tableErrors[artifact.id]),
   );
 
   Widget _workspace(BuildContext context) => LayoutBuilder(

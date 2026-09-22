@@ -9,7 +9,7 @@ internal sealed class SupabaseProvider(NpgsqlDataSource source) : ISupabaseProvi
 {
     public async Task<SupabaseQueryResult> QueryAsync(string sql, int maxRows, CancellationToken cancellationToken)
     {
-        SupabaseQueryGuard.Validate(sql);
+        sql = SupabaseQueryGuard.Normalize(sql);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxRows, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(maxRows, SupabaseQuery.MaxRowsLimit);
         var started = Stopwatch.GetTimestamp();
@@ -21,14 +21,14 @@ internal sealed class SupabaseProvider(NpgsqlDataSource source) : ISupabaseProvi
 
     public async Task<IReadOnlyList<SupabaseColumn>> DescribeAsync(string sql, CancellationToken cancellationToken)
     {
-        SupabaseQueryGuard.Validate(sql);
+        sql = SupabaseQueryGuard.Normalize(sql);
         var (columns, _) = await ReadAsync($"SELECT * FROM ({sql}) AS q LIMIT 0", [], 0, cancellationToken).ConfigureAwait(false);
         return columns;
     }
 
     public async Task<QueryPage> ExecutePlanAsync(QueryPlan plan, CancellationToken cancellationToken)
     {
-        SupabaseQueryGuard.Validate(plan.BaseSql);
+        plan = plan with { BaseSql = SupabaseQueryGuard.Normalize(plan.BaseSql) };
         var compiled = QueryPlanCompiler.Compile(plan);
         var (_, rows) = await ReadAsync(compiled.PageSql, compiled.Parameters, plan.Limit, cancellationToken).ConfigureAwait(false);
         var filtered = await CountAsync(compiled.FilteredCountSql, compiled.Parameters, cancellationToken).ConfigureAwait(false);

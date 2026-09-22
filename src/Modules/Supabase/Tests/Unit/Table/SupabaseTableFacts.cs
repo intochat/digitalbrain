@@ -9,6 +9,34 @@ namespace DigitalBrain.Modules.Supabase.Tests.Unit.Table;
 public sealed class SupabaseTableFacts
 {
     [Fact]
+    public async Task TerminatedSelectCreatesTableAndServesLiveRows()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var provider = new FakeSupabaseProvider();
+        await using var brain = await StartAsync(provider, ct);
+        var table = brain.Get<ISupabaseTable>("terminated-select");
+        await table.CreateFromQuery(new("Customers", "select id from people; \r\n"));
+
+        var page = await table.Read(new(0, 25));
+
+        Assert.Single(page!.Rows);
+        Assert.Equal("select id from people", provider.LastPlan!.BaseSql);
+    }
+
+    [Theory]
+    [InlineData("select id from people; select 2")]
+    [InlineData("select id from people;;")]
+    [InlineData("select id from people; delete from people;")]
+    [InlineData("select id from people; -- comment")]
+    public async Task StatementSeparatorsRemainRejected(string sql)
+    {
+        await using var brain = await StartAsync(new FakeSupabaseProvider(), TestContext.Current.CancellationToken);
+        var table = brain.Get<ISupabaseTable>("multiple-statements");
+        await Assert.ThrowsAsync<SupabaseTableValidationException>(() => table.CreateFromQuery(new("Customers", sql)));
+        Assert.Null(await table.ReadSummary());
+    }
+
+    [Fact]
     public async Task OperationCreationReplaysAndRejectsConflictingInput()
     {
         await using var brain = await StartAsync(new FakeSupabaseProvider(), TestContext.Current.CancellationToken);

@@ -11,9 +11,11 @@ class WorkspaceDesktop extends StatefulWidget {
     super.key,
     required this.store,
     required this.editorBuilder,
+    this.editorStateToken,
   });
   final WorkspaceStore store;
   final Widget Function(WorkspaceArtifact) editorBuilder;
+  final Object? Function(WorkspaceArtifact)? editorStateToken;
   @override
   State<WorkspaceDesktop> createState() => _WorkspaceDesktopState();
 }
@@ -59,14 +61,17 @@ class _WorkspaceDesktopState extends State<WorkspaceDesktop> {
   List<double>? _boundsOf(String id) =>
       _liveBounds[id] ?? store.currentProject.presentation.windowBounds[id];
 
+  Object _freshEditorToken(WorkspaceArtifact artifact) => Object.hash(
+    artifact.title,
+    artifact.kind,
+    artifact.content,
+    artifact.data['_dirty'],
+    artifact.data['_revision'],
+    widget.editorStateToken?.call(artifact),
+  );
+
   Object _editorToken(WorkspaceArtifact artifact) {
-    final fresh = Object.hash(
-      artifact.title,
-      artifact.kind,
-      artifact.content,
-      artifact.data['_dirty'],
-      artifact.data['_revision'],
-    );
+    final fresh = _freshEditorToken(artifact);
     if (_interacting) {
       return _frozenEditorTokens[artifact.id] ??= fresh;
     }
@@ -76,13 +81,7 @@ class _WorkspaceDesktopState extends State<WorkspaceDesktop> {
 
   void _freezeEditors() {
     for (final artifact in store.currentProject.artifacts) {
-      _frozenEditorTokens[artifact.id] = Object.hash(
-        artifact.title,
-        artifact.kind,
-        artifact.content,
-        artifact.data['_dirty'],
-        artifact.data['_revision'],
-      );
+      _frozenEditorTokens[artifact.id] = _freshEditorToken(artifact);
     }
   }
 
