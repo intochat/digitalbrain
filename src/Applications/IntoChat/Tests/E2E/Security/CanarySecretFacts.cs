@@ -88,8 +88,11 @@ public sealed class CanarySecretFacts
         Assert.DoesNotContain(Canary, exportAfterErase.GetRawText(), StringComparison.Ordinal);
     }
 
-    [Fact(Timeout = 300_000)]
-    public async Task AConnectionTokenNeverAppearsInPlaintext()
+    [Theory(Timeout = 300_000)]
+    [InlineData("salesforce")]
+    [InlineData("gmail")]
+    [InlineData("webresearch")]
+    public async Task AConnectionTokenNeverAppearsInPlaintext(string source)
     {
         var ct = TestContext.Current.CancellationToken;
         await using var collector = TestTelemetryCollector.Start();
@@ -103,7 +106,7 @@ public sealed class CanarySecretFacts
 
         using var seeded = await brain.HttpClient.PostAsJsonAsync(
             $"/connections/{Owner}/connect",
-            new { source = "webresearch", connectionId = "research", label = "Research key", value = Canary },
+            new { source, connectionId = $"conn-{source}", label = source, value = Canary },
             ct);
         Assert.Equal(System.Net.HttpStatusCode.OK, seeded.StatusCode);
         var seedBody = await seeded.Content.ReadAsStringAsync(ct);

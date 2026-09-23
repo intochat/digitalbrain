@@ -703,6 +703,20 @@ final class DigitalBrainUiClient {
         : Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
+  Future<Object?> connectionsRequest(
+    String owner,
+    String path, {
+    Map<String, Object?>? body,
+  }) async {
+    final response = await _request(
+      body == null ? 'GET' : 'POST',
+      '/connections/${Uri.encodeComponent(owner)}${path.isEmpty ? '' : '/$path'}',
+      body: body,
+      timeout: const Duration(seconds: 30),
+    );
+    return response.body.isEmpty ? null : jsonDecode(response.body);
+  }
+
   Future<Uint8List> appAsset(String workspace, String assetId) async {
     final response = await _request(
       'GET',

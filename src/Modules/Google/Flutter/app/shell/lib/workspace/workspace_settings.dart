@@ -1,6 +1,7 @@
 import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 
+import '../integrations/connect_window.dart';
 import '../integrations/integrations_menu.dart';
 import 'workspace_store.dart';
 
@@ -13,12 +14,16 @@ class WorkspaceSettings extends StatefulWidget {
     required this.onClose,
     this.kernelBaseUri,
     this.onOpen,
+    this.connectionsRequest,
+    this.oauthUrl,
   });
   final WorkspaceStore store;
   final String initialSection;
   final VoidCallback onClose;
   final Uri? kernelBaseUri;
   final OpenUrl? onOpen;
+  final ConnectionsRequest? connectionsRequest;
+  final Uri? oauthUrl;
   @override
   State<WorkspaceSettings> createState() => _WorkspaceSettingsState();
 }
@@ -81,6 +86,8 @@ class _WorkspaceSettingsState extends State<WorkspaceSettings> {
           onClose: widget.onClose,
           kernelBaseUri: widget.kernelBaseUri,
           onOpen: widget.onOpen,
+          connectionsRequest: widget.connectionsRequest,
+          oauthUrl: widget.oauthUrl,
         ),
       ),
     );
@@ -238,18 +245,28 @@ class _WorkspaceSettingsState extends State<WorkspaceSettings> {
           children: [
             _heading(
               'Connections',
-              'Service access is shared across projects. Connection status is not available in this view; a service is not marked connected until verified by the backend.',
+              'Connect a source, then probe it to confirm the credential works. The value you paste is stored in your vault and never shown again.',
             ),
+            if (widget.connectionsRequest != null)
+              SizedBox(
+                height: 520,
+                child: ConnectWindow(
+                  request: widget.connectionsRequest!,
+                  oauthUrl: widget.oauthUrl,
+                  onOpen: widget.onOpen,
+                ),
+              ),
             if (widget.kernelBaseUri != null && widget.onOpen != null) ...[
+              const Divider(height: 36),
               const Text(
-                'Open a service’s authorization flow to connect your account.',
+                'Or open a service’s authorization flow to connect your account.',
               ),
               const SizedBox(height: 12),
               IntegrationsMenu(
                 kernelBaseUri: widget.kernelBaseUri,
                 onOpen: widget.onOpen,
               ),
-            ] else ...[
+            ] else if (widget.connectionsRequest == null) ...[
               for (final name in ['Salesforce', 'Gmail', 'GitHub'])
                 ListTile(
                   contentPadding: EdgeInsets.zero,

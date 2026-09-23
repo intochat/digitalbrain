@@ -7,7 +7,7 @@ namespace DigitalBrain.Google.Gmail;
 public interface IGmail : INeuron
 {
     Task AcceptWatchPush(GmailWatchPush push);
-    Task AcceptAuthorizationCode(string authorizationCode);
+    Task AcceptAuthorizationCode(string authorizationCode, string? secretOwner = null);
 }
 
 [GenerateSerializer, Alias("gmail.watch-push")]
