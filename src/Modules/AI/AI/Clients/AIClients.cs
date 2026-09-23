@@ -1,5 +1,6 @@
 using DigitalBrain.AI.Interactions;
 using DigitalBrain.AI.Metering;
+using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
@@ -7,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans;
 
 namespace DigitalBrain.AI;
 
@@ -33,7 +35,8 @@ internal static class AIClients
     internal static void Add(IServiceCollection services)
     {
         services.TryAddSingleton<IUntrustedContentScreen, UntrustedContentScreen>();
-        services.TryAddSingleton<IIntentUsageSink, GrainIntentUsageSink>();
+        services.TryAddSingleton<IIntentUsageSink>(provider => new GrainIntentUsageSink(
+            provider.GetRequiredService<IGrainFactory>(), provider.GetService<IMeterSink>()));
         foreach (var model in LLMModel.All)
         {
             services.AddKeyedSingleton<IChatClient>(
