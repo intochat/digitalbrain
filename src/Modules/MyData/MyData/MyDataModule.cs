@@ -6,6 +6,7 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.MyData;
 
+[ModuleConfiguration(typeof(MyDataConfigurationContract))]
 public sealed class MyDataModule : IModule
 {
     public static ModuleDefinition Define() => new(typeof(MyDataModule));

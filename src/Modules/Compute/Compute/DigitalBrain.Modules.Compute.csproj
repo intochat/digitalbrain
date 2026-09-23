@@ -8,6 +8,7 @@
     <PackageReference Include="Npgsql" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="PriceBook/pricebook.v0.json" LogicalName="DigitalBrain.Compute.PriceBook.pricebook.v0.json" />
     <InternalsVisibleTo Include="DigitalBrain.Modules.Compute.Tests.Unit" />
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Compute.Contracts.csproj" />
     <ProjectReference Include="../../DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />

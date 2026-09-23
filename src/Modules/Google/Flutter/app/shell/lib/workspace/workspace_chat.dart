@@ -10,6 +10,7 @@ import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:uuid/uuid.dart';
 
 import '../integrations/integrations_menu.dart';
+import 'receipt_card.dart';
 import 'workspace_store.dart';
 
 part 'workspace_chat_presentation.dart';
@@ -358,6 +359,17 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
 
   void _event(AgentEvent event) {
     if (!mounted) return;
+    // The receipt arrives after RUN_FINISHED, so handle it before the finish short-circuit.
+    if (event.type == 'RECEIPT') {
+      final receipt = Map<String, dynamic>.from(event.data);
+      final id = '$_runId/receipt';
+      if (!_entries.any((e) => e['id'] == id)) {
+        _entries.add({'id': id, 'role': 'receipt', 'receipt': receipt});
+      }
+      _sync();
+      setState(() {});
+      return;
+    }
     if (event.type == 'RUN_FINISHED') {
       _finished = true;
       return;

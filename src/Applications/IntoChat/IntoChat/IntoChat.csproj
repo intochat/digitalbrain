@@ -19,6 +19,9 @@
     <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/Sdk/DigitalBrain.Sdk.csproj" />
     <ProjectReference Include="../../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
+    <ProjectReference Include="../../../Modules/Receipts/Receipts/DigitalBrain.Modules.Receipts.csproj" />
+    <ProjectReference Include="../../../Modules/Compute/Contracts/DigitalBrain.Modules.Compute.Contracts.csproj" />
+    <ProjectReference Include="../../../Modules/Compute/Compute/DigitalBrain.Modules.Compute.csproj" />
     <ProjectReference Include="../../../Modules/Google/Gmail/Gmail/DigitalBrain.Modules.Google.Gmail.csproj" />
     <ProjectReference Include="../../../Modules/Google/Flutter/Flutter/DigitalBrain.Modules.Flutter.csproj" />
   </ItemGroup>

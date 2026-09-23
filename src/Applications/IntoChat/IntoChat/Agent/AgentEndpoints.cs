@@ -4,7 +4,9 @@ using System.Text.Json;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.AI.Metering;
+using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
+using DigitalBrain.Receipts;
 using IntoChat.Workspace;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -28,7 +30,7 @@ internal static class AgentEndpoints
             var scope = WorkspaceScope.Create(auth.Value.Username is { Length: > 0 } owner ? owner : BasicAuthGate.DefaultLogin, workspaceId);
             return Results.Ok(await brain.Get<IAgent>(ConversationKey(scope.Id, threadId)).ReadConversation(ct));
         });
-        routes.MapPost("/agent", async (AgentInput input, HttpContext http, IDigitalBrain brain, IAgentTurnRunner runner, IIntentUsageSink usage, IOptions<BasicAuthOptions> auth, IConfiguration configuration, IHostEnvironment environment) =>
+        routes.MapPost("/agent", async (AgentInput input, HttpContext http, IDigitalBrain brain, IPriceBook priceBook, IAgentTurnRunner runner, IIntentUsageSink usage, IOptions<BasicAuthOptions> auth, IConfiguration configuration, IHostEnvironment environment) =>
         {
             if (!ValidId(input.ThreadId) || !ValidId(input.RunId) || !ValidId(input.WorkspaceId)
                 || input.Messages is not { Count: 1 } || input.Messages[0].Role != "user"
@@ -51,6 +53,9 @@ internal static class AgentEndpoints
             // Only the request that actually opened the active run may complete or interrupt it.
             // A rejected concurrent submission must never mutate the owner's conversation turn.
             var ownsRun = false;
+            var activity = new IntentActivity();
+            var outcome = ReceiptOutcome.Succeeded;
+            string? failure = null;
             async Task KeepFailedTurn(string failure)
             {
                 try { await agent.CompleteConversation(new(input.RunId, userText, failure, []), CancellationToken.None); }
@@ -84,7 +89,7 @@ internal static class AgentEndpoints
                         {
                             var text = new StringBuilder();
                             var results = new List<string>();
-                            var queryError = await RunModel(scope.Id, input.RunId, userText, developerMode, state, messageId, configuration, runner, Emit, text, results, http.RequestAborted);
+                            var queryError = await RunModel(scope.Id, input.RunId, userText, developerMode, state, messageId, configuration, runner, Emit, text, results, activity, http.RequestAborted);
                             if (queryError is not null) { throw new WorkspaceQueryException(queryError); }
                             await agent.CompleteConversation(new(input.RunId, userText, text.ToString(), results), http.RequestAborted);
                         }
@@ -96,15 +101,20 @@ internal static class AgentEndpoints
                 catch (OperationCanceledException) when (http.RequestAborted.IsCancellationRequested)
                 {
                     // The client disconnected; the run is interrupted and its turn is dropped.
+                    outcome = ReceiptOutcome.Cancelled;
                 }
                 catch (WorkspaceQueryException error)
                 {
+                    outcome = ReceiptOutcome.Failed;
+                    failure = error.Message;
                     if (ownsRun) { await KeepFailedTurn(error.Message); }
                     if (!http.RequestAborted.IsCancellationRequested)
                     { await Emit(new { type = "RUN_ERROR", message = "The table could not be opened: " + error.Message, code = "QUERY_INVALID" }); }
                 }
                 catch (Exception error)
                 {
+                    outcome = ReceiptOutcome.Failed;
+                    failure = error.Message;
                     http.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("IntoChat.Agent.AgentEndpoints").LogWarning(error, "Workspace agent run failed");
                     if (ownsRun) { await KeepFailedTurn(error.Message); }
                     if (!http.RequestAborted.IsCancellationRequested)
@@ -123,13 +133,35 @@ internal static class AgentEndpoints
                 try { await usage.FlushAsync(intent, CancellationToken.None); }
                 catch (Exception error)
                 { http.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("IntoChat.Agent.AgentEndpoints").LogWarning(error, "Workspace agent usage flush failed"); }
+                // One durable receipt per intent, from the usage batch and the captured activity.
+                try
+                {
+                    var receipt = await AgentReceipts.TryWriteAsync(brain, priceBook, intent, scope.Id, input.ThreadId, activity, outcome, failure ?? activity.FailureExplanation);
+                    if (receipt is not null && !http.RequestAborted.IsCancellationRequested)
+                    {
+                        await Emit(new
+                        {
+                            type = "RECEIPT",
+                            outcome = receipt.Outcome.ToString(),
+                            summary = receipt.Summary,
+                            modelCalls = receipt.ModelCalls,
+                            compute = receipt.ActualCompute,
+                            computeUsd = ComputeUnits.ToUsd(receipt.ActualCompute),
+                            shadow = receipt.ShadowPriced,
+                            calls = receipt.Calls.Select(call => new { appId = call.AppId, operation = call.Operation, discovered = call.Discovered, succeeded = call.Succeeded }),
+                            touched = receipt.Touched.Select(entry => new { source = entry.Source, semanticTypeId = entry.SemanticTypeId, readOnly = entry.ReadOnly, rowsRead = entry.RowsRead }),
+                        });
+                    }
+                }
+                catch (Exception error)
+                { http.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("IntoChat.Agent.AgentEndpoints").LogWarning(error, "Workspace agent receipt write failed"); }
             }
         });
     }
 
     internal static async Task<string?> RunModel(string scope, string run, string message, bool developerMode,
         AgentConversationState state, string messageId, IConfiguration configuration,
-        IAgentTurnRunner runner, Func<object, Task> emit, StringBuilder text, List<string> results, CancellationToken ct)
+        IAgentTurnRunner runner, Func<object, Task> emit, StringBuilder text, List<string> results, IntentActivity activity, CancellationToken ct)
     {
         var finished = false;
         string? queryError = null;
@@ -172,6 +204,7 @@ internal static class AgentEndpoints
                             }
                         }
                     }
+                    RecordToolActivity(activity, tool);
                     await emit(new { type = "TOOL_CALL_RESULT", toolCallId = tool.CallId, messageId = tool.CallId + "-result", role = "tool", content = tool.Result });
                     break;
                 case AgentTurnEvent.Failed failed: throw new InvalidOperationException(failed.Message);
@@ -185,6 +218,30 @@ internal static class AgentEndpoints
 
     private static bool ValidId(string? value) => !string.IsNullOrWhiteSpace(value) && value.Length <= 200 && !value.Any(char.IsControl) && !value.Contains('/') && !value.Contains('\\');
     private static bool IsLiveTableTool(string name) => name is "show_supabase_query_table" or "table_read" or "table_refine";
+    private static void RecordToolActivity(IntentActivity activity, AgentTurnEvent.ToolCompleted tool)
+    {
+        var succeeded = true;
+        string? title = null;
+        string? message = null;
+        long rowsRead = 0;
+        try
+        {
+            using var payload = JsonDocument.Parse(tool.Result);
+            var root = payload.RootElement;
+            if (root.TryGetProperty("isError", out var isError) && isError.ValueKind == JsonValueKind.True)
+            {
+                succeeded = false;
+                if (root.TryGetProperty("message", out var reason) && reason.ValueKind == JsonValueKind.String) { message = reason.GetString(); }
+            }
+            if (root.TryGetProperty("rowsRead", out var rows) && rows.TryGetInt64(out var count)) { rowsRead = count; }
+            if (root.TryGetProperty("title", out var windowTitle) && windowTitle.ValueKind == JsonValueKind.String) { title = windowTitle.GetString(); }
+        }
+        catch (JsonException)
+        {
+            // A non-JSON tool result is still a call, just without a row count.
+        }
+        activity.RecordTool(tool.Name, succeeded, title, rowsRead, message);
+    }
     internal sealed record AgentInput(string WorkspaceId, string ThreadId, string RunId, IReadOnlyList<AgentMessage> Messages);
     internal sealed record AgentMessage(string Role, string Content, string? Class = null);
 }

@@ -18,7 +18,9 @@ using DigitalBrain.Microsoft.Aspire;
 using DigitalBrain.Microsoft.GitHub;
 using DigitalBrain.Microsoft.DotNet;
 using DigitalBrain.Microsoft.Roslyn;
+using DigitalBrain.Compute;
 using DigitalBrain.MyData;
+using DigitalBrain.Receipts;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
 using DigitalBrain.Time;
@@ -57,7 +59,9 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<GmailModule>(gmail => gmail.WithGmail())
     .WithModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
     .WithModule<GitHubModule>(github => github.WithGitHubRepositories(repositories))
-    .WithModule<FlutterModule>(flutter => flutter.RunDesktopApp());
+    .WithModule<FlutterModule>(flutter => flutter.RunDesktopApp())
+    .WithModule<ReceiptsModule>()
+    .WithModule<ComputeModule>();
 
 if (developerProfile)
 {
