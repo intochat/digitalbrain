@@ -10,6 +10,7 @@ using DigitalBrain.ClickHouse;
 using DigitalBrain.Coding;
 using DigitalBrain.Behavior;
 using DigitalBrain.Behavior.Aspire.Hosting;
+using DigitalBrain.Broker;
 using DigitalBrain.Core;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
@@ -69,7 +70,8 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<ReceiptsModule>()
     .WithModule<ComputeModule>()
     .WithModule<DiscoveryModule>()
-    .WithModule<AppsModule>();
+    .WithModule<AppsModule>()
+    .WithModule<BrokerModule>();
 
 if (developerProfile)
 {
