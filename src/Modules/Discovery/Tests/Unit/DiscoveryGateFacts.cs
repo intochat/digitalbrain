@@ -26,7 +26,7 @@ public sealed class DiscoveryGateFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var manifests = BuildManifests();
-        var index = await CapabilityIndex.BuildAsync(manifests, embed, ct);
+        var index = await CapabilityIndex.BuildAsync([.. manifests.Select(ScopedAppManifest.Global)], embed, ct);
 
         Assert.True(Targets.Length * 2 + Negatives.Length >= 60, "the golden set must contain at least 60 prompts");
         Assert.True(manifests.Sum(manifest => manifest.Operations.Count) >= 50, "at least 50 operations are required");
@@ -40,7 +40,7 @@ public sealed class DiscoveryGateFacts
             foreach (var prompt in new[] { target.Direct, target.Indirect })
             {
                 var watch = Stopwatch.StartNew();
-                var hits = await index.SearchAsync(prompt, 5, degraded, ct);
+                var hits = await index.SearchAsync(prompt, null, 5, degraded, ct);
                 latencies.Add(watch.Elapsed.TotalMilliseconds);
                 if (hits.Hits.Any(hit => hit.Id == expected))
                 {
@@ -52,7 +52,7 @@ public sealed class DiscoveryGateFacts
         var negativeClean = 0;
         foreach (var prompt in Negatives)
         {
-            var hits = await index.SearchAsync(prompt, 5, degraded, ct);
+            var hits = await index.SearchAsync(prompt, null, 5, degraded, ct);
             if (hits.Hits.Count == 0)
             {
                 negativeClean++;

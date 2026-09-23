@@ -6,6 +6,7 @@ import 'package:digitalbrain_flutter_shell/workspace/workspace_app.dart';
 import 'package:digitalbrain_flutter_shell/workspace/workspace_store.dart';
 import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
+import 'package:digitalbrain_flutter_shell/workspace/workspace_chat.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 
@@ -76,7 +77,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(FirstRunView), findsOneWidget);
-    expect(find.text('IntoChat'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(FirstRunView),
+        matching: find.text('IntoChat'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byType(WorkspaceChat), findsWidgets);
     expect(find.text('Work with Salesforce'), findsOneWidget);
     expect(find.text('Ask the assistant'), findsOneWidget);
 

@@ -22,7 +22,7 @@ internal sealed class CapabilityCatalog(
 
     public async Task RebuildAsync(CancellationToken cancellationToken)
     {
-        var read = new List<AppManifest>();
+        var read = new List<ScopedAppManifest>();
         var unreadable = 0;
         foreach (var source in sources)
         {
@@ -43,9 +43,9 @@ internal sealed class CapabilityCatalog(
             return;
         }
 
-        // First-party manifests and saved apps come from different sources; a later source wins per app id.
-        IReadOnlyList<AppManifest> manifests = read
-            .GroupBy(static manifest => manifest.Id, StringComparer.Ordinal)
+        // First-party manifests and saved apps come from different sources; a later source wins per app and scope.
+        IReadOnlyList<ScopedAppManifest> manifests = read
+            .GroupBy(static entry => (entry.Manifest.Id, entry.OwningWorkspaceId))
             .Select(static group => group.Last())
             .ToList();
 
@@ -89,7 +89,11 @@ internal sealed class CapabilityCatalog(
         try
         {
             var records = index.EmbeddedEntries()
-                .Select(static entry => new CapabilityVectorRecord(entry.Id, string.Empty, entry.Text, entry.Embedding))
+                .Select(static entry => new CapabilityVectorRecord(
+                    entry.WorkspaceId.Length == 0 ? entry.Id : entry.WorkspaceId + "/" + entry.Id,
+                    entry.WorkspaceId,
+                    entry.Text,
+                    entry.Embedding))
                 .ToArray();
             await vectors.UpsertAsync(CapabilityCollection.SystemCapabilities, records, cancellationToken).ConfigureAwait(false);
         }
@@ -99,20 +103,22 @@ internal sealed class CapabilityCatalog(
         }
     }
 
-    public async ValueTask<CapabilitySearchResult> SearchAsync(string query, int take, CancellationToken cancellationToken)
+    public async ValueTask<CapabilitySearchResult> SearchAsync(string query, string? workspaceId, int take, CancellationToken cancellationToken)
     {
         // Cheap idempotent rebuild: re-reads the manifest source and re-indexes only when it changed,
         // so an app saved after startup becomes searchable on the next turn.
         await RebuildAsync(cancellationToken).ConfigureAwait(false);
-        return await _index.SearchAsync(query, take, Degraded, cancellationToken).ConfigureAwait(false);
+        return await _index.SearchAsync(query, workspaceId, take, Degraded, cancellationToken).ConfigureAwait(false);
     }
 
-    private static string Signature(IReadOnlyList<AppManifest> manifests)
+    private static string Signature(IReadOnlyList<ScopedAppManifest> manifests)
     {
         var builder = new StringBuilder();
-        foreach (var manifest in manifests.OrderBy(static manifest => manifest.Id, StringComparer.Ordinal))
+        foreach (var scoped in manifests.OrderBy(static scoped => scoped.Manifest.Id, StringComparer.Ordinal))
         {
-            builder.Append(manifest.Id).Append('|').Append(manifest.Version).Append('|')
+            var manifest = scoped.Manifest;
+            builder.Append(manifest.Id).Append('|').Append(scoped.Scope).Append('|').Append(scoped.WorkspaceId).Append('|')
+                .Append(manifest.Version).Append('|')
                 .Append(manifest.Name).Append('|').Append(manifest.DescriptionForModel).Append(';');
             foreach (var operation in manifest.Operations.OrderBy(static operation => operation.Name, StringComparer.Ordinal))
             {

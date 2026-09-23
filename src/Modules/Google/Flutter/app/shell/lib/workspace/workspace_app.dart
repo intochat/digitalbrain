@@ -798,76 +798,73 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                 ],
               ),
             ),
+            // Starter prompts sit above the conversation on a fresh workspace; the message box
+            // stays reachable so the owner can always just type.
+            if (store.firstRun != null &&
+                !_firstRunDismissed.contains(store.currentProject.id) &&
+                store.currentConversation.messages.isEmpty)
+              Flexible(
+                fit: FlexFit.loose,
+                child: FirstRunView(
+                  state: store.firstRun!,
+                  onPrompt: _startFromPrompt,
+                ),
+              ),
             Expanded(
-              child:
-                  store.firstRun != null &&
-                      !_firstRunDismissed.contains(store.currentProject.id)
-                  ? FirstRunView(
-                      state: store.firstRun!,
-                      onPrompt: _startFromPrompt,
-                    )
-                  : IndexedStack(
-                      index: [
-                        for (final project in store.projects)
-                          for (final conversation in project.conversations)
-                            conversation.id,
-                      ].indexOf(store.currentConversation.id),
-                      children: [
-                        for (final project in store.projects)
-                          for (final conversation in project.conversations)
-                            WorkspaceChat(
-                              key: ValueKey(conversation.id),
-                              conversation: conversation,
-                              project: project,
-                              active:
-                                  (ModalRoute.of(context)?.isCurrent ?? true) &&
-                                  !(mobile && _mobileWork) &&
-                                  !store
-                                      .currentProject
-                                      .presentation
-                                      .chatCollapsed &&
-                                  !_directory &&
-                                  conversation.id ==
-                                      store.currentConversation.id,
-                              store: store,
-                              onRun: widget.onRun,
-                              selectedBehaviorId:
-                                  project.presentation.activeArtifactId ==
-                                      'app-behaviors'
-                                  ? project.artifacts
-                                            .where(
-                                              (a) => a.id == 'app-behaviors',
-                                            )
-                                            .firstOrNull
-                                            ?.data['selected']
-                                        as String?
-                                  : null,
-                              onOpenBehavior: (id) {
-                                store.selectProject(project.id);
-                                final app = store.launchLocalApp('behaviors');
-                                app.data['selected'] = id;
-                                store.save();
-                              },
-                              onReadConversation: widget
-                                  .programmingClient
-                                  ?.readWorkspaceConversation,
-                              onOpenUrl: widget.onOpenUrl,
-                              onSalesforceConnected:
-                                  widget.onSalesforceConnected,
-                              onReportProblem: widget.programmingClient == null
-                                  ? null
-                                  : (workspaceId, intentId, message) =>
-                                        widget.programmingClient!.reportProblem(
-                                          workspaceId: workspaceId,
-                                          intentId: intentId,
-                                          message: message,
-                                        ),
-                              onArtifact: (result) =>
-                                  _accept(result, project: project),
-                              onAttach: () => _attach(context),
-                            ),
-                      ],
-                    ),
+              child: IndexedStack(
+                index: [
+                  for (final project in store.projects)
+                    for (final conversation in project.conversations)
+                      conversation.id,
+                ].indexOf(store.currentConversation.id),
+                children: [
+                  for (final project in store.projects)
+                    for (final conversation in project.conversations)
+                      WorkspaceChat(
+                        key: ValueKey(conversation.id),
+                        conversation: conversation,
+                        project: project,
+                        active:
+                            (ModalRoute.of(context)?.isCurrent ?? true) &&
+                            !(mobile && _mobileWork) &&
+                            !store.currentProject.presentation.chatCollapsed &&
+                            !_directory &&
+                            conversation.id == store.currentConversation.id,
+                        store: store,
+                        onRun: widget.onRun,
+                        selectedBehaviorId:
+                            project.presentation.activeArtifactId ==
+                                'app-behaviors'
+                            ? project.artifacts
+                                      .where((a) => a.id == 'app-behaviors')
+                                      .firstOrNull
+                                      ?.data['selected']
+                                  as String?
+                            : null,
+                        onOpenBehavior: (id) {
+                          store.selectProject(project.id);
+                          final app = store.launchLocalApp('behaviors');
+                          app.data['selected'] = id;
+                          store.save();
+                        },
+                        onReadConversation:
+                            widget.programmingClient?.readWorkspaceConversation,
+                        onOpenUrl: widget.onOpenUrl,
+                        onSalesforceConnected: widget.onSalesforceConnected,
+                        onReportProblem: widget.programmingClient == null
+                            ? null
+                            : (workspaceId, intentId, message) =>
+                                  widget.programmingClient!.reportProblem(
+                                    workspaceId: workspaceId,
+                                    intentId: intentId,
+                                    message: message,
+                                  ),
+                        onArtifact: (result) =>
+                            _accept(result, project: project),
+                        onAttach: () => _attach(context),
+                      ),
+                ],
+              ),
             ),
           ],
         ),
@@ -1059,10 +1056,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     showDialog<void>(
       context: context,
       builder: (_) => Dialog(
-        child: InboxPanel(
-          client: client,
-          workspaceId: store.currentProject.id,
-        ),
+        child: InboxPanel(client: client, workspaceId: store.currentProject.id),
       ),
     );
   }

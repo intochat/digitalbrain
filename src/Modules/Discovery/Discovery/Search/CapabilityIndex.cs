@@ -8,7 +8,8 @@ internal sealed record IndexedCapability(
     string Name,
     IReadOnlyList<string> Aliases,
     IReadOnlySet<string> Tokens,
-    float[]? Embedding);
+    float[]? Embedding,
+    string? WorkspaceId = null);
 
 internal sealed class CapabilityIndex
 {
@@ -18,13 +19,13 @@ internal sealed class CapabilityIndex
 
     private readonly IReadOnlyList<IndexedCapability> _entries;
     private readonly Dictionary<string, double> _inverseDocumentFrequency;
-    private readonly Dictionary<string, IndexedCapability> _aliases;
+    private readonly Dictionary<string, List<IndexedCapability>> _aliases;
     private readonly Func<string, CancellationToken, ValueTask<float[]?>>? _embed;
 
     private CapabilityIndex(
         IReadOnlyList<IndexedCapability> entries,
         Dictionary<string, double> inverseDocumentFrequency,
-        Dictionary<string, IndexedCapability> aliases,
+        Dictionary<string, List<IndexedCapability>> aliases,
         Func<string, CancellationToken, ValueTask<float[]?>>? embed)
     {
         _entries = entries;
@@ -37,17 +38,19 @@ internal sealed class CapabilityIndex
         new([], new(StringComparer.Ordinal), new(StringComparer.OrdinalIgnoreCase), null);
 
     public static async Task<CapabilityIndex> BuildAsync(
-        IReadOnlyList<AppManifest> manifests,
+        IReadOnlyList<ScopedAppManifest> manifests,
         Func<string, CancellationToken, ValueTask<float[]?>>? embed,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(manifests);
         var entries = new List<IndexedCapability>();
-        var aliases = new Dictionary<string, IndexedCapability>(StringComparer.OrdinalIgnoreCase);
+        var aliases = new Dictionary<string, List<IndexedCapability>>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var manifest in manifests)
+        foreach (var scoped in manifests)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var manifest = scoped.Manifest;
+            var workspaceId = scoped.OwningWorkspaceId;
             var appText = string.Join(' ', manifest.Name, manifest.DescriptionForPeople, manifest.DescriptionForModel, manifest.Id);
             var appEntry = new IndexedCapability(
                 manifest.Id,
@@ -55,10 +58,11 @@ internal sealed class CapabilityIndex
                 manifest.Name,
                 [manifest.Id],
                 Tokenize(appText),
-                await EmbedAsync(embed, appText, cancellationToken).ConfigureAwait(false));
+                await EmbedAsync(embed, appText, cancellationToken).ConfigureAwait(false),
+                workspaceId);
             entries.Add(appEntry);
-            aliases[manifest.Id] = appEntry;
-            aliases[manifest.Id.Replace('.', ' ')] = appEntry;
+            AddAlias(aliases, manifest.Id, appEntry);
+            AddAlias(aliases, manifest.Id.Replace('.', ' '), appEntry);
 
             foreach (var operation in manifest.Operations)
             {
@@ -69,25 +73,28 @@ internal sealed class CapabilityIndex
                     operation.Name,
                     [],
                     Tokenize(operationText),
-                    await EmbedAsync(embed, operationText, cancellationToken).ConfigureAwait(false)));
+                    await EmbedAsync(embed, operationText, cancellationToken).ConfigureAwait(false),
+                    workspaceId));
             }
         }
 
         return new CapabilityIndex(entries, BuildIdf(entries), aliases, embed);
     }
 
-    public async ValueTask<CapabilitySearchResult> SearchAsync(string query, int take, bool degraded, CancellationToken cancellationToken)
+    public async ValueTask<CapabilitySearchResult> SearchAsync(string query, string? workspaceId, int take, bool degraded, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(query) || take < 1 || _entries.Count == 0)
         {
             return new CapabilitySearchResult { Degraded = degraded };
         }
 
-        if (_aliases.TryGetValue(query.Trim(), out var aliasMatch))
+        if (_aliases.TryGetValue(query.Trim(), out var aliasMatches)
+            && aliasMatches.FirstOrDefault(entry => IsVisible(entry, workspaceId)) is { } aliasMatch)
         {
             return new CapabilitySearchResult { Hits = [Hit(aliasMatch, 1d)], Degraded = degraded };
         }
 
+        var visible = _entries.Where(entry => IsVisible(entry, workspaceId)).ToArray();
         var queryTokens = TextTokens.Split(query).Distinct(StringComparer.Ordinal).ToArray();
         var totalWeight = queryTokens.Sum(TokenIdf);
         if (totalWeight <= 0)
@@ -96,7 +103,7 @@ internal sealed class CapabilityIndex
         }
 
         var scored = new List<(IndexedCapability Entry, double Keyword)>();
-        foreach (var entry in _entries)
+        foreach (var entry in visible)
         {
             var matched = queryTokens.Where(entry.Tokens.Contains).Sum(TokenIdf);
             if (matched > 0)
@@ -107,7 +114,7 @@ internal sealed class CapabilityIndex
 
         float[]? queryEmbedding = null;
         if (!degraded && scored.Count > VectorCandidateWindow && _embed is not null
-            && _entries.Any(static entry => entry.Embedding is not null))
+            && visible.Any(static entry => entry.Embedding is not null))
         {
             queryEmbedding = await _embed(query, cancellationToken).ConfigureAwait(false);
         }
@@ -136,10 +143,25 @@ internal sealed class CapabilityIndex
     private static CapabilityHit Hit(IndexedCapability entry, double score)
         => new() { Id = entry.Id, Kind = entry.Kind, Score = Math.Round(score, 4) };
 
-    public IReadOnlyList<(string Id, string Text, float[] Embedding)> EmbeddedEntries()
+    // Global entries are visible to every workspace; a workspace-scoped entry only to its owner.
+    private static bool IsVisible(IndexedCapability entry, string? workspaceId)
+        => entry.WorkspaceId is null
+            || (workspaceId is not null && string.Equals(entry.WorkspaceId, workspaceId, StringComparison.Ordinal));
+
+    private static void AddAlias(Dictionary<string, List<IndexedCapability>> aliases, string key, IndexedCapability entry)
+    {
+        if (!aliases.TryGetValue(key, out var list))
+        {
+            aliases[key] = list = [];
+        }
+
+        list.Add(entry);
+    }
+
+    public IReadOnlyList<(string Id, string WorkspaceId, string Text, float[] Embedding)> EmbeddedEntries()
         => _entries
             .Where(static entry => entry.Embedding is not null)
-            .Select(static entry => (entry.Id, entry.Name, entry.Embedding!))
+            .Select(static entry => (entry.Id, entry.WorkspaceId ?? string.Empty, entry.Name, entry.Embedding!))
             .ToArray();
 
     private static async ValueTask<float[]?> EmbedAsync(

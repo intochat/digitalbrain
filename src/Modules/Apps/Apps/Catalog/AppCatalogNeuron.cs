@@ -119,7 +119,8 @@ internal sealed class AppCatalogNeuron(
     }
 
     private Task CatalogueAsync(AppManifest manifest) =>
-        GrainFactory.GetGrain<IAppManifestDirectory>(AppManifestDirectoryGrains.Key).Publish(manifest);
+        GrainFactory.GetGrain<IAppManifestDirectory>(AppManifestDirectoryGrains.Key)
+            .Publish(manifest, this.GetPrimaryKeyString());
 
     private List<AppInstallation> Versions(string appId) =>
         Snapshot.Versions.TryGetValue(appId, out var versions) ? [.. versions] : [];
