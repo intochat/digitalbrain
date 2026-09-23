@@ -11,5 +11,6 @@ public interface IBehaviorProgram : INeuron
     Task<BehaviorSnapshot> Stop(ChangeBehaviorState request, CancellationToken cancellationToken = default);
     Task<BehaviorSnapshot> Start(ChangeBehaviorState request, CancellationToken cancellationToken = default);
     Task<BehaviorSnapshot> Rollback(RollbackBehavior request, CancellationToken cancellationToken = default);
+    Task<BehaviorSnapshot> Delete(DeleteBehavior request, CancellationToken cancellationToken = default);
     Task<BehaviorLogPage> ReadLogs(long afterSequence, int limit = 100, CancellationToken cancellationToken = default);
 }

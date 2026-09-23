@@ -23,4 +23,20 @@ public sealed class BehaviorProgramFacts
         Assert.Equal(BehaviorDesiredState.Stopped, stopped.DesiredState);
         Assert.Equal(BehaviorDesiredState.Stopped, (await new BehaviorProgramStore(documents).ReadAsync("program", TestContext.Current.CancellationToken)).DesiredState);
     }
+
+    [Fact]
+    public async Task DeletedProgramStopsAndLeavesTheLiveList()
+    {
+        var documents = new InMemoryDocumentStore<BehaviorProgramDocument>();
+        var store = new BehaviorProgramStore(documents);
+        var deployed = await store.DeployAsync("program", new DeployBehavior(0, Guid.NewGuid(), new("id", "source", "environment"), "{}"), TestContext.Current.CancellationToken);
+        var operation = Guid.NewGuid();
+        var deleted = await store.RemoveAsync("program", new(deployed.Revision, operation), TestContext.Current.CancellationToken);
+        Assert.Equal(BehaviorDesiredState.Stopped, deleted.DesiredState);
+        Assert.Equal(BehaviorExecutionState.Stopping, deleted.State);
+        Assert.Empty(await store.ListAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(deleted.Revision, (await store.ReadAsync("program", TestContext.Current.CancellationToken)).Revision);
+        var replay = await store.ReplayAsync("program", "delete", operation, new DeleteBehavior(deployed.Revision, operation), TestContext.Current.CancellationToken);
+        Assert.Equal(deleted.Revision, replay!.Revision);
+    }
 }

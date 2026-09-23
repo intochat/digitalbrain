@@ -20,10 +20,10 @@ public sealed class BehaviorAuthoringFacts
         var registry = new BehaviorCatalogStore(new InMemoryDocumentStore<BehaviorCatalogIndex>(), new InMemoryDocumentStore<BehaviorCatalogDocument>());
         await using var fixture = new Fixture(registry);
         var tools = new BehaviorAgentTools(fixture.Tools).Create(() => new("workspace-one", "run", "call"));
-        await tools.Single(x => x.Name == "code_draft_save").InvokeAsync(new AIFunctionArguments
+        await tools.Single(x => x.Name == "behavior_draft").InvokeAsync(new AIFunctionArguments
         {
             ["id"] = "timer",
-            ["request"] = new SaveCodeDraft(0, Guid.NewGuid(), "source", "tests", []),
+            ["request"] = new BehaviorDraftInput("source", "tests", null, null, null, null, null),
         }, TestContext.Current.CancellationToken);
         Assert.Equal("timer", Assert.Single(await registry.List("workspace-one", TestContext.Current.CancellationToken)).Id);
         Assert.Empty(await registry.List("workspace-two", TestContext.Current.CancellationToken));
@@ -32,7 +32,7 @@ public sealed class BehaviorAuthoringFacts
     public async Task CheckToolWaitsForPendingValidationToSettle()
     {
         await using var fixture = new Fixture { PendingReads = 2 };
-        var result = await fixture.Tools.ForScope("trusted").ReadCheck("timer", Guid.NewGuid(), TestContext.Current.CancellationToken);
+        var result = await fixture.Tools.ForScope("trusted").Check("timer", false, TestContext.Current.CancellationToken);
         Assert.Equal(CodeCheckStatus.Passed, result.Status);
         Assert.NotNull(result.Artifact);
     }
@@ -45,7 +45,7 @@ public sealed class BehaviorAuthoringFacts
             .AddSingleton<IAgentToolFactory>(new BehaviorAgentTools(fixture.Tools)).BuildServiceProvider();
         var events = new List<AgentTurnEvent>();
         await foreach (var item in new AgentTurnRunner(services).RunAsync(
-            new("agent", "run", "trusted", [], "read contracts", null, ToolNames: ["code_contracts"]), TestContext.Current.CancellationToken))
+            new("agent", "run", "trusted", [], "read contracts", null, ToolNames: ["behavior_contracts"]), TestContext.Current.CancellationToken))
         { events.Add(item); }
         Assert.Empty(events.OfType<AgentTurnEvent.Failed>());
         Assert.Equal(2, events.OfType<AgentTurnEvent.ToolCompleted>().Count());
@@ -67,7 +67,7 @@ public sealed class BehaviorAuthoringFacts
             }
             string[] modules = results.Length == 0 ? ["not-installed"] : [];
             return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant,
-                [new FunctionCallContent("call-" + results.Length, "code_contracts", new Dictionary<string, object?>
+                [new FunctionCallContent("call-" + results.Length, "behavior_contracts", new Dictionary<string, object?>
                     { ["modules"] = modules })])));
         }
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -80,7 +80,7 @@ public sealed class BehaviorAuthoringFacts
     {
         await using var fixture = new Fixture();
         var tools = new BehaviorAgentTools(fixture.Tools).Create(() => new("trusted", "run", "call"));
-        var result = await tools.Single(x => x.Name == "code_contracts").InvokeAsync(
+        var result = await tools.Single(x => x.Name == "behavior_contracts").InvokeAsync(
             new AIFunctionArguments { ["modules"] = new[] { "missing" } }, TestContext.Current.CancellationToken);
         var json = JsonSerializer.SerializeToElement(result);
         Assert.True(json.GetProperty("isError").GetBoolean());
@@ -88,16 +88,16 @@ public sealed class BehaviorAuthoringFacts
     }
 
     [Fact]
-    public async Task MalformedOperationIdentityReturnsRepairableToolResult()
+    public async Task UnknownActivationActionReturnsRepairableToolResult()
     {
         await using var fixture = new Fixture();
         var tools = new BehaviorAgentTools(fixture.Tools).Create(() => new("trusted", "run", "call"));
-        var result = await tools.Single(x => x.Name == "behavior_start").InvokeAsync(
-            new AIFunctionArguments { ["id"] = "timer", ["request"] = JsonSerializer.SerializeToElement(new { expectedRevision = 0, operationId = "start-timer" }) },
+        var result = await tools.Single(x => x.Name == "behavior_activate").InvokeAsync(
+            new AIFunctionArguments { ["id"] = "timer", ["action"] = "explode" },
             TestContext.Current.CancellationToken);
         var json = JsonSerializer.SerializeToElement(result);
         Assert.True(json.GetProperty("isError").GetBoolean());
-        Assert.Contains("Guid", json.GetProperty("message").GetString(), StringComparison.Ordinal);
+        Assert.Contains("action", json.GetProperty("message").GetString(), StringComparison.Ordinal);
         Assert.Empty(fixture.Keys);
     }
 
@@ -154,10 +154,10 @@ public sealed class BehaviorAuthoringFacts
         var native = new BehaviorAgentTools(fixture.Tools).Create(() => new(scope, "run", "call"));
         Assert.Equal(BehaviorAgentTools.Names.Order(), native.Select(x => x.Name).Order());
         scope = "trusted";
-        var result = await native.Single(x => x.Name == "code_draft_read").InvokeAsync(new AIFunctionArguments { ["id"] = "timer" }, TestContext.Current.CancellationToken);
+        var result = await native.Single(x => x.Name == "behavior_draft").InvokeAsync(new AIFunctionArguments { ["id"] = "timer", ["request"] = new BehaviorDraftInput(null, null, null, null, null, null, null) }, TestContext.Current.CancellationToken);
         var mcp = await fixture.Tools.ForScope(scope).ReadDraft("timer", TestContext.Current.CancellationToken);
-        var decoded = JsonSerializer.SerializeToElement(result).Deserialize<CodeDraftSnapshot>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        Assert.Equivalent(mcp, decoded);
+        var decoded = JsonSerializer.SerializeToElement(result).Deserialize<BehaviorDraftView>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.Equivalent(mcp, decoded!.Draft);
         Assert.All(fixture.Keys, x => Assert.Equal(BehaviorToolScope.Key(scope, "timer"), x.Id));
     }
 

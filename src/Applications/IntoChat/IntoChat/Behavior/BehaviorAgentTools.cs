@@ -5,7 +5,7 @@ namespace IntoChat;
 
 internal sealed class BehaviorAgentTools(BehaviorToolService service) : IAgentToolFactory
 {
-    public static readonly string[] Names = ["code_contracts", "code_draft_read", "code_draft_save", "code_draft_check", "code_check_read", "code_check_cancel", "behavior_read", "behavior_deploy", "behavior_start", "behavior_stop", "behavior_rollback", "behavior_logs", "behavior_describe", "behavior_details"];
+    public static readonly string[] Names = ["behavior_contracts", "behavior_draft", "behavior_check", "behavior_activate"];
     public IReadOnlyList<AIFunction> Create(Func<AgentToolContext> context)
     {
         // Context is evaluated at invocation, not while the runner is discovering tools.

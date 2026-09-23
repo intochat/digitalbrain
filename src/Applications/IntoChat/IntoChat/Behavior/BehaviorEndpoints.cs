@@ -63,6 +63,7 @@ internal static class BehaviorEndpoints
         group.MapPost("/{id}/start", (string workspaceId, string id, ChangeBehaviorState request, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).Start(id, request, ct));
         group.MapPost("/{id}/stop", (string workspaceId, string id, ChangeBehaviorState request, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).Stop(id, request, ct));
         group.MapPost("/{id}/rollback", (string workspaceId, string id, RollbackBehavior request, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).Rollback(id, request, ct));
+        group.MapDelete("/{id}", (string workspaceId, string id, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).Delete(id, ct));
         group.MapGet("/{id}/logs", (string workspaceId, string id, long? after, int? limit, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).Logs(id, after ?? 0, limit ?? 100, ct));
         routes.MapMcp("/workspaces/{workspaceId}/behavior-mcp");
     }
