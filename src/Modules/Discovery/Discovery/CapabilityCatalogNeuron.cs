@@ -14,7 +14,7 @@ internal sealed class CapabilityCatalogNeuron(CapabilityCatalog catalog, TimePro
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
         var clamped = Math.Clamp(take, 1, MaxTake);
-        var result = await catalog.SearchAsync(query, clamped, CancellationToken.None).ConfigureAwait(true);
+        var result = await catalog.SearchAsync(query, workspaceId, clamped, CancellationToken.None).ConfigureAwait(true);
         if (result.Hits.Count == 0)
         {
             await RecordUnmetIntentAsync(workspaceId, query).ConfigureAwait(true);

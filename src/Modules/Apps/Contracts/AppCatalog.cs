@@ -40,14 +40,40 @@ public sealed record SaveAsAppRequest
     [Id(10)] public IReadOnlyList<AppWindow> Windows { get; init; } = [];
 }
 
-// The global app directory makes saved and installed apps discoverable: the Discovery module reads
-// it as its manifest source, so cataloging an app also makes it searchable by its description.
+// Where an app's manifest came from: committed first-party/platform manifests are global and visible
+// to every workspace, while a saved or workspace-installed app belongs to the workspace that owns it.
+public enum AppManifestScope
+{
+    Global = 0,
+    Workspace = 1,
+}
+
+[GenerateSerializer, Alias("apps.scoped-manifest")]
+public sealed record ScopedAppManifest
+{
+    [Id(0)] public required AppManifest Manifest { get; init; }
+    [Id(1)] public AppManifestScope Scope { get; init; }
+    [Id(2)] public string? WorkspaceId { get; init; }
+
+    public static ScopedAppManifest Global(AppManifest manifest) =>
+        new() { Manifest = manifest, Scope = AppManifestScope.Global };
+
+    public static ScopedAppManifest InWorkspace(AppManifest manifest, string workspaceId) =>
+        new() { Manifest = manifest, Scope = AppManifestScope.Workspace, WorkspaceId = workspaceId };
+
+    public string? OwningWorkspaceId =>
+        Scope == AppManifestScope.Workspace ? WorkspaceId : null;
+}
+
+// The app directory makes saved and installed apps discoverable: the Discovery module reads it as its
+// manifest source. It always exposes the committed first-party manifests as global entries, and it
+// records the owning workspace on every saved or installed manifest so discovery can scope search.
 [Alias("app-manifest-directory"), DefaultGrainType("app-manifest-directory")]
 public interface IAppManifestDirectory : INeuron
 {
-    Task<AppManifest> Publish(AppManifest manifest);
+    Task<AppManifest> Publish(AppManifest manifest, string workspaceId);
 
-    Task<IReadOnlyList<AppManifest>> Read();
+    Task<IReadOnlyList<ScopedAppManifest>> Read();
 }
 
 public static class AppManifestDirectoryGrains

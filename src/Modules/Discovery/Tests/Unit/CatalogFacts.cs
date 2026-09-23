@@ -14,7 +14,7 @@ public sealed class CatalogFacts
     public async Task SearchReturnsCapabilityIdsFromTheManifestAndResolvesAliases()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await Start(new FixtureManifestSource([InvoiceManifest()]), ct);
+        await using var brain = await Start(new FixtureManifestSource([ScopedAppManifest.Global(InvoiceManifest())]), ct);
         var catalog = brain.Get<ICapabilityCatalog>("catalog");
 
         var result = await catalog.Search("summarize my outstanding invoices", "workspace-a", 5);
@@ -28,10 +28,34 @@ public sealed class CatalogFacts
     }
 
     [Fact]
+    public async Task SavedAppIsSearchableOnlyFromItsWorkspaceWhileFirstPartyStaysGlobal()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var saved = SavedManifest();
+        await using var brain = await Start(
+            new FixtureManifestSource(
+            [
+                ScopedAppManifest.Global(InvoiceManifest()),
+                ScopedAppManifest.InWorkspace(saved, "workspace-a"),
+            ]),
+            ct);
+        var catalog = brain.Get<ICapabilityCatalog>("catalog");
+
+        var fromOwner = await catalog.Search("vendor onboarding intake", "workspace-a", 5);
+        Assert.Contains(fromOwner.Hits, hit => hit.Id == "intochat.saved-vendor-intake");
+
+        var fromStranger = await catalog.Search("vendor onboarding intake", "workspace-b", 5);
+        Assert.DoesNotContain(fromStranger.Hits, hit => hit.Id == "intochat.saved-vendor-intake");
+
+        var firstPartyFromStranger = await catalog.Search("summarize my outstanding invoices", "workspace-b", 5);
+        Assert.Contains(firstPartyFromStranger.Hits, hit => hit.Id == "intochat.invoices/summarize_invoices");
+    }
+
+    [Fact]
     public async Task EmbeddingsDownFallsBackToKeywordAndFlagsDegraded()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await Start(new FixtureManifestSource([InvoiceManifest()]), ct, new FailingEmbedder());
+        await using var brain = await Start(new FixtureManifestSource([ScopedAppManifest.Global(InvoiceManifest())]), ct, new FailingEmbedder());
         var catalog = brain.Get<ICapabilityCatalog>("catalog");
 
         var result = await catalog.Search("summarize my outstanding invoices", "workspace-a", 5);
@@ -44,7 +68,7 @@ public sealed class CatalogFacts
     public async Task UnmetIntentIsRecordedAndGrouped()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await Start(new FixtureManifestSource([InvoiceManifest()]), ct);
+        await using var brain = await Start(new FixtureManifestSource([ScopedAppManifest.Global(InvoiceManifest())]), ct);
         var catalog = brain.Get<ICapabilityCatalog>("catalog");
 
         await catalog.Search("zzzpuddle", "workspace-a", 5);
@@ -62,7 +86,7 @@ public sealed class CatalogFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var embedder = new CountingEmbedder();
-        await using var brain = await Start(new FixtureManifestSource(BroadManifests()), ct, embedder);
+        await using var brain = await Start(new FixtureManifestSource(Globals(BroadManifests())), ct, embedder);
         var catalog = brain.Get<ICapabilityCatalog>("catalog");
 
         await catalog.Search("report", "workspace-a", 5);
@@ -109,6 +133,29 @@ public sealed class CatalogFacts
         ],
     };
 
+    private static AppManifest SavedManifest() => new()
+    {
+        Id = "intochat.saved-vendor-intake",
+        Version = "1.0.0",
+        Publisher = "workspace",
+        Kind = AppKind.Declarative,
+        Name = "Vendor Onboarding Intake",
+        DescriptionForPeople = "Enter a vendor onboarding intake form.",
+        DescriptionForModel = "Open and submit the vendor onboarding intake.",
+        Operations =
+        [
+            new AppOperation
+            {
+                Name = "Submit",
+                DescriptionForModel = "Submit the vendor onboarding intake form.",
+                ReadOnly = false,
+            },
+        ],
+    };
+
+    private static IReadOnlyList<ScopedAppManifest> Globals(IReadOnlyList<AppManifest> manifests)
+        => [.. manifests.Select(ScopedAppManifest.Global)];
+
     private static IReadOnlyList<AppManifest> BroadManifests()
     {
         var operations = Enumerable.Range(0, 12)
@@ -142,9 +189,9 @@ public sealed class CatalogFacts
     }
 }
 
-internal sealed class FixtureManifestSource(IReadOnlyList<AppManifest> manifests) : IManifestSource
+internal sealed class FixtureManifestSource(IReadOnlyList<ScopedAppManifest> manifests) : IManifestSource
 {
-    public Task<IReadOnlyList<AppManifest>> ReadAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<ScopedAppManifest>> ReadAsync(CancellationToken cancellationToken = default)
         => Task.FromResult(manifests);
 }
 

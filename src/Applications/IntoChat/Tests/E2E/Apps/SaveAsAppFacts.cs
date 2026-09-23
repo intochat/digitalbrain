@@ -150,5 +150,9 @@ public sealed class SaveAsAppFacts
         var result = await brain.Get<ICapabilityCatalog>("catalog").Search("vendor onboarding intake", scope, 5);
 
         Assert.Contains(result.Hits, hit => hit.Id.StartsWith("intochat.saved-vendor-onboarding-intake", StringComparison.Ordinal));
+
+        // Discovery is workspace-scoped: another workspace must not see the saved app's content.
+        var stranger = await brain.Get<ICapabilityCatalog>("catalog").Search("vendor onboarding intake", "workspace-stranger", 5);
+        Assert.DoesNotContain(stranger.Hits, hit => hit.Id.StartsWith("intochat.saved-vendor-onboarding-intake", StringComparison.Ordinal));
     }
 }
