@@ -12,6 +12,7 @@ import 'host_environment.dart';
 import 'models/app_manifest.dart';
 import 'models/brain_models.dart';
 import 'models/inbox_models.dart';
+import 'models/session_capabilities.dart';
 import 'models/table_models.dart';
 import 'models/workspace_models.dart';
 
@@ -75,6 +76,18 @@ final class DigitalBrainUiClient {
   final String workspaceIdentity;
   final CookieHttpClient _http;
   final bool _ownsClient;
+
+  /// Server-owned capabilities; the shell hides developer-only surfaces when this is off.
+  Future<SessionCapabilities> readCapabilities() async {
+    final response = await _request(
+      'GET',
+      '/session/capabilities',
+      timeout: const Duration(seconds: 10),
+    );
+    return SessionCapabilities.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
 
   Future<bool> salesforceConnected() async =>
       (await _tableRequest('GET', '/agent/connections/salesforce')

@@ -4,6 +4,7 @@ using DigitalBrain.Coding;
 using DigitalBrain.Behavior;
 using DigitalBrain.AI.Agents;
 using IntoChat.Workspace;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 
 namespace IntoChat;
@@ -40,6 +41,7 @@ internal static class BehaviorEndpoints
         var group = routes.MapGroup("/workspaces/{workspaceId}/behaviors");
         group.AddEndpointFilter(async (context, next) =>
         {
+            if (!DeveloperModeEnabled(context.HttpContext.RequestServices)) { return Results.NotFound(); }
             try { return await next(context); }
             catch (ArgumentException error) { return Results.Problem(error.Message, statusCode: 400); }
             catch (KeyNotFoundException error) { return Results.Problem(error.Message, statusCode: 404); }
@@ -65,6 +67,10 @@ internal static class BehaviorEndpoints
         group.MapPost("/{id}/rollback", (string workspaceId, string id, RollbackBehavior request, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).Rollback(id, request, ct));
         group.MapDelete("/{id}", (string workspaceId, string id, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).Delete(id, ct));
         group.MapGet("/{id}/logs", (string workspaceId, string id, long? after, int? limit, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).Logs(id, after ?? 0, limit ?? 100, ct));
-        routes.MapMcp("/workspaces/{workspaceId}/behavior-mcp");
+        routes.MapMcp("/workspaces/{workspaceId}/behavior-mcp").AddEndpointFilter(async (context, next) =>
+            DeveloperModeEnabled(context.HttpContext.RequestServices) ? await next(context) : Results.NotFound());
     }
+
+    private static bool DeveloperModeEnabled(IServiceProvider services) =>
+        AgentToolPolicy.DeveloperModeEnabled(services.GetRequiredService<IConfiguration>()["IntoChat:DeveloperMode"]);
 }

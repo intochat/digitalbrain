@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using DigitalBrain.AI.Agents;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
 
@@ -14,6 +15,7 @@ internal static class AccountSession
 {
     public const string DefaultLogin = "owner";
     public const string CheckPath = "/auth/check";
+    public const string CapabilitiesPath = "/session/capabilities";
 
     private const string BasicScheme = "Basic";
 
@@ -53,6 +55,12 @@ internal static class AccountSession
 
         // Inside the gate, so reaching it at all proves the session is good.
         app.MapGet(CheckPath, static () => Results.NoContent());
+
+        // Read-only server capabilities the shell gates developer-only surfaces on. Developer mode
+        // is the same server setting the agent tool policy reads, so a client cannot grant itself
+        // the Behaviors console by editing local preferences.
+        app.MapGet(CapabilitiesPath, static (IConfiguration configuration) => Results.Ok(
+            new SessionCapabilities(AgentToolPolicy.DeveloperModeEnabled(configuration["IntoChat:DeveloperMode"]))));
 
         return app;
     }
@@ -187,3 +195,5 @@ internal static class AccountSession
         }
     }
 }
+
+internal sealed record SessionCapabilities(bool DeveloperMode);
