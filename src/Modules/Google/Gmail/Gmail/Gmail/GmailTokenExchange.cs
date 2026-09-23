@@ -60,7 +60,7 @@ internal sealed class GmailTokenExchange(GmailOAuthConfiguration configuration) 
                 throw new GmailUnavailableException("Google returned an unsupported token type.");
             }
             var token = root.GetProperty("access_token").GetString();
-            GmailTokenRefresh.ValidateToken(token);
+            GmailTokenPolicy.ValidateToken(token);
             return new GmailTokenGrant(token!,
                 root.TryGetProperty("refresh_token", out var replacement) ? replacement.GetString() : null,
                 root.TryGetProperty("scope", out var scope) ? scope.GetString() : null,
