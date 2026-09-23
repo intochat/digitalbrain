@@ -3,12 +3,15 @@ using Xunit;
 using DigitalBrain.Coding;
 using DigitalBrain.Contracts;
 using DigitalBrain.Behavior;
+using DigitalBrain.Core;
 using Microsoft.Extensions.Options;
 
 namespace IntoChat.Tests;
 
 public sealed class BehaviorCatalogFacts
 {
+    private static BehaviorCatalogStore NewCatalog()
+        => new(new InMemoryDocumentStore<BehaviorCatalogIndex>(), new InMemoryDocumentStore<BehaviorCatalogDocument>());
     [Fact]
     public async Task ActivityShowsTheLatestBoundedLogPage()
     {
@@ -31,7 +34,7 @@ public sealed class BehaviorCatalogFacts
     public async Task CheckedSourceMustMatchTheExactRevisionAndHash()
     {
         var ct = TestContext.Current.CancellationToken;
-        var store = new BehaviorCatalogStore(Path.Combine(Path.GetTempPath(), "behavior-catalog-tests", Guid.NewGuid().ToString("N")));
+        var store = NewCatalog();
         await store.Register("scope", "timer", ct);
         var operation = Guid.NewGuid();
         var draft = new CodeDraftSnapshot(2, "source", "tests", [], operation);
@@ -61,7 +64,7 @@ public sealed class BehaviorCatalogFacts
     public async Task DisabledRuntimeStillShowsCatalogAndDraftIdentity()
     {
         var ct = TestContext.Current.CancellationToken;
-        var store = new BehaviorCatalogStore(Path.Combine(Path.GetTempPath(), "behavior-catalog-tests", Guid.NewGuid().ToString("N")));
+        var store = NewCatalog();
         await store.Register("scope", "timer", ct);
         var manager = new BehaviorManagement(null!, store, Options.Create(new BehaviorAuthoringOptions()), Options.Create(new CodeExecutionOptions()), Options.Create(new BehaviorOptions()));
         var detail = await manager.Detail("scope", "timer", ct);
@@ -73,13 +76,14 @@ public sealed class BehaviorCatalogFacts
     [Fact]
     public async Task CatalogPersistsSeparatesWorkspacesAndPreservesNamesOnRepeatedRegistration()
     {
-        var root = Path.Combine(Path.GetTempPath(), "behavior-catalog-tests", Guid.NewGuid().ToString("N"));
         var ct = TestContext.Current.CancellationToken;
-        var store = new BehaviorCatalogStore(root);
+        var indexes = new InMemoryDocumentStore<BehaviorCatalogIndex>();
+        var items = new InMemoryDocumentStore<BehaviorCatalogDocument>();
+        var store = new BehaviorCatalogStore(indexes, items);
         await store.Register("one", "timer", ct);
         await store.Describe("one", "timer", new(0, "Timer status", "Show ticks", ["Timer tick"], ["Update text"]), ct);
         await store.Register("one", "timer", ct);
-        var restarted = new BehaviorCatalogStore(root);
+        var restarted = new BehaviorCatalogStore(indexes, items);
         Assert.Equal("Timer status", Assert.Single(await restarted.List("one", ct)).Name);
         Assert.Empty(await restarted.List("two", ct));
         await Assert.ThrowsAsync<InvalidOperationException>(() => restarted.Describe("one", "timer", new(0, "Old", "", [], []), ct));
@@ -88,7 +92,7 @@ public sealed class BehaviorCatalogFacts
     [Fact]
     public async Task CatalogRejectsInvalidIdsAndOversizedDescriptions()
     {
-        var store = new BehaviorCatalogStore(Path.Combine(Path.GetTempPath(), "behavior-catalog-tests", Guid.NewGuid().ToString("N")));
+        var store = NewCatalog();
         var ct = TestContext.Current.CancellationToken;
         await Assert.ThrowsAsync<ArgumentException>(() => store.Register("one", "../timer", ct));
         await Assert.ThrowsAsync<ArgumentException>(() => store.Describe("one", "timer", new(0, "Name", new string('x', 4001), [], []), ct));

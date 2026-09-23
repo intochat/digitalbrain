@@ -18,6 +18,7 @@ Status vocabulary:
 |---|---|---|---|
 | [0001](0001-process-runner-ownership.md) | One shared process runner | accepted | plan P0.1 |
 | [0002](0002-one-live-table-contract.md) | One live-table contract | accepted | plan P1.3; C09/D6 |
+| [0003](0003-stored-state-migration.md) | Stored-state migration policy | accepted | plan P2.4; T1 |
 
 ## Proposed product decisions (highlevel §12, not ratified)
 

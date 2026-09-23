@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
+using DigitalBrain.Core;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -7,7 +8,7 @@ using Orleans;
 
 namespace DigitalBrain.Coding;
 
-internal sealed class CodeCheckCoordinator(IOptions<CodeExecutionOptions> options, IGrainFactory grains, ILogger<CodeCheckCoordinator> logger) : BackgroundService
+internal sealed class CodeCheckCoordinator(IOptions<CodeExecutionOptions> options, IGrainFactory grains, IServiceProvider services, ILogger<CodeCheckCoordinator> logger) : BackgroundService
 {
     private readonly Channel<(string Id, Guid Operation)> _queue = Channel.CreateBounded<(string, Guid)>(32);
     private readonly ConcurrentDictionary<(string, Guid), CancellationTokenSource> _active = new();
@@ -21,7 +22,7 @@ internal sealed class CodeCheckCoordinator(IOptions<CodeExecutionOptions> option
         {
             Directory.CreateDirectory(root);
             _ownership = new(Path.Combine(root, "execution.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-            _store = new(Path.Combine(root, "drafts"));
+            _store = new((services.GetService(typeof(IDocumentStore<CodeDraftDocument>)) as IDocumentStore<CodeDraftDocument>) ?? new GrainDocumentStore<CodeDraftDocument>(grains, "coding-drafts"));
             await Store.InterruptPendingAsync(cancellationToken).ConfigureAwait(false);
         }
         await base.StartAsync(cancellationToken).ConfigureAwait(false);

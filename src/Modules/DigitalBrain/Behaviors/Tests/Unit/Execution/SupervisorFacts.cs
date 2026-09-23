@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using DigitalBrain.Behavior;
 using DigitalBrain.Coding;
+using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -131,7 +132,8 @@ public sealed class SupervisorFacts
         var root = Path.Combine(Path.GetTempPath(), "brain-supervisor-tests", Guid.NewGuid().ToString("N"));
         try
         {
-            var store = new BehaviorProgramStore(Path.Combine(root, "programs"));
+            var programs = new InMemoryDocumentStore<BehaviorProgramDocument>();
+            var store = new BehaviorProgramStore(programs);
             await store.DeployAsync("running", new(0, Guid.NewGuid(), new("id", "source", "env"), "{}"), ct);
             var stopped = await store.DeployAsync("stopped", new(0, Guid.NewGuid(), new("id", "source", "env"), "{}"), ct);
             await store.ChangeAsync("stopped", new(stopped.Revision, Guid.NewGuid()), false, ct);
@@ -141,6 +143,7 @@ public sealed class SupervisorFacts
             await using var brain = await UnitTest.Create().WithModule<BehaviorModule>().ConfigureSilo(s =>
             {
                 s.Services.Configure<BehaviorOptions>(o => o.Root = root);
+                s.Services.AddSingleton<IDocumentStore<BehaviorProgramDocument>>(programs);
                 s.Services.AddSingleton<IBehaviorExecutor>(executor);
                 s.Services.AddSingleton<ICodeArtifactStore>(new TestArtifacts());
             }).StartAsync(ct);

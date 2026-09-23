@@ -1,4 +1,5 @@
 using DigitalBrain.Coding;
+using DigitalBrain.Core;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -23,8 +24,8 @@ internal sealed class BehaviorSupervisor(IOptions<BehaviorOptions> options, IBeh
         {
             Directory.CreateDirectory(root);
             _ownership = new(Path.Combine(root, "supervisor.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-            _store = new(Path.Combine(root, "programs"));
-            _logs = new(Path.Combine(root, "logs"), options.Value.MaximumLogBytes);
+            _store = new((services.GetService(typeof(IDocumentStore<BehaviorProgramDocument>)) as IDocumentStore<BehaviorProgramDocument>) ?? new GrainDocumentStore<BehaviorProgramDocument>(grains, "behavior-programs"));
+            _logs = new((services.GetService(typeof(IDocumentStore<LogDocument>)) as IDocumentStore<LogDocument>) ?? new GrainDocumentStore<LogDocument>(grains, "behavior-logs"), options.Value.MaximumLogBytes);
             foreach (var id in await Store.ListAsync(cancellationToken).ConfigureAwait(false))
             {
                 await Store.UpdateAsync(id, d =>
