@@ -85,6 +85,27 @@ public sealed class GrantFacts
         Assert.Empty(await store.ListAsync(ct));
     }
 
+    [Fact]
+    public async Task RevokingOneModeKeepsTheOthersAndARevokedValueLooksEmpty()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
+        var store = brain.Get<IGrantStore>(IdentityGrains.Grants("ws-1"));
+        await store.GrantAsync(Grant(GrantMode.Always, "person.birthDate", "app-1", "ws-1"), ct);
+        await store.GrantAsync(Grant(GrantMode.ThisChat, "person.birthDate", "app-1", "ws-1") with { ConversationId = "chat-1" }, ct);
+        Assert.Equal(2, (await store.ListAsync(ct)).Count);
+
+        await store.RevokeAsync("app-1", "person.birthDate", GrantMode.Always, ct);
+        var remaining = Assert.Single(await store.ListAsync(ct));
+        Assert.Equal(GrantMode.ThisChat, remaining.Mode);
+
+        var request = Request(CallerKind.App, "app-1", "ws-1", "person.birthDate");
+        var revoked = Grant(GrantMode.Always, "person.birthDate", "app-1", "ws-1") with { Revoked = true };
+        var decision = GrantRules.Evaluate(request, null, [revoked]);
+        Assert.Equal(CallDenial.MissingGrant, decision!.Denial);
+        Assert.Contains("missing", decision.Explanation, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static Grant Grant(GrantMode mode, string semanticTypeId, string appId, string workspaceId) => new()
     {
         AppId = appId,

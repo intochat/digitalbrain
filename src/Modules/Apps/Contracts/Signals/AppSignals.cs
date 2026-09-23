@@ -10,3 +10,6 @@ public sealed record AppUninstalled(string AppId, IReadOnlyList<string> KeptData
 
 [GenerateSerializer, Alias("apps.rolled-back")]
 public sealed record AppRolledBack(string AppId, string Version) : Signal;
+
+[GenerateSerializer, Alias("apps.consent-approved")]
+public sealed record AppConsentApproved(string AppId, string Version, DateTimeOffset At) : Signal;

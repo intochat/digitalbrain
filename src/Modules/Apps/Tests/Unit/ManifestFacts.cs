@@ -96,9 +96,9 @@ public sealed class ManifestFacts
     public void EveryFirstPartyAppCarriesAValidGeneratedManifest()
     {
         var manifests = FirstPartyApps.All();
-        Assert.Equal(5, manifests.Count);
+        Assert.Equal(6, manifests.Count);
         Assert.All(manifests, ManifestValidator.Validate);
-        foreach (var id in new[] { "intochat.files", "intochat.forms", "intochat.mydata", "intochat.image-editor", "intochat.customer-tables" })
+        foreach (var id in new[] { "intochat.files", "intochat.forms", "intochat.mydata", "intochat.image-editor", "intochat.customer-tables", "intochat.leadgenerator" })
         {
             Assert.True(FirstPartyApps.Contains(id), $"Missing first-party manifest '{id}'.");
             Assert.NotEmpty(FirstPartyApps.Get(id).Operations);
