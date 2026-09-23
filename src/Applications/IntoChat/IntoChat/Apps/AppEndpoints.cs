@@ -1,6 +1,8 @@
-using DigitalBrain.Contracts;
 using DigitalBrain.Apps;
 using DigitalBrain.Apps.Manifests;
+using DigitalBrain.Contracts;
+using DigitalBrain.Contracts.Types;
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Button;
 using DigitalBrain.Flutter.Card;
@@ -22,7 +24,8 @@ internal static class AppEndpoints
 {
     public static void MapLocalApps(this IEndpointRouteBuilder routes)
     {
-        routes.MapGet("/workspaces/{workspaceId}/apps", (string workspaceId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        var apps = routes.MapGroup("/workspaces/{workspaceId}/apps").AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
+        apps.MapGet("", (string workspaceId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);
             var installed = await brain.Get<IAppCatalog>(scope).List().WaitAsync(ct);
@@ -42,7 +45,7 @@ internal static class AppEndpoints
                 .ToArray();
             return Results.Ok(manifests);
         }));
-        routes.MapGet("/workspaces/{workspaceId}/apps/files", (string workspaceId, string? folderId, int? offset, string? sort, string? filter, IDigitalBrain brain, LocalFileStore files, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        apps.MapGet("/files", (string workspaceId, string? folderId, int? offset, string? sort, string? filter, IDigitalBrain brain, LocalFileStore files, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);
             var neuron = brain.Get<IFileExplorer>(scope);
@@ -51,19 +54,19 @@ internal static class AppEndpoints
             await EnsureWindow(brain, scope, "app-files", "Files", state.Surface!, ct);
             return Results.Ok(new { state, page });
         }));
-        routes.MapPost("/workspaces/{workspaceId}/apps/files/open", (string workspaceId, OpenImage input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        apps.MapPost("/files/open", (string workspaceId, OpenImage input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);
             var document = await brain.Get<IFileExplorer>(scope).OpenImage(input.EntryId).WaitAsync(ct);
             await EnsureWindow(brain, scope, "app-images", "Image Editor", new("surface", scope + "/apps/image-editor/surface"), ct);
             return Results.Ok(document);
         }));
-        routes.MapGet("/workspaces/{workspaceId}/apps/images-ui", (string workspaceId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        apps.MapGet("/images-ui", (string workspaceId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var name = Scope(auth.Value, workspaceId) + "/apps/image-editor";
             return Results.Ok(new { surface = new UiChildRef("surface", name + "/surface"), tabs = await brain.Get<ITabs>(name + "/tabs").Read().WaitAsync(ct) });
         }));
-        routes.MapGet("/workspaces/{workspaceId}/apps/images/{documentId}", (string workspaceId, string documentId, IDigitalBrain brain, AppSurfaceComposer surfaces, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        apps.MapGet("/images/{documentId}", (string workspaceId, string documentId, IDigitalBrain brain, AppSurfaceComposer surfaces, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);
             var document = await Document(brain, scope, documentId).Read().WaitAsync(ct);
@@ -71,11 +74,11 @@ internal static class AppEndpoints
             await surfaces.RegisterDocument(scope, document);
             return Results.Ok(document);
         }));
-        routes.MapPost("/workspaces/{workspaceId}/apps/images/{documentId}/edit", (string workspaceId, string documentId, EditImage input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        apps.MapPost("/images/{documentId}/edit", (string workspaceId, string documentId, EditImage input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
             Results.Ok(await Document(brain, Scope(auth.Value, workspaceId), documentId).Apply(input.Command, input.ExpectedRevision, input.OperationId).WaitAsync(ct))));
-        routes.MapPost("/workspaces/{workspaceId}/apps/images/{documentId}/prepare-save", (string workspaceId, string documentId, PrepareImageSave input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        apps.MapPost("/images/{documentId}/prepare-save", (string workspaceId, string documentId, PrepareImageSave input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
             Results.Ok(await Document(brain, Scope(auth.Value, workspaceId), documentId).PrepareSave(input.ExpectedRevision, input.OperationId).WaitAsync(ct))));
-        routes.MapPost("/workspaces/{workspaceId}/apps/images/{documentId}/save/{operationId}", (string workspaceId, string documentId, string operationId, HttpRequest request, IDigitalBrain brain, ImageSaveCoordinator saves, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        apps.MapPost("/images/{documentId}/save/{operationId}", (string workspaceId, string documentId, string operationId, HttpRequest request, IDigitalBrain brain, ImageSaveCoordinator saves, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);
             var document = Document(brain, scope, documentId);
@@ -85,9 +88,9 @@ internal static class AppEndpoints
             var updated = await document.CompleteSave(operationId, result).WaitAsync(ct);
             return Results.Ok(new { document = updated, file = result });
         })).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(LocalFilesOptions.MaxExportBytes));
-        routes.MapGet("/workspaces/{workspaceId}/apps/assets/{assetId}", (string workspaceId, string assetId, LocalFileStore files, IOptions<BasicAuthOptions> auth) => Respond(() =>
+        apps.MapGet("/assets/{assetId}", (string workspaceId, string assetId, LocalFileStore files, IOptions<BasicAuthOptions> auth) => Respond(() =>
             Task.FromResult<IResult>(Results.File(files.OpenAsset(Scope(auth.Value, workspaceId), assetId), "application/octet-stream", enableRangeProcessing: true))));
-        routes.MapGet("/workspaces/{workspaceId}/apps/node", (string workspaceId, string kind, string name, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        apps.MapGet("/node", (string workspaceId, string kind, string name, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);
             if (!name.StartsWith(scope + "/apps/", StringComparison.Ordinal) && !name.StartsWith(scope + "/images/", StringComparison.Ordinal)) { throw new UnauthorizedAccessException("The UI belongs to another workspace."); }
@@ -106,7 +109,7 @@ internal static class AppEndpoints
                 _ => throw new ArgumentException("Unknown app UI kind.")
             };
         }));
-        routes.MapPost("/workspaces/{workspaceId}/apps/event", (string workspaceId, UiEvent input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        apps.MapPost("/event", (string workspaceId, UiEvent input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);
             if (!input.Name.StartsWith(scope + "/apps/", StringComparison.Ordinal) && !input.Name.StartsWith(scope + "/images/", StringComparison.Ordinal)) { throw new UnauthorizedAccessException(); }
@@ -130,7 +133,12 @@ internal static class AppEndpoints
                     }
                     else if (input.Action == "secret")
                     {
-                        await form.SetSecret(input.Field ?? "", DigitalBrain.Contracts.Types.SecretRef.For(scope, input.Value ?? "", input.Field ?? "", isSet: true)).WaitAsync(ct);
+                        if (!SecretRef.IsReference(input.Value))
+                        {
+                            throw new ArgumentException("A form secret carries the vault reference, never a raw secret value.");
+                        }
+
+                        await form.SetSecret(input.Field ?? "", SecretRef.FromReference(input.Value!, input.Field ?? "")).WaitAsync(ct);
                     }
                     else { await form.SetDraft(input.Field ?? "", input.Value ?? "").WaitAsync(ct); }
                     break;

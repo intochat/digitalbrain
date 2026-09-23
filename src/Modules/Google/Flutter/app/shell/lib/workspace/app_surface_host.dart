@@ -142,8 +142,20 @@ class _AppSurfaceHostState extends State<AppSurfaceHost> {
         widget.workspace,
         'node?${Uri(queryParameters: {'kind': kind, 'name': name}).query}',
       );
-  Future<void> dispatch(Map<String, dynamic> event) async {
-    try {
+  Future<String?> saveSecret(String fieldName, String value) async {
+    final result = await widget.client.myDataRequest(
+      widget.workspace,
+      'secrets',
+      body: {
+        'fieldPath': 'form.$fieldName',
+        'label': fieldName,
+        'value': value,
+      },
+    );
+    return result['reference'] as String?;
+  }
+
+  Future<void> dispatch(Map<String, dynamic> event) async {    try {
       if (event['kind'] == 'tabs' && editing) return;
       await widget.client.appRequest(widget.workspace, 'event', body: event);
       if (event['kind'] == 'tabs') {
@@ -354,6 +366,7 @@ class _AppSurfaceHostState extends State<AppSurfaceHost> {
                       : nodeRevision,
                   onActivate: activateItem,
                   onAction: dispatch,
+                  secretSaver: saveSecret,
                   enabled: !editing && !loading,
                   imageBuilder: (definition) =>
                       renderedBytes == null ||

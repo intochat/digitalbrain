@@ -120,6 +120,60 @@ public sealed class CanarySecretFacts
         Assert.Empty(collector.Errors());
     }
 
+    [Fact(Timeout = 300_000)]
+    public async Task AFormSecretTravelsOnlyAsAVaultReference()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var collector = TestTelemetryCollector.Start();
+        await using var brain = await IntoChatE2ETest.Create()
+            .WithResourceEnvironment(new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["OTEL_EXPORTER_OTLP_ENDPOINT"] = collector.Endpoint.AbsoluteUri,
+                ["OTEL_EXPORTER_OTLP_PROTOCOL"] = "http/protobuf",
+            })
+            .StartAsync(ct);
+
+        const string workspace = "form-canary";
+        var scope = Scope(Owner, workspace);
+        var form = brain.Get<DigitalBrain.Flutter.Form.IForm>(scope + "/apps/forms/intake");
+        await form.Define(new("Intake", [new("password", "Password", DigitalBrain.Contracts.Types.FieldKind.Secret)]));
+
+        using var seeded = await brain.HttpClient.PostAsJsonAsync(
+            $"/my-data/{Owner}/secrets",
+            new { fieldPath = "forms.intake.password", label = "Password", value = Canary },
+            ct);
+        Assert.Equal(System.Net.HttpStatusCode.OK, seeded.StatusCode);
+        var reference = (await seeded.Content.ReadFromJsonAsync<JsonElement>(ct)).GetProperty("reference").GetString();
+        Assert.NotNull(reference);
+        Assert.StartsWith("secret://", reference, StringComparison.Ordinal);
+        Assert.DoesNotContain(Canary, reference, StringComparison.Ordinal);
+
+        using var evented = await brain.HttpClient.PostAsJsonAsync(
+            $"/workspaces/{workspace}/apps/event",
+            new { kind = "form", name = scope + "/apps/forms/intake", action = "secret", field = "password", value = reference },
+            ct);
+        Assert.Equal(System.Net.HttpStatusCode.OK, evented.StatusCode);
+
+        var state = await form.Read();
+        var field = state.Fields.Single();
+        Assert.True(field.SecretSet);
+        Assert.Null(field.Value);
+        Assert.Equal(reference, field.Secret!.Reference);
+        Assert.DoesNotContain(Canary, System.Text.Json.JsonSerializer.Serialize(state), StringComparison.Ordinal);
+
+        await WaitForAsync(() => collector.Snapshot().Count > 0, ct);
+        await Task.Delay(TimeSpan.FromSeconds(3), ct);
+        Assert.DoesNotContain(collector.Snapshot(), span => TextOf(span).Contains(Canary, StringComparison.Ordinal));
+        Assert.DoesNotContain(collector.LogSnapshot(), log => TextOf(log).Contains(Canary, StringComparison.Ordinal));
+        Assert.Empty(collector.Errors());
+    }
+
+    private static string Scope(string owner, string workspace)
+    {
+        var digest = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(owner + "\0" + workspace));
+        return "workspace-" + Convert.ToHexStringLower(digest);
+    }
+
     private static string TextOf(CapturedSpan span)
         => string.Join("\n", span.Attributes.Select(pair => pair.Key + "=" + pair.Value));
 

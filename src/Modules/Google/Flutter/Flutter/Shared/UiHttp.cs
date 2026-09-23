@@ -1,3 +1,4 @@
+using DigitalBrain.Core.Enforcement;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -18,11 +19,13 @@ internal static class UiHttp
     {
         endpoints.MapGet($"/workspaces/{{workspace}}/ui/{collection}/{{name}}",
             async Task<IResult> (string workspace, string name, IGrainFactory grains, CancellationToken cancellationToken) =>
-                Results.Ok(await read(grains.GetGrain<TNeuron>(UiScope.Key(workspace, name))).WaitAsync(cancellationToken)));
+                Results.Ok(await read(grains.GetGrain<TNeuron>(UiScope.Key(workspace, name))).WaitAsync(cancellationToken)))
+            .AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
     }
 
     public static void MapPost(IEndpointRouteBuilder endpoints, string template, Delegate handler)
         => endpoints.MapPost($"/workspaces/{{workspace}}/ui/{template}", handler)
+            .AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync)
             .AddEndpointFilter(static async (context, next) =>
             {
                 var workspace = context.HttpContext.Request.RouteValues["workspace"]?.ToString()

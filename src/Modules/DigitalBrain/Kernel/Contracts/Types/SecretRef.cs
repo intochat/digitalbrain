@@ -31,4 +31,16 @@ public sealed record SecretRef
         !string.IsNullOrWhiteSpace(reference)
         && reference.StartsWith("secret://", StringComparison.Ordinal)
         && reference.Length > "secret://".Length;
+
+    // Rebuilds the handle from the reference a vault returned, so a raw secret value can be posted
+    // once to the vault and only the reference travels onward.
+    public static SecretRef FromReference(string reference, string label = "")
+    {
+        if (!IsReference(reference))
+        {
+            throw new ArgumentException("A secret reference must look like 'secret://owner/id'.", nameof(reference));
+        }
+
+        return new SecretRef { Reference = reference, Label = label, Status = SecretStatus.Set };
+    }
 }

@@ -31,6 +31,27 @@ public sealed class AccountFacts
     }
 
     [Fact]
+    public async Task CanAccessAnswersOnlyForOwnedOrSharedWorkspaces()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
+        var directory = brain.Get<IIdentityDirectory>(IdentityGrains.Directory);
+        var owner = await directory.EnsureOwnerAsync("owner", "default", "Owner", ct);
+
+        Assert.True(await directory.CanAccessAsync("owner", "default", ct));
+        Assert.False(await directory.CanAccessAsync("owner", "elsewhere", ct));
+        Assert.False(await directory.CanAccessAsync("stranger", "default", ct));
+
+        var invitation = await directory.InviteAsync("default", null, MemberRole.Member, ct);
+        await directory.AcceptInvitationAsync(invitation.Code, "member-1", "Member", ct);
+        Assert.True(await directory.CanAccessAsync("member-1", "default", ct));
+        Assert.False(await directory.CanAccessAsync("member-1", "shared", ct));
+
+        await directory.ShareWorkspaceAsync(owner.AccountId, "shared", "member-1", "Member", MemberRole.Member, ct);
+        Assert.True(await directory.CanAccessAsync("member-1", "shared", ct));
+    }
+
+    [Fact]
     public async Task AnInvitationCodeIsSingleUse()
     {
         var ct = TestContext.Current.CancellationToken;

@@ -8,6 +8,10 @@ typedef NeuronLoader = Future<Map<String, dynamic>> Function(
   String name,
 );
 
+/// Posts a raw secret once to the owner's vault and returns the vault reference; the reference,
+/// never the raw value, is what the form event carries.
+typedef SecretSaver = Future<String?> Function(String fieldName, String value);
+
 class NeuronView extends StatefulWidget {
   const NeuronView({
     super.key,
@@ -17,6 +21,7 @@ class NeuronView extends StatefulWidget {
     this.onActivate,
     this.onAction,
     this.imageBuilder,
+    this.secretSaver,
     this.ancestors = const {},
     this.revision = 0,
     this.enabled = true,
@@ -26,6 +31,7 @@ class NeuronView extends StatefulWidget {
   final ValueChanged<Map<String, dynamic>>? onActivate;
   final Future<void> Function(Map<String, dynamic>)? onAction;
   final Widget Function(Map<String, dynamic>)? imageBuilder;
+  final SecretSaver? secretSaver;
   final Set<String> ancestors;
   final int revision;
   final bool enabled;
@@ -118,6 +124,7 @@ class _NeuronViewState extends State<NeuronView> {
                       onActivate: widget.onActivate,
                       onAction: widget.onAction,
                       imageBuilder: widget.imageBuilder,
+                      secretSaver: widget.secretSaver,
                       ancestors: {...widget.ancestors, identity},
                       revision: widget.revision,
                       enabled: widget.enabled,
@@ -241,6 +248,7 @@ class _NeuronViewState extends State<NeuronView> {
                       onActivate: widget.onActivate,
                       onAction: widget.onAction,
                       imageBuilder: widget.imageBuilder,
+                      secretSaver: widget.secretSaver,
                       ancestors: {...widget.ancestors, identity},
                       revision: widget.revision,
                       enabled: widget.enabled,
@@ -363,6 +371,7 @@ class _NeuronViewState extends State<NeuronView> {
               revision: widget.revision,
               enabled: widget.enabled,
               onAction: widget.onAction,
+              secretSaver: widget.secretSaver,
             );
           default:
             return _FallbackRenderer(kind: widget.kind);
@@ -512,6 +521,7 @@ class _FormRenderer extends StatefulWidget {
     required this.revision,
     required this.enabled,
     required this.onAction,
+    this.secretSaver,
   });
 
   final UiFormPart part;
@@ -519,6 +529,7 @@ class _FormRenderer extends StatefulWidget {
   final int revision;
   final bool enabled;
   final Future<void> Function(Map<String, dynamic>)? onAction;
+  final SecretSaver? secretSaver;
 
   @override
   State<_FormRenderer> createState() => _FormRendererState();
@@ -584,20 +595,41 @@ class _FormRendererState extends State<_FormRenderer> {
     final label = field.required ? '${field.label} *' : field.label;
     switch (field.kind) {
       case 'Secret':
-        // The raw secret never reaches the form; it is set out of band and shown as a handle.
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: TextFormField(
-            key: Key('form_secret_${field.name}'),
-            obscureText: true,
-            readOnly: true,
-            enabled: widget.enabled,
-            decoration: InputDecoration(
-              labelText: label,
-              isDense: true,
-              helperText: field.secretSet ? '•••• set' : 'Not set',
+        // The raw secret is posted once to the vault; only the returned reference reaches the
+        // form. Without a vault saver there is no way to set it, so the handle stays read-only.
+        final saver = widget.secretSaver;
+        if (saver == null) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: TextFormField(
+              key: Key('form_secret_${field.name}'),
+              obscureText: true,
+              readOnly: true,
+              enabled: widget.enabled,
+              decoration: InputDecoration(
+                labelText: label,
+                isDense: true,
+                helperText: field.secretSet ? '•••• set' : 'Not set',
+              ),
             ),
-          ),
+          );
+        }
+        return _SecretInput(
+          key: Key('form_secret_${field.name}'),
+          label: label,
+          enabled: widget.enabled,
+          isSet: field.secretSet,
+          save: (value) async {
+            final reference = await saver(field.name, value);
+            if (reference != null && reference.isNotEmpty) {
+              await dispatch({
+                'action': 'secret',
+                'field': field.name,
+                'value': reference,
+              });
+            }
+            return reference;
+          },
         );
       case 'Date':
         final value = values[field.name];
@@ -687,5 +719,83 @@ class _FormRendererState extends State<_FormRenderer> {
     final formatted = picked.toIso8601String().split('T').first;
     setState(() => values[field.name] = formatted);
     await dispatch({'field': field.name, 'value': formatted});
+  }
+}
+
+/// A masked secret input that hands the raw value to the vault once and then drops it, keeping
+/// only the returned reference. The field text is cleared on success so the raw value is not held.
+class _SecretInput extends StatefulWidget {
+  const _SecretInput({
+    super.key,
+    required this.label,
+    required this.enabled,
+    required this.isSet,
+    required this.save,
+  });
+
+  final String label;
+  final bool enabled;
+  final bool isSet;
+  final Future<String?> Function(String value) save;
+
+  @override
+  State<_SecretInput> createState() => _SecretInputState();
+}
+
+class _SecretInputState extends State<_SecretInput> {
+  final controller = TextEditingController();
+  bool set = false;
+  bool saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    set = widget.isSet;
+  }
+
+  Future<void> submit() async {
+    final value = controller.text;
+    if (value.isEmpty || saving) return;
+    setState(() => saving = true);
+    try {
+      final reference = await widget.save(value);
+      if (!mounted) return;
+      setState(() {
+        set = reference != null && reference.isNotEmpty;
+        saving = false;
+        controller.clear();
+      });
+    } catch (_) {
+      if (mounted) setState(() => saving = false);
+      rethrow;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: TextFormField(
+      controller: controller,
+      obscureText: true,
+      enabled: widget.enabled && !saving,
+      decoration: InputDecoration(
+        labelText: widget.label,
+        isDense: true,
+        helperText: set ? '•••• set' : 'Not set',
+        suffixIcon: IconButton(
+          key: const Key('form_secret_save'),
+          icon: const Icon(Icons.check),
+          tooltip: 'Store in My Data',
+          onPressed: widget.enabled && !saving ? submit : null,
+        ),
+      ),
+      onFieldSubmitted: (_) => submit(),
+    ),
+  );
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
   }
 }

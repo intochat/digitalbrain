@@ -62,6 +62,7 @@ internal sealed class FormNeuron([PersistentState("state", DigitalBrainNames.Def
         if (field.Kind != FieldKind.Secret) { throw new ArgumentException($"Field '{fieldName}' is not a secret field.", nameof(fieldName)); }
         _ = TypeCatalog.Validate(reference, FieldKind.Secret);
         field.SecretSet = true;
+        field.Secret = reference;
         field.Value = null;
         Snapshot.Revision++;
         return SaveAndReturn();
@@ -83,7 +84,7 @@ internal sealed class FormNeuron([PersistentState("state", DigitalBrainNames.Def
         {
             if (!Snapshot.Fields.Any(field => field.Name == name)) { throw new ArgumentException($"The form has no field '{name}'.", nameof(submission)); }
         }
-        var normalized = new List<(FormFieldState Field, string? Value, bool SecretSet)>(Snapshot.Fields.Count);
+        var normalized = new List<(FormFieldState Field, string? Value, bool SecretSet, SecretRef? Secret)>(Snapshot.Fields.Count);
         foreach (var field in Snapshot.Fields)
         {
             provided.TryGetValue(field.Name, out var submitted);
@@ -96,7 +97,7 @@ internal sealed class FormNeuron([PersistentState("state", DigitalBrainNames.Def
                     continue;
                 }
                 _ = TypeCatalog.Validate(submitted.Secret, FieldKind.Secret);
-                normalized.Add((field, null, true));
+                normalized.Add((field, null, true, submitted.Secret));
                 continue;
             }
             if (string.IsNullOrEmpty(submitted?.Value))
@@ -115,12 +116,13 @@ internal sealed class FormNeuron([PersistentState("state", DigitalBrainNames.Def
                 }
             }
             var input = field.Kind == FieldKind.MultiChoice ? text.Split('\n') : (object)text;
-            normalized.Add((field, Normalize(field.Kind, TypeCatalog.Validate(input, field.Kind)), false));
+            normalized.Add((field, Normalize(field.Kind, TypeCatalog.Validate(input, field.Kind)), false, null));
         }
-        foreach (var (field, value, secretSet) in normalized)
+        foreach (var (field, value, secretSet, secret) in normalized)
         {
             field.Value = value;
             field.SecretSet = secretSet;
+            if (secret is not null) { field.Secret = secret; }
         }
         Snapshot.Submitted = true;
         Snapshot.Revision++;

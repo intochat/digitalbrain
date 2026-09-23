@@ -28,6 +28,42 @@ public sealed class CrossWorkspaceFacts
     }
 
     [Fact(Timeout = 180_000)]
+    public async Task ASignedInPrincipalCannotReachAnotherPrincipalsWorkspace()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await IntoChatE2ETest.StartAsync(ct);
+
+        using var alice = CookieClient(brain.HttpClient);
+        using var bob = CookieClient(brain.HttpClient);
+
+        using var aliceLogin = await alice.PostAsJsonAsync(
+            "/identity/login",
+            new { principalId = "alice", displayName = "Alice", workspaceId = "workspace-alice" }, ct);
+        Assert.Equal(HttpStatusCode.OK, aliceLogin.StatusCode);
+
+        using var bobLogin = await bob.PostAsJsonAsync(
+            "/identity/login",
+            new { principalId = "bob", displayName = "Bob", workspaceId = "workspace-bob" }, ct);
+        Assert.Equal(HttpStatusCode.OK, bobLogin.StatusCode);
+
+        // Bob reaches his own workspace but is forbidden from Alice's scoped value and app node.
+        using var ownUi = await bob.GetAsync("/workspaces/workspace-bob/ui/sliders/volume", ct);
+        Assert.Equal(HttpStatusCode.OK, ownUi.StatusCode);
+
+        using var foreignUi = await bob.GetAsync("/workspaces/workspace-alice/ui/sliders/volume", ct);
+        Assert.Equal(HttpStatusCode.Forbidden, foreignUi.StatusCode);
+
+        using var foreignNode = await bob.GetAsync("/workspaces/workspace-alice/apps/node?kind=text&name=workspace-alice/apps/forms/intake", ct);
+        Assert.Equal(HttpStatusCode.Forbidden, foreignNode.StatusCode);
+    }
+
+    private static HttpClient CookieClient(HttpClient origin)
+    {
+        var handler = new SocketsHttpHandler { UseCookies = true, CookieContainer = new CookieContainer() };
+        return new HttpClient(handler) { BaseAddress = origin.BaseAddress };
+    }
+
+    [Fact(Timeout = 180_000)]
     public async Task UnscopedValueRoutesAreGone()
     {
         var ct = TestContext.Current.CancellationToken;
