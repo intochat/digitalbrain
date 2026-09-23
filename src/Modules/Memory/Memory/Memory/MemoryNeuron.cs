@@ -55,6 +55,25 @@ internal sealed class MemoryNeuron(
         return key;
     }
 
+    public async Task<long> PurgeNamespace(PurgeNamespace note)
+    {
+        ArgumentNullException.ThrowIfNull(note);
+        ArgumentException.ThrowIfNullOrWhiteSpace(note.Namespace);
+        if (note.Namespace == ReservedNamespace)
+        {
+            throw new ArgumentException("Choose a namespace other than digitalbrain.capabilities.", nameof(note));
+        }
+
+        var (_, store) = RequireDependencies();
+        var removed = await store.RemoveNamespaceAsync(this.GetPrimaryKeyString(), note.Namespace, CancellationToken.None).ConfigureAwait(true);
+
+        var current = Current;
+        state.State = current with { ForgottenCount = current.ForgottenCount + (int)Math.Min(removed, int.MaxValue), LastChangedAt = time.GetUtcNow() };
+        await state.WriteStateAsync().ConfigureAwait(true);
+        await PublishAsync(new NamespacePurged(note.Namespace, removed)).ConfigureAwait(true);
+        return removed;
+    }
+
     [ReadOnly]
     public async Task<RecallResult> Recall(Recall query)
     {

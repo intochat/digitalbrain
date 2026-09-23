@@ -29,13 +29,16 @@ using DigitalBrain.Receipts;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
 using DigitalBrain.Time;
+using IntoChat.AppHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
 var testing = builder.Configuration.GetValue<bool>("DigitalBrain:Testing:Enabled");
 var profile = builder.Configuration[ProductSurfaceResources.ProfileKey] ?? ProductSurfaceResources.DeveloperProfile;
-var developerProfile = !string.Equals(profile, ProductSurfaceResources.ProductProfile, StringComparison.OrdinalIgnoreCase);
+var hosted = HostedProfile.IsHosted(profile, builder.Configuration);
+var developerProfile = !hosted
+    && !string.Equals(profile, ProductSurfaceResources.ProductProfile, StringComparison.OrdinalIgnoreCase);
 var repositories = builder.Configuration.GetSection("DigitalBrain:Microsoft:GitHub:Repositories")
     .Get<Dictionary<string, GitHubRepositoryDeclaration>>() ?? [];
 var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, persistentStorage: !testing)
@@ -149,6 +152,13 @@ if (testing)
     // Null arguments to WithHttpEndpoint retain ports from launchSettings.json.
     // Clear both inherited ports so each test deployment receives its own endpoint.
     runtime.WithEndpoint("http", endpoint => { endpoint.Port = null; endpoint.TargetPort = null; });
+}
+
+if (hosted)
+{
+    // Product-only hosted deployment: managed identity and Key Vault are wired by configuration,
+    // and the developer executor is absent because the developer profile was not composed.
+    HostedProfile.Apply(runtime, builder.Configuration);
 }
 
 builder.Build().Run();

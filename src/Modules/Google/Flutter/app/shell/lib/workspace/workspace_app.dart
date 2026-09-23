@@ -811,6 +811,15 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                             widget.programmingClient?.readWorkspaceConversation,
                         onOpenUrl: widget.onOpenUrl,
                         onSalesforceConnected: widget.onSalesforceConnected,
+                        onReportProblem: widget.programmingClient == null
+                            ? null
+                            : (workspaceId, intentId, message) => widget
+                                  .programmingClient!
+                                  .reportProblem(
+                                    workspaceId: workspaceId,
+                                    intentId: intentId,
+                                    message: message,
+                                  ),
                         onArtifact: (result) =>
                             _accept(result, project: project),
                         onAttach: () => _attach(context),
