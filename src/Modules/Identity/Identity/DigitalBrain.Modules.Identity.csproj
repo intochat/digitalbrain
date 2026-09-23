@@ -9,4 +9,7 @@
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Identity.Contracts.csproj" />
     <ProjectReference Include="../../DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
 </Project>

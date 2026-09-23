@@ -1,3 +1,5 @@
+using Orleans;
+
 namespace DigitalBrain.Identity;
 
 public enum MemberRole
@@ -24,4 +26,15 @@ public sealed record Grant
     [Id(4)] public string? ConversationId { get; init; }
     [Id(5)] public DateTimeOffset GrantedAt { get; init; }
     [Id(6)] public bool Revoked { get; init; }
+}
+
+// One grant store per workspace, keyed by the workspace id. Keys are (app, semantic type, mode)
+// with an optional conversation for this-chat grants.
+public interface IGrantStore : IGrainWithStringKey
+{
+    Task<Grant> GrantAsync(Grant grant, CancellationToken cancellationToken = default);
+
+    Task RevokeAsync(string appId, string semanticTypeId, GrantMode mode, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Grant>> ListAsync(CancellationToken cancellationToken = default);
 }

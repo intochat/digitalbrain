@@ -129,7 +129,7 @@ internal static class AppEndpoints
             catch (WorkspaceRevisionConflictException) when (attempt < 2) { }
         }
     }
-    private static string Scope(BasicAuthOptions auth, string workspace) => WorkspaceScope.Create(auth.Username is { Length: > 0 } owner ? owner : BasicAuthGate.DefaultLogin, workspace).Id;
+    private static string Scope(BasicAuthOptions auth, string workspace) => WorkspaceScope.Create(auth.Username is { Length: > 0 } owner ? owner : AccountSession.DefaultLogin, workspace).Id;
     private static IImageDocument Document(IDigitalBrain brain, string scope, string id)
     {
         if (id.Length != 64 || id.Any(c => !char.IsAsciiHexDigit(c))) { throw new ArgumentException("Invalid image document."); }
