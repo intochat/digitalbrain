@@ -1,0 +1,46 @@
+{
+  "id": "intochat.image-editor",
+  "version": "1.0.0",
+  "publisher": "intochat",
+  "kind": "declarative",
+  "name": "Image Editor",
+  "descriptionForPeople": "Draw, crop and save copies of images.",
+  "descriptionForModel": "Edit an image document; strokes and crops are saved as a new copy.",
+  "operations": [
+    {
+      "name": "Open",
+      "descriptionForModel": "Open an image asset as a document.",
+      "readOnly": true,
+      "inputTypeIds": { "asset": "reference" },
+      "outputTypeId": "reference"
+    },
+    {
+      "name": "Apply",
+      "descriptionForModel": "Apply a stroke, crop or reset to the open document.",
+      "inputTypeIds": { "command": "reference", "expectedRevision": "number", "operationId": "plain-text" },
+      "outputTypeId": "reference"
+    },
+    {
+      "name": "PrepareSave",
+      "descriptionForModel": "Prepare a save ticket for the current revision.",
+      "inputTypeIds": { "expectedRevision": "number", "operationId": "plain-text" },
+      "outputTypeId": "reference"
+    },
+    {
+      "name": "CompleteSave",
+      "descriptionForModel": "Complete a prepared save with the stored file.",
+      "inputTypeIds": { "operationId": "plain-text", "result": "reference" },
+      "outputTypeId": "reference"
+    },
+    {
+      "name": "Read",
+      "descriptionForModel": "Read the open image document.",
+      "readOnly": true,
+      "outputTypeId": "reference"
+    }
+  ],
+  "uiEntry": "app-images",
+  "permissions": [],
+  "meters": [],
+  "examplePrompts": ["Crop this image", "Draw on the photo"]
+}

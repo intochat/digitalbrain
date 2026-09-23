@@ -1,0 +1,28 @@
+{
+  "id": "intochat.customer-tables",
+  "version": "1.0.0",
+  "publisher": "intochat",
+  "kind": "declarative",
+  "name": "Customer Tables",
+  "descriptionForPeople": "Read and refine live tables from your connected database.",
+  "descriptionForModel": "Read a live table's schema and counts, or refine the same window with filters.",
+  "operations": [
+    {
+      "name": "Read",
+      "descriptionForModel": "Read the live table schema, counts and a bounded page.",
+      "readOnly": true,
+      "inputTypeIds": { "tableId": "plain-text", "offset": "number", "limit": "number" },
+      "outputTypeId": "reference"
+    },
+    {
+      "name": "Refine",
+      "descriptionForModel": "Refine the current table window with filters and sort.",
+      "inputTypeIds": { "view": "reference", "expectedRevision": "number" },
+      "outputTypeId": "reference"
+    }
+  ],
+  "uiEntry": "app-tables",
+  "permissions": [],
+  "meters": [],
+  "examplePrompts": ["Show the leads table", "How many active leads are there"]
+}

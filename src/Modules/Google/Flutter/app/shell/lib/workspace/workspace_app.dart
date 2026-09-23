@@ -62,6 +62,8 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   final _remote = <String, WorkspaceRemoteController>{};
   final _remoteCancelled = Completer<void>();
   final _tableCancelled = <String, Completer<void>>{};
+  final _apps = <String, List<AppManifestSummary>>{};
+  final _appsLoading = <String>{};
 
   void _connectWorkspaces() {
     final client = widget.programmingClient;
@@ -152,6 +154,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     if (!mounted) return;
     setState(() => _ready = true);
     _connectWorkspaces();
+    _loadApps(store.currentProject.id);
     _navigateRoute(_initialLocation);
   }
 
@@ -212,7 +215,27 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
 
   void _changed() {
     _connectWorkspaces();
+    if (store.projects.isNotEmpty) _loadApps(store.currentProject.id);
     if (mounted) setState(() {});
+  }
+
+  void _loadApps(String workspaceId) {
+    final client = widget.programmingClient;
+    if (client == null || _apps.containsKey(workspaceId) || !_appsLoading.add(workspaceId)) {
+      return;
+    }
+    unawaited(
+      client
+          .listApps(workspaceId)
+          .then((apps) {
+            if (!mounted) return;
+            _apps[workspaceId] = apps;
+            setState(() {});
+          })
+          .catchError((Object _) {
+            _appsLoading.remove(workspaceId);
+          }),
+    );
   }
 
   @override
@@ -929,6 +952,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   );
   Widget _islands(BuildContext context) => WorkspaceIslands(
     store: store,
+    apps: _apps[store.currentProject.id] ?? const [],
     onLaunch: (app) => store.launchLocalApp(app),
     onRestore: (id) =>
         _open(store.currentProject.artifacts.firstWhere((a) => a.id == id)),
