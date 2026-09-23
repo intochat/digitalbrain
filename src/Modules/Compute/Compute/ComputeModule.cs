@@ -32,5 +32,6 @@ public sealed class ComputeModule : IModule
             services.TryAddSingleton<ILedgerStore, InMemoryLedgerStore>();
         }
         services.TryAddSingleton<IMeterSink, DurableMeterSink>();
+        services.TryAddSingleton<IPriceBook, PriceBook>();
     }
 }
