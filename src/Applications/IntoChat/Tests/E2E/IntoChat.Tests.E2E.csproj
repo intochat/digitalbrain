@@ -7,6 +7,9 @@
     <Using Include="System.Net" />
     <Using Include="DigitalBrain" />
     <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
+    <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
+    <ProjectReference Include="../../../../Modules/Automations/Automations/DigitalBrain.Modules.Automations.csproj" />
+    <ProjectReference Include="../../../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
     <ProjectReference Include="../../../../Modules/Google/Flutter/Testing/DigitalBrain.Modules.Flutter.Testing.csproj" />
     <ProjectReference Include="../../AppHost/IntoChat.AppHost.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../IntoChat/IntoChat.csproj" />

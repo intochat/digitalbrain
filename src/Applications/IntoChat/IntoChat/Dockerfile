@@ -65,7 +65,8 @@ ENV ASPNETCORE_ENVIRONMENT=Production \
     DigitalBrain__Modules__10="DigitalBrain.Microsoft.DotNet.DotNetModule, DigitalBrain.Modules.Microsoft.DotNet" \
     DigitalBrain__Modules__11="DigitalBrain.Coding.CodingModule, DigitalBrain.Modules.Coding" \
     DigitalBrain__Modules__12="DigitalBrain.Behavior.BehaviorModule, DigitalBrain.Modules.Behavior" \
-    DigitalBrain__Modules__13="DigitalBrain.Flutter.FlutterModule, DigitalBrain.Modules.Flutter"
+    DigitalBrain__Modules__13="DigitalBrain.Flutter.FlutterModule, DigitalBrain.Modules.Flutter" \
+    DigitalBrain__Modules__14="DigitalBrain.Automations.AutomationsModule, DigitalBrain.Modules.Automations"
 
 EXPOSE 8080
 
