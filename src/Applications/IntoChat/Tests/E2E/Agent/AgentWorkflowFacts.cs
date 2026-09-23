@@ -33,7 +33,7 @@ public sealed class AgentWorkflowFacts
         Assert.True(emptyStream.Contains("RUN_FINISHED", StringComparison.Ordinal), emptyStream + "\n" + string.Join("\n", model.Errors) + "\n" + string.Join("\n", model.Requests.Select(r => r.GetRawText())));
         var workspace = brain.Get<IWorkspace>(WorkspaceScope.Create("owner", "failures").Id);
         var window = Assert.Single((await workspace.Read()).Windows);
-        Assert.Empty((await brain.Get<DigitalBrain.Supabase.Tables.ISupabaseTable>(window.View.Id).Read(new(0, 25)))!.Rows);
+        Assert.Empty((await brain.Get<DigitalBrain.Supabase.Tables.ISupabaseTable>(window.Reference.NeuronId).Read(new(0, 25)))!.Rows);
         model.Sql = "delete from leads";
         var invalid = await Ask("invalid");
         Assert.Contains("RUN_ERROR", invalid);

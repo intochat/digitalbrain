@@ -27,7 +27,7 @@ public sealed class WorkspaceRestoreFacts
         var company = snapshot.Columns.Single(column => column.Label == "company");
         await table.UpdateView(new(snapshot.Revision, [new(company.Id, "eq", JsonSerializer.Serialize(marker))], null, snapshot.VisibleColumns));
         var workspace = brain.Get<IWorkspace>(WorkspaceScope.Create("owner", projectId).Id);
-        await workspace.Open(new("show-leads", "leads-window", "Active leads", new(snapshot.Id), (await workspace.Read()).Revision));
+        await workspace.Open(new("show-leads", "leads-window", "Active leads", WindowReference.Table(snapshot.Id), (await workspace.Read()).Revision));
 
         var window = page.GetByRole(AriaRole.Region, new() { Name = "Active leads", Exact = true });
         await Assertions.Expect(window).ToHaveCountAsync(0);

@@ -128,7 +128,7 @@ public sealed class AgentTableJourneyFacts
         await SendAsync(page, "Only London");
         await Assertions.Expect(page.GetByText("Refined the same window to London.", new() { Exact = true })).ToBeVisibleAsync(new() { Timeout = 60_000 });
         await Assertions.Expect(window).ToHaveCountAsync(1);
-        var tableId = Assert.Single((await workspace.Read()).Windows).View.Id;
+        var tableId = Assert.Single((await workspace.Read()).Windows).Reference.NeuronId;
         var refined = await brain.Get<DigitalBrain.Supabase.Tables.ISupabaseTable>(tableId).Read(new(0, 25));
         Assert.Equal(60, refined!.TotalRows);
         Assert.Equal(6, refined.FilteredRows);

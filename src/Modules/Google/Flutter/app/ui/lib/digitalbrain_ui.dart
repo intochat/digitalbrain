@@ -30,3 +30,4 @@ export 'src/theme/ui_theme.dart';
 export 'src/components/image_canvas/image_recipe.dart';
 export 'src/components/image_canvas/ui_image_canvas.dart';
 export 'src/composition/neuron_view.dart';
+export 'src/composition/renderer_registry.dart';

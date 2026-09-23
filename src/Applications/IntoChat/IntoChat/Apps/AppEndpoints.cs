@@ -143,11 +143,12 @@ internal static class AppEndpoints
     private static async Task EnsureWindow(IDigitalBrain brain, string scope, string id, string title, UiChildRef surface, CancellationToken ct)
     {
         var workspace = brain.Get<IWorkspace>(scope);
+        var reference = WindowReference.For(surface);
         for (var attempt = 0; attempt < 3; attempt++)
         {
             var state = await workspace.Read().WaitAsync(ct);
-            if (state.Windows.Any(w => w.Id == id && w.IsOpen && w.Surface == surface)) { return; }
-            try { await workspace.OpenSurface(new(Guid.NewGuid().ToString(), id, title, surface, state.Revision)).WaitAsync(ct); return; }
+            if (state.Windows.Any(w => w.Id == id && w.IsOpen && w.Reference == reference)) { return; }
+            try { await workspace.OpenSurface(new(Guid.NewGuid().ToString(), id, title, reference, state.Revision)).WaitAsync(ct); return; }
             catch (WorkspaceRevisionConflictException) when (attempt < 2) { }
         }
     }

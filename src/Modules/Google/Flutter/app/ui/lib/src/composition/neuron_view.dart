@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/ui_part.dart';
+import 'renderer_registry.dart';
 
 typedef NeuronLoader = Future<Map<String, dynamic>> Function(
   String kind,
@@ -76,25 +77,26 @@ class _NeuronViewState extends State<NeuronView> {
       future: state,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('This component could not be loaded.'),
-                TextButton(
-                  onPressed: () => setState(
-                    () => state = widget.load(widget.kind, widget.name),
-                  ),
-                  child: const Text('Retry'),
-                ),
-              ],
+          return WindowStateView(
+            state: const WindowState(WindowStatus.failed),
+            onRetry: () => setState(
+              () => state = widget.load(widget.kind, widget.name),
             ),
           );
         }
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return const WindowStateView(state: WindowState(WindowStatus.loading));
         }
         final data = snapshot.data!;
+        final declared = WindowState.fromMetadata(data);
+        if (declared != null) {
+          return WindowStateView(
+            state: declared,
+            onRetry: () => setState(
+              () => state = widget.load(widget.kind, widget.name),
+            ),
+          );
+        }
         final definition = Map<String, dynamic>.from(
           data['definition'] as Map? ?? data,
         );
@@ -363,11 +365,140 @@ class _NeuronViewState extends State<NeuronView> {
               onAction: widget.onAction,
             );
           default:
-            return const Center(
-              child: Text('This component cannot be displayed.'),
-            );
+            return _FallbackRenderer(kind: widget.kind);
         }
       },
+    );
+  }
+}
+
+/// Renders the declared fallback for a UI kind that has no dedicated renderer: the kind is named
+/// and explained, never blank.
+class _FallbackRenderer extends StatelessWidget {
+  const _FallbackRenderer({required this.kind});
+
+  final String kind;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('${RendererRegistry.fallbackLabel}: $kind'),
+            const SizedBox(height: 4),
+            const Text(
+              RendererRegistry.fallbackExplanation,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Renders each declared window state. Loading shows progress, failed offers a retry, and the
+/// other states explain the situation in one line so no window is blank.
+class WindowStateView extends StatelessWidget {
+  const WindowStateView({super.key, required this.state, this.onRetry});
+
+  final WindowState state;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    if (state.status == WindowStatus.loading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+    final (icon, label, message) = switch (state.status) {
+      WindowStatus.loading => (Icons.hourglass_empty, 'Loading', ''),
+      WindowStatus.empty => (
+        Icons.inbox_outlined,
+        'Nothing here yet',
+        'This window has no content yet.',
+      ),
+      WindowStatus.permissionDenied => (
+        Icons.lock_outline,
+        'Not available to you',
+        'You do not have permission to view this window.',
+      ),
+      WindowStatus.expiredConnection => (
+        Icons.link_off,
+        'Connection expired',
+        'The connection this window needs has expired. Reconnect to continue.',
+      ),
+      WindowStatus.failed => (
+        Icons.error_outline,
+        'Could not load',
+        state.message ?? 'This component could not be loaded.',
+      ),
+    };
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 28),
+            const SizedBox(height: 8),
+            Text(label),
+            if (message.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(message, textAlign: TextAlign.center),
+            ],
+            if (onRetry != null) ...[
+              const SizedBox(height: 8),
+              TextButton(onPressed: onRetry, child: const Text('Retry')),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Renders the first-run workspace state: the assistant plus starter prompts that match the
+/// connected sources.
+class FirstRunView extends StatelessWidget {
+  const FirstRunView({super.key, required this.state, this.onPrompt});
+
+  final FirstRunState state;
+  final ValueChanged<StarterPrompt>? onPrompt;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            state.assistantTitle,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 4),
+          const Text('Start with one of these.'),
+          const SizedBox(height: 12),
+          for (final prompt in state.prompts)
+            Card(
+              child: ListTile(
+                title: Text(prompt.label),
+                subtitle: prompt.source == 'assistant'
+                    ? null
+                    : Text(prompt.source),
+                onTap: onPrompt == null ? null : () => onPrompt!(prompt),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

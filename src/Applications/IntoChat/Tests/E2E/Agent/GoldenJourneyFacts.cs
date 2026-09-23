@@ -38,14 +38,14 @@ public sealed class GoldenJourneyFacts
 
             await AskAsync(brain, workspaceId, "thread", $"{workspaceId}-open", "Show me all customers", token);
             var opened = Assert.Single((await workspace.Read()).Windows);
-            var tableId = opened.View.Id;
+            var tableId = opened.Reference.NeuronId;
             var allCustomers = await brain.Get<ISupabaseTable>(tableId).Read(new(0, 25));
             Assert.NotNull(allCustomers);
             Assert.True(allCustomers!.TotalRows > 0, "The customers window opened with no rows.");
 
             await AskAsync(brain, workspaceId, "thread", $"{workspaceId}-london", "only London", token);
             var refinedWindow = Assert.Single((await workspace.Read()).Windows);
-            Assert.Equal(tableId, refinedWindow.View.Id);
+            Assert.Equal(tableId, refinedWindow.Reference.NeuronId);
             var london = await brain.Get<ISupabaseTable>(tableId).Read(new(0, 25));
             Assert.NotNull(london);
             Assert.NotEmpty(london!.Filters);

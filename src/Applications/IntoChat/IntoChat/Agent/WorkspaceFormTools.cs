@@ -79,12 +79,13 @@ internal sealed class WorkspaceFormTools(IDigitalBrain brain, AppSurfaceComposer
     private async Task EnsureWindowAsync(string scope, string windowId, string title, UiChildRef surface, CancellationToken ct)
     {
         var workspace = brain.Get<IWorkspace>(scope);
+        var reference = WindowReference.For(surface);
         for (var attempt = 0; attempt < 4; attempt++)
         {
             ct.ThrowIfCancellationRequested();
             var state = await workspace.Read().WaitAsync(ct);
-            if (state.Windows.Any(window => window.Id == windowId && window.IsOpen && window.Surface == surface)) { return; }
-            try { await workspace.OpenSurface(new(Guid.NewGuid().ToString(), windowId, title, surface, state.Revision)).WaitAsync(ct); return; }
+            if (state.Windows.Any(window => window.Id == windowId && window.IsOpen && window.Reference == reference)) { return; }
+            try { await workspace.OpenSurface(new(Guid.NewGuid().ToString(), windowId, title, reference, state.Revision)).WaitAsync(ct); return; }
             catch (WorkspaceRevisionConflictException) when (attempt < 3) { }
         }
         throw new InvalidOperationException("The workspace changed too often; retry this operation.");

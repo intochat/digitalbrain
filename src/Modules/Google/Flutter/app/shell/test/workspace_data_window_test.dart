@@ -55,7 +55,7 @@ class WorkspaceClient extends http.BaseClient {
                     {
                       'id': 'window',
                       'title': 'Leads',
-                      'view': {'id': 'table'},
+                      'reference': {'kind': 'table', 'neuronId': 'table'},
                       'isOpen': open,
                     },
                   ],

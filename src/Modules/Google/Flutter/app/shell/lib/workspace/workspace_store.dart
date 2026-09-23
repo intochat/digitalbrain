@@ -334,16 +334,16 @@ class WorkspaceStore extends ChangeNotifier {
         artifact = WorkspaceArtifact(
           id: window.id,
           title: window.title,
-          kind: window.surface == null ? 'table' : 'app',
+          kind: window.kind == 'table' ? 'table' : 'app',
           remoteManaged: true,
-          data: window.surface == null
-              ? {'tableId': window.tableId}
+          data: window.kind == 'table'
+              ? {'tableId': window.neuronId}
               : {'app': window.id == 'app-files' ? 'files' : 'images'},
         );
         project.artifacts.add(artifact);
       }
-      if (window.surface != null && window.id == 'app-images') {
-        final name = window.surface!['name'] as String;
+      if (window.kind != 'table' && window.id == 'app-images') {
+        final name = window.neuronId;
         final parts = name.split('/images/');
         if (parts.length == 2) {
           final documentId = parts.last.split('/').first;

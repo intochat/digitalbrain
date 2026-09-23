@@ -24,7 +24,7 @@ public sealed class WorkspaceDataFacts
         var scope = WorkspaceScope.Create("owner", "workspace-a");
         var table = brain.Get<ISupabaseTable>("workspace-http-table");
         await table.CreateFromQuery(new("Leads", "select id, name, active from leads order by id"));
-        await brain.Get<IWorkspace>(scope.Id).Open(new("open", "window", "Leads", new("workspace-http-table"), 0));
+        await brain.Get<IWorkspace>(scope.Id).Open(new("open", "window", "Leads", WindowReference.Table("workspace-http-table"), 0));
         var path = "/workspaces/workspace-a/tables/workspace-http-table";
         var first = await brain.HttpClient.GetFromJsonAsync<JsonElement>(path + "?offset=0&limit=25", ct);
         Assert.Equal(25, first.GetProperty("rows").GetArrayLength());
