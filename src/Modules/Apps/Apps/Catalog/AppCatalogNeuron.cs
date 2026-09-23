@@ -107,6 +107,9 @@ internal sealed class AppCatalogNeuron(
             DescriptionForModel = request.DescriptionForModel ?? request.DescriptionForPeople,
             Operations = request.Operations,
             UiEntry = request.UiEntry,
+            Permissions = request.Permissions,
+            Meters = request.Meters,
+            Scenarios = request.Scenarios,
             ExamplePrompts = request.ExamplePrompts,
         };
         return await Install(manifest);
