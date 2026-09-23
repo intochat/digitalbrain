@@ -43,10 +43,10 @@ internal sealed class AppCatalogNeuron(
     public async Task<AppInstallation> Rollback(string appId)
     {
         var versions = Versions(appId);
-        var current = versions.LastOrDefault(version => version.Active)
-            ?? throw new KeyNotFoundException($"App '{appId}' is not installed.");
-        var previous = versions.LastOrDefault(version => !version.Active)
-            ?? throw new InvalidOperationException($"App '{appId}' has no earlier version to roll back to.");
+        var currentIndex = versions.FindLastIndex(version => version.Active);
+        if (currentIndex < 0) { throw new KeyNotFoundException($"App '{appId}' is not installed."); }
+        if (currentIndex == 0) { throw new InvalidOperationException($"App '{appId}' has no earlier version to roll back to."); }
+        var previous = versions[currentIndex - 1];
         var next = versions
             .Select(version => version with { Active = version.Manifest.Version == previous.Manifest.Version })
             .ToList();
@@ -57,9 +57,10 @@ internal sealed class AppCatalogNeuron(
     public async Task<AppUninstallOutcome> Uninstall(string appId)
     {
         var versions = Snapshot.Versions.TryGetValue(appId, out var stored) ? stored : null;
-        if (versions is null) { throw new KeyNotFoundException($"App '{appId}' is not installed."); }
+        var active = versions?.LastOrDefault(version => version.Active);
+        if (active is null) { throw new KeyNotFoundException($"App '{appId}' is not installed."); }
 
-        var manifest = versions[^1].Manifest;
+        var manifest = active.Manifest;
         var kept = manifest.Permissions.Select(permission => permission.SemanticTypeId)
             .Distinct(StringComparer.Ordinal)
             .Append(manifest.Id + ":data")
