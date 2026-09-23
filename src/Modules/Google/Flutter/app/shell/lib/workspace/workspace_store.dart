@@ -317,6 +317,16 @@ class WorkspaceStore extends ChangeNotifier {
   String? persistenceError;
   bool loaded = false;
 
+  bool _developerMode = false;
+
+  /// Server-owned; never persisted locally so a client cannot switch it on.
+  bool get developerMode => _developerMode;
+  set developerMode(bool value) {
+    if (_developerMode == value) return;
+    _developerMode = value;
+    _notify();
+  }
+
   final Map<String, FirstRunState?> _firstRun = {};
 
   /// Non-null while the selected workspace has never opened a window; drives the first-run view.
@@ -574,6 +584,9 @@ class WorkspaceStore extends ChangeNotifier {
   WorkspaceArtifact launchLocalApp(String app) {
     if (!['files', 'images', 'behaviors', 'mydata'].contains(app)) {
       throw ArgumentError('Application not implemented.');
+    }
+    if (app == 'behaviors' && !_developerMode) {
+      throw ArgumentError('Behaviors are available in developer mode only.');
     }
     final id = 'app-$app';
     final artifact =

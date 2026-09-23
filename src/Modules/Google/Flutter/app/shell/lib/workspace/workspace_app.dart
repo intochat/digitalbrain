@@ -174,7 +174,21 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     setState(() => _ready = true);
     _connectWorkspaces();
     _loadApps(store.currentProject.id);
+    _loadCapabilities();
     _navigateRoute(_initialLocation);
+  }
+
+  void _loadCapabilities() {
+    final client = widget.programmingClient;
+    if (client == null) return;
+    unawaited(
+      client
+          .readCapabilities()
+          .then((capabilities) {
+            if (mounted) store.developerMode = capabilities.developerMode;
+          })
+          .catchError((Object _) {}),
+    );
   }
 
   void _navigateRoute(Uri uri) {
@@ -381,6 +395,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   Future<void> _open(WorkspaceArtifact a) async {
     final destination = store.currentProject;
     if (a.kind == 'app') {
+      if (a.data['app'] == 'behaviors' && !store.developerMode) return;
       store.launchLocalApp(a.data['app'] as String);
       return;
     }
@@ -510,6 +525,11 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         );
       }
       if (a.data['app'] == 'behaviors') {
+        if (!store.developerMode) {
+          return const Center(
+            child: Text('Behaviors are available in developer mode only.'),
+          );
+        }
         final project = store.currentProject;
         return BehaviorManager(
           key: ValueKey('${project.id}-${a.id}'),
@@ -850,6 +870,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                                   as String?
                             : null,
                         onOpenBehavior: (id) {
+                          if (!store.developerMode) return;
                           store.selectProject(project.id);
                           final app = store.launchLocalApp('behaviors');
                           app.data['selected'] = id;
@@ -1083,6 +1104,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   }
 
   Future<void> _launchApp(String launchKey) async {
+    if (launchKey == 'behaviors' && !store.developerMode) return;
     if (const {'files', 'images', 'mydata', 'behaviors'}.contains(launchKey)) {
       store.launchLocalApp(launchKey);
       return;

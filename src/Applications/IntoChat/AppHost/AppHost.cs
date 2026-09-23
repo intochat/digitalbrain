@@ -66,7 +66,6 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<MemoryModule>(memory => memory.WithQdrant())
     .WithModule<ClickHouseModule>(database => database.WithClickHouse(options => options.WithSeed("leads")))
     .WithModule<SupabaseModule>(database => database.WithConnection("supabase"))
-    .WithModule<TimeModule>()
     .WithModule<MyDataModule>()
     .WithModule<ConnectionsModule>()
     .WithModule<IdentityModule>()
@@ -93,6 +92,9 @@ if (developerProfile)
             .WithAspire(Path.Combine(builder.AppHostDirectory, "IntoChat.AppHost.csproj")))
         .WithModule<RoslynModule>()
         .WithModule<DotNetModule>()
+        // The in-memory TimerNeuron schedule is developer-only; the durable ReminderNeuron that
+        // Automations drives is auto-registered by Orleans from the referenced Time assembly.
+        .WithModule<TimeModule>()
         .WithModule<CodingModule>(coding => coding.WithSolution(Path.GetFullPath(
             Path.Combine(builder.AppHostDirectory, "..", "..", "..", "..", "DigitalBrain.slnx"))))
         .WithModule<BehaviorModule>(behavior =>

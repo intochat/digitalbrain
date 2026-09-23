@@ -171,6 +171,28 @@ public sealed class CanarySecretFacts
         Assert.Empty(collector.Errors());
     }
 
+    [Fact(Timeout = 300_000)]
+    public async Task BehaviorConsoleIsGatedByServerDeveloperMode()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var on = await IntoChatE2ETest.Create().StartAsync(ct);
+
+        var capabilities = await on.HttpClient.GetFromJsonAsync<JsonElement>("/session/capabilities", ct);
+        Assert.True(capabilities.GetProperty("developerMode").GetBoolean());
+
+        await using var off = await IntoChatE2ETest.Create()
+            .WithResourceEnvironment(new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["IntoChat__DeveloperMode"] = "false",
+            })
+            .StartAsync(ct);
+
+        var gated = await off.HttpClient.GetFromJsonAsync<JsonElement>("/session/capabilities", ct);
+        Assert.False(gated.GetProperty("developerMode").GetBoolean());
+        using var behaviors = await off.HttpClient.GetAsync($"/workspaces/{Owner}/behaviors/", ct);
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, behaviors.StatusCode);
+    }
+
     private static string Scope(string owner, string workspace)
     {
         var digest = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(owner + "\0" + workspace));

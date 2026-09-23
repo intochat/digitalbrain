@@ -221,16 +221,18 @@ class WorkspaceIslands extends StatelessWidget {
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),
-                const PopupMenuDivider(),
-                PopupMenuItem(
-                  value: behaviorsLauncherEntry.launchKey,
-                  child: ListTile(
-                    leading: Icon(behaviorsLauncherEntry.icon),
-                    title: Text(behaviorsLauncherEntry.title),
-                    subtitle: Text(behaviorsLauncherEntry.subtitle),
-                    contentPadding: EdgeInsets.zero,
+                if (store.developerMode) ...[
+                  const PopupMenuDivider(),
+                  PopupMenuItem(
+                    value: behaviorsLauncherEntry.launchKey,
+                    child: ListTile(
+                      leading: Icon(behaviorsLauncherEntry.icon),
+                      title: Text(behaviorsLauncherEntry.title),
+                      subtitle: Text(behaviorsLauncherEntry.subtitle),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
             if (onInbox != null)
