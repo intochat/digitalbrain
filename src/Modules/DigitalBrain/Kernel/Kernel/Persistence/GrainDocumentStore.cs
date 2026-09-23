@@ -28,8 +28,17 @@ public sealed class DocumentGrain([PersistentState("document", "Default")] IPers
     {
         var current = state.State.Written ? state.State.Version : 0;
         if (current != expectedVersion) { return false; }
+        var previous = state.State;
         state.State = new DocumentState { Written = true, Version = current + 1, Payload = payload };
-        await state.WriteStateAsync();
+        try
+        {
+            await state.WriteStateAsync();
+        }
+        catch
+        {
+            state.State = previous;
+            throw;
+        }
         return true;
     }
 }
