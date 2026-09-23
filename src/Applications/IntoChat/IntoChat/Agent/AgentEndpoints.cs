@@ -25,7 +25,7 @@ internal static class AgentEndpoints
         routes.MapGet("/workspaces/{workspaceId}/conversations/{threadId}", async (string workspaceId, string threadId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) =>
         {
             if (!ValidId(workspaceId) || !ValidId(threadId)) { return Results.BadRequest(); }
-            var scope = WorkspaceScope.Create(auth.Value.Username is { Length: > 0 } owner ? owner : BasicAuthGate.DefaultLogin, workspaceId);
+            var scope = WorkspaceScope.Create(auth.Value.Username is { Length: > 0 } owner ? owner : AccountSession.DefaultLogin, workspaceId);
             return Results.Ok(await brain.Get<IAgent>(ConversationKey(scope.Id, threadId)).ReadConversation(ct));
         });
         routes.MapPost("/agent", async (AgentInput input, HttpContext http, IDigitalBrain brain, IAgentTurnRunner runner, IIntentUsageSink usage, IOptions<BasicAuthOptions> auth, IConfiguration configuration, IHostEnvironment environment) =>
@@ -34,7 +34,7 @@ internal static class AgentEndpoints
                 || input.Messages is not { Count: 1 } || input.Messages[0].Role != "user"
                 || string.IsNullOrWhiteSpace(input.Messages[0].Content) || input.Messages[0].Content.Length > 32000)
             { http.Response.StatusCode = 400; return; }
-            var scope = WorkspaceScope.Create(auth.Value.Username is { Length: > 0 } owner ? owner : BasicAuthGate.DefaultLogin, input.WorkspaceId);
+            var scope = WorkspaceScope.Create(auth.Value.Username is { Length: > 0 } owner ? owner : AccountSession.DefaultLogin, input.WorkspaceId);
             http.Response.ContentType = "text/event-stream";
             http.Response.Headers.CacheControl = "no-cache";
             async Task Emit(object value)

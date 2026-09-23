@@ -23,7 +23,7 @@ internal static class BehaviorEndpoints
             var http = sp.GetRequiredService<IHttpContextAccessor>().HttpContext ?? throw new InvalidOperationException("Behavior MCP requires an HTTP workspace context.");
             var workspace = http.Request.RouteValues["workspaceId"]?.ToString() ?? throw new ArgumentException("Workspace is required.");
             var auth = sp.GetRequiredService<IOptions<BasicAuthOptions>>().Value;
-            var scope = WorkspaceScope.Create(auth.Username is { Length: > 0 } owner ? owner : BasicAuthGate.DefaultLogin, workspace);
+            var scope = WorkspaceScope.Create(auth.Username is { Length: > 0 } owner ? owner : AccountSession.DefaultLogin, workspace);
             return sp.GetRequiredService<BehaviorToolService>().ForScope(scope.Id);
         });
         // WithTools<T> constructs T itself, bypassing our workspace-scoped factory.
@@ -47,9 +47,9 @@ internal static class BehaviorEndpoints
             catch (InvalidDataException error) { return Results.Problem(error.Message, statusCode: 422); }
         });
         static ScopedBehaviorTools Scope(string workspaceId, BehaviorToolService service, IOptions<BasicAuthOptions> auth)
-            => service.ForScope(WorkspaceScope.Create(auth.Value.Username is { Length: > 0 } owner ? owner : BasicAuthGate.DefaultLogin, workspaceId).Id);
+            => service.ForScope(WorkspaceScope.Create(auth.Value.Username is { Length: > 0 } owner ? owner : AccountSession.DefaultLogin, workspaceId).Id);
         static string ScopeId(string workspaceId, IOptions<BasicAuthOptions> auth)
-            => WorkspaceScope.Create(auth.Value.Username is { Length: > 0 } owner ? owner : BasicAuthGate.DefaultLogin, workspaceId).Id;
+            => WorkspaceScope.Create(auth.Value.Username is { Length: > 0 } owner ? owner : AccountSession.DefaultLogin, workspaceId).Id;
         group.MapGet("/", (string workspaceId, BehaviorManagement management, IOptions<BasicAuthOptions> auth, CancellationToken ct) => management.List(ScopeId(workspaceId, auth), ct));
         group.MapGet("/{id}/detail", (string workspaceId, string id, BehaviorManagement management, IOptions<BasicAuthOptions> auth, CancellationToken ct) => management.Detail(ScopeId(workspaceId, auth), id, ct));
         group.MapPost("/{id}/description", (string workspaceId, string id, DescribeBehavior request, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).Describe(id, request, ct));
