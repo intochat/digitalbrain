@@ -37,6 +37,33 @@ public sealed class SupervisorFacts
     }
 
     [Fact]
+    public async Task IdleSupervisorDoesNotPollTheDocumentStore()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var root = Path.Combine(Path.GetTempPath(), "brain-supervisor-tests", Guid.NewGuid().ToString("N"));
+        var documents = new CountingDocumentStore<BehaviorProgramDocument>(new InMemoryDocumentStore<BehaviorProgramDocument>());
+        var executor = new ControlledExecutor();
+        try
+        {
+            await using var brain = await UnitTest.Create().WithModule<BehaviorModule>().ConfigureSilo(s =>
+            {
+                s.Services.Configure<BehaviorOptions>(o => o.Root = root);
+                s.Services.AddSingleton<IDocumentStore<BehaviorProgramDocument>>(documents);
+                s.Services.AddSingleton<IBehaviorExecutor>(executor);
+                s.Services.AddSingleton<ICodeArtifactStore>(new TestArtifacts());
+            }).StartAsync(ct);
+            var program = brain.Get<IBehaviorProgram>("idle");
+            await program.Deploy(new(0, Guid.NewGuid(), new("one", "source", "env"), "{}"), ct);
+            await executor.Started.Task.WaitAsync(TimeSpan.FromSeconds(10), ct);
+            await Task.Delay(500, ct);
+            var idleBaseline = documents.ListCount;
+            await Task.Delay(2000, ct);
+            Assert.Equal(idleBaseline, documents.ListCount);
+        }
+        finally { if (Directory.Exists(root)) { Directory.Delete(root, true); } }
+    }
+
+    [Fact]
     public async Task UnconfiguredModuleDoesNotRequireExecutionStorageOrArtifactServices()
     {
         await using var brain = await UnitTest.Create().WithModule<BehaviorModule>().ConfigureSilo(s =>
@@ -249,6 +276,19 @@ public sealed class SupervisorFacts
             if (FailStop) { throw new TimeoutException("Worker exit not confirmed."); }
             if (_runs.TryRemove(generationId, out var run)) { run.TrySetResult(new(0, null)); }
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class CountingDocumentStore<T>(IDocumentStore<T> inner) : IDocumentStore<T> where T : class, new()
+    {
+        private int _listCount;
+        public int ListCount => Volatile.Read(ref _listCount);
+        public Task<TResult> ReadAsync<TResult>(string id, Func<T, TResult> read, CancellationToken ct) => inner.ReadAsync(id, read, ct);
+        public Task<TResult> UpdateAsync<TResult>(string id, Func<T, TResult> update, CancellationToken ct) => inner.UpdateAsync(id, update, ct);
+        public Task<IReadOnlyList<string>> ListIdsAsync(CancellationToken ct)
+        {
+            Interlocked.Increment(ref _listCount);
+            return inner.ListIdsAsync(ct);
         }
     }
 
