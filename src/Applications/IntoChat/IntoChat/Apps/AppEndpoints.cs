@@ -1,5 +1,6 @@
 using DigitalBrain.Apps;
 using DigitalBrain.Apps.Manifests;
+using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Types;
 using DigitalBrain.Core.Enforcement;
@@ -101,6 +102,22 @@ internal static class AppEndpoints
             var updated = await document.CompleteSave(operationId, result).WaitAsync(ct);
             return Results.Ok(new { document = updated, file = result });
         })).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(LocalFilesOptions.MaxExportBytes));
+        apps.MapPost("/background-removal/plan", (string workspaceId, BackgroundRemovalPlanInput input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+            Results.Ok(await Removal(brain, Scope(auth.Value, workspaceId)).Plan(input.ImageIds, input.IntentId).WaitAsync(ct))));
+        apps.MapPost("/background-removal/approve", (string workspaceId, BackgroundRemovalApproveInput input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        {
+            var scope = Scope(auth.Value, workspaceId);
+            var plan = (await Removal(brain, scope).ReadPlans().WaitAsync(ct)).LastOrDefault(item => item.PlanId == input.PlanId)
+                ?? throw new KeyNotFoundException("The plan is no longer available; plan again.");
+            if (plan.ApprovalId is null) { return Results.Ok(plan); }
+            var ledger = brain.Get<IAllowanceLedger>(plan.AccountId);
+            var always = input.Scope == AllowanceScope.Always;
+            await ledger.ApproveAsync(plan.ApprovalId, always ? ApprovalLevel.InstallConsent : ApprovalLevel.PerOperation,
+                input.Scope, always ? 100m : plan.MaximumCompute, ct);
+            return Results.Ok(plan);
+        }));
+        apps.MapPost("/background-removal/run", (string workspaceId, BackgroundRemovalRunInput input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+            Results.Ok(await Removal(brain, Scope(auth.Value, workspaceId)).Run(input.PlanId, input.IntentId).WaitAsync(ct))));
         apps.MapGet("/assets/{assetId}", (string workspaceId, string assetId, LocalFileStore files, IOptions<BasicAuthOptions> auth) => Respond(() =>
             Task.FromResult<IResult>(Results.File(files.OpenAsset(Scope(auth.Value, workspaceId), assetId), "application/octet-stream", enableRangeProcessing: true))));
         apps.MapGet("/node", (string workspaceId, string kind, string name, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
@@ -179,6 +196,8 @@ internal static class AppEndpoints
         if (id.Length != 64 || id.Any(c => !char.IsAsciiHexDigit(c))) { throw new ArgumentException("Invalid image document."); }
         return brain.Get<IImageDocument>(scope + "/images/" + id);
     }
+    private static IBackgroundRemoval Removal(IDigitalBrain brain, string scope) =>
+        brain.Get<IBackgroundRemoval>(scope + "/apps/image-editor/background-removal");
     private static async Task<IResult> Respond(Func<Task<IResult>> action)
     {
         try { return await action(); }
@@ -195,4 +214,7 @@ internal static class AppEndpoints
     internal sealed record SaveApp(string Name);
     internal sealed record EditImage(ImageEditCommand Command, long ExpectedRevision, string OperationId);
     internal sealed record PrepareImageSave(long ExpectedRevision, string OperationId);
+    internal sealed record BackgroundRemovalPlanInput(IReadOnlyList<string> ImageIds, string IntentId);
+    internal sealed record BackgroundRemovalApproveInput(string PlanId, AllowanceScope Scope);
+    internal sealed record BackgroundRemovalRunInput(string PlanId, string IntentId);
 }

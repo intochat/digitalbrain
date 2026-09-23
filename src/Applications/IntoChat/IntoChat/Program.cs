@@ -31,6 +31,8 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     });
 builder.Services.AddDataProtection();
 builder.Services.Configure<LocalFilesOptions>(builder.Configuration.GetSection("IntoChat:LocalFiles"));
+builder.Services.Configure<BackgroundRemovalOptions>(builder.Configuration.GetSection(BackgroundRemovalOptions.SectionName));
+builder.Services.AddSingleton<IBackgroundRemover, DeterministicBackgroundRemover>();
 builder.Services.AddSingleton<LocalFileStore>();
 builder.Services.AddSingleton<AppSurfaceComposer>();
 builder.Services.AddSingleton<WorkspaceAppService>();
