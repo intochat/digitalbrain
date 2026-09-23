@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Meters, price book, ledger, allowances and statements for Compute.</Description>
+    <RootNamespace>DigitalBrain.Compute</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Compute.Tests.Unit" />
+    <ProjectReference Include="../Contracts/DigitalBrain.Modules.Compute.Contracts.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Out-of-process gateway for remote and process apps.</Description>
+    <RootNamespace>DigitalBrain.Broker</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Broker.Tests.Unit" />
+    <ProjectReference Include="../Contracts/DigitalBrain.Modules.Broker.Contracts.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
+  </ItemGroup>
+</Project>

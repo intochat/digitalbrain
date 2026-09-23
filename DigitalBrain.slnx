@@ -104,6 +104,61 @@
     <Project Path="src/Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <Project Path="src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
   </Folder>
+  <Folder Name="/Modules/Receipts/">
+    <Project Path="src/Modules/Receipts/Tests/Unit/DigitalBrain.Modules.Receipts.Tests.Unit.csproj" />
+    <Project Path="src/Modules/Receipts/Contracts/DigitalBrain.Modules.Receipts.Contracts.csproj" />
+    <Project Path="src/Modules/Receipts/Receipts/DigitalBrain.Modules.Receipts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Compute/">
+    <Project Path="src/Modules/Compute/Tests/Unit/DigitalBrain.Modules.Compute.Tests.Unit.csproj" />
+    <Project Path="src/Modules/Compute/Contracts/DigitalBrain.Modules.Compute.Contracts.csproj" />
+    <Project Path="src/Modules/Compute/Compute/DigitalBrain.Modules.Compute.csproj" />
+  </Folder>
+  <Folder Name="/Modules/MyData/">
+    <Project Path="src/Modules/MyData/Tests/Unit/DigitalBrain.Modules.MyData.Tests.Unit.csproj" />
+    <Project Path="src/Modules/MyData/Contracts/DigitalBrain.Modules.MyData.Contracts.csproj" />
+    <Project Path="src/Modules/MyData/MyData/DigitalBrain.Modules.MyData.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Identity/">
+    <Project Path="src/Modules/Identity/Tests/Unit/DigitalBrain.Modules.Identity.Tests.Unit.csproj" />
+    <Project Path="src/Modules/Identity/Contracts/DigitalBrain.Modules.Identity.Contracts.csproj" />
+    <Project Path="src/Modules/Identity/Identity/DigitalBrain.Modules.Identity.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Connections/">
+    <Project Path="src/Modules/Connections/Tests/Unit/DigitalBrain.Modules.Connections.Tests.Unit.csproj" />
+    <Project Path="src/Modules/Connections/Contracts/DigitalBrain.Modules.Connections.Contracts.csproj" />
+    <Project Path="src/Modules/Connections/Connections/DigitalBrain.Modules.Connections.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Apps/">
+    <Project Path="src/Modules/Apps/Tests/Unit/DigitalBrain.Modules.Apps.Tests.Unit.csproj" />
+    <Project Path="src/Modules/Apps/Contracts/DigitalBrain.Modules.Apps.Contracts.csproj" />
+    <Project Path="src/Modules/Apps/Apps/DigitalBrain.Modules.Apps.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Automations/">
+    <Project Path="src/Modules/Automations/Tests/Unit/DigitalBrain.Modules.Automations.Tests.Unit.csproj" />
+    <Project Path="src/Modules/Automations/Contracts/DigitalBrain.Modules.Automations.Contracts.csproj" />
+    <Project Path="src/Modules/Automations/Automations/DigitalBrain.Modules.Automations.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Inbox/">
+    <Project Path="src/Modules/Inbox/Tests/Unit/DigitalBrain.Modules.Inbox.Tests.Unit.csproj" />
+    <Project Path="src/Modules/Inbox/Contracts/DigitalBrain.Modules.Inbox.Contracts.csproj" />
+    <Project Path="src/Modules/Inbox/Inbox/DigitalBrain.Modules.Inbox.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Discovery/">
+    <Project Path="src/Modules/Discovery/Tests/Unit/DigitalBrain.Modules.Discovery.Tests.Unit.csproj" />
+    <Project Path="src/Modules/Discovery/Contracts/DigitalBrain.Modules.Discovery.Contracts.csproj" />
+    <Project Path="src/Modules/Discovery/Discovery/DigitalBrain.Modules.Discovery.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Broker/">
+    <Project Path="src/Modules/Broker/Tests/Unit/DigitalBrain.Modules.Broker.Tests.Unit.csproj" />
+    <Project Path="src/Modules/Broker/Contracts/DigitalBrain.Modules.Broker.Contracts.csproj" />
+    <Project Path="src/Modules/Broker/Broker/DigitalBrain.Modules.Broker.csproj" />
+  </Folder>
+  <Folder Name="/Modules/Marketplace/">
+    <Project Path="src/Modules/Marketplace/Tests/Unit/DigitalBrain.Modules.Marketplace.Tests.Unit.csproj" />
+    <Project Path="src/Modules/Marketplace/Contracts/DigitalBrain.Modules.Marketplace.Contracts.csproj" />
+    <Project Path="src/Modules/Marketplace/Marketplace/DigitalBrain.Modules.Marketplace.csproj" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path="Directory.Packages.props" />

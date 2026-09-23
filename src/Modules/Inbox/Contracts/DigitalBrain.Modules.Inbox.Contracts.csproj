@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Structured inbox items for work that happened while away.</Description>
+    <RootNamespace>DigitalBrain.Inbox</RootNamespace>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../DigitalBrain/Kernel/Contracts/DigitalBrain.Contracts.csproj" />
+  </ItemGroup>
+</Project>
