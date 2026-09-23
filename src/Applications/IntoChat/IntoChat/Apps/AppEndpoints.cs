@@ -42,6 +42,19 @@ internal static class AppEndpoints
                 .ToArray();
             return Results.Ok(manifests);
         }));
+        routes.MapPost("/workspaces/{workspaceId}/apps/save", (string workspaceId, SaveApp input, WorkspaceAppService apps, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        {
+            var installation = await apps.SaveAsync(Scope(auth.Value, workspaceId), input.Name, ct);
+            return Results.Ok(new
+            {
+                id = installation.Manifest.Id,
+                name = installation.Manifest.Name,
+                version = installation.Manifest.Version,
+                windows = installation.Manifest.Windows.Select(window => new { id = window.WindowId, title = window.Title, kind = window.Kind }).ToArray(),
+            });
+        }));
+        routes.MapPost("/workspaces/{workspaceId}/apps/{appId}/reopen", (string workspaceId, string appId, WorkspaceAppService apps, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+            Results.Ok(await apps.OpenAsync(Scope(auth.Value, workspaceId), appId, ct))));
         routes.MapGet("/workspaces/{workspaceId}/apps/files", (string workspaceId, string? folderId, int? offset, string? sort, string? filter, IDigitalBrain brain, LocalFileStore files, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);
@@ -171,6 +184,7 @@ internal static class AppEndpoints
     }
     internal sealed record UiEvent(string Kind, string Name, string? Action = null, string? Value = null, long Revision = 0, string? Field = null);
     internal sealed record OpenImage(string EntryId);
+    internal sealed record SaveApp(string Name);
     internal sealed record EditImage(ImageEditCommand Command, long ExpectedRevision, string OperationId);
     internal sealed record PrepareImageSave(long ExpectedRevision, string OperationId);
 }

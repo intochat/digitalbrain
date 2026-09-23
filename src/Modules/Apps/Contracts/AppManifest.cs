@@ -43,6 +43,17 @@ public sealed record AppScenario
     [Id(3)] public required string Then { get; init; }
 }
 
+// A workspace window a saved declarative app reopens: kind 'table' resolves through the brain,
+// any other kind is a surface inside the owning workspace.
+[GenerateSerializer, Alias("apps.window")]
+public sealed record AppWindow
+{
+    [Id(0)] public required string WindowId { get; init; }
+    [Id(1)] public required string Title { get; init; }
+    [Id(2)] public required string Kind { get; init; }
+    [Id(3)] public required string NeuronId { get; init; }
+}
+
 // The app.json model: the manifest is the app.
 [GenerateSerializer, Alias("apps.manifest")]
 public sealed record AppManifest
@@ -61,4 +72,5 @@ public sealed record AppManifest
     [Id(11)] public IReadOnlyList<string> ExamplePrompts { get; init; } = [];
     [Id(12)] public IReadOnlyList<AppScenario> Scenarios { get; init; } = [];
     [Id(13)] public string? RemoteEndpoint { get; init; }
+    [Id(14)] public IReadOnlyList<AppWindow> Windows { get; init; } = [];
 }

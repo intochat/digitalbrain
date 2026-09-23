@@ -20,7 +20,7 @@ public sealed class DiscoveryModule : IModule
         ArgumentNullException.ThrowIfNull(silo);
         var services = silo.Services;
         services.TryAddSingleton(TimeProvider.System);
-        services.TryAddSingleton<IManifestSource, EmptyManifestSource>();
+        services.TryAddSingleton<IManifestSource, AppsManifestSource>();
         services.TryAddSingleton<ICapabilityEmbedder>(CreateEmbedder);
         services.TryAddSingleton<ICapabilityVectorIndex>(CreateVectorIndex);
         services.TryAddSingleton<CapabilityCatalog>();

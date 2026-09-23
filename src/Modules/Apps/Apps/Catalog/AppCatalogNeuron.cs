@@ -37,6 +37,7 @@ internal sealed class AppCatalogNeuron(
         next.Add(installed);
         var state = Store(manifest.Id, next);
         await Save(state, new AppInstalled(manifest.Id, manifest.Version, installed.InstalledAt));
+        await CatalogueAsync(manifest);
         return installed;
     }
 
@@ -51,6 +52,7 @@ internal sealed class AppCatalogNeuron(
             .Select(version => version with { Active = version.Manifest.Version == previous.Manifest.Version })
             .ToList();
         await Save(Store(appId, next), new AppRolledBack(appId, previous.Manifest.Version));
+        await CatalogueAsync(previous.Manifest);
         return previous;
     }
 
@@ -108,9 +110,13 @@ internal sealed class AppCatalogNeuron(
             Operations = request.Operations,
             UiEntry = request.UiEntry,
             ExamplePrompts = request.ExamplePrompts,
+            Windows = request.Windows,
         };
         return await Install(manifest);
     }
+
+    private Task CatalogueAsync(AppManifest manifest) =>
+        GrainFactory.GetGrain<IAppManifestDirectory>(AppManifestDirectoryGrains.Key).Publish(manifest);
 
     private List<AppInstallation> Versions(string appId) =>
         Snapshot.Versions.TryGetValue(appId, out var versions) ? [.. versions] : [];

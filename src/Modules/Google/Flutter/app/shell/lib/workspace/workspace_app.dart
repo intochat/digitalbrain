@@ -32,6 +32,7 @@ class WorkspaceApp extends StatefulWidget {
     this.onUpdateTableView,
     this.onListTables,
     this.programmingClient,
+    this.connectedSources = const [],
   });
   final WorkspaceStore? store;
   final Uri? initialLocation;
@@ -45,6 +46,9 @@ class WorkspaceApp extends StatefulWidget {
   final UpdateTableView? onUpdateTableView;
   final ListTables? onListTables;
   final DigitalBrainUiClient? programmingClient;
+
+  /// Sources the shell knows are connected; pushed to the workspace so first-run prompts match.
+  final List<String> connectedSources;
   @override
   State<WorkspaceApp> createState() => _WorkspaceAppState();
 }
@@ -64,6 +68,8 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   final _tableCancelled = <String, Completer<void>>{};
   final _apps = <String, List<AppManifestSummary>>{};
   final _appsLoading = <String>{};
+  final _sourcesSynced = <String>{};
+  final _firstRunDismissed = <String>{};
 
   void _connectWorkspaces() {
     final client = widget.programmingClient;
@@ -72,6 +78,16 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         unawaited(_remoteAction(workspace, window, open));
     for (final project in store.projects) {
       if (_remote.containsKey(project.id)) continue;
+      if (_sourcesSynced.add(project.id)) {
+        unawaited(
+          client
+              .setConnectedSources(project.id, widget.connectedSources)
+              .then((snapshot) {
+                if (mounted) store.reconcileWorkspace(project, snapshot);
+              })
+              .catchError((Object _) {}),
+        );
+      }
       final controller = WorkspaceRemoteController(
         read: (id) =>
             client.readWorkspace(id, cancelled: _remoteCancelled.future),
@@ -221,7 +237,9 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
 
   void _loadApps(String workspaceId) {
     final client = widget.programmingClient;
-    if (client == null || _apps.containsKey(workspaceId) || !_appsLoading.add(workspaceId)) {
+    if (client == null ||
+        _apps.containsKey(workspaceId) ||
+        !_appsLoading.add(workspaceId)) {
       return;
     }
     unawaited(
@@ -342,7 +360,10 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       existing.content = artifact.content;
       existing.data = artifact.data;
       if (artifact.editorState.isNotEmpty) {
-        existing.editorState = {...existing.editorState, ...artifact.editorState};
+        existing.editorState = {
+          ...existing.editorState,
+          ...artifact.editorState,
+        };
       }
       store.save();
     }
@@ -771,61 +792,75 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
               ),
             ),
             Expanded(
-              child: IndexedStack(
-                index: [
-                  for (final project in store.projects)
-                    for (final conversation in project.conversations)
-                      conversation.id,
-                ].indexOf(store.currentConversation.id),
-                children: [
-                  for (final project in store.projects)
-                    for (final conversation in project.conversations)
-                      WorkspaceChat(
-                        key: ValueKey(conversation.id),
-                        conversation: conversation,
-                        project: project,
-                        active:
-                            (ModalRoute.of(context)?.isCurrent ?? true) &&
-                            !(mobile && _mobileWork) &&
-                            !store.currentProject.presentation.chatCollapsed &&
-                            !_directory &&
-                            conversation.id == store.currentConversation.id,
-                        store: store,
-                        onRun: widget.onRun,
-                        selectedBehaviorId:
-                            project.presentation.activeArtifactId ==
-                                'app-behaviors'
-                            ? project.artifacts
-                                      .where((a) => a.id == 'app-behaviors')
-                                      .firstOrNull
-                                      ?.data['selected']
-                                  as String?
-                            : null,
-                        onOpenBehavior: (id) {
-                          store.selectProject(project.id);
-                          final app = store.launchLocalApp('behaviors');
-                          app.data['selected'] = id;
-                          store.save();
-                        },
-                        onReadConversation:
-                            widget.programmingClient?.readWorkspaceConversation,
-                        onOpenUrl: widget.onOpenUrl,
-                        onSalesforceConnected: widget.onSalesforceConnected,
-                        onReportProblem: widget.programmingClient == null
-                            ? null
-                            : (workspaceId, intentId, message) => widget
-                                  .programmingClient!
-                                  .reportProblem(
-                                    workspaceId: workspaceId,
-                                    intentId: intentId,
-                                    message: message,
-                                  ),
-                        onArtifact: (result) =>
-                            _accept(result, project: project),
-                        onAttach: () => _attach(context),
-                      ),
-                ],
-              ),
+              child:
+                  store.firstRun != null &&
+                      !_firstRunDismissed.contains(store.currentProject.id)
+                  ? FirstRunView(
+                      state: store.firstRun!,
+                      onPrompt: _startFromPrompt,
+                    )
+                  : IndexedStack(
+                      index: [
+                        for (final project in store.projects)
+                          for (final conversation in project.conversations)
+                            conversation.id,
+                      ].indexOf(store.currentConversation.id),
+                      children: [
+                        for (final project in store.projects)
+                          for (final conversation in project.conversations)
+                            WorkspaceChat(
+                              key: ValueKey(conversation.id),
+                              conversation: conversation,
+                              project: project,
+                              active:
+                                  (ModalRoute.of(context)?.isCurrent ?? true) &&
+                                  !(mobile && _mobileWork) &&
+                                  !store
+                                      .currentProject
+                                      .presentation
+                                      .chatCollapsed &&
+                                  !_directory &&
+                                  conversation.id ==
+                                      store.currentConversation.id,
+                              store: store,
+                              onRun: widget.onRun,
+                              selectedBehaviorId:
+                                  project.presentation.activeArtifactId ==
+                                      'app-behaviors'
+                                  ? project.artifacts
+                                            .where(
+                                              (a) => a.id == 'app-behaviors',
+                                            )
+                                            .firstOrNull
+                                            ?.data['selected']
+                                        as String?
+                                  : null,
+                              onOpenBehavior: (id) {
+                                store.selectProject(project.id);
+                                final app = store.launchLocalApp('behaviors');
+                                app.data['selected'] = id;
+                                store.save();
+                              },
+                              onReadConversation: widget
+                                  .programmingClient
+                                  ?.readWorkspaceConversation,
+                              onOpenUrl: widget.onOpenUrl,
+                              onSalesforceConnected:
+                                  widget.onSalesforceConnected,
+                              onReportProblem: widget.programmingClient == null
+                                  ? null
+                                  : (workspaceId, intentId, message) =>
+                                        widget.programmingClient!.reportProblem(
+                                          workspaceId: workspaceId,
+                                          intentId: intentId,
+                                          message: message,
+                                        ),
+                              onArtifact: (result) =>
+                                  _accept(result, project: project),
+                              onAttach: () => _attach(context),
+                            ),
+                      ],
+                    ),
             ),
           ],
         ),
@@ -962,7 +997,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   Widget _islands(BuildContext context) => WorkspaceIslands(
     store: store,
     apps: _apps[store.currentProject.id] ?? const [],
-    onLaunch: (app) => store.launchLocalApp(app),
+    onLaunch: _launchApp,
     onRestore: (id) =>
         _open(store.currentProject.artifacts.firstWhere((a) => a.id == id)),
     onNewWorkspace: () async {
@@ -1006,6 +1041,36 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       ),
     ),
   );
+
+  void _startFromPrompt(StarterPrompt prompt) {
+    setState(() => _firstRunDismissed.add(store.currentProject.id));
+    store.currentConversation.draft = prompt.prompt;
+    store.save();
+  }
+
+  Future<void> _launchApp(String launchKey) async {
+    if (const {'files', 'images', 'mydata', 'behaviors'}.contains(launchKey)) {
+      store.launchLocalApp(launchKey);
+      return;
+    }
+    final client = widget.programmingClient;
+    if (client == null) {
+      _messenger.currentState?.showSnackBar(
+        const SnackBar(content: Text('Connect to IntoChat to open this app.')),
+      );
+      return;
+    }
+    try {
+      final snapshot = await client.openApp(store.currentProject.id, launchKey);
+      if (mounted) store.reconcileWorkspace(store.currentProject, snapshot);
+    } catch (error) {
+      if (mounted) {
+        _messenger.currentState?.showSnackBar(
+          SnackBar(content: Text('Could not open the app. $error')),
+        );
+      }
+    }
+  }
 
   void _search(BuildContext context) {
     _query = '';

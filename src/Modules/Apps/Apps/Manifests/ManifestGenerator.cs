@@ -48,11 +48,29 @@ public static class ManifestGenerator
         return manifest;
     }
 
-    public static IReadOnlyList<AppOperation> Operations(Type neuronInterface) =>
-        [.. neuronInterface.GetMethods(BindingFlags.Public | BindingFlags.Instance)
+    public static IReadOnlyList<AppOperation> Operations(Type neuronInterface)
+    {
+        var operations = new List<AppOperation>();
+        var used = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var method in neuronInterface.GetMethods(BindingFlags.Public | BindingFlags.Instance)
             .Where(IsAppOperation)
-            .OrderBy(method => method.Name, StringComparer.Ordinal)
-            .Select(ToOperation)];
+            .OrderBy(method => method.Name, StringComparer.Ordinal))
+        {
+            var operation = ToOperation(method);
+            if (!used.Add(operation.Name))
+            {
+                for (var suffix = 2; ; suffix++)
+                {
+                    var candidate = operation.Name + "-" + suffix;
+                    if (used.Add(candidate)) { operation = operation with { Name = candidate }; break; }
+                }
+            }
+
+            operations.Add(operation);
+        }
+
+        return operations;
+    }
 
     private static AppOperation ToOperation(MethodInfo method) => new()
     {
