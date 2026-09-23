@@ -16,7 +16,7 @@ public sealed class FormHttpFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
-        var form = brain.Get<IForm>("intake");
+        var form = brain.Get<IForm>(UiScope.Key("workspace-a", "intake"));
         var defined = await form.Define(new("Customer intake",
         [
             new("name", "Name", FieldKind.PlainText, true),
@@ -24,7 +24,7 @@ public sealed class FormHttpFacts
         ]));
         await form.Submit(new([new("name", "Ada"), new("birthDate", "1815-12-10")], defined.Revision));
 
-        var state = await brain.HttpClient.GetFromJsonAsync<FormState>("/ui/forms/intake",
+        var state = await brain.HttpClient.GetFromJsonAsync<FormState>("/workspaces/workspace-a/ui/forms/intake",
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
 
         Assert.NotNull(state);
