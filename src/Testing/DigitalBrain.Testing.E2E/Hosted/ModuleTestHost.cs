@@ -8,7 +8,7 @@ namespace DigitalBrain.Testing.E2E;
 internal static class ModuleTestHost
 {
     public static Task<AspireTestSession> StartAsync(IReadOnlyList<ModuleDefinition> selectedModules,
-        TestExecutionOptions execution, string identity, CancellationToken cancellationToken = default)
+        TestExecutionOptions execution, string identity, string? durableStorageKey = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(selectedModules);
         ArgumentNullException.ThrowIfNull(execution);
@@ -21,7 +21,7 @@ internal static class ModuleTestHost
         var launch = ResolveModuleHostLaunch(modules);
         return AspireTestSession.StartAsync(identity, execution, builder =>
         {
-            var brain = builder.AddDigitalBrain("modules", persistentStorage: false);
+            var brain = builder.AddDigitalBrain("modules", persistentStorage: false, dataVolume: durableStorageKey);
             brain.AddModules(modules);
             builder.AddExecutable("runtime", "dotnet", launch.WorkingDirectory, launch.Arguments)
                 .WithReference(brain)
