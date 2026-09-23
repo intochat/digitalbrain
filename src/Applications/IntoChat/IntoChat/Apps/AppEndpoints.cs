@@ -1,4 +1,6 @@
 using DigitalBrain.Contracts;
+using DigitalBrain.Apps;
+using DigitalBrain.Apps.Manifests;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Button;
 using DigitalBrain.Flutter.Card;
@@ -20,6 +22,26 @@ internal static class AppEndpoints
 {
     public static void MapLocalApps(this IEndpointRouteBuilder routes)
     {
+        routes.MapGet("/workspaces/{workspaceId}/apps", (string workspaceId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        {
+            var scope = Scope(auth.Value, workspaceId);
+            var installed = await brain.Get<IAppCatalog>(scope).List().WaitAsync(ct);
+            var manifests = FirstPartyApps.All()
+                .Concat(installed.Select(installation => installation.Manifest))
+                .GroupBy(manifest => manifest.Id, StringComparer.Ordinal)
+                .Select(group => group.Last())
+                .OrderBy(manifest => manifest.Name, StringComparer.Ordinal)
+                .Select(manifest => new
+                {
+                    id = manifest.Id,
+                    name = manifest.Name,
+                    description = manifest.DescriptionForPeople,
+                    kind = manifest.Kind.ToString().ToLowerInvariant(),
+                    uiEntry = manifest.UiEntry,
+                })
+                .ToArray();
+            return Results.Ok(manifests);
+        }));
         routes.MapGet("/workspaces/{workspaceId}/apps/files", (string workspaceId, string? folderId, int? offset, string? sort, string? filter, IDigitalBrain brain, LocalFileStore files, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);

@@ -1,13 +1,16 @@
 import 'dart:ui';
 
+import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:flutter/material.dart';
 
+import 'app_launcher.dart';
 import 'workspace_store.dart';
 
 class WorkspaceIslands extends StatelessWidget {
   const WorkspaceIslands({
     super.key,
     required this.store,
+    this.apps = const [],
     required this.onLaunch,
     required this.onRestore,
     required this.onNewWorkspace,
@@ -16,6 +19,7 @@ class WorkspaceIslands extends StatelessWidget {
     required this.onSettings,
   });
   final WorkspaceStore store;
+  final List<AppManifestSummary> apps;
   final ValueChanged<String> onLaunch, onRestore;
   final VoidCallback onNewWorkspace, onSavedWork, onSearch, onSettings;
   Widget island(BuildContext context, Widget child) => ClipRRect(
@@ -130,7 +134,7 @@ class WorkspaceIslands extends StatelessWidget {
           ],
         ),
       );
-      final apps = island(
+      final assistantIsland = island(
         context,
         Row(
           mainAxisSize: MainAxisSize.min,
@@ -205,40 +209,23 @@ class WorkspaceIslands extends StatelessWidget {
               icon: const Icon(Icons.apps_rounded, size: 23),
               onSelected: onLaunch,
               itemBuilder: (_) => [
-                const PopupMenuItem(
-                  value: 'files',
-                  child: ListTile(
-                    leading: Icon(Icons.folder_outlined),
-                    title: Text('Files'),
-                    subtitle: Text('On this computer'),
-                    contentPadding: EdgeInsets.zero,
+                for (final entry in launcherEntries(apps))
+                  PopupMenuItem(
+                    value: entry.launchKey,
+                    child: ListTile(
+                      leading: Icon(entry.icon),
+                      title: Text(entry.title),
+                      subtitle: Text(entry.subtitle),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
-                ),
-                const PopupMenuItem(
-                  value: 'images',
-                  child: ListTile(
-                    leading: Icon(Icons.tune),
-                    title: Text('Image Editor'),
-                    subtitle: Text('Draw, crop and export'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
                 const PopupMenuDivider(),
-                const PopupMenuItem(
-                  value: 'behaviors',
+                PopupMenuItem(
+                  value: behaviorsLauncherEntry.launchKey,
                   child: ListTile(
-                    leading: Icon(Icons.account_tree_outlined),
-                    title: Text('Behaviors'),
-                    subtitle: Text('Create and manage automations'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'mydata',
-                  child: ListTile(
-                    leading: Icon(Icons.shield_outlined),
-                    title: Text('My Data'),
-                    subtitle: Text('Your facts and secrets'),
+                    leading: Icon(behaviorsLauncherEntry.icon),
+                    title: Text(behaviorsLauncherEntry.title),
+                    subtitle: Text(behaviorsLauncherEntry.subtitle),
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
@@ -340,7 +327,7 @@ class WorkspaceIslands extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  child: apps,
+                  child: assistantIsland,
                 ),
               ),
             ),

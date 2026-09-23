@@ -9,6 +9,7 @@ import 'agent_events.dart';
 import 'basic_credentials.dart';
 import 'cookie_http_client.dart';
 import 'host_environment.dart';
+import 'models/app_manifest.dart';
 import 'models/brain_models.dart';
 import 'models/table_models.dart';
 import 'models/workspace_models.dart';
@@ -88,6 +89,21 @@ final class DigitalBrainUiClient {
         .map(
           (item) =>
               TableSummary.fromJson(Map<String, dynamic>.from(item as Map)),
+        )
+        .toList();
+  }
+
+  /// The launcher reads installed manifests; the shell never hard-codes apps.
+  Future<List<AppManifestSummary>> listApps(String workspace) async {
+    final body = await _tableRequest(
+      'GET',
+      '/workspaces/${Uri.encodeComponent(workspace)}/apps',
+    );
+    return (body as List)
+        .map(
+          (item) => AppManifestSummary.fromJson(
+            Map<String, dynamic>.from(item as Map),
+          ),
         )
         .toList();
   }
