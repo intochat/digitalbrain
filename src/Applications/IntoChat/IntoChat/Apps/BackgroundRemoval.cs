@@ -2,6 +2,7 @@ using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Enforcement;
 using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Runtime;
@@ -114,7 +115,7 @@ internal sealed record BackgroundRemovalState
 }
 
 [GrainType("intochat.background-removal")]
-internal sealed class BackgroundRemovalNeuron(IGrainFactory grains, IBackgroundRemover remover, IOptions<BackgroundRemovalOptions> options,
+internal sealed class BackgroundRemovalNeuron(IGrainFactory grains, IBackgroundRemover remover, ICallFilter filter, IOptions<BackgroundRemovalOptions> options,
     [PersistentState("background-removal", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<BackgroundRemovalState> store) : Neuron, IBackgroundRemoval
 {
     private const string AppId = "intochat.image-editor";
@@ -163,7 +164,11 @@ internal sealed class BackgroundRemovalNeuron(IGrainFactory grains, IBackgroundR
     {
         var plan = store.State.Plans.LastOrDefault(item => string.Equals(item.PlanId, planId, StringComparison.Ordinal))
             ?? throw new KeyNotFoundException("The plan is no longer available; plan again.");
-        var decision = await Ledger().AuthorizeAsync(Request(plan.EstimatedCompute, intentId), CancellationToken.None);
+        // Every paid app operation goes through the one call filter; the allowance stage decides. The
+        // filter creates the deterministic reservation, which Run settles once the batch finishes.
+        var request = Request(plan.EstimatedCompute, intentId);
+        CallerContextStamper.Stamp(request.Caller);
+        var decision = await filter.AuthorizeAsync(request, CancellationToken.None);
         if (!decision.Allowed)
         {
             return new BackgroundRemovalReceipt
@@ -197,7 +202,8 @@ internal sealed class BackgroundRemovalNeuron(IGrainFactory grains, IBackgroundR
         }
 
         var failure = anySucceeded ? FailureClass.None : FailureClass.ThirdPartyFault;
-        await Ledger().SettleAsync(decision.ReservationId!, charged, failure, CancellationToken.None);
+        var reservationId = AllowanceReservations.For(request);
+        await Ledger().SettleAsync(reservationId, charged, failure, CancellationToken.None);
         return new BackgroundRemovalReceipt
         {
             PlanId = planId,
@@ -207,7 +213,7 @@ internal sealed class BackgroundRemovalNeuron(IGrainFactory grains, IBackgroundR
             EstimatedCompute = plan.EstimatedCompute,
             MaximumCompute = plan.MaximumCompute,
             RequiresApproval = false,
-            ReservationId = decision.ReservationId,
+            ReservationId = reservationId,
         };
     }
 
@@ -222,8 +228,8 @@ internal sealed class BackgroundRemovalNeuron(IGrainFactory grains, IBackgroundR
             PrincipalId = AccountId,
             AccountId = AccountId,
             WorkspaceId = Workspace,
-            Kind = CallerKind.User,
-            StampedBy = TrustedEdge.AuthenticatedHttp,
+            Kind = CallerKind.App,
+            StampedBy = TrustedEdge.AppProxy,
             AppId = AppId,
             IntentId = intentId,
         },

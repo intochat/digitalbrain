@@ -1,6 +1,8 @@
 namespace DigitalBrain.AI.Agents;
 
-// Phase 0 keeps the default turn small and developer-only code out of it.
+// The default turn carries one small set of tools chosen for the intent: an always-on core, the
+// generic live-table pair when the request is about data, and the tools of the apps discovery or
+// the conversation makes relevant. The whole selection stays within MaxDefaultTools.
 public static class AgentToolPolicy
 {
     public const int MaxDefaultTools = 8;
@@ -8,12 +10,26 @@ public static class AgentToolPolicy
     public const string BehaviorAuthoringFallback =
         "Authoring C# behaviors isn't supported outside developer mode yet; it arrives in Phase 1.";
 
-    public static readonly IReadOnlyList<string> ProductTools = ["supabase_schema", "show_supabase_query_table", "table_read", "table_refine", "show_form", "show_view", "save_as_app", "open_app"];
+    public static readonly IReadOnlyList<string> CoreTools =
+        ["table_read", "table_refine", "show_form", "show_view", "find_capability"];
 
-    public static IReadOnlyList<string> SelectTools(bool developerMode, IReadOnlyList<string> developerTools)
+    public static readonly IReadOnlyList<string> TableTools =
+        ["supabase_schema", "show_supabase_query_table"];
+
+    // The static product list is the core plus the generic live-table pair, used when no app is relevant.
+    public static readonly IReadOnlyList<string> ProductTools = [.. CoreTools, .. TableTools];
+
+    public static IReadOnlyList<string> SelectTools(bool developerMode, IReadOnlyList<string> developerTools,
+        IReadOnlyList<string>? appTools = null, bool tableIntent = false)
     {
         ArgumentNullException.ThrowIfNull(developerTools);
-        return developerMode ? [.. ProductTools, .. developerTools] : ProductTools;
+        var selected = new List<string>(CoreTools);
+        var relevant = appTools ?? [];
+        if (relevant.Count == 0 || tableIntent) { selected.AddRange(TableTools); }
+        selected.AddRange(relevant);
+        var product = selected.Distinct(StringComparer.Ordinal).Take(MaxDefaultTools).ToList();
+        if (developerMode) { product.AddRange(developerTools); }
+        return product;
     }
 
     public static bool IsBehaviorTool(string name)

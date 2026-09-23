@@ -43,6 +43,8 @@ builder.Services.AddSingleton<IAgentToolFactory, WorkspaceTableTools>();
 builder.Services.AddSingleton<IAgentToolFactory, WorkspaceFormTools>();
 builder.Services.AddSingleton<IAgentToolFactory, WorkspaceAppTools>();
 builder.Services.AddSingleton<IAgentToolFactory, DiscoveryTools>();
+builder.Services.AddSingleton<IAgentToolFactory, LeadGeneratorTools>();
+builder.Services.AddSingleton<IAgentToolFactory, ImageEditorTools>();
 builder.Services.AddSingleton<IAutomationActionCatalog, FirstPartyAutomationActionCatalog>();
 builder.Services.AddSingleton<IAutomationActionInvoker, LeadGeneratorAutomationInvoker>();
 builder.Services.AddSingleton<IProblemReportStore, ProblemReportStore>();

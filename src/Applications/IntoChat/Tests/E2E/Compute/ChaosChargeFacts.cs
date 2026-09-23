@@ -1,5 +1,8 @@
+using System.Net.Http.Json;
+using DigitalBrain.AI;
 using DigitalBrain.Compute;
 using DigitalBrain.Contracts.Enforcement;
+using IntoChat.Tests.E2E.Agent;
 
 namespace IntoChat.Tests.E2E.Compute;
 
@@ -83,6 +86,54 @@ public sealed class ChaosChargeFacts
             Paid("account-consent", "ws-consent", 5m, "i-2", "app-1", "Render", "person.birthDate"), ct);
         Assert.False(grown.Allowed);
         Assert.Contains("re-consent", grown.Explanation!, StringComparison.Ordinal);
+    }
+
+    private const string OnePixelPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==";
+
+    // The paid app operation is reachable through a real scripted-model tool call, and without an
+    // allowance the one call filter stops it: the ledger holds no reservation and nothing is charged.
+    [Fact(Timeout = 300_000)]
+    public async Task AScriptedModelToolCallChargesNothingWithoutAnAllowance()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var root = Directory.CreateTempSubdirectory("intochat-chaos-paid-").FullName;
+        try
+        {
+            foreach (var name in new[] { "photo-1.png", "photo-2.png", "photo-3.png" })
+            {
+                await File.WriteAllBytesAsync(Path.Combine(root, name), Convert.FromBase64String(OnePixelPng), ct);
+            }
+
+            await using var model = await ScriptedModelServer.StartAsync(ct);
+            await using var brain = await IntoChatE2ETest.Create(privateConfiguration: new()
+            {
+                ["IntoChat:LocalFiles:Roots:downloads"] = root,
+                ["IntoChat:LocalFiles:AssetDirectory"] = Path.Combine(root, "assets"),
+            })
+                .ConfigureModule<AIModule>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
+                .StartAsync(ct);
+
+            const string workspace = "chaos-paid";
+            async Task<string> Ask(string run, string message)
+            {
+                using var response = await brain.HttpClient.PostAsJsonAsync("/agent",
+                    new { workspaceId = workspace, threadId = "thread", runId = run, messages = new[] { new { role = "user", content = message } } }, ct);
+                return await response.Content.ReadAsStringAsync(ct);
+            }
+
+            var planned = await Ask("plan", "Remove the background from these 3 product photos");
+            Assert.Contains("UI_CARD", planned, StringComparison.Ordinal);
+            Assert.Contains("\"planId\"", planned, StringComparison.Ordinal);
+
+            var denied = await Ask("run", "Run it without approval");
+            Assert.Contains("\"requiresApproval\":true", denied, StringComparison.Ordinal);
+            Assert.Contains("\"chargedCompute\":0", denied, StringComparison.Ordinal);
+
+            var ledger = brain.Get<IAllowanceLedger>("owner");
+            Assert.Empty(await ledger.ReadReservationsAsync(ct));
+            Assert.Equal(0m, (await ledger.ReadLimitsAsync(ct)).SpentCompute);
+        }
+        finally { Directory.Delete(root, true); }
     }
 
     private static Allowance Allowance(string account, string workspace, decimal limit) => new()

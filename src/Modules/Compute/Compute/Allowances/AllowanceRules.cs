@@ -28,7 +28,7 @@ internal static class AllowanceRules
         => reservation.Settled ? reservation.SettledCompute : reservation.ReservedCompute;
 
     internal static string ReservationId(CallRequest request)
-        => $"{request.Caller.IntentId ?? "anon"}:{request.TargetNeuron}:{request.Operation}";
+        => AllowanceReservations.For(request);
 
     internal static string ApprovalId(CallRequest request)
         => $"approve:{request.Caller.WorkspaceId}:{request.Caller.AppId ?? "none"}:{request.Operation}";

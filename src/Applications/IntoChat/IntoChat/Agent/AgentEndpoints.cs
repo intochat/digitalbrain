@@ -89,7 +89,8 @@ internal static class AgentEndpoints
                         {
                             var text = new StringBuilder();
                             var results = new List<string>();
-                            var queryError = await RunModel(scope.Id, input.RunId, userText, developerMode, state, messageId, configuration, runner, Emit, text, results, activity, http.RequestAborted);
+                            var selection = await new AgentToolSelection(brain).ResolveAsync(scope.Id, userText, History(state), http.RequestAborted);
+                            var queryError = await RunModel(scope.Id, input.RunId, userText, developerMode, state, messageId, configuration, runner, selection, Emit, text, results, activity, http.RequestAborted);
                             if (queryError is not null) { throw new WorkspaceQueryException(queryError); }
                             await agent.CompleteConversation(new(input.RunId, userText, text.ToString(), results), http.RequestAborted);
                         }
@@ -161,7 +162,7 @@ internal static class AgentEndpoints
 
     internal static async Task<string?> RunModel(string scope, string run, string message, bool developerMode,
         AgentConversationState state, string messageId, IConfiguration configuration,
-        IAgentTurnRunner runner, Func<object, Task> emit, StringBuilder text, List<string> results, IntentActivity activity, CancellationToken ct)
+        IAgentTurnRunner runner, ToolSelection selection, Func<object, Task> emit, StringBuilder text, List<string> results, IntentActivity activity, CancellationToken ct)
     {
         var finished = false;
         string? queryError = null;
@@ -171,7 +172,7 @@ internal static class AgentEndpoints
         if (!string.IsNullOrEmpty(state.Summary)) { instructions += "\nEarlier conversation summary: " + state.Summary; }
         await foreach (var item in runner.RunAsync(new("workspace-assistant", run, scope, state.Turns, message, model,
             instructions,
-            AgentToolPolicy.SelectTools(developerMode, BehaviorAgentTools.Names)), ct))
+            AgentToolPolicy.SelectTools(developerMode, BehaviorAgentTools.Names, selection.AppTools, selection.TableIntent)), ct))
         {
             switch (item)
             {
@@ -206,6 +207,7 @@ internal static class AgentEndpoints
                     }
                     RecordToolActivity(activity, tool);
                     await emit(new { type = "TOOL_CALL_RESULT", toolCallId = tool.CallId, messageId = tool.CallId + "-result", role = "tool", content = tool.Result });
+                    await EmitUiCard(tool.Result, emit);
                     break;
                 case AgentTurnEvent.Failed failed: throw new InvalidOperationException(failed.Message);
                 case AgentTurnEvent.Finished: finished = true; break;
@@ -217,7 +219,27 @@ internal static class AgentEndpoints
     }
 
     private static bool ValidId(string? value) => !string.IsNullOrWhiteSpace(value) && value.Length <= 200 && !value.Any(char.IsControl) && !value.Contains('/') && !value.Contains('\\');
+
+    private static IReadOnlyList<string> History(AgentConversationState state)
+    {
+        var turns = state.Turns.Count <= 6 ? state.Turns : state.Turns.Skip(state.Turns.Count - 6).ToList();
+        return [.. turns.SelectMany(turn => new[] { turn.UserText, turn.AssistantText })];
+    }
     private static bool IsLiveTableTool(string name) => name is "show_supabase_query_table" or "table_read" or "table_refine";
+
+    private static async Task EmitUiCard(string result, Func<object, Task> emit)
+    {
+        try
+        {
+            using var payload = JsonDocument.Parse(result);
+            if (!payload.RootElement.TryGetProperty("_ui", out var card) || card.ValueKind != JsonValueKind.Object) { return; }
+            await emit(new { type = "UI_CARD", card = card.Clone() });
+        }
+        catch (JsonException)
+        {
+            // A non-JSON tool result carries no UI channel card.
+        }
+    }
     private static void RecordToolActivity(IntentActivity activity, AgentTurnEvent.ToolCompleted tool)
     {
         var succeeded = true;

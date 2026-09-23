@@ -170,7 +170,7 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
                 }
                 foreach (var call in requested)
                 {
-                    var tool = tools.SingleOrDefault(t => t.Name == call.Name) ?? throw new InvalidOperationException("The model requested an unavailable tool.");
+                    var tool = tools.SingleOrDefault(t => t.Name == call.Name) ?? throw new InvalidOperationException($"The model requested an unavailable tool '{call.Name}'. Selected: {string.Join(", ", tools.Select(t => t.Name))}.");
                     if (string.IsNullOrWhiteSpace(call.CallId) || !calls.Add(call.CallId)) { throw new InvalidOperationException("The model reused or omitted a tool call identity."); }
                     currentCall = call.CallId;
                     await WriteObserved(events, new AgentTurnEvent.ToolStarted(call.CallId, call.Name, JsonSerializer.Serialize(call.Arguments)), ct).ConfigureAwait(false);
