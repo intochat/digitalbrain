@@ -49,5 +49,8 @@ public sealed class CrossWorkspaceFacts
 
         public ValueTask<IReadOnlyList<Grant>> ListGrantsAsync(CallerContext caller, CancellationToken cancellationToken)
             => ValueTask.FromResult(grants);
+
+        public ValueTask ConsumeOnceAsync(CallerContext caller, IReadOnlyList<Grant> consumed, CancellationToken cancellationToken)
+            => ValueTask.CompletedTask;
     }
 }

@@ -41,6 +41,26 @@ public static class GrantRules
         return CallDecision.Allow();
     }
 
+    // The one-time grants a successful app read just spent. An always grant is left in place; only
+    // a live Once grant for a requested semantic type is returned, so the store clears exactly those.
+    public static IReadOnlyList<Grant> OnceToConsume(CallRequest request, IReadOnlyList<Grant> grants)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (grants is null || grants.Count == 0 || request.SemanticTypeIds.Count == 0) { return []; }
+
+        var caller = request.Caller;
+        if (caller.Kind != CallerKind.App || string.IsNullOrWhiteSpace(caller.AppId)) { return []; }
+
+        return
+        [
+            .. grants.Where(grant => !grant.Revoked
+                && grant.Mode == GrantMode.Once
+                && string.Equals(grant.WorkspaceId, caller.WorkspaceId, StringComparison.Ordinal)
+                && string.Equals(grant.AppId, caller.AppId, StringComparison.Ordinal)
+                && request.SemanticTypeIds.Contains(grant.SemanticTypeId, StringComparer.Ordinal)),
+        ];
+    }
+
     private static bool IsGranted(CallerContext caller, string semanticTypeId, IReadOnlyList<Grant> grants)
         => grants.Any(grant => !grant.Revoked
             && string.Equals(grant.WorkspaceId, caller.WorkspaceId, StringComparison.Ordinal)

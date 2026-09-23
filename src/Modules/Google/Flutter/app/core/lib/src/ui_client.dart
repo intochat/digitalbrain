@@ -11,6 +11,8 @@ import 'cookie_http_client.dart';
 import 'host_environment.dart';
 import 'models/app_manifest.dart';
 import 'models/brain_models.dart';
+import 'models/consent_sheet.dart';
+import 'models/grant_summary.dart';
 import 'models/inbox_models.dart';
 import 'models/table_models.dart';
 import 'models/workspace_models.dart';
@@ -754,6 +756,67 @@ final class DigitalBrainUiClient {
     );
     return response.body.isEmpty ? null : jsonDecode(response.body);
   }
+
+  /// The consent sheet for an app before it is installed.
+  Future<ConsentSheet> consentSheet(String workspace, String appId) async =>
+      ConsentSheet.fromJson(
+        Map<String, dynamic>.from(
+          await _tableRequest(
+            'GET',
+            '/workspaces/${Uri.encodeComponent(workspace)}/apps/${Uri.encodeComponent(appId)}/consent',
+          ) as Map,
+        ),
+      );
+
+  /// Records approval of an app's consent sheet; the manifest installs in the same step.
+  Future<ConsentSheet> approveConsent(String workspace, String appId) async =>
+      ConsentSheet.fromJson(
+        Map<String, dynamic>.from(
+          await _tableRequest(
+            'POST',
+            '/workspaces/${Uri.encodeComponent(workspace)}/apps/${Uri.encodeComponent(appId)}/consent/approve',
+            body: const <String, Object?>{},
+          ) as Map,
+        ),
+      );
+
+  /// The live grants an owner has given to apps in this workspace.
+  Future<List<GrantSummary>> listGrants(String workspace) async {
+    final response = await _request(
+      'GET',
+      '/workspaces/${Uri.encodeComponent(workspace)}/grants',
+      timeout: const Duration(seconds: 30),
+    );
+    return [
+      for (final item in jsonDecode(response.body) as List)
+        GrantSummary.fromJson(Map<String, dynamic>.from(item as Map)),
+    ];
+  }
+
+  /// Revokes one (app, semantic type, mode) grant so its value looks missing again.
+  Future<void> revokeGrant(
+    String workspace, {
+    required String appId,
+    required String semanticTypeId,
+    required String mode,
+  }) async {
+    await _request(
+      'POST',
+      '/workspaces/${Uri.encodeComponent(workspace)}/grants/revoke',
+      body: {
+        'appId': appId,
+        'semanticTypeId': semanticTypeId,
+        'mode': _grantModeValue(mode),
+      },
+      timeout: const Duration(seconds: 30),
+    );
+  }
+
+  static Object _grantModeValue(String mode) => switch (mode) {
+    'Once' => 0,
+    'ThisChat' => 1,
+    _ => 2,
+  };
 
   Future<Uint8List> appAsset(String workspace, String assetId) async {
     final response = await _request(

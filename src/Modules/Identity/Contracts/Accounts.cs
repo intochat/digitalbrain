@@ -62,5 +62,14 @@ public static class IdentityGrains
 {
     public const string Directory = "intochat-identity-directory";
 
-    public static string Grants(string workspaceId) => "intochat-grants-" + workspaceId;
+    public const string GrantsPrefix = "intochat-grants-";
+
+    public static string Grants(string workspaceId) => GrantsPrefix + workspaceId;
+
+    // The grant store is keyed by the prefixed grain key; grants themselves carry the bare
+    // workspace id, which is what the call filter compares against the caller.
+    public static string WorkspaceOfGrantStore(string grainKey) =>
+        grainKey.StartsWith(GrantsPrefix, StringComparison.Ordinal)
+            ? grainKey[GrantsPrefix.Length..]
+            : grainKey;
 }

@@ -17,6 +17,7 @@ import 'app_surface_host.dart';
 import 'inbox_panel.dart';
 import 'workspace_islands.dart';
 import 'behaviors/behavior_manager.dart';
+import 'apps/consent_sheet_view.dart';
 import 'mydata/mydata_window.dart';
 
 class WorkspaceApp extends StatefulWidget {
@@ -541,6 +542,13 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
             key: ValueKey('${store.currentProject.id}-${a.id}'),
             request: (path, {body}) =>
                 client.myDataRequest(store.currentProject.id, path, body: body),
+            loadGrants: () => client.listGrants(store.currentProject.id),
+            revokeGrant: (grant) => client.revokeGrant(
+              store.currentProject.id,
+              appId: grant.appId,
+              semanticTypeId: grant.semanticTypeId,
+              mode: grant.mode,
+            ),
           ),
         );
       }
@@ -1087,6 +1095,16 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       return;
     }
     try {
+      final consent = await client.consentSheet(store.currentProject.id, launchKey);
+      if (!consent.approved) {
+        if (!mounted) return;
+        final approved = await showConsentSheet(
+          context,
+          sheet: consent,
+        );
+        if (!approved) return;
+        await client.approveConsent(store.currentProject.id, launchKey);
+      }
       final snapshot = await client.openApp(store.currentProject.id, launchKey);
       if (mounted) store.reconcileWorkspace(store.currentProject, snapshot);
     } catch (error) {
