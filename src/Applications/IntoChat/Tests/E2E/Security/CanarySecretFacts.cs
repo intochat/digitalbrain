@@ -15,6 +15,24 @@ public sealed class CanarySecretFacts
     private const string Canary = "canary-secret-7f3a91";
 
     [Fact(Timeout = 300_000)]
+    public async Task AnotherOwnersVaultIsForbiddenWhateverThePathSays()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await IntoChatE2ETest.Create().StartAsync(ct);
+
+        using var read = await brain.HttpClient.GetAsync("/my-data/someone-else", ct);
+        using var write = await brain.HttpClient.PostAsJsonAsync(
+            "/my-data/someone-else/secrets",
+            new { fieldPath = "me.apiKey", label = "API key", value = Canary },
+            ct);
+        using var own = await brain.HttpClient.GetAsync($"/my-data/{Owner}", ct);
+
+        Assert.Equal(System.Net.HttpStatusCode.Forbidden, read.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.Forbidden, write.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.OK, own.StatusCode);
+    }
+
+    [Fact(Timeout = 300_000)]
     public async Task ASeededVaultSecretNeverAppearsInPlaintext()
     {
         var ct = TestContext.Current.CancellationToken;

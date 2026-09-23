@@ -35,8 +35,17 @@ public sealed class DiscoveryModule : IModule
 
     private static ICapabilityEmbedder CreateEmbedder(IServiceProvider services)
     {
-        var generator = services.GetService<IEmbeddingGenerator<string, Embedding<float>>>();
-        return generator is null ? new HashingCapabilityEmbedder() : new AiCapabilityEmbedder(generator);
+        try
+        {
+            var generator = services.GetService<IEmbeddingGenerator<string, Embedding<float>>>();
+            return generator is null ? new HashingCapabilityEmbedder() : new AiCapabilityEmbedder(generator);
+        }
+        catch (InvalidOperationException)
+        {
+            // The AI module registers a factory that throws when no embedding model is configured;
+            // discovery must still start and serve keyword search.
+            return new HashingCapabilityEmbedder();
+        }
     }
 
     private static ICapabilityVectorIndex CreateVectorIndex(IServiceProvider services)
