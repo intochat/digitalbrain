@@ -135,7 +135,12 @@ public sealed class AgentTableJourneyFacts
         Assert.Equal(6, refined.FilteredRows);
         Assert.Equal("city", Assert.Single(refined.Filters).ColumnId);
 
-        // Refresh reads the saved view again, so the same window now shows only London rows.
+        // The window re-reads the saved view on the refine signal, so the refined rows appear
+        // without pressing Refresh: London rows only, no Berlin row.
+        await Assertions.Expect(window.GetByText("Customer 10", new() { Exact = true })).ToBeVisibleAsync();
+        await Assertions.Expect(window.GetByText("Customer 11", new() { Exact = true })).ToHaveCountAsync(0);
+
+        // Refresh keeps showing the same saved view.
         await window.GetByRole(AriaRole.Button, new() { Name = "Refresh table", Exact = true }).ClickAsync();
         await Assertions.Expect(window.GetByText("Customer 10", new() { Exact = true })).ToBeVisibleAsync();
         await Assertions.Expect(window.GetByText("Customer 11", new() { Exact = true })).ToHaveCountAsync(0);

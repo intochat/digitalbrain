@@ -318,4 +318,60 @@ void main() {
     expect(controller.error, contains('changed elsewhere'));
     controller.dispose();
   });
+  test('a refined saved view without rows re-reads the refined rows', () async {
+    var reads = 0;
+    final controller = UiTableController(
+      workspace: 'w',
+      snapshot: TableSnapshot.fromJson(tableJson(1, 'Berlin')),
+      read: (_, _, {offset = 0, limit = 25}) async {
+        reads++;
+        return TableSnapshot.fromJson({
+          ...tableJson(2, 'London'),
+          'filteredRows': 6,
+          'filters': [
+            {'columnId': 'company', 'operator': 'eq', 'value': 'London'},
+          ],
+        });
+      },
+    );
+    await controller.acceptSavedView(
+      TableSnapshot.fromJson({
+        ...tableJson(2, 'Leads'),
+        'rows': <Object?>[],
+        'filteredRows': 0,
+        'filters': [
+          {'columnId': 'company', 'operator': 'eq', 'value': 'London'},
+        ],
+      }),
+    );
+    expect(reads, 1);
+    expect(controller.snapshot.rows.single.cells.single, 'London');
+    expect(controller.snapshot.filters.single.value, 'London');
+    controller.dispose();
+  });
+  test('an empty saved view re-reads once without looping', () async {
+    var reads = 0;
+    final controller = UiTableController(
+      workspace: 'w',
+      snapshot: TableSnapshot.fromJson(tableJson(1, 'old')),
+      read: (_, _, {offset = 0, limit = 25}) async {
+        reads++;
+        return TableSnapshot.fromJson({
+          ...tableJson(2, 'Leads'),
+          'rows': <Object?>[],
+          'filteredRows': 0,
+        });
+      },
+    );
+    await controller.acceptSavedView(
+      TableSnapshot.fromJson({
+        ...tableJson(2, 'Leads'),
+        'rows': <Object?>[],
+        'filteredRows': 0,
+      }),
+    );
+    expect(reads, 1);
+    expect(controller.snapshot.rows, isEmpty);
+    controller.dispose();
+  });
 }

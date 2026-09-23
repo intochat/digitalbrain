@@ -33,6 +33,18 @@ final class UiTableController extends ChangeNotifier {
     _notify();
   }
 
+  // The assistant refines the saved view and returns it without row values; re-read so the
+  // window shows the refined rows instead of an empty page.
+  Future<void> acceptSavedView(TableSnapshot view) async {
+    if (_disposed ||
+        view.id != _snapshot.id ||
+        view.revision < _snapshot.revision ||
+        read == null) {
+      return;
+    }
+    await reload(offset: 0);
+  }
+
   Future<void> reload({int? offset}) async {
     final reader = read;
     if (reader == null || _disposed) return;

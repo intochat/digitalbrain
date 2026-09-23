@@ -303,6 +303,10 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
             }
             store.save();
           });
+        } else if (snapshot.rows.isEmpty &&
+            snapshot.revision > existing.snapshot.revision &&
+            existing.read != null) {
+          unawaited(existing.acceptSavedView(snapshot));
         } else {
           existing.accept(snapshot);
         }
