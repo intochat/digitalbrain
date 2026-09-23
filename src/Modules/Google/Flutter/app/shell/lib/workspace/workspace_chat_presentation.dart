@@ -3,6 +3,12 @@ part of 'workspace_chat.dart';
 extension _WorkspaceChatPresentation on _WorkspaceChatState {
   Widget _message(Map<String, dynamic> entry) {
     final colors = Theme.of(context).colorScheme;
+    if (entry['role'] == 'receipt') {
+      final receipt = entry['receipt'];
+      return receipt is Map
+          ? ReceiptCard(receipt: Map<String, dynamic>.from(receipt))
+          : const SizedBox.shrink();
+    }
     if (entry['role'] == 'tool') return _toolMessage(entry);
     final user = entry['role'] == 'user';
     final text = entry['text'] as String? ?? '';

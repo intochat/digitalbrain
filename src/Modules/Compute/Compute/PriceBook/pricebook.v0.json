@@ -1,0 +1,26 @@
+{
+  "version": "v0",
+  "unit": "usd_per_million_tokens",
+  "models": [
+    { "id": "gpt-5.6-sol", "provider": "OpenAI", "local": false, "input": 5.00, "cached": 2.50, "reasoning": 20.00, "output": 20.00 },
+    { "id": "gpt-5.6-terra", "provider": "OpenAI", "local": false, "input": 3.75, "cached": 1.88, "reasoning": 15.00, "output": 15.00 },
+    { "id": "gpt-5.6-luna", "provider": "OpenAI", "local": false, "input": 2.50, "cached": 1.25, "reasoning": 10.00, "output": 10.00 },
+    { "id": "gpt-5.4", "provider": "OpenAI", "local": false, "input": 1.25, "cached": 0.63, "reasoning": 5.00, "output": 5.00 },
+    { "id": "gpt-5.4-mini", "provider": "OpenAI", "local": false, "input": 0.75, "cached": 0.38, "reasoning": 3.00, "output": 3.00 },
+    { "id": "gpt-5.4-nano", "provider": "OpenAI", "local": false, "input": 0.15, "cached": 0.08, "reasoning": 0.60, "output": 0.60 },
+    { "id": "claude-fable-5", "provider": "Anthropic", "local": false, "input": 5.00, "cached": 2.50, "reasoning": 20.00, "output": 20.00 },
+    { "id": "claude-opus-5", "provider": "Anthropic", "local": false, "input": 15.00, "cached": 7.50, "reasoning": 60.00, "output": 60.00 },
+    { "id": "claude-sonnet-5", "provider": "Anthropic", "local": false, "input": 3.00, "cached": 1.50, "reasoning": 12.00, "output": 12.00 },
+    { "id": "claude-haiku-4-5", "provider": "Anthropic", "local": false, "input": 1.00, "cached": 0.50, "reasoning": 4.00, "output": 4.00 },
+    { "id": "gemini-3.1-pro-preview", "provider": "Google", "local": false, "input": 2.00, "cached": 1.00, "reasoning": 8.00, "output": 8.00 },
+    { "id": "gemini-3.6-pro", "provider": "Google", "local": false, "input": 2.00, "cached": 1.00, "reasoning": 8.00, "output": 8.00 },
+    { "id": "gemini-3.6-flash", "provider": "Google", "local": false, "input": 0.50, "cached": 0.25, "reasoning": 2.00, "output": 2.00 },
+    { "id": "grok-4.6", "provider": "XAI", "local": false, "input": 3.00, "cached": 1.50, "reasoning": 12.00, "output": 12.00 },
+    { "id": "gemma4:e2b", "provider": "Ollama", "local": true, "input": 0, "cached": 0, "reasoning": 0, "output": 0 },
+    { "id": "qwen3.5:4b", "provider": "Ollama", "local": true, "input": 0, "cached": 0, "reasoning": 0, "output": 0 },
+    { "id": "text-embedding-3-large", "provider": "OpenAI", "local": false, "input": 0.13, "cached": 0.13, "reasoning": 0, "output": 0 },
+    { "id": "text-embedding-3-small", "provider": "OpenAI", "local": false, "input": 0.02, "cached": 0.02, "reasoning": 0, "output": 0 },
+    { "id": "gemini-embedding-001", "provider": "Google", "local": false, "input": 0.15, "cached": 0.15, "reasoning": 0, "output": 0 },
+    { "id": "embeddinggemma", "provider": "Ollama", "local": true, "input": 0, "cached": 0, "reasoning": 0, "output": 0 }
+  ]
+}
