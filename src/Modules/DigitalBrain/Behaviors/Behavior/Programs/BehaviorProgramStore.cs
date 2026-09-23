@@ -2,12 +2,13 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.Coding;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Behavior;
 
-internal sealed class BehaviorProgramStore(string root)
+internal sealed class BehaviorProgramStore(IDocumentStore<BehaviorProgramDocument> documents)
 {
-    private readonly DurableDocumentStore<BehaviorProgramDocument> _documents = new(root, () => new());
+    private readonly IDocumentStore<BehaviorProgramDocument> _documents = documents;
     public Task<BehaviorSnapshot> ReadAsync(string id, CancellationToken ct) => _documents.ReadAsync(id, d => d.Snapshot, ct);
     public Task<IReadOnlyList<string>> ListAsync(CancellationToken ct) => _documents.ListIdsAsync(ct);
     public Task<bool> CanStartAsync(string id, CancellationToken ct)

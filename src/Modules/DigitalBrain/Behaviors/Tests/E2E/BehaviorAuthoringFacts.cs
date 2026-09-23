@@ -3,6 +3,7 @@ using System.Text.Json;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Coding;
 using DigitalBrain.Contracts;
+using DigitalBrain.Core;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,7 +17,7 @@ public sealed class BehaviorAuthoringFacts
     [Fact]
     public async Task ChatDraftSaveRegistersInTheSameWorkspaceCatalog()
     {
-        var registry = new BehaviorCatalogStore(Path.Combine(Path.GetTempPath(), "behavior-chat-catalog", Guid.NewGuid().ToString("N")));
+        var registry = new BehaviorCatalogStore(new InMemoryDocumentStore<BehaviorCatalogIndex>(), new InMemoryDocumentStore<BehaviorCatalogDocument>());
         await using var fixture = new Fixture(registry);
         var tools = new BehaviorAgentTools(fixture.Tools).Create(() => new("workspace-one", "run", "call"));
         await tools.Single(x => x.Name == "code_draft_save").InvokeAsync(new AIFunctionArguments

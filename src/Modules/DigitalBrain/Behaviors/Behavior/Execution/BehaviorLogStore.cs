@@ -1,11 +1,11 @@
 using System.Text;
-using DigitalBrain.Coding;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Behavior;
 
-internal sealed class BehaviorLogStore(string root, long maximumBytes)
+internal sealed class BehaviorLogStore(IDocumentStore<LogDocument> store, long maximumBytes)
 {
-    private readonly DurableDocumentStore<LogDocument> _store = new(root, () => new());
+    private readonly IDocumentStore<LogDocument> _store = store;
     public Task<long> AppendAsync(string id, Guid generation, string stream, string message, CancellationToken ct)
         => _store.UpdateAsync(id, d =>
         {

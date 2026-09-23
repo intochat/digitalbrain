@@ -31,10 +31,31 @@ public sealed class CounterNeuron([PersistentState("state", "Default")] IPersist
     }
 }
 
+[GenerateSerializer]
+public sealed class ProbeState { [Id(0)] public int Value { get; set; } }
+
+public sealed class ProbeNeuron(IPersistentState<ProbeState> state) : Neuron<ProbeState>(state)
+{
+    public int Value => Snapshot.Value;
+    public Task Set(int value) => Save(new ProbeState { Value = value }, new Number(value));
+}
+
+internal sealed class FailingProbeState(ProbeState initial) : IPersistentState<ProbeState>
+{
+    public ProbeState State { get; set; } = initial;
+    public string Etag => string.Empty;
+    public bool RecordExists => true;
+    public bool FailNextWrite { get; set; }
+    public Task ClearStateAsync() => Task.CompletedTask;
+    public Task ReadStateAsync() => Task.CompletedTask;
+    public Task WriteStateAsync() => FailNextWrite
+        ? Task.FromException(new InvalidOperationException("Storage is unavailable."))
+        : Task.CompletedTask;
+}
+
 public sealed class PersistenceFacts
 {
     private static readonly string RepositoryRoot = FindRepositoryRoot();
-
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
@@ -62,6 +83,29 @@ public sealed class PersistenceFacts
             }
             yield return file.FullName;
         }
+    }
+
+    [Fact]
+    public async Task FailedWriteRollsStateBack()
+    {
+        var storage = new FailingProbeState(new ProbeState { Value = 7 });
+        var neuron = new ProbeNeuron(storage);
+        storage.FailNextWrite = true;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => neuron.Set(9));
+        Assert.Equal(7, neuron.Value);
+        Assert.Equal(7, storage.State.Value);
+    }
+
+    [Fact]
+    public async Task ClusterDocumentStoreWritesThroughGrainState()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().StartAsync(ct);
+        var store = new GrainDocumentStore<CounterState>(brain.Grains(), "persistence-facts");
+        await store.UpdateAsync("doc", state => state.Value = 42, ct);
+        var (_, payload) = await brain.Grains().GetGrain<IDocumentGrain>("persistence-facts/doc").ReadAsync();
+        Assert.Contains("42", payload ?? string.Empty, StringComparison.Ordinal);
+        Assert.Equal(42, await store.ReadAsync("doc", state => state.Value, ct));
     }
 
     [Fact]

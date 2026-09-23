@@ -1,7 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
 using DigitalBrain.Coding;
-using Microsoft.Extensions.Options;
+using DigitalBrain.Core;
+using Orleans;
 
 namespace IntoChat;
 
@@ -11,14 +12,15 @@ internal sealed record BehaviorDescription(string Id, long Revision, string Name
 // Human-facing identity belongs to the application. Execution remains owned by IBehaviorProgram.
 internal sealed class BehaviorCatalogStore
 {
-    private readonly DurableDocumentStore<BehaviorCatalogIndex> _indexes;
-    private readonly DurableDocumentStore<BehaviorCatalogDocument> _items;
-    public BehaviorCatalogStore(IOptions<WorkspaceStorageOptions> options, IHostEnvironment environment)
-        : this(Path.Combine(options.Value.StoragePath ?? Path.Combine(environment.ContentRootPath, ".digitalbrain", "workspace"), "behaviors")) { }
-    internal BehaviorCatalogStore(string root)
+    private readonly IDocumentStore<BehaviorCatalogIndex> _indexes;
+    private readonly IDocumentStore<BehaviorCatalogDocument> _items;
+    public BehaviorCatalogStore(IGrainFactory grains)
+        : this(new GrainDocumentStore<BehaviorCatalogIndex>(grains, "behavior-catalog-index"),
+            new GrainDocumentStore<BehaviorCatalogDocument>(grains, "behavior-catalog-items")) { }
+    internal BehaviorCatalogStore(IDocumentStore<BehaviorCatalogIndex> indexes, IDocumentStore<BehaviorCatalogDocument> items)
     {
-        _indexes = new(Path.Combine(root, "index"), () => new());
-        _items = new(Path.Combine(root, "items"), () => new());
+        _indexes = indexes;
+        _items = items;
     }
 
     public async Task Register(string scope, string id, CancellationToken ct)
