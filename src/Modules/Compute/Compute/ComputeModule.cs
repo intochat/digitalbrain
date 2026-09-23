@@ -38,6 +38,8 @@ public sealed class ComputeModule : IModule
             services.TryAddSingleton<ILedgerStore, InMemoryLedgerStore>();
         }
         services.TryAddSingleton<IMeterSink, DurableMeterSink>();
+        services.TryAddSingleton<IBatchMeterSink>(provider => (IBatchMeterSink)provider.GetRequiredService<IMeterSink>());
+        services.AddHostedService<ComputeSchemaWarmer>();
         services.TryAddSingleton<IPriceBook, PriceBook>();
         services.TryAddSingleton<IInvoicingProvider, FakeInvoicingProvider>();
         services.TryAddSingleton<IComputeAlertSink, InboxComputeAlertSink>();

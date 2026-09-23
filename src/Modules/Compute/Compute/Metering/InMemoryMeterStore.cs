@@ -15,11 +15,30 @@ internal sealed class InMemoryMeterStore : IMeterStore
         return ValueTask.FromResult(events.TryAdd(Key(meterEvent), meterEvent));
     }
 
+    public ValueTask<int> AppendBatchAsync(IReadOnlyList<MeterEvent> meterEvents, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(meterEvents);
+        cancellationToken.ThrowIfCancellationRequested();
+        var inserted = 0;
+        foreach (var meterEvent in meterEvents)
+        {
+            if (events.TryAdd(Key(meterEvent), meterEvent)) { inserted++; }
+        }
+
+        return ValueTask.FromResult(inserted);
+    }
+
     public ValueTask<IReadOnlyList<MeterEvent>> ReadAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         IReadOnlyList<MeterEvent> snapshot = [.. events.Values.OrderBy(meter => meter.OccurredAt)];
         return ValueTask.FromResult(snapshot);
+    }
+
+    public ValueTask EnsureCreatedAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.CompletedTask;
     }
 
     internal static (string IntentId, string MeterId, string Step) Key(MeterEvent meterEvent)

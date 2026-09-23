@@ -28,6 +28,28 @@ public sealed class CatalogFacts
     }
 
     [Fact]
+    public async Task SearchesReuseTheBuiltCatalogUntilAManifestChangeInvalidatesIt()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var source = new CountingManifestSource([ScopedAppManifest.Global(InvoiceManifest())]);
+        await using var brain = await Start(source, ct);
+        var catalog = brain.Get<ICapabilityCatalog>("catalog");
+
+        await catalog.Search("summarize my outstanding invoices", "workspace-a", 5);
+        var readsAfterFirstSearch = source.Reads;
+        Assert.True(readsAfterFirstSearch > 0, "the first search must build the catalog");
+
+        // A search is a read of the built index, not a manifest re-read.
+        await catalog.Search("summarize my outstanding invoices", "workspace-a", 5);
+        await catalog.Search("intochat.invoices", "workspace-a", 5);
+        Assert.Equal(readsAfterFirstSearch, source.Reads);
+
+        brain.SiloServices.GetRequiredService<CapabilityCatalog>().Invalidate();
+        await catalog.Search("summarize my outstanding invoices", "workspace-a", 5);
+        Assert.True(source.Reads > readsAfterFirstSearch, "an invalidated catalog must re-read the manifest source");
+    }
+
+    [Fact]
     public async Task SavedAppIsSearchableOnlyFromItsWorkspaceWhileFirstPartyStaysGlobal()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -193,6 +215,19 @@ internal sealed class FixtureManifestSource(IReadOnlyList<ScopedAppManifest> man
 {
     public Task<IReadOnlyList<ScopedAppManifest>> ReadAsync(CancellationToken cancellationToken = default)
         => Task.FromResult(manifests);
+}
+
+internal sealed class CountingManifestSource(IReadOnlyList<ScopedAppManifest> manifests) : IManifestSource
+{
+    private int reads;
+
+    public int Reads => reads;
+
+    public Task<IReadOnlyList<ScopedAppManifest>> ReadAsync(CancellationToken cancellationToken = default)
+    {
+        Interlocked.Increment(ref reads);
+        return Task.FromResult(manifests);
+    }
 }
 
 internal sealed class FailingEmbedder : ICapabilityEmbedder
