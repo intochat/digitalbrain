@@ -19,6 +19,7 @@ using DigitalBrain.Microsoft.GitHub;
 using DigitalBrain.Microsoft.DotNet;
 using DigitalBrain.Microsoft.Roslyn;
 using DigitalBrain.Compute;
+using DigitalBrain.Discovery;
 using DigitalBrain.MyData;
 using DigitalBrain.Receipts;
 using DigitalBrain.Salesforce;
@@ -61,7 +62,8 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<GitHubModule>(github => github.WithGitHubRepositories(repositories))
     .WithModule<FlutterModule>(flutter => flutter.RunDesktopApp())
     .WithModule<ReceiptsModule>()
-    .WithModule<ComputeModule>();
+    .WithModule<ComputeModule>()
+    .WithModule<DiscoveryModule>();
 
 if (developerProfile)
 {

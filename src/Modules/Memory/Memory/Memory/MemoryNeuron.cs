@@ -14,7 +14,6 @@ internal sealed class MemoryNeuron(
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<MemoryState> state)
     : Neuron, IMemory
 {
-    private const string ReservedNamespace = "digitalbrain.capabilities";
     private const int MaxRecallLimit = 32;
 
     private IEmbeddingGenerator<string, Embedding<float>>? _embeddings;
@@ -87,11 +86,6 @@ internal sealed class MemoryNeuron(
         if (string.IsNullOrWhiteSpace(@namespace))
         {
             throw new ArgumentException("Provide a non-blank namespace for the note.", nameof(@namespace));
-        }
-
-        if (@namespace == ReservedNamespace)
-        {
-            throw new ArgumentException("Choose a namespace other than digitalbrain.capabilities.", nameof(@namespace));
         }
 
         if (string.IsNullOrWhiteSpace(key))
