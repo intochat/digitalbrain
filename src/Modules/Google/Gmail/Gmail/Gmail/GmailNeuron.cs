@@ -48,7 +48,7 @@ internal sealed class GmailNeuron(
             ? null
             : await vault.SetSecret(platform, "gmail.refresh", "Gmail refresh token", grant.RefreshToken, CancellationToken.None)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        var expiresAt = ServiceProvider.GetRequiredService<TimeProvider>().GetUtcNow().AddSeconds(grant.ExpiresInSeconds);
+        var expiresAt = GmailTokenRefresh.Expiry(grant.ExpiresInSeconds, ServiceProvider.GetRequiredService<TimeProvider>());
         await Save(Snapshot with
         {
             Email = email,
