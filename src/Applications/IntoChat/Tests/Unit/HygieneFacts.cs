@@ -93,7 +93,7 @@ public sealed class HygieneFacts
     {
         Assert.False(File.Exists(PathInRepo("src/Behaviors/ElonBitcoin.cs")), "ElonBitcoin must move to the test host.");
         Assert.False(File.Exists(PathInRepo("src/Behaviors/Fakes/TwitterFakes.cs")), "TwitterFakes must move to the test host.");
-        Assert.True(File.Exists(PathInRepo("src/Testing/DigitalBrain.Testing.E2E/Demo/ElonBitcoin.cs")), "ElonBitcoin must live in the test host.");
+        Assert.False(File.Exists(PathInRepo("src/Testing/DigitalBrain.Testing.E2E/Demo/ElonBitcoin.cs")), "The ElonBitcoin inbox feed demo is deleted with the volatile inbox.");
         Assert.True(File.Exists(PathInRepo("src/Testing/DigitalBrain.Testing.E2E/Demo/TwitterFakes.cs")), "TwitterFakes must live in the test host.");
         Assert.DoesNotContain("TestTwitterModule", Read("src/Applications/IntoChat/AppHost/AppHost.cs"));
         Assert.DoesNotContain("AddBehavior<ElonBitcoin>", Read("src/Applications/IntoChat/IntoChat/Behavior/BehaviorEndpoints.cs"));
@@ -118,6 +118,25 @@ public sealed class HygieneFacts
             var index = appHost.IndexOf(module, StringComparison.Ordinal);
             Assert.True(index > gate, $"{module} is developer-only and must be gated behind the developer profile.");
         }
+    }
+
+    [Fact]
+    public void LegacyVolatileInboxIsDeleted()
+    {
+        string[] gone =
+        [
+            "src/Modules/Google/Flutter/Contracts/Inbox/IInbox.cs",
+            "src/Modules/Google/Flutter/Contracts/Inbox/Signals/InboxAppeared.cs",
+            "src/Modules/Google/Flutter/Flutter/Inbox/InboxNeuron.cs",
+            "src/Modules/Google/Flutter/Flutter/Inbox/InboxEndpoints.cs",
+        ];
+        foreach (var relative in gone)
+        {
+            Assert.False(File.Exists(PathInRepo(relative)), $"{relative} is the volatile inbox and should be deleted.");
+        }
+        var module = Read("src/Modules/Google/Flutter/Flutter/FlutterModule.cs");
+        Assert.DoesNotContain("InboxPath", module);
+        Assert.DoesNotContain("MapInbox", module);
     }
 
     [Fact]

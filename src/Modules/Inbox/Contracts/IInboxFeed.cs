@@ -1,4 +1,5 @@
 using DigitalBrain.Contracts;
+using Orleans.Concurrency;
 
 namespace DigitalBrain.Inbox;
 
@@ -22,6 +23,7 @@ public sealed record InboxItemDraft
     [Id(4)] public string? IntentId { get; init; }
     [Id(5)] public string? AppId { get; init; }
     [Id(6)] public string? WindowId { get; init; }
+    [Id(7)] public string? ReceiptId { get; init; }
 }
 
 // Keyed by workspace id; named IInboxFeed so it does not collide with the legacy UI-kit IInbox it replaces.
@@ -30,4 +32,16 @@ public sealed record InboxItemDraft
 public interface IInboxFeed : INeuron
 {
     Task<string> Post(InboxItemDraft item);
+
+    [ReadOnly, Alias("read")]
+    Task<InboxSnapshot> Read();
+
+    [Alias("mark-read")]
+    Task MarkRead(string itemId);
+
+    [Alias("resolve")]
+    Task Resolve(string itemId);
+
+    [Alias("digest-approvals")]
+    Task<int> DigestApprovals(TimeSpan minimumWait, string recipient);
 }

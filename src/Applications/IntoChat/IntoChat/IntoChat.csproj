@@ -21,6 +21,7 @@
     <ProjectReference Include="../../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
     <ProjectReference Include="../../../Modules/Google/Gmail/Gmail/DigitalBrain.Modules.Google.Gmail.csproj" />
     <ProjectReference Include="../../../Modules/Google/Flutter/Flutter/DigitalBrain.Modules.Flutter.csproj" />
+    <ProjectReference Include="../../../Modules/Inbox/Inbox/DigitalBrain.Modules.Inbox.csproj" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../../Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />

@@ -13,6 +13,7 @@
     <ProjectReference Include="../../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Google/Gmail/Gmail/DigitalBrain.Modules.Google.Gmail.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Google/Flutter/Aspire.Hosting/DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Inbox/Inbox/DigitalBrain.Modules.Inbox.csproj" IsAspireProjectResource="false" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../../Modules/AI/Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" IsAspireProjectResource="false" />

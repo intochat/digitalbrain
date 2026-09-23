@@ -10,6 +10,7 @@ import 'basic_credentials.dart';
 import 'cookie_http_client.dart';
 import 'host_environment.dart';
 import 'models/brain_models.dart';
+import 'models/inbox_models.dart';
 import 'models/table_models.dart';
 import 'models/workspace_models.dart';
 
@@ -448,20 +449,108 @@ final class DigitalBrainUiClient {
     return controller.stream;
   }
 
-  Future<List<String>> readInbox() async {
+  Future<InboxSnapshot> readInbox(String workspaceId) async {
     final response = await _request(
       'GET',
-      '/ui/inbox',
+      '/inbox/${Uri.encodeComponent(workspaceId)}',
       timeout: const Duration(seconds: 10),
     );
-    final decoded = jsonDecode(response.body);
-    if (decoded is! List) {
-      return const [];
-    }
-    return [
-      for (final item in decoded)
-        if (item is String) item,
-    ];
+    return InboxSnapshot.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  Future<void> resolveInboxItem(String workspaceId, String itemId) async {
+    await _request(
+      'POST',
+      '/inbox/${Uri.encodeComponent(workspaceId)}/items/${Uri.encodeComponent(itemId)}/resolve',
+      timeout: const Duration(seconds: 10),
+    );
+  }
+
+  /// Emits the snapshot first, then a fresh snapshot after every pushed change.
+  Stream<InboxSnapshot> watchInbox(String workspaceId) {
+    final abort = Completer<void>();
+    StreamSubscription<String>? incoming;
+    late StreamController<InboxSnapshot> controller;
+    controller = StreamController<InboxSnapshot>(
+      onListen: () async {
+        try {
+          final request = http.AbortableRequest(
+            'GET',
+            baseUri.resolve(
+              '/inbox/${Uri.encodeComponent(workspaceId)}/events',
+            ),
+            abortTrigger: abort.future,
+          )..headers['accept'] = 'text/event-stream';
+          final response = await _http.send(request);
+          if (abort.isCompleted || response.statusCode != 200) {
+            await response.stream.listen(null).cancel();
+            if (!abort.isCompleted) {
+              throw StateError(
+                'Inbox events are unavailable (${response.statusCode}).',
+              );
+            }
+            return;
+          }
+          String? event;
+          final data = <String>[];
+          incoming = response.stream
+              .transform(utf8.decoder)
+              .transform(const LineSplitter())
+              .listen(
+                (line) {
+                  if (line.startsWith('event:')) {
+                    event = line.substring(6).trim();
+                  }
+                  if (line.startsWith('data:')) {
+                    data.add(line.substring(5).trimLeft());
+                  }
+                  if (line.isEmpty) {
+                    final payload = data.join('\n');
+                    final name = event;
+                    event = null;
+                    data.clear();
+                    if (payload.isEmpty) return;
+                    try {
+                      if (name == 'snapshot') {
+                        controller.add(
+                          InboxSnapshot.fromJson(
+                            jsonDecode(payload) as Map<String, dynamic>,
+                          ),
+                        );
+                      } else {
+                        unawaited(
+                          readInbox(workspaceId)
+                              .then(controller.add)
+                              .catchError((Object error, StackTrace stack) {
+                                controller.addError(error, stack);
+                              }),
+                        );
+                      }
+                    } catch (error, stack) {
+                      controller.addError(error, stack);
+                    }
+                  }
+                },
+                onError: (Object error, StackTrace stack) {
+                  if (!abort.isCompleted) controller.addError(error, stack);
+                },
+                onDone: controller.close,
+              );
+        } catch (error, stack) {
+          if (!abort.isCompleted) {
+            controller.addError(error, stack);
+            unawaited(controller.close());
+          }
+        }
+      },
+      onCancel: () async {
+        if (!abort.isCompleted) abort.complete();
+        await incoming?.cancel();
+      },
+    );
+    return controller.stream;
   }
 
   Future<Map<String, dynamic>> readUi(String collection, String name) async {

@@ -13,6 +13,7 @@ using DigitalBrain.Core;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Google.Gmail;
+using DigitalBrain.Inbox;
 using DigitalBrain.Memory;
 using DigitalBrain.Microsoft.Aspire;
 using DigitalBrain.Microsoft.GitHub;
@@ -55,7 +56,8 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<GmailModule>(gmail => gmail.WithGmail())
     .WithModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
     .WithModule<GitHubModule>(github => github.WithGitHubRepositories(repositories))
-    .WithModule<FlutterModule>(flutter => flutter.RunDesktopApp());
+    .WithModule<FlutterModule>(flutter => flutter.RunDesktopApp())
+    .WithModule<InboxModule>();
 
 if (developerProfile)
 {

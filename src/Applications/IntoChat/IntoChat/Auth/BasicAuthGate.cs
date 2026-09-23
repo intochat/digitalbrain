@@ -18,7 +18,7 @@ internal static class BasicAuthGate
     private const int MaxEncodedCredentialChars = 1024;
 
     // Probed by the shell's login screen and by container probes; never gated.
-    private static readonly string[] AnonymousPaths = ["/health", "/alive", "/ui/inbox"];
+    private static readonly string[] AnonymousPaths = ["/health", "/alive"];
 
     public static WebApplication UseBasicAuthGate(this WebApplication app)
     {
