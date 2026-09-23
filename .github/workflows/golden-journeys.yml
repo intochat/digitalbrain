@@ -1,0 +1,85 @@
+name: golden-journeys
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: golden-journeys
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+
+jobs:
+  live-golden-journeys:
+    name: Live golden journeys J1/J2a
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Gate on the live model secret
+        id: gate
+        env:
+          DIGITALBRAIN_E2E_MODEL_API_KEY: ${{ secrets.DIGITALBRAIN_E2E_MODEL_API_KEY }}
+        run: |
+          if [ -z "$DIGITALBRAIN_E2E_MODEL_API_KEY" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::DIGITALBRAIN_E2E_MODEL_API_KEY is not configured; the live golden journeys are skipped."
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-dotnet@v6
+        if: steps.gate.outputs.run == 'true'
+        with:
+          global-json-file: global.json
+
+      - name: Install Flutter for the product host
+        if: steps.gate.outputs.run == 'true'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.2'
+          cache: true
+
+      - name: Resolve Flutter workspace
+        if: steps.gate.outputs.run == 'true'
+        working-directory: src/Modules/Google/Flutter/app
+        run: flutter pub get --enforce-lockfile
+
+      - name: Cache NuGet packages
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', 'global.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        if: steps.gate.outputs.run == 'true'
+        run: dotnet restore DigitalBrain.slnx
+
+      - name: Build the E2E project
+        if: steps.gate.outputs.run == 'true'
+        run: dotnet build src/Applications/IntoChat/Tests/E2E/IntoChat.Tests.E2E.csproj -c Release --no-restore -p:CodeGraphRefresh=false
+
+      - name: Install browser and system dependencies
+        if: steps.gate.outputs.run == 'true'
+        run: pwsh src/Applications/IntoChat/Tests/E2E/bin/Release/net11.0/playwright.ps1 install --with-deps chromium
+
+      - name: Run the live golden journeys
+        if: steps.gate.outputs.run == 'true'
+        env:
+          DIGITALBRAIN_E2E_LIVE_MODEL: '1'
+          DIGITALBRAIN_E2E_MODEL_API_KEY: ${{ secrets.DIGITALBRAIN_E2E_MODEL_API_KEY }}
+          DIGITALBRAIN_E2E_MODEL_ENDPOINT: ${{ vars.DIGITALBRAIN_E2E_MODEL_ENDPOINT }}
+          DIGITALBRAIN_E2E_HEADED: '0'
+        run: dotnet test --project src/Applications/IntoChat/Tests/E2E/IntoChat.Tests.E2E.csproj -c Release --no-build -p:CodeGraphRefresh=false -- --filter-class '*GoldenJourney*'
