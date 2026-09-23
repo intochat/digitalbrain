@@ -52,6 +52,7 @@ public sealed class FormFieldState
     [Id(5)] public string? Value { get; set; }
     [Id(6)] public bool SecretSet { get; set; }
     [Id(7)] public bool Supported { get; set; }
+    [Id(8)] public SecretRef? Secret { get; set; }
 }
 
 [GenerateSerializer, Alias("ui.form-state")]

@@ -81,6 +81,8 @@ public sealed class FormFacts
         var field = state.Fields.Single();
         Assert.True(field.SecretSet);
         Assert.Null(field.Value);
+        // The handle is stored so a later grant can resolve it; only the reference, never a value.
+        Assert.Equal(secret.Reference, field.Secret!.Reference);
         // Raw secret values are never accepted through a draft.
         await Assert.ThrowsAsync<ArgumentException>(() => form.SetDraft("password", "hunter2"));
         // A raw value submitted for a secret field is rejected too; only a SecretRef is allowed.

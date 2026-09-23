@@ -19,6 +19,7 @@ public sealed class IdentityModule : IModule
         ArgumentNullException.ThrowIfNull(silo);
         var services = silo.Services;
         services.TryAddSingleton<IGrantPolicySource, GrainGrantPolicySource>();
+        services.TryAddSingleton<IWorkspaceAccess, DirectoryWorkspaceAccess>();
         // The grant stage is the only enforcement increment in P2; allowances and limits add
         // further stages in P3.
         services.AddSingleton<ICallFilterStage, GrantCallFilterStage>();

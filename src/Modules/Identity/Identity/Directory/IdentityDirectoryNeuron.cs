@@ -114,6 +114,19 @@ internal sealed class IdentityDirectoryNeuron : Neuron<IdentityDirectoryState>, 
         return Task.FromResult(Snapshot.Members.FirstOrDefault(member => string.Equals(member.PrincipalId, principalId, StringComparison.Ordinal)));
     }
 
+    public Task<bool> CanAccessAsync(string principalId, string workspaceId, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (string.IsNullOrWhiteSpace(principalId) || string.IsNullOrWhiteSpace(workspaceId))
+        {
+            return Task.FromResult(false);
+        }
+
+        return Task.FromResult(Snapshot.Members.Any(member =>
+            string.Equals(member.PrincipalId, principalId, StringComparison.Ordinal)
+            && string.Equals(member.WorkspaceId, workspaceId, StringComparison.Ordinal)));
+    }
+
     public Task<IReadOnlyList<Member>> ListMembersAsync(string accountId, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();

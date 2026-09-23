@@ -48,6 +48,10 @@ public interface IIdentityDirectory : IGrainWithStringKey
 
     Task<Member?> FindMemberAsync(string principalId, CancellationToken cancellationToken = default);
 
+    // A principal may reach a workspace only when it holds a member record for it, whether it owns
+    // the account or the workspace was shared with it.
+    Task<bool> CanAccessAsync(string principalId, string workspaceId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<Member>> ListMembersAsync(string accountId, CancellationToken cancellationToken = default);
 
     Task<Member> ShareWorkspaceAsync(string accountId, string workspaceId, string principalId, string displayName, MemberRole role, CancellationToken cancellationToken = default);
