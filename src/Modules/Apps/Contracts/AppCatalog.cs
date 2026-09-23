@@ -34,6 +34,9 @@ public sealed record SaveAsAppRequest
     [Id(4)] public string? UiEntry { get; init; }
     [Id(5)] public IReadOnlyList<AppOperation> Operations { get; init; } = [];
     [Id(6)] public IReadOnlyList<string> ExamplePrompts { get; init; } = [];
+    [Id(7)] public IReadOnlyList<AppPermission> Permissions { get; init; } = [];
+    [Id(8)] public IReadOnlyList<AppMeter> Meters { get; init; } = [];
+    [Id(9)] public IReadOnlyList<AppScenario> Scenarios { get; init; } = [];
 }
 
 // The per-workspace app catalog. Key the grain by the workspace scope id.
