@@ -97,7 +97,14 @@ if (developerProfile)
 var clusterId = builder.Configuration["Orleans:ClusterId"]
     ?? (builder.Environment.IsDevelopment() ? $"digitalbrain-{Guid.NewGuid():N}" : null);
 
+// The Compute ledger and meters live in their own database, never in the customer's Supabase data.
+var computeServer = builder.AddPostgres("compute-postgres");
+if (!testing) { computeServer.WithDataVolume(); }
+var computeLedger = computeServer.AddDatabase("compute-database", ComputeModule.LedgerConnectionName);
+
 var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.IntoChat)
+    .WithReference(computeLedger, ComputeModule.LedgerConnectionName)
+    .WaitFor(computeLedger)
     .WithReference(digitalBrain)
     .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION", "false")
     .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_HTTPCLIENT_DISABLE_URL_QUERY_REDACTION", "false")

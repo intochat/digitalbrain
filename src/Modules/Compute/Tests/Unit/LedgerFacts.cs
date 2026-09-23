@@ -84,7 +84,7 @@ public sealed class LedgerFacts
         }
 
         await using var source = NpgsqlDataSource.Create(connectionString);
-        var store = new PostgresLedgerStore(source);
+        var store = new PostgresLedgerStore(new ComputeDatabase(source));
         var key = "postgres-" + Guid.NewGuid().ToString("N");
 
         var first = await store.AppendAsync(Charge(key, 3m) with { AccountId = key }, ct);

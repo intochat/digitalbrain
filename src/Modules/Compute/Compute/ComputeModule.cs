@@ -4,6 +4,7 @@ using DigitalBrain.Compute.Ledger;
 using DigitalBrain.Compute.Metering;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Enforcement;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
@@ -15,6 +16,7 @@ namespace DigitalBrain.Compute;
 public sealed class ComputeModule : IModule
 {
     public const string ConnectionStringKey = "DigitalBrain:Compute:ConnectionString";
+    public const string LedgerConnectionName = "compute";
 
     public static ModuleDefinition Define() => new(typeof(ComputeModule));
 
@@ -22,10 +24,11 @@ public sealed class ComputeModule : IModule
     {
         ArgumentNullException.ThrowIfNull(silo);
         var services = silo.Services;
-        var connectionString = silo.Configuration[ConnectionStringKey];
+        var connectionString = silo.Configuration[ConnectionStringKey]
+            ?? silo.Configuration.GetConnectionString(LedgerConnectionName);
         if (!string.IsNullOrWhiteSpace(connectionString))
         {
-            services.TryAddSingleton(_ => NpgsqlDataSource.Create(connectionString));
+            services.TryAddSingleton(_ => new ComputeDatabase(NpgsqlDataSource.Create(connectionString)));
             services.TryAddSingleton<IMeterStore, PostgresMeterStore>();
             services.TryAddSingleton<ILedgerStore, PostgresLedgerStore>();
         }

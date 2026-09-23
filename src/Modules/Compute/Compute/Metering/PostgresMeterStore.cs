@@ -4,7 +4,7 @@ namespace DigitalBrain.Compute.Metering;
 
 // Append-only PostgreSQL meter table. The primary key is the idempotency key, so a
 // duplicate insert is a no-op instead of a second event (T3, no Orleans transactions).
-internal sealed class PostgresMeterStore(NpgsqlDataSource source) : IMeterStore
+internal sealed class PostgresMeterStore(ComputeDatabase database) : IMeterStore
 {
     private const string CreateTable = """
         CREATE TABLE IF NOT EXISTS compute_meter_event (
@@ -79,7 +79,7 @@ internal sealed class PostgresMeterStore(NpgsqlDataSource source) : IMeterStore
 
     private async Task<NpgsqlConnection> OpenAsync(CancellationToken cancellationToken)
     {
-        var connection = await source.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        var connection = await database.Source.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         if (initialized) { return connection; }
         await using (var command = connection.CreateCommand())
         {
