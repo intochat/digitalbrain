@@ -279,11 +279,6 @@ internal static class UiKitEndpoints
             await grains.GetGrain<IForm>(name).SetDraft(body.Name, body.Value).WaitAsync(ct);
             return Results.Accepted();
         });
-        UiHttp.MapPost(endpoints, "forms/{name}/secret", async (string name, FormSecret body, IGrainFactory grains, CancellationToken ct) =>
-        {
-            await grains.GetGrain<IForm>(name).SetSecret(body.Name, DigitalBrain.Contracts.Types.SecretRef.For("workspace", body.SecretId, body.Label, isSet: true)).WaitAsync(ct);
-            return Results.Accepted();
-        });
         UiHttp.MapPost(endpoints, "forms/{name}/submit", async (string name, FormSubmission body, IGrainFactory grains, CancellationToken ct) =>
         {
             await grains.GetGrain<IForm>(name).Submit(body).WaitAsync(ct);
@@ -323,4 +318,3 @@ internal sealed record TreeSet(IReadOnlyList<TreeNode> Nodes);
 internal sealed record TreeSelect(string Id);
 internal sealed record SheetSet(string Title, IReadOnlyList<SheetCell> Cells);
 internal sealed record FormDraft(string Name, string Value);
-internal sealed record FormSecret(string Name, string SecretId, string Label);

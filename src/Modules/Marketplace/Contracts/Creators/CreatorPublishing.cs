@@ -43,7 +43,7 @@ public sealed record ScenarioEvidence
 
 // Deterministic-fake certification: every declared scenario ran on a fake and left evidence. A
 // scenario that depends on a live model can never be a gate (D11).
-[GenerateSerializer, Alias("marketplace.certification")]
+[GenerateSerializer, Alias("marketplace.creator-certification")]
 public sealed record CertificationReport
 {
     [Id(0)] public required string AppId { get; init; }

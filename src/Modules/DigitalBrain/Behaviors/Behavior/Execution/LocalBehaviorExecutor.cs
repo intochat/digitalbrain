@@ -71,8 +71,9 @@ internal sealed class LocalBehaviorExecutor(IOptions<BehaviorOptions> options) :
 
     private async Task<BehaviorExit> Monitor(BehaviorLaunch launch, Worker worker, string token)
     {
+        string? firstException = null;
         var output = Capture(worker.Child.Output, "stdout", launch, worker.Lifetime.Token);
-        var error = Capture(worker.Child.Error, "stderr", launch, worker.Lifetime.Token);
+        var error = Capture(worker.Child.Error, "stderr", launch, worker.Lifetime.Token, line => firstException ??= line);
         var control = Control(launch, worker, token);
         string? failure = null;
         var code = -1;
@@ -107,6 +108,8 @@ internal sealed class LocalBehaviorExecutor(IOptions<BehaviorOptions> options) :
             await worker.Lifetime.CancelAsync().ConfigureAwait(false);
             try { await Task.WhenAll(output, error, control).ConfigureAwait(false); }
             catch (Exception exception) { if (!worker.StopRequested && failure is null && code != 0) { failure = exception.Message; } }
+            // The first worker exception is the actionable status; logs keep the full trace.
+            if (firstException is not null) { failure = failure is null ? firstException : failure + " " + firstException; }
             _workers.TryRemove(launch.GenerationId, out _);
             worker.Finished.TrySetResult();
             worker.Dispose();
@@ -142,12 +145,23 @@ internal sealed class LocalBehaviorExecutor(IOptions<BehaviorOptions> options) :
         }
     }
 
-    private static async Task Capture(StreamReader reader, string stream, BehaviorLaunch launch, CancellationToken ct)
+    private static async Task Capture(StreamReader reader, string stream, BehaviorLaunch launch, CancellationToken ct, Action<string>? onException = null)
     {
         var buffer = new char[4096];
         int read;
         while ((read = await reader.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
-        { await launch.Log(stream, new string(buffer, 0, read)).ConfigureAwait(false); }
+        {
+            var chunk = new string(buffer, 0, read);
+            if (onException is not null && chunk.Contains("Exception", StringComparison.Ordinal))
+            {
+                using var lines = new StringReader(chunk);
+                while (lines.ReadLine() is { } line)
+                {
+                    if (line.Contains("Exception", StringComparison.Ordinal)) { onException(line.Trim()); break; }
+                }
+            }
+            await launch.Log(stream, chunk).ConfigureAwait(false);
+        }
     }
 
     public void Dispose() { foreach (var worker in _workers.Values) { worker.Child.Terminate(); } }

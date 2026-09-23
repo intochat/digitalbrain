@@ -42,7 +42,13 @@ internal sealed class ScopedBehaviorTools(IDigitalBrain brain, ContractCatalog c
         return await Draft(id).Save(request, ct);
     }
     [McpServerTool(Name = "code_draft_check"), Description("Compile and test this exact draft revision in a contained process. Returns a check operation to poll.")]
-    public Task<CodeCheckSnapshot> CheckDraft(string id, CheckCodeDraft request, CancellationToken ct) => Draft(id).Check(request, ct);
+    public async Task<CodeCheckSnapshot> CheckDraft(string id, CheckCodeDraft request, CancellationToken ct)
+    {
+        var draft = Draft(id);
+        var snapshot = await draft.Read(ct);
+        if (snapshot.Revision == request.Revision) { BehaviorTestContract.RejectTestsThatNeverReferenceTheBehavior(snapshot.Source, snapshot.Tests); }
+        return await draft.Check(request, ct);
+    }
     [McpServerTool(Name = "code_check_read"), Description("Wait up to 20 seconds for validation, then return status, diagnostics and the passing artifact reference. If still Queued, Building or Testing, call again; the task is not finished.")]
     public async Task<CodeCheckSnapshot> ReadCheck(string id, Guid operationId, CancellationToken ct)
     {

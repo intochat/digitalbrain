@@ -28,7 +28,6 @@ public sealed class GmailModule : IModule
         });
     }
     public const string GmailOAuthConfigurationRoot = "DigitalBrain:Google:Gmail:OAuth";
-    public static readonly Uri GmailMcpEndpoint = new("https://gmailmcp.googleapis.com/mcp/v1");
 
     public void Configure(ISiloBuilder silo)
     {

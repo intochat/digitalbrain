@@ -15,4 +15,16 @@ public sealed class BehaviorToolFacts
     [Fact]
     public void WorkspacesReceiveDifferentNeuronKeys()
         => Assert.NotEqual(BehaviorToolScope.Key("workspace-a", "invoice"), BehaviorToolScope.Key("workspace-b", "invoice"));
+
+    [Fact]
+    public void TautologicalTestsAreRejected()
+        => Assert.Throws<ArgumentException>(() => BehaviorTestContract.RejectTestsThatNeverReferenceTheBehavior(
+            "public sealed class TimerToText { public static string Format(int tick) => tick.ToString(); }",
+            "public sealed class Tests { [Xunit.Fact] public void Passes() => Xunit.Assert.True(true); }"));
+
+    [Fact]
+    public void TestsThatExerciseTheBehaviorAreAccepted()
+        => BehaviorTestContract.RejectTestsThatNeverReferenceTheBehavior(
+            "public sealed class TimerToText { public static string Format(int tick) => tick.ToString(); }",
+            "public sealed class Tests { [Xunit.Fact] public void Formats() => Xunit.Assert.Equal(\"7\", TimerToText.Format(7)); }");
 }
