@@ -65,7 +65,9 @@ ENV ASPNETCORE_ENVIRONMENT=Production \
     DigitalBrain__Modules__15="DigitalBrain.Discovery.DiscoveryModule, DigitalBrain.Modules.Discovery" \
     DigitalBrain__Modules__16="DigitalBrain.Apps.AppsModule, DigitalBrain.Modules.Apps" \
     DigitalBrain__Modules__17="DigitalBrain.Broker.BrokerModule, DigitalBrain.Modules.Broker" \
-    DigitalBrain__Modules__18="DigitalBrain.Inbox.InboxModule, DigitalBrain.Modules.Inbox"
+    DigitalBrain__Modules__18="DigitalBrain.Inbox.InboxModule, DigitalBrain.Modules.Inbox" \
+    DigitalBrain__Modules__19="DigitalBrain.Marketplace.MarketplaceModule, DigitalBrain.Modules.Marketplace" \
+    DigitalBrain__Modules__20="DigitalBrain.Marketplace.Creators.CreatorPublishingModule, DigitalBrain.Modules.Marketplace"
 
 EXPOSE 8080
 

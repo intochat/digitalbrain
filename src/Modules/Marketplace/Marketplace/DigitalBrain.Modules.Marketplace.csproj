@@ -7,6 +7,9 @@
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Modules.Marketplace.Tests.Unit" />
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Marketplace.Contracts.csproj" />
+    <ProjectReference Include="../../Broker/Broker/DigitalBrain.Modules.Broker.csproj" />
+    <ProjectReference Include="../../Inbox/Contracts/DigitalBrain.Modules.Inbox.Contracts.csproj" />
     <ProjectReference Include="../../DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
+    <PackageReference Include="BouncyCastle.Cryptography" />
   </ItemGroup>
 </Project>

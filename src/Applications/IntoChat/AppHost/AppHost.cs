@@ -19,6 +19,8 @@ using DigitalBrain.Google.Gmail;
 using DigitalBrain.Identity;
 using DigitalBrain.Inbox;
 using DigitalBrain.Memory;
+using DigitalBrain.Marketplace;
+using DigitalBrain.Marketplace.Creators;
 using DigitalBrain.Microsoft.Aspire;
 using DigitalBrain.Microsoft.GitHub;
 using DigitalBrain.Microsoft.DotNet;
@@ -78,7 +80,9 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<DiscoveryModule>()
     .WithModule<AppsModule>()
     .WithModule<BrokerModule>()
-    .WithModule<InboxModule>();
+    .WithModule<InboxModule>()
+    .WithModule<MarketplaceModule>()
+    .WithModule<CreatorPublishingModule>();
 
 if (developerProfile)
 {

@@ -27,6 +27,10 @@ public sealed class UnitBrain : IDigitalBrain, ITrackedBrain
 
     public IGrainFactory Grains => cluster.Client;
 
+    // The active silo's service provider. Lets a test reach module-registered singletons that are
+    // not grains (for example the broker gateway or a certification service).
+    public IServiceProvider SiloServices => cluster.GetActiveSilos().First().ServiceProvider;
+
     internal IDigitalBrain Client => _brain;
 
     void ITrackedBrain.Track(IAsyncDisposable resource) => _lifetime.Own("observation", resource);
