@@ -148,6 +148,17 @@ public interface IComputeAlertSink
     Task RaiseAsync(ComputeLimitAlert alert, CancellationToken cancellationToken = default);
 }
 
+// A reservation id is derived from the intent and operation, so a retried or duplicated call
+// reserves once. The same function backs the ledger and any caller that later settles the call.
+public static class AllowanceReservations
+{
+    public static string For(CallRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return $"{request.Caller.IntentId ?? "anon"}:{request.TargetNeuron}:{request.Operation}";
+    }
+}
+
 // Per account. The one durable writer of allowances, reservations, pending approvals and limits.
 [Alias("compute-allowance-ledger")]
 [Orleans.Metadata.DefaultGrainType("compute-allowance-ledger")]

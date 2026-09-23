@@ -374,6 +374,20 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
       setState(() {});
       return;
     }
+    if (event.type == 'UI_CARD') {
+      final card = event.data['card'];
+      if (card is Map) {
+        final id = '$_runId/ui/${_entries.length}';
+        _entries.add({
+          'id': id,
+          'role': 'ui',
+          'card': Map<String, dynamic>.from(card),
+        });
+      }
+      _sync();
+      setState(() {});
+      return;
+    }
     if (event.type == 'RUN_FINISHED') {
       _finished = true;
       return;

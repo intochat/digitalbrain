@@ -68,7 +68,13 @@ public sealed partial class ScriptedModelServer : IAsyncDisposable
         var wantsRefine = RefineValue is not null && ownerText.Contains("only", StringComparison.OrdinalIgnoreCase);
         object message;
         var reason = "tool_calls";
-        if (results.Length == 0)
+        var journey = Journey(ownerText, results);
+        if (journey is not null)
+        {
+            message = journey.Value.Message;
+            reason = journey.Value.Reason;
+        }
+        else if (results.Length == 0)
         {
             if (wantsCount)
             {
@@ -160,6 +166,43 @@ public sealed partial class ScriptedModelServer : IAsyncDisposable
 
     private static JsonElement ParseProperty(JsonElement element, string name)
         => element.EnumerateObject().Single(property => property.Name.Equals(name, StringComparison.OrdinalIgnoreCase)).Value;
+
+    // The J3 and J4 journeys: propose a capability and its consent sheet, then, on approval, run it.
+    private static (object Message, string Reason)? Journey(string ownerText, JsonElement[] results)
+    {
+        if (ownerText.Contains("dental", StringComparison.OrdinalIgnoreCase))
+        {
+            if (results.Length == 0)
+            { return (Call("find-capability", "find_capability", JsonSerializer.Serialize(new { query = "Find new dental clinics in Berlin" })), "tool_calls"); }
+            if (results.Length == 1)
+            { return (Call("propose-app", "propose_app", JsonSerializer.Serialize(new { appId = "intochat.leadgenerator" })), "tool_calls"); }
+            return (new { role = "assistant", content = "I found LeadGenerator and prepared its consent sheet." }, "stop");
+        }
+        if (ownerText.Contains("approve", StringComparison.OrdinalIgnoreCase))
+        {
+            if (results.Length == 0)
+            { return (Call("run-leadgenerator", "run_leadgenerator", JsonSerializer.Serialize(new { query = "Find new dental clinics in Berlin", approved = true })), "tool_calls"); }
+            return (new { role = "assistant", content = "I opened the Leads window with company-level details." }, "stop");
+        }
+        if (ownerText.Contains("background", StringComparison.OrdinalIgnoreCase))
+        {
+            if (results.Length == 0)
+            { return (Call("plan-removal", "plan_background_removal", JsonSerializer.Serialize(new { imageCount = 3 })), "tool_calls"); }
+            return (new { role = "assistant", content = "I prepared a background-removal plan with an estimate of 12 and a maximum of 20." }, "stop");
+        }
+        var withoutApproval = ownerText.Contains("without approval", StringComparison.OrdinalIgnoreCase);
+        var allowance = withoutApproval ? null
+            : ownerText.Contains("allow once", StringComparison.OrdinalIgnoreCase) ? "once"
+            : ownerText.Contains("always", StringComparison.OrdinalIgnoreCase) ? "always"
+            : null;
+        if (allowance is not null || withoutApproval)
+        {
+            if (results.Length == 0)
+            { return (Call("run-removal", "run_background_removal", JsonSerializer.Serialize(new { planId = (string?)null, allowance })), "tool_calls"); }
+            return (new { role = "assistant", content = allowance is null ? "No allowance; nothing was charged." : "Charged 9 Compute." }, "stop");
+        }
+        return null;
+    }
 
     // The open tool records the window id on the assistant turn; later turns read it from there.
     private static string WindowId(JsonElement[] messages)

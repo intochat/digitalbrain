@@ -10,6 +10,10 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
           : const SizedBox.shrink();
     }
     if (entry['role'] == 'tool') return _toolMessage(entry);
+    if (entry['role'] == 'ui') {
+      final card = entry['card'];
+      return card is Map ? _uiCard(Map<String, dynamic>.from(card)) : const SizedBox.shrink();
+    }
     final user = entry['role'] == 'user';
     final text = entry['text'] as String? ?? '';
     return Padding(
@@ -260,6 +264,170 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
         ],
       ),
     );
+  }
+
+  // A UI channel card: structured content rendered by trusted widgets, never by the model.
+  Widget _uiCard(Map<String, dynamic> card) {
+    final colors = Theme.of(context).colorScheme;
+    final kind = card['kind'] as String? ?? '';
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Container(
+        key: Key('ui-card-$kind'),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: colors.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: colors.outlineVariant),
+        ),
+        child: switch (kind) {
+          'consent-sheet' => _consentCard(card, colors),
+          'plan-card' => _planCard(card, colors),
+          'charge-receipt' => _chargeCard(card, colors),
+          'leads' => _leadsCard(card, colors),
+          _ => const Text('Updated'),
+        },
+      ),
+    );
+  }
+
+  Widget _consentCard(Map<String, dynamic> card, ColorScheme colors) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(
+        '${card['name'] ?? 'App'} · consent',
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+      if (card['description'] is String) ...[
+        const SizedBox(height: 8),
+        Text(card['description'] as String),
+      ],
+      if (card['examples'] is List) ...[
+        const SizedBox(height: 8),
+        Text(
+          'Try: ${(card['examples'] as List).join(' · ')}',
+          style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+        ),
+      ],
+      if (card['dataTypes'] is List) ...[
+        const SizedBox(height: 6),
+        Text(
+          'Data: ${_labels(card['dataTypes'] as List, 'id')}',
+          style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+        ),
+      ],
+      if (card['meters'] is List) ...[
+        const SizedBox(height: 6),
+        Text(
+          'Meters: ${_labels(card['meters'] as List, 'meterId')}',
+          style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+        ),
+      ],
+      const SizedBox(height: 8),
+      Text(
+        'Estimated ${card['estimate'] ?? 0} Compute (preview, not charged)',
+        style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+      ),
+      const SizedBox(height: 12),
+      if (card['approved'] == true)
+        Text(
+          'Approved',
+          style: TextStyle(fontSize: 12, color: colors.primary),
+        )
+      else
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            FilledButton(
+              onPressed: _running ? null : () => _decide('Approve'),
+              child: const Text('Approve'),
+            ),
+            TextButton(
+              onPressed: _running ? null : () => _decide('Not now'),
+              child: const Text('Not now'),
+            ),
+          ],
+        ),
+    ],
+  );
+
+  Widget _planCard(Map<String, dynamic> card, ColorScheme colors) {
+    final images = card['images'] is List ? (card['images'] as List).length : 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text(
+          'Remove background',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'The app sees only these $images images · estimate ${card['estimate']} Compute · maximum ${card['maximum']}',
+        ),
+        const SizedBox(height: 12),
+        if (card['requiresApproval'] == false)
+          Text(
+            'Already allowed',
+            style: TextStyle(fontSize: 12, color: colors.primary),
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton(
+                onPressed: _running ? null : () => _decide('Allow once'),
+                child: const Text('Allow once'),
+              ),
+              TextButton(
+                onPressed: _running
+                    ? null
+                    : () => _decide('Always, up to 100 a month'),
+                child: const Text('Always, up to 100 a month'),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  Widget _chargeCard(Map<String, dynamic> card, ColorScheme colors) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(
+        card['requiresApproval'] == true
+            ? 'No allowance yet · nothing charged'
+            : 'Charged ${card['chargedCompute'] ?? 0} Compute',
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+      if (card['maximum'] != null) ...[
+        const SizedBox(height: 6),
+        Text(
+          'Maximum ${card['maximum']} Compute',
+          style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+        ),
+      ],
+    ],
+  );
+
+  Widget _leadsCard(Map<String, dynamic> card, ColorScheme colors) => Text(
+    'Leads window opened (${card['leads'] ?? 0} companies)',
+    style: const TextStyle(fontWeight: FontWeight.w600),
+  );
+
+  String _labels(List items, String key) => items
+      .whereType<Map>()
+      .map((item) => item[key]?.toString() ?? '')
+      .where((value) => value.isNotEmpty)
+      .join(', ');
+
+  void _decide(String message) {
+    _composer.text = message;
+    _send();
   }
 
   Widget _chatSurface(BuildContext context) {
