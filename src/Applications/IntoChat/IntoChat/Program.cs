@@ -24,6 +24,7 @@ builder.Services.AddSingleton<AppSurfaceComposer>();
 builder.Services.AddSingleton<ImageSaveCoordinator>();
 builder.Services.AddSingleton<LiveTableWindows>();
 builder.Services.AddSingleton<IAgentToolFactory, WorkspaceTableTools>();
+builder.Services.AddSingleton<IAgentToolFactory, WorkspaceFormTools>();
 
 var app = builder.Build();
 

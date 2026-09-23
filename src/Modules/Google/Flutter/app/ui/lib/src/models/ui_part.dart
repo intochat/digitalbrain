@@ -24,9 +24,102 @@ sealed class UiPart {
       UiVideoPart.kindName => UiVideoPart.fromMetadata(metadata),
       UiWebBrowserPart.kindName => UiWebBrowserPart.fromMetadata(metadata),
       UiExpanderPart.kindName => UiExpanderPart.fromMetadata(metadata),
+      UiFormPart.kindName => UiFormPart.fromMetadata(metadata),
       _ => null,
     };
   }
+}
+
+final class UiFormField {
+  const UiFormField({
+    required this.name,
+    required this.label,
+    required this.kind,
+    this.required = false,
+    this.choices = const [],
+    this.value,
+    this.secretSet = false,
+    this.supported = true,
+  });
+
+  final String name;
+  final String label;
+  final String kind;
+  final bool required;
+  final List<String> choices;
+  final String? value;
+  final bool secretSet;
+  final bool supported;
+
+  factory UiFormField.fromJson(Map<String, dynamic> json) {
+    return UiFormField(
+      name: json['name'] as String? ?? '',
+      label: json['label'] as String? ?? '',
+      kind: json['kind'] as String? ?? 'PlainText',
+      required: json['required'] as bool? ?? false,
+      choices: (json['choices'] as List? ?? const [])
+          .map((choice) => choice.toString())
+          .toList(growable: false),
+      value: json['value'] as String?,
+      secretSet: json['secretSet'] as bool? ?? false,
+      supported: json['supported'] as bool? ?? true,
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+    'name': name,
+    'label': label,
+    'kind': kind,
+    'required': required,
+    'choices': choices,
+    'value': value,
+    'secretSet': secretSet,
+    'supported': supported,
+  };
+}
+
+/// Declarative form read from one [FormState]; rendered field by field, no per-field neuron.
+final class UiFormPart extends UiPart {
+  const UiFormPart({
+    required this.title,
+    required this.fields,
+    this.submitted = false,
+  });
+
+  static const kindName = 'form';
+
+  final String title;
+  final List<UiFormField> fields;
+  final bool submitted;
+
+  @override
+  String get kind => kindName;
+
+  @override
+  String get copyText => title;
+
+  factory UiFormPart.fromMetadata(Map<String, dynamic> metadata) {
+    final raw = metadata['fields'];
+    final fields = raw is List
+        ? raw
+              .whereType<Map>()
+              .map((field) => UiFormField.fromJson(Map<String, dynamic>.from(field)))
+              .toList(growable: false)
+        : const <UiFormField>[];
+    return UiFormPart(
+      title: metadata['title'] as String? ?? '',
+      fields: fields,
+      submitted: metadata['submitted'] as bool? ?? false,
+    );
+  }
+
+  @override
+  Map<String, Object?> toMetadata() => {
+    'kind': kindName,
+    'title': title,
+    'submitted': submitted,
+    'fields': [for (final field in fields) field.toJson()],
+  };
 }
 
 final class UiTimerPart extends UiPart {

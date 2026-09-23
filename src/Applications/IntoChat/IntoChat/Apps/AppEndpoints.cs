@@ -3,6 +3,7 @@ using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Button;
 using DigitalBrain.Flutter.Card;
 using DigitalBrain.Flutter.Collection;
+using DigitalBrain.Flutter.Form;
 using DigitalBrain.Flutter.ImageCanvas;
 using DigitalBrain.Flutter.Layout;
 using DigitalBrain.Flutter.Surface;
@@ -79,6 +80,7 @@ internal static class AppEndpoints
                 "layout" => Results.Ok(await brain.Get<ILayout>(name).Read().WaitAsync(ct)),
                 "collection" => Results.Ok(await brain.Get<ICollectionView>(name).Read().WaitAsync(ct)),
                 "imagecanvas" => Results.Ok(await brain.Get<IImageCanvas>(name).Read().WaitAsync(ct)),
+                "form" => Results.Ok(await brain.Get<IForm>(name).Read().WaitAsync(ct)),
                 _ => throw new ArgumentException("Unknown app UI kind.")
             };
         }));
@@ -95,6 +97,20 @@ internal static class AppEndpoints
                     var collection = brain.Get<ICollectionView>(input.Name);
                     if (input.Action == "select") { await collection.Select(input.Value ?? "", input.Revision).WaitAsync(ct); }
                     else { await collection.Activate(input.Value ?? "", input.Revision).WaitAsync(ct); }
+                    break;
+                case "form":
+                    var form = brain.Get<IForm>(input.Name);
+                    if (input.Action == "submit")
+                    {
+                        var state = await form.Read().WaitAsync(ct);
+                        var values = state.Fields.Select(field => new FormFieldValue(field.Name, field.Value)).ToArray();
+                        await form.Submit(new(values, (int)input.Revision)).WaitAsync(ct);
+                    }
+                    else if (input.Action == "secret")
+                    {
+                        await form.SetSecret(input.Field ?? "", DigitalBrain.Contracts.Types.SecretRef.For(scope, input.Value ?? "", input.Field ?? "", isSet: true)).WaitAsync(ct);
+                    }
+                    else { await form.SetDraft(input.Field ?? "", input.Value ?? "").WaitAsync(ct); }
                     break;
                 default: throw new ArgumentException("Unknown UI event.");
             }
@@ -130,7 +146,7 @@ internal static class AppEndpoints
         catch (InvalidOperationException error) { return Results.Conflict(new { error = error.Message }); }
         catch (IOException error) { return Results.Json(new { error = error.Message.Contains("changed since", StringComparison.Ordinal) ? error.Message : "The local file could not be accessed. Check its permissions and retry." }, statusCode: 503); }
     }
-    internal sealed record UiEvent(string Kind, string Name, string? Action = null, string? Value = null, long Revision = 0);
+    internal sealed record UiEvent(string Kind, string Name, string? Action = null, string? Value = null, long Revision = 0, string? Field = null);
     internal sealed record OpenImage(string EntryId);
     internal sealed record EditImage(ImageEditCommand Command, long ExpectedRevision, string OperationId);
     internal sealed record PrepareImageSave(long ExpectedRevision, string OperationId);
