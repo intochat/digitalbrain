@@ -30,12 +30,23 @@ var testing = builder.Configuration.GetValue<bool>("DigitalBrain:Testing:Enabled
 var repositories = builder.Configuration.GetSection("DigitalBrain:Microsoft:GitHub:Repositories")
     .Get<Dictionary<string, GitHubRepositoryDeclaration>>() ?? [];
 var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, persistentStorage: !testing)
-    .WithModule<AIModule>(ai => ai
-        .WithLlm<IGpt56Luna>()
-        .WithDefaultLlm<IGemma4>()
-        .WithDefaultEmbedding<ITextEmbedding3Small>()
-        .WithVoiceToText<IWhisperLargeV3Turbo>()
-        .WithTavilySearch())
+    .WithModule<AIModule>(ai =>
+    {
+        // Capture model inputs and outputs during local development runs so GenAI
+        // traces in Aspire show the actual conversation and tool activity. An
+        // explicit configuration value still controls the behavior in every environment.
+        ai.ConfigureOptions<AIOptions>(options =>
+            options.Telemetry.EnableSensitiveData = builder.Configuration.GetValue<bool?>(
+                $"{AIOptions.SectionName}:Telemetry:EnableSensitiveData")
+                ?? (builder.Environment.IsDevelopment() && builder.ExecutionContext.IsRunMode),
+            "Telemetry.EnableSensitiveData");
+
+        ai.WithLlm<IGpt56Luna>()
+            .WithDefaultLlm<IGemma4>()
+            .WithDefaultEmbedding<ITextEmbedding3Small>()
+            .WithVoiceToText<IWhisperLargeV3Turbo>()
+            .WithTavilySearch();
+    })
     .WithModule<MemoryModule>(memory => memory.WithQdrant())
     .WithModule<ClickHouseModule>(database => database.WithClickHouse(options => options.WithSeed("leads")))
     .WithModule<SupabaseModule>(database => database.WithConnection("supabase"))
