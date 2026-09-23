@@ -29,7 +29,7 @@ public static class DigitalBrainHostingExtensions
         }
     }
 
-    public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name, bool persistentStorage = true)
+    public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name, bool persistentStorage = true, string? dataVolume = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -50,6 +50,7 @@ public static class DigitalBrainHostingExtensions
             .RunAsEmulator(emulator =>
             {
                 if (persistentStorage) { emulator.WithDataVolume().WithLifetime(ContainerLifetime.Persistent); }
+                else if (dataVolume is not null) { emulator.WithDataVolume(dataVolume); }
             })
             .WithParentRelationship(kernel);
         var clustering = storage.AddTables(DigitalBrainNames.Clustering);

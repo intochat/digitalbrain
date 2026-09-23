@@ -30,6 +30,7 @@ public sealed class ProgrammableBehaviorFacts
         deadline.CancelAfter(TimeSpan.FromMinutes(8));
         var ct = deadline.Token;
         var root = Path.Combine(Path.GetTempPath(), "brain-behavior-e2e", Guid.NewGuid().ToString("N"));
+        var durableStorage = "programmable-behavior-" + Guid.NewGuid().ToString("N");
         using var model = new ScriptedModel();
         var ai = new AIOptions { Default = new() { Profile = "fixture" } };
         ai.ModelProfiles.Add("fixture", new() { Provider = "OpenAI", Model = "fixture", Endpoint = model.Url, Capabilities = LlmCapabilities.None });
@@ -37,7 +38,8 @@ public sealed class ProgrammableBehaviorFacts
         {
             DigitalBrain.Testing.E2E.E2ETestBuilder CreateHost() => E2ETest.Create().WithModule<AIModule>(m => m.WithOptions(ai))
                 .WithModule<CodingModule>().WithModule<BehaviorModule>().WithModule<TimeModule>().WithModule<FlutterModule>()
-                .WithModule<BehaviorFixtureModule>().WithExecution(new TestExecutionOptions
+                .WithModule<BehaviorFixtureModule>().WithDurableStorage(durableStorage)
+                .WithExecution(new TestExecutionOptions
                 {
                     PrivateConfiguration = new Dictionary<string, string?>
                     {
