@@ -28,7 +28,21 @@ internal static class DurableStorageVolume
                 AppDomain.CurrentDomain.ProcessExit += (_, _) => RemoveAll();
             }
         }
+        WaitUntilReleased(name);
         return name;
+    }
+
+    // The second host of a test must not start its storage emulator on a volume the previous host's
+    // emulator is still writing. Later acquisition waits for the previous emulator to disappear; the
+    // first acquisition sees no container and returns at once.
+    private static void WaitUntilReleased(string name)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(60);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (Split(Run("ps", "-q", "--filter", "volume=" + name)).Length == 0) { return; }
+            Thread.Sleep(200);
+        }
     }
 
     private static string Fingerprint(string key)
