@@ -25,6 +25,21 @@ public sealed class MeterFacts
     }
 
     [Fact]
+    public async Task BatchAppendWritesOneEventPerKeyAndIgnoresDuplicates()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var store = new InMemoryMeterStore();
+        var sink = new DurableMeterSink(store);
+        var input = Event();
+        var output = input with { MeterId = "llm.gpt.output_tokens", Step = "output_tokens" };
+
+        var inserted = await sink.RecordBatchAsync([input, output, input], ct);
+
+        Assert.Equal(2, inserted);
+        Assert.Equal(2, (await store.ReadAsync(ct)).Count);
+    }
+
+    [Fact]
     public async Task ConcurrentDuplicateAppendsRecordOneEvent()
     {
         var ct = TestContext.Current.CancellationToken;

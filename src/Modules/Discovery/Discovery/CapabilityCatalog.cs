@@ -17,8 +17,13 @@ internal sealed class CapabilityCatalog(
     private readonly SemaphoreSlim _gate = new(1, 1);
     private CapabilityIndex _index = CapabilityIndex.Empty;
     private string? _signature;
+    private volatile bool _dirty = true;
 
     public bool Degraded { get; private set; }
+
+    // A manifest changed: the next search re-reads the sources. Between changes a search reads
+    // the already-built index, so a turn never pays a manifest round-trip.
+    public void Invalidate() => _dirty = true;
 
     public async Task RebuildAsync(CancellationToken cancellationToken)
     {
@@ -55,6 +60,7 @@ internal sealed class CapabilityCatalog(
         {
             if (signature == _signature)
             {
+                _dirty = false;
                 return;
             }
 
@@ -77,6 +83,7 @@ internal sealed class CapabilityCatalog(
             await PersistAsync(_index, cancellationToken).ConfigureAwait(false);
             _signature = signature;
             Degraded = degraded;
+            _dirty = false;
         }
         finally
         {
@@ -105,9 +112,13 @@ internal sealed class CapabilityCatalog(
 
     public async ValueTask<CapabilitySearchResult> SearchAsync(string query, string? workspaceId, int take, CancellationToken cancellationToken)
     {
-        // Cheap idempotent rebuild: re-reads the manifest source and re-indexes only when it changed,
-        // so an app saved after startup becomes searchable on the next turn.
-        await RebuildAsync(cancellationToken).ConfigureAwait(false);
+        // The index is rebuilt at startup and whenever a manifest-change signal invalidates it, so
+        // a per-turn search is only a read; a stale or never-built index rebuilds on the first use.
+        if (_dirty)
+        {
+            await RebuildAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         return await _index.SearchAsync(query, workspaceId, take, Degraded, cancellationToken).ConfigureAwait(false);
     }
 

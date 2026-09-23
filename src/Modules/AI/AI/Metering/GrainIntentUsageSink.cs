@@ -38,9 +38,18 @@ internal sealed class GrainIntentUsageSink(IGrainFactory grains, IMeterSink? met
     private async Task EmitAsync(string intentId, string? workspaceId, TokenUsageEntry[] entries, CancellationToken cancellationToken)
     {
         if (meterSink is null) { return; }
+        var meterEvents = IntentMeterEvents.FromUsage(intentId, workspaceId, entries).ToArray();
+        if (meterEvents.Length == 0) { return; }
         try
         {
-            foreach (var meterEvent in IntentMeterEvents.FromUsage(intentId, workspaceId, entries))
+            // One intent's events are one durable write, keyed per (IntentId, MeterId, Step).
+            if (meterSink is IBatchMeterSink batch)
+            {
+                await batch.RecordBatchAsync(meterEvents, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            foreach (var meterEvent in meterEvents)
             {
                 await meterSink.RecordAsync(meterEvent, cancellationToken).ConfigureAwait(false);
             }

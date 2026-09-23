@@ -36,6 +36,13 @@ public interface IMeterSink
     ValueTask RecordAsync(MeterEvent meterEvent, CancellationToken cancellationToken = default);
 }
 
+// A sink that persists a whole intent's meter events together: one store round-trip, same
+// idempotency key per event. Sinks that only implement IMeterSink are called event by event.
+public interface IBatchMeterSink : IMeterSink
+{
+    ValueTask<int> RecordBatchAsync(IReadOnlyList<MeterEvent> meterEvents, CancellationToken cancellationToken = default);
+}
+
 public interface IPriceBook
 {
     string Version { get; }
