@@ -6,6 +6,7 @@ using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.OpenAI;
 using DigitalBrain.Apps;
 using DigitalBrain.Aspire.Hosting;
+using DigitalBrain.Automations;
 using DigitalBrain.ClickHouse;
 using DigitalBrain.Coding;
 using DigitalBrain.Behavior;
@@ -67,6 +68,7 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<MyDataModule>()
     .WithModule<ConnectionsModule>()
     .WithModule<IdentityModule>()
+    .WithModule<AutomationsModule>()
     .WithModule<GmailModule>(gmail => gmail.WithGmail())
     .WithModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
     .WithModule<GitHubModule>(github => github.WithGitHubRepositories(repositories))

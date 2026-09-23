@@ -19,6 +19,7 @@
     <ProjectReference Include="../../../Modules/Broker/Broker/DigitalBrain.Modules.Broker.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Identity/Identity/DigitalBrain.Modules.Identity.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Discovery/Discovery/DigitalBrain.Modules.Discovery.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Automations/Automations/DigitalBrain.Modules.Automations.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Google/Gmail/Gmail/DigitalBrain.Modules.Google.Gmail.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Google/Flutter/Aspire.Hosting/DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Inbox/Inbox/DigitalBrain.Modules.Inbox.csproj" IsAspireProjectResource="false" />
