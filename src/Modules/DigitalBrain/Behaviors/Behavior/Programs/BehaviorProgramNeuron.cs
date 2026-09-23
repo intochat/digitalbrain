@@ -43,6 +43,13 @@ internal sealed class BehaviorProgramNeuron(BehaviorSupervisor supervisor, ICode
         await DeploymentChanged(result);
         return result;
     }
+    public async Task<BehaviorSnapshot> Delete(DeleteBehavior request, CancellationToken cancellationToken = default)
+    {
+        if (await supervisor.Store.ReplayAsync(this.GetPrimaryKeyString(), "delete", request.OperationId, request, cancellationToken) is { } prior) { return prior; }
+        var result = await supervisor.Store.RemoveAsync(this.GetPrimaryKeyString(), request, cancellationToken);
+        await supervisor.StopProgramAsync(this.GetPrimaryKeyString(), cancellationToken);
+        return result;
+    }
     public Task<BehaviorLogPage> ReadLogs(long afterSequence, int limit = 100, CancellationToken cancellationToken = default)
         => supervisor.Logs.ReadAsync(this.GetPrimaryKeyString(), afterSequence, limit, cancellationToken);
     public async Task Changed()

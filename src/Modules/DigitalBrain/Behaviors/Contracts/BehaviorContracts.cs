@@ -19,6 +19,9 @@ public sealed record RollbackBehavior(
     [property: Id(1)] Guid OperationId,
     [property: Id(2)] long DeploymentRevision);
 
+[GenerateSerializer, Alias("behavior.delete")]
+public sealed record DeleteBehavior([property: Id(0)] long ExpectedRevision, [property: Id(1)] Guid OperationId);
+
 [Alias("behavior.desired-state")]
 public enum BehaviorDesiredState { Stopped, Running }
 

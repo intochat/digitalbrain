@@ -167,6 +167,14 @@ internal sealed class BehaviorSupervisor(IOptions<BehaviorOptions> options, IBeh
         }
     }
 
+    public async Task StopProgramAsync(string id, CancellationToken ct)
+    {
+        if (!_active.TryGetValue(id, out var active)) { return; }
+        await executor.StopAsync(active.GenerationId, ct).ConfigureAwait(false);
+        await active.Completion.WaitAsync(TimeSpan.FromSeconds(5), ct).ConfigureAwait(false);
+        _active.Remove(id);
+    }
+
     private async Task Notify(string id)
     {
         try { await grains.GetGrain<IBehaviorProgramEvents>(id).Changed().ConfigureAwait(false); }

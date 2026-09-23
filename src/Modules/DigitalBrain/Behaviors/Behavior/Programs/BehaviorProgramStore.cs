@@ -10,7 +10,15 @@ internal sealed class BehaviorProgramStore(IDocumentStore<BehaviorProgramDocumen
 {
     private readonly IDocumentStore<BehaviorProgramDocument> _documents = documents;
     public Task<BehaviorSnapshot> ReadAsync(string id, CancellationToken ct) => _documents.ReadAsync(id, d => d.Snapshot, ct);
-    public Task<IReadOnlyList<string>> ListAsync(CancellationToken ct) => _documents.ListIdsAsync(ct);
+    public async Task<IReadOnlyList<string>> ListAsync(CancellationToken ct)
+    {
+        var live = new List<string>();
+        foreach (var id in await _documents.ListIdsAsync(ct).ConfigureAwait(false))
+        {
+            if (!await _documents.ReadAsync(id, d => d.Deleted, ct).ConfigureAwait(false)) { live.Add(id); }
+        }
+        return live;
+    }
     public Task<bool> CanStartAsync(string id, CancellationToken ct)
         => _documents.ReadAsync(id, d => d.Retries <= 3 && (d.NextRetryAt is null || d.NextRetryAt <= DateTimeOffset.UtcNow), ct);
     public Task<TResult> UpdateAsync<TResult>(string id, Func<BehaviorProgramDocument, TResult> action, CancellationToken ct)
@@ -90,6 +98,35 @@ internal sealed class BehaviorProgramStore(IDocumentStore<BehaviorProgramDocumen
             };
         }, ct);
 
+    public Task<BehaviorSnapshot> RemoveAsync(string id, DeleteBehavior request, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.OperationId == Guid.Empty) { throw new ArgumentException("Operation ID is required.", nameof(request.OperationId)); }
+        var hash = RequestHash("delete", request);
+        return _documents.UpdateAsync(id, d =>
+        {
+            if (d.Operations.TryGetValue(request.OperationId, out var prior))
+            {
+                if (prior.Hash != hash) { throw new InvalidOperationException("Operation ID was used with different input."); }
+                return prior.Snapshot;
+            }
+            if (d.Snapshot.Revision != request.ExpectedRevision) { throw new InvalidOperationException("Behavior revision conflict; read the program again."); }
+            d.Id = id;
+            d.Deleted = true;
+            d.Snapshot = d.Snapshot with
+            {
+                Revision = d.Snapshot.Revision + 1,
+                DesiredState = BehaviorDesiredState.Stopped,
+                State = BehaviorExecutionState.Stopping,
+                Ready = false,
+                GenerationId = null,
+                Error = null
+            };
+            d.Operations.Add(request.OperationId, new(hash, d.Snapshot));
+            return d.Snapshot;
+        }, ct);
+    }
+
     private Task<BehaviorSnapshot> Command<T>(string id, string kind, long revision, Guid operation, T request,
         Func<BehaviorProgramDocument, BehaviorSnapshot> apply, CancellationToken ct)
     {
@@ -129,6 +166,7 @@ internal sealed class BehaviorProgramStore(IDocumentStore<BehaviorProgramDocumen
 internal sealed class BehaviorProgramDocument
 {
     public string Id { get; set; } = "";
+    public bool Deleted { get; set; }
     public BehaviorSnapshot Snapshot { get; set; } = new(0, BehaviorDesiredState.Stopped, BehaviorExecutionState.Stopped, null, null, null, false, null, []);
     public Dictionary<Guid, BehaviorCommandReceipt> Operations { get; set; } = [];
     public int Retries { get; set; }

@@ -61,6 +61,21 @@ internal sealed class BehaviorCatalogStore
         }, ct);
     }
 
+    public async Task Remove(string scope, string id, CancellationToken ct)
+    {
+        await _items.UpdateAsync(BehaviorToolScope.Key(scope, id), doc =>
+        {
+            doc.Description = null;
+            doc.CheckedSources.Clear();
+            return true;
+        }, ct);
+        await _indexes.UpdateAsync(scope, doc =>
+        {
+            doc.Id = scope;
+            return doc.Ids.Remove(id);
+        }, ct);
+    }
+
     public async Task RememberChecked(string scope, string id, CodeDraftSnapshot draft, CodeCheckSnapshot? check, CancellationToken ct)
     {
         if (check?.Status != CodeCheckStatus.Passed || check.Artifact is not { } artifact || check.Revision != draft.Revision
