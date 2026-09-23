@@ -70,6 +70,38 @@ public sealed class CanarySecretFacts
         Assert.DoesNotContain(Canary, exportAfterErase.GetRawText(), StringComparison.Ordinal);
     }
 
+    [Fact(Timeout = 300_000)]
+    public async Task AConnectionTokenNeverAppearsInPlaintext()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var collector = TestTelemetryCollector.Start();
+        await using var brain = await IntoChatE2ETest.Create()
+            .WithResourceEnvironment(new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["OTEL_EXPORTER_OTLP_ENDPOINT"] = collector.Endpoint.AbsoluteUri,
+                ["OTEL_EXPORTER_OTLP_PROTOCOL"] = "http/protobuf",
+            })
+            .StartAsync(ct);
+
+        using var seeded = await brain.HttpClient.PostAsJsonAsync(
+            $"/connections/{Owner}/connect",
+            new { source = "webresearch", connectionId = "research", label = "Research key", value = Canary },
+            ct);
+        Assert.Equal(System.Net.HttpStatusCode.OK, seeded.StatusCode);
+        var seedBody = await seeded.Content.ReadAsStringAsync(ct);
+        Assert.DoesNotContain(Canary, seedBody, StringComparison.Ordinal);
+        Assert.Contains("secret://", seedBody, StringComparison.Ordinal);
+
+        var list = await brain.HttpClient.GetStringAsync($"/connections/{Owner}", ct);
+        Assert.DoesNotContain(Canary, list, StringComparison.Ordinal);
+
+        await WaitForAsync(() => collector.Snapshot().Count > 0, ct);
+        await Task.Delay(TimeSpan.FromSeconds(3), ct);
+        Assert.DoesNotContain(collector.Snapshot(), span => TextOf(span).Contains(Canary, StringComparison.Ordinal));
+        Assert.DoesNotContain(collector.LogSnapshot(), log => TextOf(log).Contains(Canary, StringComparison.Ordinal));
+        Assert.Empty(collector.Errors());
+    }
+
     private static string TextOf(CapturedSpan span)
         => string.Join("\n", span.Attributes.Select(pair => pair.Key + "=" + pair.Value));
 

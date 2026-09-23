@@ -20,6 +20,7 @@ using DigitalBrain.Microsoft.GitHub;
 using DigitalBrain.Microsoft.DotNet;
 using DigitalBrain.Microsoft.Roslyn;
 using DigitalBrain.Compute;
+using DigitalBrain.Connections;
 using DigitalBrain.MyData;
 using DigitalBrain.Receipts;
 using DigitalBrain.Salesforce;
@@ -57,6 +58,7 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<SupabaseModule>(database => database.WithConnection("supabase"))
     .WithModule<TimeModule>()
     .WithModule<MyDataModule>()
+    .WithModule<ConnectionsModule>()
     .WithModule<IdentityModule>()
     .WithModule<GmailModule>(gmail => gmail.WithGmail())
     .WithModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
