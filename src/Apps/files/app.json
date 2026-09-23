@@ -1,0 +1,35 @@
+{
+  "id": "intochat.files",
+  "version": "1.0.0",
+  "publisher": "intochat",
+  "kind": "declarative",
+  "name": "Files",
+  "descriptionForPeople": "Browse and open files in your workspace.",
+  "descriptionForModel": "Read folders and open local files; list, filter and sort entries.",
+  "operations": [
+    {
+      "name": "Navigate",
+      "descriptionForModel": "List a folder's entries and breadcrumbs.",
+      "readOnly": true,
+      "inputTypeIds": { "folderId": "plain-text", "offset": "number", "sort": "plain-text", "filter": "plain-text" },
+      "outputTypeId": "reference"
+    },
+    {
+      "name": "OpenImage",
+      "descriptionForModel": "Open an image entry in the image editor.",
+      "readOnly": true,
+      "inputTypeIds": { "entryId": "plain-text" },
+      "outputTypeId": "reference"
+    },
+    {
+      "name": "Read",
+      "descriptionForModel": "Read the current folder state.",
+      "readOnly": true,
+      "outputTypeId": "reference"
+    }
+  ],
+  "uiEntry": "app-files",
+  "permissions": [],
+  "meters": [],
+  "examplePrompts": ["Show my files", "Open the latest image"]
+}

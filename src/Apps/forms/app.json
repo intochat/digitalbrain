@@ -1,0 +1,39 @@
+{
+  "id": "intochat.forms",
+  "version": "1.0.0",
+  "publisher": "intochat",
+  "kind": "declarative",
+  "name": "Forms",
+  "descriptionForPeople": "Fill in a form the assistant shows in a window.",
+  "descriptionForModel": "Render a typed form and submit all fields in one atomic step.",
+  "operations": [
+    {
+      "name": "Read",
+      "descriptionForModel": "Read the form fields and current draft values.",
+      "readOnly": true,
+      "outputTypeId": "reference"
+    },
+    {
+      "name": "SetDraft",
+      "descriptionForModel": "Set one field's draft value.",
+      "inputTypeIds": { "field": "plain-text", "value": "plain-text" },
+      "outputTypeId": "reference"
+    },
+    {
+      "name": "SetSecret",
+      "descriptionForModel": "Store a credential by reference without exposing its value.",
+      "inputTypeIds": { "field": "plain-text", "secret": "secret" },
+      "outputTypeId": "reference"
+    },
+    {
+      "name": "Submit",
+      "descriptionForModel": "Submit every field atomically against the expected revision.",
+      "inputTypeIds": { "values": "reference", "revision": "number" },
+      "outputTypeId": "reference"
+    }
+  ],
+  "uiEntry": "app-forms",
+  "permissions": [],
+  "meters": [],
+  "examplePrompts": ["Show me a form", "Let me enter this by hand"]
+}
