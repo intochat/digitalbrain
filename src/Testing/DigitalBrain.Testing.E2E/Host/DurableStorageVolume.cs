@@ -1,5 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace DigitalBrain.Testing.E2E;
 
@@ -15,8 +17,8 @@ internal static class DurableStorageVolume
     internal static string Acquire(string key)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        var sanitized = new string([.. key.Select(character => char.IsLetterOrDigit(character) || character is '_' or '.' or '-' ? character : '-')]);
-        var name = "brain-e2e-" + sanitized;
+        var sanitized = new string([.. key.Select(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '.' or '-' ? character : '-')]);
+        var name = "brain-e2e-" + sanitized + "-" + Fingerprint(key);
         lock (Gate)
         {
             Volumes.Add(name);
@@ -28,6 +30,9 @@ internal static class DurableStorageVolume
         }
         return name;
     }
+
+    private static string Fingerprint(string key)
+        => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(key)))[..12];
 
     private static void RemoveAll()
     {
@@ -52,11 +57,16 @@ internal static class DurableStorageVolume
             foreach (var argument in arguments) { startInfo.ArgumentList.Add(argument); }
             using var process = Process.Start(startInfo);
             if (process is null) { return ""; }
-            var output = process.StandardOutput.ReadToEnd();
-            process.WaitForExit(5000);
-            return output;
+            var output = process.StandardOutput.ReadToEndAsync();
+            if (!process.WaitForExit(5000))
+            {
+                try { process.Kill(entireProcessTree: true); }
+                catch (InvalidOperationException) { /* The process exited between the wait and the kill. */ }
+            }
+            return output.Wait(5000) ? output.Result : "";
         }
         catch (Win32Exception) { return ""; }
         catch (InvalidOperationException) { return ""; }
+        catch (AggregateException) { return ""; }
     }
 }

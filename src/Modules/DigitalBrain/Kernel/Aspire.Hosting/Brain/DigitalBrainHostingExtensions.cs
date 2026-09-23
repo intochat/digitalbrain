@@ -49,8 +49,9 @@ public static class DigitalBrainHostingExtensions
             .AddAzureStorage(DigitalBrainNames.Storage)
             .RunAsEmulator(emulator =>
             {
-                if (persistentStorage) { emulator.WithDataVolume().WithLifetime(ContainerLifetime.Persistent); }
-                else if (dataVolume is not null) { emulator.WithDataVolume(dataVolume); }
+                if (persistentStorage) { emulator.WithLifetime(ContainerLifetime.Persistent); }
+                if (dataVolume is not null) { emulator.WithDataVolume(dataVolume); }
+                else if (persistentStorage) { emulator.WithDataVolume(); }
             })
             .WithParentRelationship(kernel);
         var clustering = storage.AddTables(DigitalBrainNames.Clustering);
