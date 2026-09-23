@@ -15,8 +15,8 @@ public sealed class RatingHttpFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
-        await brain.Get<IRating>("stars").Set(5, 4);
-        var state = await brain.HttpClient.GetFromJsonAsync<RatingState>("/ui/ratings/stars", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
+        await brain.Get<IRating>(UiScope.Key("workspace-a", "stars")).Set(5, 4);
+        var state = await brain.HttpClient.GetFromJsonAsync<RatingState>("/workspaces/workspace-a/ui/ratings/stars", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
         Assert.Equal(4, state!.Value);
     }
 }

@@ -175,12 +175,14 @@ final class TableRequestException implements Exception {
 }
 
 typedef ReadTable = Future<TableSnapshot> Function(
+  String workspace,
   String id, {
   int offset,
   int limit,
 });
 typedef UpdateTableView = Future<TableSnapshot> Function(
+  String workspace,
   String id,
   TableViewUpdate update,
 );
-typedef ListTables = Future<List<TableSummary>> Function();
+typedef ListTables = Future<List<TableSummary>> Function(String workspace);

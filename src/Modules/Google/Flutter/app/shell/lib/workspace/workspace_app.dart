@@ -251,6 +251,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         final existing = _tables[id];
         if (existing == null) {
           _tables[id] = UiTableController(
+            workspace: destination.id,
             snapshot: snapshot,
             read: widget.onReadTable,
             update: widget.onUpdateTableView,
@@ -335,7 +336,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     if (a.kind == 'table' && !_tables.containsKey(a.id)) {
       if (widget.onReadTable != null) {
         try {
-          final snapshot = await widget.onReadTable!(a.id);
+          final snapshot = await widget.onReadTable!(destination.id, a.id);
           if (mounted) _accept(snapshot.toJson(), project: destination);
         } catch (e) {
           _messenger.currentState?.showSnackBar(
@@ -418,15 +419,16 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         );
         if (!mounted) return;
         _tables[artifact.id] = UiTableController(
+          workspace: project.id,
           snapshot: snapshot,
-          read: (id, {offset = 0, limit = 25}) => client.readWorkspaceTable(
+          read: (_, id, {offset = 0, limit = 25}) => client.readWorkspaceTable(
             project.id,
             id,
             offset: offset,
             limit: limit,
             cancelled: _cancelPreviousTable(id),
           ),
-          update: (id, update) => client.updateWorkspaceTable(
+          update: (_, id, update) => client.updateWorkspaceTable(
             project.id,
             id,
             update,
@@ -437,7 +439,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       }
       final snapshot = widget.onReadTable == null
           ? TableSnapshot.fromJson(artifact.data)
-          : await widget.onReadTable!(artifact.id);
+          : await widget.onReadTable!(project.id, artifact.id);
       if (mounted) _accept(snapshot.toJson(), project: project);
     } catch (e) {
       _tableErrors[artifact.id] = 'Could not load table: $e';

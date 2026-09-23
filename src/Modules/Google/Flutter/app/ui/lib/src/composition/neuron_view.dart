@@ -183,7 +183,9 @@ class _NeuronViewState extends State<NeuronView> {
               child: TextFormField(
                 key: ValueKey('${widget.name}:${widget.revision}'),
                 initialValue: definition['value'] as String? ?? '',
-                obscureText: definition['kind'] == 'secret',
+                obscureText:
+                    definition['kind'] == 'secret' ||
+                    definition['kind'] == 'password',
                 decoration: InputDecoration(
                   labelText: definition['label'] as String? ?? '',
                   isDense: true,

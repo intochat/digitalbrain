@@ -79,8 +79,11 @@ final class DigitalBrainUiClient {
           as Map)['connected'] ==
       true;
 
-  Future<List<TableSummary>> listTables() async {
-    final body = await _tableRequest('GET', '/ui/tables');
+  Future<List<TableSummary>> listTables(String workspace) async {
+    final body = await _tableRequest(
+      'GET',
+      '/workspaces/${Uri.encodeComponent(workspace)}/ui/tables',
+    );
     return (body as List)
         .map(
           (item) =>
@@ -90,6 +93,7 @@ final class DigitalBrainUiClient {
   }
 
   Future<TableSnapshot> readTable(
+    String workspace,
     String id, {
     int offset = 0,
     int limit = 50,
@@ -97,12 +101,13 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'GET',
-        '/ui/tables/${Uri.encodeComponent(id)}?offset=$offset&limit=$limit',
+        '/workspaces/${Uri.encodeComponent(workspace)}/ui/tables/${Uri.encodeComponent(id)}?offset=$offset&limit=$limit',
       ) as Map,
     ),
   );
 
-  Future<TableSnapshot> createTable({
+  Future<TableSnapshot> createTable(
+    String workspace, {
     required String title,
     required List<TableColumn> columns,
     required List<TableRowData> rows,
@@ -110,7 +115,7 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'POST',
-        '/ui/tables',
+        '/workspaces/${Uri.encodeComponent(workspace)}/ui/tables',
         body: {
           'title': title,
           'columns': columns.map((x) => x.toJson()).toList(),
@@ -121,13 +126,14 @@ final class DigitalBrainUiClient {
   );
 
   Future<TableSnapshot> updateTableView(
+    String workspace,
     String id,
     TableViewUpdate update,
   ) async => TableSnapshot.fromJson(
     Map<String, dynamic>.from(
       await _tableRequest(
-        'PUT',
-        '/ui/tables/${Uri.encodeComponent(id)}/view',
+        'POST',
+        '/workspaces/${Uri.encodeComponent(workspace)}/ui/tables/${Uri.encodeComponent(id)}/view',
         body: update.toJson(),
       ) as Map,
     ),
@@ -464,10 +470,14 @@ final class DigitalBrainUiClient {
     ];
   }
 
-  Future<Map<String, dynamic>> readUi(String collection, String name) async {
+  Future<Map<String, dynamic>> readUi(
+    String workspace,
+    String collection,
+    String name,
+  ) async {
     final response = await _request(
       'GET',
-      '/ui/$collection/${Uri.encodeComponent(name)}',
+      '/workspaces/${Uri.encodeComponent(workspace)}/ui/$collection/${Uri.encodeComponent(name)}',
       timeout: const Duration(seconds: 10),
     );
     return jsonDecode(response.body) as Map<String, dynamic>;
