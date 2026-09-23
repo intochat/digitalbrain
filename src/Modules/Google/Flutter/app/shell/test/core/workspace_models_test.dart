@@ -9,13 +9,14 @@ void main() {
         {
           'id': 'window',
           'title': 'Leads',
-          'view': {'id': 'table'},
+          'reference': {'kind': 'table', 'neuronId': 'table'},
           'isOpen': false,
         },
       ],
     });
     expect(state.revision, 4);
-    expect(state.windows.single.tableId, 'table');
+    expect(state.windows.single.kind, 'table');
+    expect(state.windows.single.neuronId, 'table');
     expect(state.windows.single.isOpen, false);
     expect(() => state.windows.clear(), throwsUnsupportedError);
   });

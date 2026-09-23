@@ -9,6 +9,7 @@ public interface IWorkspace : INeuron
 {
     Task<WorkspaceOpenResult> Open(OpenWindow request);
     Task<WorkspaceState> OpenSurface(OpenSurfaceWindow request);
+    Task<WorkspaceState> SetConnectedSources(IReadOnlyList<string> sources);
     Task<WorkspaceState> Close(string windowId, long expectedRevision);
     [ReadOnly] Task<WorkspaceState> Read();
 }
