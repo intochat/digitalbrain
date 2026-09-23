@@ -18,6 +18,7 @@ using DigitalBrain.Microsoft.Aspire;
 using DigitalBrain.Microsoft.GitHub;
 using DigitalBrain.Microsoft.DotNet;
 using DigitalBrain.Microsoft.Roslyn;
+using DigitalBrain.MyData;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
 using DigitalBrain.Time;
@@ -52,6 +53,7 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<ClickHouseModule>(database => database.WithClickHouse(options => options.WithSeed("leads")))
     .WithModule<SupabaseModule>(database => database.WithConnection("supabase"))
     .WithModule<TimeModule>()
+    .WithModule<MyDataModule>()
     .WithModule<GmailModule>(gmail => gmail.WithGmail())
     .WithModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
     .WithModule<GitHubModule>(github => github.WithGitHubRepositories(repositories))

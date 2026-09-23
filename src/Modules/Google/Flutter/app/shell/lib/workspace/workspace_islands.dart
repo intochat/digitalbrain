@@ -49,6 +49,7 @@ class WorkspaceIslands extends StatelessWidget {
     'files' => Icons.folder_outlined,
     'images' => Icons.tune,
     'behaviors' => Icons.account_tree_outlined,
+    'mydata' => Icons.shield_outlined,
     'table' => Icons.table_chart_outlined,
     _ => Icons.web_asset_outlined,
   };
@@ -229,6 +230,15 @@ class WorkspaceIslands extends StatelessWidget {
                     leading: Icon(Icons.account_tree_outlined),
                     title: Text('Behaviors'),
                     subtitle: Text('Create and manage automations'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'mydata',
+                  child: ListTile(
+                    leading: Icon(Icons.shield_outlined),
+                    title: Text('My Data'),
+                    subtitle: Text('Your facts and secrets'),
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),

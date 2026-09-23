@@ -15,6 +15,7 @@ import 'workspace_chat.dart';
 import 'app_surface_host.dart';
 import 'workspace_islands.dart';
 import 'behaviors/behavior_manager.dart';
+import 'mydata/mydata_window.dart';
 
 class WorkspaceApp extends StatefulWidget {
   const WorkspaceApp({
@@ -475,6 +476,19 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
             setState(() => _mobileWork = false);
             store.save();
           },
+        );
+      }
+      if (a.data['app'] == 'mydata') {
+        return Semantics(
+          container: true,
+          explicitChildNodes: true,
+          role: SemanticsRole.region,
+          label: a.title,
+          child: MyDataWindow(
+            key: ValueKey('${store.currentProject.id}-${a.id}'),
+            request: (path, {body}) =>
+                client.myDataRequest(store.currentProject.id, path, body: body),
+          ),
         );
       }
       return Semantics(

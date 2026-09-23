@@ -34,6 +34,7 @@
     <ProjectReference Include="../../../Modules/Microsoft/Roslyn/Roslyn/DigitalBrain.Modules.Microsoft.Roslyn.csproj" />
     <ProjectReference Include="../../../Modules/Microsoft/DotNet/DotNet/DigitalBrain.Modules.Microsoft.DotNet.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Behaviors/Behavior/DigitalBrain.Modules.Behavior.csproj" />
+    <ProjectReference Include="../../../Modules/MyData/MyData/DigitalBrain.Modules.MyData.csproj" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" />
   </ItemGroup>
 </Project>
