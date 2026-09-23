@@ -4,5 +4,6 @@
     <ProjectReference Include="../../../../../Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
     <ProjectReference Include="../../Gmail/DigitalBrain.Modules.Google.Gmail.csproj" />
     <ProjectReference Include="../../Aspire.Hosting/DigitalBrain.Modules.Google.Gmail.Aspire.Hosting.csproj" />
+    <ProjectReference Include="../../../../MyData/MyData/DigitalBrain.Modules.MyData.csproj" />
   </ItemGroup>
 </Project>

@@ -6,4 +6,5 @@ namespace DigitalBrain.Salesforce;
 public sealed record ConnectSalesforceAccount(
     [property: Id(0)] string InstanceUrl,
     [property: Id(1)] int ExpiresInSeconds,
-    [property: Id(2)] string Nonce);
+    [property: Id(2)] string Nonce,
+    [property: Id(3)] string? SecretOwner = null);

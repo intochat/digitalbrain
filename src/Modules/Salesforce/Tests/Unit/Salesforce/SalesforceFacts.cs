@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DigitalBrain.MyData;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Salesforce.Signals;
 using DigitalBrain.Sdk;
@@ -10,6 +11,8 @@ namespace DigitalBrain.Tests;
 
 public sealed class SalesforceFacts
 {
+    private const string Owner = "owner";
+
     [Fact]
     public async Task ConnectPublishesSalesforceConnectedAndConsumesNonce()
     {
@@ -19,7 +22,7 @@ public sealed class SalesforceFacts
         var salesforce = fixture.Brain.Get<ISalesforce>("salesforce");
         await using var connected = await fixture.Brain.Observe<SalesforceConnected>(salesforce, ct);
 
-        var connection = await salesforce.Connect(new("https://acme.my.salesforce.com", 3600, nonce));
+        var connection = await salesforce.Connect(new("https://acme.my.salesforce.com", 3600, nonce, Owner));
 
         Assert.True(connection.Connected);
         Assert.Equal("https://acme.my.salesforce.com", connection.InstanceUrl);
@@ -27,6 +30,27 @@ public sealed class SalesforceFacts
         Assert.True(published.Connection.Connected);
         Assert.Equal(connection.InstanceUrl, published.Connection.InstanceUrl);
         Assert.False(fixture.Handoff.TryPeek(nonce, out _));
+
+        var export = await fixture.Brain.Get<IVault>(Owner).Export(UserCaller(), ct);
+        var text = string.Join("\n", export.Fields.Select(field => $"{field.FieldPath}={field.Value}"));
+        Assert.DoesNotContain("access-token", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("refresh-token", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task QueryResolvesTheAccessTokenFromTheVault()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var provider = new FakeSalesforceProvider
+        {
+            Result = JsonSerializer.SerializeToElement(new { totalSize = 2, records = Array.Empty<object>() }),
+        };
+        await using var fixture = await StartAsync(provider, null, ct);
+        var salesforce = await ConnectAsync(fixture);
+
+        await salesforce.Query(new("SELECT Id FROM Account WHERE Name != null LIMIT 10"), ct);
+
+        Assert.Equal("access-token", provider.AccessToken);
     }
 
     [Fact]
@@ -38,16 +62,17 @@ public sealed class SalesforceFacts
         await using var rejected = await fixture.Brain.Observe<SalesforceConnectionRejected>(salesforce, ct);
 
         await Assert.ThrowsAsync<SalesforceUnavailableException>(
-            () => salesforce.Connect(new("https://acme.my.salesforce.com", 3600, "missing-nonce")));
+            () => salesforce.Connect(new("https://acme.my.salesforce.com", 3600, "missing-nonce", Owner)));
 
         Assert.False(string.IsNullOrWhiteSpace((await rejected.NextAsync(ct: ct)).Reason));
     }
 
     [Fact]
-    public async Task RefreshPublishesSalesforceRefreshed()
+    public async Task RefreshPublishesSalesforceRefreshedAndResolvesTheStoredRefreshToken()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var fixture = await StartAsync(new FakeSalesforceProvider(), new FakeTokenExchange(), ct);
+        var exchange = new FakeTokenExchange();
+        await using var fixture = await StartAsync(new FakeSalesforceProvider(), exchange, ct);
         await ConnectAsync(fixture);
         var salesforce = fixture.Brain.Get<ISalesforce>("salesforce");
         await using var refreshed = await fixture.Brain.Observe<SalesforceRefreshed>(salesforce, ct);
@@ -57,6 +82,7 @@ public sealed class SalesforceFacts
         Assert.True(connection.Connected);
         var published = await refreshed.NextAsync(ct: ct);
         Assert.True(published.Connection.Connected);
+        Assert.Equal("refresh-token", exchange.RefreshToken);
     }
 
     [Fact]
@@ -141,14 +167,23 @@ public sealed class SalesforceFacts
     {
         var nonce = fixture.Handoff.Deposit(new OAuthTokens("access-token", "refresh-token"));
         var salesforce = fixture.Brain.Get<ISalesforce>("salesforce");
-        await salesforce.Connect(new("https://acme.my.salesforce.com", 3600, nonce));
+        await salesforce.Connect(new("https://acme.my.salesforce.com", 3600, nonce, Owner));
         return salesforce;
     }
+
+    private static DigitalBrain.Contracts.Enforcement.CallerContext UserCaller() => new()
+    {
+        PrincipalId = Owner,
+        AccountId = Owner,
+        WorkspaceId = Owner,
+        Kind = DigitalBrain.Contracts.Enforcement.CallerKind.User,
+        StampedBy = DigitalBrain.Contracts.Enforcement.TrustedEdge.AuthenticatedHttp,
+    };
 
     private static async Task<Fixture> StartAsync(FakeSalesforceProvider provider, FakeTokenExchange? exchange, CancellationToken cancellationToken)
     {
         var handoff = new TokenHandoff(TimeProvider.System);
-        var brain = await UnitTest.Create().WithModule<SalesforceModule>()
+        var brain = await UnitTest.Create().WithModule<MyDataModule>().WithModule<SalesforceModule>()
             .ConfigureSilo(silo =>
             {
                 silo.Services.AddSingleton<ISalesforceProvider>(provider);
@@ -180,21 +215,30 @@ internal sealed class FakeSalesforceProvider : ISalesforceProvider
 
     public string? AttemptedTool { get; private set; }
 
+    public string? AccessToken { get; private set; }
+
     public Task<JsonElement> InvokeAsync(string tool, JsonElement arguments, string accessToken, CancellationToken cancellationToken)
     {
         AttemptedTool = tool;
+        AccessToken = accessToken;
         return Task.FromResult(Result);
     }
 
     public Task<string> ReadToolSchemaHashAsync(string tool, string accessToken, CancellationToken cancellationToken)
     {
         AttemptedTool = tool;
+        AccessToken = accessToken;
         return Task.FromResult(SchemaHash);
     }
 }
 
 internal sealed class FakeTokenExchange : ISalesforceTokenExchange
 {
+    public string? RefreshToken { get; private set; }
+
     public Task<SalesforceTokenGrant> ExchangeAsync(string refreshToken, CancellationToken cancellationToken)
-        => Task.FromResult(new SalesforceTokenGrant("fresh-access-token", "fresh-refresh-token", 3600));
+    {
+        RefreshToken = refreshToken;
+        return Task.FromResult(new SalesforceTokenGrant("fresh-access-token", "fresh-refresh-token", 3600));
+    }
 }

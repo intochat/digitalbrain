@@ -12,11 +12,11 @@ namespace DigitalBrain.Salesforce;
 [GrainType("salesforce")]
 internal sealed class SalesforceNeuron(
     ISalesforceProvider provider,
-    SalesforceTokenRefresh tokenRefresh,
+    SalesforceCredentialStore credentials,
     TokenHandoff handoff,
     SalesforceWriteAccess writeAccess,
     TimeProvider time,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SalesforceState> state)
+    [PersistentState("salesforce-vault", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SalesforceState> state)
     : Neuron, ISalesforce
 {
     private const int MaxWriteArgumentsBytes = 24 * 1024;
@@ -30,7 +30,7 @@ internal sealed class SalesforceNeuron(
             throw new SalesforceUnavailableException("Salesforce did not issue a valid HTTPS instance URL.");
         }
 
-        _ = SalesforceTokenRefresh.Expiry(account.ExpiresInSeconds, time);
+        var expiresAt = SalesforceTokenRefresh.Expiry(account.ExpiresInSeconds, time);
         if (!handoff.TryPeek(account.Nonce, out var tokens))
         {
             await RejectAsync(new TokenHandoffExpiredException().Message);
@@ -45,11 +45,9 @@ internal sealed class SalesforceNeuron(
                 SalesforceTokenRefresh.ValidateToken(tokens.RefreshToken);
             }
 
-            state.State = new SalesforceState(
-                tokens.AccessToken,
-                tokens.RefreshToken ?? (Current.InstanceUrl == account.InstanceUrl ? Current.RefreshToken : null),
-                time.GetUtcNow().AddSeconds(account.ExpiresInSeconds),
-                account.InstanceUrl);
+            var owner = string.IsNullOrWhiteSpace(account.SecretOwner) ? this.GetPrimaryKeyString() : account.SecretOwner;
+            var carryOver = (Current.InstanceUrl == account.InstanceUrl ? Current : new SalesforceState()) with { InstanceUrl = account.InstanceUrl };
+            state.State = await credentials.StoreAsync(owner, carryOver, tokens.AccessToken, tokens.RefreshToken, expiresAt, CancellationToken.None);
             await state.WriteStateAsync();
             var connection = Connection();
             await PublishAsync(new SalesforceConnected(connection));
@@ -68,7 +66,7 @@ internal sealed class SalesforceNeuron(
         ArgumentNullException.ThrowIfNull(command);
         try
         {
-            state.State = await tokenRefresh.RefreshAsync(RequireConnection(), time, CancellationToken.None);
+            state.State = await credentials.RefreshAsync(RequireConnection(), CancellationToken.None);
             await state.WriteStateAsync();
             var connection = Connection();
             await PublishAsync(new SalesforceRefreshed(connection));
@@ -225,8 +223,9 @@ internal sealed class SalesforceNeuron(
         try
         {
             var connection = RequireConnection();
+            var accessToken = await credentials.AccessTokenAsync(connection, cancellationToken).ConfigureAwait(true);
             using var arguments = JsonDocument.Parse(preview.Arguments);
-            var result = await provider.InvokeAsync(preview.Tool, arguments.RootElement, connection.AccessToken!, cancellationToken).ConfigureAwait(true);
+            var result = await provider.InvokeAsync(preview.Tool, arguments.RootElement, accessToken, cancellationToken).ConfigureAwait(true);
             if (result.ValueKind != JsonValueKind.Object
                 || result.TryGetProperty("id", out var record) && record.ValueKind is not (JsonValueKind.String or JsonValueKind.Null))
             {
@@ -260,7 +259,7 @@ internal sealed class SalesforceNeuron(
     {
         try
         {
-            return await writeAccess.ReadAsync(tool, RequireConnection(), time, cancellationToken).ConfigureAwait(true);
+            return await writeAccess.ReadAsync(tool, RequireConnection(), cancellationToken).ConfigureAwait(true);
         }
         catch (SalesforceNotConnectedException error)
         {
@@ -280,14 +279,15 @@ internal sealed class SalesforceNeuron(
             throw new SalesforceNotConnectedException("The Salesforce access token expired. Refresh the connection.");
         }
 
-        return await provider.InvokeAsync(tool, arguments, connection.AccessToken!, cancellationToken).ConfigureAwait(true);
+        var accessToken = await credentials.AccessTokenAsync(connection, cancellationToken).ConfigureAwait(true);
+        return await provider.InvokeAsync(tool, arguments, accessToken, cancellationToken).ConfigureAwait(true);
     }
 
     private Task RejectAsync(string reason) => PublishAsync(new SalesforceConnectionRejected(reason));
 
     private SalesforceState RequireConnection()
     {
-        if (Current is not { AccessToken: not null, InstanceUrl: not null, ExpiresAt: not null } connection)
+        if (Current is not { AccessToken.IsSet: true, InstanceUrl: not null, ExpiresAt: not null } connection)
         {
             throw new SalesforceNotConnectedException();
         }
@@ -298,7 +298,7 @@ internal sealed class SalesforceNeuron(
     private SalesforceConnection Connection() => ToConnection(Current);
 
     private static SalesforceConnection ToConnection(SalesforceState connection)
-        => connection is { AccessToken: not null }
+        => connection.AccessToken is { IsSet: true }
             ? new SalesforceConnection(true, connection.InstanceUrl, connection.ExpiresAt)
             : new SalesforceConnection(false, null, null);
 

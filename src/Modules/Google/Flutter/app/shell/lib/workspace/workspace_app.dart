@@ -5,6 +5,7 @@ import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 
+import '../integrations/connect_window.dart';
 import '../integrations/integrations_menu.dart';
 import 'workspace_store.dart';
 import 'workspace_remote_controller.dart';
@@ -174,6 +175,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
               initialSection: section,
               kernelBaseUri: widget.kernelBaseUri,
               onOpen: widget.onOpenUrl,
+              connectionsRequest: _connectionsRequest,
               onClose: () => _navigator.currentState?.pop(),
             ),
           ),
@@ -1001,11 +1003,19 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
           store: store,
           kernelBaseUri: widget.kernelBaseUri,
           onOpen: widget.onOpenUrl,
+          connectionsRequest: _connectionsRequest,
           onClose: () => Navigator.of(context).pop(),
         ),
       ),
     ),
   );
+
+  ConnectionsRequest? get _connectionsRequest {
+    final client = widget.programmingClient;
+    if (client == null) return null;
+    return (path, {body}) =>
+        client.connectionsRequest(store.currentProject.id, path, body: body);
+  }
 
   void _search(BuildContext context) {
     _query = '';
