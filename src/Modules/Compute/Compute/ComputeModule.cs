@@ -1,6 +1,9 @@
+using DigitalBrain.Compute.Allowances;
+using DigitalBrain.Compute.Billing;
 using DigitalBrain.Compute.Ledger;
 using DigitalBrain.Compute.Metering;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Enforcement;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
@@ -33,5 +36,11 @@ public sealed class ComputeModule : IModule
         }
         services.TryAddSingleton<IMeterSink, DurableMeterSink>();
         services.TryAddSingleton<IPriceBook, PriceBook>();
+        services.TryAddSingleton<IInvoicingProvider, FakeInvoicingProvider>();
+        services.TryAddSingleton<IComputeAlertSink, InboxComputeAlertSink>();
+        services.TryAddSingleton<IAllowancePolicySource, GrainAllowancePolicySource>();
+        // The allowance stage is an increment of the one call filter. It runs before grants (Order -1)
+        // so a granted app call without an allowance is still stopped.
+        services.AddSingleton<ICallFilterStage, AllowanceCallFilterStage>();
     }
 }

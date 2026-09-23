@@ -8,7 +8,7 @@ namespace DigitalBrain.Core.Enforcement;
 // pipeline allows.
 public sealed class CallFilter(IEnumerable<ICallFilterStage> stages) : ICallFilter
 {
-    private readonly IReadOnlyList<ICallFilterStage> _stages = [.. stages];
+    private readonly IReadOnlyList<ICallFilterStage> _stages = [.. stages.OrderBy(stage => stage.Order)];
 
     public async ValueTask<CallDecision> AuthorizeAsync(CallRequest request, CancellationToken cancellationToken = default)
     {
