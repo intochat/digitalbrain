@@ -66,7 +66,7 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<FlutterModule>(flutter => flutter.RunDesktopApp())
     .WithModule<ReceiptsModule>()
     .WithModule<ComputeModule>()
-    .WithModule<DiscoveryModule>();
+    .WithModule<DiscoveryModule>()
     .WithModule<AppsModule>();
 
 if (developerProfile)
