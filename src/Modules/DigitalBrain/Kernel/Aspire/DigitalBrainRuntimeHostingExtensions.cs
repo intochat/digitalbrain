@@ -36,8 +36,9 @@ public static class DigitalBrainRuntimeHostingExtensions
                     services.GetRequiredService<Orleans.Serialization.Serializer>()));
             silo.Services.AddOptions<AzureBlobStorageOptions>(DigitalBrainNames.DefaultGrainStorage)
                 .Configure(static options => options.ContainerName = "digitalbrain-v2-state");
-            silo.AddAzureBlobJournal(builder.Configuration);
-            silo.AddActivityPropagation();
+            // Orleans hosting already registers one activity-propagation filter pair. An explicit
+            // `silo.AddActivityPropagation()` here registered a second pair and doubled every grain
+            // call to 4 spans (measured); it was removed so exactly one registration remains.
             silo.AddDigitalBrain();
             foreach (var module in LoadModules(builder.Configuration))
             {

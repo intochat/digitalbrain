@@ -13,8 +13,8 @@ public sealed class BehaviorCatalogFacts
     public async Task ActivityShowsTheLatestBoundedLogPage()
     {
         var calls = new List<(long After, int Limit)>();
-        var program = System.Reflection.DispatchProxy.Create<IBehaviorProgram, BehaviorAuthoringFacts.MethodProxy>();
-        ((BehaviorAuthoringFacts.MethodProxy)(object)program).Handler = (_, args) =>
+        var program = System.Reflection.DispatchProxy.Create<IBehaviorProgram, MethodProxy>();
+        ((MethodProxy)(object)program).Handler = (_, args) =>
         {
             var after = (long)args[0]!;
             var limit = (int)args[1]!;
@@ -93,5 +93,11 @@ public sealed class BehaviorCatalogFacts
         await Assert.ThrowsAsync<ArgumentException>(() => store.Register("one", "../timer", ct));
         await Assert.ThrowsAsync<ArgumentException>(() => store.Describe("one", "timer", new(0, "Name", new string('x', 4001), [], []), ct));
         Assert.Empty(await store.List("one", ct));
+    }
+
+    public class MethodProxy : System.Reflection.DispatchProxy
+    {
+        public Func<System.Reflection.MethodInfo, object?[], object?> Handler { get; set; } = null!;
+        protected override object? Invoke(System.Reflection.MethodInfo? targetMethod, object?[]? args) => Handler(targetMethod!, args ?? []);
     }
 }

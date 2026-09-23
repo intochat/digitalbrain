@@ -7,7 +7,7 @@ subscriptions — and grouped into *modules* that declare their own options, HTT
 | Area | Location |
 |---|---|
 | Runtime, composition and SDK | `src/Modules/DigitalBrain/` |
-| Capability modules (AI, Flutter, Google, Supabase, …) | `src/Modules/<Module>/` |
+| Capability modules (AI, Flutter, Google, Supabase, …) | `src/Modules/<Group>/` |
 | Test harness packages | `src/Testing/` |
 | IntoChat application | `src/Applications/IntoChat/` |
 
@@ -24,7 +24,7 @@ Two kinds, described in [src/Testing/README.md](src/Testing/README.md):
 
 ```bash
 dotnet test --project src/Modules/Time/Tests/Unit/DigitalBrain.Modules.Time.Tests.Unit.csproj
-dotnet test --project src/Modules/Flutter/Tests/E2E/DigitalBrain.Modules.Flutter.Tests.E2E.csproj
+dotnet test --project src/Modules/Google/Flutter/Tests/E2E/DigitalBrain.Modules.Flutter.Tests.E2E.csproj
 ```
 
 End-to-end tests need a container runtime for their disposable storage, and browser scenarios need

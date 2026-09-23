@@ -38,11 +38,47 @@ public sealed class WorkspaceFacts
         await workspace.Close("view", 1);
         await brain.DeactivateAsync(workspace, ct);
         var replay = await workspace.Open(request);
-        Assert.False(Assert.Single(replay.Windows).IsOpen);
-        Assert.Equal(2, replay.Revision);
+        Assert.False(Assert.Single(replay.State.Windows).IsOpen);
+        Assert.Equal(2, replay.State.Revision);
         var reopened = await workspace.Open(request with { OperationId = "explicit-reopen", ExpectedRevision = 2 });
-        Assert.True(Assert.Single(reopened.Windows).IsOpen);
-        Assert.Equal(3, reopened.Revision);
+        Assert.True(Assert.Single(reopened.State.Windows).IsOpen);
+        Assert.Equal(3, reopened.State.Revision);
+    }
+
+    [Fact]
+    public async Task OperationRevisionIsStableAfterCloseAndReplay()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().StartAsync(ct);
+        var workspace = brain.Get<IWorkspace>("owner/a");
+        var request = new OpenWindow("run/call", "view", "Active leads", new("table"), 0);
+        var opened = await workspace.Open(request);
+        // The operation log remembers the revision this operation applied, not the latest revision.
+        Assert.Equal(1, opened.AppliedRevision);
+        await workspace.Close("view", opened.AppliedRevision);
+        await brain.DeactivateAsync(workspace, ct);
+        var replay = await workspace.Open(request);
+        Assert.Equal(opened.AppliedRevision, replay.AppliedRevision);
+        Assert.False(Assert.Single(replay.State.Windows).IsOpen);
+        Assert.Equal(2, replay.State.Revision);
+        // A new operation opens again and reports its own applied revision.
+        var reopened = await workspace.Open(request with { OperationId = "run/next", ExpectedRevision = 2 });
+        Assert.Equal(3, reopened.AppliedRevision);
+        Assert.True(Assert.Single(reopened.State.Windows).IsOpen);
+    }
+
+    [Fact]
+    public async Task MismatchedOperationIdsFail()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().StartAsync(ct);
+        var workspace = brain.Get<IWorkspace>("owner/a");
+        await workspace.Open(new OpenWindow("run/call", "view", "Active leads", new("table"), 0));
+        // Reusing the operation id for a different window, title or view is a conflict.
+        await Assert.ThrowsAsync<InvalidOperationException>(() => workspace.Open(new OpenWindow("run/call", "other", "Active leads", new("table"), 1)));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => workspace.Open(new OpenWindow("run/call", "view", "Other", new("table"), 1)));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => workspace.Open(new OpenWindow("run/call", "view", "Active leads", new("other-table"), 1)));
+        Assert.Equal(1, (await workspace.Read()).Revision);
     }
 
     [Fact]
@@ -69,8 +105,19 @@ public sealed class WorkspaceFacts
         var result = await workspace.Open(new("operation", "window", "Leads", new("table"), 0));
         var change = await changes.NextAsync(ct: ct);
         Assert.Equal("owner/a", change.WorkspaceId);
-        Assert.Equal(result.Revision, change.Revision);
+        Assert.Equal(result.State.Revision, change.Revision);
         Assert.Equal(change.Revision, (await workspace.Read()).Revision);
+    }
+
+    [Fact]
+    public async Task RevisionConflictCarriesTheCurrentRevisionForOptimisticRetry()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().StartAsync(ct);
+        var workspace = brain.Get<IWorkspace>("owner/a");
+        await workspace.Open(new("operation", "window", "Leads", new("table"), 0));
+        var conflict = await Assert.ThrowsAsync<WorkspaceRevisionConflictException>(() => workspace.Close("window", 0));
+        Assert.Equal(1, conflict.CurrentRevision);
     }
 
     [Theory]
@@ -86,5 +133,39 @@ public sealed class WorkspaceFacts
         await Assert.ThrowsAsync<ArgumentException>(() => workspace.Open(new(new string('x', 257), "window", "Title", new("table"), 0)));
         await Assert.ThrowsAsync<ArgumentException>(() => workspace.Open(new("operation", "window", new string('x', 201), new("table"), 0)));
         Assert.Empty((await workspace.Read()).Windows);
+    }
+
+    [Fact]
+    public void OperationLogMembersKeepOrleansFieldIdsAndDataShape()
+    {
+        var storage = typeof(WorkspaceStorage);
+        var operationLog = storage.GetProperty("OperationLog");
+        var surfaceOperationLog = storage.GetProperty("SurfaceOperationLog");
+        var operationRevisionLog = storage.GetProperty("OperationRevisionLog");
+
+        Assert.NotNull(operationLog);
+        Assert.NotNull(surfaceOperationLog);
+        Assert.NotNull(operationRevisionLog);
+        // A rename stays wire-compatible only while each member keeps its Orleans field id.
+        Assert.Equal(2, OrleansFieldId(operationLog!));
+        Assert.Equal(3, OrleansFieldId(surfaceOperationLog!));
+        Assert.Equal(4, OrleansFieldId(operationRevisionLog!));
+        // The persisted shape stays a dictionary keyed by operation id.
+        Assert.Equal(typeof(Dictionary<string, OpenWindow>), operationLog.PropertyType);
+        Assert.Equal(typeof(Dictionary<string, OpenSurfaceWindow>), surfaceOperationLog.PropertyType);
+        Assert.Equal(typeof(Dictionary<string, long>), operationRevisionLog.PropertyType);
+        // No idempotency member keeps the old receipt name.
+        Assert.Null(storage.GetProperty("Receipts"));
+        Assert.Null(storage.GetProperty("SurfaceReceipts"));
+        Assert.Null(storage.GetProperty("OpenReceiptRevisions"));
+    }
+
+    private static int OrleansFieldId(System.Reflection.PropertyInfo property)
+    {
+        var id = property.GetCustomAttributesData()
+            .Single(attribute => attribute.AttributeType.Name == "IdAttribute")
+            .ConstructorArguments[0].Value;
+        // Orleans boxes the [Id] constructor argument as UInt32, not Int32.
+        return Convert.ToInt32(id, System.Globalization.CultureInfo.InvariantCulture);
     }
 }

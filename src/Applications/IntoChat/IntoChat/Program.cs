@@ -7,7 +7,6 @@ using IntoChat.Apps;
 using IntoChat.LocalFiles;
 using IntoChat.ServiceDefaults;
 using IntoChat.Workspace;
-using IntoChat.Workspace.Queries;
 using Orleans.Dashboard;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,9 +22,8 @@ builder.Services.Configure<LocalFilesOptions>(builder.Configuration.GetSection("
 builder.Services.AddSingleton<LocalFileStore>();
 builder.Services.AddSingleton<AppSurfaceComposer>();
 builder.Services.AddSingleton<ImageSaveCoordinator>();
-builder.Services.AddSingleton<QueryWindowOperation>();
-builder.Services.AddSingleton<IAgentToolFactory, SupabaseWorkspaceTools>();
-builder.Services.AddSingleton<ConversationCoordinator>();
+builder.Services.AddSingleton<LiveTableWindows>();
+builder.Services.AddSingleton<IAgentToolFactory, WorkspaceTableTools>();
 
 var app = builder.Build();
 

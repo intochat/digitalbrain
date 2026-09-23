@@ -200,12 +200,12 @@ class _BehaviorManagerState extends State<BehaviorManager> {
       if (create) {
         widget.onAsk(
           id,
-          'Create behavior "$id" named "${result['name']}". ${result['purpose']}\nInspect installed contracts, save source and meaningful tests, and validate. Leave it as a draft for me to deploy from Behaviors.',
+          'Create automation "$id" named "${result['name']}". ${result['purpose']}\nInspect installed contracts, save source and meaningful tests, and validate. Leave it as a draft for me to deploy from Automations.',
         );
       }
     } catch (error) {
       if (mounted) {
-        setState(() => notice = 'Could not save behavior details. $error');
+        setState(() => notice = 'Could not save automation details. $error');
       }
     } finally {
       if (mounted) {
@@ -281,7 +281,7 @@ class _BehaviorManagerState extends State<BehaviorManager> {
           child: TextField(
             decoration: const InputDecoration(
               prefixIcon: Icon(Icons.search),
-              hintText: 'Find a behavior',
+              hintText: 'Find an automation',
               isDense: true,
             ),
             onChanged: (value) => setState(() => query = value),
@@ -315,8 +315,8 @@ class _BehaviorManagerState extends State<BehaviorManager> {
                     padding: const EdgeInsets.all(20),
                     child: Text(
                       items.isEmpty
-                          ? 'Make something happen.\nCreate your first behavior with the assistant.'
-                          : 'No matching behaviors.',
+                          ? 'Make something happen.\nCreate your first automation with the assistant.'
+                          : 'No matching automations.',
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -367,27 +367,36 @@ class _BehaviorManagerState extends State<BehaviorManager> {
           children: [
             const Expanded(
               child: Text(
-                'Behaviors',
+                'Automations',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
               ),
             ),
             IconButton(
-              tooltip: 'Find existing behavior by ID',
+              tooltip: 'Find existing automation by ID',
               onPressed: busy ? null : findExisting,
               icon: const Icon(Icons.link),
             ),
             IconButton(
-              tooltip: 'Refresh behaviors',
+              tooltip: 'Refresh automations',
               onPressed: load,
               icon: const Icon(Icons.refresh),
             ),
-            FilledButton.icon(
-              onPressed: busy || stale
-                  ? null
-                  : () => editDescription(create: true),
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('New behavior'),
-            ),
+            if (MediaQuery.sizeOf(context).width >= 700)
+              FilledButton.icon(
+                onPressed: busy || stale
+                    ? null
+                    : () => editDescription(create: true),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('New automation'),
+              )
+            else
+              IconButton(
+                tooltip: 'New automation',
+                onPressed: busy || stale
+                    ? null
+                    : () => editDescription(create: true),
+                icon: const Icon(Icons.add, size: 18),
+              ),
           ],
         ),
       ),
@@ -413,13 +422,13 @@ class _BehaviorManagerState extends State<BehaviorManager> {
             final narrow = box.maxWidth < 700;
             final content = selected == null
                 ? const Center(
-                    child: Text('Select a behavior to see what it does.'),
+                    child: Text('Select an automation to see what it does.'),
                   )
                 : detail == null
                 ? Center(
                     child: stale && failure != null
                         ? const Text(
-                            'Could not load this behavior. Refresh to retry.',
+                            'Could not load this automation. Refresh to retry.',
                           )
                         : const CircularProgressIndicator(),
                   )
@@ -439,10 +448,10 @@ class _BehaviorManagerState extends State<BehaviorManager> {
                       children: [
                         Align(
                           alignment: Alignment.centerLeft,
-                          child: TextButton.icon(
+                          child: IconButton(
+                            tooltip: 'All automations',
                             onPressed: () => choose(null),
                             icon: const Icon(Icons.arrow_back),
-                            label: const Text('All behaviors'),
                           ),
                         ),
                         Expanded(child: content),

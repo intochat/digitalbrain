@@ -34,4 +34,8 @@
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="../../DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Modules.AI.Tests.Unit" />
+  </ItemGroup>
 </Project>

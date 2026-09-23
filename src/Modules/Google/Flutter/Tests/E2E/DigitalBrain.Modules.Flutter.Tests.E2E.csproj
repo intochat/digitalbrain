@@ -2,7 +2,7 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.Playwright" />
-    <ProjectReference Include="../../../../../../Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
+    <ProjectReference Include="../../../../../Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
     <ProjectReference Include="../../Flutter/DigitalBrain.Modules.Flutter.csproj" />
     <ProjectReference Include="../../Aspire.Hosting/DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" />
   </ItemGroup>

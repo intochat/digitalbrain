@@ -18,6 +18,10 @@ public interface ISupabaseTable : INeuron
     [ReadOnly]
     Task<SupabaseTableSnapshot?> Read(ReadSupabaseTable query);
 
+    /// <summary>Computes one aggregate over the saved view's filtered rows without returning rows.</summary>
+    [ReadOnly]
+    Task<SupabaseTableAggregate?> Aggregate(ReadSupabaseTableAggregate query);
+
     [ReadOnly]
     Task<SupabaseTableSummary?> ReadSummary();
 }

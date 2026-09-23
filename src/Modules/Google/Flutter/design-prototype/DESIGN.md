@@ -28,7 +28,7 @@ Browser verification: removed topbar and workspace-strip confirmed absent; selec
 
 ## Mapping to the actual Flutter module
 
-Paths below are relative to `src/Modules/Flutter/`.
+Paths below are relative to `src/Modules/Google/Flutter/`.
 
 | Design surface | Existing implementation inspected | Proposed work |
 |---|---|---|
@@ -70,7 +70,7 @@ Clip the panel to its own boundary, then apply `BackdropFilter` and a translucen
 From the repository root:
 
 ```powershell
-python -m http.server 4318 --bind 127.0.0.1 --directory src/Modules/Flutter/design-prototype
+python -m http.server 4318 --bind 127.0.0.1 --directory src/Modules/Google/Flutter/design-prototype
 ```
 
 Open `http://127.0.0.1:4318`. No build or package installation is required. State is in memory; refresh resets the demo while the selected design remains in the URL. `index.html` can also be opened directly with its adjacent CSS, JavaScript and icon file.

@@ -53,7 +53,9 @@ class _BehaviorDescriptionDialogState extends State<BehaviorDescriptionDialog> {
       );
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.current == null ? 'New behavior' : 'Behavior details'),
+    title: Text(
+      widget.current == null ? 'New automation' : 'Automation details',
+    ),
     content: SizedBox(
       width: 460,
       child: SingleChildScrollView(
@@ -69,7 +71,7 @@ class _BehaviorDescriptionDialogState extends State<BehaviorDescriptionDialog> {
                 decoration: const InputDecoration(labelText: 'Name'),
                 validator: (v) => v?.trim().isNotEmpty == true
                     ? null
-                    : 'Give this behavior a name.',
+                    : 'Give this automation a name.',
               ),
               TextFormField(
                 controller: purpose,
@@ -133,12 +135,12 @@ class _BehaviorFindDialogState extends State<BehaviorFindDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Find an existing behavior'),
+    title: const Text('Find an existing automation'),
     content: TextField(
       controller: id,
       autofocus: true,
       decoration: const InputDecoration(
-        labelText: 'Behavior ID',
+        labelText: 'Automation ID',
         hintText: 'timer-status',
         helperText: 'Use the ID from a previous chat in this workspace.',
       ),

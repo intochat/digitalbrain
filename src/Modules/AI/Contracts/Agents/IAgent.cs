@@ -16,6 +16,10 @@ public interface IAgent : INeuron
     [AlwaysInterleave, ResponseTimeout("00:10:00")] IAsyncEnumerable<string> GetResponseStream(AiMessage message, CancellationToken ct = default);
     [AlwaysInterleave] Task<IReadOnlyList<AiMessage>> GetHistory(CancellationToken ct = default);
     [AlwaysInterleave] Task ClearHistory(CancellationToken ct = default);
+    [AlwaysInterleave] Task<AgentConversationState> BeginConversation(AgentConversationRequest request, CancellationToken ct = default);
+    [AlwaysInterleave] Task<AgentConversationState> CompleteConversation(AgentConversationTurn turn, CancellationToken ct = default);
+    [AlwaysInterleave] Task<AgentConversationState> InterruptConversation(string runId, CancellationToken ct = default);
+    [ReadOnly, AlwaysInterleave] Task<AgentConversationState> ReadConversation(CancellationToken ct = default);
     [AlwaysInterleave] Task<AgentState> GetState(CancellationToken ct = default);
     [AlwaysInterleave] Task<AgentMetadata> GetMetadata(CancellationToken ct = default);
     [AlwaysInterleave] Task<AgentUsage?> GetLastUsage(CancellationToken ct = default);

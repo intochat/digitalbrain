@@ -5,6 +5,7 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Microsoft.Roslyn;
 
+[ModuleConfiguration(typeof(RoslynConfigurationContract))]
 public sealed class RoslynModule : IModule
 {
     public void Configure(ISiloBuilder builder)

@@ -37,7 +37,7 @@ jobs:
           cache: true
 
       - name: Resolve Flutter workspace
-        working-directory: src/Modules/Flutter/app
+        working-directory: src/Modules/Google/Flutter/app
         run: flutter pub get --enforce-lockfile
 
       - name: Cache NuGet packages
@@ -47,6 +47,18 @@ jobs:
           key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', 'global.json') }}
           restore-keys: |
             ${{ runner.os }}-nuget-
+
+      - name: Docs and packaging path lint
+        run: |
+          files=".github/workflows/deploy.yml \
+            src/Applications/IntoChat/IntoChat/Dockerfile \
+            src/Applications/IntoChat/IntoChat/docker-entrypoint.sh \
+            src/Applications/IntoChat/IntoChat/Properties/PublishProfiles/Container.pubxml \
+            README.md CONTEXT.md continuation.md"
+          if grep -Hn -E 'src/Modules/DigitalBrain/Mcp|DigitalBrain\.Mcp|DigitalBrain\.Excel' $files; then
+            echo "::error::Stale moved/deleted path in CI, publish, container or status docs." >&2
+            exit 1
+          fi
 
       - name: Restore dependencies
         run: dotnet restore DigitalBrain.slnx
@@ -64,7 +76,7 @@ jobs:
         run: dotnet pack DigitalBrain.slnx -c Release --no-build -o artifacts
 
       - name: Install browser and system dependencies
-        run: pwsh src/Modules/Flutter/Tests/E2E/bin/Release/net11.0/playwright.ps1 install --with-deps chromium
+        run: pwsh src/Modules/Google/Flutter/Tests/E2E/bin/Release/net11.0/playwright.ps1 install --with-deps chromium
 
       - name: Run tests
         run: dotnet test --solution DigitalBrain.slnx -c Release --no-build --max-parallel-test-modules 1 --ignore-exit-code 8
@@ -78,7 +90,7 @@ jobs:
     timeout-minutes: 35
     defaults:
       run:
-        working-directory: src/Modules/Flutter/app/shell
+        working-directory: src/Modules/Google/Flutter/app/shell
     steps:
       - uses: actions/checkout@v7
 
@@ -89,15 +101,15 @@ jobs:
           cache: true
 
       - name: Resolve Flutter workspace
-        working-directory: src/Modules/Flutter/app
+        working-directory: src/Modules/Google/Flutter/app
         run: flutter pub get --enforce-lockfile
 
       - name: Dart format
-        working-directory: src/Modules/Flutter/app
+        working-directory: src/Modules/Google/Flutter/app
         run: dart format --output=none --set-exit-if-changed core ui shell
 
       - name: Analyze core, ui and shell
-        working-directory: src/Modules/Flutter/app
+        working-directory: src/Modules/Google/Flutter/app
         run: |
           (cd core && dart analyze --fatal-infos)
           (cd ui && flutter analyze --no-pub)
@@ -107,7 +119,7 @@ jobs:
         run: flutter build web --release --base-href "/" --no-tree-shake-icons --no-pub
 
       - name: Flutter widget and client tests
-        working-directory: src/Modules/Flutter/app
+        working-directory: src/Modules/Google/Flutter/app
         run: |
           (cd ui && flutter test --no-pub)
           (cd shell && flutter test --no-pub)

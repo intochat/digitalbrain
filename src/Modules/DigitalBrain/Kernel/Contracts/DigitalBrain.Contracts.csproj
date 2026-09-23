@@ -6,4 +6,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Sdk" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Types/TypeCatalog.v0.json" />
+  </ItemGroup>
 </Project>

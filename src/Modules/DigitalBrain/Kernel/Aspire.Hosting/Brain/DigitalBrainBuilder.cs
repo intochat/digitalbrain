@@ -69,20 +69,16 @@ public sealed class DigitalBrainBuilder
         Name = name;
         Resource = resource;
         Orleans = null!;
-        DurableStateStore = null!;
         GrainState = null!;
     }
 
     internal void AttachRuntime(
         OrleansService orleans,
-        IResourceBuilder<AzureBlobStorageResource> durableStateStore,
         IResourceBuilder<AzureBlobStorageResource> grainState)
     {
         ArgumentNullException.ThrowIfNull(orleans);
-        ArgumentNullException.ThrowIfNull(durableStateStore);
         ArgumentNullException.ThrowIfNull(grainState);
         Orleans = orleans;
-        DurableStateStore = durableStateStore;
         GrainState = grainState;
     }
 
@@ -91,8 +87,6 @@ public sealed class DigitalBrainBuilder
     public IDistributedApplicationBuilder ApplicationBuilder { get; }
 
     public IResourceBuilder<DigitalBrainResource> Resource { get; }
-
-    internal IResourceBuilder<AzureBlobStorageResource> DurableStateStore { get; private set; }
 
     internal IResourceBuilder<AzureBlobStorageResource> GrainState { get; private set; }
 

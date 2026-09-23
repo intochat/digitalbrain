@@ -136,7 +136,7 @@ void main() {
     await tester.pumpAndSettle();
     final obsolete = snapshot();
     delay = true;
-    await tester.tap(find.byTooltip('Refresh behaviors'));
+    await tester.tap(find.byTooltip('Refresh automations'));
     await tester.pump();
     await tester.tap(find.text('Stop'));
     await tester.pump();
@@ -188,7 +188,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Timer status'));
       await tester.pump();
-      await tester.tap(find.text('All behaviors'));
+      // The narrow back control is a compact accessible icon button.
+      expect(find.byTooltip('All automations'), findsOneWidget);
+      await tester.tap(find.byTooltip('All automations'));
       await tester.pump();
       await tester.tap(find.text('Second behavior'));
       await tester.pump();
@@ -282,12 +284,13 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      expect(find.text('Automations'), findsOneWidget);
       await tester.tap(find.text('Timer status').first);
       await tester.pumpAndSettle();
       expect(find.textContaining('Waiting for readiness'), findsWidgets);
       expect(find.text('Deploy changes'), findsNothing);
       disconnected = true;
-      await tester.tap(find.byTooltip('Refresh behaviors'));
+      await tester.tap(find.byTooltip('Refresh automations'));
       await tester.pumpAndSettle();
       expect(find.textContaining('Connection lost'), findsOneWidget);
       final stop = tester.widget<OutlinedButton>(
@@ -299,4 +302,27 @@ void main() {
       tester.view.resetDevicePixelRatio();
     },
   );
+
+  testWidgets('customer copy names automations, not behaviors', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BehaviorManager(
+            onAsk: (_, _) {},
+            onSelected: (_) {},
+            request: (path, {body}) async => path.isEmpty
+                ? {'items': <Map<String, dynamic>>[]}
+                : <String, dynamic>{},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Automations'), findsOneWidget);
+    expect(find.text('New automation'), findsOneWidget);
+    expect(find.byTooltip('Refresh automations'), findsOneWidget);
+    expect(find.textContaining('Create your first automation'), findsOneWidget);
+    expect(find.textContaining('behavior'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 }

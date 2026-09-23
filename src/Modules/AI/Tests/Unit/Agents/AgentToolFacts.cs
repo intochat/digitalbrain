@@ -90,6 +90,53 @@ public sealed class AgentToolFacts
         Assert.Single(events.OfType<AgentTurnEvent.Failed>());
         Assert.Empty(events.OfType<AgentTurnEvent.Finished>());
     }
+
+    [Fact]
+    public void DefaultAllowlistIsAtMostEightToolsAndExcludesBehaviorTools()
+    {
+        var selected = AgentToolPolicy.SelectTools(developerMode: false,
+            ["code_contracts", "code_draft_save", "behavior_read", "behavior_deploy", "behavior_start"]);
+        Assert.True(selected.Count <= AgentToolPolicy.MaxDefaultTools);
+        Assert.DoesNotContain(selected, AgentToolPolicy.IsBehaviorTool);
+        Assert.Equal(AgentToolPolicy.ProductTools, selected);
+    }
+
+    [Fact]
+    public void ExplicitDeveloperModeIncludesBehaviorTools()
+    {
+        string[] developerTools = ["code_contracts", "behavior_read", "behavior_deploy"];
+        var selected = AgentToolPolicy.SelectTools(developerMode: true, developerTools);
+        Assert.Equal(AgentToolPolicy.ProductTools.Concat(developerTools), selected);
+        Assert.Contains("behavior_read", selected);
+    }
+
+    [Fact]
+    public void DeveloperModeOffRefusesBehaviorAuthoringWithOneLinePhase1Fallback()
+    {
+        var fallback = AgentToolPolicy.UnsupportedBehaviorAuthoring(developerMode: false, "write a C# behavior that saves invoices");
+        Assert.NotNull(fallback);
+        Assert.Equal(AgentToolPolicy.BehaviorAuthoringFallback, fallback);
+        Assert.Contains("Phase 1", fallback!);
+        Assert.DoesNotContain('\n', fallback!);
+    }
+
+    [Fact]
+    public void DeveloperModeOffStillAnswersOrdinaryTableRequests()
+    {
+        Assert.Null(AgentToolPolicy.UnsupportedBehaviorAuthoring(developerMode: false, "show me all customers"));
+        Assert.Equal(AgentToolPolicy.ProductTools, AgentToolPolicy.SelectTools(developerMode: false, ["behavior_read"]));
+    }
+
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("true", true)]
+    [InlineData("True", true)]
+    [InlineData("false", false)]
+    [InlineData("False", false)]
+    [InlineData("yes", false)]
+    [InlineData("", false)]
+    public void DeveloperModeFailsClosedOnInvalidConfigurationButDefaultsOn(string? configured, bool expected)
+        => Assert.Equal(expected, AgentToolPolicy.DeveloperModeEnabled(configured));
     private sealed class ScriptedClient(string toolName = "lookup") : IChatClient
     {
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)

@@ -42,7 +42,9 @@ public sealed class AIOptions
     }
 
     // Model markers are open-ended child keys beside Endpoint, rather than under Models.
-    // Keep that public configuration shape and the standard telemetry fallback at the boundary.
+    // Keep that public configuration shape. Capture is never enabled by the ambient
+    // OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT variable: the explicit
+    // Telemetry:EnableSensitiveData setting plus the D14 request scope decide.
     private static void ProjectLegacyKeys(AIOptions options, IConfiguration configuration)
     {
         foreach (var section in configuration.GetSection($"{SectionName}:Ollama").GetChildren())
@@ -52,8 +54,6 @@ public sealed class AIOptions
                 options.Ollama.Models[section.Key] = new AIModelOptions { Model = model };
             }
         }
-        options.Telemetry.EnableSensitiveData ??=
-            configuration.GetValue<bool?>("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT");
     }
 }
 

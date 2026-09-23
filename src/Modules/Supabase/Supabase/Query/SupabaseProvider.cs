@@ -36,6 +36,15 @@ internal sealed class SupabaseProvider(NpgsqlDataSource source) : ISupabaseProvi
         return new(rows.Select((cells, index) => new SupabaseTableRow($"row-{plan.Offset + index}", cells)).ToArray(), total, filtered);
     }
 
+    public async Task<SupabaseTableAggregate> AggregateAsync(QueryPlan plan, string function, string columnId, CancellationToken cancellationToken = default)
+    {
+        plan = plan with { BaseSql = SupabaseQueryGuard.Normalize(plan.BaseSql) };
+        var compiled = QueryPlanCompiler.CompileAggregate(plan, function, columnId);
+        var (_, rows) = await ReadAsync(compiled.Sql, compiled.Parameters, 1, cancellationToken).ConfigureAwait(false);
+        var value = rows.Count > 0 && rows[0].Length > 0 ? rows[0][0] : "null";
+        return new(columnId, function, value);
+    }
+
     public async Task<SupabaseSchema> ReadSchemaAsync(string? table, CancellationToken cancellationToken)
     {
         // Discover application schemas visible to the connected role; keep internal schemas out of the index.

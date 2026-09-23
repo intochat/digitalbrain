@@ -18,6 +18,10 @@ internal sealed class FakeSupabaseProvider : ISupabaseProvider
 
     public QueryPlan? LastPlan { get; private set; }
 
+    public string? LastAggregateFunction { get; private set; }
+
+    public string? LastAggregateColumn { get; private set; }
+
     public Task<SupabaseQueryResult> QueryAsync(string sql, int maxRows, CancellationToken cancellationToken)
         => Task.FromResult(QueryResult);
 
@@ -25,6 +29,14 @@ internal sealed class FakeSupabaseProvider : ISupabaseProvider
     {
         LastPlan = plan;
         return Task.FromResult(new QueryPage(PageRows, Total, Total));
+    }
+
+    public Task<SupabaseTableAggregate> AggregateAsync(QueryPlan plan, string function, string columnId, CancellationToken cancellationToken = default)
+    {
+        LastPlan = plan;
+        LastAggregateFunction = function;
+        LastAggregateColumn = columnId;
+        return Task.FromResult(new SupabaseTableAggregate(columnId, function, Total.ToString(System.Globalization.CultureInfo.InvariantCulture)));
     }
 
     public Task<IReadOnlyList<SupabaseColumn>> DescribeAsync(string sql, CancellationToken cancellationToken)

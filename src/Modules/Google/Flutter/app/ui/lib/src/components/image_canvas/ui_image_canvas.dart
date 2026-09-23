@@ -59,6 +59,7 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
   Timer? persistTimer;
   ImageRecipe? queuedPersist;
   bool persisting = false;
+  Completer<void>? _persistDrained;
   ImageRecipe get displayed => localRecipe ?? widget.recipe;
   bool busy = false;
   String? error;
@@ -168,9 +169,11 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
   Future<void> persist(ImageRecipe recipe) async {
     if (persisting) {
       queuedPersist = recipe;
+      await _persistDrained!.future;
       return;
     }
     persisting = true;
+    final drained = _persistDrained ??= Completer<void>();
     if (mounted) setState(() {});
     history.pendingEdit = recipe;
     try {
@@ -186,6 +189,30 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
       if (queued != null && history.pendingEdit == null) {
         await persist(queued);
       }
+      if (!persisting && queuedPersist == null) {
+        final completed = _persistDrained;
+        if (identical(completed, drained)) {
+          _persistDrained = null;
+        }
+        if (!drained.isCompleted) drained.complete();
+      }
+    }
+  }
+
+  // Saving binds an operation to the recipe of one document revision, so every
+  // displayed edit must reach that revision before the export is produced.
+  Future<void> flushEdits() async {
+    persistTimer?.cancel();
+    persistTimer = null;
+    final pending = localRecipe;
+    if (pending != null && !pending.sameAs(widget.recipe)) {
+      await persist(pending);
+      return;
+    }
+    while (persisting || queuedPersist != null) {
+      final drained = _persistDrained;
+      if (drained == null) return;
+      await drained.future;
     }
   }
 
@@ -414,13 +441,14 @@ class _UiImageCanvasState extends State<UiImageCanvas> {
                       final onSave = widget.onSave;
                       final exportImage = widget.exportImage;
                       final onBusyChanged = widget.onBusyChanged;
-                      final recipe = displayed;
                       onBusyChanged?.call(true);
                       setState(() {
                         busy = true;
                         error = null;
                       });
                       try {
+                        await flushEdits();
+                        final recipe = displayed;
                         await onSave(await exportImage(image!, recipe));
                       } catch (e) {
                         if (mounted) {

@@ -7,7 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="ModelContextProtocol.Core" />
-    <ProjectReference Include="../Contracts/DigitalBrain.Modules.Microsoft.Aspire.Contracts.csproj" />
     <ProjectReference Include="../../../DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
   </ItemGroup>
 </Project>

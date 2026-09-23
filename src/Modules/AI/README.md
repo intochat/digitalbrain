@@ -11,8 +11,7 @@ configuration and history. Separate keys have separate conversations.
 | --- | --- |
 | `ILLM` | One inference, returning content or proposed tool calls without executing them |
 | Provider interfaces such as `OpenAI.IGpt56Sol` | The same inference contract constrained to one catalog model |
-| `Agents.IAgent` | Instructions, tools, history, responses, streaming, metadata, usage and cancellation |
-| `Conversations.IConversation` | Existing lower-level conversation coordination, retained for IntoChat |
+| `Agents.IAgent` | Instructions, tools, durable conversation turns, responses, streaming, metadata, usage and cancellation |
 | `Media.IImageGenerator` | Image generation through the configured image provider |
 | `Media.IEmbeddingModel` | Embeddings through the configured embedding provider |
 | `Media.ISpeechRecognizer` | Audio transcription |

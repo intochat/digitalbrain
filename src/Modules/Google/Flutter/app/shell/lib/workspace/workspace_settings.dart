@@ -28,7 +28,7 @@ class _WorkspaceSettingsState extends State<WorkspaceSettings> {
     ('profile', 'Profile', Icons.person_outline),
     ('appearance', 'Appearance', Icons.palette_outlined),
     ('connections', 'Connections', Icons.link),
-    ('agents', 'Agents', Icons.auto_awesome_outlined),
+    ('agents', 'Assistant', Icons.auto_awesome_outlined),
     ('developer', 'Developer tools', Icons.code),
   ];
   late String _section;
@@ -267,8 +267,8 @@ class _WorkspaceSettingsState extends State<WorkspaceSettings> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _heading(
-              'Agents',
-              'Choose a capability beside the composer. Changing agents keeps the same conversation and attached work.',
+              'Assistant',
+              'Choose a capability beside the composer. Changing assistants keeps the same conversation and attached work.',
             ),
             for (final agent in workspaceAgents)
               Card(

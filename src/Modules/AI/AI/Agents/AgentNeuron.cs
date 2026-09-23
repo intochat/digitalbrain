@@ -25,6 +25,11 @@ internal sealed record AgentStorage
     [Id(3)] public AgentRunState? LastRun { get; init; }
     [Id(4)] public List<AgentEvent> Events { get; init; } = [];
     [Id(5)] public long EventSequence { get; init; }
+    [Id(6)] public List<AgentConversationTurn> Turns { get; init; } = [];
+    [Id(7)] public string? ActiveRun { get; init; }
+    [Id(8)] public string? HistorySummary { get; init; }
+    [Id(9)] public Dictionary<string, string> RunInputs { get; init; } = new(StringComparer.Ordinal);
+    [Id(10)] public string? ConversationSummary { get; init; }
 }
 
 [GrainType("agent")]
@@ -113,8 +118,6 @@ internal sealed class AgentNeuron(
         { throw new ArgumentException("User messages may contain bounded text, images or audio, never tool calls or reasoning.", nameof(message)); }
         _ = InferenceMapping.ToChatMessage(message);
         var definition = _state.Definition;
-        if (_state.History.Count + 2 > definition.MaxHistoryMessages)
-        { throw new InvalidOperationException("Conversation history budget reached. Clear history or raise the configured limit."); }
         using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(ct);
         lifetime.CancelAfter(definition.Timeout);
         _active = lifetime;
@@ -133,9 +136,10 @@ internal sealed class AgentNeuron(
             await Notify(new AgentRunChanged(this.GetPrimaryKeyString(), run));
             var text = new StringBuilder();
             AgentTurnEvent.Completed? output = null;
+            var bounded = BoundHistory(_state.History, Math.Max(1, definition.MaxHistoryMessages - 1), _state.HistorySummary);
             var request = new AgentTurnRequest(this.GetPrimaryKeyString(), run.RunId, this.GetPrimaryKeyString(), [], "",
-                model ?? definition.Model, instructions ?? definition.Instructions, definition.Tools,
-                _state.History, message, streaming, definition.MaxModelCalls, definition.Timeout, definition.Options);
+                model ?? definition.Model, AppendSummary(instructions ?? definition.Instructions, bounded.Summary), definition.Tools,
+                bounded.Messages, message, streaming, definition.MaxModelCalls, definition.Timeout, definition.Options);
             await using var iterator = runner.RunAsync(request, lifetime.Token).GetAsyncEnumerator(lifetime.Token);
             long sequence = 0;
             while (true)
@@ -175,14 +179,14 @@ internal sealed class AgentNeuron(
             }
             lifetime.Token.ThrowIfCancellationRequested();
             if (output is null) { error = "The run ended without a completed response."; throw new InvalidOperationException(error); }
-            if (_state.History.Count + 1 + output.Messages.Count > definition.MaxHistoryMessages)
-            { error = "The response exceeds the conversation history budget."; throw new InvalidOperationException(error); }
             var response = new AgentResponse(run.RunId, text.ToString(), output.Messages, output.Usage);
             run = run with { Status = AgentRunStatus.Completed, EndedAt = DateTimeOffset.UtcNow, Response = response };
             var terminal = new AgentEvent(_state.EventSequence + 1, run.RunId, "completed", run.EndedAt.Value);
+            var history = BoundHistory([.. _state.History, message, .. output.Messages], definition.MaxHistoryMessages, _state.HistorySummary);
             await Save(_state with
             {
-                History = [.. _state.History, message, .. output.Messages],
+                History = history.Messages,
+                HistorySummary = history.Summary,
                 LastRun = run,
                 EventSequence = terminal.Sequence,
                 Events = [.. _state.Events.TakeLast(255), terminal]
@@ -221,11 +225,95 @@ internal sealed class AgentNeuron(
         ct.ThrowIfCancellationRequested(); EnsureIdle(); _mutating = true;
         try
         {
-            await Save(_state with { History = [], Revision = _state.Revision + 1 });
+            await Save(_state with { History = [], HistorySummary = null, Revision = _state.Revision + 1 });
             await Notify(new AgentHistoryCleared(this.GetPrimaryKeyString(), _state.Revision));
         }
         finally { _mutating = false; }
     }
+
+    public Task<AgentConversationState> ReadConversation(CancellationToken ct = default)
+    { ct.ThrowIfCancellationRequested(); return Task.FromResult(Snapshot()); }
+
+    public async Task<AgentConversationState> BeginConversation(AgentConversationRequest request, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        EnsureIdle();
+        ArgumentNullException.ThrowIfNull(request);
+        if (string.IsNullOrWhiteSpace(request.RunId) || request.RunId.Length > 200)
+        { throw new ArgumentException("A conversation run needs an identity of at most 200 characters.", nameof(request)); }
+        if (string.IsNullOrWhiteSpace(request.Message) || request.Message.Length > 32000)
+        { throw new ArgumentException("A conversation run needs a message of at most 32000 characters.", nameof(request)); }
+        var existing = _state.Turns.FirstOrDefault(turn => turn.RunId == request.RunId);
+        if (existing is not null)
+        {
+            // A retained turn can be replayed only for the exact same request. Reusing a run id
+            // with a different payload must never return an unrelated stored answer.
+            if (existing.UserText != request.Message) { throw new InvalidOperationException("Run ID already belongs to another message."); }
+            return Snapshot();
+        }
+        if (_state.RunInputs.TryGetValue(request.RunId, out var previous) && previous != request.Message)
+        { throw new InvalidOperationException("Run ID already belongs to another message."); }
+        if (_state.ActiveRun is not null) { throw new InvalidOperationException("A conversation run is already active."); }
+        _mutating = true;
+        try
+        {
+            var inputs = new Dictionary<string, string>(_state.RunInputs, StringComparer.Ordinal) { [request.RunId] = request.Message };
+            await Save(_state with { Revision = _state.Revision + 1, ActiveRun = request.RunId, RunInputs = inputs });
+            return Snapshot();
+        }
+        finally { _mutating = false; }
+    }
+
+    public async Task<AgentConversationState> CompleteConversation(AgentConversationTurn turn, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        EnsureIdle();
+        ArgumentNullException.ThrowIfNull(turn);
+        if (_state.ActiveRun != turn.RunId || !_state.RunInputs.TryGetValue(turn.RunId, out var input) || input != turn.UserText)
+        { throw new InvalidOperationException("This run is no longer active."); }
+        _mutating = true;
+        try
+        {
+            var turns = new List<AgentConversationTurn>(_state.Turns) { turn with { ResultIds = turn.ResultIds.ToArray() } };
+            var bounded = BoundTurns(turns, _state.Definition.MaxHistoryMessages, _state.ConversationSummary);
+            await Save(_state with
+            {
+                Revision = _state.Revision + 1,
+                ActiveRun = null,
+                Turns = bounded.Turns,
+                ConversationSummary = bounded.Summary,
+                RunInputs = WithoutRun(_state.RunInputs, turn.RunId)
+            });
+            return Snapshot();
+        }
+        finally { _mutating = false; }
+    }
+
+    public async Task<AgentConversationState> InterruptConversation(string runId, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        EnsureIdle();
+        if (_state.ActiveRun != runId) { return Snapshot(); }
+        _mutating = true;
+        try
+        {
+            await Save(_state with { Revision = _state.Revision + 1, ActiveRun = null, RunInputs = WithoutRun(_state.RunInputs, runId) });
+            return Snapshot();
+        }
+        finally { _mutating = false; }
+    }
+
+    // Committed or interrupted run inputs are redundant once the turn carries its own user text;
+    // keeping them would grow the run-input map without bound and outlive turn eviction.
+    private static Dictionary<string, string> WithoutRun(Dictionary<string, string> inputs, string runId)
+    {
+        if (!inputs.ContainsKey(runId)) { return inputs; }
+        var next = new Dictionary<string, string>(inputs, StringComparer.Ordinal);
+        next.Remove(runId);
+        return next;
+    }
+
+    private AgentConversationState Snapshot() => new(_state.Revision, _state.ActiveRun, _state.Turns.ToArray(), _state.ConversationSummary);
     public Task<AgentState> GetState(CancellationToken ct = default)
     { ct.ThrowIfCancellationRequested(); return Task.FromResult(new AgentState(_state.Revision, _state.Definition, _state.LastRun, _state.History.Count)); }
     public Task<AgentMetadata> GetMetadata(CancellationToken ct = default)
@@ -272,4 +360,39 @@ internal sealed class AgentNeuron(
         }
     }
     private sealed record RunUpdate(string? Text, AgentResponse? Response);
+
+    // Both the message history and the conversation turns stay inside the configured budget.
+    // Overflow folds the oldest content into a bounded summary instead of failing the run.
+    private static (List<AiMessage> Messages, string? Summary) BoundHistory(
+        IReadOnlyList<AiMessage> messages, int maxMessages, string? summary)
+    {
+        if (maxMessages < 1) { maxMessages = 1; }
+        if (messages.Count <= maxMessages) { return ([.. messages], summary); }
+        var drop = messages.Count - maxMessages;
+        var excerpts = messages.Take(drop)
+            .Select(message => string.Concat(message.Content.OfType<AiText>().Select(text => text.Text)));
+        return ([.. messages.Skip(drop)], MergeSummary(summary, excerpts));
+    }
+
+    private static (List<AgentConversationTurn> Turns, string? Summary) BoundTurns(
+        IReadOnlyList<AgentConversationTurn> turns, int maxMessages, string? summary)
+    {
+        var maxTurns = Math.Max(1, maxMessages / 2);
+        if (turns.Count <= maxTurns) { return ([.. turns], summary); }
+        var drop = turns.Count - maxTurns;
+        return ([.. turns.Skip(drop)], MergeSummary(summary, turns.Take(drop).Select(turn => turn.UserText)));
+    }
+
+    private static string? MergeSummary(string? summary, IEnumerable<string> dropped)
+    {
+        var added = string.Join(" ", dropped
+            .Where(text => !string.IsNullOrWhiteSpace(text))
+            .Select(text => text.Length <= 120 ? text : text[..120]));
+        if (added.Length == 0) { return summary; }
+        var combined = string.IsNullOrEmpty(summary) ? added : summary + " " + added;
+        return combined.Length <= 4000 ? combined : combined[^4000..];
+    }
+
+    private static string AppendSummary(string instructions, string? summary) =>
+        string.IsNullOrEmpty(summary) ? instructions : instructions + "\nEarlier conversation summary: " + summary;
 }

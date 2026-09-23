@@ -2,6 +2,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Sdk" />
     <ProjectReference Include="../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
+    <ProjectReference Include="../../../Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
     <ProjectReference Include="../../DigitalBrain.Behaviors.csproj" />
     <ProjectReference Include="../../../Modules/Google/Flutter/Flutter/DigitalBrain.Modules.Flutter.csproj" />
   </ItemGroup>

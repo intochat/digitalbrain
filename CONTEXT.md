@@ -1,91 +1,72 @@
 # DigitalBrain
 
-A personal assistant whose durable graph a user (or the assistant) programs with typed C#.
+A durable actor runtime on [Orleans](https://learn.microsoft.com/dotnet/orleans/), composed and hosted
+with [Aspire](https://aspire.dev). The sentence that settles naming: **a neuron publishes a signal; a
+client subscribes to the neuron and reads that stream**.
 
-The sentence that settles naming: **a neuron fires a signal along a synapse**.
-
-## Graph
+## Runtime
 
 **Neuron**
-A durable actor. It receives and emits typed Signals, owns its Synapses and journals, and keeps its own state.
-_Avoid_: agent, service, grain (product language)
+A durable Orleans grain. `Neuron : Grain, INeuron` accepts observers with `Watch(INeuronObserver)` /
+`Unwatch`, holds them for its activation lease, and publishes typed signals. `Neuron<TState>` persists
+`TState` through `IPersistentState<TState>` and saves state and signals together in `Save`.
+_Avoid_: agent, service (product language)
 
 **Signal**
-A typed, immutable message. Identity, causation, correlation, and ownership ride the delivery envelope, not the payload.
-_Avoid_: event, bus message, “synapse” as a message
+A typed, immutable message. `Signal` is the base record; concrete signals are Orleans-serializable
+records published by a neuron. Delivery carries no routing of its own beyond the source neuron.
+_Avoid_: event, bus message
 
-**Synapse**
-A directed, typed, weighted edge between two Neurons. Lives on the source. `SubscribeTo` writes a Bound edge (does not decay). A handled Send writes a Learned edge (decays). Anatomy, not traffic.
-_Avoid_: message, subscription grain, journal entry
-
-**Journal**
-A bounded window over a Neuron’s incoming or outgoing Signals. How scripts notice that something happened.
-_Avoid_: event store, execution history, a record of Synapses
-
-**Entity**
-A live snapshot (Chart, Surface, Memory). Direct typed reads/writes. Not on the graph: no journal, no synapses, not a signal target.
-_Avoid_: neuron, run history
+**Subscription**
+`IDigitalBrain.SubscribeAsync<TSignal>(INeuron source)` returns `ISignalSubscription<TSignal>`, a
+bounded `IAsyncEnumerable<TSignal>`. In process it joins `LocalSignalHub`; out of process it registers
+an `INeuronObserver` under a renewable lease and fails when the source reactivates, because live
+signals may have been missed. A subscription has one reader; overflow fails it rather than blocking.
+_Avoid_: message queue, journal
 
 **IDigitalBrain**
-The owner’s typed handle: `Get<TNeuron>`, `GetEntity<TEntity>`, journals. The assistant and scripts use this, not Orleans.
+The owner's typed handle: `Get<T>(id) where T : IGrainWithStringKey` and `SubscribeAsync<T>(source)`.
+`BrainClient` implements it over `IGrainFactory`; hosts register it with `AddDigitalBrain()`.
+_Avoid_: Orleans client (product language)
 
-In code, a `Neuron` owns its outgoing relationships through `NeuronSynapses` and its incoming/outgoing journal windows (`JournalWindow`) through `NeuronJournals`. Synapses `Bind`, `Unbind`, and `Reinforce`; journals record signal deliveries.
+## Modules
 
-## Programming
+**Module**
+An `IModule` configures a silo and its HTTP endpoints. A module declares typed options with
+`[ModuleConfiguration(typeof(...))]` and a `ModuleConfigurationContract<TModule, TOptions>`.
+`AddDigitalBrain()` builds the Orleans host; `WithModule<T>()` composes modules in code; the runtime
+loads the composed list from `DigitalBrain:Modules` (`TypeFullName, AssemblyName`). The AppHost writes
+that list as `DigitalBrain__Modules__N`, and the container images pin the same list.
+
+Modules: AI; Memory; ClickHouse; Supabase; Time; Google (Gmail); Salesforce; Microsoft (Aspire,
+GitHub, Roslyn, DotNet); Coding; Behavior; Flutter.
+
+## Behavior
+
+**Behavior program**
+`IBehaviorProgram`, implemented by `BehaviorProgramNeuron`, deploys saved code artifacts and owns
+their lifecycle: `Deploy`, `Start`, `Stop`, `Rollback`, `Read` and `ReadLogs`. Deployment verifies the
+artifact before use; revisions and logs are persisted; changes publish deployment, execution and log
+signals.
+
+**Behavior runtime**
+`IBehavior` is a program run outside the silo by `BehaviorApp.RunAsync<TBehavior>`. It connects an
+Orleans client, subscribes through a scoped `IDigitalBrain`, reports readiness over a control pipe,
+and stops when a required subscription closes.
 
 **Script**
-User- or assistant-authored C#, compiled against module contracts, executed outside the silo.
+C# authored against module contracts. Saving a script creates a draft and artifact; deploying and
+starting it is a behavior-program lifecycle action.
+_Avoid_: plugin, capability
 
-**Behavior**
-A named `IBehavior` neuron that owns a saved C# handler, its validated draft and active revision,
-subscriptions, durable accepted inputs, execution claims, request checkpoints and output delivery.
-The scripting host runs handlers outside serialized neuron turns. Each accepted input pins its
-revision. Saving changes creates a draft; activation affects future inputs. Disable removes its
-incoming subscriptions and fences outstanding execution and output.
+## Providers
 
-Trigger is type-safe: you may `Send`/`Publish` `TSignal` only to a neuron that `IHandle<TSignal>`s it.
-`IHandle<T>` is the capability to receive T. A **synapse** is who actually receives T from **this** source.
-`SubscribeTo<TSource, TSignal>(sourceId)` writes that synapse (durable, does not decay). Broadcast fires only along those synapses — not to every neuron type that `IHandle`s T.
+**IAgent**
+The assistant runtime: `Ask`, definition and capability configuration, streaming responses, history,
+usage and an event log. It is an `INeuron`.
 
-```csharp
-await using IDigitalBrain digitalBrain = await DigitalBrainClient.ConnectAsync(args);
-var inbox = digitalBrain.Get<IUserMessages>("default");
-var memoryAgent = digitalBrain.Get<IBehavior>("memory-agent");
-await memoryAgent.SaveScriptAsync<UserMessaged>(handlerSource);
-await memoryAgent.SubscribeToAsync<IUserMessages, UserMessaged>(inbox.Id);
-await memoryAgent.ActivateAsync();
-```
+Provider neurons — `IGmail`, `ISalesforce`, `IClickHouse`, `IRepository` (GitHub) and the live-table
+neuron — are `INeuron` grains that expose their provider operations and publish domain signals such
+as `TableRendered`.
 
-English is how the owner asks. A compiled script is what they get. There is no second runtime, grant catalog, or JSON capability bus for this path.
-
-Start with [Flutter chat and personal C# review routines](docs/GETTING_STARTED.md).
-The assistant can save, inspect, validate, connect, activate, invoke and disable behaviors.
-Each definition lives on its own `BehaviorNeuron`; `BehaviorsNeuron` is the discovery index.
-Its notifications wake the separate scripting worker;
-durable recovery handles missed notifications. Composition commands are not replayed on restart.
-The former admitted-script runtime and fixed GitHub review pipeline have been removed.
-Development chat can read the configured local repository diff for a one-off review.
-
-The SDK owns the concrete client and reusable `WebhookNeuron`. A thin authenticated HTTP
-adapter durably accepts receipts before acknowledging them. Provider modules translate those
-receipts into minimal typed domain facts. `IRepository : IWebhook` is the GitHub source;
-there is no mandatory second webhook neuron or GitHub-specific review orchestrator.
-See [the implementation contract](docs/programmable-behaviors-implementation.md).
-
-## Specialist modules
-
-Ino delegates to `IAspire`, `IGmail`, and `ISalesforce`. Each inherits `IAgent`
-(`IHandle<AgentRequest>` with `AgentReply`) and owns its native discovered MCP tools.
-An ordinary request uses the initiating neuron's source-owned send path and can
-create a Learned synapse; it does not create a Bound subscription.
-
-Google, Salesforce, and Microsoft own connection policy and static presentation
-metadata. The SDK owns MCP sessions/discovery; the shared AI tool boundary owns
-screened evidence. Provider operation schemas remain MCP-owned.
-
-`IClickHouse` is the read-only door into ClickHouse: its query table neuron owns a saved SELECT,
-serves pages live, and fires `TableRendered` along its synapse to the chat, which shows the table card.
-
-`AgentActivity` records diagnostic journal evidence, not subscriber delivery.
-Unsubscribe removes the current edge; a later explicit handled send can establish
-a Learned edge that is again eligible for broadcast. Journals remain bounded.
+The SDK supplies shared host helpers: HTTP surfaces, JSON webhooks and browser login.

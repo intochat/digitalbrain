@@ -5,10 +5,6 @@
     <Description>Compiled behaviors: IBehavior types that program neurons through IDigitalBrain.</Description>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="ElonBitcoin.cs" />
-    <Compile Include="Fakes/TwitterFakes.cs" />
-  </ItemGroup>
-  <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.Orleans.Sdk" />
   </ItemGroup>

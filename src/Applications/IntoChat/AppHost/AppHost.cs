@@ -5,7 +5,6 @@ using DigitalBrain.AI.FoundryLocal;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.OpenAI;
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Behaviors;
 using DigitalBrain.ClickHouse;
 using DigitalBrain.Coding;
 using DigitalBrain.Behavior;
@@ -27,6 +26,8 @@ using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
 var testing = builder.Configuration.GetValue<bool>("DigitalBrain:Testing:Enabled");
+var profile = builder.Configuration[ProductSurfaceResources.ProfileKey] ?? ProductSurfaceResources.DeveloperProfile;
+var developerProfile = !string.Equals(profile, ProductSurfaceResources.ProductProfile, StringComparison.OrdinalIgnoreCase);
 var repositories = builder.Configuration.GetSection("DigitalBrain:Microsoft:GitHub:Repositories")
     .Get<Dictionary<string, GitHubRepositoryDeclaration>>() ?? [];
 var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, persistentStorage: !testing)
@@ -53,21 +54,26 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<TimeModule>()
     .WithModule<GmailModule>(gmail => gmail.WithGmail())
     .WithModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
-    .WithModule<AspireModule>(aspire => aspire
-        .WithAspire(Path.Combine(builder.AppHostDirectory, "IntoChat.AppHost.csproj")))
     .WithModule<GitHubModule>(github => github.WithGitHubRepositories(repositories))
-    .WithModule<RoslynModule>()
-    .WithModule<DotNetModule>()
-    .WithModule<CodingModule>(coding => coding.WithSolution(Path.GetFullPath(
-        Path.Combine(builder.AppHostDirectory, "..", "..", "..", "..", "DigitalBrain.slnx"))))
-    .WithModule<BehaviorModule>(behavior =>
-    {
-        if (builder.Configuration["IntoChat:BehaviorAuthoring:Root"] is { Length: > 0 } root)
-        { behavior.WithLocalExecution(root); }
-    })
-    .WithModule<FlutterModule>(flutter => flutter.RunDesktopApp())
-    // Existing demo behavior dependency; this is part of the application, not injected by tests.
-    .WithModule<TestTwitterModule>();
+    .WithModule<FlutterModule>(flutter => flutter.RunDesktopApp());
+
+if (developerProfile)
+{
+    // Developer-only surfaces: the Windows executor, C# compilation, the behavior runtime and the
+    // self-referential Aspire project path. The product profile composes only modules with a user path.
+    digitalBrain
+        .WithModule<AspireModule>(aspire => aspire
+            .WithAspire(Path.Combine(builder.AppHostDirectory, "IntoChat.AppHost.csproj")))
+        .WithModule<RoslynModule>()
+        .WithModule<DotNetModule>()
+        .WithModule<CodingModule>(coding => coding.WithSolution(Path.GetFullPath(
+            Path.Combine(builder.AppHostDirectory, "..", "..", "..", "..", "DigitalBrain.slnx"))))
+        .WithModule<BehaviorModule>(behavior =>
+        {
+            if (builder.Configuration["IntoChat:BehaviorAuthoring:Root"] is { Length: > 0 } root)
+            { behavior.WithLocalExecution(root); }
+        });
+}
 
 var clusterId = builder.Configuration["Orleans:ClusterId"]
     ?? (builder.Environment.IsDevelopment() ? $"digitalbrain-{Guid.NewGuid():N}" : null);
@@ -92,8 +98,8 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
         })
     .WithEnvironment(context =>
     {
+        // No default host filesystem root: the Files app stays off unless a root is configured.
         var downloads = builder.Configuration["IntoChat:LocalFiles:Roots:downloads"];
-        if (downloads is null && !testing) { downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"); }
         if (downloads is not null) { context.EnvironmentVariables["IntoChat__LocalFiles__Roots__downloads"] = downloads; }
         var assets = builder.Configuration["IntoChat:LocalFiles:AssetDirectory"];
         if (assets is not null) { context.EnvironmentVariables["IntoChat__LocalFiles__AssetDirectory"] = assets; }

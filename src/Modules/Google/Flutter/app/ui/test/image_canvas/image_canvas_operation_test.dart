@@ -89,4 +89,60 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
     expect(edits, 1);
   });
+
+  testWidgets(
+    'save flushes the displayed edit before exporting the bound recipe',
+    (tester) async {
+      final bytes = base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==',
+      );
+      ImageRecipe? persisted;
+      ImageRecipe? exported;
+      var saved = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: UiImageCanvas(
+              bytes: bytes,
+              recipe: const ImageRecipe(),
+              sourceWidth: 1,
+              sourceHeight: 1,
+              persistDebounce: const Duration(seconds: 30),
+              exportImage: (_, recipe) async {
+                exported = recipe;
+                return bytes;
+              },
+              onEdit: (recipe) async {
+                persisted = recipe;
+              },
+              onSave: (_) async {
+                saved = true;
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Draw'));
+      await tester.pump();
+      final canvas = tester.getRect(find.bySemanticsLabel('Image canvas'));
+      final gesture = await tester.startGesture(canvas.center);
+      await gesture.moveBy(const Offset(0.2, 0));
+      await gesture.up();
+      await tester.pump();
+      expect(persisted, isNull);
+      await tester.tap(find.text('Save copy'));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pumpAndSettle();
+      expect(persisted, isNotNull);
+      expect(exported, isNotNull);
+      expect(exported!.toJson(), persisted!.toJson());
+      expect(saved, isTrue);
+    },
+  );
 }

@@ -90,7 +90,7 @@ class _BehaviorDetailViewState extends State<BehaviorDetailView> {
       builder: (context) => AlertDialog(
         title: Text('Restore version ${version['revision']}?'),
         content: const Text(
-          'This replaces the active behavior with this verified version and its saved configuration.',
+          'This replaces the active automation with this verified version and its saved configuration.',
         ),
         actions: [
           TextButton(
@@ -500,7 +500,7 @@ class _BehaviorDetailViewState extends State<BehaviorDetailView> {
                   TextButton.icon(
                     onPressed: widget.enabled
                         ? () => widget.onAsk(
-                            'Help me edit behavior "$id". Read its details and current draft, then ask what I want to change. Do not deploy changes without my request.',
+                            'Help me edit automation "$id". Read its details and current draft, then ask what I want to change. Do not deploy changes without my request.',
                           )
                         : null,
                     icon: const Icon(Icons.auto_awesome, size: 16),
@@ -510,7 +510,7 @@ class _BehaviorDetailViewState extends State<BehaviorDetailView> {
                     TextButton(
                       onPressed: widget.enabled
                           ? () => widget.onAsk(
-                              'Repair behavior "$id". Read its draft, latest check diagnostics, behavior state and worker logs. Save and validate the repair, then leave it ready for me to deploy from Behaviors.',
+                              'Repair automation "$id". Read its draft, latest check diagnostics, behavior state and worker logs. Save and validate the repair, then leave it ready for me to deploy from Automations.',
                             )
                           : null,
                       child: const Text('Ask assistant to repair'),

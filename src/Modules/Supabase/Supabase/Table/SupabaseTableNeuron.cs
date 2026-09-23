@@ -15,9 +15,9 @@ internal sealed class SupabaseTableNeuron(
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SupabaseTableState> state)
     : Neuron, ISupabaseTable
 {
-    private ISupabaseProvider? _provider;
+    private ILiveTableSource? _source;
 
-    private ISupabaseProvider Provider => _provider ??= ServiceProvider.GetRequiredService<ISupabaseProvider>();
+    private ILiveTableSource Source => _source ??= ServiceProvider.GetRequiredService<ILiveTableSource>();
     private SupabaseTableState Current => state.State ?? SupabaseTableState.Empty;
 
     public Task<SupabaseTableSnapshot> CreateFromQuery(CreateQueryTable request)
@@ -26,7 +26,7 @@ internal sealed class SupabaseTableNeuron(
     public Task<SupabaseTableSnapshot> CreateFromQueryOnce(string operationId, CreateQueryTable request, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(operationId);
-        if (operationId.Length > 256) { throw new SupabaseTableValidationException("Operation ID is too long."); }
+        if (operationId.Length > 256 || operationId.Any(char.IsControl)) { throw new SupabaseTableValidationException("Operation ID is too long or contains control characters."); }
         return Create(request, operationId, cancellationToken);
     }
 
@@ -60,7 +60,7 @@ internal sealed class SupabaseTableNeuron(
         try
         {
             // Describing runs the query with LIMIT 0, so a wrong column or table fails here, not on first read.
-            columns = await Provider.DescribeAsync(sql, cancellationToken);
+            columns = await Source.DescribeAsync(sql, cancellationToken);
         }
         catch (SupabaseQueryException error)
         {
@@ -91,7 +91,7 @@ internal sealed class SupabaseTableNeuron(
 
         if (saved.Revision != request.ExpectedRevision)
         {
-            throw new SupabaseTableRevisionConflictException($"Expected revision {request.ExpectedRevision}; current revision is {saved.Revision}.");
+            throw new SupabaseTableRevisionConflictException($"Expected revision {request.ExpectedRevision}; current revision is {saved.Revision}.", saved.Revision);
         }
 
         var normalized = SupabaseTablePolicy.ValidateView(saved, request);
@@ -122,7 +122,7 @@ internal sealed class SupabaseTableNeuron(
         QueryPage page;
         try
         {
-            page = await Provider.ExecutePlanAsync(plan, CancellationToken.None);
+            page = await Source.ExecutePlanAsync(plan, CancellationToken.None);
         }
         catch (SupabaseQueryException error)
         {
@@ -141,6 +141,30 @@ internal sealed class SupabaseTableNeuron(
             Offset = query.Offset,
             Limit = query.Limit,
         };
+    }
+
+    [ReadOnly]
+    public async Task<SupabaseTableAggregate?> Aggregate(ReadSupabaseTableAggregate query)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        if (Current is not { View: { } view, BaseSql: { } baseSql } current)
+        {
+            return null;
+        }
+
+        var plan = new QueryPlan(baseSql, current.SourceColumns, view.Filters, view.Sort, 0, 1);
+        try
+        {
+            return await Source.AggregateAsync(plan, query.Function, query.ColumnId, CancellationToken.None);
+        }
+        catch (SupabaseQueryException error)
+        {
+            throw new SupabaseTableSourceException($"Supabase refused the aggregate behind table '{this.GetPrimaryKeyString()}': {error.Message}");
+        }
+        catch (SupabaseUnavailableException error)
+        {
+            throw new SupabaseTableSourceException(error.Message);
+        }
     }
 
     [ReadOnly]

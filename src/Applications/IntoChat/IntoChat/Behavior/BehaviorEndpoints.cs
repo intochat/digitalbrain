@@ -1,4 +1,3 @@
-using DigitalBrain.Behaviors;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using DigitalBrain.Coding;
@@ -13,13 +12,10 @@ internal static class BehaviorEndpoints
 {
     public static void AddBehaviors(this IHostApplicationBuilder builder)
     {
-        builder.Services.AddBehavior<ElonBitcoin>(brain =>
-            [SubscriptionRequirement.For<Posted>(brain.Get<ITwitterAccount>("elonmusk"))]);
         builder.Services.AddOptions<BehaviorAuthoringOptions>().BindConfiguration("IntoChat:BehaviorAuthoring");
         builder.Services.AddSingleton<BehaviorToolService>();
         builder.Services.AddSingleton<BehaviorCatalogStore>();
         builder.Services.AddSingleton<BehaviorManagement>();
-        builder.Services.AddSingleton<BehaviorAuthoringService>();
         builder.Services.AddSingleton<IAgentToolFactory, BehaviorAgentTools>();
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddScoped(sp =>
@@ -68,8 +64,6 @@ internal static class BehaviorEndpoints
         group.MapPost("/{id}/stop", (string workspaceId, string id, ChangeBehaviorState request, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).Stop(id, request, ct));
         group.MapPost("/{id}/rollback", (string workspaceId, string id, RollbackBehavior request, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).Rollback(id, request, ct));
         group.MapGet("/{id}/logs", (string workspaceId, string id, long? after, int? limit, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).Logs(id, after ?? 0, limit ?? 100, ct));
-        group.MapPost("/author", (string workspaceId, AuthorBehaviorRequest request, BehaviorAuthoringService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) =>
-            service.AuthorAsync(WorkspaceScope.Create(auth.Value.Username is { Length: > 0 } owner ? owner : BasicAuthGate.DefaultLogin, workspaceId).Id, request, ct));
         routes.MapMcp("/workspaces/{workspaceId}/behavior-mcp");
     }
 }

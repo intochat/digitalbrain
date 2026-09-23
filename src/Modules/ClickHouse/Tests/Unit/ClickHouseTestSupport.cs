@@ -1,6 +1,5 @@
 using DigitalBrain.ClickHouse;
 using DigitalBrain.ClickHouse.Query;
-using DigitalBrain.ClickHouse.Tables;
 
 namespace DigitalBrain.Tests;
 
@@ -12,8 +11,6 @@ internal sealed class FakeClickHouseProvider : IClickHouseProvider
     public string ProviderName => "Fake";
     public bool Connected { get; set; } = true;
     public string Database => "digitalbrain";
-
-    public QueryPlan? LastPlan { get; private set; }
 
     public FakeClickHouseProvider WithColumns(string sql, params ClickHouseColumn[] columns)
     {
@@ -30,18 +27,6 @@ internal sealed class FakeClickHouseProvider : IClickHouseProvider
             ["42"],
         ];
         return Task.FromResult(new ClickHouseQueryResult(columns, rows, 1, false, 1.5));
-    }
-
-    public Task<QueryPage> ExecutePlanAsync(QueryPlan plan, CancellationToken cancellationToken)
-    {
-        LastPlan = plan;
-        IReadOnlyList<ClickHouseTableRow> rows =
-        [
-            new ClickHouseTableRow("row-0", ["1", "\"alpha\""]),
-            new ClickHouseTableRow("row-1", ["2", "\"beta\""]),
-        ];
-        var total = plan.Filters.Count == 0 ? 2 : 1;
-        return Task.FromResult(new QueryPage(rows, total, total));
     }
 
     public Task<IReadOnlyList<ClickHouseColumn>> DescribeAsync(string sql, CancellationToken cancellationToken)

@@ -265,7 +265,9 @@ class _AppSurfaceHostState extends State<AppSurfaceHost> {
     }
   }
 
-  Future<void> save(Uint8List png, Map<String, dynamic> current) async {
+  Future<void> save(Uint8List png) async {
+    final current = document;
+    if (current == null) return;
     final id = current['id'] as String;
     final pending = pendingSaves[id] as Map?;
     final operation =
@@ -377,7 +379,7 @@ class _AppSurfaceHostState extends State<AppSurfaceHost> {
                             ),
                           ),
                           onEdit: (recipe) => edit(recipe, renderedDocument),
-                          onSave: (png) => save(png, renderedDocument),
+                          onSave: (png) => save(png),
                           saved:
                               document!['lastSavedRevision'] ==
                               document!['revision'],

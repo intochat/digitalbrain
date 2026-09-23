@@ -78,7 +78,8 @@ public sealed class LocalAppsJourneyFacts
             { await WorkspaceBrowser.EnterTextAsync(page.GetByRole(AriaRole.Textbox, new() { Name = label, Exact = true }), value); }
             await page.GetByRole(AriaRole.Button, new() { Name = "Apply crop", Exact = true }).ClickAsync();
             await editor.GetByRole(AriaRole.Button, new() { Name = "Save copy", Exact = true }).ClickAsync();
-            await Assertions.Expect(page.GetByText("Saved " + outputName, new() { Exact = true })).ToBeVisibleAsync();
+            // Flutter mirrors the SnackBar text into an aria-live announcement; assert the visible node.
+            await Assertions.Expect(page.Locator("flt-semantics").GetByText("Saved " + outputName, new() { Exact = true })).ToBeVisibleAsync();
             var output = await File.ReadAllBytesAsync(Path.Combine(downloads, outputName), ct);
             Assert.Equal(60, BinaryPrimitives.ReadInt32BigEndian(output.AsSpan(16, 4)));
             Assert.Equal(40, BinaryPrimitives.ReadInt32BigEndian(output.AsSpan(20, 4)));

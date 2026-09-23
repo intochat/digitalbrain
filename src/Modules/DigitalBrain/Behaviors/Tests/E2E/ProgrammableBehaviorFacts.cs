@@ -274,7 +274,10 @@ public sealed class ProgrammableBehaviorFacts
             await reader.ReadToEndAsync(ct);
             var response = JsonSerializer.Serialize(new
             {
-                id = Guid.NewGuid().ToString("N"), @object = "chat.completion", created = 1, model = "fixture",
+                id = Guid.NewGuid().ToString("N"),
+                @object = "chat.completion",
+                created = 1,
+                model = "fixture",
                 choices = new[] { new { index = 0, message = new { role = "assistant", content = JsonSerializer.Serialize(new { source, tests, moduleIds = new[] { "time", "flutter" } }) }, finish_reason = "stop" } },
             });
             var bytes = Encoding.UTF8.GetBytes(response);

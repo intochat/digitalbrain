@@ -76,14 +76,16 @@ public static class ServiceDefaultsExtensions
             logging.IncludeFormattedMessage = true;
             logging.IncludeScopes = true;
         });
+        // Framework chatter does not belong in traces or the log exporter: keep the collection
+        // quiet at Warning while the GenAI categories opt back in below when capture is enabled.
+        builder.Logging.SetMinimumLevel(LogLevel.Warning);
 
-        if (integration.EnableSensitiveData
-            ?? integration.CaptureMessageContent
-            ?? false)
+        if (integration.EnableSensitiveData == true)
         {
             // MEAI's structured inference events use this category. Broad Microsoft
-            // Warning filters must not discard opted-in GenAI evidence. Tool payloads
-            // belong to execute_tool spans; avoid duplicate Trace-level logging.
+            // Warning filters must not discard opted-in GenAI evidence. Only the explicit
+            // module setting raises this category; the OTEL standard capture variable cannot
+            // silently turn content logging on.
             builder.Logging.AddFilter("Microsoft.Extensions.AI.OpenTelemetryChatClient", LogLevel.Information);
         }
 
@@ -113,8 +115,9 @@ public static class ServiceDefaultsExtensions
                 .AddSource("Microsoft.Extensions.AI")
                 .AddSource("Microsoft.Extensions.AI.*")
                 .AddSource("Microsoft.Orleans.Application")
-                .AddSource("Microsoft.Orleans.Lifecycle")
                 .AddSource("ClickHouse.Driver")
+                .AddSource("Npgsql")
+                .AddSource("Experimental.ModelContextProtocol")
                 .AddAspNetCoreInstrumentation(options =>
                     options.Filter = context =>
                         !context.Request.Path.StartsWithSegments(HealthPath, StringComparison.OrdinalIgnoreCase)

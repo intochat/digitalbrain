@@ -115,10 +115,15 @@ public sealed class ModelProfiles(IServiceProvider services, IOptionsMonitor<AIO
     // Callers own these pipelines. Recreating a client never rereads a changed profile or default.
     public IChatClient CreateClient(ResolvedAgentModel resolved)
         => AIClients.BuildChatPipeline(services, resolved.Capabilities.HasFlag(LlmCapabilities.Tools),
-            resolved.Provider, CreateInferenceClient(resolved), rejectUnsupportedTools: true);
+            resolved.Provider, CreatePinnedClient(resolved), resolved.Provider, resolved.Model, rejectUnsupportedTools: true);
 
-    // Inference returns proposed calls. The agent owns the only tool invocation loop.
+    // Inference returns proposed calls. The agent owns the only tool invocation loop, so the
+    // inference client carries GenAI telemetry but never the function-invocation middleware.
     public IChatClient CreateInferenceClient(ResolvedAgentModel resolved)
+        => AIClients.BuildChatPipeline(services, supportsTools: true, resolved.Provider,
+            CreatePinnedClient(resolved), resolved.Provider, resolved.Model, rejectUnsupportedTools: false, useFunctionInvocation: false);
+
+    private IChatClient CreatePinnedClient(ResolvedAgentModel resolved)
     {
         ArgumentNullException.ThrowIfNull(resolved);
         if (!string.Equals(resolved.Revision, Revision(resolved), StringComparison.Ordinal))
@@ -130,13 +135,12 @@ public sealed class ModelProfiles(IServiceProvider services, IOptionsMonitor<AIO
         configuration.Provider(provider).ApiKey = options.CurrentValue.Provider(provider).ApiKey;
         configuration.Provider(provider).Endpoint = resolved.Endpoint;
         var inner = AIClients.Factory(provider).CreateChatClient(resolved.Model, configuration);
-        var pinned = new ChatClientBuilder(inner).ConfigureOptions(request =>
+        return new ChatClientBuilder(inner).ConfigureOptions(request =>
         {
             request.ModelId = resolved.Model;
             if (resolved.Reasoning is not null) { request.Reasoning = Reasoning(resolved.Reasoning); }
             if (resolved.MaxOutputTokens is not null) { request.MaxOutputTokens = resolved.MaxOutputTokens; }
         }).Build();
-        return pinned;
     }
 
     public static ChatOptions CreateOptions(ResolvedAgentModel resolved)

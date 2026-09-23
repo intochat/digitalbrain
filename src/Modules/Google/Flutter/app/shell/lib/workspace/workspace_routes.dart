@@ -42,9 +42,7 @@ class WorkspaceRouteBridge extends NavigatorObserver
   @override
   void didChangeTop(Route<dynamic> topRoute, Route<dynamic>? previousTopRoute) {
     final name = topRoute.settings.name;
-    _overlayPath = name?.startsWith('/settings/') == true || name == '/programs'
-        ? name
-        : null;
+    _overlayPath = name?.startsWith('/settings/') == true ? name : null;
     sync(_basePath);
   }
 
@@ -54,7 +52,6 @@ class WorkspaceRouteBridge extends NavigatorObserver
   ) async {
     final uri = routeInformation.uri;
     if (uri.path != '/explore' &&
-        uri.path != '/programs' &&
         !uri.path.startsWith('/projects') &&
         !uri.path.startsWith('/settings')) {
       return false;

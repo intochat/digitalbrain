@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'workspace_voice.dart';
-
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
@@ -27,8 +25,6 @@ class WorkspaceChat extends StatefulWidget {
     this.onSalesforceConnected,
     required this.onArtifact,
     required this.onAttach,
-    this.onProgram,
-    this.onTranscribe,
     this.project,
     this.active = true,
     this.selectedBehaviorId,
@@ -50,8 +46,6 @@ class WorkspaceChat extends StatefulWidget {
   final Future<bool> Function()? onSalesforceConnected;
   final void Function(Map<String, dynamic>) onArtifact;
   final VoidCallback onAttach;
-  final ValueChanged<Map<String, dynamic>>? onProgram;
-  final Future<String> Function(Uint8List, String)? onTranscribe;
   @override
   State<WorkspaceChat> createState() => _WorkspaceChatState();
 }

@@ -74,103 +74,10 @@ final class DigitalBrainUiClient {
   final CookieHttpClient _http;
   final bool _ownsClient;
 
-  /// Transcription only: callers review the draft before starting an agent run.
-  Future<String> transcribeVoice({
-    required List<int> audioBytes,
-    String fileName = 'voice.wav',
-  }) async {
-    if (audioBytes.isEmpty) throw ArgumentError('Audio is empty.');
-    final request =
-        http.MultipartRequest(
-            'POST',
-            baseUri.replace(path: '/agent/transcribe'),
-          )
-          ..files.add(
-            http.MultipartFile.fromBytes(
-              'audio',
-              audioBytes,
-              filename: fileName,
-            ),
-          );
-    final response = await http.Response.fromStream(
-      await _http.send(request).timeout(const Duration(seconds: 60)),
-    ).timeout(const Duration(seconds: 60));
-    if (response.statusCode != 200) {
-      throw StateError('Voice transcription unavailable: ${response.body}');
-    }
-    final body = jsonDecode(response.body) as Map;
-    final text = body['text'];
-    if (text is! String || text.trim().isEmpty) {
-      throw StateError('No speech was recognized.');
-    }
-    return text;
-  }
-
   Future<bool> salesforceConnected() async =>
       (await _tableRequest('GET', '/agent/connections/salesforce')
           as Map)['connected'] ==
       true;
-
-  Future<Object?> programmingRequest(
-    String method,
-    String path, {
-    Map<String, Object?>? body,
-  }) async {
-    try {
-      return await _tableRequest(
-        method,
-        path.isEmpty ? '/programs/' : '/programs$path',
-        body: body,
-        timeout: const Duration(seconds: 135),
-      );
-    } on TableRequestException catch (error) {
-      throw StateError(
-        'Program request failed (${error.statusCode}): ${error.message}',
-      );
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> listWorkspaceArtifacts() async =>
-      (await _tableRequest('GET', '/workspace/artifacts') as List)
-          .map((item) => Map<String, dynamic>.from(item as Map))
-          .toList();
-
-  Future<Map<String, dynamic>> readWorkspaceArtifact(String id) async =>
-      Map<String, dynamic>.from(
-        await _tableRequest(
-          'GET',
-          '/workspace/artifacts/${Uri.encodeComponent(id)}',
-        ) as Map,
-      );
-
-  Future<Map<String, dynamic>> createWorkspaceArtifact({
-    required String kind,
-    required String title,
-    required Map<String, dynamic> content,
-  }) async => Map<String, dynamic>.from(
-    await _tableRequest(
-      'POST',
-      '/workspace/artifacts',
-      body: {'kind': kind, 'title': title, 'content': content},
-    ) as Map,
-  );
-
-  Future<Map<String, dynamic>> updateWorkspaceArtifact(
-    String id, {
-    required int expectedRevision,
-    required String title,
-    required Map<String, dynamic> content,
-  }) async => Map<String, dynamic>.from(
-    await _tableRequest(
-      'PUT',
-      '/workspace/artifacts/${Uri.encodeComponent(id)}',
-      body: {
-        'expectedRevision': expectedRevision,
-        'title': title,
-        'content': content,
-      },
-    ) as Map,
-  );
 
   Future<List<TableSummary>> listTables() async {
     final body = await _tableRequest('GET', '/ui/tables');

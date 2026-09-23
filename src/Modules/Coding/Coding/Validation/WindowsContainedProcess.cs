@@ -63,8 +63,14 @@ public sealed class WindowsContainedProcess : IDisposable
             if (!Native.UpdateProcThreadAttribute(attributes, 0, 0x20002, handlesValue, (nuint)(nint.Size * 3), 0, 0)) { throw new Win32Exception(); }
             var startup = new Native.StartupEx
             {
-                Startup = new() { Size = Marshal.SizeOf<Native.StartupEx>(), Flags = 0x100,
-                    StandardInput = inputRead.DangerousGetHandle(), StandardOutput = outputWrite.DangerousGetHandle(), StandardError = errorWrite.DangerousGetHandle() },
+                Startup = new()
+                {
+                    Size = Marshal.SizeOf<Native.StartupEx>(),
+                    Flags = 0x100,
+                    StandardInput = inputRead.DangerousGetHandle(),
+                    StandardOutput = outputWrite.DangerousGetHandle(),
+                    StandardError = errorWrite.DangerousGetHandle()
+                },
                 Attributes = attributes,
             };
             var values = new SortedDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -79,6 +85,10 @@ public sealed class WindowsContainedProcess : IDisposable
                 if (pair.Key.Contains('=') || pair.Key.Contains('\0') || pair.Value.Contains('\0')) { throw new ArgumentException("Invalid environment value."); }
                 values[pair.Key] = pair.Value;
             }
+            // A contained process inherits the caller's W3C trace context so its work stays on the
+            // same trace. An explicit value from the caller wins over the ambient activity.
+            if (AmbientTraceParent() is { } traceParent && !values.ContainsKey("TRACEPARENT")) { values["TRACEPARENT"] = traceParent; }
+            if (Activity.Current?.TraceStateString is { Length: > 0 } traceState && !values.ContainsKey("TRACESTATE")) { values["TRACESTATE"] = traceState; }
             environment = Marshal.StringToHGlobalUni(string.Join('\0', values.Select(x => x.Key + "=" + x.Value)) + "\0\0");
             var command = new StringBuilder(string.Join(' ', new[] { fileName }.Concat(arguments).Select(Quote)));
             if (!Native.CreateProcessW(fileName, command, 0, 0, true, 0x08080404, environment, directory, ref startup, out var info))
@@ -109,6 +119,12 @@ public sealed class WindowsContainedProcess : IDisposable
     public void Terminate() => _job.Dispose();
     public void Dispose() { _job.Dispose(); Output.Dispose(); Error.Dispose(); Process.Dispose(); }
 
+    private static string? AmbientTraceParent()
+        => Activity.Current is { } activity
+            ? "00-" + activity.TraceId.ToHexString() + "-" + activity.SpanId.ToHexString()
+                + "-" + (activity.ActivityTraceFlags.HasFlag(ActivityTraceFlags.Recorded) ? "01" : "00")
+            : null;
+
     private static string Quote(string argument)
     {
         var result = new StringBuilder("\"");
@@ -133,13 +149,13 @@ public sealed class WindowsContainedProcess : IDisposable
         [StructLayout(LayoutKind.Sequential)] internal struct StartupEx { public Startup Startup; public nint Attributes; }
         [StructLayout(LayoutKind.Sequential)] internal struct ProcessInfo { public nint Process, Thread; public int ProcessId, ThreadId; }
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] internal static extern SafeFileHandle CreateJobObjectW(nint attributes, string? name);
-        [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool SetInformationJobObject(SafeFileHandle job, int kind, ref ExtendedLimits info, int length);
-        [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool CreatePipe(out SafeFileHandle read, out SafeFileHandle write, ref Security security, uint size);
-        [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool SetHandleInformation(SafeFileHandle handle, uint mask, uint flags);
-        [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool InitializeProcThreadAttributeList(nint list, int count, uint flags, ref nuint size);
-        [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool UpdateProcThreadAttribute(nint list, uint flags, nuint attribute, nint value, nuint size, nint previous, nint returnedSize);
+        [DllImport("kernel32.dll", SetLastError = true)][return: MarshalAs(UnmanagedType.Bool)] internal static extern bool SetInformationJobObject(SafeFileHandle job, int kind, ref ExtendedLimits info, int length);
+        [DllImport("kernel32.dll", SetLastError = true)][return: MarshalAs(UnmanagedType.Bool)] internal static extern bool CreatePipe(out SafeFileHandle read, out SafeFileHandle write, ref Security security, uint size);
+        [DllImport("kernel32.dll", SetLastError = true)][return: MarshalAs(UnmanagedType.Bool)] internal static extern bool SetHandleInformation(SafeFileHandle handle, uint mask, uint flags);
+        [DllImport("kernel32.dll", SetLastError = true)][return: MarshalAs(UnmanagedType.Bool)] internal static extern bool InitializeProcThreadAttributeList(nint list, int count, uint flags, ref nuint size);
+        [DllImport("kernel32.dll", SetLastError = true)][return: MarshalAs(UnmanagedType.Bool)] internal static extern bool UpdateProcThreadAttribute(nint list, uint flags, nuint attribute, nint value, nuint size, nint previous, nint returnedSize);
         [DllImport("kernel32.dll")] internal static extern void DeleteProcThreadAttributeList(nint list);
-        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] [return: MarshalAs(UnmanagedType.Bool)] internal static extern bool CreateProcessW(string application, StringBuilder command, nint processAttributes, nint threadAttributes, [MarshalAs(UnmanagedType.Bool)] bool inherit, uint flags, nint environment, string directory, ref StartupEx startup, out ProcessInfo info);
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)][return: MarshalAs(UnmanagedType.Bool)] internal static extern bool CreateProcessW(string application, StringBuilder command, nint processAttributes, nint threadAttributes, [MarshalAs(UnmanagedType.Bool)] bool inherit, uint flags, nint environment, string directory, ref StartupEx startup, out ProcessInfo info);
         [DllImport("kernel32.dll", SetLastError = true)] internal static extern uint ResumeThread(SafeFileHandle thread);
     }
 }

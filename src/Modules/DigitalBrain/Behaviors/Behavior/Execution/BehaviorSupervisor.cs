@@ -88,8 +88,13 @@ internal sealed class BehaviorSupervisor(IOptions<BehaviorOptions> options, IBeh
                     if (d.Snapshot.GenerationId != active.GenerationId) { return false; }
                     d.Retries++;
                     d.NextRetryAt = exit.ExitCode == 0 && exit.Error is null ? null : DateTimeOffset.UtcNow.AddSeconds(Math.Pow(2, d.Retries - 1));
-                    d.Snapshot = d.Snapshot with { State = exit.ExitCode == 0 && exit.Error is null ? BehaviorExecutionState.Completed : BehaviorExecutionState.Failed,
-                        Ready = false, Error = exit.Error ?? (exit.ExitCode == 0 ? null : $"Worker exited with code {exit.ExitCode}."), ActiveDeploymentRevision = null };
+                    d.Snapshot = d.Snapshot with
+                    {
+                        State = exit.ExitCode == 0 && exit.Error is null ? BehaviorExecutionState.Completed : BehaviorExecutionState.Failed,
+                        Ready = false,
+                        Error = exit.Error ?? (exit.ExitCode == 0 ? null : $"Worker exited with code {exit.ExitCode}."),
+                        ActiveDeploymentRevision = null
+                    };
                     return true;
                 }, ct).ConfigureAwait(false);
                 await Notify(id).ConfigureAwait(false);

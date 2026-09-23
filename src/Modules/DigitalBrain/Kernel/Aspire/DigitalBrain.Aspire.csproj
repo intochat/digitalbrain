@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Silo host wiring for IntoChat. AppHost uses DigitalBrain.Aspire.Hosting (thin). MCP is DigitalBrain.Mcp.</Description>
+    <Description>Silo host wiring for IntoChat. The AppHost uses DigitalBrain.Aspire.Hosting (thin).</Description>
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
@@ -9,7 +9,6 @@
     <PackageReference Include="Aspire.Azure.Storage.Blobs" />
     <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
     <PackageReference Include="Microsoft.Orleans.Dashboard" />
-    <PackageReference Include="Microsoft.Orleans.Journaling.AzureStorage" />
     <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" />
     <PackageReference Include="Microsoft.Orleans.Reminders.AzureStorage" />
     <PackageReference Include="Microsoft.Orleans.Server" />

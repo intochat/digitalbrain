@@ -1,4 +1,6 @@
 using DigitalBrain.AI.Interactions;
+using DigitalBrain.AI.Metering;
+using DigitalBrain.Contracts;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,6 +33,7 @@ internal static class AIClients
     internal static void Add(IServiceCollection services)
     {
         services.TryAddSingleton<IUntrustedContentScreen, UntrustedContentScreen>();
+        services.TryAddSingleton<IIntentUsageSink, GrainIntentUsageSink>();
         foreach (var model in LLMModel.All)
         {
             services.AddKeyedSingleton<IChatClient>(
@@ -42,9 +45,15 @@ internal static class AIClients
         {
             services.AddKeyedSingleton<IEmbeddingGenerator<string, Embedding<float>>>(
                 model.Marker,
-                (provider, _) => Factories[model.Provider].CreateEmbeddingGenerator(
-                    model,
-                    provider.GetRequiredService<IOptions<AIOptions>>().Value));
+                (provider, _) =>
+                {
+                    var inner = Factories[model.Provider].CreateEmbeddingGenerator(
+                        model,
+                        provider.GetRequiredService<IOptions<AIOptions>>().Value);
+                    return provider.GetService<IIntentUsageSink>() is { } sink
+                        ? new MeteringEmbeddingGenerator(inner, sink, model.Provider.ToString(), model.Id)
+                        : inner;
+                });
         }
 
         // Resolve the final options after application Configure delegates have run.
@@ -66,14 +75,19 @@ internal static class AIClients
             model, provider.GetRequiredService<IOptions<AIOptions>>().Value));
 
     internal static IChatClient BuildChatPipeline(IServiceProvider provider, LLMModel model, IChatClient innerClient)
-        => BuildChatPipeline(provider, model.SupportsTools, model.Marker.Name, innerClient);
+        => BuildChatPipeline(provider, model.SupportsTools, model.Marker.Name, innerClient,
+            model.Provider.ToString(), model.Id);
 
     internal static IChatClient BuildChatPipeline(IServiceProvider provider, bool supportsTools, string telemetryName,
-        IChatClient innerClient, bool rejectUnsupportedTools = false)
+        IChatClient innerClient, string? meterProvider = null, string? meterModel = null,
+        bool rejectUnsupportedTools = false, bool useFunctionInvocation = true)
     {
         var configuration = provider.GetRequiredService<IOptions<AIOptions>>().Value;
-        var captureContent = configuration.Telemetry.EnableSensitiveData
-            ?? false;
+        // Capture is deployment-gated and request-gated: the host must allow it, and the calling
+        // request must be the local owner's ordinary dev run (D14). The per-turn agent client is
+        // rebuilt inside that request's ambient scope, so Personal/Credential runs stay uncaptured.
+        var captureContent = (configuration.Telemetry.EnableSensitiveData ?? false)
+            && ContentCaptureScope.Current is { AllowsCapture: true };
         var loggerFactory = provider.GetService<ILoggerFactory>();
         var pipeline = new ChatClientBuilder(innerClient);
         if (!supportsTools)
@@ -93,13 +107,19 @@ internal static class AIClients
                 await next(messages, options, cancellationToken).ConfigureAwait(false);
             });
         }
-        return pipeline
-            .UseFunctionInvocation()
-            .UseOpenTelemetry(
-                loggerFactory: loggerFactory,
-                sourceName: $"{TelemetrySource}.{telemetryName}",
-                configure: telemetry => telemetry.EnableSensitiveData = captureContent)
-            .Build(provider);
+        // Inference-only clients leave the tool loop to the caller but still need GenAI spans.
+        if (useFunctionInvocation) { pipeline = pipeline.UseFunctionInvocation(); }
+        pipeline = pipeline.UseOpenTelemetry(
+            loggerFactory: loggerFactory,
+            sourceName: $"{TelemetrySource}.{telemetryName}",
+            configure: telemetry => telemetry.EnableSensitiveData = captureContent);
+        // Innermost: one metered entry per raw provider call, before any function-invocation
+        // aggregation, and never a second entry for the same call.
+        if (meterProvider is not null && meterModel is not null && provider.GetService<IIntentUsageSink>() is { } sink)
+        {
+            pipeline = pipeline.Use(inner => new MeteringChatClient(inner, sink, meterProvider, meterModel));
+        }
+        return pipeline.Build(provider);
     }
 
     private static IChatClient DefaultChatClient(IServiceProvider provider)

@@ -31,23 +31,24 @@ public sealed class AspireTestSession : IAsyncDisposable
     public TestSessionLifetime Lifetime => _lifetime;
 
     public static Task<AspireTestSession> StartAsync<TAppHost>(
-        IReadOnlyList<string> args, string identity, TestExecutionOptions options, CancellationToken cancellationToken)
+        IReadOnlyList<string> args, string identity, TestExecutionOptions options, TestExecutionRoot? executionRoot,
+        CancellationToken cancellationToken)
         where TAppHost : class
         => StartCoreAsync(ct => DistributedApplicationTestingBuilder.CreateAsync<TAppHost>([.. args], ct),
-            declareTopology: null, identity, options, cancellationToken);
+            declareTopology: null, identity, options, executionRoot, cancellationToken);
 
     public static Task<AspireTestSession> StartAsync(string identity, TestExecutionOptions options,
         Action<IDistributedApplicationTestingBuilder> declareTopology, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(declareTopology);
         return StartCoreAsync(_ => Task.FromResult(DistributedApplicationTestingBuilder.Create([])),
-            declareTopology, identity, options, cancellationToken);
+            declareTopology, identity, options, executionRoot: null, cancellationToken);
     }
 
     private static async Task<AspireTestSession> StartCoreAsync(
         Func<CancellationToken, Task<IDistributedApplicationTestingBuilder>> createBuilder,
         Action<IDistributedApplicationTestingBuilder>? declareTopology,
-        string identity, TestExecutionOptions options, CancellationToken cancellationToken)
+        string identity, TestExecutionOptions options, TestExecutionRoot? executionRoot, CancellationToken cancellationToken)
     {
         options.Validate();
         cancellationToken.ThrowIfCancellationRequested();
@@ -55,6 +56,8 @@ public sealed class AspireTestSession : IAsyncDisposable
         deadline.CancelAfter(options.StartupTimeout);
         var ct = deadline.Token;
         var lifetime = new TestSessionLifetime(options);
+        // Owned before the host so its directory outlives every child process and is deleted last.
+        if (executionRoot is not null) { lifetime.Own("execution-root", executionRoot); }
         var stage = "builder";
         try
         {
@@ -82,6 +85,13 @@ public sealed class AspireTestSession : IAsyncDisposable
             {
                 resource.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
                     context.EnvironmentVariables["DigitalBrain__Testing__PrivateConfiguration"] = privateSettings.FilePath));
+            }
+            if (options.ResourceEnvironment.Count > 0)
+            {
+                resource.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
+                {
+                    foreach (var (key, value) in options.ResourceEnvironment) { context.EnvironmentVariables[key] = value; }
+                }));
             }
             var endpoint = resource.Annotations.OfType<BrainEndpointAnnotation>().Single();
             stage = "build";

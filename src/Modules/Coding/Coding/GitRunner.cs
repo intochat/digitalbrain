@@ -1,3 +1,5 @@
+using DigitalBrain.Microsoft.DotNet;
+
 namespace DigitalBrain.Coding;
 
 public sealed class GitRunner(IProcessRunner processes)

@@ -31,7 +31,6 @@
     <Project Path="src/Modules/DigitalBrain/Kernel/Contracts/DigitalBrain.Contracts.csproj" />
     <Project Path="src/Modules/DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
     <Project Path="src/Modules/DigitalBrain/Kernel/Sdk/DigitalBrain.Sdk.csproj" />
-    <Project Path="src/Modules/DigitalBrain/Kernel/Mcp/DigitalBrain.Mcp.csproj" />
   </Folder>
   <Folder Name="/Modules/ClickHouse/">
     <Project Path="src/Modules/ClickHouse/Tests/Unit/DigitalBrain.Modules.ClickHouse.Tests.Unit.csproj" />
@@ -71,7 +70,6 @@
   <Folder Name="/Modules/Microsoft/Aspire/">
     <Project Path="src/Modules/Microsoft/Aspire/Aspire.Hosting/DigitalBrain.Modules.Microsoft.Aspire.Aspire.Hosting.csproj" />
     <Project Path="src/Modules/Microsoft/Aspire/Aspire/DigitalBrain.Modules.Microsoft.Aspire.csproj" />
-    <Project Path="src/Modules/Microsoft/Aspire/Contracts/DigitalBrain.Modules.Microsoft.Aspire.Contracts.csproj" />
   </Folder>
   <Folder Name="/Modules/Microsoft/DotNet/">
     <Project Path="src/Modules/Microsoft/DotNet/Tests/Unit/DigitalBrain.Modules.Microsoft.DotNet.Tests.Unit.csproj" />

@@ -17,7 +17,7 @@ flowchart LR
 * AI owns model selection, instructions, agent runs, native tools and MCP support. A behavior is not an LLM or another agent implementation.
 * Coding owns drafts, revision checks, compiler diagnostics, tests, environment fingerprints and immutable artifacts. Existing solution-editing APIs remain available.
 * Behavior owns desired state, deployments, generations, readiness, bounded logs, process supervision and rollback.
-* IntoChat composes these through `BehaviorAuthoringService`, HTTP endpoints, `BehaviorAgentTools` and `ScopedBehaviorTools`.
+* IntoChat composes these through HTTP endpoints, `BehaviorAgentTools` and `ScopedBehaviorTools`.
 
 `IBehavior.RunAsync(CancellationToken)` is the execution contract. Constructors can receive `IDigitalBrain` and host services. `BehaviorApp.RunAsync<T>` supplies a generation-scoped brain that owns the subscriptions opened through it.
 
@@ -37,7 +37,7 @@ IntoChat's AppHost accepts `IntoChat:BehaviorAuthoring:Root`. It configures sibl
 }
 ```
 
-For the desktop workspace assistant, set `IntoChat:Assistant:Model` to a configured model marker or model ID (for example `IGpt56Luna`). This selects the model for `/agent` independently of the AI module default; it does not provision a provider or credentials. `IntoChat:BehaviorAuthoring:ModelProfile` separately selects the model for the `/author` orchestration endpoint. A model declaring tool support still needs sufficient coding ability to author and repair a behavior.
+For the desktop workspace assistant, set `IntoChat:Assistant:Model` to a configured model marker or model ID (for example `IGpt56Luna`). This selects the model for `/agent` independently of the AI module default; it does not provision a provider or credentials. A model declaring tool support still needs sufficient coding ability to author and repair a behavior.
 
 Contract discovery works even when local execution is disabled. Start with `code_contracts` and `modules=[]`, then use installed module IDs from its response. Native behavior tools return expected validation/configuration failures as `isError=true` results so the assistant can repair arguments or explain the problem. Cancellation and infrastructure failures still stop the run.
 
@@ -93,11 +93,11 @@ Defaults: source and tests each 128 KiB UTF-8; at most 32 selected modules; 128 
 
 ## Authoring and application integration
 
-`BehaviorAuthoringService` uses the existing `IAgent` with a contract catalog, selected model profile and no activation tools. It checks at most three candidates within ten minutes, feeds bounded diagnostics back for repair, and cancels an outstanding check on cancellation. Draft-only requests return `Validated`; explicitly requested, policy-enabled activation returns `Starting`. Model prose is never accepted as test evidence.
+The product has one assistant runtime, `AgentNeuron`; behavior authoring is offered there as developer-mode agent tools. The programmable-behavior E2E keeps an author orchestration in its own test host to exercise the draft/check/deploy lifecycle: it uses `IAgent` with a contract catalog, a selected model profile and no activation tools, checks at most three candidates within ten minutes, feeds bounded diagnostics back for repair, and cancels an outstanding check on cancellation. Model prose is never accepted as test evidence.
 
 Workspace neuron keys are derived from the authenticated application scope and a bounded logical ID. Native agent tools and MCP tools share the same scoped service and host policy. Generated C# still has the privileges described above; key scoping is not a code sandbox.
 
-HTTP routes live under `/workspaces/{workspaceId}/behaviors`: draft read/save, check/start/read/cancel, program read/deploy/start/stop/rollback/logs and `/author`. Mutation request contracts carry expected revision and operation IDs. `/author` is a long-running orchestration request: disable automatic POST retries and propagate cancellation. MCP is at `/workspaces/{workspaceId}/behavior-mcp`, behind the application's existing authentication middleware.
+HTTP routes live under `/workspaces/{workspaceId}/behaviors`: draft read/save, check/start/read/cancel, program read/deploy/start/stop/rollback/logs. Mutation request contracts carry expected revision and operation IDs. MCP is at `/workspaces/{workspaceId}/behavior-mcp`, behind the application's existing authentication middleware.
 
 The repository's `src/Behaviors/timer-report.cs` demonstrates the SDK bootstrap as a single file. It retains standalone SDK directives; managed draft source omits those directives because the host supplies references. The separate-process test contains a complete Timer-to-Flutter source and corresponding tests.
 

@@ -54,18 +54,8 @@ jobs:
             -p:ContainerRegistry=docker.io \
             -p:ContainerRepository=${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-kernel
 
-      # MCP image publication remains intentionally commented out for now.
-      #
-      # - name: Publish MCP image
-      #   env:
-      #     ContainerImageTags: ${{ github.event.release.tag_name }};latest
-      #   run: |
-      #     dotnet publish src/Modules/DigitalBrain/Mcp/DigitalBrain.Mcp.csproj \
-      #       -c Release -r linux-x64 /t:PublishContainer \
-      #       -p:PublishProfile=Container \
-      #       -p:EnableSdkContainerSupport=true \
-      #       -p:ContainerRegistry=docker.io \
-      #       -p:ContainerRepository=${{ vars.DOCKERHUB_USERNAME }}/digitalbrain-mcp
+      # Northbound MCP image publication was removed with the Kernel MCP host in P0.1.
+      # The kernel image is the only published product image.
 
   update-kernel-container-app:
     name: Roll kernel container app
@@ -158,7 +148,7 @@ jobs:
       url: https://purple-sky-0f80f110f.7.azurestaticapps.net/
     defaults:
       run:
-        working-directory: src/Modules/Flutter/app/shell
+        working-directory: src/Modules/Google/Flutter/app/shell
     steps:
       - uses: actions/checkout@v7
 
@@ -169,11 +159,11 @@ jobs:
           cache: true
 
       - name: Resolve Flutter workspace
-        working-directory: src/Modules/Flutter/app
+        working-directory: src/Modules/Google/Flutter/app
         run: flutter pub get --enforce-lockfile
 
       - name: Dart format
-        working-directory: src/Modules/Flutter/app
+        working-directory: src/Modules/Google/Flutter/app
         run: dart format --output=none --set-exit-if-changed core ui shell
 
       - name: Web release build
@@ -188,7 +178,7 @@ jobs:
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           action: upload
-          app_location: src/Modules/Flutter/app/shell/build/web
+          app_location: src/Modules/Google/Flutter/app/shell/build/web
           api_location: ''
           output_location: ''
           skip_app_build: true

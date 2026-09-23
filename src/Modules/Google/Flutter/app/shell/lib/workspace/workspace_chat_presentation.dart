@@ -73,31 +73,6 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
     final result = entry['result'];
     final map = result is Map ? result : null;
     final kind = map?['kind'];
-    final program = map?['definition'];
-    if (program is Map &&
-        program['nodes'] is List &&
-        program['synapses'] is List) {
-      final deployed = map?['version'] != null;
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Card(
-          elevation: 0,
-          child: ListTile(
-            leading: Icon(Icons.hub_outlined, color: colors.primary),
-            title: Text('${program['name'] ?? 'Living program'}'),
-            subtitle: Text(
-              deployed
-                  ? 'Version ${map!['version']} · Open living program'
-                  : 'Review neurons and deploy this behavior',
-            ),
-            trailing: const Icon(Icons.arrow_outward, size: 18),
-            onTap: widget.onProgram == null
-                ? null
-                : () => widget.onProgram!(Map<String, dynamic>.from(map!)),
-          ),
-        ),
-      );
-    }
     if (kind == 'connection' && map?['service'] == 'salesforce') {
       final needsLogin = map?['status'] == 'authentication_required';
       final loginUrl = map?['loginUrl'] as String?;
@@ -526,14 +501,6 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
                                   ],
                                 ),
                               ),
-                            ),
-                            WorkspaceVoiceButton(
-                              onTranscribe: widget.onTranscribe,
-                              onDraft: (draft) {
-                                _composer.text = draft;
-                                _composerFocus.requestFocus();
-                              },
-                              enabled: !_running && widget.active,
                             ),
                           ],
                         ),

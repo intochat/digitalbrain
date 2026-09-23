@@ -36,9 +36,17 @@ internal sealed class BehaviorProgramStore(string root)
             var deployment = new BehaviorDeployment(d.Snapshot.Deployments.Count + 1, request.Artifact, request.ConfigurationJson, DateTimeOffset.UtcNow, request.AgentRunId);
             d.Retries = 0;
             d.NextRetryAt = null;
-            return d.Snapshot with { Revision = d.Snapshot.Revision + 1, DesiredState = BehaviorDesiredState.Running,
-                State = BehaviorExecutionState.Starting, DesiredDeploymentRevision = deployment.Revision,
-                GenerationId = null, Ready = false, Error = null, Deployments = [.. d.Snapshot.Deployments, deployment] };
+            return d.Snapshot with
+            {
+                Revision = d.Snapshot.Revision + 1,
+                DesiredState = BehaviorDesiredState.Running,
+                State = BehaviorExecutionState.Starting,
+                DesiredDeploymentRevision = deployment.Revision,
+                GenerationId = null,
+                Ready = false,
+                Error = null,
+                Deployments = [.. d.Snapshot.Deployments, deployment]
+            };
         }, ct);
     }
 
@@ -48,8 +56,15 @@ internal sealed class BehaviorProgramStore(string root)
             if (running && d.Snapshot.DesiredDeploymentRevision is null) { throw new InvalidOperationException("Deploy an artifact before starting."); }
             d.Retries = 0;
             d.NextRetryAt = null;
-            return d.Snapshot with { Revision = d.Snapshot.Revision + 1, DesiredState = running ? BehaviorDesiredState.Running : BehaviorDesiredState.Stopped,
-                State = running ? BehaviorExecutionState.Starting : BehaviorExecutionState.Stopping, Ready = false, GenerationId = null, Error = null };
+            return d.Snapshot with
+            {
+                Revision = d.Snapshot.Revision + 1,
+                DesiredState = running ? BehaviorDesiredState.Running : BehaviorDesiredState.Stopped,
+                State = running ? BehaviorExecutionState.Starting : BehaviorExecutionState.Stopping,
+                Ready = false,
+                GenerationId = null,
+                Error = null
+            };
         }, ct);
 
     public Task<BehaviorSnapshot> RollbackAsync(string id, RollbackBehavior request, CancellationToken ct)
@@ -61,9 +76,17 @@ internal sealed class BehaviorProgramStore(string root)
             var deployment = previous with { Revision = d.Snapshot.Deployments.Count + 1, CreatedAt = DateTimeOffset.UtcNow };
             d.Retries = 0;
             d.NextRetryAt = null;
-            return d.Snapshot with { Revision = d.Snapshot.Revision + 1, DesiredState = BehaviorDesiredState.Running,
-                State = BehaviorExecutionState.Starting, DesiredDeploymentRevision = deployment.Revision,
-                GenerationId = null, Ready = false, Error = null, Deployments = [.. d.Snapshot.Deployments, deployment] };
+            return d.Snapshot with
+            {
+                Revision = d.Snapshot.Revision + 1,
+                DesiredState = BehaviorDesiredState.Running,
+                State = BehaviorExecutionState.Starting,
+                DesiredDeploymentRevision = deployment.Revision,
+                GenerationId = null,
+                Ready = false,
+                Error = null,
+                Deployments = [.. d.Snapshot.Deployments, deployment]
+            };
         }, ct);
 
     private Task<BehaviorSnapshot> Command<T>(string id, string kind, long revision, Guid operation, T request,

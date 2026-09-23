@@ -1,26 +1,17 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:typed_data';
 import 'dart:ui' show SemanticsRole;
 
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
 
-import '../inbox_banner.dart';
 import '../integrations/integrations_menu.dart';
-import 'brain_graph_store.dart';
-import 'workspace_table_import.dart';
 import 'workspace_store.dart';
 import 'workspace_remote_controller.dart';
 import 'workspace_desktop.dart';
 import 'workspace_settings.dart';
 import 'workspace_routes.dart';
-import 'workspace_brain_observation.dart';
 import 'workspace_chat.dart';
-import 'workspace_programs.dart';
-import 'artifact_editors.dart';
 import 'app_surface_host.dart';
 import 'workspace_islands.dart';
 import 'behaviors/behavior_manager.dart';
@@ -39,14 +30,6 @@ class WorkspaceApp extends StatefulWidget {
     this.onReadTable,
     this.onUpdateTableView,
     this.onListTables,
-    this.onTranscribe,
-    this.onCreateArtifact,
-    this.onReadArtifact,
-    this.onUpdateArtifact,
-    this.onListArtifacts,
-    this.onCreateTable,
-    this.onReadBrain,
-    this.onWatchBrain,
     this.programmingClient,
   });
   final WorkspaceStore? store;
@@ -60,31 +43,7 @@ class WorkspaceApp extends StatefulWidget {
   final ReadTable? onReadTable;
   final UpdateTableView? onUpdateTableView;
   final ListTables? onListTables;
-  final ReadBrain? onReadBrain;
-  final WatchBrain? onWatchBrain;
   final DigitalBrainUiClient? programmingClient;
-  final Future<String> Function(Uint8List, String)? onTranscribe;
-  final Future<Map<String, dynamic>> Function({
-    required String kind,
-    required String title,
-    required Map<String, dynamic> content,
-  })?
-  onCreateArtifact;
-  final Future<Map<String, dynamic>> Function(String id)? onReadArtifact;
-  final Future<Map<String, dynamic>> Function(
-    String id, {
-    required int expectedRevision,
-    required String title,
-    required Map<String, dynamic> content,
-  })?
-  onUpdateArtifact;
-  final Future<List<Map<String, dynamic>>> Function()? onListArtifacts;
-  final Future<TableSnapshot> Function({
-    required String title,
-    required List<TableColumn> columns,
-    required List<TableRowData> rows,
-  })?
-  onCreateTable;
   @override
   State<WorkspaceApp> createState() => _WorkspaceAppState();
 }
@@ -168,49 +127,11 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
 
   final _hydratingTables = <String>{};
   final _tableErrors = <String, String>{};
-  BrainGraphStore? _graph;
-  BrainGraphStore _liveGraph({bool refresh = false}) {
-    if (_graph == null ||
-        (_graph!.read == null && widget.onReadBrain != null)) {
-      _graph?.dispose();
-      _graph = BrainGraphStore(
-        read: widget.onReadBrain,
-        watch: widget.onWatchBrain,
-      );
-      _graph!.addListener(_publishLiveObservation);
-    } else if (refresh) {
-      unawaited(_graph!.refresh());
-    }
-    return _graph!;
-  }
-
-  void _publishLiveObservation() {
-    if (!mounted) return;
-    final graph = _graph;
-    if (graph == null) return;
-    final snapshot = graph.snapshot;
-    for (final project in store.projects) {
-      for (final artifact in project.artifacts) {
-        if (artifact.data['_live'] != true) continue;
-        artifact.data = {
-          ...artifact.data,
-          if (snapshot != null) ...workspaceBrainObservation(snapshot),
-          '_observationStale':
-              graph.stale || graph.failure != null || snapshot == null,
-          '_observationFailure': graph.failure,
-        }..remove('_dirty');
-      }
-    }
-    store.save();
-  }
 
   final _messenger = GlobalKey<ScaffoldMessengerState>();
   final _navigator = GlobalKey<NavigatorState>();
   late final WorkspaceRouteBridge _routes;
   late final Uri _initialLocation;
-  final _saveTimers = <String, Timer>{};
-  final _saving = <String>{};
-  final _saveErrors = <String, String>{};
   bool _ready = false, _directory = false, _mobileWork = false;
   String _query = '';
   @override
@@ -228,29 +149,8 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     await store.load();
     if (store.projects.isEmpty) store.createProject('Personal');
     if (!mounted) return;
-    var cleaned = false;
-    var hasLive = false;
-    for (final project in store.projects) {
-      for (final artifact in project.artifacts) {
-        if (artifact.data['_live'] == true) {
-          hasLive = true;
-          artifact.data['_observationStale'] = true;
-        }
-        if (artifact.data['_live'] == true &&
-            artifact.data.remove('_dirty') != null) {
-          cleaned = true;
-        }
-      }
-    }
-    if (cleaned) {
-      await store.save();
-    }
-    if (!mounted) return;
     setState(() => _ready = true);
     _connectWorkspaces();
-    if (hasLive) {
-      _liveGraph();
-    }
     _navigateRoute(_initialLocation);
   }
 
@@ -258,26 +158,6 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     if (!_ready || !mounted) return;
     final segments = uri.pathSegments;
     _navigator.currentState?.popUntil((route) => route.isFirst);
-    if (segments.firstOrNull == 'programs' &&
-        widget.programmingClient != null) {
-      void showPrograms() {
-        if (!mounted) return;
-        _navigator.currentState?.push(
-          MaterialPageRoute<void>(
-            settings: const RouteSettings(name: '/programs'),
-            builder: (_) =>
-                WorkspacePrograms(client: widget.programmingClient!),
-          ),
-        );
-      }
-
-      if (_navigator.currentState != null) {
-        showPrograms();
-      } else {
-        WidgetsBinding.instance.addPostFrameCallback((_) => showPrograms());
-      }
-      return;
-    }
     if (segments.firstOrNull == 'settings') {
       void showSettings() {
         if (!mounted) return;
@@ -345,10 +225,6 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     }
     store.onRemoteWindowAction = null;
     _routes.dispose();
-    _graph?.dispose();
-    for (final timer in _saveTimers.values) {
-      timer.cancel();
-    }
     store.removeListener(_changed);
     for (final t in _tables.values) {
       t.dispose();
@@ -356,11 +232,6 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     if (widget.store == null) store.dispose();
     super.dispose();
   }
-
-  /// Tables, charts, and graphs arrive complete in the tool result: there is
-  /// no saved artifact to re-read on open or to write back on edit.
-  static bool _servedByResult(String kind) =>
-      kind == 'table' || kind == 'chart' || kind == 'graph';
 
   void _accept(Map<String, dynamic> result, {WorkspaceProject? project}) {
     final destination = project ?? store.currentProject;
@@ -424,8 +295,6 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       data: {
         ...content,
         if (result['revision'] != null) '_revision': result['revision'],
-        if (!_servedByResult(result['kind'] as String? ?? 'document'))
-          '_remote': true,
       },
       editorState: content['editorState'] is Map
           ? Map<String, dynamic>.from(content['editorState'] as Map)
@@ -442,116 +311,17 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     if (existing == null) {
       destination.artifacts.add(artifact);
       store.save();
-    } else if (existing.data['_dirty'] != true) {
-      if ((existing.data['_revision'] as num? ?? 0) <=
-          (artifact.data['_revision'] as num? ?? 0)) {
-        existing.title = artifact.title;
-        existing.content = artifact.content;
-        existing.data = artifact.data;
-        if (artifact.editorState.isNotEmpty) {
-          existing.editorState = {
-            ...existing.editorState,
-            ...artifact.editorState,
-          };
-        }
-        store.save();
+    } else if ((existing.data['_revision'] as num? ?? 0) <=
+        (artifact.data['_revision'] as num? ?? 0)) {
+      existing.title = artifact.title;
+      existing.content = artifact.content;
+      existing.data = artifact.data;
+      if (artifact.editorState.isNotEmpty) {
+        existing.editorState = {...existing.editorState, ...artifact.editorState};
       }
+      store.save();
     }
     if (destination.id == store.currentProject.id) store.openArtifact(id);
-  }
-
-  void _editArtifact(WorkspaceArtifact artifact) {
-    final project = store.currentProject;
-    final edited = project.artifacts.firstWhere((a) => a.id == artifact.id);
-    edited.content = artifact.content;
-    edited.editorState = artifact.editorState;
-    edited.data = {
-      ...artifact.data,
-      if (artifact.kind != 'table' && artifact.data['_remote'] == true)
-        '_dirty': true,
-    };
-    if (artifact.data['_live'] == true) {
-      edited.data.remove('_dirty');
-    }
-    store.save();
-    if (artifact.kind == 'table' || artifact.data['_remote'] != true) return;
-    _saveTimers[artifact.id]?.cancel();
-    _saveTimers[artifact.id] = Timer(
-      const Duration(milliseconds: 600),
-      () => _saveArtifact(edited),
-    );
-  }
-
-  Future<void> _saveArtifact(WorkspaceArtifact artifact) async {
-    final update = widget.onUpdateArtifact;
-    if (update == null || artifact.data['_remote'] != true) return;
-    if (_saving.contains(artifact.id)) {
-      _saveTimers[artifact.id] = Timer(
-        const Duration(milliseconds: 600),
-        () => _saveArtifact(artifact),
-      );
-      return;
-    }
-    final payload = {...artifact.data}
-      ..removeWhere((key, _) => key.startsWith('_'));
-    payload['editorState'] = {...artifact.editorState};
-    if (artifact.content.isNotEmpty) payload['source'] = artifact.content;
-    final fingerprint = jsonEncode(payload);
-    _saving.add(artifact.id);
-    if (mounted) setState(() {});
-    try {
-      final saved = await update(
-        artifact.id,
-        expectedRevision: (artifact.data['_revision'] as num? ?? 0).toInt(),
-        title: artifact.title,
-        content: payload,
-      );
-      artifact.data['_revision'] = saved['revision'];
-      final current = {...artifact.data}
-        ..removeWhere((key, _) => key.startsWith('_'));
-      current['editorState'] = {...artifact.editorState};
-      if (artifact.content.isNotEmpty) current['source'] = artifact.content;
-      if (jsonEncode(current) == fingerprint) artifact.data.remove('_dirty');
-      _saveErrors.remove(artifact.id);
-      store.save();
-    } catch (e) {
-      _saveErrors[artifact.id] =
-          'Changes saved locally; remote save failed. $e';
-    } finally {
-      _saving.remove(artifact.id);
-      if (mounted) setState(() {});
-    }
-  }
-
-  Future<void> _resolveSave(
-    WorkspaceArtifact artifact, {
-    required bool keepLocal,
-  }) async {
-    final destination = store.projects
-        .where((p) => p.artifacts.contains(artifact))
-        .firstOrNull;
-    final read = widget.onReadArtifact;
-    if (read == null) return;
-    _saveTimers[artifact.id]?.cancel();
-    try {
-      final latest = await read(artifact.id);
-      if (!mounted) return;
-      if (keepLocal) {
-        artifact.data['_revision'] = latest['revision'];
-        await _saveArtifact(artifact);
-      } else {
-        artifact.data.remove('_dirty');
-        _saveErrors.remove(artifact.id);
-        _accept(latest, project: destination);
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(
-          () => _saveErrors[artifact.id] =
-              'Could not read the latest version: $e',
-        );
-      }
-    }
   }
 
   Future<void> _open(WorkspaceArtifact a) async {
@@ -561,20 +331,6 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       return;
     }
     store.openArtifact(a.id);
-    if (!_servedByResult(a.kind) &&
-        a.data['_live'] != true &&
-        a.data['_dirty'] != true &&
-        widget.onReadArtifact != null) {
-      final projectId = store.currentProject.id;
-      try {
-        final value = await widget.onReadArtifact!(a.id);
-        if (mounted && store.currentProject.id == projectId) _accept(value);
-      } catch (e) {
-        _messenger.currentState?.showSnackBar(
-          SnackBar(content: Text('Could not refresh saved work: $e')),
-        );
-      }
-    }
     if (a.kind == 'table' && !_tables.containsKey(a.id)) {
       if (widget.onReadTable != null) {
         try {
@@ -591,126 +347,6 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         } catch (_) {}
       }
     }
-  }
-
-  Future<void> _newWork(BuildContext context, String kind) async {
-    final destination = store.currentProject;
-    if (kind == 'table') {
-      if (widget.onCreateTable != null) {
-        final table = await importWorkspaceTable(
-          context,
-          widget.onCreateTable!,
-        );
-        if (table != null && mounted) {
-          _accept(table.toJson(), project: destination);
-          setState(() => _mobileWork = true);
-        }
-      }
-      return;
-    }
-    if (kind == 'liveBrain') {
-      _liveGraph(refresh: true);
-      final id = 'live-brain-${store.currentProject.id}';
-      store.addArtifact(
-        WorkspaceArtifact(
-          id: id,
-          title: 'Live brain',
-          kind: 'brain',
-          data: {'_live': true, 'live': true},
-        ),
-      );
-      store.openArtifact(id);
-      _publishLiveObservation();
-      setState(() => _mobileWork = true);
-      return;
-    }
-    final create = widget.onCreateArtifact;
-    if (create == null) return;
-    try {
-      Map<String, dynamic> content = {};
-      String title = kind == 'diagram'
-          ? 'Untitled drawing'
-          : kind == 'brain'
-          ? 'Untitled scenario'
-          : 'Untitled image';
-      if (kind == 'diagram') {
-        content = {'source': createWorkspaceDrawingSource()};
-      } else if (kind == 'image') {
-        final picked = await FilePicker.platform.pickFiles(
-          type: FileType.image,
-          withData: true,
-        );
-        if (picked == null) return;
-        final file = picked.files.single;
-        final bytes = file.bytes;
-        if (bytes == null) throw StateError('Image bytes could not be read.');
-        title = file.name;
-        content = {
-          'originalDataUrl':
-              'data:image/${file.extension ?? 'png'};base64,${base64Encode(bytes)}',
-          'fileName': file.name,
-        };
-      } else if (kind == 'brain') {
-        content = {
-          'rootId': 'draft',
-          'observedAt': DateTime.now().toUtc().toIso8601String(),
-          'scope': 'Draft scenario · not activated',
-          'nodes': [],
-          'synapses': [],
-        };
-      }
-      final result = await create(kind: kind, title: title, content: content);
-      if (mounted) {
-        _accept(result, project: destination);
-        if (store.currentProject.id == destination.id) {
-          setState(() => _mobileWork = true);
-        }
-      }
-    } catch (e) {
-      _messenger.currentState?.showSnackBar(
-        SnackBar(content: Text('Could not create work: $e')),
-      );
-    }
-  }
-
-  Widget _newWorkMenu(BuildContext context) => PopupMenuButton<String>(
-    tooltip: 'New work',
-    onSelected: (kind) =>
-        kind == 'program' ? _openPrograms(context) : _newWork(context, kind),
-    itemBuilder: (_) => [
-      for (final entry in const {
-        'diagram': 'Drawing',
-        'brain': 'Brain diagram (visual draft)',
-        'image': 'Import image',
-        'table': 'Import table (CSV, TSV, XLSX)',
-        'liveBrain': 'Live brain',
-        'program': 'Living program',
-      }.entries)
-        PopupMenuItem(
-          value: entry.key,
-          enabled: entry.key == 'program'
-              ? widget.programmingClient != null
-              : entry.key == 'table'
-              ? widget.onCreateTable != null
-              : entry.key == 'liveBrain'
-              ? widget.onReadBrain != null
-              : widget.onCreateArtifact != null,
-          child: Text(entry.value),
-        ),
-    ],
-    icon: const Icon(Icons.add, size: 20),
-  );
-
-  void _openPrograms(BuildContext context, [Map<String, dynamic>? program]) {
-    final client = widget.programmingClient;
-    if (client == null) return;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        settings: const RouteSettings(name: '/programs'),
-        builder: (_) =>
-            WorkspacePrograms(client: client, initialProgram: program),
-      ),
-    );
   }
 
   void _attach(BuildContext context) {
@@ -756,58 +392,6 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         ),
       ),
     );
-  }
-
-  Future<void> _import(BuildContext context) async {
-    final project = store.currentProject;
-    try {
-      final results = await Future.wait<Object>([
-        if (widget.onListTables != null) widget.onListTables!(),
-        if (widget.onListArtifacts != null) widget.onListArtifacts!(),
-      ]);
-      final choices = <Map<String, dynamic>>[];
-      for (final result in results) {
-        if (result is List<TableSummary>) {
-          choices.addAll(
-            result.map((t) => {'id': t.id, 'title': t.title, 'kind': 'table'}),
-          );
-        } else if (result is List<Map<String, dynamic>>) {
-          choices.addAll(result);
-        }
-      }
-      if (!context.mounted) return;
-      final selected = await showDialog<Map<String, dynamic>>(
-        context: context,
-        builder: (c) => AlertDialog(
-          title: const Text('Import saved work'),
-          content: SizedBox(
-            width: 420,
-            child: ListView(
-              shrinkWrap: true,
-              children: [
-                for (final item in choices)
-                  ListTile(
-                    leading: Icon(_icon(item['kind'] as String? ?? '')),
-                    title: Text(item['title'] as String? ?? 'Untitled'),
-                    onTap: () => Navigator.pop(c, item),
-                  ),
-                if (choices.isEmpty) const Text('No saved work yet.'),
-              ],
-            ),
-          ),
-        ),
-      );
-      if (selected == null) return;
-      final id = selected['id'] as String;
-      final snapshot = selected['kind'] == 'table'
-          ? await widget.onReadTable!(id).then((t) => t.toJson())
-          : await widget.onReadArtifact!(id);
-      if (mounted) _accept(snapshot, project: project);
-    } catch (e) {
-      _messenger.currentState?.showSnackBar(
-        SnackBar(content: Text('Could not load saved work: $e')),
-      );
-    }
   }
 
   IconData _icon(String kind) => switch (kind) {
@@ -942,70 +526,45 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
           if (mounted) _hydrateTable(a, project);
         });
       }
-      return Center(
-        child: _tableErrors[a.id] == null
-            ? const CircularProgressIndicator()
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(_tableErrors[a.id]!),
-                  TextButton(
-                    onPressed: () {
-                      _tableErrors.remove(a.id);
-                      setState(() {});
-                    },
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
+      return _region(
+        a.title,
+        Center(
+          child: _tableErrors[a.id] == null
+              ? const CircularProgressIndicator()
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_tableErrors[a.id]!),
+                    TextButton(
+                      onPressed: () {
+                        _tableErrors.remove(a.id);
+                        setState(() {});
+                      },
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+        ),
       );
     }
-    return Semantics(
-      container: true,
-      explicitChildNodes: true,
-      role: SemanticsRole.region,
-      label: a.title,
-      child: WorkspaceArtifactEditor(
-        key: ValueKey(a.id),
-        artifact: a,
-        tableController: _tables[a.id],
-        graph: a.data['_live'] == true ? _liveGraph() : null,
-        onChanged: _editArtifact,
-      ),
+    if (a.kind == 'table') {
+      return _region(a.title, UiDataTable(controller: _tables[a.id]!));
+    }
+    return _region(
+      a.title,
+      Center(child: Text('This window type is not available yet: ${a.kind}')),
     );
   }
 
-  Widget _pane(WorkspaceArtifact a) => Column(
-    children: [
-      if (a.data['_dirty'] == true)
-        MaterialBanner(
-          content: Text(
-            _saveErrors[a.id] ??
-                (_saving.contains(a.id)
-                    ? 'Saving changes…'
-                    : 'Changes saved locally · awaiting sync'),
-          ),
-          actions: [
-            if (_saveErrors.containsKey(a.id) &&
-                widget.onReadArtifact != null) ...[
-              TextButton(
-                onPressed: () => _resolveSave(a, keepLocal: false),
-                child: const Text('Reload server version'),
-              ),
-              TextButton(
-                onPressed: () => _resolveSave(a, keepLocal: true),
-                child: const Text('Save my version'),
-              ),
-            ] else
-              TextButton(
-                onPressed: () => _saveArtifact(a),
-                child: const Text('Retry save'),
-              ),
-          ],
-        ),
-      Expanded(child: _editor(a)),
-    ],
+  Widget _region(String title, Widget child) => Semantics(
+    container: true,
+    explicitChildNodes: true,
+    role: SemanticsRole.region,
+    label: title,
+    child: child,
   );
+
+  Widget _pane(WorkspaceArtifact a) => _editor(a);
   Future<void> _projectFiles(BuildContext context) async {
     final project = store.currentProject;
     final choice = await showDialog<(String, String)>(
@@ -1014,17 +573,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         var query = '';
         return StatefulBuilder(
           builder: (context, update) => AlertDialog(
-            title: Row(
-              children: [
-                const Expanded(child: Text('Saved work')),
-                _newWorkMenu(context),
-                IconButton(
-                  tooltip: 'Import saved work',
-                  onPressed: () => _import(context),
-                  icon: const Icon(Icons.download_outlined),
-                ),
-              ],
-            ),
+            title: const Text('Saved work'),
             content: SizedBox(
               width: 560,
               height: 400,
@@ -1109,8 +658,12 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     key: ValueKey('desktop-${store.currentProject.id}'),
     store: store,
     editorBuilder: _pane,
-    editorStateToken: (artifact) =>
-        Object.hash(_tables[artifact.id], _tableErrors[artifact.id]),
+    editorStateToken: (artifact) => Object.hash(
+      _tables[artifact.id],
+      _tableErrors[artifact.id],
+      artifact.data['selected'],
+      artifact.data['refresh'],
+    ),
   );
 
   Widget _workspace(BuildContext context) => LayoutBuilder(
@@ -1222,10 +775,6 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                         onArtifact: (result) =>
                             _accept(result, project: project),
                         onAttach: () => _attach(context),
-                        onProgram: widget.programmingClient == null
-                            ? null
-                            : (program) => _openPrograms(context, program),
-                        onTranscribe: widget.onTranscribe,
                       ),
                 ],
               ),
@@ -1342,8 +891,6 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                       content: Text(widget.statusMessage!),
                       actions: const [SizedBox.shrink()],
                     ),
-                  if (widget.programmingClient != null)
-                    InboxBanner(client: widget.programmingClient!),
                   if (store.persistenceError != null)
                     Text(
                       store.persistenceError!,

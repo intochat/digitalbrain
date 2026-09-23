@@ -1,7 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading.Channels;
-using DigitalBrain.AI.Conversations;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -18,7 +17,7 @@ public interface IAgentToolFactory
     IReadOnlyList<AIFunction> Create(Func<AgentToolContext> context);
 }
 public sealed record AgentTurnRequest(string AgentId, string RunId, string ScopeId,
-    IReadOnlyList<ConversationTurn> History, string Message, AgentModelSelection? Model,
+    IReadOnlyList<AgentConversationTurn> History, string Message, AgentModelSelection? Model,
     string? Instructions = null, IReadOnlyList<string>? ToolNames = null,
     IReadOnlyList<AiMessage>? Messages = null, AiMessage? Input = null,
     bool Streaming = false, int MaxModelCalls = 16, TimeSpan? Timeout = null, InferenceOptions? Options = null);

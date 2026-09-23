@@ -27,12 +27,8 @@ node_modules/
 
 # Dart / Flutter clients
 **/.dart_tool/
-/src/Modules/Flutter/app/build/
+/src/Modules/Google/Flutter/app/build/
 **/packages/pubspec_overrides.yaml
-
-# Reqnroll code-behind: generated into obj/, never source
-*.feature.cs
-
 
 plans/stage1/logs/
 

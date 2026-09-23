@@ -1,0 +1,34 @@
+namespace DigitalBrain.Contracts.Types;
+
+public enum SecretStatus
+{
+    Unset = 0,
+    Set = 1,
+}
+
+[GenerateSerializer, Alias("semantic.secret-ref")]
+public sealed record SecretRef
+{
+    [Id(0)] public string Reference { get; init; } = "";
+    [Id(1)] public string Label { get; init; } = "";
+    [Id(2)] public SecretStatus Status { get; init; }
+
+    public bool IsSet => Status == SecretStatus.Set;
+
+    public static SecretRef For(string owner, string secretId, string label, bool isSet)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(secretId);
+        return new SecretRef
+        {
+            Reference = $"secret://{owner}/{secretId}",
+            Label = label,
+            Status = isSet ? SecretStatus.Set : SecretStatus.Unset,
+        };
+    }
+
+    public static bool IsReference(string? reference) =>
+        !string.IsNullOrWhiteSpace(reference)
+        && reference.StartsWith("secret://", StringComparison.Ordinal)
+        && reference.Length > "secret://".Length;
+}

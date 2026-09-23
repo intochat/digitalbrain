@@ -69,17 +69,6 @@ Widget buildShell({
     programmingClient: edge,
     onRun: edge?.runAgent,
     onSalesforceConnected: edge?.salesforceConnected,
-    onCreateArtifact: edge?.createWorkspaceArtifact,
-    onReadArtifact: edge?.readWorkspaceArtifact,
-    onUpdateArtifact: edge?.updateWorkspaceArtifact,
-    onListArtifacts: edge?.listWorkspaceArtifacts,
-    onCreateTable: edge?.createTable,
-    onReadBrain: edge == null ? null : () => edge.readBrain(chatName: chat),
-    onWatchBrain: edge == null ? null : () => edge.watchBrain(chatName: chat),
-    onTranscribe: edge == null
-        ? null
-        : (bytes, fileName) =>
-              edge.transcribeVoice(audioBytes: bytes, fileName: fileName),
     onReadTable: edge?.readTable,
     onUpdateTableView: edge?.updateTableView,
     onListTables: edge?.listTables,

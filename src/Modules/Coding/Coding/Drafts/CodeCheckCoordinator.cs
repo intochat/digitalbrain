@@ -31,8 +31,12 @@ internal sealed class CodeCheckCoordinator(IOptions<CodeExecutionOptions> option
     {
         if (!_queue.Writer.TryWrite((id, operation)))
         {
-            await Store.UpdateCheckAsync(id, operation, check => check with { Status = CodeCheckStatus.Failed,
-                CompletedAt = DateTimeOffset.UtcNow, Diagnostics = [new("queue-full", "error", "The check queue is full; retry with a new operation ID.")] }, ct).ConfigureAwait(false);
+            await Store.UpdateCheckAsync(id, operation, check => check with
+            {
+                Status = CodeCheckStatus.Failed,
+                CompletedAt = DateTimeOffset.UtcNow,
+                Diagnostics = [new("queue-full", "error", "The check queue is full; retry with a new operation ID.")]
+            }, ct).ConfigureAwait(false);
         }
     }
 

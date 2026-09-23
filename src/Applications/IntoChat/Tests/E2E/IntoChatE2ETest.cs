@@ -22,6 +22,7 @@ internal static class IntoChatE2ETest
 
     public static E2ETestBuilder<Projects.IntoChat_AppHost> Create(string modelApiKey = "fixture-key", Dictionary<string, string?>? privateConfiguration = null)
         => E2ETest.For<Projects.IntoChat_AppHost>()
+            .WithExecutionRoot("IntoChat:BehaviorAuthoring:Root")
             .ConfigureModule<AIModule>(ai => ai.WithoutLocalModels().WithoutVoiceToText().WithoutWebSearch()
                 .WithDefaultLlm<IGpt56Luna>().WithModelEndpoint(AiProvider.OpenAI, new(UnconfiguredProvider, "v1/")))
             .ConfigureModule<MemoryModule>(memory => memory.WithQdrant())

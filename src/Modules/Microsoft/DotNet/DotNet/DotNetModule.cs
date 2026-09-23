@@ -5,6 +5,7 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Microsoft.DotNet;
 
+[ModuleConfiguration(typeof(DotNetConfigurationContract))]
 public sealed class DotNetModule : IModule
 {
     public void Configure(ISiloBuilder builder)

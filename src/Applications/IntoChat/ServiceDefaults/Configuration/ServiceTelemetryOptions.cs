@@ -15,9 +15,6 @@ internal sealed class TelemetryIntegrationOptions
     [ConfigurationKeyName("OTEL_EXPORTER_OTLP_ENDPOINT")]
     public string? ExporterEndpoint { get; set; }
 
-    [ConfigurationKeyName("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT")]
-    public bool? CaptureMessageContent { get; set; }
-
     [ConfigurationKeyName("DigitalBrain:AI:Telemetry:EnableSensitiveData")]
     public bool? EnableSensitiveData { get; set; }
 }

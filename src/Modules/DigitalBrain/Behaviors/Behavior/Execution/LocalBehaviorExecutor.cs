@@ -24,11 +24,23 @@ internal sealed class LocalBehaviorExecutor(IOptions<BehaviorOptions> options) :
         var pipe = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
         var environment = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["BRAIN_CONTROL_PIPE"] = pipeName, ["BRAIN_CONTROL_TOKEN"] = token, ["BRAIN_GENERATION"] = launch.GenerationId.ToString(),
-            ["Gateways"] = settings.Gateways, ["ClusterId"] = settings.ClusterId, ["ServiceId"] = settings.ServiceId,
+            ["BRAIN_CONTROL_PIPE"] = pipeName,
+            ["BRAIN_CONTROL_TOKEN"] = token,
+            ["BRAIN_GENERATION"] = launch.GenerationId.ToString(),
+            ["Gateways"] = settings.Gateways,
+            ["ClusterId"] = settings.ClusterId,
+            ["ServiceId"] = settings.ServiceId,
             ["BRAIN_HEARTBEAT_MS"] = settings.HeartbeatInterval.TotalMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["BRAIN_HEARTBEAT_LOSS_MS"] = settings.HeartbeatLossTimeout.TotalMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture),
         };
+        // The worker continues the launching trace: without this a behavior's grain calls start a
+        // brand-new root trace and the intent cannot be followed through the child process.
+        if (System.Diagnostics.Activity.Current is { } activity)
+        {
+            environment["TRACEPARENT"] = "00-" + activity.TraceId.ToHexString() + "-" + activity.SpanId.ToHexString()
+                + "-" + (activity.ActivityTraceFlags.HasFlag(System.Diagnostics.ActivityTraceFlags.Recorded) ? "01" : "00");
+            if (activity.TraceStateString is { Length: > 0 } traceState) { environment["TRACESTATE"] = traceState; }
+        }
         using var config = JsonDocument.Parse(launch.ConfigurationJson);
         foreach (var item in config.RootElement.EnumerateObject()) { environment.Add(item.Name, item.Value.GetString()!); }
         WindowsContainedProcess child;

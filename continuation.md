@@ -1,5 +1,11 @@
 # Continuation — programmable neurons and Behavior Studio
 
+> **Superseded (P0.2, 2026-09-23).** This is a historical continuation note, not current status.
+> Current product state is [`docs/product/current-state.md`](docs/product/current-state.md); current
+> delivery status and evidence are in
+> [`docs/superpowers/plans/2026-09-23-intochat-product-delivery-verification.md`](docs/superpowers/plans/2026-09-23-intochat-product-delivery-verification.md).
+> Do not treat the counts, paths or "remaining work" below as current.
+
 The user approved the simplified architecture and implementation, then explicitly
 requested removal of the remaining legacy code, investigation of missing Aspire
 dashboard URLs, and final native Flutter testing through Computer Use.

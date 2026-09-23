@@ -54,19 +54,17 @@ public static class DigitalBrainHostingExtensions
             .WithParentRelationship(kernel);
         var clustering = storage.AddTables(DigitalBrainNames.Clustering);
         var reminders = storage.AddTables(DigitalBrainNames.Reminders);
-        var durableStateStore = storage.AddBlobs(DigitalBrainNames.Journal);
         var grainState = storage.AddBlobs(DigitalBrainNames.GrainState);
         var orleans = builder
             .AddOrleans(DigitalBrainHostingNames.Orleans)
             .WithClustering(clustering)
             .WithReminders(reminders)
             .WithGrainStorage(DigitalBrainNames.DefaultGrainStorage, grainState);
-        brain.AttachRuntime(orleans, durableStateStore, grainState);
+        brain.AttachRuntime(orleans, grainState);
 
         brain.RequireHealthyBeforeStart(storage.Resource);
         brain.RequireHealthyBeforeStart(clustering.Resource);
         brain.RequireHealthyBeforeStart(reminders.Resource);
-        brain.RequireHealthyBeforeStart(durableStateStore.Resource);
         brain.RequireHealthyBeforeStart(grainState.Resource);
         return brain;
     }
@@ -104,7 +102,6 @@ public static class DigitalBrainHostingExtensions
 
         brain.Materialize();
         builder.WithReference(brain.Orleans);
-        builder.WithReference(brain.DurableStateStore, DigitalBrainNames.JournalConnection);
         builder.WithReference(brain.GrainState, DigitalBrainNames.GrainState);
 
         for (var index = 0; index < brain.Modules.Count; index++)

@@ -27,7 +27,7 @@ internal static class WorkspaceEndpoints
                 var window = state.Windows.SingleOrDefault(w => w.Id == windowId) ?? throw new KeyNotFoundException("Window not found.");
                 return Results.Ok(window.Surface is { } surface
                     ? await workspace.OpenSurface(new(input.OperationId, window.Id, window.Title, surface, input.ExpectedRevision)).WaitAsync(ct)
-                    : await workspace.Open(new(input.OperationId, window.Id, window.Title, window.View, input.ExpectedRevision)).WaitAsync(ct));
+                    : (await workspace.Open(new(input.OperationId, window.Id, window.Title, window.View, input.ExpectedRevision)).WaitAsync(ct)).State);
             }));
         routes.MapGet("/workspaces/{workspaceId}/tables/{tableId}",
             (string workspaceId, string tableId, int? offset, int? limit, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct)

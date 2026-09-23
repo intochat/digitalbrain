@@ -1,0 +1,138 @@
+{
+  "version": "v0",
+  "closed": true,
+  "types": [
+    {
+      "id": "plain-text",
+      "kind": "PlainText",
+      "primitive": "String",
+      "sensitivity": "Public",
+      "llmExposure": "Value",
+      "inputWidget": "TextBox",
+      "displayWidget": "Text",
+      "redactor": "Erase",
+      "indexable": true
+    },
+    {
+      "id": "long-text",
+      "kind": "LongText",
+      "primitive": "String",
+      "sensitivity": "Public",
+      "llmExposure": "Value",
+      "inputWidget": "MultilineTextBox",
+      "displayWidget": "LongText",
+      "redactor": "Erase",
+      "indexable": true
+    },
+    {
+      "id": "number",
+      "kind": "Number",
+      "primitive": "Number",
+      "sensitivity": "Public",
+      "llmExposure": "Value",
+      "inputWidget": "NumberBox",
+      "displayWidget": "Number",
+      "redactor": "Erase",
+      "indexable": true
+    },
+    {
+      "id": "date",
+      "kind": "Date",
+      "primitive": "Date",
+      "sensitivity": "Public",
+      "llmExposure": "Value",
+      "inputWidget": "DatePicker",
+      "displayWidget": "Date",
+      "redactor": "Erase",
+      "indexable": true
+    },
+    {
+      "id": "date-time",
+      "kind": "DateTime",
+      "primitive": "DateTime",
+      "sensitivity": "Public",
+      "llmExposure": "Value",
+      "inputWidget": "DateTimePicker",
+      "displayWidget": "DateTime",
+      "redactor": "Erase",
+      "indexable": true
+    },
+    {
+      "id": "boolean",
+      "kind": "Boolean",
+      "primitive": "Boolean",
+      "sensitivity": "Public",
+      "llmExposure": "Value",
+      "inputWidget": "Checkbox",
+      "displayWidget": "Boolean",
+      "redactor": "Erase",
+      "indexable": true
+    },
+    {
+      "id": "choice",
+      "kind": "Choice",
+      "primitive": "String",
+      "sensitivity": "Public",
+      "llmExposure": "Value",
+      "inputWidget": "Select",
+      "displayWidget": "Choice",
+      "redactor": "Erase",
+      "indexable": true
+    },
+    {
+      "id": "multi-choice",
+      "kind": "MultiChoice",
+      "primitive": "Array",
+      "sensitivity": "Public",
+      "llmExposure": "Value",
+      "inputWidget": "MultiSelect",
+      "displayWidget": "MultiChoice",
+      "redactor": "Erase",
+      "indexable": true
+    },
+    {
+      "id": "email",
+      "kind": "Email",
+      "primitive": "String",
+      "sensitivity": "Personal",
+      "llmExposure": "Value",
+      "inputWidget": "EmailBox",
+      "displayWidget": "Email",
+      "redactor": "Mask",
+      "indexable": false
+    },
+    {
+      "id": "url",
+      "kind": "Url",
+      "primitive": "String",
+      "sensitivity": "Public",
+      "llmExposure": "Value",
+      "inputWidget": "UrlBox",
+      "displayWidget": "Link",
+      "redactor": "Erase",
+      "indexable": true
+    },
+    {
+      "id": "secret",
+      "kind": "Secret",
+      "primitive": "Reference",
+      "sensitivity": "Credential",
+      "llmExposure": "ReferenceOnly",
+      "inputWidget": "OutOfBand",
+      "displayWidget": "Masked",
+      "redactor": "Mask",
+      "indexable": false
+    },
+    {
+      "id": "reference",
+      "kind": "Reference",
+      "primitive": "Reference",
+      "sensitivity": "Public",
+      "llmExposure": "ReferenceOnly",
+      "inputWidget": "ReferencePicker",
+      "displayWidget": "Reference",
+      "redactor": "Erase",
+      "indexable": false
+    }
+  ]
+}

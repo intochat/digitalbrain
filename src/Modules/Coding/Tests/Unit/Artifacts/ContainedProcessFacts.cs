@@ -56,5 +56,17 @@ public sealed class ContainedProcessFacts
         Assert.True(result.Duration < TimeSpan.FromSeconds(5));
     }
 
+    [Fact]
+    public async Task ChildInheritsTheAmbientW3cTraceContext()
+    {
+        using var activity = new System.Diagnostics.Activity("propagation-probe").Start();
+        var runner = new ContainedProcessRunner();
+        var result = await runner.RunAsync(PowerShell,
+            ["-NoProfile", "-Command", "[Console]::WriteLine([Environment]::GetEnvironmentVariable('TRACEPARENT'))"], Path.GetTempPath(), TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.True(result.ExitCode == 0, result.Error);
+        var expected = "00-" + activity.TraceId.ToHexString() + "-" + activity.SpanId.ToHexString() + "-00";
+        Assert.Equal(expected, result.Output.Trim());
+    }
+
     private static string PowerShell => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe");
 }

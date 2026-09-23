@@ -15,7 +15,12 @@
     <PackageReference Include="Microsoft.Playwright" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="IntoChat.Tests.E2E" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="../../Modules/DigitalBrain/Behaviors/Runtime/DigitalBrain.Behavior.csproj" />
+    <ProjectReference Include="../../Modules/Google/Flutter/Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
     <ProjectReference Include="../../Modules/DigitalBrain/Kernel/Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
     <ProjectReference Include="../../Modules/DigitalBrain/Kernel/Aspire/DigitalBrain.Aspire.csproj" />
     <ProjectReference Include="../../Modules/DigitalBrain/Kernel/Sdk/DigitalBrain.Sdk.csproj" />

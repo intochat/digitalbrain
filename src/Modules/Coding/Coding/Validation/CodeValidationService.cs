@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using DigitalBrain.Microsoft.DotNet;
 
 namespace DigitalBrain.Coding;
 
@@ -67,8 +68,13 @@ internal sealed class CodeValidationService(CodeExecutionOptions options)
                 || ArtifactStore.EnvironmentHash(environment) != ArtifactStore.EnvironmentHash(Environment()))
             { throw new InvalidDataException("Build inputs changed during validation."); }
             var artifact = await Store().SealAsync(new(draft.Source, draft.Tests, environment, payload, "Behavior.dll", report), ct).ConfigureAwait(false);
-            return operation with { Status = CodeCheckStatus.Passed, CompletedAt = DateTimeOffset.UtcNow, Artifact = artifact,
-                Tests = new(report.Discovered, report.Passed, report.Failed, report.Skipped) };
+            return operation with
+            {
+                Status = CodeCheckStatus.Passed,
+                CompletedAt = DateTimeOffset.UtcNow,
+                Artifact = artifact,
+                Tests = new(report.Discovered, report.Passed, report.Failed, report.Skipped)
+            };
         }
         finally { Directory.Delete(directory, recursive: true); }
     }

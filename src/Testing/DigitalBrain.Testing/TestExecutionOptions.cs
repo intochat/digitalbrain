@@ -8,6 +8,7 @@ public sealed record TestExecutionOptions
     public Action<TestDiagnostic>? Diagnostics { get; init; }
     public string? ArtifactDirectory { get; init; }
     public IReadOnlyDictionary<string, string?> PrivateConfiguration { get; init; } = new Dictionary<string, string?>();
+    public IReadOnlyDictionary<string, string> ResourceEnvironment { get; init; } = new Dictionary<string, string>();
 
     public void Validate()
     {

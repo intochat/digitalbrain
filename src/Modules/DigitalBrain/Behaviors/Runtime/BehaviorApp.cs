@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO.Pipes;
 using System.Text.Json;
 using DigitalBrain.Contracts;
@@ -13,12 +14,18 @@ namespace DigitalBrain.Core;
 
 public static class BehaviorApp
 {
+    private static readonly ActivitySource BehaviorActivity = new("DigitalBrain.Behavior");
+
     public static async Task RunAsync<TBehavior>(string[] args,
         Func<IDigitalBrain, IReadOnlyList<SubscriptionRequirement>> requirements) where TBehavior : class, IBehavior
     {
         var builder = Host.CreateApplicationBuilder(args);
+        // Continue the launching trace when the executor supplied one: the worker's grain calls
+        // then remain children of the intent that started it instead of opening a new root.
+        using var behaviorActivity = StartBehaviorActivity();
         builder.UseOrleansClient(client =>
         {
+            client.AddActivityPropagation();
             client.AddDigitalBrain();
             // Raw assembly references in generated apps do not emit Orleans ApplicationPart attributes.
             client.Services.AddSerializer(serializer =>
@@ -131,6 +138,14 @@ public static class BehaviorApp
     private static TimeSpan ControlDuration(string key, TimeSpan fallback)
         => double.TryParse(Environment.GetEnvironmentVariable(key), System.Globalization.CultureInfo.InvariantCulture, out var milliseconds)
             && double.IsFinite(milliseconds) && milliseconds > 0 ? TimeSpan.FromMilliseconds(milliseconds) : fallback;
+
+    private static Activity? StartBehaviorActivity()
+    {
+        var traceParent = Environment.GetEnvironmentVariable("TRACEPARENT");
+        if (traceParent is null || !ActivityContext.TryParse(traceParent, Environment.GetEnvironmentVariable("TRACESTATE"), out var parent))
+        { return null; }
+        return BehaviorActivity.CreateActivity("behavior.run", ActivityKind.Consumer, parent)?.Start();
+    }
 
     public static async Task<string> ReadControlLineAsync(StreamReader reader, CancellationToken cancellationToken)
     {

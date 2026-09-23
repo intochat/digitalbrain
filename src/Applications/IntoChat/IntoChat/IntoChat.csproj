@@ -1,26 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
-    <!-- Local runs write journal and grain state under this folder. -->
+    <!-- Local runs write grain state under this folder. -->
     <DefaultItemExcludes>$(DefaultItemExcludes);.digitalbrain/**</DefaultItemExcludes>
     <NoWarn>$(NoWarn);CA2007;CA1812</NoWarn>
     <DisableMSBuildAssemblyCopyCheck>true</DisableMSBuildAssemblyCopyCheck>
   </PropertyGroup>
-  <ItemGroup>
-    <Compile Remove="Http/ActivityEndpoints.cs" />
-    <Compile Remove="Http/EdgeResults.cs" />
-    <Compile Remove="Http/GraphEndpoints.cs" />
-    <Compile Remove="Http/NeuronNameFilter.cs" />
-    <Compile Remove="Http/Projections/**" />
-    <Compile Remove="Http/SessionNeuron.cs" />
-    <Compile Remove="Http/SessionStream.cs" />
-    <Compile Remove="Http/SurfaceEndpoints.cs" />
-    <Compile Remove="Http/TableEndpoints.cs" />
-    <Compile Remove="Http/UiEndpoints.cs" />
-    <Compile Remove="Http/WorkspaceAgentTools.cs" />
-    <Compile Remove="Http/WorkspaceArtifactStore.cs" />
-    <Compile Remove="Http/WorkspaceEndpoints.cs" />
-    <Compile Remove="IntoChatHost.cs" />
-  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Client" />
     <InternalsVisibleTo Include="IntoChat.Tests.E2E" />

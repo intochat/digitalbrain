@@ -1,11 +1,9 @@
 using System.Diagnostics;
-using System.Globalization;
 using System.Text.Json;
 using ClickHouse.Driver;
 using ClickHouse.Driver.ADO;
 using ClickHouse.Driver.ADO.Parameters;
 using DigitalBrain.ClickHouse.Query;
-using DigitalBrain.ClickHouse.Tables;
 using QueryConnection = DigitalBrain.ClickHouse.Query.ClickHouseConnection;
 
 namespace DigitalBrain.ClickHouse;
@@ -32,31 +30,6 @@ internal sealed class ClickHouseDriverProvider(ClickHouseClient client, string d
         var page = truncated ? rows.Take(maxRows).ToArray() : rows.ToArray();
         IReadOnlyList<IReadOnlyList<string>> cells = page.Select(row => (IReadOnlyList<string>)row.Select(cell => cell.GetRawText()).ToArray()).ToArray();
         return new(columns, cells, page.Length, truncated, Stopwatch.GetElapsedTime(started).TotalMilliseconds);
-    }
-
-    // The page and its counts are independent statements, so they run concurrently and the
-    // slowest one bounds the latency instead of their sum.
-    public async Task<QueryPage> ExecutePlanAsync(QueryPlan plan, CancellationToken cancellationToken)
-    {
-        ClickHouseQueryGuard.Validate(plan.BaseSql);
-        var compiled = QueryPlanCompiler.Compile(plan);
-        using var siblings = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var pageRead = ReadAsync(compiled.PageSql, Parameters(compiled.Parameters), plan.Limit, siblings.Token);
-        var filteredCount = CountAsync(compiled.FilteredCountSql, Parameters(compiled.Parameters), siblings.Token);
-        var totalCount = plan.Filters.Count == 0 ? filteredCount : CountAsync(compiled.TotalCountSql, Parameters(compiled.Parameters), siblings.Token);
-        try
-        {
-            await Task.WhenAll(pageRead, filteredCount, totalCount).ConfigureAwait(false);
-        }
-        catch
-        {
-            // One refused statement ends the others instead of letting them run to their own cap.
-            await siblings.CancelAsync().ConfigureAwait(false);
-            throw;
-        }
-
-        var page = pageRead.Result.Rows.Select((cells, index) => new ClickHouseTableRow($"row-{plan.Offset + index}", cells.Select(cell => cell.GetRawText()).ToArray())).ToArray();
-        return new(page, totalCount.Result, filteredCount.Result);
     }
 
     public async Task<IReadOnlyList<ClickHouseColumn>> DescribeAsync(string sql, CancellationToken cancellationToken)
@@ -171,12 +144,6 @@ internal sealed class ClickHouseDriverProvider(ClickHouseClient client, string d
         return parameters;
     }
 
-    private async Task<long> CountAsync(string sql, ClickHouseParameterCollection parameters, CancellationToken cancellationToken)
-    {
-        var (_, rows) = await ReadAsync(sql, parameters, 1, cancellationToken).ConfigureAwait(false);
-        return rows.Count == 1 && rows[0][0].ValueKind == JsonValueKind.Number ? rows[0][0].GetInt64() : long.Parse(rows[0][0].GetString()!, CultureInfo.InvariantCulture);
-    }
-
     private async Task<(ClickHouseColumn[] Columns, List<JsonElement[]> Rows)> ReadAsync(
         string sql, ClickHouseParameterCollection? parameters, int maxResultRows, CancellationToken cancellationToken)
     {
@@ -216,18 +183,6 @@ internal sealed class ClickHouseDriverProvider(ClickHouseClient client, string d
         {
             throw new ClickHouseQueryException($"The query did not finish within {QueryTimeout.TotalSeconds:0} seconds. Narrow it with WHERE or LIMIT.");
         }
-    }
-
-    // Each concurrent statement gets its own collection; the driver reads it while building the request.
-    private static ClickHouseParameterCollection Parameters(IReadOnlyDictionary<string, object> values)
-    {
-        var parameters = new ClickHouseParameterCollection();
-        foreach (var (name, value) in values)
-        {
-            parameters.Add(Parameter(name, value));
-        }
-
-        return parameters;
     }
 
     private static ClickHouseDbParameter Parameter(string name, object value) => new() { ParameterName = name, Value = value };
