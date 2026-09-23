@@ -41,6 +41,8 @@
     <ProjectReference Include="../../../Modules/MyData/MyData/DigitalBrain.Modules.MyData.csproj" />
     <ProjectReference Include="../../../Modules/Discovery/Discovery/DigitalBrain.Modules.Discovery.csproj" />
     <ProjectReference Include="../../../Modules/Apps/Apps/DigitalBrain.Modules.Apps.csproj" />
+    <ProjectReference Include="../../../Modules/Broker/Broker/DigitalBrain.Modules.Broker.csproj" />
+    <ProjectReference Include="../../../Modules/Marketplace/Marketplace/DigitalBrain.Modules.Marketplace.csproj" />
     <ProjectReference Include="../../../Modules/Connections/Connections/DigitalBrain.Modules.Connections.csproj" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" />
   </ItemGroup>

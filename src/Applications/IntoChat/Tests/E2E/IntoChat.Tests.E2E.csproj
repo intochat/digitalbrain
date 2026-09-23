@@ -9,6 +9,10 @@
     <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
     <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
     <ProjectReference Include="../../../../Modules/Apps/Apps/DigitalBrain.Modules.Apps.csproj" />
+    <ProjectReference Include="../../../../Modules/Broker/Broker/DigitalBrain.Modules.Broker.csproj" />
+    <ProjectReference Include="../../../../Modules/Compute/Compute/DigitalBrain.Modules.Compute.csproj" />
+    <ProjectReference Include="../../../../Modules/Receipts/Receipts/DigitalBrain.Modules.Receipts.csproj" />
+    <ProjectReference Include="../../../../Modules/Marketplace/Marketplace/DigitalBrain.Modules.Marketplace.csproj" />
     <ProjectReference Include="../../../../Modules/Google/Flutter/Testing/DigitalBrain.Modules.Flutter.Testing.csproj" />
     <ProjectReference Include="../../AppHost/IntoChat.AppHost.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../IntoChat/IntoChat.csproj" />
