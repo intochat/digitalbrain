@@ -1026,7 +1026,10 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         ),
       ),
     );
+  }
+
   ConnectionsRequest? get _connectionsRequest {
+    final client = widget.programmingClient;
     if (client == null) return null;
     return (path, {body}) =>
         client.connectionsRequest(store.currentProject.id, path, body: body);

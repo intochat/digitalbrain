@@ -52,18 +52,20 @@ ENV ASPNETCORE_ENVIRONMENT=Production \
     DigitalBrain__Modules__2="DigitalBrain.ClickHouse.ClickHouseModule, DigitalBrain.Modules.ClickHouse" \
     DigitalBrain__Modules__3="DigitalBrain.Supabase.SupabaseModule, DigitalBrain.Modules.Supabase" \
     DigitalBrain__Modules__4="DigitalBrain.Time.TimeModule, DigitalBrain.Modules.Time" \
-    DigitalBrain__Modules__5="DigitalBrain.Google.Gmail.GmailModule, DigitalBrain.Modules.Google.Gmail" \
-    DigitalBrain__Modules__6="DigitalBrain.Salesforce.SalesforceModule, DigitalBrain.Modules.Salesforce" \
-    DigitalBrain__Modules__7="DigitalBrain.Microsoft.GitHub.GitHubModule, DigitalBrain.Modules.Microsoft.GitHub" \
-    DigitalBrain__Modules__8="DigitalBrain.Flutter.FlutterModule, DigitalBrain.Modules.Flutter"
-    DigitalBrain__Modules__7="DigitalBrain.Microsoft.Aspire.AspireModule, DigitalBrain.Modules.Microsoft.Aspire" \
-    DigitalBrain__Modules__8="DigitalBrain.Microsoft.GitHub.GitHubModule, DigitalBrain.Modules.Microsoft.GitHub" \
-    DigitalBrain__Modules__9="DigitalBrain.Microsoft.Roslyn.RoslynModule, DigitalBrain.Modules.Microsoft.Roslyn" \
-    DigitalBrain__Modules__10="DigitalBrain.Microsoft.DotNet.DotNetModule, DigitalBrain.Modules.Microsoft.DotNet" \
-    DigitalBrain__Modules__11="DigitalBrain.Coding.CodingModule, DigitalBrain.Modules.Coding" \
-    DigitalBrain__Modules__12="DigitalBrain.Behavior.BehaviorModule, DigitalBrain.Modules.Behavior" \
-    DigitalBrain__Modules__13="DigitalBrain.Flutter.FlutterModule, DigitalBrain.Modules.Flutter" \
-    DigitalBrain__Modules__14="DigitalBrain.Automations.AutomationsModule, DigitalBrain.Modules.Automations"
+    DigitalBrain__Modules__5="DigitalBrain.MyData.MyDataModule, DigitalBrain.Modules.MyData" \
+    DigitalBrain__Modules__6="DigitalBrain.Connections.ConnectionsModule, DigitalBrain.Modules.Connections" \
+    DigitalBrain__Modules__7="DigitalBrain.Identity.IdentityModule, DigitalBrain.Modules.Identity" \
+    DigitalBrain__Modules__8="DigitalBrain.Automations.AutomationsModule, DigitalBrain.Modules.Automations" \
+    DigitalBrain__Modules__9="DigitalBrain.Google.Gmail.GmailModule, DigitalBrain.Modules.Google.Gmail" \
+    DigitalBrain__Modules__10="DigitalBrain.Salesforce.SalesforceModule, DigitalBrain.Modules.Salesforce" \
+    DigitalBrain__Modules__11="DigitalBrain.Microsoft.GitHub.GitHubModule, DigitalBrain.Modules.Microsoft.GitHub" \
+    DigitalBrain__Modules__12="DigitalBrain.Flutter.FlutterModule, DigitalBrain.Modules.Flutter" \
+    DigitalBrain__Modules__13="DigitalBrain.Receipts.ReceiptsModule, DigitalBrain.Modules.Receipts" \
+    DigitalBrain__Modules__14="DigitalBrain.Compute.ComputeModule, DigitalBrain.Modules.Compute" \
+    DigitalBrain__Modules__15="DigitalBrain.Discovery.DiscoveryModule, DigitalBrain.Modules.Discovery" \
+    DigitalBrain__Modules__16="DigitalBrain.Apps.AppsModule, DigitalBrain.Modules.Apps" \
+    DigitalBrain__Modules__17="DigitalBrain.Broker.BrokerModule, DigitalBrain.Modules.Broker" \
+    DigitalBrain__Modules__18="DigitalBrain.Inbox.InboxModule, DigitalBrain.Modules.Inbox"
 
 EXPOSE 8080
 
