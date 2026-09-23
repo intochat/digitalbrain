@@ -79,10 +79,13 @@ internal sealed class BehaviorSupervisor(IOptions<BehaviorOptions> options, IBeh
         }
     }
 
+    // Timers can fire a few milliseconds before the due time, and the retry gate compares against the
+    // clock, so the wake lands just after the retry is due rather than exactly on it.
+    private static readonly TimeSpan RetryWakeMargin = TimeSpan.FromMilliseconds(100);
+
     private void ScheduleRetryWake(DateTimeOffset when)
     {
-        var delay = when - DateTimeOffset.UtcNow;
-        if (delay <= TimeSpan.Zero) { Wake(); return; }
+        var delay = when - DateTimeOffset.UtcNow + RetryWakeMargin;
         _ = Task.Delay(delay, _stopping).ContinueWith(_ => Wake(), CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
     }
 
@@ -145,7 +148,13 @@ internal sealed class BehaviorSupervisor(IOptions<BehaviorOptions> options, IBeh
         }
         if (state.State == BehaviorExecutionState.Completed || state.DesiredDeploymentRevision is null) { return; }
         var canStart = await Store.CanStartAsync(id, ct).ConfigureAwait(false);
-        if (!canStart) { return; }
+        if (!canStart)
+        {
+            // A retry that is not due yet (an early timer, or a host that restarted mid-backoff) must
+            // still wake the loop when it becomes due; nothing else will.
+            if (await Store.PendingRetryAsync(id, ct).ConfigureAwait(false) is { } pending) { ScheduleRetryWake(pending); }
+            return;
+        }
         var generation = Guid.NewGuid();
         try
         {

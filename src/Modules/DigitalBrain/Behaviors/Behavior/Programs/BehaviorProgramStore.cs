@@ -21,6 +21,8 @@ internal sealed class BehaviorProgramStore(IDocumentStore<BehaviorProgramDocumen
     }
     public Task<bool> CanStartAsync(string id, CancellationToken ct)
         => _documents.ReadAsync(id, d => d.Retries <= 3 && (d.NextRetryAt is null || d.NextRetryAt <= DateTimeOffset.UtcNow), ct);
+    public Task<DateTimeOffset?> PendingRetryAsync(string id, CancellationToken ct)
+        => _documents.ReadAsync(id, d => d.Retries <= 3 && d.NextRetryAt > DateTimeOffset.UtcNow ? d.NextRetryAt : null, ct);
     public Task<TResult> UpdateAsync<TResult>(string id, Func<BehaviorProgramDocument, TResult> action, CancellationToken ct)
         => _documents.UpdateAsync(id, action, ct);
 
