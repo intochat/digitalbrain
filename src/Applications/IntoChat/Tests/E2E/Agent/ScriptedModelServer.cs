@@ -62,8 +62,10 @@ public sealed partial class ScriptedModelServer : IAsyncDisposable
         var lastUser = messages.LastOrDefault(m => m.GetProperty("role").GetString() == "user") is { } user
             ? user.GetProperty("content").GetString() ?? ""
             : "";
-        var wantsCount = lastUser.Contains("how many", StringComparison.OrdinalIgnoreCase);
-        var wantsRefine = RefineValue is not null && lastUser.Contains("only", StringComparison.OrdinalIgnoreCase);
+        // The client appends an artifact-context paragraph to the owner's words; intent comes from the owner's own text.
+        var ownerText = lastUser.Split("\n\n[Conversation agent:", 2, StringSplitOptions.None)[0];
+        var wantsCount = ownerText.Contains("how many", StringComparison.OrdinalIgnoreCase);
+        var wantsRefine = RefineValue is not null && ownerText.Contains("only", StringComparison.OrdinalIgnoreCase);
         object message;
         var reason = "tool_calls";
         if (results.Length == 0)

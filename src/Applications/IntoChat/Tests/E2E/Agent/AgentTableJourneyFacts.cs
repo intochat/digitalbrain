@@ -126,7 +126,8 @@ public sealed class AgentTableJourneyFacts
 
         // "Only London" refines the existing window; it must not open a second one.
         await SendAsync(page, "Only London");
-        await Assertions.Expect(page.GetByText("Refined the same window to London.", new() { Exact = true })).ToBeVisibleAsync(new() { Timeout = 60_000 });
+        // The assistant message's semantics node carries the sender label, so match the message group by name.
+        await Assertions.Expect(page.GetByRole(AriaRole.Group, new() { Name = "IntoChat Refined the same window to London." })).ToBeVisibleAsync(new() { Timeout = 60_000 });
         await Assertions.Expect(window).ToHaveCountAsync(1);
         var tableId = Assert.Single((await workspace.Read()).Windows).View.Id;
         var refined = await brain.Get<DigitalBrain.Supabase.Tables.ISupabaseTable>(tableId).Read(new(0, 25));
@@ -141,7 +142,7 @@ public sealed class AgentTableJourneyFacts
 
         // "How many?" is answered from a count aggregate; the read returns no row values.
         await SendAsync(page, "How many?");
-        await Assertions.Expect(page.GetByText("6 in London", new() { Exact = true })).ToBeVisibleAsync(new() { Timeout = 60_000 });
+        await Assertions.Expect(page.GetByRole(AriaRole.Group, new() { Name = "IntoChat 6 in London" })).ToBeVisibleAsync(new() { Timeout = 60_000 });
         Assert.Equal(6, model.LastReadFilteredRows);
         Assert.Equal("6", model.LastReadAggregate);
         await Assertions.Expect(window).ToHaveCountAsync(1);
