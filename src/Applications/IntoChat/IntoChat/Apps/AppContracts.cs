@@ -20,6 +20,8 @@ public interface IImageDocument : INeuron
     Task<ImageDocumentState> Apply(ImageEditCommand command, long expectedRevision, string operationId);
     Task<SaveTicket> PrepareSave(long expectedRevision, string operationId);
     Task<ImageDocumentState> CompleteSave(string operationId, SavedFile result);
+    // A background-removed copy is appended while the original stays at revision zero.
+    Task<ImageDocumentState> AddVersion(string kind, string assetId);
     [ReadOnly] Task<ImageDocumentState> Read();
 }
 [GenerateSerializer, Alias("intochat.image-edit-command")]
@@ -42,7 +44,10 @@ public sealed record ImageDocumentState
     [Id(5)] public UiChildRef? Surface { get; init; }
     [Id(6)] public Dictionary<string, string> Receipts { get; init; } = [];
     [Id(7)] public Dictionary<string, SaveTicket> Saves { get; init; } = [];
+    [Id(8)] public IReadOnlyList<ImageVersion> Versions { get; init; } = [];
 }
+[GenerateSerializer, Alias("intochat.image-version")]
+public sealed record ImageVersion([property: Id(0)] string VersionId, [property: Id(1)] string AssetId, [property: Id(2)] long Revision, [property: Id(3)] string Kind);
 [GenerateSerializer, Alias("intochat.image-save-ticket")]
 public sealed record SaveTicket([property: Id(0)] string OperationId, [property: Id(1)] long Revision, [property: Id(2)] ImageRecipe Recipe, [property: Id(3)] ImageAsset Asset, [property: Id(4)] SavedFile? Result = null);
 

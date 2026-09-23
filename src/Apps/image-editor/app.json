@@ -1,11 +1,11 @@
 {
   "id": "intochat.image-editor",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "intochat",
   "kind": "declarative",
   "name": "Image Editor",
-  "descriptionForPeople": "Draw, crop and save copies of images.",
-  "descriptionForModel": "Edit an image document; strokes and crops are saved as a new copy.",
+  "descriptionForPeople": "Draw, crop and save copies of images. Removing a background is a paid operation, priced in Compute.",
+  "descriptionForModel": "Edit an image document; strokes and crops are saved as a new copy. Removing the background from one or more selected images is a paid operation that first shows a plan card with an estimate and a maximum, then runs under an allowance.",
   "operations": [
     {
       "name": "Open",
@@ -33,6 +33,12 @@
       "outputTypeId": "reference"
     },
     {
+      "name": "RemoveBackground",
+      "descriptionForModel": "Remove the background from the selected images. This is paid: it shows a plan for the selected images with an estimate and a maximum, and runs only under an allowance.",
+      "inputTypeIds": { "images": "reference" },
+      "outputTypeId": "reference"
+    },
+    {
       "name": "Read",
       "descriptionForModel": "Read the open image document.",
       "readOnly": true,
@@ -41,6 +47,13 @@
   ],
   "uiEntry": "app-images",
   "permissions": [],
-  "meters": [],
-  "examplePrompts": ["Crop this image", "Draw on the photo"]
+  "meters": [
+    {
+      "meterId": "image.background_removed",
+      "unit": "image",
+      "aggregation": "sum",
+      "proposedPriceInCompute": 4.5
+    }
+  ],
+  "examplePrompts": ["Crop this image", "Draw on the photo", "Remove the background from these 3 product photos"]
 }
