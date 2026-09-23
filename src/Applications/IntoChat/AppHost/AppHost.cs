@@ -16,6 +16,7 @@ using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Google.Gmail;
 using DigitalBrain.Identity;
+using DigitalBrain.Inbox;
 using DigitalBrain.Memory;
 using DigitalBrain.Microsoft.Aspire;
 using DigitalBrain.Microsoft.GitHub;
@@ -74,7 +75,8 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<ComputeModule>()
     .WithModule<DiscoveryModule>()
     .WithModule<AppsModule>()
-    .WithModule<BrokerModule>();
+    .WithModule<BrokerModule>()
+    .WithModule<InboxModule>();
 
 if (developerProfile)
 {
