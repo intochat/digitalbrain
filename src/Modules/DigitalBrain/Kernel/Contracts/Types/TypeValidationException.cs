@@ -1,25 +1,26 @@
+using Orleans;
+
 namespace DigitalBrain.Contracts.Types;
 
-public sealed class TypeValidationException : ArgumentException
+[GenerateSerializer, Alias("digitalbrain.type-validation")]
+public sealed class TypeValidationException(
+    FieldKind kind,
+    object? rejectedValue,
+    IReadOnlyList<string> allowedValues)
+    : ArgumentException(BuildMessage(kind, rejectedValue, allowedValues))
 {
     public TypeValidationException(FieldKind kind, object? rejectedValue)
         : this(kind, rejectedValue, TypeCatalog.AllowedFor(kind))
     {
     }
 
-    public TypeValidationException(FieldKind kind, object? rejectedValue, IReadOnlyList<string> allowedValues)
-        : base(BuildMessage(kind, rejectedValue, allowedValues))
-    {
-        Kind = kind;
-        AllowedValues = allowedValues;
-        RejectedValue = kind == FieldKind.Secret ? null : rejectedValue;
-    }
+    [Id(0)] public FieldKind Kind { get; } = kind;
 
-    public FieldKind Kind { get; }
+    [Id(1)] public string[] AllowedValues { get; } = [.. allowedValues];
 
-    public object? RejectedValue { get; }
+    [Id(2)] public object? RejectedValue { get; } = kind == FieldKind.Secret ? null : Display(rejectedValue);
 
-    public IReadOnlyList<string> AllowedValues { get; }
+    private static object? Display(object? rejectedValue) => rejectedValue?.ToString();
 
     private static string BuildMessage(FieldKind kind, object? rejectedValue, IReadOnlyList<string> allowedValues)
     {

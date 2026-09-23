@@ -31,6 +31,7 @@ public static class UIVocabulary
     public const string TabsType = "tabs";
     public const string TreeType = "tree";
     public const string SheetType = "sheet";
+    public const string FormType = "form";
 
     public const int ChartMaxPoints = 256;
 }

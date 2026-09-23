@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../models/ui_part.dart';
+
 typedef NeuronLoader = Future<Map<String, dynamic>> Function(
   String kind,
   String name,
@@ -350,6 +352,14 @@ class _NeuronViewState extends State<NeuronView> {
           case 'imagecanvas':
             return widget.imageBuilder?.call(definition) ??
                 const Center(child: Text('Image canvas unavailable.'));
+          case 'form':
+            return _FormRenderer(
+              part: UiFormPart.fromMetadata(definition),
+              name: widget.name,
+              revision: widget.revision,
+              enabled: widget.enabled,
+              onAction: widget.onAction,
+            );
           default:
             return const Center(
               child: Text('This component cannot be displayed.'),
@@ -357,5 +367,192 @@ class _NeuronViewState extends State<NeuronView> {
         }
       },
     );
+  }
+}
+
+/// Renders a declarative form from one read: typed fields, a date picker and a masked secret
+/// input. Field edits dispatch a `form` event; Save submits the whole form atomically.
+class _FormRenderer extends StatefulWidget {
+  const _FormRenderer({
+    required this.part,
+    required this.name,
+    required this.revision,
+    required this.enabled,
+    required this.onAction,
+  });
+
+  final UiFormPart part;
+  final String name;
+  final int revision;
+  final bool enabled;
+  final Future<void> Function(Map<String, dynamic>)? onAction;
+
+  @override
+  State<_FormRenderer> createState() => _FormRendererState();
+}
+
+class _FormRendererState extends State<_FormRenderer> {
+  late Map<String, String?> values = _initial();
+
+  Map<String, String?> _initial() => {
+    for (final field in widget.part.fields) field.name: field.value,
+  };
+
+  @override
+  void didUpdateWidget(_FormRenderer old) {
+    super.didUpdateWidget(old);
+    if (old.revision != widget.revision) {
+      values = _initial();
+    }
+  }
+
+  Future<void> dispatch(Map<String, Object?> event) async {
+    await widget.onAction?.call({
+      'kind': 'form',
+      'name': widget.name,
+      'revision': widget.revision,
+      ...event,
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (widget.part.title.isNotEmpty) ...[
+            Text(widget.part.title, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+          ],
+          for (final field in widget.part.fields) _field(context, field),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              FilledButton(
+                onPressed: widget.enabled
+                    ? () => dispatch({'action': 'submit'})
+                    : null,
+                child: const Text('Save'),
+              ),
+              if (widget.part.submitted) ...[
+                const SizedBox(width: 8),
+                const Text('Saved'),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _field(BuildContext context, UiFormField field) {
+    final label = field.required ? '${field.label} *' : field.label;
+    switch (field.kind) {
+      case 'Secret':
+        // The raw secret never reaches the form; it is set out of band and shown as a handle.
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: TextFormField(
+            key: Key('form_secret_${field.name}'),
+            obscureText: true,
+            readOnly: true,
+            enabled: widget.enabled,
+            decoration: InputDecoration(
+              labelText: label,
+              isDense: true,
+              helperText: field.secretSet ? '•••• set' : 'Not set',
+            ),
+          ),
+        );
+      case 'Date':
+        final value = values[field.name];
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: InputDecorator(
+                  decoration: InputDecoration(labelText: label, isDense: true),
+                  child: Text(
+                    value == null || value.isEmpty ? 'Pick a date' : value,
+                  ),
+                ),
+              ),
+              IconButton(
+                key: Key('form_date_${field.name}'),
+                icon: const Icon(Icons.calendar_today),
+                tooltip: 'Pick ${field.label}',
+                onPressed: widget.enabled ? () => _pickDate(field) : null,
+              ),
+            ],
+          ),
+        );
+      case 'Boolean':
+        return SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          value: values[field.name] == 'true',
+          title: Text(label),
+          onChanged: widget.enabled
+              ? (on) => dispatch({
+                  'field': field.name,
+                  'value': on ? 'true' : 'false',
+                })
+              : null,
+        );
+      case 'Choice':
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: DropdownButtonFormField<String>(
+            initialValue: field.choices.contains(values[field.name])
+                ? values[field.name]
+                : null,
+            decoration: InputDecoration(labelText: label, isDense: true),
+            items: [
+              for (final choice in field.choices)
+                DropdownMenuItem(value: choice, child: Text(choice)),
+            ],
+            onChanged: widget.enabled
+                ? (value) => dispatch({'field': field.name, 'value': value})
+                : null,
+          ),
+        );
+      default:
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: TextFormField(
+            key: Key('form_field_${field.name}'),
+            initialValue: values[field.name] ?? '',
+            enabled: widget.enabled,
+            decoration: InputDecoration(
+              labelText: label,
+              isDense: true,
+              helperText: field.supported ? null : 'Shown as plain text.',
+            ),
+            onFieldSubmitted: (value) =>
+                dispatch({'field': field.name, 'value': value}),
+          ),
+        );
+    }
+  }
+
+  Future<void> _pickDate(UiFormField field) async {
+    final current = values[field.name];
+    final parsed = current == null || current.isEmpty
+        ? null
+        : DateTime.tryParse(current);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: parsed ?? DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime(2200),
+    );
+    if (picked == null) {
+      return;
+    }
+    final formatted = picked.toIso8601String().split('T').first;
+    setState(() => values[field.name] = formatted);
+    await dispatch({'field': field.name, 'value': formatted});
   }
 }

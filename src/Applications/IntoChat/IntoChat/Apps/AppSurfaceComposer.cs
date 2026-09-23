@@ -57,6 +57,9 @@ internal sealed class AppSurfaceComposer(IGrainFactory grains)
         await canvas.Set(new(asset.Id, asset.Width, asset.Height, recipe, revision), (await canvas.Read()).Revision);
         return await Compose(name, "Image Editor", [new("imagecanvas", name + "/canvas")]);
     }
+    // The whole form is one neuron rendered from one read; the window only lays it out.
+    public Task<UiChildRef> Form(string name, string title, string formId)
+        => Compose(name, title, [new("form", formId)]);
     private async Task<UiChildRef> Compose(string name, string title, UiChildRef[] children, IReadOnlyList<double>? extents = null)
     {
         var layout = grains.GetGrain<ILayout>(name + "/layout");
