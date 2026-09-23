@@ -14,8 +14,15 @@ public sealed class MyDataModule : IModule
     {
         ArgumentNullException.ThrowIfNull(silo);
         silo.Services.TryAddSingleton(TimeProvider.System);
-        silo.Services.TryAddSingleton<IKeyWrapper, DpapiKeyWrapper>();
         silo.Services.TryAddSingleton<IKeyVault, FakeKeyVault>();
+        if (OperatingSystem.IsWindows())
+        {
+            silo.Services.TryAddSingleton<IKeyWrapper, DpapiKeyWrapper>();
+        }
+        else
+        {
+            silo.Services.TryAddSingleton<IKeyWrapper, KeyVaultKeyWrapper>();
+        }
         silo.Services.TryAddSingleton<ISecretResolver, SecretResolver>();
     }
 
