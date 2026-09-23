@@ -32,11 +32,18 @@ internal static class IdentityEndpoints
             Results.Ok(await Directory(brain).InviteAsync(workspaceId, input.Email, input.Role, ct)));
         routes.MapPost("/identity/invitations/{code}/accept", async (string code, AcceptRequest input, IDigitalBrain brain, CancellationToken ct) =>
             Results.Ok(await Directory(brain).AcceptInvitationAsync(code, input.PrincipalId, input.DisplayName, ct)));
-        routes.MapGet("/identity/workspaces/{workspaceId}/grants", async (string workspaceId, IDigitalBrain brain, CancellationToken ct) =>
+        var grants = routes.MapGroup("/workspaces/{workspaceId}/grants")
+            .AddEndpointFilter(DigitalBrain.Core.Enforcement.WorkspaceAccessFilter.EnforceAsync);
+        grants.MapGet("", async (string workspaceId, IDigitalBrain brain, CancellationToken ct) =>
             Results.Ok(await Grants(brain, workspaceId).ListAsync(ct)));
-        routes.MapPost("/identity/workspaces/{workspaceId}/grants", async (string workspaceId, Grant input, IDigitalBrain brain, CancellationToken ct) =>
+        grants.MapPost("", async (string workspaceId, Grant input, IDigitalBrain brain, CancellationToken ct) =>
             Results.Ok(await Grants(brain, workspaceId).GrantAsync(input, ct)));
-        routes.MapDelete("/identity/workspaces/{workspaceId}/grants", async (string workspaceId, string appId, string semanticTypeId, GrantMode mode, IDigitalBrain brain, CancellationToken ct) =>
+        grants.MapPost("/revoke", async (string workspaceId, RevokeGrant input, IDigitalBrain brain, CancellationToken ct) =>
+        {
+            await Grants(brain, workspaceId).RevokeAsync(input.AppId, input.SemanticTypeId, input.Mode, ct);
+            return Results.NoContent();
+        });
+        grants.MapDelete("", async (string workspaceId, string appId, string semanticTypeId, GrantMode mode, IDigitalBrain brain, CancellationToken ct) =>
         {
             await Grants(brain, workspaceId).RevokeAsync(appId, semanticTypeId, mode, ct);
             return Results.NoContent();
@@ -87,5 +94,6 @@ internal static class IdentityEndpoints
     internal sealed record LoginRequest(string PrincipalId, string? DisplayName = null, string? WorkspaceId = null);
     internal sealed record InviteRequest(string? Email = null, MemberRole Role = MemberRole.Member);
     internal sealed record AcceptRequest(string PrincipalId, string DisplayName);
+    internal sealed record RevokeGrant(string AppId, string SemanticTypeId, GrantMode Mode);
     internal sealed record SessionView(string PrincipalId, string AccountId, string WorkspaceId, string Role);
 }

@@ -18,6 +18,17 @@ internal sealed class GrantCallFilterStage(IGrantPolicySource source) : ICallFil
             ? await source.ListGrantsAsync(caller, cancellationToken).ConfigureAwait(false)
             : [];
 
-        return GrantRules.Evaluate(request, member, grants);
+        var decision = GrantRules.Evaluate(request, member, grants);
+        // A one-time grant is spent by the read it just authorized; an always grant is not.
+        if (decision is { Allowed: true })
+        {
+            var spent = GrantRules.OnceToConsume(request, grants);
+            if (spent.Count > 0)
+            {
+                await source.ConsumeOnceAsync(caller, spent, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        return decision;
     }
 }

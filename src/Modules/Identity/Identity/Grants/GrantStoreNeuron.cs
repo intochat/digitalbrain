@@ -21,7 +21,7 @@ internal sealed class GrantStoreNeuron : Neuron<GrantStoreState>, IGrantStore
         : base(store)
         => _store = store;
 
-    private string WorkspaceId => this.GetPrimaryKeyString();
+    private string WorkspaceId => IdentityGrains.WorkspaceOfGrantStore(this.GetPrimaryKeyString());
 
     public async Task<Grant> GrantAsync(Grant grant, CancellationToken cancellationToken = default)
     {

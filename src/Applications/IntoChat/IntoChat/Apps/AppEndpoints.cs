@@ -42,6 +42,20 @@ internal static class AppEndpoints
                     description = manifest.DescriptionForPeople,
                     kind = manifest.Kind.ToString().ToLowerInvariant(),
                     uiEntry = manifest.UiEntry,
+                    examplePrompts = manifest.ExamplePrompts,
+                    permissions = manifest.Permissions.Select(permission => new
+                    {
+                        semanticTypeId = permission.SemanticTypeId,
+                        reason = permission.Reason,
+                        write = permission.Write,
+                    }),
+                    meters = manifest.Meters.Select(meter => new
+                    {
+                        meterId = meter.MeterId,
+                        unit = meter.Unit,
+                        aggregation = meter.Aggregation,
+                        proposedPriceInCompute = meter.ProposedPriceInCompute,
+                    }),
                 })
                 .ToArray();
             return Results.Ok(manifests);

@@ -74,6 +74,59 @@ public sealed class GrantFacts
     }
 
     [Fact]
+    public async Task AOnceGrantIsConsumedAfterOneSuccessfulRead()
+    {
+        var policy = new RecordingPolicy([Grant(GrantMode.Once, "person.birthDate", "app-1", "ws-1")]);
+        var stage = new GrantCallFilterStage(policy);
+        var decision = await stage.EvaluateAsync(Request(CallerKind.App, "app-1", "ws-1", "person.birthDate"), TestContext.Current.CancellationToken);
+
+        Assert.True(decision!.Allowed);
+        var spent = Assert.Single(policy.Consumed);
+        Assert.Equal("person.birthDate", spent.SemanticTypeId);
+        Assert.Equal(GrantMode.Once, spent.Mode);
+    }
+
+    [Fact]
+    public async Task AnAlwaysGrantIsNotConsumed()
+    {
+        var policy = new RecordingPolicy([Grant(GrantMode.Always, "person.birthDate", "app-1", "ws-1")]);
+        var stage = new GrantCallFilterStage(policy);
+        var decision = await stage.EvaluateAsync(Request(CallerKind.App, "app-1", "ws-1", "person.birthDate"), TestContext.Current.CancellationToken);
+
+        Assert.True(decision!.Allowed);
+        Assert.Empty(policy.Consumed);
+    }
+
+    [Fact]
+    public async Task ADeniedReadConsumesNoGrant()
+    {
+        var policy = new RecordingPolicy([Grant(GrantMode.Once, "person.birthDate", "app-1", "ws-2")]);
+        var stage = new GrantCallFilterStage(policy);
+        var decision = await stage.EvaluateAsync(Request(CallerKind.App, "app-1", "ws-1", "person.birthDate"), TestContext.Current.CancellationToken);
+
+        Assert.Equal(CallDenial.MissingGrant, decision!.Denial);
+        Assert.Empty(policy.Consumed);
+    }
+
+    [Fact]
+    public async Task ConsumingAOnceGrantMakesTheNextReadLookEmpty()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
+        var store = brain.Get<IGrantStore>(IdentityGrains.Grants("ws-1"));
+        await store.GrantAsync(Grant(GrantMode.Once, "person.birthDate", "app-1", "ws-1"), ct);
+        Assert.Single(await store.ListAsync(ct));
+
+        await store.RevokeAsync("app-1", "person.birthDate", GrantMode.Once, ct);
+        Assert.Empty(await store.ListAsync(ct));
+
+        var decision = GrantRules.Evaluate(
+            Request(CallerKind.App, "app-1", "ws-1", "person.birthDate"), null, await store.ListAsync(ct));
+        Assert.Equal(CallDenial.MissingGrant, decision!.Denial);
+        Assert.Contains("missing", decision.Explanation, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task GrantStoreGrantsRevokesAndRelists()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -138,5 +191,25 @@ public sealed class GrantFacts
 
         public ValueTask<IReadOnlyList<Grant>> ListGrantsAsync(CallerContext caller, CancellationToken cancellationToken)
             => ValueTask.FromResult(grants);
+
+        public ValueTask ConsumeOnceAsync(CallerContext caller, IReadOnlyList<Grant> consumed, CancellationToken cancellationToken)
+            => ValueTask.CompletedTask;
+    }
+
+    private sealed class RecordingPolicy(IReadOnlyList<Grant> grants) : IGrantPolicySource
+    {
+        public List<Grant> Consumed { get; } = [];
+
+        public ValueTask<Member?> FindMemberAsync(CallerContext caller, CancellationToken cancellationToken)
+            => ValueTask.FromResult<Member?>(null);
+
+        public ValueTask<IReadOnlyList<Grant>> ListGrantsAsync(CallerContext caller, CancellationToken cancellationToken)
+            => ValueTask.FromResult(grants);
+
+        public ValueTask ConsumeOnceAsync(CallerContext caller, IReadOnlyList<Grant> consumed, CancellationToken cancellationToken)
+        {
+            Consumed.AddRange(consumed);
+            return ValueTask.CompletedTask;
+        }
     }
 }
