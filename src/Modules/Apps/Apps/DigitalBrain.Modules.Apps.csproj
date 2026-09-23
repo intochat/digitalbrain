@@ -7,6 +7,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Modules.Apps.Tests.Unit" />
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Apps.Contracts.csproj" />
+    <ProjectReference Include="../../Discovery/Contracts/DigitalBrain.Modules.Discovery.Contracts.csproj" />
     <ProjectReference Include="../../DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
   </ItemGroup>
   <ItemGroup>
@@ -15,5 +16,6 @@
     <EmbeddedResource Include="../../../Apps/mydata/app.json" LogicalName="DigitalBrain.Apps.FirstParty.mydata.app.json" />
     <EmbeddedResource Include="../../../Apps/image-editor/app.json" LogicalName="DigitalBrain.Apps.FirstParty.image-editor.app.json" />
     <EmbeddedResource Include="../../../Apps/customer-tables/app.json" LogicalName="DigitalBrain.Apps.FirstParty.customer-tables.app.json" />
+    <EmbeddedResource Include="../../../Apps/leadgenerator/app.json" LogicalName="DigitalBrain.Apps.FirstParty.leadgenerator.app.json" />
   </ItemGroup>
 </Project>

@@ -1,5 +1,6 @@
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Aspire;
+using DigitalBrain.Automations;
 using DigitalBrain.Sdk;
 using IntoChat;
 using IntoChat.Agent;
@@ -42,6 +43,8 @@ builder.Services.AddSingleton<IAgentToolFactory, WorkspaceTableTools>();
 builder.Services.AddSingleton<IAgentToolFactory, WorkspaceFormTools>();
 builder.Services.AddSingleton<IAgentToolFactory, WorkspaceAppTools>();
 builder.Services.AddSingleton<IAgentToolFactory, DiscoveryTools>();
+builder.Services.AddSingleton<IAutomationActionCatalog, FirstPartyAutomationActionCatalog>();
+builder.Services.AddSingleton<IAutomationActionInvoker, LeadGeneratorAutomationInvoker>();
 builder.Services.AddSingleton<IProblemReportStore, ProblemReportStore>();
 builder.Services.AddSingleton<IWorkspaceVectorPurge, MemoryWorkspaceVectorPurge>();
 builder.Services.AddSingleton<IWorkspaceBackupPurge, HostedWorkspaceBackupPurge>();

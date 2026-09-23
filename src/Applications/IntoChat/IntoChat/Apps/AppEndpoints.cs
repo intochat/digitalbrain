@@ -59,6 +59,24 @@ internal static class AppEndpoints
         }));
         apps.MapPost("/{appId}/reopen", (string workspaceId, string appId, WorkspaceAppService appService, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
             Results.Ok(await appService.OpenAsync(Scope(auth.Value, workspaceId), appId, ct))));
+        apps.MapGet("/{appId}/consent", (string workspaceId, string appId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        {
+            var scope = Scope(auth.Value, workspaceId);
+            var sheet = await brain.Get<IAppConsent>(scope).Review(appId).WaitAsync(ct);
+            return Results.Ok(sheet);
+        }));
+        apps.MapPost("/{appId}/consent/approve", (string workspaceId, string appId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        {
+            var scope = Scope(auth.Value, workspaceId);
+            var sheet = await brain.Get<IAppConsent>(scope).Approve(appId).WaitAsync(ct);
+            return Results.Ok(sheet);
+        }));
+        apps.MapPost("/leadgenerator/run", (string workspaceId, LeadGeneratorRunRequest input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        {
+            var scope = Scope(auth.Value, workspaceId);
+            var result = await brain.Get<ILeadGeneratorLeads>(scope).Sweep(input.Query).WaitAsync(ct);
+            return Results.Ok(result);
+        }));
         apps.MapGet("/files", (string workspaceId, string? folderId, int? offset, string? sort, string? filter, IDigitalBrain brain, LocalFileStore files, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);
@@ -217,4 +235,5 @@ internal static class AppEndpoints
     internal sealed record BackgroundRemovalPlanInput(IReadOnlyList<string> ImageIds, string IntentId);
     internal sealed record BackgroundRemovalApproveInput(string PlanId, AllowanceScope Scope);
     internal sealed record BackgroundRemovalRunInput(string PlanId, string IntentId);
+    internal sealed record LeadGeneratorRunRequest(string Query);
 }

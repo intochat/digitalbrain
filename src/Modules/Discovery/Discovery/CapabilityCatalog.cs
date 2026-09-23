@@ -9,7 +9,7 @@ namespace DigitalBrain.Discovery;
 
 // Manifests are the truth. The catalog is rebuilt idempotently and falls back to keyword search.
 internal sealed class CapabilityCatalog(
-    IManifestSource source,
+    IEnumerable<IManifestSource> sources,
     ICapabilityEmbedder embedder,
     ICapabilityVectorIndex vectors,
     ILogger<CapabilityCatalog> logger)
@@ -22,17 +22,32 @@ internal sealed class CapabilityCatalog(
 
     public async Task RebuildAsync(CancellationToken cancellationToken)
     {
-        IReadOnlyList<AppManifest> manifests;
-        try
+        var read = new List<AppManifest>();
+        var unreadable = 0;
+        foreach (var source in sources)
         {
-            manifests = await source.ReadAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                read.AddRange(await source.ReadAsync(cancellationToken).ConfigureAwait(false));
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                logger.LogWarning(exception, "Capability manifests from {Source} could not be read; indexing the others.", source.GetType().Name);
+                unreadable++;
+            }
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+
+        if (unreadable > 0 && read.Count == 0)
         {
-            logger.LogWarning(exception, "Capability manifests could not be read; keeping the previous catalog.");
             Degraded = true;
             return;
         }
+
+        // First-party manifests and saved apps come from different sources; a later source wins per app id.
+        IReadOnlyList<AppManifest> manifests = read
+            .GroupBy(static manifest => manifest.Id, StringComparer.Ordinal)
+            .Select(static group => group.Last())
+            .ToList();
 
         var signature = Signature(manifests);
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);

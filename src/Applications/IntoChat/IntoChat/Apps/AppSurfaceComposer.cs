@@ -60,6 +60,16 @@ internal sealed class AppSurfaceComposer(IGrainFactory grains)
     // The whole form is one neuron rendered from one read; the window only lays it out.
     public Task<UiChildRef> Form(string name, string title, string formId)
         => Compose(name, title, [new("form", formId)]);
+    // A Leads table in the app's own data: company-level fields only.
+    public async Task<UiChildRef> Leads(string name, IReadOnlyList<LeadRecord> leads)
+    {
+        var collection = grains.GetGrain<ICollectionView>(name + "/leads");
+        var items = leads
+            .Select(lead => new CollectionItem(lead.Company, lead.Company, "lead", lead.Category + " · " + lead.Website))
+            .ToArray();
+        await collection.Set(new(items), (await collection.Read()).Revision);
+        return await Compose(name, "Leads", [new("collection", name + "/leads")]);
+    }
     private async Task<UiChildRef> Compose(string name, string title, UiChildRef[] children, IReadOnlyList<double>? extents = null)
     {
         var layout = grains.GetGrain<ILayout>(name + "/layout");

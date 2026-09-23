@@ -1,0 +1,54 @@
+{
+  "id": "intochat.leadgenerator",
+  "version": "1.0.0",
+  "publisher": "intochat",
+  "kind": "declarative",
+  "name": "LeadGenerator",
+  "descriptionForPeople": "Find companies to contact, with company-level details only.",
+  "descriptionForModel": "Find new companies such as new dental clinics in Berlin, look up each company, and keep them in a Leads table. Company-level fields only: name, address, website, phone and category. Never LinkedIn-derived, and no outreach is sent.",
+  "operations": [
+    {
+      "name": "Find",
+      "descriptionForModel": "Find new companies matching a query, for example new dental clinics in Berlin.",
+      "readOnly": true,
+      "inputTypeIds": { "query": "plain-text" },
+      "outputTypeId": "reference"
+    },
+    {
+      "name": "Lookup",
+      "descriptionForModel": "Look up one company and return its company-level details.",
+      "readOnly": true,
+      "inputTypeIds": { "company": "plain-text" },
+      "outputTypeId": "reference"
+    },
+    {
+      "name": "Read",
+      "descriptionForModel": "Read the Leads table of company-level fields.",
+      "readOnly": true,
+      "outputTypeId": "reference"
+    }
+  ],
+  "uiEntry": "app-leadgenerator",
+  "permissions": [],
+  "meters": [
+    {
+      "meterId": "search.request",
+      "unit": "request",
+      "aggregation": "count",
+      "proposedPriceInCompute": 1
+    }
+  ],
+  "examplePrompts": [
+    "Find new dental clinics in Berlin",
+    "Find leads in Munich",
+    "Look up this company"
+  ],
+  "scenarios": [
+    {
+      "name": "Find dental clinics",
+      "given": "the LeadGenerator app",
+      "when": "I ask for new dental clinics in Berlin",
+      "then": "a Leads window opens with company-level fields only"
+    }
+  ]
+}
