@@ -1,6 +1,15 @@
+using DigitalBrain.AI.Agents;
 using DigitalBrain.Apps;
 using DigitalBrain.Apps.Manifests;
+using DigitalBrain.Contracts.Types;
+using DigitalBrain.Discovery;
+using DigitalBrain.Flutter;
+using DigitalBrain.Flutter.Form;
+using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Testing.Unit;
+using IntoChat.Agent;
+using IntoChat.Apps;
+using Microsoft.Extensions.AI;
 
 namespace IntoChat.Tests.E2E.Apps;
 
@@ -86,4 +95,60 @@ public sealed class SaveAsAppFacts
             },
         ],
     };
+
+    [Fact(Timeout = 120_000)]
+    public async Task AssistantToolSavesTheOpenFormAndReopensItAfterRestart()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().WithModule<AppsModule>().StartAsync(ct);
+        const string scope = "workspace-save";
+        var formId = scope + "/apps/forms/lead";
+        await brain.Get<IForm>(formId).Define(new("Lead intake",
+        [
+            new("company", "Company", FieldKind.PlainText, true),
+            new("email", "Email", FieldKind.Email),
+        ]));
+        var workspace = brain.Get<IWorkspace>(scope);
+        await workspace.OpenSurface(new("open-form", formId, "Lead intake", new("surface", formId + "/surface"), 0));
+
+        var tools = new WorkspaceAppTools(new WorkspaceAppService(brain)).Create(() => new AgentToolContext(scope, "run", "call"));
+        var result = await tools.Single(tool => tool.Name == "save_as_app")
+            .InvokeAsync(new AIFunctionArguments { ["name"] = "Lead Intake" }, ct);
+        Assert.NotNull(result);
+
+        var catalog = brain.Get<IAppCatalog>(scope);
+        var saved = await catalog.Read("intochat.saved-lead-intake");
+        Assert.NotNull(saved);
+        Assert.Equal(AppKind.Declarative, saved!.Manifest.Kind);
+        Assert.Contains(saved.Manifest.Windows, window => window.WindowId == formId && window.Kind == "surface");
+
+        // A restart is a fresh activation over persisted state.
+        await brain.DeactivateAsync(catalog, ct);
+        var afterRestart = await catalog.Read("intochat.saved-lead-intake");
+        Assert.NotNull(afterRestart);
+        Assert.Single(afterRestart!.Manifest.Windows);
+
+        await workspace.Close(formId, (await workspace.Read()).Revision);
+        var reopened = await new WorkspaceAppService(brain).OpenAsync(scope, "intochat.saved-lead-intake", ct);
+        Assert.Contains(reopened.Windows, window => window.Id == formId && window.IsOpen);
+    }
+
+    [Fact(Timeout = 120_000)]
+    public async Task DiscoveryFindsASavedAppByItsDescription()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create()
+            .WithModule<FlutterModule>().WithModule<AppsModule>().WithModule<DiscoveryModule>().StartAsync(ct);
+        const string scope = "workspace-discovery";
+        var formId = scope + "/apps/forms/intake";
+        await brain.Get<IForm>(formId).Define(new("Intake", [new("company", "Company", FieldKind.PlainText, true)]));
+        await brain.Get<IWorkspace>(scope)
+            .OpenSurface(new("open", formId, "Vendor onboarding intake", new("surface", formId + "/surface"), 0));
+
+        await new WorkspaceAppService(brain).SaveAsync(scope, "Vendor Onboarding Intake", ct);
+
+        var result = await brain.Get<ICapabilityCatalog>("catalog").Search("vendor onboarding intake", scope, 5);
+
+        Assert.Contains(result.Hits, hit => hit.Id.StartsWith("intochat.saved-vendor-onboarding-intake", StringComparison.Ordinal));
+    }
 }

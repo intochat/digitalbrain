@@ -37,6 +37,22 @@ public sealed record SaveAsAppRequest
     [Id(7)] public IReadOnlyList<AppPermission> Permissions { get; init; } = [];
     [Id(8)] public IReadOnlyList<AppMeter> Meters { get; init; } = [];
     [Id(9)] public IReadOnlyList<AppScenario> Scenarios { get; init; } = [];
+    [Id(10)] public IReadOnlyList<AppWindow> Windows { get; init; } = [];
+}
+
+// The global app directory makes saved and installed apps discoverable: the Discovery module reads
+// it as its manifest source, so cataloging an app also makes it searchable by its description.
+[Alias("app-manifest-directory"), DefaultGrainType("app-manifest-directory")]
+public interface IAppManifestDirectory : INeuron
+{
+    Task<AppManifest> Publish(AppManifest manifest);
+
+    Task<IReadOnlyList<AppManifest>> Read();
+}
+
+public static class AppManifestDirectoryGrains
+{
+    public const string Key = "apps";
 }
 
 // The per-workspace app catalog. Key the grain by the workspace scope id.

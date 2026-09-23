@@ -33,7 +33,7 @@ public enum CreatorPublishOutcome
     ReConsentRequired = 7,
 }
 
-[GenerateSerializer, Alias("marketplace.scenario-evidence")]
+[GenerateSerializer, Alias("marketplace.creators.scenario-evidence")]
 public sealed record ScenarioEvidence
 {
     [Id(0)] public required string Name { get; init; }
@@ -43,7 +43,7 @@ public sealed record ScenarioEvidence
 
 // Deterministic-fake certification: every declared scenario ran on a fake and left evidence. A
 // scenario that depends on a live model can never be a gate (D11).
-[GenerateSerializer, Alias("marketplace.certification")]
+[GenerateSerializer, Alias("marketplace.creators.certification")]
 public sealed record CertificationReport
 {
     [Id(0)] public required string AppId { get; init; }
@@ -54,7 +54,7 @@ public sealed record CertificationReport
     [Id(5)] public IReadOnlyList<ScenarioEvidence> Scenarios { get; init; } = [];
 }
 
-[GenerateSerializer, Alias("marketplace.price-increase")]
+[GenerateSerializer, Alias("marketplace.creators.price-increase")]
 public sealed record PriceIncrease
 {
     [Id(0)] public required string MeterId { get; init; }
@@ -64,7 +64,7 @@ public sealed record PriceIncrease
 
 // A new version may only widen permission or price after the publisher re-consents. The fingerprint
 // is stable for the exact change so consent cannot be replayed onto a different one.
-[GenerateSerializer, Alias("marketplace.consent-change")]
+[GenerateSerializer, Alias("marketplace.creators.consent-change")]
 public sealed record ConsentChange
 {
     [Id(0)] public IReadOnlyList<string> AddedPermissions { get; init; } = [];
@@ -72,7 +72,7 @@ public sealed record ConsentChange
     [Id(2)] public required string Fingerprint { get; init; }
 }
 
-[GenerateSerializer, Alias("marketplace.creator-listing")]
+[GenerateSerializer, Alias("marketplace.creators.creator-listing")]
 public sealed record CreatorListing
 {
     [Id(0)] public required string ListingId { get; init; }
@@ -89,7 +89,7 @@ public sealed record CreatorListing
 
 // A saved declarative app publishes in one step. The request carries the manifest and the caller;
 // the app needs no sandbox because it carries no code.
-[GenerateSerializer, Alias("marketplace.publish-declarative")]
+[GenerateSerializer, Alias("marketplace.creators.publish-declarative")]
 public sealed record PublishDeclarativeRequest
 {
     [Id(0)] public required AppManifest Manifest { get; init; }
@@ -97,7 +97,7 @@ public sealed record PublishDeclarativeRequest
     [Id(2)] public string? ReConsentFingerprint { get; init; }
 }
 
-[GenerateSerializer, Alias("marketplace.publish-result")]
+[GenerateSerializer, Alias("marketplace.creators.publish-result")]
 public sealed record PublishResult
 {
     [Id(0)] public required CreatorPublishOutcome Outcome { get; init; }
@@ -108,7 +108,7 @@ public sealed record PublishResult
 }
 
 // D7/D16 stay behind flags that default off until the owner closes G-1/G-3.
-[GenerateSerializer, Alias("marketplace.creator-features")]
+[GenerateSerializer, Alias("marketplace.creators.creator-features")]
 public sealed record CreatorPublishingFeatures
 {
     [Id(0)] public bool SelfServeSignUp { get; init; }
@@ -116,7 +116,7 @@ public sealed record CreatorPublishingFeatures
     [Id(2)] public bool ConsumerTerms { get; init; }
 }
 
-[GenerateSerializer, Alias("marketplace.kill-status")]
+[GenerateSerializer, Alias("marketplace.creators.kill-status")]
 public sealed record KillSwitchStatus
 {
     [Id(0)] public required string AppId { get; init; }
@@ -142,7 +142,7 @@ public interface ICreatorScenarioCertifier
     Task<CertificationReport> CertifyAsync(AppManifest manifest, CancellationToken cancellationToken = default);
 }
 
-[Alias("marketplace.creator-publishing"), DefaultGrainType("marketplace.creator-publishing")]
+[Alias("marketplace.creators.creator-publishing"), DefaultGrainType("marketplace.creator-publishing")]
 public interface ICreatorPublishing : INeuron
 {
     Task<PublishResult> Publish(PublishDeclarativeRequest request);

@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart'
     show WorkspaceSnapshot;
+import 'package:digitalbrain_ui/digitalbrain_ui.dart' show FirstRunState;
 
 abstract interface class WorkspacePersistence {
   Future<String?> read();
@@ -315,6 +316,11 @@ class WorkspaceStore extends ChangeNotifier {
   String selectedProjectId = '';
   String? persistenceError;
   bool loaded = false;
+
+  final Map<String, FirstRunState?> _firstRun = {};
+
+  /// Non-null while the selected workspace has never opened a window; drives the first-run view.
+  FirstRunState? get firstRun => _firstRun[selectedProjectId];
   void Function(String workspaceId, String windowId, bool open)?
   onRemoteWindowAction;
   final Map<String, int> remoteRevisions = {};
@@ -325,6 +331,9 @@ class WorkspaceStore extends ChangeNotifier {
   ) {
     if (snapshot.revision < (remoteRevisions[project.id] ?? -1)) return;
     remoteRevisions[project.id] = snapshot.revision;
+    _firstRun[project.id] = snapshot.firstRun == null
+        ? null
+        : FirstRunState.fromMetadata(snapshot.firstRun);
     final layout = project.presentation;
     for (final window in snapshot.windows) {
       var artifact = project.artifacts

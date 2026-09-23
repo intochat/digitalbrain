@@ -50,4 +50,22 @@ void main() {
     ]);
     expect(entries, isEmpty);
   });
+
+  test(
+    'a saved declarative app is offered and launched by its manifest id',
+    () {
+      final entries = launcherEntries(const [
+        AppManifestSummary(
+          id: 'intochat.saved-lead-form',
+          name: 'Lead form',
+          description: 'Enter a lead',
+          kind: 'declarative',
+          uiEntry: 'app-saved-lead-form',
+        ),
+      ]);
+      expect(entries.single.launchKey, 'intochat.saved-lead-form');
+      expect(entries.single.title, 'Lead form');
+      expect(entries.single.subtitle, 'Enter a lead');
+    },
+  );
 }

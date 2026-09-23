@@ -17,7 +17,6 @@ internal sealed class CapabilityCatalog(
     private readonly SemaphoreSlim _gate = new(1, 1);
     private CapabilityIndex _index = CapabilityIndex.Empty;
     private string? _signature;
-    private bool _built;
 
     public bool Degraded { get; private set; }
 
@@ -63,7 +62,6 @@ internal sealed class CapabilityCatalog(
             await PersistAsync(_index, cancellationToken).ConfigureAwait(false);
             _signature = signature;
             Degraded = degraded;
-            _built = true;
         }
         finally
         {
@@ -88,11 +86,9 @@ internal sealed class CapabilityCatalog(
 
     public async ValueTask<CapabilitySearchResult> SearchAsync(string query, int take, CancellationToken cancellationToken)
     {
-        if (!_built)
-        {
-            await RebuildAsync(cancellationToken).ConfigureAwait(false);
-        }
-
+        // Cheap idempotent rebuild: re-reads the manifest source and re-indexes only when it changed,
+        // so an app saved after startup becomes searchable on the next turn.
+        await RebuildAsync(cancellationToken).ConfigureAwait(false);
         return await _index.SearchAsync(query, take, Degraded, cancellationToken).ConfigureAwait(false);
     }
 

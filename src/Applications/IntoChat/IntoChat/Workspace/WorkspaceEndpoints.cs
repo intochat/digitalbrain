@@ -30,6 +30,9 @@ internal static class WorkspaceEndpoints
                     ? (await workspace.Open(new(input.OperationId, window.Id, window.Title, window.Reference, input.ExpectedRevision)).WaitAsync(ct)).State
                     : await workspace.OpenSurface(new(input.OperationId, window.Id, window.Title, window.Reference, input.ExpectedRevision)).WaitAsync(ct));
             }));
+        routes.MapPost("/workspaces/{workspaceId}/connected-sources",
+            (string workspaceId, SetConnectedSources input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct)
+            => Respond(async () => Results.Ok(await GetWorkspace(brain, auth.Value, workspaceId).SetConnectedSources(input.Sources ?? []).WaitAsync(ct))));
         routes.MapGet("/workspaces/{workspaceId}/tables/{tableId}",
             (string workspaceId, string tableId, int? offset, int? limit, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct)
             => Respond(async () =>
@@ -90,4 +93,5 @@ internal static class WorkspaceEndpoints
     }
     internal sealed record CloseWindow(long ExpectedRevision);
     internal sealed record ReopenWindow(string OperationId, long ExpectedRevision);
+    internal sealed record SetConnectedSources(IReadOnlyList<string>? Sources);
 }

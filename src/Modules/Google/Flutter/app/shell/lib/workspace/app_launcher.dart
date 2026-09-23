@@ -17,14 +17,20 @@ class AppLauncherEntry {
 }
 
 /// The launcher is driven by installed manifests. First-party apps keep their established window
-/// keys and labels; only apps the shell can open today are listed. An empty list falls back to the
-/// built-in first-party entries.
+/// keys and labels; only apps the shell can open today are listed. Saved declarative apps are listed
+/// by their manifest id and opened through the server. An empty list falls back to the built-in
+/// first-party entries.
 List<AppLauncherEntry> launcherEntries(List<AppManifestSummary> apps) {
   if (apps.isEmpty) return defaultLauncherEntries;
-  final entries = apps
-      .map(entryFor)
-      .where((entry) => _openableLaunchKeys.contains(entry.launchKey))
-      .toList();
+  final entries = <AppLauncherEntry>[];
+  for (final app in apps) {
+    if (_firstPartyIds.contains(app.id)) {
+      final entry = entryFor(app);
+      if (_openableLaunchKeys.contains(entry.launchKey)) entries.add(entry);
+    } else if (app.kind == 'declarative') {
+      entries.add(savedLauncherEntry(app));
+    }
+  }
   entries.sort(
     (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
   );
@@ -32,6 +38,22 @@ List<AppLauncherEntry> launcherEntries(List<AppManifestSummary> apps) {
 }
 
 const _openableLaunchKeys = {'files', 'images', 'mydata', 'behaviors'};
+
+const _firstPartyIds = {
+  'intochat.files',
+  'intochat.image-editor',
+  'intochat.mydata',
+  'intochat.customer-tables',
+  'intochat.forms',
+};
+
+/// A saved app: the manifest id is the launch key, because the server reopens its windows.
+AppLauncherEntry savedLauncherEntry(AppManifestSummary app) => AppLauncherEntry(
+  launchKey: app.id,
+  title: app.name,
+  subtitle: app.description,
+  icon: Icons.bolt_outlined,
+);
 
 AppLauncherEntry entryFor(AppManifestSummary app) => switch (app.id) {
   'intochat.files' => const AppLauncherEntry(

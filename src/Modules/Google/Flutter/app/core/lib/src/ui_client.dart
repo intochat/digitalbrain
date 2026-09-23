@@ -156,6 +156,44 @@ final class DigitalBrainUiClient {
     ),
   );
 
+  /// Declares which sources a workspace is connected to; the first-run prompts follow them.
+  Future<WorkspaceSnapshot> setConnectedSources(
+    String workspaceId,
+    List<String> sources,
+  ) async => WorkspaceSnapshot.fromJson(
+    Map<String, dynamic>.from(
+      await _tableRequest(
+        'POST',
+        '/workspaces/${Uri.encodeComponent(workspaceId)}/connected-sources',
+        body: {'sources': sources},
+      ) as Map,
+    ),
+  );
+
+  /// Saves the workspace's open form and live-table windows as a declarative app.
+  Future<Map<String, dynamic>> saveApp(String workspaceId, String name) async =>
+      Map<String, dynamic>.from(
+        await _tableRequest(
+          'POST',
+          '/workspaces/${Uri.encodeComponent(workspaceId)}/apps/save',
+          body: {'name': name},
+        ) as Map,
+      );
+
+  /// Reopens a saved app's windows in the workspace.
+  Future<WorkspaceSnapshot> openApp(
+    String workspaceId,
+    String appId,
+  ) async => WorkspaceSnapshot.fromJson(
+    Map<String, dynamic>.from(
+      await _tableRequest(
+        'POST',
+        '/workspaces/${Uri.encodeComponent(workspaceId)}/apps/${Uri.encodeComponent(appId)}/reopen',
+        body: const <String, Object?>{},
+      ) as Map,
+    ),
+  );
+
   Future<WorkspaceSnapshot> readWorkspace(
     String workspaceId, {
     Future<void>? cancelled,
