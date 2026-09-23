@@ -59,10 +59,6 @@ internal sealed class MemoryNeuron(
     {
         ArgumentNullException.ThrowIfNull(note);
         ArgumentException.ThrowIfNullOrWhiteSpace(note.Namespace);
-        if (note.Namespace == ReservedNamespace)
-        {
-            throw new ArgumentException("Choose a namespace other than digitalbrain.capabilities.", nameof(note));
-        }
 
         var (_, store) = RequireDependencies();
         var removed = await store.RemoveNamespaceAsync(this.GetPrimaryKeyString(), note.Namespace, CancellationToken.None).ConfigureAwait(true);
