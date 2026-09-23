@@ -173,6 +173,17 @@ final class DigitalBrainUiClient {
       ) as Map,
     ),
   );
+  Future<void> reportProblem({
+    required String workspaceId,
+    required String intentId,
+    required String message,
+  }) async {
+    await _tableRequest(
+      'POST',
+      '/workspaces/${Uri.encodeComponent(workspaceId)}/reports',
+      body: {'intentId': intentId, 'message': message},
+    );
+  }
 
   Future<TableSnapshot> readWorkspaceTable(
     String workspaceId,

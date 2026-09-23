@@ -64,6 +64,27 @@ public sealed class MemoryFacts
     }
 
     [Fact]
+    public async Task PurgeNamespaceRemovesEveryNoteInThatNamespace()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var store = new InMemoryVectorMemoryStore();
+        await using var brain = await Start(store, ct);
+        var memory = brain.Get<IMemory>("owner");
+        await memory.Remember(new("intochat.workspace", "a", "alpha", [], null));
+        await memory.Remember(new("intochat.workspace", "b", "beta", [], null));
+        await memory.Remember(new("other", "c", "gamma", [], null));
+        await using var purged = await brain.Observe<NamespacePurged>(memory, ct);
+
+        var removed = await memory.PurgeNamespace(new("intochat.workspace"));
+
+        Assert.Equal(2, removed);
+        var published = await purged.NextAsync(ct: ct);
+        Assert.Equal("intochat.workspace", published.Namespace);
+        Assert.Empty((await memory.Recall(new("intochat.workspace", "alpha", 5, []))).Matches);
+        Assert.Single((await memory.Recall(new("other", "gamma", 5, []))).Matches);
+    }
+
+    [Fact]
     public async Task InvalidArgumentsAreRejected()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -133,4 +154,11 @@ internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore
 
     public Task<bool> RemoveAsync(string name, string @namespace, string key, CancellationToken cancellationToken)
         => Task.FromResult(_entries.Remove((name, @namespace, key)));
+
+    public Task<long> RemoveNamespaceAsync(string name, string @namespace, CancellationToken cancellationToken)
+    {
+        var keys = _entries.Keys.Where(entry => entry.Owner == name && entry.Namespace == @namespace).ToArray();
+        foreach (var key in keys) { _entries.Remove(key); }
+        return Task.FromResult((long)keys.Length);
+    }
 }

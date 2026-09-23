@@ -10,5 +10,7 @@ internal static class ProductSurfaceResources
 
     public const string ProductProfile = "product";
 
+    public const string HostedProfile = "hosted";
+
     public const int UiHttpPort = 5080;
 }

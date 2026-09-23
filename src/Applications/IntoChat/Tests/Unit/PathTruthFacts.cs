@@ -85,9 +85,9 @@ public sealed class PathTruthFacts
     }
 
     [Fact]
-    public void ContainerModuleListsMatchTheLiveAppHostChain()
+    public void ContainerModuleListsMatchTheProductProfile()
     {
-        string[] live =
+        string[] product =
         [
             "DigitalBrain.AI.AIModule, DigitalBrain.Modules.AI",
             "DigitalBrain.Memory.MemoryModule, DigitalBrain.Modules.Memory",
@@ -96,13 +96,16 @@ public sealed class PathTruthFacts
             "DigitalBrain.Time.TimeModule, DigitalBrain.Modules.Time",
             "DigitalBrain.Google.Gmail.GmailModule, DigitalBrain.Modules.Google.Gmail",
             "DigitalBrain.Salesforce.SalesforceModule, DigitalBrain.Modules.Salesforce",
-            "DigitalBrain.Microsoft.Aspire.AspireModule, DigitalBrain.Modules.Microsoft.Aspire",
             "DigitalBrain.Microsoft.GitHub.GitHubModule, DigitalBrain.Modules.Microsoft.GitHub",
-            "DigitalBrain.Microsoft.Roslyn.RoslynModule, DigitalBrain.Modules.Microsoft.Roslyn",
-            "DigitalBrain.Microsoft.DotNet.DotNetModule, DigitalBrain.Modules.Microsoft.DotNet",
-            "DigitalBrain.Coding.CodingModule, DigitalBrain.Modules.Coding",
-            "DigitalBrain.Behavior.BehaviorModule, DigitalBrain.Modules.Behavior",
             "DigitalBrain.Flutter.FlutterModule, DigitalBrain.Modules.Flutter",
+        ];
+        string[] developerOnly =
+        [
+            "DigitalBrain.Microsoft.Aspire.AspireModule",
+            "DigitalBrain.Microsoft.Roslyn.RoslynModule",
+            "DigitalBrain.Microsoft.DotNet.DotNetModule",
+            "DigitalBrain.Coding.CodingModule",
+            "DigitalBrain.Behavior.BehaviorModule",
         ];
         foreach (var file in new[]
         {
@@ -111,9 +114,13 @@ public sealed class PathTruthFacts
         })
         {
             var text = Read(file);
-            foreach (var module in live)
+            foreach (var module in product)
             {
                 Assert.Contains(module, text);
+            }
+            foreach (var module in developerOnly)
+            {
+                Assert.DoesNotContain(module, text);
             }
             Assert.DoesNotContain("Excel", text);
             Assert.DoesNotContain("DigitalBrain.Google.GoogleModule", text);

@@ -32,4 +32,7 @@ internal sealed class QdrantVectorMemoryStore(QdrantVectorMemoryProvider provide
 
     public Task<bool> RemoveAsync(string name, string @namespace, string key, CancellationToken cancellationToken)
         => _provider.RemoveAsync(name, @namespace, key, cancellationToken);
+
+    public Task<long> RemoveNamespaceAsync(string name, string @namespace, CancellationToken cancellationToken)
+        => _provider.RemoveNamespaceAsync(name, @namespace, cancellationToken);
 }

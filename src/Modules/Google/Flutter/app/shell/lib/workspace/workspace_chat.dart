@@ -23,6 +23,7 @@ class WorkspaceChat extends StatefulWidget {
     this.onReadConversation,
     this.onOpenUrl,
     this.onSalesforceConnected,
+    this.onReportProblem,
     required this.onArtifact,
     required this.onAttach,
     this.project,
@@ -44,6 +45,8 @@ class WorkspaceChat extends StatefulWidget {
   onReadConversation;
   final OpenUrl? onOpenUrl;
   final Future<bool> Function()? onSalesforceConnected;
+  final Future<void> Function(String workspaceId, String intentId, String message)?
+  onReportProblem;
   final void Function(Map<String, dynamic>) onArtifact;
   final VoidCallback onAttach;
   @override
@@ -58,7 +61,7 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
   final _composerFocus = FocusNode();
   final _entries = <Map<String, dynamic>>[];
   StreamSubscription<AgentEvent>? _subscription;
-  bool _running = false, _finished = false;
+  bool _running = false, _finished = false, _reported = false;
   String? _runId, _notice;
   @override
   void initState() {
@@ -263,6 +266,7 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
       _running = true;
       _finished = false;
       _notice = null;
+      _reported = false;
       _runId = runId;
     });
     final refs = c.attachedArtifactIds.map((id) {
@@ -452,6 +456,18 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
       await widget.onOpenUrl?.call(uri);
     } catch (_) {
       if (mounted) setState(() => _notice = 'The link could not be opened.');
+    }
+  }
+
+  Future<void> _reportProblem() async {
+    final report = widget.onReportProblem;
+    final runId = _runId;
+    if (report == null || runId == null) return;
+    try {
+      await report(_project.id, runId, _notice ?? 'The request failed.');
+      if (mounted) setState(() { _reported = true; _notice = 'Thanks — your report was sent.'; });
+    } catch (_) {
+      if (mounted) setState(() => _notice = 'The report could not be sent.');
     }
   }
 

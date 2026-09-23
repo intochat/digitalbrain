@@ -3,6 +3,7 @@ using DigitalBrain.Contracts;
 using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Flutter.Workspace.Signals;
 using DigitalBrain.Supabase.Tables;
+using IntoChat.Operations;
 using Microsoft.Extensions.Options;
 
 namespace IntoChat.Workspace;
@@ -47,6 +48,7 @@ internal static class WorkspaceEndpoints
                 return Results.Ok(WorkspaceTableAdapter.ToJson(snapshot));
             }));
         routes.MapGet("/workspaces/{workspaceId}/events", Events);
+        OperationsEndpoints.MapOperationsEndpoints(routes);
     }
 
     private static async Task Events(string workspaceId, HttpContext http, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct)

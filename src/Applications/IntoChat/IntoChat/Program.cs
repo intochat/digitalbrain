@@ -5,6 +5,7 @@ using IntoChat;
 using IntoChat.Agent;
 using IntoChat.Apps;
 using IntoChat.LocalFiles;
+using IntoChat.Operations;
 using IntoChat.ServiceDefaults;
 using IntoChat.Workspace;
 using Orleans.Dashboard;
@@ -24,6 +25,10 @@ builder.Services.AddSingleton<AppSurfaceComposer>();
 builder.Services.AddSingleton<ImageSaveCoordinator>();
 builder.Services.AddSingleton<LiveTableWindows>();
 builder.Services.AddSingleton<IAgentToolFactory, WorkspaceTableTools>();
+builder.Services.AddSingleton<IProblemReportStore, ProblemReportStore>();
+builder.Services.AddSingleton<IWorkspaceVectorPurge, MemoryWorkspaceVectorPurge>();
+builder.Services.AddSingleton<IWorkspaceBackupPurge, HostedWorkspaceBackupPurge>();
+builder.Services.AddSingleton<WorkspaceDeletion>();
 
 var app = builder.Build();
 

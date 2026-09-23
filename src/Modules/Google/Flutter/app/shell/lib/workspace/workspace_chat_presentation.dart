@@ -329,9 +329,25 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
         if (_notice != null)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            child: Text(
-              _notice!,
-              style: TextStyle(fontSize: 12, color: colors.error),
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    _notice!,
+                    style: TextStyle(fontSize: 12, color: colors.error),
+                  ),
+                ),
+                if (!_reported &&
+                    _runId != null &&
+                    widget.onReportProblem != null) ...[
+                  const SizedBox(width: 8),
+                  TextButton(
+                    key: const Key('report-problem'),
+                    onPressed: _reportProblem,
+                    child: const Text('Report a problem'),
+                  ),
+                ],
+              ],
             ),
           ),
         Padding(
