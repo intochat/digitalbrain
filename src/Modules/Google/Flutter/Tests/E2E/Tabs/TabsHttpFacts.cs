@@ -15,10 +15,10 @@ public sealed class TabsHttpFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
-        await brain.Get<ITabs>("pages").Set(
+        await brain.Get<ITabs>(UiScope.Key("workspace-a", "pages")).Set(
             [new TabItem("a", "A", new UiChildRef("text", "about"))],
             "a");
-        var state = await brain.HttpClient.GetFromJsonAsync<TabsState>("/ui/tabs/pages", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
+        var state = await brain.HttpClient.GetFromJsonAsync<TabsState>("/workspaces/workspace-a/ui/tabs/pages", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
         Assert.Equal("a", state!.SelectedId);
     }
 }

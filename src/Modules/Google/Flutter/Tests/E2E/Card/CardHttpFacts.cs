@@ -15,8 +15,8 @@ public sealed class CardHttpFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
-        await brain.Get<ICard>("hero").Set("Title", "Body", []);
-        var state = await brain.HttpClient.GetFromJsonAsync<CardState>("/ui/cards/hero", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
+        await brain.Get<ICard>(UiScope.Key("workspace-a", "hero")).Set("Title", "Body", []);
+        var state = await brain.HttpClient.GetFromJsonAsync<CardState>("/workspaces/workspace-a/ui/cards/hero", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
         Assert.Equal("Title", state!.Title);
     }
 }

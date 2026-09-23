@@ -71,7 +71,6 @@ internal static class UiKitEndpoints
             return Results.Accepted();
         });
 
-        UiHttp.MapGet<ITextField, TextFieldState>(endpoints, "textfields", neuron => neuron.Read());
         UiHttp.MapPost(endpoints, "textfields/{name}/configure", async (string name, TextFieldConfigure body, IGrainFactory grains, CancellationToken ct) =>
         {
             await grains.GetGrain<ITextField>(name).Configure(body.Label, body.Kind).WaitAsync(ct);

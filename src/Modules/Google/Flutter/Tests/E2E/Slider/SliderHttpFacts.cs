@@ -15,10 +15,10 @@ public sealed class SliderHttpFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
-        var slider = brain.Get<ISlider>("vol");
+        var slider = brain.Get<ISlider>(UiScope.Key("workspace-a", "vol"));
         await slider.Configure(0, 10, 1);
         await slider.SetValue(4);
-        var state = await brain.HttpClient.GetFromJsonAsync<SliderState>("/ui/sliders/vol", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
+        var state = await brain.HttpClient.GetFromJsonAsync<SliderState>("/workspaces/workspace-a/ui/sliders/vol", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
         Assert.Equal(4, state!.Value);
     }
 }

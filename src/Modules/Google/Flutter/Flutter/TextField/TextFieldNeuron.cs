@@ -12,7 +12,7 @@ namespace DigitalBrain.Flutter.TextField;
 internal sealed class TextFieldNeuron([PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<TextFieldState> store)
     : Neuron<TextFieldState>(store), ITextField
 {
-    private static readonly HashSet<string> Kinds = new(StringComparer.OrdinalIgnoreCase) { "text", "number", "password", "suggest" };
+    private static readonly HashSet<string> Kinds = new(StringComparer.OrdinalIgnoreCase) { "text", "number", "password", "secret", "suggest" };
 
     public Task Configure(string label, string kind)
     {

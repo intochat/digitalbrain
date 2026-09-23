@@ -121,13 +121,14 @@ void main() {
   ) async {
     TableViewUpdate? submitted;
     final controller = UiTableController(
+      workspace: 'w',
       snapshot: TableSnapshot.fromJson({
         ...tableJson(1, 'Filtered'),
         'filters': [
           {'columnId': 'company', 'operator': 'eq', 'value': 'Filtered'},
         ],
       }),
-      update: (_, update) async {
+      update: (_, __, update) async {
         submitted = update;
         return TableSnapshot.fromJson(tableJson(2, 'All rows'));
       },
@@ -295,13 +296,14 @@ void main() {
     final fast = Completer<TableSnapshot>();
     var calls = 0;
     final controller = UiTableController(
+      workspace: 'w',
       snapshot: TableSnapshot.fromJson(tableJson(1, 'old')),
-      read: (_, {offset = 0, limit = 25}) => ++calls == 1
+      read: (_, __, {offset = 0, limit = 25}) => ++calls == 1
           ? slow.future
           : calls == 2
           ? fast.future
           : Future.value(TableSnapshot.fromJson(tableJson(3, 'authoritative'))),
-      update: (_, update) async =>
+      update: (_, __, update) async =>
           throw const TableRequestException(409, 'conflict'),
     );
     final first = controller.reload();

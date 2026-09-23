@@ -15,8 +15,8 @@ public sealed class GraphHttpFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
-        await brain.Get<IGraph>("net").Render("N", [new GraphNode("a", "A")], []);
-        var state = await brain.HttpClient.GetFromJsonAsync<GraphState>("/ui/graphs/net", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
+        await brain.Get<IGraph>(UiScope.Key("workspace-a", "net")).Render("N", [new GraphNode("a", "A")], []);
+        var state = await brain.HttpClient.GetFromJsonAsync<GraphState>("/workspaces/workspace-a/ui/graphs/net", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
         Assert.Single(state!.Nodes);
     }
 }

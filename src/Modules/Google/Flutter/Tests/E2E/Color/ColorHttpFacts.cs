@@ -15,8 +15,8 @@ public sealed class ColorHttpFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
-        await brain.Get<IColor>("accent").Set("#0a84ff");
-        var state = await brain.HttpClient.GetFromJsonAsync<ColorState>("/ui/colors/accent", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
+        await brain.Get<IColor>(UiScope.Key("workspace-a", "accent")).Set("#0a84ff");
+        var state = await brain.HttpClient.GetFromJsonAsync<ColorState>("/workspaces/workspace-a/ui/colors/accent", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
         Assert.Equal("#0A84FF", state!.Hex);
     }
 }

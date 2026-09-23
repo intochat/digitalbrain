@@ -15,8 +15,8 @@ public sealed class ImageHttpFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
-        await brain.Get<IImage>("logo").Set("https://example.com/a.png", "image/png", "logo");
-        var state = await brain.HttpClient.GetFromJsonAsync<ImageState>("/ui/images/logo", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
+        await brain.Get<IImage>(UiScope.Key("workspace-a", "logo")).Set("https://example.com/a.png", "image/png", "logo");
+        var state = await brain.HttpClient.GetFromJsonAsync<ImageState>("/workspaces/workspace-a/ui/images/logo", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
         Assert.Equal("image/png", state!.MediaType);
     }
 }

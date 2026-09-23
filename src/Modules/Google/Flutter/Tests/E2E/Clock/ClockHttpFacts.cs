@@ -15,8 +15,8 @@ public sealed class ClockHttpFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
-        await brain.Get<IClock>("tea").Set("Tea", DateTimeOffset.UnixEpoch);
-        var state = await brain.HttpClient.GetFromJsonAsync<ClockState>("/ui/clocks/tea", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
+        await brain.Get<IClock>(UiScope.Key("workspace-a", "tea")).Set("Tea", DateTimeOffset.UnixEpoch);
+        var state = await brain.HttpClient.GetFromJsonAsync<ClockState>("/workspaces/workspace-a/ui/clocks/tea", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
         Assert.Equal("Tea", state!.Label);
     }
 }

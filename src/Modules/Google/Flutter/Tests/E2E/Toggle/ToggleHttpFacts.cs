@@ -15,8 +15,8 @@ public sealed class ToggleHttpFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
-        await brain.Get<IToggle>("dark").Set("Dark", true);
-        var state = await brain.HttpClient.GetFromJsonAsync<ToggleState>("/ui/toggles/dark", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
+        await brain.Get<IToggle>(UiScope.Key("workspace-a", "dark")).Set("Dark", true);
+        var state = await brain.HttpClient.GetFromJsonAsync<ToggleState>("/workspaces/workspace-a/ui/toggles/dark", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
         Assert.True(state!.On);
     }
 }

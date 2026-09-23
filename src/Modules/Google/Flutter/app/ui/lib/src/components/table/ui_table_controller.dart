@@ -3,7 +3,13 @@ import 'package:flutter/foundation.dart';
 
 /// Share this controller by table ID: cards always display the same server view.
 final class UiTableController extends ChangeNotifier {
-  UiTableController({required this._snapshot, this.read, this.update});
+  UiTableController({
+    required this.workspace,
+    required this._snapshot,
+    this.read,
+    this.update,
+  });
+  final String workspace;
   TableSnapshot _snapshot;
   TableSnapshot get snapshot => _snapshot;
   final ReadTable? read;
@@ -36,6 +42,7 @@ final class UiTableController extends ChangeNotifier {
     _notify();
     try {
       final next = await reader(
+        workspace,
         snapshot.id,
         offset: offset ?? snapshot.offset,
         limit: snapshot.limit,
@@ -68,6 +75,7 @@ final class UiTableController extends ChangeNotifier {
     _notify();
     try {
       final next = await writer(
+        workspace,
         current.id,
         TableViewUpdate(
           expectedRevision: current.revision,
@@ -87,6 +95,7 @@ final class UiTableController extends ChangeNotifier {
       if (read case final reader?) {
         try {
           final latest = await reader(
+            workspace,
             current.id,
             offset: 0,
             limit: current.limit,

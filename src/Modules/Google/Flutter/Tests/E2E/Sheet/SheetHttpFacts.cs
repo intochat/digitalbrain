@@ -15,8 +15,8 @@ public sealed class SheetHttpFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
-        await brain.Get<ISheet>("budget").Set("Budget", [new SheetCell(0, 0, "100")]);
-        var state = await brain.HttpClient.GetFromJsonAsync<SheetState>("/ui/sheets/budget", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
+        await brain.Get<ISheet>(UiScope.Key("workspace-a", "budget")).Set("Budget", [new SheetCell(0, 0, "100")]);
+        var state = await brain.HttpClient.GetFromJsonAsync<SheetState>("/workspaces/workspace-a/ui/sheets/budget", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
         Assert.Equal("Budget", state!.Title);
     }
 }

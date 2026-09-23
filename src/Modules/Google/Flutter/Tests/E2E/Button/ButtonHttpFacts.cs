@@ -16,11 +16,11 @@ public sealed class ButtonHttpFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
-        var button = brain.Get<IButton>("go");
+        var button = brain.Get<IButton>(UiScope.Key("workspace-a", "go"));
         await using var clicks = await brain.Observe<ButtonClicked>(button, ct);
-        using var set = await brain.HttpClient.PostAsJsonAsync("/ui/buttons/go/set", new { label = "Open", action = "navigate:docs" }, ct);
+        using var set = await brain.HttpClient.PostAsJsonAsync("/workspaces/workspace-a/ui/buttons/go/set", new { label = "Open", action = "navigate:docs" }, ct);
         Assert.Equal(HttpStatusCode.Accepted, set.StatusCode);
-        using var click = await brain.HttpClient.PostAsJsonAsync("/ui/buttons/go/click", new { }, ct);
+        using var click = await brain.HttpClient.PostAsJsonAsync("/workspaces/workspace-a/ui/buttons/go/click", new { }, ct);
         Assert.Equal(HttpStatusCode.Accepted, click.StatusCode);
         Assert.Equal("navigate:docs", (await clicks.NextAsync(ct: ct)).Action);
     }
