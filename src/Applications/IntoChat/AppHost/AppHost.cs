@@ -9,6 +9,7 @@ using DigitalBrain.ClickHouse;
 using DigitalBrain.Coding;
 using DigitalBrain.Behavior;
 using DigitalBrain.Behavior.Aspire.Hosting;
+using DigitalBrain.Broker;
 using DigitalBrain.Core;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
@@ -63,7 +64,8 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<GitHubModule>(github => github.WithGitHubRepositories(repositories))
     .WithModule<FlutterModule>(flutter => flutter.RunDesktopApp())
     .WithModule<ReceiptsModule>()
-    .WithModule<ComputeModule>();
+    .WithModule<ComputeModule>()
+    .WithModule<BrokerModule>();
 
 if (developerProfile)
 {
