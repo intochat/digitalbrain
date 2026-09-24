@@ -1,3 +1,4 @@
+using IntoChat.Packages;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Aspire;
 using DigitalBrain.Automations;
@@ -18,6 +19,7 @@ builder.Services.AddIntoChatOptions();
 builder.AddServiceDefaults();
 builder.AddDigitalBrain();
 builder.AddBehaviors();
+builder.AddPackages();
 builder.AddKernelCors();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -61,6 +63,7 @@ app.UseAccountSession();
 app.MapDefaultEndpoints();
 app.MapOrleansDashboard("/orleans");
 app.MapBehaviors();
+app.MapPackages();
 app.MapDigitalBrainModules();
 app.MapWorkspaceDataEndpoints();
 app.MapWorkspaceAgent();
