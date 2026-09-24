@@ -31,13 +31,13 @@ public sealed class AppRegistrationFacts
     }
 }
 
-public sealed class ExampleApp(IPersistentState<ExampleState> state) : App<ExampleState>(state), IAppDefinition
+public sealed class ExampleApp(IPersistentState<ExampleState> state) : Neuron<ExampleState>(state), IAppDefinition
 {
     public static AppDefinition Definition => new("test.example", [typeof(AppsModule)]);
 }
 public sealed class ExampleState;
 
-public sealed class SecondExampleApp(IPersistentState<ExampleState> state) : App<ExampleState>(state), IAppDefinition
+public sealed class SecondExampleApp(IPersistentState<ExampleState> state) : Neuron<ExampleState>(state), IAppDefinition
 {
     public static AppDefinition Definition => new("test.second", [typeof(AppsModule)]);
 }

@@ -45,7 +45,7 @@ public interface ISettingsApp : INeuron
 [GrainType("intochat.settings-app")]
 public sealed class SettingsApp(
     [PersistentState("intochat.settings-app", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SettingsAppState> store)
-    : App<SettingsAppState>(store), ISettingsApp, IAppDefinition, INeuronObserver
+    : Neuron<SettingsAppState>(store), ISettingsApp, IAppDefinition, INeuronObserver
 {
     private IGrainTimer? _renewal;
     public static AppDefinition Definition => new("intochat.settings", [typeof(FlutterModule)], typeof(ISettingsApp));

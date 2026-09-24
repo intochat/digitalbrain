@@ -1,22 +1,9 @@
-using Orleans.Runtime;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Core;
 
-/// <summary>A workspace app is a neuron aggregate. Definitions are read without creating a grain.</summary>
-public abstract class App<TState>(IPersistentState<TState> store) : Neuron<TState>(store) where TState : class, new();
-
-public interface IAppDefinition
-{
-    static abstract AppDefinition Definition { get; }
-}
-
-public sealed record AppDefinition(string Id, IReadOnlyList<Type> RequiredModules, Type? Contract = null);
-
-public sealed record AppRegistration(Type AppType, AppDefinition Definition);
-
-/// <summary>Transports frozen app declarations through the same module configuration as production and test hosts.</summary>
+// Transports frozen app declarations through the same module configuration as production and test hosts.
 public sealed class AppCompositionModule : IModule
 {
     public void Configure(Orleans.Hosting.ISiloBuilder silo)

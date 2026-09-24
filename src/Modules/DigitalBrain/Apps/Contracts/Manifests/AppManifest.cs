@@ -19,5 +19,4 @@ public sealed record AppManifest
     [Id(12)] public IReadOnlyList<AppScenario> Scenarios { get; init; } = [];
     [Id(13)] public string? RemoteEndpoint { get; init; }
     [Id(14)] public IReadOnlyList<AppWindow> Windows { get; init; } = [];
-    [Id(15)] public AppComposition? Composition { get; init; }
 }

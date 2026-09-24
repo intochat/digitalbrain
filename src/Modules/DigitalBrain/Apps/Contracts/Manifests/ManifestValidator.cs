@@ -51,7 +51,6 @@ public static partial class ManifestValidator
             Require(permission is not null && knownTypeIds.Contains(permission.SemanticTypeId),
                 $"Permission references unknown type '{permission?.SemanticTypeId}'.");
         }
-        if (manifest.Composition is { } composition) { AppCompositionValidation.Validate(composition); }
     }
 
     private static void Require(bool condition, string message)

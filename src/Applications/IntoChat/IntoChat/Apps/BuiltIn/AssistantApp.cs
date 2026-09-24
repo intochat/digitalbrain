@@ -43,7 +43,7 @@ public interface IAssistantApp : INeuron
 [GrainType("intochat.assistant-app")]
 public sealed class AssistantApp(
     [PersistentState("intochat.assistant-app", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<AssistantAppState> store)
-    : App<AssistantAppState>(store), IAssistantApp, IAppDefinition, INeuronObserver
+    : Neuron<AssistantAppState>(store), IAssistantApp, IAppDefinition, INeuronObserver
 {
     private IGrainTimer? _renewal;
     public static AppDefinition Definition => new("intochat.assistant", [typeof(AIModule), typeof(FlutterModule)], typeof(IAssistantApp));

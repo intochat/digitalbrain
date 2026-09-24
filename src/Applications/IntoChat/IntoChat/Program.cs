@@ -65,7 +65,6 @@ app.MapDigitalBrainModules();
 app.MapWorkspaceDataEndpoints();
 app.MapWorkspaceAgent();
 app.MapLocalApps();
-app.MapAppRuntime();
 app.MapBuiltInApps();
 
 app.Run();
