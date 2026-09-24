@@ -46,22 +46,66 @@ public sealed class AppFacts
     }
 
     [Fact]
-    public async Task ConfiguringRedeploysTheSameArtifactWithoutForking()
+    public async Task ConfiguringRunsTheSameArtifactInAFreshProgramWithoutForking()
+    {
+        await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
+        var revision = await Publish(brain, "Research");
+        var app = brain.Get<IApp>(Key());
+        var installed = await app.Install(new(Guid.NewGuid(), new(Researcher, revision.Id), new Dictionary<string, string>()));
+        var configure = new ConfigureApp(Guid.NewGuid(), new Dictionary<string, string> { ["style"] = "brief" });
+
+        var configured = await app.Configure(configure);
+        var repeated = await app.Configure(configure);
+
+        Assert.Equal("brief", configured.Settings["style"]);
+        Assert.Equal(configured.BehaviorProgram, repeated.BehaviorProgram);
+        Assert.NotEqual(installed.BehaviorProgram, configured.BehaviorProgram);
+        Assert.True(RecordingBehaviorProgram.Deleted.ContainsKey(installed.BehaviorProgram!));
+        var deployment = Assert.Single(Program(configured).Deployments);
+        Assert.Equal(revision.Artifact, deployment.Artifact);
+        Assert.Equal("brief", Configuration(deployment)["Behavior__Settings__style"]);
+    }
+
+    [Fact]
+    public async Task CommandsRetriedAfterTheirStateFailedToSaveFinishWithoutDuplicatingWork()
+    {
+        await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
+        var revision = await Publish(brain, "Research");
+        var app = brain.Get<IApp>(Key());
+        var install = new InstallApp(Guid.NewGuid(), new(Researcher, revision.Id), new Dictionary<string, string> { ["style"] = "bullets" });
+
+        brain.Storage.FailNextWrite = state => state is AppState { Status: AppStatus.Installed };
+        await Assert.ThrowsAnyAsync<Exception>(() => app.Install(install));
+        var installed = await app.Install(install);
+        Assert.Single(Program(installed).Deployments);
+
+        var configure = new ConfigureApp(Guid.NewGuid(), new Dictionary<string, string> { ["style"] = "brief" });
+        brain.Storage.FailNextWrite = state => state is AppState { Status: AppStatus.Installed } app && app.Settings["style"] == "brief";
+        await Assert.ThrowsAnyAsync<Exception>(() => app.Configure(configure));
+        var configured = await app.Configure(configure);
+        Assert.Single(Program(configured).Deployments);
+        Assert.True(RecordingBehaviorProgram.Deleted.ContainsKey(installed.BehaviorProgram!));
+
+        var uninstall = new UninstallApp(Guid.NewGuid());
+        brain.Storage.FailNextWrite = state => state is AppState { Status: AppStatus.Uninstalled };
+        await Assert.ThrowsAnyAsync<Exception>(() => app.Uninstall(uninstall));
+        Assert.Equal(AppStatus.Uninstalled, (await app.Uninstall(uninstall)).Status);
+        Assert.True(RecordingBehaviorProgram.Deleted.ContainsKey(configured.BehaviorProgram!));
+    }
+
+    [Fact]
+    public async Task ARetryListingTheSameSettingsInAnotherOrderIsTheSameCommand()
     {
         await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
         var revision = await Publish(brain, "Research");
         var app = brain.Get<IApp>(Key());
         await app.Install(new(Guid.NewGuid(), new(Researcher, revision.Id), new Dictionary<string, string>()));
-        var configure = new ConfigureApp(Guid.NewGuid(), new Dictionary<string, string> { ["style"] = "brief" });
+        var operation = Guid.NewGuid();
 
-        var configured = await app.Configure(configure);
-        await app.Configure(configure);
+        await app.Configure(new(operation, new Dictionary<string, string> { ["style"] = "brief", ["language"] = "uk" }));
+        var retried = await app.Configure(new(operation, new Dictionary<string, string> { ["language"] = "uk", ["style"] = "brief" }));
 
-        Assert.Equal("brief", configured.Settings["style"]);
-        var deployments = Program(configured).Deployments;
-        Assert.Equal(2, deployments.Count);
-        Assert.All(deployments, deployment => Assert.Equal(revision.Artifact, deployment.Artifact));
-        Assert.Equal("brief", Configuration(deployments[^1])["Behavior__Settings__style"]);
+        Assert.Equal(("brief", "uk"), (retried.Settings["style"], retried.Settings["language"]));
     }
 
     [Fact]
@@ -77,7 +121,7 @@ public sealed class AppFacts
 
         Assert.Equal(second.Id, upgraded.Revision!.Revision);
         Assert.Equal("bullets", upgraded.Settings["style"]);
-        Assert.Equal(second.Artifact, Program(upgraded).Deployments[^1].Artifact);
+        Assert.Equal(second.Artifact, Assert.Single(Program(upgraded).Deployments).Artifact);
         Caller.As("bob");
         await brain.Get<IPackage>("bob/researcher").Fork(new(Guid.NewGuid(), new(Researcher, second.Id)));
         await Assert.ThrowsAsync<ArgumentException>(() => app.Upgrade(new(Guid.NewGuid(), new(PackageId.Parse("bob/researcher"), second.Id))));

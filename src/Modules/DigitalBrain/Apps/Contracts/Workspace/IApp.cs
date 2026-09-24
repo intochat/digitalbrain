@@ -1,5 +1,4 @@
 using DigitalBrain.Contracts;
-using Orleans.Concurrency;
 using Orleans.Metadata;
 
 namespace DigitalBrain.Apps;
@@ -9,13 +8,13 @@ namespace DigitalBrain.Apps;
 [Alias("apps.app"), DefaultGrainType("apps.app")]
 public interface IApp : INeuron
 {
-    [AlwaysInterleave] Task<AppSnapshot> Read();
+    Task<AppSnapshot> Read();
     Task<AppSnapshot> Install(InstallApp request);
     Task<AppSnapshot> Configure(ConfigureApp request);
     Task<AppSnapshot> Upgrade(UpgradeApp request);
     Task<AppSnapshot> Uninstall(UninstallApp request);
     Task<AppInvocation> Invoke(InvokeApp request);
     Task<AppInvocation> Respond(AppResponse response);
-    [AlwaysInterleave] Task<AppInvocation> ReadInvocation(Guid invocationId);
-    [AlwaysInterleave] Task<IReadOnlyList<AppInvocation>> Pending();
+    Task<AppInvocation> ReadInvocation(Guid invocationId);
+    Task<IReadOnlyList<AppInvocation>> Pending();
 }

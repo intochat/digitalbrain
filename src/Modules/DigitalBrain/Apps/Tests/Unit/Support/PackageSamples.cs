@@ -9,7 +9,7 @@ internal static class PackageSamples
             "Internet researcher",
             "Answers a question with a short research brief.",
             [new PackageOperation("research", "Research a question.")],
-            [new PackageSetting("style", "How the brief is written.", "plain")]),
+            [new PackageSetting("style", "How the brief is written.", "plain"), new PackageSetting("language", "Language of the brief.", "en")]),
         $$"""
         public static class Brief
         {

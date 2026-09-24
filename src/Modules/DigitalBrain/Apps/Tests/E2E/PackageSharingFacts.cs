@@ -43,12 +43,12 @@ public sealed class PackageSharingFacts
             // One step from a marketplace listing to a running behavior in Bob's workspace.
             var bobsApp = brain.Get<IApp>("workspace-bob/apps/alice/researcher");
             var installed = await bobsApp.Install(new(Guid.NewGuid(), new(listing.Package, listing.Revision), new Dictionary<string, string>()));
-            await Running(brain, installed, 1, ct);
+            await Running(brain, installed, ct);
             Assert.Equal("Research (plain): What is Orleans?", await Ask(bobsApp, "What is Orleans?", ct));
 
             // Customizing a declared setting redeploys the same revision; nothing is forked.
             var configured = await bobsApp.Configure(new(Guid.NewGuid(), new Dictionary<string, string> { ["style"] = "bullets" }));
-            await Running(brain, configured, 2, ct);
+            await Running(brain, configured, ct);
             Assert.Equal("Research (bullets): What is Orleans?", await Ask(bobsApp, "What is Orleans?", ct));
 
             // Changing the code needs a fork, and the fork's own tests gate the change.
@@ -61,7 +61,7 @@ public sealed class PackageSharingFacts
             var summaries = await CommitChecked(brain, fork, original.Id, ResearcherPackage.Content("Summary"), "Summarize instead", ct);
             var bobsFork = brain.Get<IApp>("workspace-bob/apps/bob/researcher");
             var forkInstalled = await bobsFork.Install(new(Guid.NewGuid(), new(Fork, summaries.Id), new Dictionary<string, string>()));
-            await Running(brain, forkInstalled, 1, ct);
+            await Running(brain, forkInstalled, ct);
             Assert.Equal("Summary (plain): What is Orleans?", await Ask(bobsFork, "What is Orleans?", ct));
 
             // Bob proposes the change back; Alice accepts and publishes it.
@@ -74,7 +74,7 @@ public sealed class PackageSharingFacts
 
             // Bob's original install upgrades to the contributed revision and keeps his setting.
             var upgraded = await bobsApp.Upgrade(new(Guid.NewGuid(), new(Upstream, summaries.Id)));
-            await Running(brain, upgraded, 3, ct);
+            await Running(brain, upgraded, ct);
             Assert.Equal("Summary (bullets): What is Orleans?", await Ask(bobsApp, "What is Orleans?", ct));
 
             await bobsApp.Uninstall(new(Guid.NewGuid()));
@@ -107,7 +107,7 @@ public sealed class PackageSharingFacts
         return check;
     }
 
-    private static async Task Running(E2EBrain brain, AppSnapshot app, long deployment, CancellationToken ct)
+    private static async Task Running(E2EBrain brain, AppSnapshot app, CancellationToken ct)
     {
         var program = brain.Get<IBehaviorProgram>(app.BehaviorProgram!);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -115,7 +115,7 @@ public sealed class PackageSharingFacts
         while (true)
         {
             var state = await program.Read(timeout.Token);
-            if (state.Ready && state.ActiveDeploymentRevision == deployment) { return; }
+            if (state.Ready && state.ActiveDeploymentRevision == state.DesiredDeploymentRevision) { return; }
             if (state.State == BehaviorExecutionState.Failed)
             {
                 var logs = await program.ReadLogs(0, 200, timeout.Token);

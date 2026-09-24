@@ -65,6 +65,8 @@ internal sealed class PackageService(
 
     public Task<PackageSnapshot> Accept(PackageId id, int number) => Package(id).Accept(new(Guid.NewGuid(), number));
 
+    public Task<PackageSnapshot> Close(PackageId id, int number) => Package(id).Close(new(Guid.NewGuid(), number));
+
     public async Task<PackageSnapshot> Publish(PackageId id, PublishPackageRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -114,7 +116,7 @@ internal sealed class PackageService(
 
     public Task<AppInvocation> ReadInvocation(string workspaceId, PackageId id, Guid invocationId) => App(workspaceId, id).ReadInvocation(invocationId);
 
-    // Identical content shares one draft, so a retried commit reuses its finished check instead of rebuilding.
+    // Identical content shares one draft, so a retried commit reuses its passing check instead of rebuilding.
     private async Task<CodeCheckSnapshot> Check(PackageContent content, CancellationToken cancellationToken)
     {
         var draftKey = "package-check-" + Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(content)));
@@ -123,7 +125,8 @@ internal sealed class PackageService(
         if (saved.Revision == 0)
         { saved = await draft.Save(new(0, Guid.NewGuid(), content.Source, content.Tests, content.ModuleIds ?? []), cancellationToken); }
         var check = saved.LatestCheckId is { } latest ? await draft.ReadCheck(latest, cancellationToken) : null;
-        if (check is null || check.Status is CodeCheckStatus.Cancelled or CodeCheckStatus.Interrupted)
+        // Only a passing or running check is reused; a failure may have been a timeout, so asking again rebuilds.
+        if (check?.Status is not (CodeCheckStatus.Passed or CodeCheckStatus.Queued or CodeCheckStatus.Building or CodeCheckStatus.Testing))
         { check = await draft.Check(new(saved.Revision, Guid.NewGuid()), cancellationToken); }
         while (check.Status is CodeCheckStatus.Queued or CodeCheckStatus.Building or CodeCheckStatus.Testing)
         {

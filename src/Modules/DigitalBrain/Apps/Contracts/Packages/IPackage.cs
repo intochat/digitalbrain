@@ -16,5 +16,6 @@ public interface IPackage : INeuron
     Task<PackageSnapshot> Pull(PullPackage request);
     Task<PackageProposal> Propose(ProposeChange request);
     Task<PackageSnapshot> Accept(AcceptProposal request);
+    Task<PackageSnapshot> Close(CloseProposal request);
     Task<PackageSnapshot> Publish(PublishPackage request);
 }

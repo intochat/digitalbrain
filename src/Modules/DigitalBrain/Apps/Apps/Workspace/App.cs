@@ -30,8 +30,8 @@ internal sealed class App(
         { throw new InvalidOperationException($"{Snapshot.Revision!.Package} is already installed here; configure or upgrade it instead."); }
         var revision = await GrainFactory.GetGrain<IPackage>(request.Revision.Package.ToString()).ReadRevision(request.Revision.Revision);
         var settings = Resolve(revision.Content.Manifest.Settings, new Dictionary<string, string>(), request.Settings);
-        var installation = Snapshot.Installation + 1;
-        await Deploy(ProgramKey(installation), request.OperationId, revision.Artifact, settings);
+        var generation = Snapshot.ProgramGeneration + 1;
+        await Deploy(generation, request.OperationId, revision.Artifact, settings);
         await Persist(Snapshot with
         {
             Status = AppStatus.Installed,
@@ -40,7 +40,7 @@ internal sealed class App(
             Declared = [.. revision.Content.Manifest.Settings],
             Settings = settings,
             Operations = [.. revision.Content.Manifest.Operations],
-            Installation = installation,
+            ProgramGeneration = generation,
             Receipts = Receipted(request.OperationId, request),
         });
         return Describe(Snapshot);
@@ -52,8 +52,9 @@ internal sealed class App(
         if (Replay(request.OperationId, request)) { return Describe(Snapshot); }
         RequireInstalled();
         var settings = Resolve(Snapshot.Declared, Snapshot.Settings, request.Settings);
-        await Deploy(ProgramKey(Snapshot.Installation), request.OperationId, Snapshot.Artifact!, settings);
-        await Persist(Snapshot with { Settings = settings, Receipts = Receipted(request.OperationId, request) });
+        await Retire(Snapshot.ProgramGeneration, request.OperationId);
+        await Deploy(Snapshot.ProgramGeneration + 1, request.OperationId, Snapshot.Artifact!, settings);
+        await Persist(Snapshot with { Settings = settings, ProgramGeneration = Snapshot.ProgramGeneration + 1, Receipts = Receipted(request.OperationId, request) });
         return Describe(Snapshot);
     }
 
@@ -70,10 +71,12 @@ internal sealed class App(
         var declared = revision.Content.Manifest.Settings;
         var kept = Snapshot.Settings.Where(pair => declared.Any(setting => setting.Name == pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value);
         var settings = Resolve(declared, kept, new Dictionary<string, string>());
-        await Deploy(ProgramKey(Snapshot.Installation), request.OperationId, revision.Artifact, settings);
+        await Retire(Snapshot.ProgramGeneration, request.OperationId);
+        await Deploy(Snapshot.ProgramGeneration + 1, request.OperationId, revision.Artifact, settings);
         await Persist(Snapshot with
         {
             Revision = request.Revision,
+            ProgramGeneration = Snapshot.ProgramGeneration + 1,
             Artifact = revision.Artifact,
             Declared = [.. declared],
             Settings = settings,
@@ -88,8 +91,7 @@ internal sealed class App(
         ArgumentNullException.ThrowIfNull(request);
         if (Replay(request.OperationId, request)) { return Describe(Snapshot); }
         RequireInstalled();
-        var program = GrainFactory.GetGrain<IBehaviorProgram>(ProgramKey(Snapshot.Installation));
-        await program.Delete(new DeleteBehavior((await program.Read()).Revision, request.OperationId));
+        await Retire(Snapshot.ProgramGeneration, request.OperationId);
         var now = clock.GetUtcNow();
         var invocations = Snapshot.Invocations
             .Select(item => item.Status == InvocationStatus.Pending ? item with { Status = InvocationStatus.Failed, Error = "The app was uninstalled.", CompletedAt = now } : item)
@@ -150,11 +152,18 @@ internal sealed class App(
     public Task<IReadOnlyList<AppInvocation>> Pending()
         => Task.FromResult<IReadOnlyList<AppInvocation>>(Snapshot.Invocations.Where(item => item.Status == InvocationStatus.Pending).ToArray());
 
-    private async Task Deploy(string programKey, Guid operationId, CodeArtifactRef artifact, IReadOnlyDictionary<string, string> settings)
+    // Every deployment gets a fresh program: its request never depends on program state, so a command
+    // retried after a lost save replays the same deployment, and no program outgrows its deployment history.
+    private Task Deploy(int generation, Guid operationId, CodeArtifactRef artifact, IReadOnlyDictionary<string, string> settings)
+        => GrainFactory.GetGrain<IBehaviorProgram>(ProgramKey(generation)).Deploy(new DeployBehavior(0, operationId, artifact, Configuration(settings)));
+
+    // Deleting an already deleted program is harmless, so a retry deletes again under a revision-specific operation id.
+    private async Task Retire(int generation, Guid operationId)
     {
-        var program = GrainFactory.GetGrain<IBehaviorProgram>(programKey);
-        var current = await program.Read();
-        await program.Deploy(new DeployBehavior(current.Revision, operationId, artifact, Configuration(settings)));
+        var program = GrainFactory.GetGrain<IBehaviorProgram>(ProgramKey(generation));
+        var revision = (await program.Read()).Revision;
+        var retirement = new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(operationId + "\0" + revision)).AsSpan(0, 16));
+        await program.Delete(new DeleteBehavior(revision, retirement));
     }
 
     // The behavior reads Behavior:App to find this neuron and Behavior:Settings:{name} for each setting.
@@ -165,9 +174,8 @@ internal sealed class App(
         return JsonSerializer.Serialize(values);
     }
 
-    // Deleted programs cannot be redeployed, so every installation runs under a key of its own.
-    private string ProgramKey(int installation)
-        => "app-behavior-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(this.GetPrimaryKeyString() + "\0" + installation)));
+    private string ProgramKey(int generation)
+        => "app-behavior-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(this.GetPrimaryKeyString() + "\0" + generation)));
 
     private static Dictionary<string, string> Resolve(IReadOnlyList<PackageSetting> declared, IReadOnlyDictionary<string, string> current, IReadOnlyDictionary<string, string> supplied)
     {
@@ -192,17 +200,25 @@ internal sealed class App(
     {
         var receipt = Snapshot.Receipts.Find(item => item.OperationId == operationId);
         if (receipt is null) { return false; }
-        return receipt.RequestHash == PackageHash.Of(request)
+        return receipt.RequestHash == CommandHash(request)
             ? true
             : throw new InvalidOperationException($"Operation {operationId} was already used for a different change.");
     }
 
     private List<OperationReceipt> Receipted(Guid operationId, object request)
     {
-        var receipts = new List<OperationReceipt>(Snapshot.Receipts) { new(operationId, PackageHash.Of(request), "") };
+        var receipts = new List<OperationReceipt>(Snapshot.Receipts) { new(operationId, CommandHash(request), "") };
         if (receipts.Count > PackageRules.MaxReceipts) { receipts.RemoveAt(0); }
         return receipts;
     }
+
+    // Settings are a set: the same keys sent in another order are the same command.
+    private static string CommandHash(object request) => PackageHash.Of(request switch
+    {
+        InstallApp install => install with { Settings = new SortedDictionary<string, string>(install.Settings.ToDictionary(), StringComparer.Ordinal) },
+        ConfigureApp configure => configure with { Settings = new SortedDictionary<string, string>(configure.Settings.ToDictionary(), StringComparer.Ordinal) },
+        _ => request,
+    });
 
     private Task Persist(AppState next) => Save(next, new AppChanged(Describe(next)));
 
@@ -211,5 +227,5 @@ internal sealed class App(
         state.Revision,
         new Dictionary<string, string>(state.Settings),
         state.Operations.ToArray(),
-        state.Installation == 0 ? null : ProgramKey(state.Installation));
+        state.ProgramGeneration == 0 ? null : ProgramKey(state.ProgramGeneration));
 }

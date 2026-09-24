@@ -25,6 +25,8 @@ internal static class PackageEndpoints
             => service.Propose(PackageId.Create(owner, name), request));
         packages.MapPost("/{owner}/{name}/proposals/{number:int}/accept", (string owner, string name, int number, PackageService service)
             => service.Accept(PackageId.Create(owner, name), number));
+        packages.MapPost("/{owner}/{name}/proposals/{number:int}/close", (string owner, string name, int number, PackageService service)
+            => service.Close(PackageId.Create(owner, name), number));
         packages.MapPost("/{owner}/{name}/publish", (string owner, string name, PublishPackageRequest request, PackageService service)
             => service.Publish(PackageId.Create(owner, name), request));
 

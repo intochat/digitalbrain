@@ -52,6 +52,42 @@ void main() {
     );
   });
 
+  testWidgets('keeps the marketplace visible when one install cannot be read', (
+    tester,
+  ) async {
+    Future<dynamic> request(String method, String path, [Object? body]) async {
+      if (path == '/packages') {
+        return [
+          for (final name in ['researcher', 'broken'])
+            {
+              'package': {'owner': 'alice', 'name': name},
+              'title': 'Package $name',
+              'revision': 'published-revision',
+            },
+        ];
+      }
+      if (path.endsWith('/broken')) throw Exception('unavailable');
+      return {
+        'app': {'status': 0},
+      };
+    }
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PackagesScreen(
+          workspaceId: 'workspace-bob',
+          request: request,
+          onClose: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Package researcher'), findsOneWidget);
+    expect(find.text('Package broken'), findsOneWidget);
+    expect(find.text('Could not read 1 installed package(s).'), findsOneWidget);
+  });
+
   testWidgets('offers an update when the publisher has moved on', (
     tester,
   ) async {

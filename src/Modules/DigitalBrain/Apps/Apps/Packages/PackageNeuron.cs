@@ -96,6 +96,7 @@ internal sealed class PackageNeuron(
         if (request.Source.Package == id) { throw new ArgumentException("Propose changes from a fork of this package."); }
         if (author != request.Source.Package.Owner) { throw new UnauthorizedAccessException($"Only {request.Source.Package.Owner} can propose changes from {request.Source.Package}."); }
         var title = PackageRules.Message(request.Title);
+        if (Snapshot.Head is null) { throw new InvalidOperationException($"{id} has no revisions to propose changes to."); }
         if (Replay(request.OperationId, request) is { } number) { return Snapshot.Proposals.Single(item => item.Number == int.Parse(number, System.Globalization.CultureInfo.InvariantCulture)); }
         await GrainFactory.GetGrain<IPackage>(request.Source.Package.ToString()).ReadRevision(request.Source.Revision);
         // A fork has at most one open proposal; proposing again moves it to the new revision, like pushing to a pull request.
@@ -122,7 +123,8 @@ internal sealed class PackageNeuron(
         var index = Snapshot.Proposals.FindIndex(item => item.Number == request.Number);
         if (index < 0) { throw new KeyNotFoundException($"{id} has no proposal {request.Number}."); }
         var proposal = Snapshot.Proposals[index];
-        if (proposal.Status != ProposalStatus.Open) { throw new InvalidOperationException($"Proposal {proposal.Number} is already {proposal.Status.ToString().ToLowerInvariant()}."); }
+        if (proposal.Status == ProposalStatus.Accepted) { return Describe(id); }
+        if (proposal.Status == ProposalStatus.Closed) { throw new InvalidOperationException($"Proposal {proposal.Number} was closed; propose again to reopen the change."); }
         var tip = proposal.Source.Revision;
         var arrived = await Fetch(proposal.Source);
         if (Snapshot.Head is { } head && !IsAncestor(head, tip, arrived))
@@ -132,6 +134,22 @@ internal sealed class PackageNeuron(
         }
         var proposals = new List<PackageProposal>(Snapshot.Proposals) { [index] = proposal with { Status = ProposalStatus.Accepted } };
         await Persist(id, Advance(tip, arrived, request.OperationId, request, tip) with { Proposals = proposals });
+        return Describe(id);
+    }
+
+    public async Task<PackageSnapshot> Close(CloseProposal request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var id = Id;
+        var caller = RequireCaller();
+        var index = Snapshot.Proposals.FindIndex(item => item.Number == request.Number);
+        if (index < 0) { throw new KeyNotFoundException($"{id} has no proposal {request.Number}."); }
+        var proposal = Snapshot.Proposals[index];
+        if (caller != id.Owner && caller != proposal.Author) { throw new UnauthorizedAccessException($"Only {id.Owner} or {proposal.Author} can close proposal {proposal.Number}."); }
+        if (Replay(request.OperationId, request) is not null || proposal.Status == ProposalStatus.Closed) { return Describe(id); }
+        if (proposal.Status == ProposalStatus.Accepted) { throw new InvalidOperationException($"Proposal {proposal.Number} was already accepted."); }
+        var proposals = new List<PackageProposal>(Snapshot.Proposals) { [index] = proposal with { Status = ProposalStatus.Closed } };
+        await Persist(id, Snapshot with { Proposals = proposals, Receipts = Receipted(request.OperationId, request, proposal.Number.ToString(System.Globalization.CultureInfo.InvariantCulture)) });
         return Describe(id);
     }
 

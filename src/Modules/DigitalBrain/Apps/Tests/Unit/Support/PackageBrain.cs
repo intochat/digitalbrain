@@ -2,11 +2,14 @@ using DigitalBrain.Apps;
 using DigitalBrain.Coding;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
+using Orleans.Storage;
 
 namespace DigitalBrain.Modules.Apps.Tests.Unit;
 
-internal sealed class PackageBrain(UnitBrain brain, FakeArtifactStore artifacts) : IAsyncDisposable
+internal sealed class PackageBrain(UnitBrain brain, FakeArtifactStore artifacts, FlakyGrainStorage storage) : IAsyncDisposable
 {
+    public FlakyGrainStorage Storage => storage;
+
     public FakeArtifactStore Artifacts => artifacts;
 
     public UnitBrain Brain => brain;
@@ -19,15 +22,17 @@ internal sealed class PackageBrain(UnitBrain brain, FakeArtifactStore artifacts)
     public static async Task<PackageBrain> StartAsync(CancellationToken cancellationToken, Action<ISiloBuilder>? configureSilo = null)
     {
         var artifacts = new FakeArtifactStore();
+        var storage = new FlakyGrainStorage();
         var brain = await UnitTest.Create()
             .WithModule<AppsModule>()
             .ConfigureSilo(silo =>
             {
                 silo.Services.AddSingleton<ICodeArtifactStore>(artifacts);
+                silo.Services.AddKeyedSingleton<IGrainStorage>("Default", storage);
                 configureSilo?.Invoke(silo);
             })
             .StartAsync(cancellationToken);
-        return new(brain, artifacts);
+        return new(brain, artifacts, storage);
     }
 
     public ValueTask DisposeAsync()

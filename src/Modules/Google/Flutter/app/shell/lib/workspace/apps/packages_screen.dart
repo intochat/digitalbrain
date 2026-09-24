@@ -89,17 +89,29 @@ class _PackagesScreenState extends State<PackagesScreen> {
     final loaded = listings is List
         ? listings.map(_map).toList()
         : <Map<String, dynamic>>[];
-    final apps = <String, Map<String, dynamic>>{};
-    for (final listing in loaded) {
-      final id = _id(listing);
-      apps[id] = _map(_map(await widget.request('GET', _appPath(id)))['app']);
-    }
+    final ids = loaded.map(_id).toList();
+    // One unreadable install must not hide the rest of the marketplace.
+    final reads = await Future.wait(
+      ids.map(
+        (id) => widget
+            .request('GET', _appPath(id))
+            .then<Object?>((view) => view, onError: (Object error) => error),
+      ),
+    );
+    final failures =
+        reads.whereType<Exception>().length + reads.whereType<Error>().length;
     if (!mounted) return;
     setState(() {
       _listings = loaded;
       _apps
         ..clear()
-        ..addAll(apps);
+        ..addEntries([
+          for (var index = 0; index < ids.length; index++)
+            MapEntry(ids[index], _map(_map(reads[index])['app'])),
+        ]);
+      if (failures > 0) {
+        _error = 'Could not read $failures installed package(s).';
+      }
     });
   }
 

@@ -125,6 +125,49 @@ public sealed class PackageLineageFacts
         await Assert.ThrowsAsync<KeyNotFoundException>(() => brain.Get<IPackage>(Upstream.ToString()).Accept(new(Guid.NewGuid(), 42)));
     }
 
+    [Fact]
+    public async Task TheOwnerOrTheAuthorClosesAProposalAndAFreshOneCanBeOpened()
+    {
+        await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
+        var first = await Commit(brain, "alice", Upstream, "Research");
+        await ForkFrom(brain, first);
+        var local = await Commit(brain, "bob", Fork, "Summarize");
+        Caller.As("bob");
+        var proposal = await brain.Get<IPackage>(Upstream.ToString()).Propose(new(Guid.NewGuid(), new(Fork, local.Id), "Summaries"));
+
+        Caller.As("carol");
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => brain.Get<IPackage>(Upstream.ToString()).Close(new(Guid.NewGuid(), proposal.Number)));
+        Caller.As("alice");
+        var closed = await brain.Get<IPackage>(Upstream.ToString()).Close(new(Guid.NewGuid(), proposal.Number));
+        Assert.Equal(ProposalStatus.Closed, Assert.Single(closed.Proposals).Status);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => brain.Get<IPackage>(Upstream.ToString()).Accept(new(Guid.NewGuid(), proposal.Number)));
+
+        Caller.As("bob");
+        var reopened = await brain.Get<IPackage>(Upstream.ToString()).Propose(new(Guid.NewGuid(), new(Fork, local.Id), "Summaries, again"));
+        Assert.Equal(2, reopened.Number);
+        var withdrawn = await brain.Get<IPackage>(Upstream.ToString()).Close(new(Guid.NewGuid(), reopened.Number));
+        Assert.All(withdrawn.Proposals, item => Assert.Equal(ProposalStatus.Closed, item.Status));
+    }
+
+    [Fact]
+    public async Task ProposalsNeedAnExistingUpstreamAndAcceptingTwiceIsHarmless()
+    {
+        await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
+        var first = await Commit(brain, "alice", Upstream, "Research");
+        await ForkFrom(brain, first);
+        var local = await Commit(brain, "bob", Fork, "Summarize");
+
+        Caller.As("bob");
+        await Assert.ThrowsAsync<InvalidOperationException>(() => brain.Get<IPackage>("alice/empty").Propose(new(Guid.NewGuid(), new(Fork, local.Id), "Nothing to change")));
+        var proposal = await brain.Get<IPackage>(Upstream.ToString()).Propose(new(Guid.NewGuid(), new(Fork, local.Id), "Summaries"));
+        Caller.As("alice");
+        await brain.Get<IPackage>(Upstream.ToString()).Accept(new(Guid.NewGuid(), proposal.Number));
+
+        var again = await brain.Get<IPackage>(Upstream.ToString()).Accept(new(Guid.NewGuid(), proposal.Number));
+
+        Assert.Equal(local.Id, again.Head);
+    }
+
     private static async Task<PackageRevision> Commit(PackageBrain brain, string principal, PackageId package, string verb)
     {
         Caller.As(principal);
