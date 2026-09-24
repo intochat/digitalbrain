@@ -135,7 +135,19 @@ internal sealed class PackageNeuron(
         return Describe(id);
     }
 
-    public Task<PackageSnapshot> Publish(PublishPackage request) => throw new NotSupportedException();
+    public async Task<PackageSnapshot> Publish(PublishPackage request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var id = Id;
+        RequireOwner(id);
+        if (Replay(request.OperationId, request) is null)
+        {
+            if (!Snapshot.Revisions.ContainsKey(request.Revision ?? "")) { throw new KeyNotFoundException($"{id} has no revision {request.Revision}."); }
+            await Persist(id, Snapshot with { Published = request.Revision, Receipts = Receipted(request.OperationId, request, request.Revision!) });
+        }
+        await GrainFactory.GetGrain<IPackageDirectory>(PackageDirectory.Key).Refresh(id);
+        return Describe(id);
+    }
 
     private async Task VerifyArtifact(PackageContent content, CodeArtifactRef artifact)
     {
