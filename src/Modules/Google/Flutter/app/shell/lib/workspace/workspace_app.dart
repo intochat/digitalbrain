@@ -19,6 +19,7 @@ import 'workspace_islands.dart';
 import 'behaviors/behavior_manager.dart';
 import 'apps/consent_sheet_view.dart';
 import 'apps/built_in_app_view.dart';
+import 'apps/packages_screen.dart';
 import 'mydata/mydata_window.dart';
 
 class WorkspaceApp extends StatefulWidget {
@@ -86,7 +87,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       if (_remote.containsKey(project.id)) continue;
       unawaited(
         client
-            .appStudioRequest(
+            .jsonRequest(
               'POST',
               '/workspaces/${Uri.encodeComponent(project.id)}/built-in/activate',
             )
@@ -866,6 +867,23 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                       onPressed: widget.onSwitchAccount,
                       icon: const Icon(Icons.switch_account, size: 18),
                       label: const Text('Switch account'),
+                    ),
+                  if (widget.programmingClient != null)
+                    IconButton(
+                      tooltip: 'Packages',
+                      icon: const Icon(Icons.extension),
+                      onPressed: () => _navigator.currentState?.push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => PackagesScreen(
+                            key: ValueKey(
+                              '${widget.programmingClient!.workspaceIdentity}/${store.currentProject.id}',
+                            ),
+                            workspaceId: store.currentProject.id,
+                            request: widget.programmingClient!.jsonRequest,
+                            onClose: () => _navigator.currentState?.pop(),
+                          ),
+                        ),
+                      ),
                     ),
                   IconButton(
                     tooltip: 'New conversation',

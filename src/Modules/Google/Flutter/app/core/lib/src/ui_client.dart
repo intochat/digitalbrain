@@ -925,7 +925,7 @@ final class DigitalBrainUiClient {
     }
   }
 
-  Future<dynamic> appStudioRequest(
+  Future<dynamic> jsonRequest(
     String method,
     String path, [
     Object? body,
