@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>App manifests, install, versions and Save as app.</Description>
+    <RootNamespace>DigitalBrain.Apps</RootNamespace>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Kernel/Contracts/DigitalBrain.Contracts.csproj" />
+  </ItemGroup>
+</Project>

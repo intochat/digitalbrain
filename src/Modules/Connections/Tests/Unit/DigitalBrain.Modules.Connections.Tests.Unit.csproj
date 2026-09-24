@@ -3,7 +3,7 @@
     <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
     <ProjectReference Include="../../Connections/DigitalBrain.Modules.Connections.csproj" />
     <ProjectReference Include="../../../MyData/MyData/DigitalBrain.Modules.MyData.csproj" />
-    <ProjectReference Include="../../../Compute/Compute/DigitalBrain.Modules.Compute.csproj" />
+    <ProjectReference Include="../../../DigitalBrain/Compute/Compute/DigitalBrain.Modules.Compute.csproj" />
     <ProjectReference Include="../../../AI/AI/DigitalBrain.Modules.AI.csproj" />
   </ItemGroup>
 </Project>

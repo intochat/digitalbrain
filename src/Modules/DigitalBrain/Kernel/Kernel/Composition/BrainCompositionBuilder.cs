@@ -45,7 +45,10 @@ public sealed class BrainCompositionBuilder
     {
         if (_built is not null) { return _built; }
         var modules = ModuleComposition.Resolve(_modules.Values.Select(m => m.Compile()).ToArray());
-        foreach (var app in _apps)
+        var apps = _apps.Concat(_modules.Values.SelectMany(module => module.Apps)).ToArray();
+        if (apps.Select(app => app.Definition.Id).Distinct(StringComparer.Ordinal).Count() != apps.Length)
+        { throw new InvalidOperationException("App definitions must have unique IDs and concrete neuron implementations."); }
+        foreach (var app in apps)
         {
             foreach (var required in app.Definition.RequiredModules)
             {
@@ -53,15 +56,15 @@ public sealed class BrainCompositionBuilder
                 { throw new InvalidOperationException($"App '{app.Definition.Id}' requires host module '{required.FullName}'."); }
             }
         }
-        if (_apps.Count > 0)
+        if (apps.Length > 0)
         {
             if (modules.Count == 0) { throw new InvalidOperationException("Apps require at least one host module."); }
             var settings = new Dictionary<string, string?>();
-            for (var index = 0; index < _apps.Count; index++) { settings[$"DigitalBrain:Apps:{index}"] = _apps[index].AppType.AssemblyQualifiedName; }
+            for (var index = 0; index < apps.Length; index++) { settings[$"DigitalBrain:Apps:{index}"] = apps[index].AppType.AssemblyQualifiedName; }
             modules = Array.AsReadOnly(modules.Append(new ModuleDefinition(typeof(AppCompositionModule), settings)).ToArray());
         }
         ModuleSettingsValidation.ValidatePublicSettings(modules);
-        return _built = new(modules, _modules.Values.SelectMany(m => m.LocalServices).ToArray(), _apps.AsReadOnly());
+        return _built = new(modules, _modules.Values.SelectMany(m => m.LocalServices).ToArray(), Array.AsReadOnly(apps));
     }
 
     public BrainCompositionBuilder ApplyOverrides(string envelope)

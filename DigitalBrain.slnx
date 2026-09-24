@@ -109,10 +109,10 @@
     <Project Path="src/Modules/Receipts/Contracts/DigitalBrain.Modules.Receipts.Contracts.csproj" />
     <Project Path="src/Modules/Receipts/Receipts/DigitalBrain.Modules.Receipts.csproj" />
   </Folder>
-  <Folder Name="/Modules/Compute/">
-    <Project Path="src/Modules/Compute/Tests/Unit/DigitalBrain.Modules.Compute.Tests.Unit.csproj" />
-    <Project Path="src/Modules/Compute/Contracts/DigitalBrain.Modules.Compute.Contracts.csproj" />
-    <Project Path="src/Modules/Compute/Compute/DigitalBrain.Modules.Compute.csproj" />
+  <Folder Name="/Modules/DigitalBrain/Compute/">
+    <Project Path="src/Modules/DigitalBrain/Compute/Tests/Unit/DigitalBrain.Modules.Compute.Tests.Unit.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Compute/Contracts/DigitalBrain.Modules.Compute.Contracts.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Compute/Compute/DigitalBrain.Modules.Compute.csproj" />
   </Folder>
   <Folder Name="/Modules/MyData/">
     <Project Path="src/Modules/MyData/Tests/Unit/DigitalBrain.Modules.MyData.Tests.Unit.csproj" />
@@ -129,10 +129,10 @@
     <Project Path="src/Modules/Connections/Contracts/DigitalBrain.Modules.Connections.Contracts.csproj" />
     <Project Path="src/Modules/Connections/Connections/DigitalBrain.Modules.Connections.csproj" />
   </Folder>
-  <Folder Name="/Modules/Apps/">
-    <Project Path="src/Modules/Apps/Tests/Unit/DigitalBrain.Modules.Apps.Tests.Unit.csproj" />
-    <Project Path="src/Modules/Apps/Contracts/DigitalBrain.Modules.Apps.Contracts.csproj" />
-    <Project Path="src/Modules/Apps/Apps/DigitalBrain.Modules.Apps.csproj" />
+  <Folder Name="/Modules/DigitalBrain/Apps/">
+    <Project Path="src/Modules/DigitalBrain/Apps/Tests/Unit/DigitalBrain.Modules.Apps.Tests.Unit.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Apps/Contracts/DigitalBrain.Modules.Apps.Contracts.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Apps/Apps/DigitalBrain.Modules.Apps.csproj" />
   </Folder>
   <Folder Name="/Modules/Automations/">
     <Project Path="src/Modules/Automations/Tests/Unit/DigitalBrain.Modules.Automations.Tests.Unit.csproj" />

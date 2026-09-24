@@ -80,13 +80,13 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<ReceiptsModule>()
     .WithModule<ComputeModule>()
     .WithModule<DiscoveryModule>()
-    .WithModule<AppsModule>()
+    .WithModule<AppsModule>(apps => apps
+        .AddApp<AssistantApp>()
+        .AddApp<SettingsApp>())
     .WithModule<BrokerModule>()
     .WithModule<InboxModule>()
     .WithModule<MarketplaceModule>()
-    .WithModule<CreatorPublishingModule>()
-    .AddApp<AssistantApp>()
-    .AddApp<SettingsApp>();
+    .WithModule<CreatorPublishingModule>();
 
 if (developerProfile)
 {

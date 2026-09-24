@@ -6,9 +6,9 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../Apps/Contracts/DigitalBrain.Modules.Apps.Contracts.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Apps/Contracts/DigitalBrain.Modules.Apps.Contracts.csproj" />
     <ProjectReference Include="../../Broker/Contracts/DigitalBrain.Modules.Broker.Contracts.csproj" />
     <ProjectReference Include="../../DigitalBrain/Kernel/Contracts/DigitalBrain.Contracts.csproj" />
-    <ProjectReference Include="../../Apps/Contracts/DigitalBrain.Modules.Apps.Contracts.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Apps/Contracts/DigitalBrain.Modules.Apps.Contracts.csproj" />
   </ItemGroup>
 </Project>

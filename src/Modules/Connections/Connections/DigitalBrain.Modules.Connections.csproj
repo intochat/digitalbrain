@@ -9,7 +9,7 @@
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Connections.Contracts.csproj" />
     <ProjectReference Include="../../DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
     <ProjectReference Include="../../MyData/Contracts/DigitalBrain.Modules.MyData.Contracts.csproj" />
-    <ProjectReference Include="../../Compute/Contracts/DigitalBrain.Modules.Compute.Contracts.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Compute/Contracts/DigitalBrain.Modules.Compute.Contracts.csproj" />
     <ProjectReference Include="../../Supabase/Contracts/DigitalBrain.Modules.Supabase.Contracts.csproj" />
     <ProjectReference Include="../../AI/AI/DigitalBrain.Modules.AI.csproj" />
   </ItemGroup>
