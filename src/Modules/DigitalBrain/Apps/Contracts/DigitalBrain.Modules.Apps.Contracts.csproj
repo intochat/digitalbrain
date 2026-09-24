@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../Kernel/Contracts/DigitalBrain.Contracts.csproj" />
+    <ProjectReference Include="../../../Coding/Contracts/DigitalBrain.Modules.Coding.Contracts.csproj" />
   </ItemGroup>
 </Project>
