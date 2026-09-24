@@ -2,13 +2,16 @@ using DigitalBrain.Coding;
 using DigitalBrain.Core;
 using Microsoft.Extensions.Logging;
 using Orleans;
+using Orleans.Concurrency;
 using Orleans.Metadata;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Behavior;
 
+// Worker callbacks interleave: Delete stops the worker inside this grain's turn, and the stopping
+// worker's log and readiness notifications would otherwise wait on that same turn until the stop times out.
 [Alias("behavior.events"), DefaultGrainType("behavior.program")]
-internal interface IBehaviorProgramEvents : IGrainWithStringKey { Task Changed(); Task LogsChanged(Guid generation, long sequence); }
+internal interface IBehaviorProgramEvents : IGrainWithStringKey { [AlwaysInterleave] Task Changed(); [AlwaysInterleave] Task LogsChanged(Guid generation, long sequence); }
 
 [GrainType("behavior.program")]
 internal sealed class BehaviorProgramNeuron(BehaviorSupervisor supervisor, ICodeArtifactStore artifacts, ILogger<BehaviorProgramNeuron> logger)

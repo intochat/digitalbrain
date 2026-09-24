@@ -130,6 +130,7 @@
     <Project Path="src/Modules/Connections/Connections/DigitalBrain.Modules.Connections.csproj" />
   </Folder>
   <Folder Name="/Modules/DigitalBrain/Apps/">
+    <Project Path="src/Modules/DigitalBrain/Apps/Tests/E2E/DigitalBrain.Modules.Apps.Tests.E2E.csproj" />
     <Project Path="src/Modules/DigitalBrain/Apps/Tests/Unit/DigitalBrain.Modules.Apps.Tests.Unit.csproj" />
     <Project Path="src/Modules/DigitalBrain/Apps/Contracts/DigitalBrain.Modules.Apps.Contracts.csproj" />
     <Project Path="src/Modules/DigitalBrain/Apps/Apps/DigitalBrain.Modules.Apps.csproj" />
