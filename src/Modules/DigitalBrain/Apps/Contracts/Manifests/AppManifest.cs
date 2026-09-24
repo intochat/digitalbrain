@@ -17,6 +17,4 @@ public sealed record AppManifest
     [Id(10)] public IReadOnlyList<AppMeter> Meters { get; init; } = [];
     [Id(11)] public IReadOnlyList<string> ExamplePrompts { get; init; } = [];
     [Id(12)] public IReadOnlyList<AppScenario> Scenarios { get; init; } = [];
-    [Id(13)] public string? RemoteEndpoint { get; init; }
-    [Id(14)] public IReadOnlyList<AppWindow> Windows { get; init; } = [];
 }

@@ -10,13 +10,6 @@ public sealed class UnitTestBuilder
     private UnitOptions _options = new();
     private bool _started;
 
-    public UnitTestBuilder AddApp<TApp>() where TApp : Neuron, IAppDefinition
-    {
-        EnsureMutable();
-        _composition.AddApp<TApp>();
-        return this;
-    }
-
     public UnitTestBuilder WithModule<TModule>(Action<ModuleConfiguration<TModule>>? configure = null)
         where TModule : class, IModule, new()
     {

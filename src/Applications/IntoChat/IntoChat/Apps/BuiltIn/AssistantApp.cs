@@ -1,4 +1,3 @@
-using DigitalBrain.AI;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
@@ -43,10 +42,10 @@ public interface IAssistantApp : INeuron
 [GrainType("intochat.assistant-app")]
 public sealed class AssistantApp(
     [PersistentState("intochat.assistant-app", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<AssistantAppState> store)
-    : Neuron<AssistantAppState>(store), IAssistantApp, IAppDefinition, INeuronObserver
+    : Neuron<AssistantAppState>(store), IAssistantApp, INeuronObserver
 {
+    private const string AppId = "intochat.assistant";
     private IGrainTimer? _renewal;
-    public static AppDefinition Definition => new("intochat.assistant", [typeof(AIModule), typeof(FlutterModule)], typeof(IAssistantApp));
 
     public async Task<AssistantAppState> Activate()
     {
@@ -70,7 +69,7 @@ public sealed class AssistantApp(
             Active = true, Revision = Snapshot.Revision + 1, AgentId = agentId,
             Surface = new("surface", prefix + "/surface"), Input = new("textfield", prefix + "/input"), Response = new("text", prefix + "/response"),
         };
-        await Save(next, new BuiltInAppChanged(Definition.Id, next.Revision));
+        await Save(next, new BuiltInAppChanged(AppId, next.Revision));
         await Subscribe();
         return Snapshot;
     }
@@ -84,7 +83,7 @@ public sealed class AssistantApp(
         var agent = GrainFactory.GetGrain<IAgent>(Snapshot.AgentId);
         await agent.Configure(definition, (await agent.GetState()).Revision);
         var next = Snapshot with { Agent = definition, Revision = Snapshot.Revision + 1 };
-        await Save(next, new BuiltInAppChanged(Definition.Id, next.Revision));
+        await Save(next, new BuiltInAppChanged(AppId, next.Revision));
         return Snapshot;
     }
 

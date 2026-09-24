@@ -94,30 +94,6 @@ internal sealed class AppCatalogNeuron(
         return Task.FromResult(active);
     }
 
-    public async Task<AppInstallation> SaveAsApp(SaveAsAppRequest request)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-        var existing = Versions(request.Id);
-        var manifest = new AppManifest
-        {
-            Id = request.Id,
-            Version = existing.Count == 0 ? "1.0.0" : $"1.0.{existing.Count}",
-            Publisher = "workspace",
-            Kind = AppKind.Declarative,
-            Name = request.Name,
-            DescriptionForPeople = request.DescriptionForPeople,
-            DescriptionForModel = request.DescriptionForModel ?? request.DescriptionForPeople,
-            Operations = request.Operations,
-            UiEntry = request.UiEntry,
-            Permissions = request.Permissions,
-            Meters = request.Meters,
-            Scenarios = request.Scenarios,
-            ExamplePrompts = request.ExamplePrompts,
-            Windows = request.Windows,
-        };
-        return await Install(manifest);
-    }
-
     private Task CatalogueAsync(AppManifest manifest) =>
         GrainFactory.GetGrain<IAppManifestDirectory>(AppManifestDirectoryGrains.Key)
             .Publish(manifest, this.GetPrimaryKeyString());

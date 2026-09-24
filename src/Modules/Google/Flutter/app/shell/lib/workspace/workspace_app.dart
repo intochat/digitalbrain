@@ -1235,18 +1235,27 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         store.currentProject.id,
         launchKey,
       );
-      if (!consent.approved) {
-        if (!mounted) return;
-        final approved = await showConsentSheet(context, sheet: consent);
-        if (!approved) return;
-        await client.approveConsent(store.currentProject.id, launchKey);
+      if (consent.approved) {
+        _messenger.currentState?.showSnackBar(
+          const SnackBar(
+            content: Text('Already installed. Ask the assistant to use it.'),
+          ),
+        );
+        return;
       }
-      final snapshot = await client.openApp(store.currentProject.id, launchKey);
-      if (mounted) store.reconcileWorkspace(store.currentProject, snapshot);
+      if (!mounted) return;
+      final approved = await showConsentSheet(context, sheet: consent);
+      if (!approved) return;
+      await client.approveConsent(store.currentProject.id, launchKey);
+      _messenger.currentState?.showSnackBar(
+        const SnackBar(
+          content: Text('Installed. Ask the assistant to use it.'),
+        ),
+      );
     } catch (error) {
       if (mounted) {
         _messenger.currentState?.showSnackBar(
-          SnackBar(content: Text('Could not open the app. $error')),
+          SnackBar(content: Text('Could not install the app. $error')),
         );
       }
     }

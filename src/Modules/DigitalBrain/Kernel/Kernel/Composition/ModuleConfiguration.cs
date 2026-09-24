@@ -37,16 +37,6 @@ public sealed class ModuleConfiguration<TModule> where TModule : class, IModule,
         _draft.Options = contract.Copy(options);
         _draft.Replace = true;
     }
-
-    /// <summary>Registers an app declaration from a module-specific configuration extension.</summary>
-    public void RegisterApp<TApp>() where TApp : Neuron, IAppDefinition
-    {
-        _ensureMutable();
-        var definition = TApp.Definition;
-        if (typeof(TApp).IsAbstract || string.IsNullOrWhiteSpace(definition.Id) || _draft.Apps.Any(app => app.Definition.Id == definition.Id))
-        { throw new InvalidOperationException("App definitions must have unique IDs and concrete neuron implementations."); }
-        _draft.Apps.Add(new(typeof(TApp), new(definition.Id, Array.AsReadOnly(definition.RequiredModules.ToArray()), definition.Contract)));
-    }
 }
 
 internal sealed class ModuleDraft
@@ -57,7 +47,6 @@ internal sealed class ModuleDraft
     public HashSet<string> Assigned { get; } = new(StringComparer.Ordinal);
     public bool Replace { get; set; }
     public List<Action<IServiceCollection>> LocalServices { get; } = [];
-    public List<AppRegistration> Apps { get; } = [];
 
     public ModuleDraft(Type type)
     {
@@ -79,7 +68,6 @@ internal sealed class ModuleDraft
         var copy = new ModuleDraft(Type) { Options = Contract?.Copy(Options!), Replace = Replace };
         copy.Assigned.UnionWith(Assigned);
         copy.LocalServices.AddRange(LocalServices);
-        copy.Apps.AddRange(Apps);
         return copy;
     }
 }

@@ -150,16 +150,6 @@
     <Project Path="src/Modules/Discovery/Contracts/DigitalBrain.Modules.Discovery.Contracts.csproj" />
     <Project Path="src/Modules/Discovery/Discovery/DigitalBrain.Modules.Discovery.csproj" />
   </Folder>
-  <Folder Name="/Modules/Broker/">
-    <Project Path="src/Modules/Broker/Tests/Unit/DigitalBrain.Modules.Broker.Tests.Unit.csproj" />
-    <Project Path="src/Modules/Broker/Contracts/DigitalBrain.Modules.Broker.Contracts.csproj" />
-    <Project Path="src/Modules/Broker/Broker/DigitalBrain.Modules.Broker.csproj" />
-  </Folder>
-  <Folder Name="/Modules/Marketplace/">
-    <Project Path="src/Modules/Marketplace/Tests/Unit/DigitalBrain.Modules.Marketplace.Tests.Unit.csproj" />
-    <Project Path="src/Modules/Marketplace/Contracts/DigitalBrain.Modules.Marketplace.Contracts.csproj" />
-    <Project Path="src/Modules/Marketplace/Marketplace/DigitalBrain.Modules.Marketplace.csproj" />
-  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path="Directory.Packages.props" />

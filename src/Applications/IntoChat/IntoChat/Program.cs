@@ -38,12 +38,10 @@ builder.Services.Configure<BackgroundRemovalOptions>(builder.Configuration.GetSe
 builder.Services.AddSingleton<IBackgroundRemover, DeterministicBackgroundRemover>();
 builder.Services.AddSingleton<LocalFileStore>();
 builder.Services.AddSingleton<AppSurfaceComposer>();
-builder.Services.AddSingleton<WorkspaceAppService>();
 builder.Services.AddSingleton<ImageSaveCoordinator>();
 builder.Services.AddSingleton<LiveTableWindows>();
 builder.Services.AddSingleton<IAgentToolFactory, WorkspaceTableTools>();
 builder.Services.AddSingleton<IAgentToolFactory, WorkspaceFormTools>();
-builder.Services.AddSingleton<IAgentToolFactory, WorkspaceAppTools>();
 builder.Services.AddSingleton<IAgentToolFactory, DiscoveryTools>();
 builder.Services.AddSingleton<IAgentToolFactory, LeadGeneratorTools>();
 builder.Services.AddSingleton<IAgentToolFactory, ImageEditorTools>();

@@ -1,6 +1,6 @@
 # Apps
 
-Shared behaviors (packages), their marketplace directory, and packages installed into workspaces as apps. The module also keeps first-party app manifests, catalog, consent and proxy for the existing app surfaces.
+Shared behaviors (packages), their marketplace directory, and packages installed into workspaces as apps. The module also keeps first-party app manifests, the per-workspace catalog and consent for the existing app surfaces.
 
 ## Packages
 

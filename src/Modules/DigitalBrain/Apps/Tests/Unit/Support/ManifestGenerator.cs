@@ -1,15 +1,16 @@
 using System.ComponentModel;
 using System.Reflection;
+using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Types;
 using Orleans.Concurrency;
 
-namespace DigitalBrain.Apps.Manifests;
+namespace DigitalBrain.Modules.Apps.Tests.Unit;
 
 // A manifest is generated from the neuron interface, never hand-written, so an operation list cannot
 // drift from the code it describes. [Alias] names the app, [ReadOnly] marks an operation as a read,
 // [Description] becomes the model-facing description.
-public static class ManifestGenerator
+internal static class ManifestGenerator
 {
     public static AppManifest FromInterface<TNeuron>(AppManifestSeed seed) where TNeuron : INeuron
         => FromInterface(typeof(TNeuron), seed);
@@ -42,7 +43,6 @@ public static class ManifestGenerator
             Meters = seed.Meters,
             ExamplePrompts = seed.ExamplePrompts,
             Scenarios = seed.Scenarios,
-            RemoteEndpoint = seed.RemoteEndpoint,
         };
         ManifestValidator.Validate(manifest);
         return manifest;
@@ -126,21 +126,4 @@ public static class ManifestGenerator
 
     private static string TrimInterfacePrefix(string name) =>
         name.Length > 1 && name[0] == 'I' && char.IsUpper(name[1]) ? name[1..] : name;
-}
-
-public sealed record AppManifestSeed
-{
-    public string? Id { get; init; }
-    public required string Version { get; init; }
-    public required string Publisher { get; init; }
-    public required AppKind Kind { get; init; }
-    public string? Name { get; init; }
-    public required string DescriptionForPeople { get; init; }
-    public required string DescriptionForModel { get; init; }
-    public string? UiEntry { get; init; }
-    public IReadOnlyList<AppPermission> Permissions { get; init; } = [];
-    public IReadOnlyList<AppMeter> Meters { get; init; } = [];
-    public IReadOnlyList<string> ExamplePrompts { get; init; } = [];
-    public IReadOnlyList<AppScenario> Scenarios { get; init; } = [];
-    public string? RemoteEndpoint { get; init; }
 }

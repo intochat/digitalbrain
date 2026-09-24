@@ -45,10 +45,10 @@ public interface ISettingsApp : INeuron
 [GrainType("intochat.settings-app")]
 public sealed class SettingsApp(
     [PersistentState("intochat.settings-app", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SettingsAppState> store)
-    : Neuron<SettingsAppState>(store), ISettingsApp, IAppDefinition, INeuronObserver
+    : Neuron<SettingsAppState>(store), ISettingsApp, INeuronObserver
 {
+    private const string AppId = "intochat.settings";
     private IGrainTimer? _renewal;
-    public static AppDefinition Definition => new("intochat.settings", [typeof(FlutterModule)], typeof(ISettingsApp));
 
     public async Task<SettingsAppState> Activate()
     {
@@ -73,7 +73,7 @@ public sealed class SettingsApp(
             DisplayNameField = new("textfield", prefix + "/display-name"),
             ThemeField = new("textfield", prefix + "/theme"),
         };
-        await Save(next, new BuiltInAppChanged(Definition.Id, next.Revision));
+        await Save(next, new BuiltInAppChanged(AppId, next.Revision));
         await Subscribe();
         return Snapshot;
     }
@@ -88,7 +88,7 @@ public sealed class SettingsApp(
         { throw new ArgumentException("Use a display name of at most 120 characters and a system, light or dark theme.", nameof(preferences)); }
         await Activate();
         var next = Snapshot with { Preferences = preferences, Revision = Snapshot.Revision + 1 };
-        await Save(next, new BuiltInAppChanged(Definition.Id, next.Revision));
+        await Save(next, new BuiltInAppChanged(AppId, next.Revision));
         await GrainFactory.GetGrain<ITextField>(Snapshot.DisplayNameField.Name).SetValue(preferences.DisplayName);
         await GrainFactory.GetGrain<ITextField>(Snapshot.ThemeField.Name).SetValue(preferences.Theme);
         return Snapshot;

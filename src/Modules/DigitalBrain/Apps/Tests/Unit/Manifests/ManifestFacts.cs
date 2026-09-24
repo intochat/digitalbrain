@@ -145,51 +145,5 @@ public sealed class ManifestFacts
         Assert.Empty(await catalog.List());
     }
 
-    [Fact]
-    public async Task ProxyReStampsTheAppCallerAndRejectsAnUntrustedCall()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var handler = new RecordingHandler();
-        await using var brain = await UnitTest.Create().WithModule<AppsModule>()
-            .ConfigureSilo(silo => silo.Services.AddSingleton<IAppOperationHandler>(handler))
-            .StartAsync(ct);
-        var proxy = brain.Get<IAppProxy>("proxy");
-
-        var allowed = await proxy.Invoke(new AppProxyRequest
-        {
-            AppId = "test.widget",
-            Operation = "Read",
-            TargetNeuron = "widget",
-            PrincipalId = "owner",
-            AccountId = "account",
-            WorkspaceId = "workspace-a",
-        });
-        Assert.True(allowed.Allowed);
-        Assert.True(handler.Called);
-
-        var denied = await proxy.Invoke(new AppProxyRequest
-        {
-            AppId = "test.widget",
-            Operation = "Read",
-            TargetNeuron = "widget",
-            PrincipalId = "",
-            AccountId = "account",
-            WorkspaceId = "workspace-a",
-        });
-        Assert.False(denied.Allowed);
-        Assert.Equal(nameof(CallDenial.UntrustedCaller), denied.Denial);
-    }
-
     private static AppManifest Widget(string version) => ManifestGenerator.FromInterface<IWidgetNeuron>(Seed() with { Version = version });
-
-    private sealed class RecordingHandler : IAppOperationHandler
-    {
-        public bool Called { get; private set; }
-
-        public ValueTask<bool> InvokeAsync(AppProxyRequest request, CancellationToken cancellationToken = default)
-        {
-            Called = true;
-            return ValueTask.FromResult(true);
-        }
-    }
 }

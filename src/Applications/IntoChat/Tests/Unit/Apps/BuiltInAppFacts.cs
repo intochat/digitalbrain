@@ -20,7 +20,7 @@ public sealed class BuiltInAppFacts
     [Fact]
     public async Task SettingsOwnsEditableNeuronsAndPreservesPreferencesAcrossActivation()
     {
-        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().AddApp<SettingsApp>()
+        await using var brain = await UnitTest.Create().WithModule<FlutterModule>()
             .ConfigureSilo(silo => silo.Services.Configure<BrainOptions>(options =>
             {
                 options.ObserverLease = TimeSpan.FromSeconds(2);
@@ -53,7 +53,7 @@ public sealed class BuiltInAppFacts
     [Fact]
     public async Task AssistantRunsItsConfiguredAgentAndKeepsWorkspaceConversationsIndependent()
     {
-        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().WithModule<AIModule>().AddApp<AssistantApp>()
+        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().WithModule<AIModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<IChatClient>(new FixedChatClient()))
             .StartAsync(TestContext.Current.CancellationToken);
         var first = brain.Get<IAssistantApp>("workspace-a");

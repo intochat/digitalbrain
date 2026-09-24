@@ -19,14 +19,12 @@ public static partial class ManifestValidator
         Require(manifest.Id is { Length: <= 160 } && IdPattern().IsMatch(manifest.Id), "App id must be a namespaced alias or publisher/appname.");
         Require(manifest.Version is { Length: > 0 and <= 100 } && VersionPattern().IsMatch(manifest.Version), $"App version '{manifest.Version}' is not a semantic version.");
         Require(Enum.IsDefined(manifest.Kind), "Unknown app kind.");
-        Require(manifest.Operations is not null && manifest.Permissions is not null && manifest.Windows is not null && manifest.Meters is not null,
-            "Operations, permissions, windows and meters must be arrays.");
+        Require(manifest.Operations is not null && manifest.Permissions is not null && manifest.Meters is not null,
+            "Operations, permissions and meters must be arrays.");
         Require(!string.IsNullOrWhiteSpace(manifest.Publisher), "App publisher is required.");
         Require(!string.IsNullOrWhiteSpace(manifest.Name), "App name is required.");
         Require(!string.IsNullOrWhiteSpace(manifest.DescriptionForPeople), "A description for people is required.");
         Require(!string.IsNullOrWhiteSpace(manifest.DescriptionForModel), "A description for the model is required.");
-        Require(manifest.Kind != AppKind.Remote || !string.IsNullOrWhiteSpace(manifest.RemoteEndpoint),
-            "A remote app declares a remote endpoint.");
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var operation in manifest.Operations!)

@@ -11,7 +11,6 @@ using DigitalBrain.ClickHouse;
 using DigitalBrain.Coding;
 using DigitalBrain.Behavior;
 using DigitalBrain.Behavior.Aspire.Hosting;
-using DigitalBrain.Broker;
 using DigitalBrain.Core;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
@@ -19,8 +18,6 @@ using DigitalBrain.Google.Gmail;
 using DigitalBrain.Identity;
 using DigitalBrain.Inbox;
 using DigitalBrain.Memory;
-using DigitalBrain.Marketplace;
-using DigitalBrain.Marketplace.Creators;
 using DigitalBrain.Microsoft.Aspire;
 using DigitalBrain.Microsoft.GitHub;
 using DigitalBrain.Microsoft.DotNet;
@@ -34,7 +31,6 @@ using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
 using DigitalBrain.Time;
 using IntoChat.AppHost;
-using IntoChat.Apps.BuiltIn;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 
@@ -80,13 +76,8 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<ReceiptsModule>()
     .WithModule<ComputeModule>()
     .WithModule<DiscoveryModule>()
-    .WithModule<AppsModule>(apps => apps
-        .AddApp<AssistantApp>()
-        .AddApp<SettingsApp>())
-    .WithModule<BrokerModule>()
-    .WithModule<InboxModule>()
-    .WithModule<MarketplaceModule>()
-    .WithModule<CreatorPublishingModule>();
+    .WithModule<AppsModule>()
+    .WithModule<InboxModule>();
 
 if (developerProfile)
 {

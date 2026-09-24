@@ -1,18 +1,15 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using DigitalBrain.Apps;
 
 namespace IntoChat.Tests.E2E.Security;
 
-// J5 second half at the HTTP edge: a grant lets an app read an owner's field, revoking it makes the
-// value look missing again, and the grants list/revoke routes are scoped to the caller's workspace.
+// The grants list and revoke routes at the HTTP edge are scoped to the caller's workspace.
+// Enforcement of a grant on a call is covered by Identity's GrantFacts.
 public sealed class GrantRevokeFacts
 {
-
-
     [Fact(Timeout = 300_000)]
-    public async Task GrantThenRevokeMakesTheValueLookEmptyAndForeignWorkspacesAreForbidden()
+    public async Task GrantsAreListedAndRevokedOnlyInTheOwnersWorkspace()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await IntoChatE2ETest.StartAsync(ct);
@@ -30,22 +27,6 @@ public sealed class GrantRevokeFacts
 
         var member = await aliceLogin.Content.ReadFromJsonAsync<DigitalBrain.Identity.Member>(ct);
         var workspace = member!.WorkspaceId;
-        var proxy = brain.Get<IAppProxy>("grant-gate");
-        var appRead = new AppProxyRequest
-        {
-            AppId = "app-1",
-            Operation = "Read",
-            TargetNeuron = "vault",
-            PrincipalId = "alice",
-            AccountId = member.AccountId,
-            WorkspaceId = workspace,
-            SemanticTypeIds = ["person.birthDate"],
-        };
-
-        var before = await proxy.Invoke(appRead);
-        Assert.False(before.Allowed);
-        Assert.Equal("MissingGrant", before.Denial);
-
         using var create = await alice.PostAsJsonAsync(
             $"/workspaces/{workspace}/grants",
             new { appId = "app-1", semanticTypeId = "person.birthDate", mode = 2, workspaceId = workspace },
@@ -59,9 +40,6 @@ public sealed class GrantRevokeFacts
         var grantJson = Assert.Single(grants);
         Assert.Equal("app-1", grantJson.GetProperty("appId").GetString());
 
-        var allowed = await proxy.Invoke(appRead);
-        Assert.True(allowed.Allowed, $"{allowed.Denial}: {allowed.Explanation}; listed={listedJson}");
-
         using var foreign = await bob.GetAsync($"/workspaces/{workspace}/grants", ct);
         Assert.Equal(HttpStatusCode.Forbidden, foreign.StatusCode);
 
@@ -70,10 +48,6 @@ public sealed class GrantRevokeFacts
             new { appId = "app-1", semanticTypeId = "person.birthDate", mode = 2 },
             ct);
         Assert.Equal(HttpStatusCode.NoContent, revoke.StatusCode);
-
-        var after = await proxy.Invoke(appRead);
-        Assert.False(after.Allowed);
-        Assert.Equal("MissingGrant", after.Denial);
 
         using var emptied = await alice.GetAsync($"/workspaces/{workspace}/grants", ct);
         Assert.Empty(JsonSerializer.Deserialize<JsonElement[]>(await emptied.Content.ReadAsStringAsync(ct))!);

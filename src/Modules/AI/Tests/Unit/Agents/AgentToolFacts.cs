@@ -126,7 +126,7 @@ public sealed class AgentToolFacts
     public void ManyRelevantAppToolsStillFitTheCap()
     {
         var selected = AgentToolPolicy.SelectTools(developerMode: false, [],
-            ["propose_app", "run_leadgenerator", "plan_background_removal", "run_background_removal", "save_as_app"]);
+            ["propose_app", "run_leadgenerator", "plan_background_removal", "run_background_removal", "find_capability"]);
         Assert.Equal(AgentToolPolicy.MaxDefaultTools, selected.Count);
         Assert.Equal(selected.Count, selected.Distinct(StringComparer.Ordinal).Count());
     }

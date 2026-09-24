@@ -23,11 +23,9 @@ internal sealed class AgentToolSelection(IDigitalBrain brain)
     private static readonly string[] TableKeywords =
         ["table", "supabase", "database", "query", "rows", "how many", "leads", "customer", "count", "sql", "select"];
 
-    private static readonly string[] WorkspaceTools = ["save_as_app", "open_app"];
-
     // A turn only needs the workspace snapshot when it may touch an app window.
     private static readonly string[] WindowKeywords =
-        ["app", "save", "open", "window", "form", "view", "tab", "reopen", "publish", "install"];
+        ["app", "open", "window", "form", "view", "tab", "install"];
 
     private static readonly Dictionary<string, string[]> KeywordApps = new(StringComparer.Ordinal)
     {
@@ -60,7 +58,7 @@ internal sealed class AgentToolSelection(IDigitalBrain brain)
         }
 
         // The workspace snapshot is only needed when the owner's words point at an app window; the
-        // window tools and any app an open window belongs to are the only things it adds. A turn
+        // apps its open windows belong to are the only thing it adds. A turn
         // about a table or a plain question skips the read.
         var windows = NeedsWindows(context) ? await WindowsAsync(scope, ct) : [];
         foreach (var id in windows) { ids.Add(id); }
@@ -74,7 +72,6 @@ internal sealed class AgentToolSelection(IDigitalBrain brain)
                 { tools.AddRange(AppTools[appId]); }
             }
         }
-        if (windows.Count > 0) { tools.AddRange(WorkspaceTools); }
         return new ToolSelection([.. tools.Distinct(StringComparer.Ordinal)], tableIntent);
     }
 

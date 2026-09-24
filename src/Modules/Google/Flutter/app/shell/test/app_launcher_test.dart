@@ -52,7 +52,7 @@ void main() {
   });
 
   test(
-    'a saved declarative app is offered and launched by its manifest id',
+    'a catalog app without a shell window is offered by its manifest id',
     () {
       final entries = launcherEntries(const [
         AppManifestSummary(

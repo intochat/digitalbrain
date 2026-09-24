@@ -16,10 +16,10 @@ class AppLauncherEntry {
   final IconData icon;
 }
 
-/// The launcher is driven by installed manifests. First-party apps keep their established window
-/// keys and labels; only apps the shell can open today are listed. Saved declarative apps are listed
-/// by their manifest id and opened through the server. An empty list falls back to the built-in
-/// first-party entries.
+/// The launcher is driven by catalog manifests. First-party apps keep their established window
+/// keys and labels; only apps the shell can open today are listed. Other declarative apps are listed
+/// by their manifest id and installed through their consent sheet. An empty list falls back to the
+/// built-in first-party entries.
 List<AppLauncherEntry> launcherEntries(List<AppManifestSummary> apps) {
   if (apps.isEmpty) return defaultLauncherEntries;
   final entries = <AppLauncherEntry>[];
@@ -28,7 +28,7 @@ List<AppLauncherEntry> launcherEntries(List<AppManifestSummary> apps) {
       final entry = entryFor(app);
       if (_openableLaunchKeys.contains(entry.launchKey)) entries.add(entry);
     } else if (app.kind == 'declarative') {
-      entries.add(savedLauncherEntry(app));
+      entries.add(catalogLauncherEntry(app));
     }
   }
   entries.sort(
@@ -47,8 +47,8 @@ const _firstPartyIds = {
   'intochat.forms',
 };
 
-/// A saved app: the manifest id is the launch key, because the server reopens its windows.
-AppLauncherEntry savedLauncherEntry(AppManifestSummary app) => AppLauncherEntry(
+/// A catalog app without a shell window: the manifest id is the launch key for its consent sheet.
+AppLauncherEntry catalogLauncherEntry(AppManifestSummary app) => AppLauncherEntry(
   launchKey: app.id,
   title: app.name,
   subtitle: app.description,

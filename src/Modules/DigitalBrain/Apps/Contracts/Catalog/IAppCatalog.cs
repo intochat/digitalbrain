@@ -16,6 +16,4 @@ public interface IAppCatalog : INeuron
     Task<IReadOnlyList<AppInstallation>> List();
 
     Task<AppInstallation?> Read(string appId);
-
-    Task<AppInstallation> SaveAsApp(SaveAsAppRequest request);
 }

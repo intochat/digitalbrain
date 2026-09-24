@@ -1,5 +1,4 @@
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
 using DigitalBrain.Core.Enforcement;
 using IntoChat.Apps.BuiltIn;
 using IntoChat.Workspace;
@@ -13,16 +12,13 @@ internal static class BuiltInAppEndpoints
     {
         var apps = routes.MapGroup("/workspaces/{workspaceId}/built-in")
             .AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
-        apps.MapGet("", (IEnumerable<AppRegistration> available) => Results.Ok(available.Select(app => new { app.Definition.Id })));
-        apps.MapPost("/activate", async (string workspaceId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, IEnumerable<AppRegistration> available) =>
+        apps.MapPost("/activate", async (string workspaceId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth) =>
         {
-            if (available.Any(app => app.Definition.Id == "intochat.assistant"))
-            { await brain.Get<IAssistantApp>(WorkspaceScope.Current(auth.Value, workspaceId).Id).Activate(); }
+            await brain.Get<IAssistantApp>(WorkspaceScope.Current(auth.Value, workspaceId).Id).Activate();
             return Results.NoContent();
         });
-        apps.MapPost("/{appId}/open", async (string workspaceId, string appId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, IEnumerable<AppRegistration> available) =>
+        apps.MapPost("/{appId}/open", async (string workspaceId, string appId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth) =>
         {
-            if (!available.Any(app => app.Definition.Id == "intochat." + appId)) { return Results.NotFound(); }
             var key = WorkspaceScope.Current(auth.Value, workspaceId).Id;
             return appId switch
             {
