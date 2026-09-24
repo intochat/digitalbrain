@@ -75,7 +75,7 @@ Flutter `app_studio.dart` and its test; remove `AppManifest.Composition`; replac
 `AppSnapshot`, `AppInvocation`, `AppInvoked`, `AppChanged`.
 
 - [ ] Failing tests (`Tests/Unit/Workspace/AppFacts.cs`) with a recording `behavior.program` grain:
-  install deploys artifact with `Behavior__App`/`Behavior__Settings__*`; defaults fill; unknown
+  install deploys artifact with `Behavior__App`/`Behavior__{setting}`; defaults fill; unknown
   setting rejected; configure redeploys; upgrade refuses another package; invoke publishes and
   respond completes; pending drains; uninstall deletes the program.
 - [ ] Implement `App`; commit.

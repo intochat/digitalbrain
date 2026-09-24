@@ -166,11 +166,12 @@ internal sealed class App(
         await program.Delete(new DeleteBehavior(revision, retirement));
     }
 
-    // The behavior reads Behavior:App to find this neuron and Behavior:Settings:{name} for each setting.
+    // The behavior reads Behavior:App to find this neuron and Behavior:{name} for each setting,
+    // the same keys an automation reads in the behavior console.
     private string Configuration(IReadOnlyDictionary<string, string> settings)
     {
         var values = new SortedDictionary<string, string>(StringComparer.Ordinal) { ["Behavior__App"] = this.GetPrimaryKeyString() };
-        foreach (var (name, value) in settings) { values["Behavior__Settings__" + name] = value; }
+        foreach (var (name, value) in settings) { values["Behavior__" + name] = value; }
         return JsonSerializer.Serialize(values);
     }
 

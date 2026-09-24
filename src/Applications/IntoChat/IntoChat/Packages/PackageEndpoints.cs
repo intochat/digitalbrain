@@ -6,7 +6,11 @@ namespace IntoChat.Packages;
 
 internal static class PackageEndpoints
 {
-    public static void AddPackages(this IHostApplicationBuilder builder) => builder.Services.AddSingleton<PackageService>();
+    public static void AddPackages(this IHostApplicationBuilder builder)
+    {
+        builder.Services.AddSingleton<PackageService>();
+        builder.Services.AddSingleton<BehaviorSharing>();
+    }
 
     public static void MapPackages(this IEndpointRouteBuilder routes)
     {
@@ -29,6 +33,11 @@ internal static class PackageEndpoints
             => service.Close(PackageId.Create(owner, name), number));
         packages.MapPost("/{owner}/{name}/publish", (string owner, string name, PublishPackageRequest request, PackageService service)
             => service.Publish(PackageId.Create(owner, name), request));
+
+        routes.MapPost("/workspaces/{workspaceId}/behaviors/{id}/share", (string workspaceId, string id, ShareBehaviorRequest request, BehaviorSharing sharing, CancellationToken ct)
+                => sharing.Share(workspaceId, id, request, ct))
+            .AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync)
+            .AddEndpointFilter(Guard);
 
         var installed = routes.MapGroup("/workspaces/{workspaceId}/packages/{owner}/{name}")
             .AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync)

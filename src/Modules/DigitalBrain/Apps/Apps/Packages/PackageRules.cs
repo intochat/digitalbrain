@@ -25,6 +25,7 @@ internal static partial class PackageRules
             Require(setting is { Name: not null } && SettingName().IsMatch(setting.Name) && setting.Description is { Length: <= 500 } && setting.DefaultValue is { Length: <= 4096 },
                 "Setting names are letters and digits starting with a letter, with defaults of at most 4096 characters.");
             Require(!CredentialName().IsMatch(setting.Name), "Credentials never ship in a package; ask the installer to connect an account instead.");
+            Require(!string.Equals(setting.Name, "App", StringComparison.OrdinalIgnoreCase), "App is reserved for the address of the installed app.");
         }
         // Settings become configuration keys, which are case-insensitive.
         Require(manifest.Settings.Select(setting => setting.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() == manifest.Settings.Count, "Setting names must be unique.");

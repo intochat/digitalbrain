@@ -145,6 +145,34 @@ class _BehaviorManagerState extends State<BehaviorManager> {
     unawaited(load());
   }
 
+  Future<void> share(String packageName) async {
+    if (busy || stale || selected == null) return;
+    final id = selected!;
+    setState(() {
+      busy = true;
+      notice = null;
+    });
+    try {
+      final package = await widget.request(
+        '${Uri.encodeComponent(id)}/share',
+        body: {'name': packageName},
+      );
+      final shared = behaviorMap(package['id']);
+      if (mounted && selected == id) {
+        setState(
+          () => notice =
+              'Shared as ${shared['owner']}/${shared['name']}. Anyone can install it from Packages.',
+        );
+      }
+    } catch (error) {
+      if (mounted && selected == id) {
+        setState(() => notice = 'Could not share this automation. $error');
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   Future<void> command(String path, Map<String, Object?> body) async {
     if (busy || stale || selected == null) return;
     final id = selected!;
@@ -438,6 +466,7 @@ class _BehaviorManagerState extends State<BehaviorManager> {
                     enabled: !busy && !stale,
                     stale: stale,
                     onCommand: command,
+                    onShare: share,
                     onDescribe: editDescription,
                     onAsk: (prompt) => widget.onAsk(selected!, prompt),
                   );

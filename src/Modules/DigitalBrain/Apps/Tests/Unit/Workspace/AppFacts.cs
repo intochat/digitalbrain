@@ -26,7 +26,7 @@ public sealed class AppFacts
         Assert.Equal(revision.Artifact, deployment.Artifact);
         var configuration = Configuration(deployment);
         Assert.Equal(key, configuration["Behavior__App"]);
-        Assert.Equal("bullets", configuration["Behavior__Settings__style"]);
+        Assert.Equal("bullets", configuration["Behavior__style"]);
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public sealed class AppFacts
         Assert.True(RecordingBehaviorProgram.Deleted.ContainsKey(installed.BehaviorProgram!));
         var deployment = Assert.Single(Program(configured).Deployments);
         Assert.Equal(revision.Artifact, deployment.Artifact);
-        Assert.Equal("brief", Configuration(deployment)["Behavior__Settings__style"]);
+        Assert.Equal("brief", Configuration(deployment)["Behavior__style"]);
     }
 
     [Fact]

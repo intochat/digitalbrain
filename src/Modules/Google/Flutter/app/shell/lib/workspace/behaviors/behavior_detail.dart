@@ -14,12 +14,14 @@ class BehaviorDetailView extends StatefulWidget {
     required this.onCommand,
     required this.onDescribe,
     required this.onAsk,
+    this.onShare,
   });
   final Map<String, dynamic> detail;
   final bool enabled, stale;
   final Future<void> Function(String path, Map<String, Object?> body) onCommand;
   final VoidCallback onDescribe;
   final ValueChanged<String> onAsk;
+  final Future<void> Function(String packageName)? onShare;
   @override
   State<BehaviorDetailView> createState() => _BehaviorDetailViewState();
 }
@@ -27,6 +29,9 @@ class BehaviorDetailView extends StatefulWidget {
 class _BehaviorDetailViewState extends State<BehaviorDetailView> {
   int tab = 0;
   late final configuration = TextEditingController(text: currentConfiguration);
+  late final packageName = TextEditingController(
+    text: id.toLowerCase().replaceAll('_', '-').replaceFirst(RegExp('^-+'), ''),
+  );
   String? configError;
   bool configurationEdited = false;
   Map<String, dynamic> get d => behaviorMap(widget.detail['description']);
@@ -53,7 +58,45 @@ class _BehaviorDetailViewState extends State<BehaviorDetailView> {
   @override
   void dispose() {
     configuration.dispose();
+    packageName.dispose();
     super.dispose();
+  }
+
+  bool get shareable =>
+      checkState(check) == 'Passed' && check['revision'] == draft['revision'];
+
+  Future<void> share() async {
+    final chosen = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Share as package'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Publishes the checked code and its current settings. Anyone can install it from Packages.',
+            ),
+            TextField(
+              key: const ValueKey('share-package-name'),
+              controller: packageName,
+              decoration: const InputDecoration(labelText: 'Package name'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, packageName.text.trim()),
+            child: const Text('Share'),
+          ),
+        ],
+      ),
+    );
+    if (chosen != null && chosen.isNotEmpty) await widget.onShare!(chosen);
   }
 
   Map<String, Object?> commandBody() => {
@@ -496,6 +539,12 @@ class _BehaviorDetailViewState extends State<BehaviorDetailView> {
                             )
                           : null,
                       child: Text(running ? 'Stop' : 'Start'),
+                    ),
+                  if (widget.onShare != null && shareable)
+                    OutlinedButton.icon(
+                      onPressed: widget.enabled ? share : null,
+                      icon: const Icon(Icons.ios_share, size: 16),
+                      label: const Text('Share as package'),
                     ),
                   TextButton.icon(
                     onPressed: widget.enabled

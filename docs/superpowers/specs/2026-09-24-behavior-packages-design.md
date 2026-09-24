@@ -53,7 +53,7 @@ host neurons, so the app neuron gives them an address, settings and an invocatio
 
 - `Install(revision, settings)` validates settings against the manifest, deploys the revision's
   artifact through `IBehaviorProgram` with configuration `Behavior__App` and
-  `Behavior__Settings__{name}`.
+  `Behavior__{name}` (a setting may not be named `App`).
 - `Configure` redeploys the same artifact with new settings: customization without a fork.
 - `Upgrade` redeploys another revision of the same package.
 - `Invoke(operation, input)` stores a pending invocation and publishes `AppInvoked`.

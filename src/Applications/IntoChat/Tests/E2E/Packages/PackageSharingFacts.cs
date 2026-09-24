@@ -19,13 +19,13 @@ public sealed class PackageSharingFacts
         await using var brain = await IntoChatE2ETest.Create()
             .WithResourceEnvironment(new Dictionary<string, string> { ["IntoChat__BehaviorAuthoring__AllowActivation"] = "true" })
             .StartAsync(ct);
-        using var alice = await SignedIn(brain.HttpClient, "alice", ct);
-        using var bob = await SignedIn(brain.HttpClient, "bob", ct);
+        using var alice = await People.SignedIn(brain.HttpClient, "alice", ct);
+        using var bob = await People.SignedIn(brain.HttpClient, "bob", ct);
 
-        var original = await Send(alice.Client, HttpMethod.Post, "/packages/alice/researcher/revisions",
+        var original = await People.Send(alice.Client, HttpMethod.Post, "/packages/alice/researcher/revisions",
             new { content = ResearcherPackage.Content("Research"), message = "Research briefs" }, ct);
-        await Send(alice.Client, HttpMethod.Post, "/packages/alice/researcher/publish", new { }, ct);
-        var listings = await Send(bob.Client, HttpMethod.Get, "/packages", null, ct);
+        await People.Send(alice.Client, HttpMethod.Post, "/packages/alice/researcher/publish", new { }, ct);
+        var listings = await People.Send(bob.Client, HttpMethod.Get, "/packages", null, ct);
         Assert.Contains(listings.EnumerateArray(), listing => listing.GetProperty("revision").GetString() == original.GetProperty("id").GetString());
 
         using (var forged = await bob.Client.PostAsJsonAsync("/packages/alice/researcher/revisions",
@@ -33,16 +33,16 @@ public sealed class PackageSharingFacts
         { Assert.Equal(HttpStatusCode.Forbidden, forged.StatusCode); }
 
         var app = $"/workspaces/{bob.Workspace}/packages/alice/researcher";
-        await Send(bob.Client, HttpMethod.Post, app, new { }, ct);
+        await People.Send(bob.Client, HttpMethod.Post, app, new { }, ct);
         await Running(bob.Client, app, ct);
         Assert.Equal("Research (plain): What is Orleans?", await Ask(bob.Client, app, "What is Orleans?", ct));
         using (var foreign = await alice.Client.GetAsync(app, ct)) { Assert.Equal(HttpStatusCode.Forbidden, foreign.StatusCode); }
 
-        await Send(bob.Client, HttpMethod.Post, app + "/configure", new { settings = new { style = "bullets" } }, ct);
+        await People.Send(bob.Client, HttpMethod.Post, app + "/configure", new { settings = new { style = "bullets" } }, ct);
         await Running(bob.Client, app, ct);
         Assert.Equal("Research (bullets): What is Orleans?", await Ask(bob.Client, app, "What is Orleans?", ct));
 
-        var fork = await Send(bob.Client, HttpMethod.Post, "/packages/alice/researcher/fork", new { }, ct);
+        var fork = await People.Send(bob.Client, HttpMethod.Post, "/packages/alice/researcher/fork", new { }, ct);
         Assert.Equal("bob", fork.GetProperty("id").GetProperty("owner").GetString());
         using (var failing = await bob.Client.PostAsJsonAsync("/packages/bob/researcher/revisions", new
         {
@@ -51,20 +51,20 @@ public sealed class PackageSharingFacts
             expectedHead = fork.GetProperty("head").GetString(),
         }, Json, ct))
         { Assert.Equal(HttpStatusCode.UnprocessableEntity, failing.StatusCode); }
-        var summaries = await Send(bob.Client, HttpMethod.Post, "/packages/bob/researcher/revisions",
+        var summaries = await People.Send(bob.Client, HttpMethod.Post, "/packages/bob/researcher/revisions",
             new { content = ResearcherPackage.Content("Summary"), message = "Summarize instead", expectedHead = fork.GetProperty("head").GetString() }, ct);
 
-        var proposal = await Send(bob.Client, HttpMethod.Post, "/packages/alice/researcher/proposals",
+        var proposal = await People.Send(bob.Client, HttpMethod.Post, "/packages/alice/researcher/proposals",
             new { source = new { owner = "bob", name = "researcher" }, title = "Summaries" }, ct);
-        await Send(alice.Client, HttpMethod.Post, $"/packages/alice/researcher/proposals/{proposal.GetProperty("number").GetInt32()}/accept", null, ct);
-        var published = await Send(alice.Client, HttpMethod.Post, "/packages/alice/researcher/publish", new { }, ct);
+        await People.Send(alice.Client, HttpMethod.Post, $"/packages/alice/researcher/proposals/{proposal.GetProperty("number").GetInt32()}/accept", null, ct);
+        var published = await People.Send(alice.Client, HttpMethod.Post, "/packages/alice/researcher/publish", new { }, ct);
         Assert.Equal(summaries.GetProperty("id").GetString(), published.GetProperty("published").GetString());
 
-        await Send(bob.Client, HttpMethod.Post, app + "/upgrade", new { }, ct);
+        await People.Send(bob.Client, HttpMethod.Post, app + "/upgrade", new { }, ct);
         await Running(bob.Client, app, ct);
         Assert.Equal("Summary (bullets): What is Orleans?", await Ask(bob.Client, app, "What is Orleans?", ct));
 
-        var uninstalled = await Send(bob.Client, HttpMethod.Delete, app, null, ct);
+        var uninstalled = await People.Send(bob.Client, HttpMethod.Delete, app, null, ct);
         Assert.Equal((int)AppStatus.Uninstalled, uninstalled.GetProperty("app").GetProperty("status").GetInt32());
     }
 
@@ -74,7 +74,7 @@ public sealed class PackageSharingFacts
         timeout.CancelAfter(TimeSpan.FromSeconds(120));
         while (true)
         {
-            var view = await Send(client, HttpMethod.Get, app, null, timeout.Token);
+            var view = await People.Send(client, HttpMethod.Get, app, null, timeout.Token);
             var behavior = view.GetProperty("behavior");
             Assert.NotEqual((int)BehaviorExecutionState.Failed, behavior.GetProperty("state").GetInt32());
             if (behavior.GetProperty("ready").GetBoolean()
@@ -86,38 +86,15 @@ public sealed class PackageSharingFacts
 
     private static async Task<string?> Ask(HttpClient client, string app, string question, CancellationToken ct)
     {
-        var invocation = await Send(client, HttpMethod.Post, app + "/invocations", new { operation = "research", input = question }, ct);
+        var invocation = await People.Send(client, HttpMethod.Post, app + "/invocations", new { operation = "research", input = question }, ct);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(30));
         while (invocation.GetProperty("status").GetInt32() == (int)InvocationStatus.Pending)
         {
             await Task.Delay(200, timeout.Token);
-            invocation = await Send(client, HttpMethod.Get, $"{app}/invocations/{invocation.GetProperty("id").GetGuid()}", null, timeout.Token);
+            invocation = await People.Send(client, HttpMethod.Get, $"{app}/invocations/{invocation.GetProperty("id").GetGuid()}", null, timeout.Token);
         }
         Assert.Equal((int)InvocationStatus.Completed, invocation.GetProperty("status").GetInt32());
         return invocation.GetProperty("output").GetString();
-    }
-
-    private static async Task<JsonElement> Send(HttpClient client, HttpMethod method, string path, object? body, CancellationToken ct)
-    {
-        using var request = new HttpRequestMessage(method, path) { Content = body is null ? null : JsonContent.Create(body, options: Json) };
-        using var response = await client.SendAsync(request, ct);
-        var text = await response.Content.ReadAsStringAsync(ct);
-        Assert.True(response.IsSuccessStatusCode, $"{method} {path} returned {(int)response.StatusCode}: {text}");
-        return JsonDocument.Parse(text).RootElement.Clone();
-    }
-
-    private static async Task<SignedInPerson> SignedIn(HttpClient origin, string principal, CancellationToken ct)
-    {
-        var client = new HttpClient(new SocketsHttpHandler { UseCookies = true, CookieContainer = new CookieContainer() })
-        {
-            BaseAddress = origin.BaseAddress,
-            Timeout = TimeSpan.FromMinutes(5),
-        };
-        using var registered = await client.PostAsJsonAsync("/identity/register",
-            new { principalId = principal, displayName = principal, password = principal + "-password-123" }, Json, ct);
-        Assert.Equal(HttpStatusCode.OK, registered.StatusCode);
-        var member = await registered.Content.ReadFromJsonAsync<DigitalBrain.Identity.Member>(Json, ct);
-        return new(client, member!.WorkspaceId);
     }
 }

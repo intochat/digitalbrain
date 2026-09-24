@@ -40,7 +40,7 @@ internal static class ResearcherPackage
             public async Task RunAsync(CancellationToken cancellation = default)
             {
                 var app = brain.Get<IApp>(configuration["Behavior:App"]!);
-                var style = configuration["Behavior:Settings:style"] ?? "plain";
+                var style = configuration["Behavior:style"] ?? "plain";
                 await using var invocations = await brain.SubscribeAsync<AppInvoked>(app, cancellation);
                 foreach (var missed in await app.Pending()) { await app.Respond(Brief.Answer(missed.Id, missed.Input, style)); }
                 await foreach (var invoked in invocations.ReadAllAsync(cancellation)) { await app.Respond(Brief.Answer(invoked.InvocationId, invoked.Input, style)); }
