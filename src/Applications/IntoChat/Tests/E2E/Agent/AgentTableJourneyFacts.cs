@@ -126,22 +126,28 @@ public sealed class AgentTableJourneyFacts
 
         // "Only London" refines the existing window; it must not open a second one.
         await SendAsync(page, "Only London");
-        await Assertions.Expect(page.GetByText("Refined the same window to London.", new() { Exact = true })).ToBeVisibleAsync(new() { Timeout = 60_000 });
+        // The assistant message's semantics node carries the sender label, so match the message group by name.
+        await Assertions.Expect(page.GetByRole(AriaRole.Group, new() { Name = "IntoChat Refined the same window to London." })).ToBeVisibleAsync(new() { Timeout = 60_000 });
         await Assertions.Expect(window).ToHaveCountAsync(1);
-        var tableId = Assert.Single((await workspace.Read()).Windows).View.Id;
+        var tableId = Assert.Single((await workspace.Read()).Windows).Reference.NeuronId;
         var refined = await brain.Get<DigitalBrain.Supabase.Tables.ISupabaseTable>(tableId).Read(new(0, 25));
         Assert.Equal(60, refined!.TotalRows);
         Assert.Equal(6, refined.FilteredRows);
         Assert.Equal("city", Assert.Single(refined.Filters).ColumnId);
 
-        // Refresh reads the saved view again, so the same window now shows only London rows.
+        // The window re-reads the saved view on the refine signal, so the refined rows appear
+        // without pressing Refresh: London rows only, no Berlin row.
+        await Assertions.Expect(window.GetByText("Customer 10", new() { Exact = true })).ToBeVisibleAsync();
+        await Assertions.Expect(window.GetByText("Customer 11", new() { Exact = true })).ToHaveCountAsync(0);
+
+        // Refresh keeps showing the same saved view.
         await window.GetByRole(AriaRole.Button, new() { Name = "Refresh table", Exact = true }).ClickAsync();
         await Assertions.Expect(window.GetByText("Customer 10", new() { Exact = true })).ToBeVisibleAsync();
         await Assertions.Expect(window.GetByText("Customer 11", new() { Exact = true })).ToHaveCountAsync(0);
 
         // "How many?" is answered from a count aggregate; the read returns no row values.
         await SendAsync(page, "How many?");
-        await Assertions.Expect(page.GetByText("6 in London", new() { Exact = true })).ToBeVisibleAsync(new() { Timeout = 60_000 });
+        await Assertions.Expect(page.GetByRole(AriaRole.Group, new() { Name = "IntoChat 6 in London" })).ToBeVisibleAsync(new() { Timeout = 60_000 });
         Assert.Equal(6, model.LastReadFilteredRows);
         Assert.Equal("6", model.LastReadAggregate);
         await Assertions.Expect(window).ToHaveCountAsync(1);

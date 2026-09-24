@@ -35,6 +35,22 @@ public sealed class SupabaseQueryFacts
     }
 
     [Fact]
+    public async Task TheConnectionProbeRunsOnlyReadOnlySql()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var provider = new FakeSupabaseProvider();
+        await using var brain = await StartAsync(provider, ct);
+        var supabase = brain.Get<ISupabase>(SupabaseNames.DefaultNeuron);
+
+        var connection = await supabase.ReadConnection();
+
+        Assert.True(connection.Connected);
+        Assert.NotEmpty(provider.ExecutedSql);
+        Assert.All(provider.ExecutedSql, sql =>
+            Assert.StartsWith("SELECT", sql.TrimStart(), StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task BlankOrWriteSqlIsRejected()
     {
         var ct = TestContext.Current.CancellationToken;

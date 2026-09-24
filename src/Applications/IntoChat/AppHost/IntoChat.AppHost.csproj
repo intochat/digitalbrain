@@ -10,9 +10,18 @@
     <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Behaviors/DigitalBrain.Behaviors.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../IntoChat/IntoChat.csproj" />
+    <ProjectReference Include="../../../Modules/MyData/MyData/DigitalBrain.Modules.MyData.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Connections/Connections/DigitalBrain.Modules.Connections.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Receipts/Receipts/DigitalBrain.Modules.Receipts.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Compute/Compute/DigitalBrain.Modules.Compute.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Apps/Apps/DigitalBrain.Modules.Apps.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Identity/Identity/DigitalBrain.Modules.Identity.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Discovery/Discovery/DigitalBrain.Modules.Discovery.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Automations/Automations/DigitalBrain.Modules.Automations.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Google/Gmail/Gmail/DigitalBrain.Modules.Google.Gmail.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Google/Flutter/Aspire.Hosting/DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Inbox/Inbox/DigitalBrain.Modules.Inbox.csproj" IsAspireProjectResource="false" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../../Modules/AI/Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" IsAspireProjectResource="false" />

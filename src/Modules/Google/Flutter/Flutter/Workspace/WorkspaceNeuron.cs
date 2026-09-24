@@ -16,12 +16,13 @@ internal sealed class WorkspaceNeuron(
         Validate(request.OperationId, 256, nameof(request.OperationId));
         Validate(request.WindowId, 256, nameof(request.WindowId));
         Validate(request.Title, 200, nameof(request.Title));
-        ArgumentNullException.ThrowIfNull(request.View);
-        Validate(request.View.Id, 256, nameof(request.View));
+        ArgumentNullException.ThrowIfNull(request.Reference);
+        Validate(request.Reference.Kind, 64, nameof(request.Reference));
+        Validate(request.Reference.NeuronId, 256, nameof(request.Reference));
         var current = store.State;
         if (current.OperationLog.TryGetValue(request.OperationId, out var previous))
         {
-            if (previous.WindowId != request.WindowId || previous.Title != request.Title || previous.View != request.View)
+            if (previous.WindowId != request.WindowId || previous.Title != request.Title || previous.Reference != request.Reference)
             { throw new InvalidOperationException("This operation ID already belongs to a different window request."); }
             // An operation log entry recorded before the applied revision was persisted falls back
             // to the revision the request itself proved it advanced from.
@@ -33,9 +34,9 @@ internal sealed class WorkspaceNeuron(
         if (current.SurfaceOperationLog.ContainsKey(request.OperationId)) { throw new InvalidOperationException("This operation ID belongs to a surface request."); }
         RequireRevision(request.ExpectedRevision);
         var windows = new Dictionary<string, WorkspaceWindow>(current.Windows, StringComparer.Ordinal);
-        if (windows.TryGetValue(request.WindowId, out var existing) && (existing.View != request.View || existing.Surface is not null))
-        { throw new InvalidOperationException("A window ID cannot be reassigned to another table."); }
-        windows[request.WindowId] = new(request.WindowId, request.Title, request.View, true);
+        if (windows.TryGetValue(request.WindowId, out var existing) && existing.Reference != request.Reference)
+        { throw new InvalidOperationException("A window ID cannot be reassigned to another neuron."); }
+        windows[request.WindowId] = new(request.WindowId, request.Title, request.Reference, true);
         var revision = checked(current.Revision + 1);
         var operationLog = new Dictionary<string, OpenWindow>(current.OperationLog, StringComparer.Ordinal) { [request.OperationId] = request };
         var operationRevisionLog = new Dictionary<string, long>(current.OperationRevisionLog, StringComparer.Ordinal) { [request.OperationId] = revision };
@@ -46,31 +47,34 @@ internal sealed class WorkspaceNeuron(
             OperationLog = operationLog,
             SurfaceOperationLog = current.SurfaceOperationLog,
             OperationRevisionLog = operationRevisionLog,
+            ConnectedSources = current.ConnectedSources,
         });
         return new WorkspaceOpenResult(Snapshot(), revision);
     }
 
     public async Task<WorkspaceState> OpenSurface(OpenSurfaceWindow request)
     {
+        ArgumentNullException.ThrowIfNull(request);
         Validate(request.OperationId, 256, nameof(request.OperationId));
         Validate(request.WindowId, 256, nameof(request.WindowId));
         Validate(request.Title, 200, nameof(request.Title));
-        ArgumentNullException.ThrowIfNull(request.Surface);
-        if (request.Surface.Kind != UIVocabulary.SurfaceType || !request.Surface.Name.StartsWith(this.GetPrimaryKeyString() + "/", StringComparison.Ordinal))
+        ArgumentNullException.ThrowIfNull(request.Reference);
+        if (request.Reference.Kind != UIVocabulary.SurfaceType
+            || !request.Reference.NeuronId.StartsWith(this.GetPrimaryKeyString() + "/", StringComparison.Ordinal))
         { throw new ArgumentException("A workspace window must reference a surface in this workspace."); }
         var current = store.State;
         if (current.SurfaceOperationLog.TryGetValue(request.OperationId, out var previous))
         {
-            if (previous.WindowId != request.WindowId || previous.Title != request.Title || previous.Surface != request.Surface)
+            if (previous.WindowId != request.WindowId || previous.Title != request.Title || previous.Reference != request.Reference)
             { throw new InvalidOperationException("This operation ID already belongs to another surface request."); }
             return Snapshot();
         }
         if (current.OperationLog.ContainsKey(request.OperationId)) { throw new InvalidOperationException("This operation ID belongs to a table request."); }
         RequireRevision(request.ExpectedRevision);
-        if (current.Windows.TryGetValue(request.WindowId, out var existing) && existing.Surface is null)
+        if (current.Windows.TryGetValue(request.WindowId, out var existing) && existing.Reference.Kind == WindowReference.TableKind)
         { throw new InvalidOperationException("A table window cannot be changed into an app window."); }
         var windows = new Dictionary<string, WorkspaceWindow>(current.Windows, StringComparer.Ordinal)
-        { [request.WindowId] = new(request.WindowId, request.Title, new(""), true, request.Surface) };
+        { [request.WindowId] = new(request.WindowId, request.Title, request.Reference, true) };
         await Save(new()
         {
             Revision = checked(current.Revision + 1),
@@ -78,6 +82,28 @@ internal sealed class WorkspaceNeuron(
             OperationLog = current.OperationLog,
             SurfaceOperationLog = new(current.SurfaceOperationLog) { [request.OperationId] = request },
             OperationRevisionLog = current.OperationRevisionLog,
+            ConnectedSources = current.ConnectedSources,
+        });
+        return Snapshot();
+    }
+
+    public async Task<WorkspaceState> SetConnectedSources(IReadOnlyList<string> sources)
+    {
+        ArgumentNullException.ThrowIfNull(sources);
+        var connected = sources
+            .Where(source => !string.IsNullOrWhiteSpace(source))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (connected.SequenceEqual(store.State.ConnectedSources, StringComparer.OrdinalIgnoreCase)) { return Snapshot(); }
+        await Save(new()
+        {
+            Revision = store.State.Revision,
+            Windows = store.State.Windows,
+            OperationLog = store.State.OperationLog,
+            SurfaceOperationLog = store.State.SurfaceOperationLog,
+            OperationRevisionLog = store.State.OperationRevisionLog,
+            ConnectedSources = connected,
         });
         return Snapshot();
     }
@@ -93,12 +119,18 @@ internal sealed class WorkspaceNeuron(
         {
             [windowId] = window with { IsOpen = false },
         };
-        await Save(new() { Revision = checked(store.State.Revision + 1), Windows = windows, OperationLog = store.State.OperationLog, SurfaceOperationLog = store.State.SurfaceOperationLog, OperationRevisionLog = store.State.OperationRevisionLog });
+        await Save(new() { Revision = checked(store.State.Revision + 1), Windows = windows, OperationLog = store.State.OperationLog, SurfaceOperationLog = store.State.SurfaceOperationLog, OperationRevisionLog = store.State.OperationRevisionLog, ConnectedSources = store.State.ConnectedSources });
         return Snapshot();
     }
 
     public Task<WorkspaceState> Read() => Task.FromResult(Snapshot());
-    private WorkspaceState Snapshot() => new(store.State.Revision, store.State.Windows.Values.ToArray());
+
+    private WorkspaceState Snapshot() => new(store.State.Revision, store.State.Windows.Values.ToArray(), FirstRun());
+
+    private FirstRunState? FirstRun() =>
+        store.State.OperationLog.Count == 0 && store.State.SurfaceOperationLog.Count == 0 && store.State.Windows.Count == 0
+            ? WorkspaceStarterCatalog.Build(store.State.ConnectedSources)
+            : null;
 
     private async Task Save(WorkspaceStorage next)
     {
@@ -128,4 +160,5 @@ internal sealed class WorkspaceStorage
     [Id(3)] public Dictionary<string, OpenSurfaceWindow> SurfaceOperationLog { get; set; } = new(StringComparer.Ordinal);
     [Id(2)] public Dictionary<string, OpenWindow> OperationLog { get; set; } = new(StringComparer.Ordinal);
     [Id(4)] public Dictionary<string, long> OperationRevisionLog { get; set; } = new(StringComparer.Ordinal);
+    [Id(5)] public string[] ConnectedSources { get; set; } = [];
 }

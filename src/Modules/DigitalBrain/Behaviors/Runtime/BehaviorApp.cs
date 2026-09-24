@@ -5,6 +5,7 @@ using DigitalBrain.Contracts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Serialization;
@@ -20,6 +21,9 @@ public static class BehaviorApp
         Func<IDigitalBrain, IReadOnlyList<SubscriptionRequirement>> requirements) where TBehavior : class, IBehavior
     {
         var builder = Host.CreateApplicationBuilder(args);
+        // Behavior worker logs stay at Warning: the supervisor captures stdout/stderr, so routine
+        // Information lines would flood the log page and the signal that matters is the failure.
+        builder.Logging.SetMinimumLevel(LogLevel.Warning);
         // Continue the launching trace when the executor supplied one: the worker's grain calls
         // then remain children of the intent that started it instead of opening a new root.
         using var behaviorActivity = StartBehaviorActivity();

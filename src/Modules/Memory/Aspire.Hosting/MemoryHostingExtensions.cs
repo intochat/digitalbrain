@@ -52,7 +52,12 @@ public static class MemoryHostingExtensions
 
             var builder = brain.ApplicationBuilder;
             _options = options;
-            _qdrant = builder.AddQdrant(options.ResourceName).WithParentRelationship(module);
+            var qdrant = builder.AddQdrant(options.ResourceName).WithParentRelationship(module);
+            if (options.PersistentStorage)
+            {
+                qdrant.WithDataVolume().WithLifetime(ContainerLifetime.Persistent);
+            }
+            _qdrant = qdrant;
             _enabled = true;
         }
 

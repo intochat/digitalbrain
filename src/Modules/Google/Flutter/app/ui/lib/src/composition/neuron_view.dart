@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../models/ui_part.dart';
+import 'renderer_registry.dart';
+
 typedef NeuronLoader = Future<Map<String, dynamic>> Function(
   String kind,
   String name,
 );
+
+/// Posts a raw secret once to the owner's vault and returns the vault reference; the reference,
+/// never the raw value, is what the form event carries.
+typedef SecretSaver = Future<String?> Function(String fieldName, String value);
 
 class NeuronView extends StatefulWidget {
   const NeuronView({
@@ -14,6 +21,7 @@ class NeuronView extends StatefulWidget {
     this.onActivate,
     this.onAction,
     this.imageBuilder,
+    this.secretSaver,
     this.ancestors = const {},
     this.revision = 0,
     this.enabled = true,
@@ -23,6 +31,7 @@ class NeuronView extends StatefulWidget {
   final ValueChanged<Map<String, dynamic>>? onActivate;
   final Future<void> Function(Map<String, dynamic>)? onAction;
   final Widget Function(Map<String, dynamic>)? imageBuilder;
+  final SecretSaver? secretSaver;
   final Set<String> ancestors;
   final int revision;
   final bool enabled;
@@ -74,25 +83,26 @@ class _NeuronViewState extends State<NeuronView> {
       future: state,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('This component could not be loaded.'),
-                TextButton(
-                  onPressed: () => setState(
-                    () => state = widget.load(widget.kind, widget.name),
-                  ),
-                  child: const Text('Retry'),
-                ),
-              ],
+          return WindowStateView(
+            state: const WindowState(WindowStatus.failed),
+            onRetry: () => setState(
+              () => state = widget.load(widget.kind, widget.name),
             ),
           );
         }
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return const WindowStateView(state: WindowState(WindowStatus.loading));
         }
         final data = snapshot.data!;
+        final declared = WindowState.fromMetadata(data);
+        if (declared != null) {
+          return WindowStateView(
+            state: declared,
+            onRetry: () => setState(
+              () => state = widget.load(widget.kind, widget.name),
+            ),
+          );
+        }
         final definition = Map<String, dynamic>.from(
           data['definition'] as Map? ?? data,
         );
@@ -114,6 +124,7 @@ class _NeuronViewState extends State<NeuronView> {
                       onActivate: widget.onActivate,
                       onAction: widget.onAction,
                       imageBuilder: widget.imageBuilder,
+                      secretSaver: widget.secretSaver,
                       ancestors: {...widget.ancestors, identity},
                       revision: widget.revision,
                       enabled: widget.enabled,
@@ -181,7 +192,9 @@ class _NeuronViewState extends State<NeuronView> {
               child: TextFormField(
                 key: ValueKey('${widget.name}:${widget.revision}'),
                 initialValue: definition['value'] as String? ?? '',
-                obscureText: definition['kind'] == 'secret',
+                obscureText:
+                    definition['kind'] == 'secret' ||
+                    definition['kind'] == 'password',
                 decoration: InputDecoration(
                   labelText: definition['label'] as String? ?? '',
                   isDense: true,
@@ -235,6 +248,7 @@ class _NeuronViewState extends State<NeuronView> {
                       onActivate: widget.onActivate,
                       onAction: widget.onAction,
                       imageBuilder: widget.imageBuilder,
+                      secretSaver: widget.secretSaver,
                       ancestors: {...widget.ancestors, identity},
                       revision: widget.revision,
                       enabled: widget.enabled,
@@ -350,12 +364,438 @@ class _NeuronViewState extends State<NeuronView> {
           case 'imagecanvas':
             return widget.imageBuilder?.call(definition) ??
                 const Center(child: Text('Image canvas unavailable.'));
-          default:
-            return const Center(
-              child: Text('This component cannot be displayed.'),
+          case 'form':
+            return _FormRenderer(
+              part: UiFormPart.fromMetadata(definition),
+              name: widget.name,
+              revision: widget.revision,
+              enabled: widget.enabled,
+              onAction: widget.onAction,
+              secretSaver: widget.secretSaver,
             );
+          default:
+            return _FallbackRenderer(kind: widget.kind);
         }
       },
     );
+  }
+}
+
+/// Renders the declared fallback for a UI kind that has no dedicated renderer: the kind is named
+/// and explained, never blank.
+class _FallbackRenderer extends StatelessWidget {
+  const _FallbackRenderer({required this.kind});
+
+  final String kind;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('${RendererRegistry.fallbackLabel}: $kind'),
+            const SizedBox(height: 4),
+            const Text(
+              RendererRegistry.fallbackExplanation,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Renders each declared window state. Loading shows progress, failed offers a retry, and the
+/// other states explain the situation in one line so no window is blank.
+class WindowStateView extends StatelessWidget {
+  const WindowStateView({super.key, required this.state, this.onRetry});
+
+  final WindowState state;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    if (state.status == WindowStatus.loading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+    final (icon, label, message) = switch (state.status) {
+      WindowStatus.loading => (Icons.hourglass_empty, 'Loading', ''),
+      WindowStatus.empty => (
+        Icons.inbox_outlined,
+        'Nothing here yet',
+        'This window has no content yet.',
+      ),
+      WindowStatus.permissionDenied => (
+        Icons.lock_outline,
+        'Not available to you',
+        'You do not have permission to view this window.',
+      ),
+      WindowStatus.expiredConnection => (
+        Icons.link_off,
+        'Connection expired',
+        'The connection this window needs has expired. Reconnect to continue.',
+      ),
+      WindowStatus.failed => (
+        Icons.error_outline,
+        'Could not load',
+        state.message ?? 'This component could not be loaded.',
+      ),
+    };
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 28),
+            const SizedBox(height: 8),
+            Text(label),
+            if (message.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(message, textAlign: TextAlign.center),
+            ],
+            if (onRetry != null) ...[
+              const SizedBox(height: 8),
+              TextButton(onPressed: onRetry, child: const Text('Retry')),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Renders the first-run workspace state: the assistant plus starter prompts that match the
+/// connected sources.
+class FirstRunView extends StatelessWidget {
+  const FirstRunView({super.key, required this.state, this.onPrompt});
+
+  final FirstRunState state;
+  final ValueChanged<StarterPrompt>? onPrompt;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            state.assistantTitle,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 4),
+          const Text('Start with one of these.'),
+          const SizedBox(height: 12),
+          for (final prompt in state.prompts)
+            Card(
+              child: ListTile(
+                title: Text(prompt.label),
+                subtitle: prompt.source == 'assistant'
+                    ? null
+                    : Text(prompt.source),
+                onTap: onPrompt == null ? null : () => onPrompt!(prompt),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Renders a declarative form from one read: typed fields, a date picker and a masked secret
+/// input. Field edits dispatch a `form` event; Save submits the whole form atomically.
+class _FormRenderer extends StatefulWidget {
+  const _FormRenderer({
+    required this.part,
+    required this.name,
+    required this.revision,
+    required this.enabled,
+    required this.onAction,
+    this.secretSaver,
+  });
+
+  final UiFormPart part;
+  final String name;
+  final int revision;
+  final bool enabled;
+  final Future<void> Function(Map<String, dynamic>)? onAction;
+  final SecretSaver? secretSaver;
+
+  @override
+  State<_FormRenderer> createState() => _FormRendererState();
+}
+
+class _FormRendererState extends State<_FormRenderer> {
+  late Map<String, String?> values = _initial();
+
+  Map<String, String?> _initial() => {
+    for (final field in widget.part.fields) field.name: field.value,
+  };
+
+  @override
+  void didUpdateWidget(_FormRenderer old) {
+    super.didUpdateWidget(old);
+    if (old.revision != widget.revision) {
+      values = _initial();
+    }
+  }
+
+  Future<void> dispatch(Map<String, Object?> event) async {
+    await widget.onAction?.call({
+      'kind': 'form',
+      'name': widget.name,
+      'revision': widget.revision,
+      ...event,
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (widget.part.title.isNotEmpty) ...[
+            Text(widget.part.title, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+          ],
+          for (final field in widget.part.fields) _field(context, field),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              FilledButton(
+                onPressed: widget.enabled
+                    ? () => dispatch({'action': 'submit'})
+                    : null,
+                child: const Text('Save'),
+              ),
+              if (widget.part.submitted) ...[
+                const SizedBox(width: 8),
+                const Text('Saved'),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _field(BuildContext context, UiFormField field) {
+    final label = field.required ? '${field.label} *' : field.label;
+    switch (field.kind) {
+      case 'Secret':
+        // The raw secret is posted once to the vault; only the returned reference reaches the
+        // form. Without a vault saver there is no way to set it, so the handle stays read-only.
+        final saver = widget.secretSaver;
+        if (saver == null) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: TextFormField(
+              key: Key('form_secret_${field.name}'),
+              obscureText: true,
+              readOnly: true,
+              enabled: widget.enabled,
+              decoration: InputDecoration(
+                labelText: label,
+                isDense: true,
+                helperText: field.secretSet ? '•••• set' : 'Not set',
+              ),
+            ),
+          );
+        }
+        return _SecretInput(
+          key: Key('form_secret_${field.name}'),
+          label: label,
+          enabled: widget.enabled,
+          isSet: field.secretSet,
+          save: (value) async {
+            final reference = await saver(field.name, value);
+            if (reference != null && reference.isNotEmpty) {
+              await dispatch({
+                'action': 'secret',
+                'field': field.name,
+                'value': reference,
+              });
+            }
+            return reference;
+          },
+        );
+      case 'Date':
+        final value = values[field.name];
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: InputDecorator(
+                  decoration: InputDecoration(labelText: label, isDense: true),
+                  child: Text(
+                    value == null || value.isEmpty ? 'Pick a date' : value,
+                  ),
+                ),
+              ),
+              IconButton(
+                key: Key('form_date_${field.name}'),
+                icon: const Icon(Icons.calendar_today),
+                tooltip: 'Pick ${field.label}',
+                onPressed: widget.enabled ? () => _pickDate(field) : null,
+              ),
+            ],
+          ),
+        );
+      case 'Boolean':
+        return SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          value: values[field.name] == 'true',
+          title: Text(label),
+          onChanged: widget.enabled
+              ? (on) => dispatch({
+                  'field': field.name,
+                  'value': on ? 'true' : 'false',
+                })
+              : null,
+        );
+      case 'Choice':
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: DropdownButtonFormField<String>(
+            initialValue: field.choices.contains(values[field.name])
+                ? values[field.name]
+                : null,
+            decoration: InputDecoration(labelText: label, isDense: true),
+            items: [
+              for (final choice in field.choices)
+                DropdownMenuItem(value: choice, child: Text(choice)),
+            ],
+            onChanged: widget.enabled
+                ? (value) => dispatch({'field': field.name, 'value': value})
+                : null,
+          ),
+        );
+      default:
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: TextFormField(
+            key: Key('form_field_${field.name}'),
+            initialValue: values[field.name] ?? '',
+            enabled: widget.enabled,
+            decoration: InputDecoration(
+              labelText: label,
+              isDense: true,
+              helperText: field.supported ? null : 'Shown as plain text.',
+            ),
+            onFieldSubmitted: (value) =>
+                dispatch({'field': field.name, 'value': value}),
+          ),
+        );
+    }
+  }
+
+  Future<void> _pickDate(UiFormField field) async {
+    final current = values[field.name];
+    final parsed = current == null || current.isEmpty
+        ? null
+        : DateTime.tryParse(current);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: parsed ?? DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime(2200),
+    );
+    if (picked == null) {
+      return;
+    }
+    final formatted = picked.toIso8601String().split('T').first;
+    setState(() => values[field.name] = formatted);
+    await dispatch({'field': field.name, 'value': formatted});
+  }
+}
+
+/// A masked secret input that hands the raw value to the vault once and then drops it, keeping
+/// only the returned reference. The field text is cleared on success so the raw value is not held.
+class _SecretInput extends StatefulWidget {
+  const _SecretInput({
+    super.key,
+    required this.label,
+    required this.enabled,
+    required this.isSet,
+    required this.save,
+  });
+
+  final String label;
+  final bool enabled;
+  final bool isSet;
+  final Future<String?> Function(String value) save;
+
+  @override
+  State<_SecretInput> createState() => _SecretInputState();
+}
+
+class _SecretInputState extends State<_SecretInput> {
+  final controller = TextEditingController();
+  bool set = false;
+  bool saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    set = widget.isSet;
+  }
+
+  Future<void> submit() async {
+    final value = controller.text;
+    if (value.isEmpty || saving) return;
+    setState(() => saving = true);
+    try {
+      final reference = await widget.save(value);
+      if (!mounted) return;
+      setState(() {
+        set = reference != null && reference.isNotEmpty;
+        saving = false;
+        controller.clear();
+      });
+    } catch (_) {
+      if (mounted) setState(() => saving = false);
+      rethrow;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: TextFormField(
+      controller: controller,
+      obscureText: true,
+      enabled: widget.enabled && !saving,
+      decoration: InputDecoration(
+        labelText: widget.label,
+        isDense: true,
+        helperText: set ? '•••• set' : 'Not set',
+        suffixIcon: IconButton(
+          key: const Key('form_secret_save'),
+          icon: const Icon(Icons.check),
+          tooltip: 'Store in My Data',
+          onPressed: widget.enabled && !saving ? submit : null,
+        ),
+      ),
+      onFieldSubmitted: (_) => submit(),
+    ),
+  );
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
   }
 }

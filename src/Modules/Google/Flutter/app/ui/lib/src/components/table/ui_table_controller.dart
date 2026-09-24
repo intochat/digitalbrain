@@ -3,7 +3,13 @@ import 'package:flutter/foundation.dart';
 
 /// Share this controller by table ID: cards always display the same server view.
 final class UiTableController extends ChangeNotifier {
-  UiTableController({required this._snapshot, this.read, this.update});
+  UiTableController({
+    required this.workspace,
+    required this._snapshot,
+    this.read,
+    this.update,
+  });
+  final String workspace;
   TableSnapshot _snapshot;
   TableSnapshot get snapshot => _snapshot;
   final ReadTable? read;
@@ -27,6 +33,18 @@ final class UiTableController extends ChangeNotifier {
     _notify();
   }
 
+  // The assistant refines the saved view and returns it without row values; re-read so the
+  // window shows the refined rows instead of an empty page.
+  Future<void> acceptSavedView(TableSnapshot view) async {
+    if (_disposed ||
+        view.id != _snapshot.id ||
+        view.revision < _snapshot.revision ||
+        read == null) {
+      return;
+    }
+    await reload(offset: 0);
+  }
+
   Future<void> reload({int? offset}) async {
     final reader = read;
     if (reader == null || _disposed) return;
@@ -36,6 +54,7 @@ final class UiTableController extends ChangeNotifier {
     _notify();
     try {
       final next = await reader(
+        workspace,
         snapshot.id,
         offset: offset ?? snapshot.offset,
         limit: snapshot.limit,
@@ -68,6 +87,7 @@ final class UiTableController extends ChangeNotifier {
     _notify();
     try {
       final next = await writer(
+        workspace,
         current.id,
         TableViewUpdate(
           expectedRevision: current.revision,
@@ -87,6 +107,7 @@ final class UiTableController extends ChangeNotifier {
       if (read case final reader?) {
         try {
           final latest = await reader(
+            workspace,
             current.id,
             offset: 0,
             limit: current.limit,

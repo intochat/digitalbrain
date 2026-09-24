@@ -29,7 +29,8 @@ void main() {
           WorkspaceWindow(
             id: 'result',
             title: 'Leads',
-            tableId: 'table',
+            kind: 'table',
+            neuronId: 'table',
             isOpen: open,
           ),
         ],
@@ -79,7 +80,8 @@ void main() {
           const WorkspaceWindow(
             id: 'result',
             title: 'Leads',
-            tableId: 'table',
+            kind: 'table',
+            neuronId: 'table',
             isOpen: true,
           ),
         ],
@@ -102,7 +104,8 @@ void main() {
           const WorkspaceWindow(
             id: 'result',
             title: 'Leads',
-            tableId: 'table',
+            kind: 'table',
+            neuronId: 'table',
             isOpen: false,
           ),
         ],

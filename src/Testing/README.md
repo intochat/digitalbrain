@@ -61,9 +61,9 @@ a frontend, so the module's own hosting call is the switch:
 await using var brain = await E2ETest.Create()
     .WithModule<FlutterModule>(flutter => flutter.BackendOnly())
     .StartAsync(ct);
-var button = brain.Get<IButton>("go");
+var button = brain.Get<IButton>(UiScope.Key("workspace-a", "go"));
 await using var clicks = await brain.Observe<ButtonClicked>(button, ct);
-using var response = await brain.HttpClient.PostAsJsonAsync("/ui/buttons/go/click", new { }, ct);
+using var response = await brain.HttpClient.PostAsJsonAsync("/workspaces/workspace-a/ui/buttons/go/click", new { }, ct);
 Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
 await clicks.NextAsync(ct: ct);
 

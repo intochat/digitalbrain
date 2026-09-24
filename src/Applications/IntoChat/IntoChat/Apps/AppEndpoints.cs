@@ -1,8 +1,14 @@
+using DigitalBrain.Apps;
+using DigitalBrain.Apps.Manifests;
+using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
+using DigitalBrain.Contracts.Types;
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Button;
 using DigitalBrain.Flutter.Card;
 using DigitalBrain.Flutter.Collection;
+using DigitalBrain.Flutter.Form;
 using DigitalBrain.Flutter.ImageCanvas;
 using DigitalBrain.Flutter.Layout;
 using DigitalBrain.Flutter.Surface;
@@ -19,7 +25,60 @@ internal static class AppEndpoints
 {
     public static void MapLocalApps(this IEndpointRouteBuilder routes)
     {
-        routes.MapGet("/workspaces/{workspaceId}/apps/files", (string workspaceId, string? folderId, int? offset, string? sort, string? filter, IDigitalBrain brain, LocalFileStore files, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        var apps = routes.MapGroup("/workspaces/{workspaceId}/apps").AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
+        apps.MapGet("", (string workspaceId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        {
+            var scope = Scope(auth.Value, workspaceId);
+            var installed = await brain.Get<IAppCatalog>(scope).List().WaitAsync(ct);
+            var manifests = FirstPartyApps.All()
+                .Concat(installed.Select(installation => installation.Manifest))
+                .GroupBy(manifest => manifest.Id, StringComparer.Ordinal)
+                .Select(group => group.Last())
+                .OrderBy(manifest => manifest.Name, StringComparer.Ordinal)
+                .Select(manifest => new
+                {
+                    id = manifest.Id,
+                    name = manifest.Name,
+                    description = manifest.DescriptionForPeople,
+                    kind = manifest.Kind.ToString().ToLowerInvariant(),
+                    uiEntry = manifest.UiEntry,
+                    examplePrompts = manifest.ExamplePrompts,
+                    permissions = manifest.Permissions.Select(permission => new
+                    {
+                        semanticTypeId = permission.SemanticTypeId,
+                        reason = permission.Reason,
+                        write = permission.Write,
+                    }),
+                    meters = manifest.Meters.Select(meter => new
+                    {
+                        meterId = meter.MeterId,
+                        unit = meter.Unit,
+                        aggregation = meter.Aggregation,
+                        proposedPriceInCompute = meter.ProposedPriceInCompute,
+                    }),
+                })
+                .ToArray();
+            return Results.Ok(manifests);
+        }));
+        apps.MapGet("/{appId}/consent", (string workspaceId, string appId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        {
+            var scope = Scope(auth.Value, workspaceId);
+            var sheet = await brain.Get<IAppConsent>(scope).Review(appId).WaitAsync(ct);
+            return Results.Ok(sheet);
+        }));
+        apps.MapPost("/{appId}/consent/approve", (string workspaceId, string appId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        {
+            var scope = Scope(auth.Value, workspaceId);
+            var sheet = await brain.Get<IAppConsent>(scope).Approve(appId).WaitAsync(ct);
+            return Results.Ok(sheet);
+        }));
+        apps.MapPost("/leadgenerator/run", (string workspaceId, LeadGeneratorRunRequest input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        {
+            var scope = Scope(auth.Value, workspaceId);
+            var result = await brain.Get<ILeadGeneratorLeads>(scope).Sweep(input.Query).WaitAsync(ct);
+            return Results.Ok(result);
+        }));
+        apps.MapGet("/files", (string workspaceId, string? folderId, int? offset, string? sort, string? filter, IDigitalBrain brain, LocalFileStore files, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);
             var neuron = brain.Get<IFileExplorer>(scope);
@@ -28,19 +87,19 @@ internal static class AppEndpoints
             await EnsureWindow(brain, scope, "app-files", "Files", state.Surface!, ct);
             return Results.Ok(new { state, page });
         }));
-        routes.MapPost("/workspaces/{workspaceId}/apps/files/open", (string workspaceId, OpenImage input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        apps.MapPost("/files/open", (string workspaceId, OpenImage input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);
             var document = await brain.Get<IFileExplorer>(scope).OpenImage(input.EntryId).WaitAsync(ct);
             await EnsureWindow(brain, scope, "app-images", "Image Editor", new("surface", scope + "/apps/image-editor/surface"), ct);
             return Results.Ok(document);
         }));
-        routes.MapGet("/workspaces/{workspaceId}/apps/images-ui", (string workspaceId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        apps.MapGet("/images-ui", (string workspaceId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var name = Scope(auth.Value, workspaceId) + "/apps/image-editor";
             return Results.Ok(new { surface = new UiChildRef("surface", name + "/surface"), tabs = await brain.Get<ITabs>(name + "/tabs").Read().WaitAsync(ct) });
         }));
-        routes.MapGet("/workspaces/{workspaceId}/apps/images/{documentId}", (string workspaceId, string documentId, IDigitalBrain brain, AppSurfaceComposer surfaces, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        apps.MapGet("/images/{documentId}", (string workspaceId, string documentId, IDigitalBrain brain, AppSurfaceComposer surfaces, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);
             var document = await Document(brain, scope, documentId).Read().WaitAsync(ct);
@@ -48,11 +107,11 @@ internal static class AppEndpoints
             await surfaces.RegisterDocument(scope, document);
             return Results.Ok(document);
         }));
-        routes.MapPost("/workspaces/{workspaceId}/apps/images/{documentId}/edit", (string workspaceId, string documentId, EditImage input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        apps.MapPost("/images/{documentId}/edit", (string workspaceId, string documentId, EditImage input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
             Results.Ok(await Document(brain, Scope(auth.Value, workspaceId), documentId).Apply(input.Command, input.ExpectedRevision, input.OperationId).WaitAsync(ct))));
-        routes.MapPost("/workspaces/{workspaceId}/apps/images/{documentId}/prepare-save", (string workspaceId, string documentId, PrepareImageSave input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        apps.MapPost("/images/{documentId}/prepare-save", (string workspaceId, string documentId, PrepareImageSave input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
             Results.Ok(await Document(brain, Scope(auth.Value, workspaceId), documentId).PrepareSave(input.ExpectedRevision, input.OperationId).WaitAsync(ct))));
-        routes.MapPost("/workspaces/{workspaceId}/apps/images/{documentId}/save/{operationId}", (string workspaceId, string documentId, string operationId, HttpRequest request, IDigitalBrain brain, ImageSaveCoordinator saves, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        apps.MapPost("/images/{documentId}/save/{operationId}", (string workspaceId, string documentId, string operationId, HttpRequest request, IDigitalBrain brain, ImageSaveCoordinator saves, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);
             var document = Document(brain, scope, documentId);
@@ -62,9 +121,25 @@ internal static class AppEndpoints
             var updated = await document.CompleteSave(operationId, result).WaitAsync(ct);
             return Results.Ok(new { document = updated, file = result });
         })).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(LocalFilesOptions.MaxExportBytes));
-        routes.MapGet("/workspaces/{workspaceId}/apps/assets/{assetId}", (string workspaceId, string assetId, LocalFileStore files, IOptions<BasicAuthOptions> auth) => Respond(() =>
+        apps.MapPost("/background-removal/plan", (string workspaceId, BackgroundRemovalPlanInput input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+            Results.Ok(await Removal(brain, Scope(auth.Value, workspaceId)).Plan(input.ImageIds, input.IntentId).WaitAsync(ct))));
+        apps.MapPost("/background-removal/approve", (string workspaceId, BackgroundRemovalApproveInput input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        {
+            var scope = Scope(auth.Value, workspaceId);
+            var plan = (await Removal(brain, scope).ReadPlans().WaitAsync(ct)).LastOrDefault(item => item.PlanId == input.PlanId)
+                ?? throw new KeyNotFoundException("The plan is no longer available; plan again.");
+            if (plan.ApprovalId is null) { return Results.Ok(plan); }
+            var ledger = brain.Get<IAllowanceLedger>(plan.AccountId);
+            var always = input.Scope == AllowanceScope.Always;
+            await ledger.ApproveAsync(plan.ApprovalId, always ? ApprovalLevel.InstallConsent : ApprovalLevel.PerOperation,
+                input.Scope, always ? 100m : plan.MaximumCompute, ct);
+            return Results.Ok(plan);
+        }));
+        apps.MapPost("/background-removal/run", (string workspaceId, BackgroundRemovalRunInput input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+            Results.Ok(await Removal(brain, Scope(auth.Value, workspaceId)).Run(input.PlanId, input.IntentId).WaitAsync(ct))));
+        apps.MapGet("/assets/{assetId}", (string workspaceId, string assetId, LocalFileStore files, IOptions<BasicAuthOptions> auth) => Respond(() =>
             Task.FromResult<IResult>(Results.File(files.OpenAsset(Scope(auth.Value, workspaceId), assetId), "application/octet-stream", enableRangeProcessing: true))));
-        routes.MapGet("/workspaces/{workspaceId}/apps/node", (string workspaceId, string kind, string name, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        apps.MapGet("/node", (string workspaceId, string kind, string name, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);
             if (!name.StartsWith(scope + "/apps/", StringComparison.Ordinal) && !name.StartsWith(scope + "/images/", StringComparison.Ordinal)) { throw new UnauthorizedAccessException("The UI belongs to another workspace."); }
@@ -79,10 +154,11 @@ internal static class AppEndpoints
                 "layout" => Results.Ok(await brain.Get<ILayout>(name).Read().WaitAsync(ct)),
                 "collection" => Results.Ok(await brain.Get<ICollectionView>(name).Read().WaitAsync(ct)),
                 "imagecanvas" => Results.Ok(await brain.Get<IImageCanvas>(name).Read().WaitAsync(ct)),
+                "form" => Results.Ok(await brain.Get<IForm>(name).Read().WaitAsync(ct)),
                 _ => throw new ArgumentException("Unknown app UI kind.")
             };
         }));
-        routes.MapPost("/workspaces/{workspaceId}/apps/event", (string workspaceId, UiEvent input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        apps.MapPost("/event", (string workspaceId, UiEvent input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);
             if (!input.Name.StartsWith(scope + "/apps/", StringComparison.Ordinal) && !input.Name.StartsWith(scope + "/images/", StringComparison.Ordinal)) { throw new UnauthorizedAccessException(); }
@@ -96,6 +172,25 @@ internal static class AppEndpoints
                     if (input.Action == "select") { await collection.Select(input.Value ?? "", input.Revision).WaitAsync(ct); }
                     else { await collection.Activate(input.Value ?? "", input.Revision).WaitAsync(ct); }
                     break;
+                case "form":
+                    var form = brain.Get<IForm>(input.Name);
+                    if (input.Action == "submit")
+                    {
+                        var state = await form.Read().WaitAsync(ct);
+                        var values = state.Fields.Select(field => new FormFieldValue(field.Name, field.Value)).ToArray();
+                        await form.Submit(new(values, (int)input.Revision)).WaitAsync(ct);
+                    }
+                    else if (input.Action == "secret")
+                    {
+                        if (!SecretRef.IsReference(input.Value))
+                        {
+                            throw new ArgumentException("A form secret carries the vault reference, never a raw secret value.");
+                        }
+
+                        await form.SetSecret(input.Field ?? "", SecretRef.FromReference(input.Value!, input.Field ?? "")).WaitAsync(ct);
+                    }
+                    else { await form.SetDraft(input.Field ?? "", input.Value ?? "").WaitAsync(ct); }
+                    break;
                 default: throw new ArgumentException("Unknown UI event.");
             }
             return Results.Ok(new { delivered = true });
@@ -105,20 +200,23 @@ internal static class AppEndpoints
     private static async Task EnsureWindow(IDigitalBrain brain, string scope, string id, string title, UiChildRef surface, CancellationToken ct)
     {
         var workspace = brain.Get<IWorkspace>(scope);
+        var reference = WindowReference.For(surface);
         for (var attempt = 0; attempt < 3; attempt++)
         {
             var state = await workspace.Read().WaitAsync(ct);
-            if (state.Windows.Any(w => w.Id == id && w.IsOpen && w.Surface == surface)) { return; }
-            try { await workspace.OpenSurface(new(Guid.NewGuid().ToString(), id, title, surface, state.Revision)).WaitAsync(ct); return; }
+            if (state.Windows.Any(w => w.Id == id && w.IsOpen && w.Reference == reference)) { return; }
+            try { await workspace.OpenSurface(new(Guid.NewGuid().ToString(), id, title, reference, state.Revision)).WaitAsync(ct); return; }
             catch (WorkspaceRevisionConflictException) when (attempt < 2) { }
         }
     }
-    private static string Scope(BasicAuthOptions auth, string workspace) => WorkspaceScope.Create(auth.Username is { Length: > 0 } owner ? owner : BasicAuthGate.DefaultLogin, workspace).Id;
+    private static string Scope(BasicAuthOptions auth, string workspace) => WorkspaceScope.Current(auth, workspace).Id;
     private static IImageDocument Document(IDigitalBrain brain, string scope, string id)
     {
         if (id.Length != 64 || id.Any(c => !char.IsAsciiHexDigit(c))) { throw new ArgumentException("Invalid image document."); }
         return brain.Get<IImageDocument>(scope + "/images/" + id);
     }
+    private static IBackgroundRemoval Removal(IDigitalBrain brain, string scope) =>
+        brain.Get<IBackgroundRemoval>(scope + "/apps/image-editor/background-removal");
     private static async Task<IResult> Respond(Func<Task<IResult>> action)
     {
         try { return await action(); }
@@ -130,8 +228,12 @@ internal static class AppEndpoints
         catch (InvalidOperationException error) { return Results.Conflict(new { error = error.Message }); }
         catch (IOException error) { return Results.Json(new { error = error.Message.Contains("changed since", StringComparison.Ordinal) ? error.Message : "The local file could not be accessed. Check its permissions and retry." }, statusCode: 503); }
     }
-    internal sealed record UiEvent(string Kind, string Name, string? Action = null, string? Value = null, long Revision = 0);
+    internal sealed record UiEvent(string Kind, string Name, string? Action = null, string? Value = null, long Revision = 0, string? Field = null);
     internal sealed record OpenImage(string EntryId);
     internal sealed record EditImage(ImageEditCommand Command, long ExpectedRevision, string OperationId);
     internal sealed record PrepareImageSave(long ExpectedRevision, string OperationId);
+    internal sealed record BackgroundRemovalPlanInput(IReadOnlyList<string> ImageIds, string IntentId);
+    internal sealed record BackgroundRemovalApproveInput(string PlanId, AllowanceScope Scope);
+    internal sealed record BackgroundRemovalRunInput(string PlanId, string IntentId);
+    internal sealed record LeadGeneratorRunRequest(string Query);
 }

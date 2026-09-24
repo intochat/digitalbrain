@@ -234,6 +234,56 @@ internal sealed class QdrantVectorMemoryProvider : IAsyncDisposable
         }
     }
 
+    public async Task<long> RemoveNamespaceAsync(
+        string name,
+        string @namespace,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(@namespace);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!await CollectionExistsAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return 0;
+        }
+
+        try
+        {
+            var filter = new Filter
+            {
+                Must =
+                {
+                    MatchKeyword(NameField, name),
+                    MatchKeyword(NamespaceField, @namespace),
+                },
+            };
+
+            var count = await _client.CountAsync(_collectionName, filter, exact: true, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            if (count == 0)
+            {
+                return 0;
+            }
+
+            await _client.DeleteAsync(
+                    _collectionName,
+                    filter,
+                    wait: true,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            return (long)count;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException("Vector memory namespace purge failed.", ex);
+        }
+    }
+
     private async Task EnsureCollectionAsync(int vectorSize, CancellationToken cancellationToken)
     {
         if (_collectionReady && _vectorSize == vectorSize)

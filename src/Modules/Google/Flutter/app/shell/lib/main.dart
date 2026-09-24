@@ -35,8 +35,9 @@ Future<void> main() async {
   // kernel accepted before any stream opens.
   runApp(
     BrainSessionGate(
-      builder: (client, status) => buildShell(
+      builder: (client, status, switchAccount) => buildShell(
         chat: chat,
+        onSwitchAccount: switchAccount,
         edge: client,
         statusMessage: status,
         initialLocation: initialLocation,
@@ -52,6 +53,7 @@ Widget buildShell({
   String? statusMessage,
   WorkspaceStore? workspaceStore,
   Uri? initialLocation,
+  Future<void> Function()? onSwitchAccount,
 }) {
   final scope = base64Url.encode(
     utf8.encode(
@@ -62,6 +64,7 @@ Widget buildShell({
   );
   return WorkspaceApp(
     key: ValueKey(scope),
+    onSwitchAccount: onSwitchAccount,
     persistenceKey: 'intocaht.workspace.v1.$scope',
     store: workspaceStore,
     initialLocation: initialLocation,

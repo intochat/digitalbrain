@@ -37,7 +37,7 @@ abstract final class DigitalBrainHostEnv {
       processEnvironment: processEnvironment,
     );
     if (raw.isNotEmpty) {
-      return Uri.parse(raw);
+      return browserKernelUri(Uri.parse(raw), surface.sameOriginUiBase());
     }
 
     // Deployed shell served from digitalbrain-ui (same origin) has no process env.
@@ -80,4 +80,15 @@ abstract final class DigitalBrainHostEnv {
     }
     return raw;
   }
+}
+
+/// Keeps local shell and kernel cookies same-site without rewriting remote hosts.
+Uri browserKernelUri(Uri kernel, Uri? page) {
+  const loopback = {'localhost', '127.0.0.1', '::1', '[::1]'};
+  if (page != null &&
+      loopback.contains(kernel.host) &&
+      loopback.contains(page.host)) {
+    return kernel.replace(host: page.host);
+  }
+  return kernel;
 }

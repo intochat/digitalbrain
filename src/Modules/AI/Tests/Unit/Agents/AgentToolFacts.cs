@@ -102,6 +102,36 @@ public sealed class AgentToolFacts
     }
 
     [Fact]
+    public void RelevantAppToolsJoinTheCoreAndNoneOfThemExceedTheCap()
+    {
+        var selected = AgentToolPolicy.SelectTools(developerMode: false, [],
+            ["propose_app", "run_leadgenerator"]);
+        Assert.True(selected.Count <= AgentToolPolicy.MaxDefaultTools);
+        Assert.Contains("find_capability", selected);
+        Assert.Contains("propose_app", selected);
+        Assert.Contains("run_leadgenerator", selected);
+        Assert.DoesNotContain("supabase_schema", selected);
+    }
+
+    [Fact]
+    public void ATableIntentKeepsTheGenericTableToolsWhenAnAppIsRelevant()
+    {
+        var selected = AgentToolPolicy.SelectTools(developerMode: false, [],
+            ["propose_app"], tableIntent: true);
+        Assert.Contains("supabase_schema", selected);
+        Assert.Contains("show_supabase_query_table", selected);
+    }
+
+    [Fact]
+    public void ManyRelevantAppToolsStillFitTheCap()
+    {
+        var selected = AgentToolPolicy.SelectTools(developerMode: false, [],
+            ["propose_app", "run_leadgenerator", "plan_background_removal", "run_background_removal", "find_capability"]);
+        Assert.Equal(AgentToolPolicy.MaxDefaultTools, selected.Count);
+        Assert.Equal(selected.Count, selected.Distinct(StringComparer.Ordinal).Count());
+    }
+
+    [Fact]
     public void ExplicitDeveloperModeIncludesBehaviorTools()
     {
         string[] developerTools = ["code_contracts", "behavior_read", "behavior_deploy"];

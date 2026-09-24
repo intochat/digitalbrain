@@ -1,0 +1,59 @@
+{
+  "id": "intochat.image-editor",
+  "version": "1.1.0",
+  "publisher": "intochat",
+  "kind": "declarative",
+  "name": "Image Editor",
+  "descriptionForPeople": "Draw, crop and save copies of images. Removing a background is a paid operation, priced in Compute.",
+  "descriptionForModel": "Edit an image document; strokes and crops are saved as a new copy. Removing the background from one or more selected images is a paid operation that first shows a plan card with an estimate and a maximum, then runs under an allowance.",
+  "operations": [
+    {
+      "name": "Open",
+      "descriptionForModel": "Open an image asset as a document.",
+      "readOnly": true,
+      "inputTypeIds": { "asset": "reference" },
+      "outputTypeId": "reference"
+    },
+    {
+      "name": "Apply",
+      "descriptionForModel": "Apply a stroke, crop or reset to the open document.",
+      "inputTypeIds": { "command": "reference", "expectedRevision": "number", "operationId": "plain-text" },
+      "outputTypeId": "reference"
+    },
+    {
+      "name": "PrepareSave",
+      "descriptionForModel": "Prepare a save ticket for the current revision.",
+      "inputTypeIds": { "expectedRevision": "number", "operationId": "plain-text" },
+      "outputTypeId": "reference"
+    },
+    {
+      "name": "CompleteSave",
+      "descriptionForModel": "Complete a prepared save with the stored file.",
+      "inputTypeIds": { "operationId": "plain-text", "result": "reference" },
+      "outputTypeId": "reference"
+    },
+    {
+      "name": "RemoveBackground",
+      "descriptionForModel": "Remove the background from the selected images. This is paid: it shows a plan for the selected images with an estimate and a maximum, and runs only under an allowance.",
+      "inputTypeIds": { "images": "reference" },
+      "outputTypeId": "reference"
+    },
+    {
+      "name": "Read",
+      "descriptionForModel": "Read the open image document.",
+      "readOnly": true,
+      "outputTypeId": "reference"
+    }
+  ],
+  "uiEntry": "app-images",
+  "permissions": [],
+  "meters": [
+    {
+      "meterId": "image.background_removed",
+      "unit": "image",
+      "aggregation": "sum",
+      "proposedPriceInCompute": 4.5
+    }
+  ],
+  "examplePrompts": ["Crop this image", "Draw on the photo", "Remove the background from these 3 product photos"]
+}

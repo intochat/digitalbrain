@@ -2,13 +2,16 @@ using DigitalBrain.Coding;
 using DigitalBrain.Core;
 using Microsoft.Extensions.Logging;
 using Orleans;
+using Orleans.Concurrency;
 using Orleans.Metadata;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Behavior;
 
+// Worker callbacks interleave: Delete stops the worker inside this grain's turn, and the stopping
+// worker's log and readiness notifications would otherwise wait on that same turn until the stop times out.
 [Alias("behavior.events"), DefaultGrainType("behavior.program")]
-internal interface IBehaviorProgramEvents : IGrainWithStringKey { Task Changed(); Task LogsChanged(Guid generation, long sequence); }
+internal interface IBehaviorProgramEvents : IGrainWithStringKey { [AlwaysInterleave] Task Changed(); [AlwaysInterleave] Task LogsChanged(Guid generation, long sequence); }
 
 [GrainType("behavior.program")]
 internal sealed class BehaviorProgramNeuron(BehaviorSupervisor supervisor, ICodeArtifactStore artifacts, ILogger<BehaviorProgramNeuron> logger)
@@ -21,6 +24,7 @@ internal sealed class BehaviorProgramNeuron(BehaviorSupervisor supervisor, ICode
         await artifacts.OpenVerifiedAsync(request.Artifact, cancellationToken);
         var result = await supervisor.Store.DeployAsync(this.GetPrimaryKeyString(), request, cancellationToken);
         await DeploymentChanged(result);
+        supervisor.Wake();
         return result;
     }
     public async Task<BehaviorSnapshot> Start(ChangeBehaviorState request, CancellationToken cancellationToken = default)
@@ -29,10 +33,16 @@ internal sealed class BehaviorProgramNeuron(BehaviorSupervisor supervisor, ICode
         var current = await Read(cancellationToken);
         var deployment = current.Deployments.SingleOrDefault(d => d.Revision == current.DesiredDeploymentRevision) ?? throw new InvalidOperationException("Deploy an artifact first.");
         await artifacts.OpenVerifiedAsync(deployment.Artifact, cancellationToken);
-        return await supervisor.Store.ChangeAsync(this.GetPrimaryKeyString(), request, true, cancellationToken);
+        var result = await supervisor.Store.ChangeAsync(this.GetPrimaryKeyString(), request, true, cancellationToken);
+        supervisor.Wake();
+        return result;
     }
-    public Task<BehaviorSnapshot> Stop(ChangeBehaviorState request, CancellationToken cancellationToken = default)
-        => supervisor.Store.ChangeAsync(this.GetPrimaryKeyString(), request, false, cancellationToken);
+    public async Task<BehaviorSnapshot> Stop(ChangeBehaviorState request, CancellationToken cancellationToken = default)
+    {
+        var result = await supervisor.Store.ChangeAsync(this.GetPrimaryKeyString(), request, false, cancellationToken);
+        supervisor.Wake();
+        return result;
+    }
     public async Task<BehaviorSnapshot> Rollback(RollbackBehavior request, CancellationToken cancellationToken = default)
     {
         if (await supervisor.Store.ReplayAsync(this.GetPrimaryKeyString(), "rollback", request.OperationId, request, cancellationToken) is { } prior) { return prior; }
@@ -41,6 +51,15 @@ internal sealed class BehaviorProgramNeuron(BehaviorSupervisor supervisor, ICode
         await artifacts.OpenVerifiedAsync(deployment.Artifact, cancellationToken);
         var result = await supervisor.Store.RollbackAsync(this.GetPrimaryKeyString(), request, cancellationToken);
         await DeploymentChanged(result);
+        supervisor.Wake();
+        return result;
+    }
+    public async Task<BehaviorSnapshot> Delete(DeleteBehavior request, CancellationToken cancellationToken = default)
+    {
+        if (await supervisor.Store.ReplayAsync(this.GetPrimaryKeyString(), "delete", request.OperationId, request, cancellationToken) is { } prior) { return prior; }
+        var result = await supervisor.Store.RemoveAsync(this.GetPrimaryKeyString(), request, cancellationToken);
+        await supervisor.StopProgramAsync(this.GetPrimaryKeyString(), cancellationToken);
+        supervisor.Wake();
         return result;
     }
     public Task<BehaviorLogPage> ReadLogs(long afterSequence, int limit = 100, CancellationToken cancellationToken = default)

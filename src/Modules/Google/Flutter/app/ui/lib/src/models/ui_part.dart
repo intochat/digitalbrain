@@ -24,9 +24,102 @@ sealed class UiPart {
       UiVideoPart.kindName => UiVideoPart.fromMetadata(metadata),
       UiWebBrowserPart.kindName => UiWebBrowserPart.fromMetadata(metadata),
       UiExpanderPart.kindName => UiExpanderPart.fromMetadata(metadata),
+      UiFormPart.kindName => UiFormPart.fromMetadata(metadata),
       _ => null,
     };
   }
+}
+
+final class UiFormField {
+  const UiFormField({
+    required this.name,
+    required this.label,
+    required this.kind,
+    this.required = false,
+    this.choices = const [],
+    this.value,
+    this.secretSet = false,
+    this.supported = true,
+  });
+
+  final String name;
+  final String label;
+  final String kind;
+  final bool required;
+  final List<String> choices;
+  final String? value;
+  final bool secretSet;
+  final bool supported;
+
+  factory UiFormField.fromJson(Map<String, dynamic> json) {
+    return UiFormField(
+      name: json['name'] as String? ?? '',
+      label: json['label'] as String? ?? '',
+      kind: json['kind'] as String? ?? 'PlainText',
+      required: json['required'] as bool? ?? false,
+      choices: (json['choices'] as List? ?? const [])
+          .map((choice) => choice.toString())
+          .toList(growable: false),
+      value: json['value'] as String?,
+      secretSet: json['secretSet'] as bool? ?? false,
+      supported: json['supported'] as bool? ?? true,
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+    'name': name,
+    'label': label,
+    'kind': kind,
+    'required': required,
+    'choices': choices,
+    'value': value,
+    'secretSet': secretSet,
+    'supported': supported,
+  };
+}
+
+/// Declarative form read from one [FormState]; rendered field by field, no per-field neuron.
+final class UiFormPart extends UiPart {
+  const UiFormPart({
+    required this.title,
+    required this.fields,
+    this.submitted = false,
+  });
+
+  static const kindName = 'form';
+
+  final String title;
+  final List<UiFormField> fields;
+  final bool submitted;
+
+  @override
+  String get kind => kindName;
+
+  @override
+  String get copyText => title;
+
+  factory UiFormPart.fromMetadata(Map<String, dynamic> metadata) {
+    final raw = metadata['fields'];
+    final fields = raw is List
+        ? raw
+              .whereType<Map>()
+              .map((field) => UiFormField.fromJson(Map<String, dynamic>.from(field)))
+              .toList(growable: false)
+        : const <UiFormField>[];
+    return UiFormPart(
+      title: metadata['title'] as String? ?? '',
+      fields: fields,
+      submitted: metadata['submitted'] as bool? ?? false,
+    );
+  }
+
+  @override
+  Map<String, Object?> toMetadata() => {
+    'kind': kindName,
+    'title': title,
+    'submitted': submitted,
+    'fields': [for (final field in fields) field.toJson()],
+  };
 }
 
 final class UiTimerPart extends UiPart {
@@ -405,4 +498,88 @@ final class UiExpanderPart extends UiPart {
     'header': header,
     'expanded': expanded,
   };
+}
+
+/// The declared states a window can be in before it has content to draw. Each state renders; none
+/// leaves the window blank.
+enum WindowStatus {
+  loading,
+  empty,
+  permissionDenied,
+  expiredConnection,
+  failed,
+}
+
+final class WindowState {
+  const WindowState(this.status, {this.message});
+
+  final WindowStatus status;
+  final String? message;
+
+  static WindowState? fromMetadata(Map<String, dynamic>? metadata) {
+    final raw = metadata?['state'];
+    if (raw is! String) {
+      return null;
+    }
+    return WindowState(
+      WindowStatus.values.firstWhere(
+        (status) => status.name == raw,
+        orElse: () => WindowStatus.failed,
+      ),
+      message: metadata?['message'] as String?,
+    );
+  }
+}
+
+final class StarterPrompt {
+  const StarterPrompt({
+    required this.id,
+    required this.label,
+    required this.prompt,
+    required this.source,
+  });
+
+  final String id;
+  final String label;
+  final String prompt;
+  final String source;
+
+  factory StarterPrompt.fromJson(Map<String, dynamic> json) => StarterPrompt(
+    id: json['id'] as String? ?? '',
+    label: json['label'] as String? ?? '',
+    prompt: json['prompt'] as String? ?? '',
+    source: json['source'] as String? ?? '',
+  );
+}
+
+/// The first-run workspace state: the assistant plus starter prompts that match the connected
+/// sources. Rendered when the workspace holds no window yet.
+final class FirstRunState {
+  const FirstRunState({
+    required this.assistantId,
+    required this.assistantTitle,
+    required this.prompts,
+  });
+
+  final String assistantId;
+  final String assistantTitle;
+  final List<StarterPrompt> prompts;
+
+  factory FirstRunState.fromMetadata(Map<String, dynamic>? metadata) {
+    final raw = metadata?['prompts'];
+    final prompts = raw is List
+        ? raw
+              .whereType<Map>()
+              .map(
+                (prompt) =>
+                    StarterPrompt.fromJson(Map<String, dynamic>.from(prompt)),
+              )
+              .toList(growable: false)
+        : const <StarterPrompt>[];
+    return FirstRunState(
+      assistantId: metadata?['assistantId'] as String? ?? 'intocaht',
+      assistantTitle: metadata?['assistantTitle'] as String? ?? 'IntoChat',
+      prompts: prompts,
+    );
+  }
 }

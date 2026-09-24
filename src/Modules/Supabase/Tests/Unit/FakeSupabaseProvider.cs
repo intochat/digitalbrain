@@ -22,8 +22,14 @@ internal sealed class FakeSupabaseProvider : ISupabaseProvider
 
     public string? LastAggregateColumn { get; private set; }
 
+    // Every statement the provider was asked to run, so a test can prove a probe is read-only.
+    public List<string> ExecutedSql { get; } = [];
+
     public Task<SupabaseQueryResult> QueryAsync(string sql, int maxRows, CancellationToken cancellationToken)
-        => Task.FromResult(QueryResult);
+    {
+        ExecutedSql.Add(sql);
+        return Task.FromResult(QueryResult);
+    }
 
     public Task<QueryPage> ExecutePlanAsync(QueryPlan plan, CancellationToken cancellationToken)
     {
@@ -46,5 +52,8 @@ internal sealed class FakeSupabaseProvider : ISupabaseProvider
         => Task.FromResult(new SupabaseSchema("test", []));
 
     public Task<SupabaseConnection> PingAsync(CancellationToken cancellationToken)
-        => Task.FromResult(new SupabaseConnection(true, "test", "16.0", SupabaseModule.ProviderName));
+    {
+        ExecutedSql.Add("SELECT version()");
+        return Task.FromResult(new SupabaseConnection(true, "test", "16.0", SupabaseModule.ProviderName));
+    }
 }

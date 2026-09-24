@@ -1,4 +1,7 @@
+using DigitalBrain.Contracts;
+using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core;
+using DigitalBrain.MyData;
 using DigitalBrain.Sdk;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
@@ -6,7 +9,9 @@ using Orleans.Runtime;
 namespace DigitalBrain.Google.Gmail;
 
 [GrainType("gmail")]
-public sealed class GmailNeuron : Neuron, IGmail
+internal sealed class GmailNeuron(
+    [PersistentState("gmail-vault", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<GmailState> store)
+    : Neuron<GmailState>(store), IGmail
 {
     public Task AcceptWatchPush(GmailWatchPush push)
     {
@@ -15,23 +20,53 @@ public sealed class GmailNeuron : Neuron, IGmail
         return PublishAsync(new MailReceived(push.EmailAddress, push.HistoryId));
     }
 
-    public async Task AcceptAuthorizationCode(string authorizationCode)
+    public async Task AcceptAuthorizationCode(string authorizationCode, string? secretOwner = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(authorizationCode);
         var tokens = ServiceProvider.GetRequiredService<IGmailTokenExchange>();
-        var handoff = ServiceProvider.GetRequiredService<TokenHandoff>();
         var grant = await tokens.ExchangeAuthorizationCodeAsync(authorizationCode, CancellationToken.None)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
-        GmailTokenRefresh.ValidateToken(grant.AccessToken);
-        var email = grant.Email ?? this.GetPrimaryKeyString();
-        ArgumentException.ThrowIfNullOrWhiteSpace(email);
-        var nonce = handoff.Deposit(new OAuthTokens(grant.AccessToken, grant.RefreshToken));
-        if (!handoff.TryPeek(nonce, out _))
+        GmailTokenPolicy.ValidateToken(grant.AccessToken);
+        if (grant.RefreshToken is not null)
         {
-            throw new TokenHandoffExpiredException();
+            GmailTokenPolicy.ValidateToken(grant.RefreshToken);
         }
 
-        handoff.Consume(nonce);
-        await PublishAsync(new GmailConnected(email)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        var email = grant.Email ?? this.GetPrimaryKeyString();
+        ArgumentException.ThrowIfNullOrWhiteSpace(email);
+        var owner = string.IsNullOrWhiteSpace(secretOwner) ? this.GetPrimaryKeyString() : secretOwner;
+        var vault = GrainFactory.GetGrain<IVault>(owner);
+        var platform = Platform();
+        var credential = await vault.SetSecret(platform, "gmail.access", "Gmail access token", grant.AccessToken, CancellationToken.None)
+            .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        if (!credential.IsSet)
+        {
+            throw new GmailNotConnectedException();
+        }
+
+        var refreshCredential = grant.RefreshToken is null
+            ? null
+            : await vault.SetSecret(platform, "gmail.refresh", "Gmail refresh token", grant.RefreshToken, CancellationToken.None)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
+        var expiresAt = GmailTokenPolicy.Expiry(grant.ExpiresInSeconds, ServiceProvider.GetRequiredService<TimeProvider>());
+        await Save(Snapshot with
+        {
+            Email = email,
+            Credential = credential,
+            RefreshCredential = refreshCredential,
+            GrantedScopes = grant.GrantedScopes ?? "",
+            ExpiresAt = expiresAt,
+        }, new GmailConnected(email)).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
     }
+
+    // The outbound call resolves the secret as trusted platform code, never as the user turn.
+    private static CallerContext Platform() => new()
+    {
+        PrincipalId = "gmail",
+        AccountId = "gmail",
+        WorkspaceId = "gmail",
+        Kind = CallerKind.Platform,
+        StampedBy = TrustedEdge.Platform,
+        AppId = "gmail",
+    };
 }

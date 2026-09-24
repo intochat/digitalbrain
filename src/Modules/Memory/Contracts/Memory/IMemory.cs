@@ -10,6 +10,8 @@ public interface IMemory : INeuron
 
     Task<MemoryKey> Forget(Forget note);
 
+    Task<long> PurgeNamespace(PurgeNamespace note);
+
     [ReadOnly]
     Task<RecallResult> Recall(Recall query);
 }

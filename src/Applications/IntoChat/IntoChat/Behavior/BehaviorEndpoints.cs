@@ -4,6 +4,7 @@ using DigitalBrain.Coding;
 using DigitalBrain.Behavior;
 using DigitalBrain.AI.Agents;
 using IntoChat.Workspace;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 
 namespace IntoChat;
@@ -23,7 +24,7 @@ internal static class BehaviorEndpoints
             var http = sp.GetRequiredService<IHttpContextAccessor>().HttpContext ?? throw new InvalidOperationException("Behavior MCP requires an HTTP workspace context.");
             var workspace = http.Request.RouteValues["workspaceId"]?.ToString() ?? throw new ArgumentException("Workspace is required.");
             var auth = sp.GetRequiredService<IOptions<BasicAuthOptions>>().Value;
-            var scope = WorkspaceScope.Create(auth.Username is { Length: > 0 } owner ? owner : BasicAuthGate.DefaultLogin, workspace);
+            var scope = WorkspaceScope.Current(auth, workspace);
             return sp.GetRequiredService<BehaviorToolService>().ForScope(scope.Id);
         });
         // WithTools<T> constructs T itself, bypassing our workspace-scoped factory.
@@ -40,6 +41,7 @@ internal static class BehaviorEndpoints
         var group = routes.MapGroup("/workspaces/{workspaceId}/behaviors");
         group.AddEndpointFilter(async (context, next) =>
         {
+            if (!DeveloperModeEnabled(context.HttpContext.RequestServices)) { return Results.NotFound(); }
             try { return await next(context); }
             catch (ArgumentException error) { return Results.Problem(error.Message, statusCode: 400); }
             catch (KeyNotFoundException error) { return Results.Problem(error.Message, statusCode: 404); }
@@ -47,9 +49,9 @@ internal static class BehaviorEndpoints
             catch (InvalidDataException error) { return Results.Problem(error.Message, statusCode: 422); }
         });
         static ScopedBehaviorTools Scope(string workspaceId, BehaviorToolService service, IOptions<BasicAuthOptions> auth)
-            => service.ForScope(WorkspaceScope.Create(auth.Value.Username is { Length: > 0 } owner ? owner : BasicAuthGate.DefaultLogin, workspaceId).Id);
+            => service.ForScope(WorkspaceScope.Current(auth.Value, workspaceId).Id);
         static string ScopeId(string workspaceId, IOptions<BasicAuthOptions> auth)
-            => WorkspaceScope.Create(auth.Value.Username is { Length: > 0 } owner ? owner : BasicAuthGate.DefaultLogin, workspaceId).Id;
+            => WorkspaceScope.Current(auth.Value, workspaceId).Id;
         group.MapGet("/", (string workspaceId, BehaviorManagement management, IOptions<BasicAuthOptions> auth, CancellationToken ct) => management.List(ScopeId(workspaceId, auth), ct));
         group.MapGet("/{id}/detail", (string workspaceId, string id, BehaviorManagement management, IOptions<BasicAuthOptions> auth, CancellationToken ct) => management.Detail(ScopeId(workspaceId, auth), id, ct));
         group.MapPost("/{id}/description", (string workspaceId, string id, DescribeBehavior request, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).Describe(id, request, ct));
@@ -63,7 +65,12 @@ internal static class BehaviorEndpoints
         group.MapPost("/{id}/start", (string workspaceId, string id, ChangeBehaviorState request, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).Start(id, request, ct));
         group.MapPost("/{id}/stop", (string workspaceId, string id, ChangeBehaviorState request, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).Stop(id, request, ct));
         group.MapPost("/{id}/rollback", (string workspaceId, string id, RollbackBehavior request, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).Rollback(id, request, ct));
+        group.MapDelete("/{id}", (string workspaceId, string id, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).Delete(id, ct));
         group.MapGet("/{id}/logs", (string workspaceId, string id, long? after, int? limit, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).Logs(id, after ?? 0, limit ?? 100, ct));
-        routes.MapMcp("/workspaces/{workspaceId}/behavior-mcp");
+        routes.MapMcp("/workspaces/{workspaceId}/behavior-mcp").AddEndpointFilter(async (context, next) =>
+            DeveloperModeEnabled(context.HttpContext.RequestServices) ? await next(context) : Results.NotFound());
     }
+
+    private static bool DeveloperModeEnabled(IServiceProvider services) =>
+        AgentToolPolicy.DeveloperModeEnabled(services.GetRequiredService<IConfiguration>()["IntoChat:DeveloperMode"]);
 }

@@ -22,7 +22,7 @@ public sealed class SupabaseTableDisplayFacts
         var workspace = brain.Get<IWorkspace>(WorkspaceScope.Create("owner", projectId).Id);
         var table = brain.Get<ISupabaseTable>("active-leads");
         var snapshot = await table.CreateFromQuery(new("Active leads", "select id, company, email from leads where active order by id"));
-        await workspace.Open(new("show-leads", "leads-window", "Active leads", new(snapshot.Id), (await workspace.Read()).Revision));
+        await workspace.Open(new("show-leads", "leads-window", "Active leads", WindowReference.Table(snapshot.Id), (await workspace.Read()).Revision));
 
         var window = page.GetByRole(AriaRole.Region, new() { Name = "Active leads", Exact = true });
         await Assertions.Expect(window).ToBeVisibleAsync();
@@ -54,7 +54,7 @@ public sealed class SupabaseTableDisplayFacts
         var workspace = brain.Get<IWorkspace>(WorkspaceScope.Create("owner", projectId).Id);
         var table = brain.Get<ISupabaseTable>("empty-leads");
         var snapshot = await table.CreateFromQuery(new("Empty leads", "select id, company, email from leads where false"));
-        await workspace.Open(new("show-empty", "empty-window", "Empty leads", new(snapshot.Id), (await workspace.Read()).Revision));
+        await workspace.Open(new("show-empty", "empty-window", "Empty leads", WindowReference.Table(snapshot.Id), (await workspace.Read()).Revision));
         var window = page.GetByRole(AriaRole.Region, new() { Name = "Empty leads", Exact = true });
         await Assertions.Expect(window.GetByText("No rows match these filters.", new() { Exact = true })).ToBeVisibleAsync();
         await Assertions.Expect(window.GetByText("Company 1", new() { Exact = true })).ToHaveCountAsync(0);

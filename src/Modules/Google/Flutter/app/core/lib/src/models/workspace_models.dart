@@ -2,30 +2,35 @@ final class WorkspaceWindow {
   const WorkspaceWindow({
     required this.id,
     required this.title,
-    required this.tableId,
+    required this.kind,
+    required this.neuronId,
     required this.isOpen,
-    this.surface,
   });
-  final String id, title, tableId;
+  final String id, title, kind, neuronId;
   final bool isOpen;
-  final Map<String,dynamic>? surface;
-  factory WorkspaceWindow.fromJson(Map<String, dynamic> json) =>
-      WorkspaceWindow(
-        id: json['id'] as String,
-        title: json['title'] as String,
-        tableId: (json['view'] as Map)['id'] as String,
-        isOpen: json['isOpen'] as bool,
-        surface: json['surface'] == null ? null : Map<String,dynamic>.from(json['surface'] as Map),
-      );
+  factory WorkspaceWindow.fromJson(Map<String, dynamic> json) {
+    final reference = Map<String, dynamic>.from(json['reference'] as Map);
+    return WorkspaceWindow(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      kind: reference['kind'] as String,
+      neuronId: reference['neuronId'] as String,
+      isOpen: json['isOpen'] as bool,
+    );
+  }
 }
 
 final class WorkspaceSnapshot {
   WorkspaceSnapshot({
     required this.revision,
     required List<WorkspaceWindow> windows,
+    this.firstRun,
   }) : windows = List.unmodifiable(windows);
   final int revision;
   final List<WorkspaceWindow> windows;
+
+  /// The assistant starter state of a workspace that has never opened a window; null afterwards.
+  final Map<String, dynamic>? firstRun;
   factory WorkspaceSnapshot.fromJson(Map<String, dynamic> json) =>
       WorkspaceSnapshot(
         revision: json['revision'] as int,
@@ -35,6 +40,9 @@ final class WorkspaceSnapshot {
                   WorkspaceWindow.fromJson(Map<String, dynamic>.from(w as Map)),
             )
             .toList(),
+        firstRun: json['firstRun'] is Map
+            ? Map<String, dynamic>.from(json['firstRun'] as Map)
+            : null,
       );
 }
 

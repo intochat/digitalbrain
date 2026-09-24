@@ -5,6 +5,7 @@ import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 
+import '../integrations/connect_window.dart';
 import '../integrations/integrations_menu.dart';
 import 'workspace_store.dart';
 import 'workspace_remote_controller.dart';
@@ -13,13 +14,19 @@ import 'workspace_settings.dart';
 import 'workspace_routes.dart';
 import 'workspace_chat.dart';
 import 'app_surface_host.dart';
+import 'inbox_panel.dart';
 import 'workspace_islands.dart';
 import 'behaviors/behavior_manager.dart';
+import 'apps/consent_sheet_view.dart';
+import 'apps/built_in_app_view.dart';
+import 'apps/packages_screen.dart';
+import 'mydata/mydata_window.dart';
 
 class WorkspaceApp extends StatefulWidget {
   const WorkspaceApp({
     super.key,
     this.store,
+    this.onSwitchAccount,
     this.initialLocation,
     this.persistenceKey = 'intocaht.workspace.v1',
     this.onRun,
@@ -31,8 +38,10 @@ class WorkspaceApp extends StatefulWidget {
     this.onUpdateTableView,
     this.onListTables,
     this.programmingClient,
+    this.connectedSources = const [],
   });
   final WorkspaceStore? store;
+  final Future<void> Function()? onSwitchAccount;
   final Uri? initialLocation;
   final String persistenceKey;
   final AgentRunner? onRun;
@@ -44,6 +53,9 @@ class WorkspaceApp extends StatefulWidget {
   final UpdateTableView? onUpdateTableView;
   final ListTables? onListTables;
   final DigitalBrainUiClient? programmingClient;
+
+  /// Sources the shell knows are connected; pushed to the workspace so first-run prompts match.
+  final List<String> connectedSources;
   @override
   State<WorkspaceApp> createState() => _WorkspaceAppState();
 }
@@ -61,6 +73,10 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   final _remote = <String, WorkspaceRemoteController>{};
   final _remoteCancelled = Completer<void>();
   final _tableCancelled = <String, Completer<void>>{};
+  final _apps = <String, List<AppManifestSummary>>{};
+  final _appsLoading = <String>{};
+  final _sourcesSynced = <String>{};
+  final _firstRunDismissed = <String>{};
 
   void _connectWorkspaces() {
     final client = widget.programmingClient;
@@ -69,6 +85,31 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         unawaited(_remoteAction(workspace, window, open));
     for (final project in store.projects) {
       if (_remote.containsKey(project.id)) continue;
+      unawaited(
+        client
+            .jsonRequest(
+              'POST',
+              '/workspaces/${Uri.encodeComponent(project.id)}/built-in/activate',
+            )
+            .catchError((Object error) {
+              if (mounted) {
+                _messenger.currentState?.showSnackBar(
+                  SnackBar(content: Text('Apps could not start: $error')),
+                );
+              }
+              return null;
+            }),
+      );
+      if (_sourcesSynced.add(project.id)) {
+        unawaited(
+          client
+              .setConnectedSources(project.id, widget.connectedSources)
+              .then((snapshot) {
+                if (mounted) store.reconcileWorkspace(project, snapshot);
+              })
+              .catchError((Object _) {}),
+        );
+      }
       final controller = WorkspaceRemoteController(
         read: (id) =>
             client.readWorkspace(id, cancelled: _remoteCancelled.future),
@@ -147,11 +188,47 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
 
   Future<void> _load() async {
     await store.load();
-    if (store.projects.isEmpty) store.createProject('Personal');
+    if (!mounted) return;
+    if (store.projects.isEmpty) {
+      final owned = widget.programmingClient?.defaultWorkspaceId;
+      if (owned == null) {
+        store.createProject('Personal');
+      } else {
+        final conversation = WorkspaceConversation(
+          id: 'initial',
+          title: 'New conversation',
+        );
+        store.projects.add(
+          WorkspaceProject(
+            id: owned,
+            title: 'Personal',
+            conversations: [conversation],
+            selectedConversationId: conversation.id,
+          ),
+        );
+        store.selectedProjectId = owned;
+        store.save();
+      }
+    }
     if (!mounted) return;
     setState(() => _ready = true);
     _connectWorkspaces();
+    _loadApps(store.currentProject.id);
+    _loadCapabilities();
     _navigateRoute(_initialLocation);
+  }
+
+  void _loadCapabilities() {
+    final client = widget.programmingClient;
+    if (client == null) return;
+    unawaited(
+      client
+          .readCapabilities()
+          .then((capabilities) {
+            if (mounted) store.developerMode = capabilities.developerMode;
+          })
+          .catchError((Object _) {}),
+    );
   }
 
   void _navigateRoute(Uri uri) {
@@ -165,13 +242,18 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         _navigator.currentState?.push(
           MaterialPageRoute<void>(
             settings: RouteSettings(name: '/settings/$section'),
-            builder: (_) => WorkspaceSettings(
-              store: store,
-              initialSection: section,
-              kernelBaseUri: widget.kernelBaseUri,
-              onOpen: widget.onOpenUrl,
-              onClose: () => _navigator.currentState?.pop(),
-            ),
+            builder: (_) =>
+                widget.programmingClient != null &&
+                    (section == 'profile' || section == 'appearance')
+                ? _settingsApp(() => _navigator.currentState?.pop())
+                : WorkspaceSettings(
+                    store: store,
+                    initialSection: section,
+                    kernelBaseUri: widget.kernelBaseUri,
+                    onOpen: widget.onOpenUrl,
+                    connectionsRequest: _connectionsRequest,
+                    onClose: () => _navigator.currentState?.pop(),
+                  ),
           ),
         );
         if (segments.length > 2 && segments[2] == 'gallery') {
@@ -211,7 +293,29 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
 
   void _changed() {
     _connectWorkspaces();
+    if (store.projects.isNotEmpty) _loadApps(store.currentProject.id);
     if (mounted) setState(() {});
+  }
+
+  void _loadApps(String workspaceId) {
+    final client = widget.programmingClient;
+    if (client == null ||
+        _apps.containsKey(workspaceId) ||
+        !_appsLoading.add(workspaceId)) {
+      return;
+    }
+    unawaited(
+      client
+          .listApps(workspaceId)
+          .then((apps) {
+            if (!mounted) return;
+            _apps[workspaceId] = apps;
+            setState(() {});
+          })
+          .catchError((Object _) {
+            _appsLoading.remove(workspaceId);
+          }),
+    );
   }
 
   @override
@@ -250,6 +354,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         final existing = _tables[id];
         if (existing == null) {
           _tables[id] = UiTableController(
+            workspace: destination.id,
             snapshot: snapshot,
             read: widget.onReadTable,
             update: widget.onUpdateTableView,
@@ -275,6 +380,10 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
             }
             store.save();
           });
+        } else if (snapshot.rows.isEmpty &&
+            snapshot.revision > existing.snapshot.revision &&
+            existing.read != null) {
+          unawaited(existing.acceptSavedView(snapshot));
         } else {
           existing.accept(snapshot);
         }
@@ -317,7 +426,10 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       existing.content = artifact.content;
       existing.data = artifact.data;
       if (artifact.editorState.isNotEmpty) {
-        existing.editorState = {...existing.editorState, ...artifact.editorState};
+        existing.editorState = {
+          ...existing.editorState,
+          ...artifact.editorState,
+        };
       }
       store.save();
     }
@@ -327,6 +439,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   Future<void> _open(WorkspaceArtifact a) async {
     final destination = store.currentProject;
     if (a.kind == 'app') {
+      if (a.data['app'] == 'behaviors' && !store.developerMode) return;
       store.launchLocalApp(a.data['app'] as String);
       return;
     }
@@ -334,7 +447,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     if (a.kind == 'table' && !_tables.containsKey(a.id)) {
       if (widget.onReadTable != null) {
         try {
-          final snapshot = await widget.onReadTable!(a.id);
+          final snapshot = await widget.onReadTable!(destination.id, a.id);
           if (mounted) _accept(snapshot.toJson(), project: destination);
         } catch (e) {
           _messenger.currentState?.showSnackBar(
@@ -417,15 +530,16 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         );
         if (!mounted) return;
         _tables[artifact.id] = UiTableController(
+          workspace: project.id,
           snapshot: snapshot,
-          read: (id, {offset = 0, limit = 25}) => client.readWorkspaceTable(
+          read: (_, id, {offset = 0, limit = 25}) => client.readWorkspaceTable(
             project.id,
             id,
             offset: offset,
             limit: limit,
             cancelled: _cancelPreviousTable(id),
           ),
-          update: (id, update) => client.updateWorkspaceTable(
+          update: (_, id, update) => client.updateWorkspaceTable(
             project.id,
             id,
             update,
@@ -436,7 +550,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       }
       final snapshot = widget.onReadTable == null
           ? TableSnapshot.fromJson(artifact.data)
-          : await widget.onReadTable!(artifact.id);
+          : await widget.onReadTable!(project.id, artifact.id);
       if (mounted) _accept(snapshot.toJson(), project: project);
     } catch (e) {
       _tableErrors[artifact.id] = 'Could not load table: $e';
@@ -455,6 +569,11 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         );
       }
       if (a.data['app'] == 'behaviors') {
+        if (!store.developerMode) {
+          return const Center(
+            child: Text('Behaviors are available in developer mode only.'),
+          );
+        }
         final project = store.currentProject;
         return BehaviorManager(
           key: ValueKey('${project.id}-${a.id}'),
@@ -475,6 +594,26 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
             setState(() => _mobileWork = false);
             store.save();
           },
+        );
+      }
+      if (a.data['app'] == 'mydata') {
+        return Semantics(
+          container: true,
+          explicitChildNodes: true,
+          role: SemanticsRole.region,
+          label: a.title,
+          child: MyDataWindow(
+            key: ValueKey('${store.currentProject.id}-${a.id}'),
+            request: (path, {body}) =>
+                client.myDataRequest(store.currentProject.id, path, body: body),
+            loadGrants: () => client.listGrants(store.currentProject.id),
+            revokeGrant: (grant) => client.revokeGrant(
+              store.currentProject.id,
+              appId: grant.appId,
+              semanticTypeId: grant.semanticTypeId,
+              mode: grant.mode,
+            ),
+          ),
         );
       }
       return Semantics(
@@ -723,6 +862,29 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                       ),
                     ),
                   ),
+                  if (widget.onSwitchAccount != null)
+                    TextButton.icon(
+                      onPressed: widget.onSwitchAccount,
+                      icon: const Icon(Icons.switch_account, size: 18),
+                      label: const Text('Switch account'),
+                    ),
+                  if (widget.programmingClient != null)
+                    IconButton(
+                      tooltip: 'Packages',
+                      icon: const Icon(Icons.extension),
+                      onPressed: () => _navigator.currentState?.push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => PackagesScreen(
+                            key: ValueKey(
+                              '${widget.programmingClient!.workspaceIdentity}/${store.currentProject.id}',
+                            ),
+                            workspaceId: store.currentProject.id,
+                            request: widget.programmingClient!.jsonRequest,
+                            onClose: () => _navigator.currentState?.pop(),
+                          ),
+                        ),
+                      ),
+                    ),
                   IconButton(
                     tooltip: 'New conversation',
                     onPressed: () => store.createConversation(),
@@ -731,6 +893,18 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                 ],
               ),
             ),
+            // Starter prompts sit above the conversation on a fresh workspace; the message box
+            // stays reachable so the owner can always just type.
+            if (store.firstRun != null &&
+                !_firstRunDismissed.contains(store.currentProject.id) &&
+                store.currentConversation.messages.isEmpty)
+              Flexible(
+                fit: FlexFit.loose,
+                child: FirstRunView(
+                  state: store.firstRun!,
+                  onPrompt: _startFromPrompt,
+                ),
+              ),
             Expanded(
               child: IndexedStack(
                 index: [
@@ -763,6 +937,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                                   as String?
                             : null,
                         onOpenBehavior: (id) {
+                          if (!store.developerMode) return;
                           store.selectProject(project.id);
                           final app = store.launchLocalApp('behaviors');
                           app.data['selected'] = id;
@@ -772,6 +947,14 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                             widget.programmingClient?.readWorkspaceConversation,
                         onOpenUrl: widget.onOpenUrl,
                         onSalesforceConnected: widget.onSalesforceConnected,
+                        onReportProblem: widget.programmingClient == null
+                            ? null
+                            : (workspaceId, intentId, message) =>
+                                  widget.programmingClient!.reportProblem(
+                                    workspaceId: workspaceId,
+                                    intentId: intentId,
+                                    message: message,
+                                  ),
                         onArtifact: (result) =>
                             _accept(result, project: project),
                         onAttach: () => _attach(context),
@@ -913,7 +1096,8 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   );
   Widget _islands(BuildContext context) => WorkspaceIslands(
     store: store,
-    onLaunch: (app) => store.launchLocalApp(app),
+    apps: _apps[store.currentProject.id] ?? const [],
+    onLaunch: _launchApp,
     onRestore: (id) =>
         _open(store.currentProject.artifacts.firstWhere((a) => a.id == id)),
     onNewWorkspace: () async {
@@ -940,23 +1124,142 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         ),
       );
       if (name != null && mounted) {
-        store.createProject(name.trim().isEmpty ? 'Untitled workspace' : name);
+        try {
+          final client = widget.programmingClient;
+          final id = client?.accountId != null
+              ? await client!.createWorkspace()
+              : null;
+          if (!mounted) return;
+          store.createProject(
+            name.trim().isEmpty ? 'Untitled workspace' : name,
+            id: id,
+          );
+        } on Object {
+          if (mounted) {
+            _messenger.currentState?.showSnackBar(
+              const SnackBar(
+                content: Text('Could not create workspace. Please try again.'),
+              ),
+            );
+          }
+        }
       }
     },
     onSavedWork: () => _projectFiles(context),
     onSearch: () => _search(context),
+    onInbox: widget.programmingClient == null
+        ? null
+        : () => _openInbox(context),
     onSettings: () => Navigator.of(context).push(
       MaterialPageRoute<void>(
         settings: const RouteSettings(name: '/settings/profile'),
+        builder: (_) => widget.programmingClient != null
+            ? _settingsApp(() => Navigator.of(context).pop())
+            : WorkspaceSettings(
+                store: store,
+                kernelBaseUri: widget.kernelBaseUri,
+                onOpen: widget.onOpenUrl,
+                connectionsRequest: _connectionsRequest,
+                onClose: () => Navigator.of(context).pop(),
+              ),
+      ),
+    ),
+  );
+
+  void _openInbox(BuildContext context) {
+    final client = widget.programmingClient;
+    if (client == null) return;
+    showDialog<void>(
+      context: context,
+      builder: (_) => Dialog(
+        child: InboxPanel(client: client, workspaceId: store.currentProject.id),
+      ),
+    );
+  }
+
+  Widget _settingsApp(VoidCallback onClose) => BuiltInAppView(
+    key: ValueKey(
+      '${widget.programmingClient!.workspaceIdentity}/${store.currentProject.id}/settings',
+    ),
+    client: widget.programmingClient!,
+    workspaceId: store.currentProject.id,
+    appId: 'settings',
+    onClose: onClose,
+    onMoreSettings: () => Navigator.of(context).push(
+      MaterialPageRoute<void>(
         builder: (_) => WorkspaceSettings(
           store: store,
           kernelBaseUri: widget.kernelBaseUri,
           onOpen: widget.onOpenUrl,
+          connectionsRequest: _connectionsRequest,
           onClose: () => Navigator.of(context).pop(),
         ),
       ),
     ),
+    onPreferences: (preferences) {
+      if (!mounted) return;
+      store.settings.displayName = preferences['displayName'] as String? ?? '';
+      store.settings.theme = preferences['theme'] as String? ?? 'system';
+      unawaited(store.save());
+    },
   );
+
+  ConnectionsRequest? get _connectionsRequest {
+    final client = widget.programmingClient;
+    if (client == null) return null;
+    return (path, {body}) =>
+        client.connectionsRequest(store.currentProject.id, path, body: body);
+  }
+
+  void _startFromPrompt(StarterPrompt prompt) {
+    setState(() => _firstRunDismissed.add(store.currentProject.id));
+    store.currentConversation.draft = prompt.prompt;
+    store.save();
+  }
+
+  Future<void> _launchApp(String launchKey) async {
+    if (launchKey == 'behaviors' && !store.developerMode) return;
+    if (const {'files', 'images', 'mydata', 'behaviors'}.contains(launchKey)) {
+      store.launchLocalApp(launchKey);
+      return;
+    }
+    final client = widget.programmingClient;
+    if (client == null) {
+      _messenger.currentState?.showSnackBar(
+        const SnackBar(content: Text('Connect to IntoChat to open this app.')),
+      );
+      return;
+    }
+    try {
+      final consent = await client.consentSheet(
+        store.currentProject.id,
+        launchKey,
+      );
+      if (consent.approved) {
+        _messenger.currentState?.showSnackBar(
+          const SnackBar(
+            content: Text('Already installed. Ask the assistant to use it.'),
+          ),
+        );
+        return;
+      }
+      if (!mounted) return;
+      final approved = await showConsentSheet(context, sheet: consent);
+      if (!approved) return;
+      await client.approveConsent(store.currentProject.id, launchKey);
+      _messenger.currentState?.showSnackBar(
+        const SnackBar(
+          content: Text('Installed. Ask the assistant to use it.'),
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        _messenger.currentState?.showSnackBar(
+          SnackBar(content: Text('Could not install the app. $error')),
+        );
+      }
+    }
+  }
 
   void _search(BuildContext context) {
     _query = '';

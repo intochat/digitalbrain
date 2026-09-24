@@ -3,6 +3,7 @@ using DigitalBrain.Contracts;
 using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Flutter.Workspace.Signals;
 using DigitalBrain.Supabase.Tables;
+using IntoChat.Operations;
 using Microsoft.Extensions.Options;
 
 namespace IntoChat.Workspace;
@@ -25,10 +26,13 @@ internal static class WorkspaceEndpoints
                 var workspace = GetWorkspace(brain, auth.Value, workspaceId);
                 var state = await workspace.Read().WaitAsync(ct);
                 var window = state.Windows.SingleOrDefault(w => w.Id == windowId) ?? throw new KeyNotFoundException("Window not found.");
-                return Results.Ok(window.Surface is { } surface
-                    ? await workspace.OpenSurface(new(input.OperationId, window.Id, window.Title, surface, input.ExpectedRevision)).WaitAsync(ct)
-                    : (await workspace.Open(new(input.OperationId, window.Id, window.Title, window.View, input.ExpectedRevision)).WaitAsync(ct)).State);
+                return Results.Ok(window.Reference.Kind == WindowReference.TableKind
+                    ? (await workspace.Open(new(input.OperationId, window.Id, window.Title, window.Reference, input.ExpectedRevision)).WaitAsync(ct)).State
+                    : await workspace.OpenSurface(new(input.OperationId, window.Id, window.Title, window.Reference, input.ExpectedRevision)).WaitAsync(ct));
             }));
+        routes.MapPost("/workspaces/{workspaceId}/connected-sources",
+            (string workspaceId, SetConnectedSources input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct)
+            => Respond(async () => Results.Ok(await GetWorkspace(brain, auth.Value, workspaceId).SetConnectedSources(input.Sources ?? []).WaitAsync(ct))));
         routes.MapGet("/workspaces/{workspaceId}/tables/{tableId}",
             (string workspaceId, string tableId, int? offset, int? limit, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct)
             => Respond(async () =>
@@ -47,6 +51,7 @@ internal static class WorkspaceEndpoints
                 return Results.Ok(WorkspaceTableAdapter.ToJson(snapshot));
             }));
         routes.MapGet("/workspaces/{workspaceId}/events", Events);
+        OperationsEndpoints.MapOperationsEndpoints(routes);
     }
 
     private static async Task Events(string workspaceId, HttpContext http, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct)
@@ -68,12 +73,12 @@ internal static class WorkspaceEndpoints
     }
 
     internal static IWorkspace GetWorkspace(IDigitalBrain brain, BasicAuthOptions auth, string workspaceId)
-        => brain.Get<IWorkspace>(WorkspaceScope.Create(auth.Username is { Length: > 0 } owner ? owner : BasicAuthGate.DefaultLogin, workspaceId).Id);
+        => brain.Get<IWorkspace>(WorkspaceScope.Current(auth, workspaceId).Id);
 
     private static async Task<ISupabaseTable> ResolveTable(IDigitalBrain brain, BasicAuthOptions auth, string workspaceId, string tableId, CancellationToken ct)
     {
         var state = await GetWorkspace(brain, auth, workspaceId).Read().WaitAsync(ct);
-        if (!state.Windows.Any(w => w.Surface is null && w.View.Id == tableId)) { throw new KeyNotFoundException("Table not found in this workspace."); }
+        if (!state.Windows.Any(w => w.Reference.Kind == WindowReference.TableKind && w.Reference.NeuronId == tableId)) { throw new KeyNotFoundException("Table not found in this workspace."); }
         return brain.Get<ISupabaseTable>(tableId);
     }
     private static async Task<IResult> Respond(Func<Task<IResult>> action)
@@ -88,4 +93,5 @@ internal static class WorkspaceEndpoints
     }
     internal sealed record CloseWindow(long ExpectedRevision);
     internal sealed record ReopenWindow(string OperationId, long ExpectedRevision);
+    internal sealed record SetConnectedSources(IReadOnlyList<string>? Sources);
 }

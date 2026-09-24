@@ -39,6 +39,7 @@ public sealed class SalesforceModule : IModule
         services.TryAddSingleton<SalesforceLogins>();
         services.TryAddSingleton<ISalesforceTokenExchange, SalesforceTokenExchange>();
         services.TryAddSingleton<SalesforceTokenRefresh>();
+        services.TryAddSingleton<SalesforceCredentialStore>();
         services.TryAddSingleton<SalesforceWriteAccess>();
         services.AddOptions<SalesforceMcpOptions>()
             .Bind(silo.Configuration.GetSection(SalesforceMcpOptions.SectionName))

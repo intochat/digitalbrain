@@ -21,7 +21,7 @@ public sealed class GmailOAuthCallbackFacts
             PublicOrigin = stub.Origin,
             TokenEndpoint = stub.TokenEndpoint,
         };
-        await using var brain = await E2ETest.Create().WithModule<GmailModule>(google => google.WithOptions(options))
+        await using var brain = await E2ETest.Create().WithModule<DigitalBrain.MyData.MyDataModule>().WithModule<GmailModule>(google => google.WithOptions(options))
             .WithExecution(new()
             {
                 PrivateConfiguration = new Dictionary<string, string?>

@@ -23,7 +23,7 @@ internal static class ContentCapturePolicy
         ArgumentNullException.ThrowIfNull(environment);
         var development = environment.IsDevelopment();
         var owner = string.IsNullOrEmpty(auth.Username)
-            || string.Equals(auth.Username, BasicAuthGate.DefaultLogin, StringComparison.Ordinal);
+            || string.Equals(auth.Username, AccountSession.DefaultLogin, StringComparison.Ordinal);
         var profile = configuration[ProfileKey];
         var developerProfile = string.IsNullOrEmpty(profile)
             || string.Equals(profile, DeveloperProfile, StringComparison.OrdinalIgnoreCase);

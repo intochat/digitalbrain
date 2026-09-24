@@ -15,8 +15,8 @@ public sealed class TextHttpFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
-        await brain.Get<IText>("about").Set("hello");
-        var state = await brain.HttpClient.GetFromJsonAsync<TextState>("/ui/texts/about", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
+        await brain.Get<IText>(UiScope.Key("workspace-a", "about")).Set("hello");
+        var state = await brain.HttpClient.GetFromJsonAsync<TextState>("/workspaces/workspace-a/ui/texts/about", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
         Assert.Equal("hello", state!.Markdown);
     }
 }

@@ -8,8 +8,15 @@ import 'package:uuid/uuid.dart';
 import 'agent_events.dart';
 import 'basic_credentials.dart';
 import 'cookie_http_client.dart';
+import 'session_http_client_io.dart'
+    if (dart.library.html) 'session_http_client_web.dart' as transport;
 import 'host_environment.dart';
+import 'models/app_manifest.dart';
 import 'models/brain_models.dart';
+import 'models/consent_sheet.dart';
+import 'models/grant_summary.dart';
+import 'models/inbox_models.dart';
+import 'models/session_capabilities.dart';
 import 'models/table_models.dart';
 import 'models/workspace_models.dart';
 
@@ -27,7 +34,7 @@ final class DigitalBrainUiClient {
        _http = httpClient is CookieHttpClient
            ? httpClient
            : CookieHttpClient(
-               httpClient ?? http.Client(),
+               httpClient ?? transport.createSessionHttpClient(),
                credentials: credentials,
              ),
        _ownsClient = httpClient == null;
@@ -70,17 +77,83 @@ final class DigitalBrainUiClient {
   final Uri baseUri;
 
   /// Non-secret scope for local workspace preferences; never includes credentials.
-  final String workspaceIdentity;
+  String workspaceIdentity;
+  String? principalId;
+  String? accountId;
+  String? defaultWorkspaceId;
+
+  void _useSession(Map<String, dynamic> session) {
+    principalId = session['principalId'] as String;
+    accountId = session['accountId'] as String;
+    defaultWorkspaceId = session['workspaceId'] as String;
+    workspaceIdentity = '$principalId|$accountId';
+  }
+
+  Future<void> readSession() async {
+    final response = await _request(
+      'GET',
+      '/identity/session',
+      timeout: const Duration(seconds: 10),
+    );
+    if (response.statusCode == 200 && response.body.isNotEmpty) {
+      _useSession(jsonDecode(response.body) as Map<String, dynamic>);
+    }
+  }
+
+  Future<void> signIn(
+    String username,
+    String password, {
+    bool register = false,
+  }) async {
+    final response = await _request(
+      'POST',
+      register ? '/identity/register' : '/identity/login',
+      body: {'principalId': username, 'password': password},
+      timeout: const Duration(seconds: 15),
+    );
+    _useSession(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  /// Creates an owned workspace; clients never choose or claim an existing id.
+  Future<String> createWorkspace() async {
+    final response = await _request('POST', '/identity/workspaces',
+      body: const {}, timeout: const Duration(seconds: 15));
+    return (jsonDecode(response.body) as Map<String, dynamic>)['workspaceId'] as String;
+  }
+
+  Future<void> signOut() async {
+    await _request(
+      'POST',
+      '/identity/logout',
+      timeout: const Duration(seconds: 10),
+    );
+  }
+
   final CookieHttpClient _http;
   final bool _ownsClient;
+
+  /// Server-owned capabilities; the shell hides developer-only surfaces when this is off.
+  Future<SessionCapabilities> readCapabilities() async {
+    final response = await _request(
+      'GET',
+      '/session/capabilities',
+      timeout: const Duration(seconds: 10),
+    );
+    return SessionCapabilities.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
 
   Future<bool> salesforceConnected() async =>
       (await _tableRequest('GET', '/agent/connections/salesforce')
           as Map)['connected'] ==
       true;
 
-  Future<List<TableSummary>> listTables() async {
-    final body = await _tableRequest('GET', '/ui/tables');
+  Future<List<TableSummary>> listTables(String workspace) async {
+    final body = await _tableRequest(
+      'GET',
+      '/workspaces/${Uri.encodeComponent(workspace)}/ui/tables',
+    );
     return (body as List)
         .map(
           (item) =>
@@ -89,7 +162,23 @@ final class DigitalBrainUiClient {
         .toList();
   }
 
+  /// The launcher reads installed manifests; the shell never hard-codes apps.
+  Future<List<AppManifestSummary>> listApps(String workspace) async {
+    final body = await _tableRequest(
+      'GET',
+      '/workspaces/${Uri.encodeComponent(workspace)}/apps',
+    );
+    return (body as List)
+        .map(
+          (item) => AppManifestSummary.fromJson(
+            Map<String, dynamic>.from(item as Map),
+          ),
+        )
+        .toList();
+  }
+
   Future<TableSnapshot> readTable(
+    String workspace,
     String id, {
     int offset = 0,
     int limit = 50,
@@ -97,12 +186,13 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'GET',
-        '/ui/tables/${Uri.encodeComponent(id)}?offset=$offset&limit=$limit',
+        '/workspaces/${Uri.encodeComponent(workspace)}/ui/tables/${Uri.encodeComponent(id)}?offset=$offset&limit=$limit',
       ) as Map,
     ),
   );
 
-  Future<TableSnapshot> createTable({
+  Future<TableSnapshot> createTable(
+    String workspace, {
     required String title,
     required List<TableColumn> columns,
     required List<TableRowData> rows,
@@ -110,7 +200,7 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'POST',
-        '/ui/tables',
+        '/workspaces/${Uri.encodeComponent(workspace)}/ui/tables',
         body: {
           'title': title,
           'columns': columns.map((x) => x.toJson()).toList(),
@@ -121,14 +211,29 @@ final class DigitalBrainUiClient {
   );
 
   Future<TableSnapshot> updateTableView(
+    String workspace,
     String id,
     TableViewUpdate update,
   ) async => TableSnapshot.fromJson(
     Map<String, dynamic>.from(
       await _tableRequest(
-        'PUT',
-        '/ui/tables/${Uri.encodeComponent(id)}/view',
+        'POST',
+        '/workspaces/${Uri.encodeComponent(workspace)}/ui/tables/${Uri.encodeComponent(id)}/view',
         body: update.toJson(),
+      ) as Map,
+    ),
+  );
+
+  /// Declares which sources a workspace is connected to; the first-run prompts follow them.
+  Future<WorkspaceSnapshot> setConnectedSources(
+    String workspaceId,
+    List<String> sources,
+  ) async => WorkspaceSnapshot.fromJson(
+    Map<String, dynamic>.from(
+      await _tableRequest(
+        'POST',
+        '/workspaces/${Uri.encodeComponent(workspaceId)}/connected-sources',
+        body: {'sources': sources},
       ) as Map,
     ),
   );
@@ -173,6 +278,17 @@ final class DigitalBrainUiClient {
       ) as Map,
     ),
   );
+  Future<void> reportProblem({
+    required String workspaceId,
+    required String intentId,
+    required String message,
+  }) async {
+    await _tableRequest(
+      'POST',
+      '/workspaces/${Uri.encodeComponent(workspaceId)}/reports',
+      body: {'intentId': intentId, 'message': message},
+    );
+  }
 
   Future<TableSnapshot> readWorkspaceTable(
     String workspaceId,
@@ -448,26 +564,118 @@ final class DigitalBrainUiClient {
     return controller.stream;
   }
 
-  Future<List<String>> readInbox() async {
+  Future<InboxSnapshot> readInbox(String workspaceId) async {
     final response = await _request(
       'GET',
-      '/ui/inbox',
+      '/inbox/${Uri.encodeComponent(workspaceId)}',
       timeout: const Duration(seconds: 10),
     );
-    final decoded = jsonDecode(response.body);
-    if (decoded is! List) {
-      return const [];
-    }
-    return [
-      for (final item in decoded)
-        if (item is String) item,
-    ];
+    return InboxSnapshot.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
-  Future<Map<String, dynamic>> readUi(String collection, String name) async {
+  Future<void> resolveInboxItem(String workspaceId, String itemId) async {
+    await _request(
+      'POST',
+      '/inbox/${Uri.encodeComponent(workspaceId)}/items/${Uri.encodeComponent(itemId)}/resolve',
+      timeout: const Duration(seconds: 10),
+    );
+  }
+
+  /// Emits the snapshot first, then a fresh snapshot after every pushed change.
+  Stream<InboxSnapshot> watchInbox(String workspaceId) {
+    final abort = Completer<void>();
+    StreamSubscription<String>? incoming;
+    late StreamController<InboxSnapshot> controller;
+    controller = StreamController<InboxSnapshot>(
+      onListen: () async {
+        try {
+          final request = http.AbortableRequest(
+            'GET',
+            baseUri.resolve(
+              '/inbox/${Uri.encodeComponent(workspaceId)}/events',
+            ),
+            abortTrigger: abort.future,
+          )..headers['accept'] = 'text/event-stream';
+          final response = await _http.send(request);
+          if (abort.isCompleted || response.statusCode != 200) {
+            await response.stream.listen(null).cancel();
+            if (!abort.isCompleted) {
+              throw StateError(
+                'Inbox events are unavailable (${response.statusCode}).',
+              );
+            }
+            return;
+          }
+          String? event;
+          final data = <String>[];
+          incoming = response.stream
+              .transform(utf8.decoder)
+              .transform(const LineSplitter())
+              .listen(
+                (line) {
+                  if (line.startsWith('event:')) {
+                    event = line.substring(6).trim();
+                  }
+                  if (line.startsWith('data:')) {
+                    data.add(line.substring(5).trimLeft());
+                  }
+                  if (line.isEmpty) {
+                    final payload = data.join('\n');
+                    final name = event;
+                    event = null;
+                    data.clear();
+                    if (payload.isEmpty) return;
+                    try {
+                      if (name == 'snapshot') {
+                        controller.add(
+                          InboxSnapshot.fromJson(
+                            jsonDecode(payload) as Map<String, dynamic>,
+                          ),
+                        );
+                      } else {
+                        unawaited(
+                          readInbox(workspaceId)
+                              .then(controller.add)
+                              .catchError((Object error, StackTrace stack) {
+                                controller.addError(error, stack);
+                              }),
+                        );
+                      }
+                    } catch (error, stack) {
+                      controller.addError(error, stack);
+                    }
+                  }
+                },
+                onError: (Object error, StackTrace stack) {
+                  if (!abort.isCompleted) controller.addError(error, stack);
+                },
+                onDone: controller.close,
+              );
+        } catch (error, stack) {
+          if (!abort.isCompleted) {
+            controller.addError(error, stack);
+            unawaited(controller.close());
+          }
+        }
+      },
+      onCancel: () async {
+        if (!abort.isCompleted) abort.complete();
+        await incoming?.cancel();
+      },
+    );
+    return controller.stream;
+  }
+
+  Future<Map<String, dynamic>> readUi(
+    String workspace,
+    String collection,
+    String name,
+  ) async {
     final response = await _request(
       'GET',
-      '/ui/$collection/${Uri.encodeComponent(name)}',
+      '/workspaces/${Uri.encodeComponent(workspace)}/ui/$collection/${Uri.encodeComponent(name)}',
       timeout: const Duration(seconds: 10),
     );
     return jsonDecode(response.body) as Map<String, dynamic>;
@@ -561,6 +769,101 @@ final class DigitalBrainUiClient {
         : Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
+  Future<Map<String, dynamic>> myDataRequest(
+    String owner,
+    String path, {
+    Map<String, Object?>? body,
+  }) async {
+    final response = await _request(
+      body == null ? 'GET' : 'POST',
+      '/my-data/${Uri.encodeComponent(owner)}${path.isEmpty ? '' : '/$path'}',
+      body: body,
+      timeout: const Duration(seconds: 30),
+    );
+    return response.body.isEmpty
+        ? <String, dynamic>{}
+        : Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+  }
+
+  Future<Object?> connectionsRequest(
+    String owner,
+    String path, {
+    Map<String, Object?>? body,
+  }) async {
+    final response = await _request(
+      body == null ? 'GET' : 'POST',
+      '/connections/${Uri.encodeComponent(owner)}${path.isEmpty ? '' : '/$path'}',
+      body: body,
+      timeout: const Duration(seconds: 30),
+    );
+    return response.body.isEmpty ? null : jsonDecode(response.body);
+  }
+
+  /// The consent sheet for an app before it is installed.
+  Future<ConsentSheet> consentSheet(
+    String workspace,
+    String appId,
+  ) async => ConsentSheet.fromJson(
+    Map<String, dynamic>.from(
+      await _tableRequest(
+        'GET',
+        '/workspaces/${Uri.encodeComponent(workspace)}/apps/${Uri.encodeComponent(appId)}/consent',
+      ) as Map,
+    ),
+  );
+
+  /// Records approval of an app's consent sheet; the manifest installs in the same step.
+  Future<ConsentSheet> approveConsent(
+    String workspace,
+    String appId,
+  ) async => ConsentSheet.fromJson(
+    Map<String, dynamic>.from(
+      await _tableRequest(
+        'POST',
+        '/workspaces/${Uri.encodeComponent(workspace)}/apps/${Uri.encodeComponent(appId)}/consent/approve',
+        body: const <String, Object?>{},
+      ) as Map,
+    ),
+  );
+
+  /// The live grants an owner has given to apps in this workspace.
+  Future<List<GrantSummary>> listGrants(String workspace) async {
+    final response = await _request(
+      'GET',
+      '/workspaces/${Uri.encodeComponent(workspace)}/grants',
+      timeout: const Duration(seconds: 30),
+    );
+    return [
+      for (final item in jsonDecode(response.body) as List)
+        GrantSummary.fromJson(Map<String, dynamic>.from(item as Map)),
+    ];
+  }
+
+  /// Revokes one (app, semantic type, mode) grant so its value looks missing again.
+  Future<void> revokeGrant(
+    String workspace, {
+    required String appId,
+    required String semanticTypeId,
+    required String mode,
+  }) async {
+    await _request(
+      'POST',
+      '/workspaces/${Uri.encodeComponent(workspace)}/grants/revoke',
+      body: {
+        'appId': appId,
+        'semanticTypeId': semanticTypeId,
+        'mode': _grantModeValue(mode),
+      },
+      timeout: const Duration(seconds: 30),
+    );
+  }
+
+  static Object _grantModeValue(String mode) => switch (mode) {
+    'Once' => 0,
+    'ThisChat' => 1,
+    _ => 2,
+  };
+
   Future<Uint8List> appAsset(String workspace, String assetId) async {
     final response = await _request(
       'GET',
@@ -596,5 +899,19 @@ final class DigitalBrainUiClient {
     if (_ownsClient) {
       _http.close();
     }
+  }
+
+  Future<dynamic> jsonRequest(
+    String method,
+    String path, [
+    Object? body,
+  ]) async {
+    final response = await _request(
+      method,
+      path,
+      body: body == null ? null : Map<String, Object?>.from(body as Map),
+      timeout: const Duration(seconds: 30),
+    );
+    return response.body.isEmpty ? null : jsonDecode(response.body);
   }
 }

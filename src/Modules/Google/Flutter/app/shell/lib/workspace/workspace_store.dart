@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart'
     show WorkspaceSnapshot;
+import 'package:digitalbrain_ui/digitalbrain_ui.dart' show FirstRunState;
 
 abstract interface class WorkspacePersistence {
   Future<String?> read();
@@ -315,6 +316,21 @@ class WorkspaceStore extends ChangeNotifier {
   String selectedProjectId = '';
   String? persistenceError;
   bool loaded = false;
+
+  bool _developerMode = false;
+
+  /// Server-owned; never persisted locally so a client cannot switch it on.
+  bool get developerMode => _developerMode;
+  set developerMode(bool value) {
+    if (_developerMode == value) return;
+    _developerMode = value;
+    _notify();
+  }
+
+  final Map<String, FirstRunState?> _firstRun = {};
+
+  /// Non-null while the selected workspace has never opened a window; drives the first-run view.
+  FirstRunState? get firstRun => _firstRun[selectedProjectId];
   void Function(String workspaceId, String windowId, bool open)?
   onRemoteWindowAction;
   final Map<String, int> remoteRevisions = {};
@@ -325,6 +341,9 @@ class WorkspaceStore extends ChangeNotifier {
   ) {
     if (snapshot.revision < (remoteRevisions[project.id] ?? -1)) return;
     remoteRevisions[project.id] = snapshot.revision;
+    _firstRun[project.id] = snapshot.firstRun == null
+        ? null
+        : FirstRunState.fromMetadata(snapshot.firstRun);
     final layout = project.presentation;
     for (final window in snapshot.windows) {
       var artifact = project.artifacts
@@ -334,16 +353,16 @@ class WorkspaceStore extends ChangeNotifier {
         artifact = WorkspaceArtifact(
           id: window.id,
           title: window.title,
-          kind: window.surface == null ? 'table' : 'app',
+          kind: window.kind == 'table' ? 'table' : 'app',
           remoteManaged: true,
-          data: window.surface == null
-              ? {'tableId': window.tableId}
+          data: window.kind == 'table'
+              ? {'tableId': window.neuronId}
               : {'app': window.id == 'app-files' ? 'files' : 'images'},
         );
         project.artifacts.add(artifact);
       }
-      if (window.surface != null && window.id == 'app-images') {
-        final name = window.surface!['name'] as String;
+      if (window.kind != 'table' && window.id == 'app-images') {
+        final name = window.neuronId;
         final parts = name.split('/images/');
         if (parts.length == 2) {
           final documentId = parts.last.split('/').first;
@@ -488,6 +507,7 @@ class WorkspaceStore extends ChangeNotifier {
   Future<void> flush() => _writes;
   WorkspaceProject createProject(
     String title, {
+    String? id,
     String agentId = 'intocaht',
     String draft = '',
   }) {
@@ -500,7 +520,7 @@ class WorkspaceStore extends ChangeNotifier {
       draft: draft,
     );
     final p = WorkspaceProject(
-      id: _id(),
+      id: id ?? _id(),
       title: title.trim().isEmpty ? 'Untitled project' : title.trim(),
       conversations: [c],
       selectedConversationId: c.id,
@@ -563,8 +583,11 @@ class WorkspaceStore extends ChangeNotifier {
   }
 
   WorkspaceArtifact launchLocalApp(String app) {
-    if (!['files', 'images', 'behaviors'].contains(app)) {
+    if (!['files', 'images', 'behaviors', 'mydata'].contains(app)) {
       throw ArgumentError('Application not implemented.');
+    }
+    if (app == 'behaviors' && !_developerMode) {
+      throw ArgumentError('Behaviors are available in developer mode only.');
     }
     final id = 'app-$app';
     final artifact =
@@ -574,6 +597,7 @@ class WorkspaceStore extends ChangeNotifier {
           title: switch (app) {
             'files' => 'Files',
             'behaviors' => 'Behaviors',
+            'mydata' => 'My Data',
             _ => 'Image Editor',
           },
           kind: 'app',

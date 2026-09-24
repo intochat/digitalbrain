@@ -6,6 +6,7 @@ using DigitalBrain.Flutter.Clock;
 using DigitalBrain.Flutter.Collection;
 using DigitalBrain.Flutter.Color;
 using DigitalBrain.Flutter.Expander;
+using DigitalBrain.Flutter.Form;
 using DigitalBrain.Flutter.Graph;
 using DigitalBrain.Flutter.Image;
 using DigitalBrain.Flutter.ImageCanvas;
@@ -71,7 +72,6 @@ internal static class UiKitEndpoints
             return Results.Accepted();
         });
 
-        UiHttp.MapGet<ITextField, TextFieldState>(endpoints, "textfields", neuron => neuron.Read());
         UiHttp.MapPost(endpoints, "textfields/{name}/configure", async (string name, TextFieldConfigure body, IGrainFactory grains, CancellationToken ct) =>
         {
             await grains.GetGrain<ITextField>(name).Configure(body.Label, body.Kind).WaitAsync(ct);
@@ -272,6 +272,18 @@ internal static class UiKitEndpoints
             await grains.GetGrain<ISheet>(name).Set(body.Title, body.Cells).WaitAsync(ct);
             return Results.Accepted();
         });
+
+        UiHttp.MapGet<IForm, FormState>(endpoints, "forms", neuron => neuron.Read());
+        UiHttp.MapPost(endpoints, "forms/{name}/draft", async (string name, FormDraft body, IGrainFactory grains, CancellationToken ct) =>
+        {
+            await grains.GetGrain<IForm>(name).SetDraft(body.Name, body.Value).WaitAsync(ct);
+            return Results.Accepted();
+        });
+        UiHttp.MapPost(endpoints, "forms/{name}/submit", async (string name, FormSubmission body, IGrainFactory grains, CancellationToken ct) =>
+        {
+            await grains.GetGrain<IForm>(name).Submit(body).WaitAsync(ct);
+            return Results.Accepted();
+        });
     }
 }
 
@@ -305,3 +317,4 @@ internal sealed record TabsSelect(string Id);
 internal sealed record TreeSet(IReadOnlyList<TreeNode> Nodes);
 internal sealed record TreeSelect(string Id);
 internal sealed record SheetSet(string Title, IReadOnlyList<SheetCell> Cells);
+internal sealed record FormDraft(string Name, string Value);

@@ -38,7 +38,7 @@ internal sealed class LiveTableWindows(IDigitalBrain brain, Func<Task>? afterTab
             ct.ThrowIfCancellationRequested();
             try
             {
-                var receipt = await workspace.Open(new(operationId, tableId, title, new(tableId), expectedRevision)).WaitAsync(ct);
+                var receipt = await workspace.Open(new(operationId, tableId, title, WindowReference.Table(tableId), expectedRevision)).WaitAsync(ct);
                 return new QueryWindowResult(tableId, tableId, title, receipt.AppliedRevision);
             }
             catch (WorkspaceRevisionConflictException conflict) when (attempt < MaxOpenRetries - 1)
@@ -119,7 +119,7 @@ internal sealed class LiveTableWindows(IDigitalBrain brain, Func<Task>? afterTab
     private async Task<ISupabaseTable> ResolveAsync(string scopeId, string tableId, CancellationToken ct)
     {
         var state = await brain.Get<IWorkspace>(scopeId).Read().WaitAsync(ct);
-        if (!state.Windows.Any(window => window.Surface is null && window.View.Id == tableId))
+        if (!state.Windows.Any(window => window.Reference.Kind == WindowReference.TableKind && window.Reference.NeuronId == tableId))
         { throw new SupabaseTableNotFoundException(tableId); }
         return brain.Get<ISupabaseTable>(tableId);
     }

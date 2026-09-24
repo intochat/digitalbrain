@@ -14,7 +14,6 @@ internal sealed class MemoryNeuron(
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<MemoryState> state)
     : Neuron, IMemory
 {
-    private const string ReservedNamespace = "digitalbrain.capabilities";
     private const int MaxRecallLimit = 32;
 
     private IEmbeddingGenerator<string, Embedding<float>>? _embeddings;
@@ -56,6 +55,21 @@ internal sealed class MemoryNeuron(
         return key;
     }
 
+    public async Task<long> PurgeNamespace(PurgeNamespace note)
+    {
+        ArgumentNullException.ThrowIfNull(note);
+        ArgumentException.ThrowIfNullOrWhiteSpace(note.Namespace);
+
+        var (_, store) = RequireDependencies();
+        var removed = await store.RemoveNamespaceAsync(this.GetPrimaryKeyString(), note.Namespace, CancellationToken.None).ConfigureAwait(true);
+
+        var current = Current;
+        state.State = current with { ForgottenCount = current.ForgottenCount + (int)Math.Min(removed, int.MaxValue), LastChangedAt = time.GetUtcNow() };
+        await state.WriteStateAsync().ConfigureAwait(true);
+        await PublishAsync(new NamespacePurged(note.Namespace, removed)).ConfigureAwait(true);
+        return removed;
+    }
+
     [ReadOnly]
     public async Task<RecallResult> Recall(Recall query)
     {
@@ -87,11 +101,6 @@ internal sealed class MemoryNeuron(
         if (string.IsNullOrWhiteSpace(@namespace))
         {
             throw new ArgumentException("Provide a non-blank namespace for the note.", nameof(@namespace));
-        }
-
-        if (@namespace == ReservedNamespace)
-        {
-            throw new ArgumentException("Choose a namespace other than digitalbrain.capabilities.", nameof(@namespace));
         }
 
         if (string.IsNullOrWhiteSpace(key))

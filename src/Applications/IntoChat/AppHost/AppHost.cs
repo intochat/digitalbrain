@@ -4,7 +4,9 @@ using DigitalBrain.AI;
 using DigitalBrain.AI.FoundryLocal;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.OpenAI;
+using DigitalBrain.Apps;
 using DigitalBrain.Aspire.Hosting;
+using DigitalBrain.Automations;
 using DigitalBrain.ClickHouse;
 using DigitalBrain.Coding;
 using DigitalBrain.Behavior;
@@ -13,21 +15,31 @@ using DigitalBrain.Core;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Google.Gmail;
+using DigitalBrain.Identity;
+using DigitalBrain.Inbox;
 using DigitalBrain.Memory;
 using DigitalBrain.Microsoft.Aspire;
 using DigitalBrain.Microsoft.GitHub;
 using DigitalBrain.Microsoft.DotNet;
 using DigitalBrain.Microsoft.Roslyn;
+using DigitalBrain.Compute;
+using DigitalBrain.Discovery;
+using DigitalBrain.Connections;
+using DigitalBrain.MyData;
+using DigitalBrain.Receipts;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
 using DigitalBrain.Time;
+using IntoChat.AppHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
 var testing = builder.Configuration.GetValue<bool>("DigitalBrain:Testing:Enabled");
 var profile = builder.Configuration[ProductSurfaceResources.ProfileKey] ?? ProductSurfaceResources.DeveloperProfile;
-var developerProfile = !string.Equals(profile, ProductSurfaceResources.ProductProfile, StringComparison.OrdinalIgnoreCase);
+var hosted = HostedProfile.IsHosted(profile, builder.Configuration);
+var developerProfile = !hosted
+    && !string.Equals(profile, ProductSurfaceResources.ProductProfile, StringComparison.OrdinalIgnoreCase);
 var repositories = builder.Configuration.GetSection("DigitalBrain:Microsoft:GitHub:Repositories")
     .Get<Dictionary<string, GitHubRepositoryDeclaration>>() ?? [];
 var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, persistentStorage: !testing)
@@ -51,11 +63,21 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<MemoryModule>(memory => memory.WithQdrant())
     .WithModule<ClickHouseModule>(database => database.WithClickHouse(options => options.WithSeed("leads")))
     .WithModule<SupabaseModule>(database => database.WithConnection("supabase"))
+    // Durable reminders drive customer automations (T8); the module also validates the reminder provider.
     .WithModule<TimeModule>()
+    .WithModule<MyDataModule>()
+    .WithModule<ConnectionsModule>()
+    .WithModule<IdentityModule>()
+    .WithModule<AutomationsModule>()
     .WithModule<GmailModule>(gmail => gmail.WithGmail())
     .WithModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
     .WithModule<GitHubModule>(github => github.WithGitHubRepositories(repositories))
-    .WithModule<FlutterModule>(flutter => flutter.RunDesktopApp());
+    .WithModule<FlutterModule>(flutter => flutter.RunDesktopApp())
+    .WithModule<ReceiptsModule>()
+    .WithModule<ComputeModule>()
+    .WithModule<DiscoveryModule>()
+    .WithModule<AppsModule>()
+    .WithModule<InboxModule>();
 
 if (developerProfile)
 {
@@ -78,7 +100,14 @@ if (developerProfile)
 var clusterId = builder.Configuration["Orleans:ClusterId"]
     ?? (builder.Environment.IsDevelopment() ? $"digitalbrain-{Guid.NewGuid():N}" : null);
 
+// The Compute ledger and meters live in their own database, never in the customer's Supabase data.
+var computeServer = builder.AddPostgres("compute-postgres");
+if (!testing) { computeServer.WithDataVolume(); }
+var computeLedger = computeServer.AddDatabase("compute-database", ComputeModule.LedgerConnectionName);
+
 var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.IntoChat)
+    .WithReference(computeLedger, ComputeModule.LedgerConnectionName)
+    .WaitFor(computeLedger)
     .WithReference(digitalBrain)
     .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION", "false")
     .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_HTTPCLIENT_DISABLE_URL_QUERY_REDACTION", "false")
@@ -133,6 +162,13 @@ if (testing)
     // Null arguments to WithHttpEndpoint retain ports from launchSettings.json.
     // Clear both inherited ports so each test deployment receives its own endpoint.
     runtime.WithEndpoint("http", endpoint => { endpoint.Port = null; endpoint.TargetPort = null; });
+}
+
+if (hosted)
+{
+    // Product-only hosted deployment: managed identity and Key Vault are wired by configuration,
+    // and the developer executor is absent because the developer profile was not composed.
+    HostedProfile.Apply(runtime, builder.Configuration);
 }
 
 builder.Build().Run();

@@ -29,13 +29,13 @@ public static class E2ETest
     }
 
     internal static async Task<E2EBrain> StartModulesAsync(IReadOnlyList<ModuleDefinition> modules,
-        TestExecutionOptions options, BrowserOptions browserOptions, CancellationToken cancellationToken)
+        TestExecutionOptions options, BrowserOptions browserOptions, string? durableStorageKey, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         options.Validate();
         var browser = Resolve(browserOptions);
         var identity = NewIdentity();
-        var session = await ModuleTestHost.StartAsync(modules, WithArtifacts(options, identity), identity, cancellationToken).ConfigureAwait(false);
+        var session = await ModuleTestHost.StartAsync(modules, WithArtifacts(options, identity), identity, durableStorageKey, cancellationToken).ConfigureAwait(false);
         return await ReadyAsync(new E2EBrain(session, browser), brain => brain.StartBrowserAsync(cancellationToken)).ConfigureAwait(false);
     }
 

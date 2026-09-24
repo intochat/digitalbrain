@@ -60,10 +60,11 @@ class _DataTablePreviewState extends State<_DataTablePreview> {
     );
     _controller =
         UiTableController(
+            workspace: 'gallery',
             snapshot: snapshot,
             read: widget.state == 'Disabled'
                 ? null
-                : (id, {offset = 0, limit = 50}) async => snapshot,
+                : (_, id, {offset = 0, limit = 50}) async => snapshot,
           )
           ..busy = widget.state == 'Loading'
           ..error = widget.state == 'Error'

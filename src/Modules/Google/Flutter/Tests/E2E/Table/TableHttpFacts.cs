@@ -15,8 +15,8 @@ public sealed class TableHttpFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
-        await brain.Get<ITable>("grid").Replace("T", [new TableColumn("c", "C")], [["1"]]);
-        var state = await brain.HttpClient.GetFromJsonAsync<TableState>("/ui/tables/grid", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
+        await brain.Get<ITable>(UiScope.Key("workspace-a", "grid")).Replace("T", [new TableColumn("c", "C")], [["1"]]);
+        var state = await brain.HttpClient.GetFromJsonAsync<TableState>("/workspaces/workspace-a/ui/tables/grid", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
         Assert.Equal("T", state!.Title);
     }
 }

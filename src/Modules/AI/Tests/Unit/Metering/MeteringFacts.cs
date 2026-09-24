@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Metering;
+using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
 using Microsoft.Extensions.AI;
 using Xunit;
@@ -160,6 +161,47 @@ public sealed class MeteringFacts
         Assert.Equal(MeterKind.Embedding, recorded.Entries[1].Meter);
     }
 
+    [Fact]
+    public async Task IntentScopeFlushesEveryMeterEventAsOneBatch()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var meters = new RecordingBatchMeterSink();
+        await using var brain = await UnitTest.Create().WithModule<AIModule>().StartAsync(ct);
+        var sink = new GrainIntentUsageSink(brain.Grains, meters);
+        var chat = new TokenUsageEntry(MeterKind.Chat, "OpenAI", "gpt-5.6-luna", 10, 3, 2, 5, 15, true, DateTimeOffset.UnixEpoch);
+
+        using (var intent = IntentContext.Begin("intent-meter-batch", "scope"))
+        {
+            await sink.RecordAsync(intent.IntentId, chat, ct);
+            await sink.RecordAsync(intent.IntentId, chat with { Meter = MeterKind.Embedding }, ct);
+            await sink.FlushAsync(intent, ct);
+        }
+
+        var batch = Assert.Single(meters.Batches);
+        // One chat entry emits five token classes; the batch carries both entries in one call.
+        Assert.Equal(10, batch.Length);
+        Assert.Equal(MeterSource.ChatClient, batch.First().Source);
+    }
+
+    [Fact]
+    public void EveryReportedTokenClassBecomesItsOwnIdempotentMeterEvent()
+    {
+        var entry = new TokenUsageEntry(MeterKind.Chat, "OpenAI", "gpt-5.6-luna", 10, 3, 2, 5, 15, true, DateTimeOffset.UnixEpoch);
+
+        var events = IntentMeterEvents.FromUsage("intent-1", "scope", entry).ToArray();
+
+        Assert.Equal(
+            ["input_tokens", "cached_input_tokens", "reasoning_tokens", "output_tokens", "total_tokens"],
+            events.Select(meterEvent => meterEvent.Step));
+        Assert.All(events, meterEvent => Assert.Equal($"llm.gpt-5.6-luna.{meterEvent.Step}", meterEvent.MeterId));
+        Assert.All(events, meterEvent =>
+        {
+            Assert.Equal("intent-1", meterEvent.IntentId);
+            Assert.Equal("scope", meterEvent.WorkspaceId);
+            Assert.Equal(MeterSource.ChatClient, meterEvent.Source);
+        });
+    }
+
     private static ChatResponse Response(UsageDetails? usage, string modelId)
         => new(new ChatMessage(ChatRole.Assistant, "ok")) { Usage = usage, ModelId = modelId };
 
@@ -174,6 +216,23 @@ public sealed class MeteringFacts
         }
 
         public Task FlushAsync(IntentContext intent, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class RecordingBatchMeterSink : IBatchMeterSink
+    {
+        public List<MeterEvent[]> Batches { get; } = [];
+
+        public ValueTask RecordAsync(MeterEvent meterEvent, CancellationToken cancellationToken = default)
+        {
+            Batches.Add([meterEvent]);
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask<int> RecordBatchAsync(IReadOnlyList<MeterEvent> meterEvents, CancellationToken cancellationToken = default)
+        {
+            Batches.Add([.. meterEvents]);
+            return ValueTask.FromResult(meterEvents.Count);
+        }
     }
 
     private sealed class FixedChatClient(ChatResponse response) : IChatClient

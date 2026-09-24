@@ -47,8 +47,17 @@ public abstract class Neuron<TState>(IPersistentState<TState> store) : Neuron wh
 
     protected async Task Save(TState next, Signal changed, Signal? acted = null)
     {
+        var previous = store.State;
         store.State = next;
-        await store.WriteStateAsync();
+        try
+        {
+            await store.WriteStateAsync();
+        }
+        catch
+        {
+            store.State = previous;
+            throw;
+        }
         await PublishAsync(changed);
         if (acted is not null)
         {

@@ -28,7 +28,6 @@ public sealed class GmailModule : IModule
         });
     }
     public const string GmailOAuthConfigurationRoot = "DigitalBrain:Google:Gmail:OAuth";
-    public static readonly Uri GmailMcpEndpoint = new("https://gmailmcp.googleapis.com/mcp/v1");
 
     public void Configure(ISiloBuilder silo)
     {
@@ -62,7 +61,10 @@ public sealed class GmailModule : IModule
                 return Results.BadRequest();
             }
 
-            await grains.GetGrain<IGmail>("gmail").AcceptAuthorizationCode(code);
+            var owner = DigitalBrain.Core.Enforcement.CallerContextStamper.TryGet(out var caller) && caller is not null
+                ? caller.PrincipalId
+                : null;
+            await grains.GetGrain<IGmail>("gmail").AcceptAuthorizationCode(code, owner);
             return Results.Ok();
         });
     }

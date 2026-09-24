@@ -19,8 +19,14 @@
     <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/Sdk/DigitalBrain.Sdk.csproj" />
     <ProjectReference Include="../../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
+    <ProjectReference Include="../../../Modules/Receipts/Receipts/DigitalBrain.Modules.Receipts.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Compute/Contracts/DigitalBrain.Modules.Compute.Contracts.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Compute/Compute/DigitalBrain.Modules.Compute.csproj" />
+    <ProjectReference Include="../../../Modules/Identity/Identity/DigitalBrain.Modules.Identity.csproj" />
+    <ProjectReference Include="../../../Modules/Automations/Automations/DigitalBrain.Modules.Automations.csproj" />
     <ProjectReference Include="../../../Modules/Google/Gmail/Gmail/DigitalBrain.Modules.Google.Gmail.csproj" />
     <ProjectReference Include="../../../Modules/Google/Flutter/Flutter/DigitalBrain.Modules.Flutter.csproj" />
+    <ProjectReference Include="../../../Modules/Inbox/Inbox/DigitalBrain.Modules.Inbox.csproj" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../../Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
@@ -34,6 +40,10 @@
     <ProjectReference Include="../../../Modules/Microsoft/Roslyn/Roslyn/DigitalBrain.Modules.Microsoft.Roslyn.csproj" />
     <ProjectReference Include="../../../Modules/Microsoft/DotNet/DotNet/DigitalBrain.Modules.Microsoft.DotNet.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Behaviors/Behavior/DigitalBrain.Modules.Behavior.csproj" />
+    <ProjectReference Include="../../../Modules/MyData/MyData/DigitalBrain.Modules.MyData.csproj" />
+    <ProjectReference Include="../../../Modules/Discovery/Discovery/DigitalBrain.Modules.Discovery.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Apps/Apps/DigitalBrain.Modules.Apps.csproj" />
+    <ProjectReference Include="../../../Modules/Connections/Connections/DigitalBrain.Modules.Connections.csproj" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" />
   </ItemGroup>
 </Project>

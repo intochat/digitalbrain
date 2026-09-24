@@ -10,8 +10,10 @@ void main() {
     'paging replaces visible rows and previous restores the first page',
     (tester) async {
       final controller = UiTableController(
+        workspace: 'w',
         snapshot: TableSnapshot.fromJson(tableJson(1, 'First page company')),
-        read: (_, {offset = 0, limit = 25}) async => TableSnapshot.fromJson({
+        read: (_, __, {offset = 0, limit = 25}) async =>
+            TableSnapshot.fromJson({
           ...tableJson(
             1,
             offset == 0 ? 'First page company' : 'Next page company',
@@ -41,8 +43,9 @@ void main() {
     'column gestures render ascending and descending server results',
     (tester) async {
       final controller = UiTableController(
+        workspace: 'w',
         snapshot: TableSnapshot.fromJson(tableJson(1, 'Unsorted company')),
-        update: (_, update) async => TableSnapshot.fromJson({
+        update: (_, __, update) async => TableSnapshot.fromJson({
           ...tableJson(
             update.expectedRevision + 1,
             update.sort?.descending == true ? 'Zulu first' : 'Alpha first',

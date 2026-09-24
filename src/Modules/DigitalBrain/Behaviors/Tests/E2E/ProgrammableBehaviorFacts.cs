@@ -10,6 +10,8 @@ using DigitalBrain.Core;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Text;
 using DigitalBrain.Time;
+using DigitalBrain.Time.Reminders;
+using DigitalBrain.Time.Reminders.Signals;
 using IntoChat;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
@@ -28,6 +30,7 @@ public sealed class ProgrammableBehaviorFacts
         deadline.CancelAfter(TimeSpan.FromMinutes(8));
         var ct = deadline.Token;
         var root = Path.Combine(Path.GetTempPath(), "brain-behavior-e2e", Guid.NewGuid().ToString("N"));
+        var durableStorage = "programmable-behavior-" + Guid.NewGuid().ToString("N");
         using var model = new ScriptedModel();
         var ai = new AIOptions { Default = new() { Profile = "fixture" } };
         ai.ModelProfiles.Add("fixture", new() { Provider = "OpenAI", Model = "fixture", Endpoint = model.Url, Capabilities = LlmCapabilities.None });
@@ -35,7 +38,8 @@ public sealed class ProgrammableBehaviorFacts
         {
             DigitalBrain.Testing.E2E.E2ETestBuilder CreateHost() => E2ETest.Create().WithModule<AIModule>(m => m.WithOptions(ai))
                 .WithModule<CodingModule>().WithModule<BehaviorModule>().WithModule<TimeModule>().WithModule<FlutterModule>()
-                .WithModule<BehaviorFixtureModule>().WithExecution(new TestExecutionOptions
+                .WithModule<BehaviorFixtureModule>().WithDurableStorage(durableStorage)
+                .WithExecution(new TestExecutionOptions
                 {
                     PrivateConfiguration = new Dictionary<string, string?>
                     {
@@ -44,6 +48,7 @@ public sealed class ProgrammableBehaviorFacts
                         [BehaviorOptions.SectionName + ":Root"] = Path.Combine(root, "behaviors"),
                         [BehaviorOptions.SectionName + ":StartupTimeout"] = "00:00:05",
                         [BehaviorOptions.SectionName + ":HeartbeatInterval"] = "00:00:00.250",
+                        ["DigitalBrain:Time:MinimumReminderPeriod"] = "00:00:00.100",
                     },
                 });
             await using var brain = await StartHost(CreateHost(), ct);
@@ -59,8 +64,8 @@ public sealed class ProgrammableBehaviorFacts
             var state = await Ready(program, ct);
             Assert.Equal(result.Artifact.Id, state.Deployments.Single().Artifact.Id);
             var text = brain.Get<IText>("stage2-output");
-            var timer = brain.Get<DigitalBrain.Time.Timers.ITimer>("stage2-timer");
-            await timer.Start(TimeSpan.Zero);
+            var timer = brain.Get<DigitalBrain.Time.Reminders.IReminder>("stage2-timer");
+            await timer.Start(TimeSpan.Zero, TimeSpan.FromMilliseconds(100));
             await Output(text, "tick stage2-timer", ct);
             var logs = await program.ReadLogs(0, 100, ct);
             var hostPid = await http.GetFromJsonAsync<int>("/behavior-fixture/pid", ct);
@@ -73,18 +78,18 @@ public sealed class ProgrammableBehaviorFacts
             await updatedAnswer;
             state = await Ready(program, ct);
             Assert.Equal(2, state.DesiredDeploymentRevision);
-            await timer.Start(TimeSpan.Zero);
+            await timer.Start(TimeSpan.Zero, TimeSpan.FromMilliseconds(100));
             await Output(text, "updated stage2-timer", ct);
             await program.Stop(new(state.Revision, Guid.NewGuid()), ct);
             state = await State(program, BehaviorExecutionState.Stopped, ct);
             await program.Rollback(new(state.Revision, Guid.NewGuid(), 1), ct);
             state = await Ready(program, ct);
             Assert.Equal(result.Artifact.Id, state.Deployments.Last().Artifact.Id);
-            await timer.Start(TimeSpan.Zero);
+            await timer.Start(TimeSpan.Zero, TimeSpan.FromMilliseconds(100));
             await Output(text, "tick stage2-timer", ct);
             await program.Stop(new(state.Revision, Guid.NewGuid()), ct);
             await State(program, BehaviorExecutionState.Stopped, ct);
-            await timer.Start(TimeSpan.Zero);
+            await timer.Start(TimeSpan.Zero, TimeSpan.FromMilliseconds(100));
             await Task.Delay(250, ct);
             Assert.Equal("tick stage2-timer", (await text.Read()).Markdown);
 
@@ -112,8 +117,8 @@ public sealed class ProgrammableBehaviorFacts
             Assert.Null(failed.Artifact);
 
             var unavailableSource = Source.Replace(
-                "await using var ticks = await brain.SubscribeAsync<TimerTick>(brain.Get<Timer>(\"stage2-timer\"), cancellation);",
-                "await Task.Delay(Timeout.Infinite, cancellation); await using var ticks = await brain.SubscribeAsync<TimerTick>(brain.Get<Timer>(\"stage2-timer\"), cancellation);", StringComparison.Ordinal);
+                "await using var ticks = await brain.SubscribeAsync<ReminderTick>(brain.Get<Reminder>(\"stage2-timer\"), cancellation);",
+                "await Task.Delay(Timeout.Infinite, cancellation); await using var ticks = await brain.SubscribeAsync<ReminderTick>(brain.Get<Reminder>(\"stage2-timer\"), cancellation);", StringComparison.Ordinal);
             await completedDraft.Save(new(2, Guid.NewGuid(), unavailableSource, Tests, ["time", "flutter"]), ct);
             var unavailable = await Check(completedDraft, 3, ct);
             Assert.True(unavailable.Artifact is not null, string.Join("\n", unavailable.Diagnostics.Select(x => x.Message)));
@@ -166,7 +171,7 @@ public sealed class ProgrammableBehaviorFacts
             Assert.NotEqual(beforeRestart.GenerationId, recovered.GenerationId);
             Assert.Equal(beforeRestart.Deployments.Last().Artifact.Id, recovered.Deployments.Last().Artifact.Id);
             Assert.Equal(BehaviorDesiredState.Stopped, (await restarted.Get<IBehaviorProgram>("crashing-example").Read(ct)).DesiredState);
-            await restarted.Get<DigitalBrain.Time.Timers.ITimer>("stage2-timer").Start(TimeSpan.Zero);
+            await restarted.Get<IReminder>("stage2-timer").Start(TimeSpan.Zero, TimeSpan.FromMilliseconds(100));
             await Output(restarted.Get<IText>("stage2-output"), "tick stage2-timer", ct);
             await recoveredProgram.Stop(new(recovered.Revision, Guid.NewGuid()), ct);
             await State(recoveredProgram, BehaviorExecutionState.Stopped, ct);
@@ -225,17 +230,17 @@ public sealed class ProgrammableBehaviorFacts
     private const string Source = """
         using DigitalBrain.Contracts;
         using DigitalBrain.Core;
-        using DigitalBrain.Time.Timers.Signals;
+        using DigitalBrain.Time.Reminders.Signals;
         using DigitalBrain.Flutter.Text;
-        using Timer = DigitalBrain.Time.Timers.ITimer;
-        await BehaviorApp.RunAsync<TimerToText>(args, brain => [SubscriptionRequirement.For<TimerTick>(brain.Get<Timer>("stage2-timer"))]);
+        using Reminder = DigitalBrain.Time.Reminders.IReminder;
+        await BehaviorApp.RunAsync<TimerToText>(args, brain => [SubscriptionRequirement.For<ReminderTick>(brain.Get<Reminder>("stage2-timer"))]);
         public sealed class TimerToText(IDigitalBrain brain) : IBehavior
         {
-            public static string Format(TimerTick tick) => "tick " + tick.TimerId;
+            public static string Format(ReminderTick tick) => "tick " + tick.ReminderId;
             public async Task RunAsync(CancellationToken cancellation = default)
             {
                 Console.WriteLine("WORKERPID:" + Environment.ProcessId);
-                await using var ticks = await brain.SubscribeAsync<TimerTick>(brain.Get<Timer>("stage2-timer"), cancellation);
+                await using var ticks = await brain.SubscribeAsync<ReminderTick>(brain.Get<Reminder>("stage2-timer"), cancellation);
                 await foreach (var tick in ticks.ReadAllAsync(cancellation))
                 { await brain.Get<IText>("stage2-output").Set(Format(tick)); }
             }
@@ -247,7 +252,7 @@ public sealed class ProgrammableBehaviorFacts
             [Xunit.Fact]
             public void FormatsTheObservedTimerIdentity()
             {
-                var tick = new DigitalBrain.Time.Timers.Signals.TimerTick("sample", DateTimeOffset.UnixEpoch);
+                var tick = new DigitalBrain.Time.Reminders.Signals.ReminderTick("sample", DateTimeOffset.UnixEpoch);
                 Xunit.Assert.Equal("tick sample", TimerToText.Format(tick));
             }
         }

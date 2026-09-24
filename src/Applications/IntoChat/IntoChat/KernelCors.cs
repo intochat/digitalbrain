@@ -24,7 +24,8 @@ internal static class KernelCors
                 cors.AddPolicy(PolicyName, policy => policy
                     .WithOrigins(origins)
                     .AllowAnyHeader()
-                    .AllowAnyMethod());
+                    .AllowAnyMethod()
+                    .AllowCredentials());
             }
         });
 
@@ -53,8 +54,13 @@ internal static class KernelCors
         }
 
         var origin = options.AllowedOrigin.Trim().TrimEnd('/');
-        if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri) || !uri.IsLoopback
-            || uri.Scheme is not ("http" or "https"))
+        if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri)
+            || uri.Scheme is not ("http" or "https") || string.IsNullOrEmpty(uri.Host)
+            || uri.AbsolutePath != "/" || uri.Query.Length > 0 || uri.Fragment.Length > 0 || uri.UserInfo.Length > 0)
+        {
+            return [];
+        }
+        if (!uri.IsLoopback)
         {
             return [origin];
         }

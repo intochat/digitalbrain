@@ -18,10 +18,10 @@ public sealed class WebBrowserHttpFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
-        using var navigate = await brain.HttpClient.PostAsJsonAsync("/ui/browsers/docs/navigate",
+        using var navigate = await brain.HttpClient.PostAsJsonAsync("/workspaces/workspace-a/ui/browsers/docs/navigate",
             new { uri = "https://learn.microsoft.com/", title = "Docs" }, ct);
         Assert.Equal(HttpStatusCode.Accepted, navigate.StatusCode);
-        var state = await brain.HttpClient.GetFromJsonAsync<WebBrowserState>("/ui/browsers/docs", Json, ct);
+        var state = await brain.HttpClient.GetFromJsonAsync<WebBrowserState>("/workspaces/workspace-a/ui/browsers/docs", Json, ct);
         Assert.Equal("https://learn.microsoft.com/", state!.Uri);
         Assert.Equal("Docs", state.Title);
     }
