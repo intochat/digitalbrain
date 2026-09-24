@@ -222,9 +222,9 @@ internal sealed class PackageNeuron(
             : throw new InvalidOperationException($"Operation {operationId} was already used for a different change.");
     }
 
-    private List<PackageReceipt> Receipted(Guid operationId, object request, string result)
+    private List<OperationReceipt> Receipted(Guid operationId, object request, string result)
     {
-        var receipts = new List<PackageReceipt>(Snapshot.Receipts) { new(operationId, PackageHash.Of(request), result) };
+        var receipts = new List<OperationReceipt>(Snapshot.Receipts) { new(operationId, PackageHash.Of(request), result) };
         if (receipts.Count > PackageRules.MaxReceipts) { receipts.RemoveAt(0); }
         return receipts;
     }

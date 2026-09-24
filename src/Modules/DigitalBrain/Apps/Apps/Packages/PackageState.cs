@@ -11,5 +11,5 @@ public sealed record PackageState
     [Id(3)] public Dictionary<string, PackageRevision> Revisions { get; init; } = [];
     [Id(4)] public List<string> History { get; init; } = [];
     [Id(5)] public List<PackageProposal> Proposals { get; init; } = [];
-    [Id(6)] public List<PackageReceipt> Receipts { get; init; } = [];
+    [Id(6)] public List<OperationReceipt> Receipts { get; init; } = [];
 }
