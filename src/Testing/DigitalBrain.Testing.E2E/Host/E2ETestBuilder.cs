@@ -10,6 +10,13 @@ public sealed class E2ETestBuilder
     private string? _durableStorageKey;
     private bool _started;
 
+    public E2ETestBuilder AddApp<TApp>() where TApp : Neuron, IAppDefinition
+    {
+        EnsureMutable();
+        _composition.AddApp<TApp>();
+        return this;
+    }
+
     public E2ETestBuilder WithModule<TModule>(Action<ModuleConfiguration<TModule>>? configure = null)
         where TModule : class, IModule, new()
     {

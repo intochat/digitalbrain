@@ -18,5 +18,9 @@ public sealed class AppsModule : IModule
         // Discovery indexes the committed first-party manifests; apps are composed after discovery
         // in the product profile, so this replaces the empty default source.
         silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IManifestSource, FirstPartyManifestSource>());
+        silo.Services.TryAddSingleton<AppBehaviorRegistry>();
+        silo.Services.TryAddSingleton<WorkspaceApps>();
+        foreach (var id in new[] { "text.prefix", "text.suffix", "text.uppercase", "text.lowercase", "text.trim", "text.identity" })
+        { silo.Services.AddSingleton<IAppBehavior>(new TextAppBehavior(id)); }
     }
 }

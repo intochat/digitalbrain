@@ -39,7 +39,7 @@ internal static class OperationsEndpoints
     }
 
     private static WorkspaceScope ScopeOf(BasicAuthOptions auth, string workspaceId)
-        => WorkspaceScope.Create(auth.Username is { Length: > 0 } owner ? owner : AccountSession.DefaultLogin, workspaceId);
+        => WorkspaceScope.Current(auth, workspaceId);
 
     private static bool ValidIntentId(string? value)
         => !string.IsNullOrWhiteSpace(value) && value.Length <= 200 && !value.Any(char.IsControl);

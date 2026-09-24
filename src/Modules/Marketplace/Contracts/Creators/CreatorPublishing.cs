@@ -31,6 +31,7 @@ public enum CreatorPublishOutcome
     KillSwitchActive = 5,
     NotCertified = 6,
     ReConsentRequired = 7,
+    VersionConflict = 8,
 }
 
 [GenerateSerializer, Alias("marketplace.creators.scenario-evidence")]
@@ -150,6 +151,8 @@ public interface ICreatorPublishing : INeuron
     Task<CreatorPublishingFeatures> Features();
 
     Task<CreatorListing?> Read(string appId);
+
+    Task<CreatorListing?> ReadVersion(string appId, string version);
 
     Task<IReadOnlyList<CreatorListing>> List();
 

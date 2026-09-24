@@ -507,6 +507,7 @@ class WorkspaceStore extends ChangeNotifier {
   Future<void> flush() => _writes;
   WorkspaceProject createProject(
     String title, {
+    String? id,
     String agentId = 'intocaht',
     String draft = '',
   }) {
@@ -519,7 +520,7 @@ class WorkspaceStore extends ChangeNotifier {
       draft: draft,
     );
     final p = WorkspaceProject(
-      id: _id(),
+      id: id ?? _id(),
       title: title.trim().isEmpty ? 'Untitled project' : title.trim(),
       conversations: [c],
       selectedConversationId: c.id,

@@ -16,8 +16,11 @@ public static partial class ManifestValidator
         ArgumentNullException.ThrowIfNull(manifest);
         ArgumentNullException.ThrowIfNull(knownTypeIds);
 
-        Require(IdPattern().IsMatch(manifest.Id), $"App id '{manifest.Id}' is not a namespaced alias such as 'intochat.files'.");
-        Require(VersionPattern().IsMatch(manifest.Version), $"App version '{manifest.Version}' is not a semantic version.");
+        Require(manifest.Id is { Length: <= 160 } && IdPattern().IsMatch(manifest.Id), "App id must be a namespaced alias or publisher/appname.");
+        Require(manifest.Version is { Length: > 0 and <= 100 } && VersionPattern().IsMatch(manifest.Version), $"App version '{manifest.Version}' is not a semantic version.");
+        Require(Enum.IsDefined(manifest.Kind), "Unknown app kind.");
+        Require(manifest.Operations is not null && manifest.Permissions is not null && manifest.Windows is not null && manifest.Meters is not null,
+            "Operations, permissions, windows and meters must be arrays.");
         Require(!string.IsNullOrWhiteSpace(manifest.Publisher), "App publisher is required.");
         Require(!string.IsNullOrWhiteSpace(manifest.Name), "App name is required.");
         Require(!string.IsNullOrWhiteSpace(manifest.DescriptionForPeople), "A description for people is required.");
@@ -26,12 +29,13 @@ public static partial class ManifestValidator
             "A remote app declares a remote endpoint.");
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var operation in manifest.Operations)
+        foreach (var operation in manifest.Operations!)
         {
-            Require(!string.IsNullOrWhiteSpace(operation.Name), "Every operation has a name.");
+            Require(operation is not null && !string.IsNullOrWhiteSpace(operation.Name), "Every operation has a name.");
+            Require(operation!.InputTypeIds is not null, "Operation input types must be a map.");
             Require(seen.Add(operation.Name), $"Operation '{operation.Name}' is declared twice.");
             Require(!string.IsNullOrWhiteSpace(operation.DescriptionForModel), $"Operation '{operation.Name}' needs a model description.");
-            foreach (var (parameter, typeId) in operation.InputTypeIds)
+            foreach (var (parameter, typeId) in operation.InputTypeIds!)
             {
                 Require(knownTypeIds.Contains(typeId),
                     $"Operation '{operation.Name}' parameter '{parameter}' references unknown type '{typeId}'.");
@@ -42,11 +46,12 @@ public static partial class ManifestValidator
             }
         }
 
-        foreach (var permission in manifest.Permissions)
+        foreach (var permission in manifest.Permissions!)
         {
-            Require(knownTypeIds.Contains(permission.SemanticTypeId),
-                $"Permission references unknown type '{permission.SemanticTypeId}'.");
+            Require(permission is not null && knownTypeIds.Contains(permission.SemanticTypeId),
+                $"Permission references unknown type '{permission?.SemanticTypeId}'.");
         }
+        if (manifest.Composition is { } composition) { AppCompositionValidation.Validate(composition); }
     }
 
     private static void Require(bool condition, string message)
@@ -54,7 +59,7 @@ public static partial class ManifestValidator
         if (!condition) { throw new AppManifestException(message); }
     }
 
-    [GeneratedRegex(@"^[a-z0-9]+([.\-][a-z0-9]+)*$")]
+    [GeneratedRegex(@"^[a-z0-9]+([.\-][a-z0-9]+)*(/[a-z0-9]+([\-][a-z0-9]+)*)?$")]
     private static partial Regex IdPattern();
 
     [GeneratedRegex(@"^\d+\.\d+\.\d+(-[0-9A-Za-z.\-]+)?(\+[0-9A-Za-z.\-]+)?$")]

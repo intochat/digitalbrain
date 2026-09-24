@@ -10,9 +10,8 @@ using Microsoft.AspNetCore.Routing;
 
 namespace DigitalBrain.Identity;
 
-// Single-owner login on by default: the login call is itself the account-creation path. Members
-// are invited by code and share the owner's workspace; grants are keyed by (app, semantic type,
-// mode) in a per-workspace store.
+// Password-authenticated accounts own independent default workspaces. Invitation membership
+// and grants remain scoped to the owning account and workspace.
 internal static class IdentityEndpoints
 {
     internal const string DefaultWorkspace = "default";
@@ -23,15 +22,22 @@ internal static class IdentityEndpoints
 
     public static void Map(IEndpointRouteBuilder routes)
     {
+        routes.MapPost("/identity/register", RegisterAsync);
         routes.MapPost("/identity/login", LoginAsync);
         routes.MapGet("/identity/session", Session);
         routes.MapPost("/identity/logout", (Delegate)LogoutAsync);
-        routes.MapGet("/identity/accounts/{accountId}/members", async (string accountId, IDigitalBrain brain, CancellationToken ct) =>
-            Results.Ok(await Directory(brain).ListMembersAsync(accountId, ct)));
-        routes.MapPost("/identity/workspaces/{workspaceId}/invitations", async (string workspaceId, InviteRequest input, IDigitalBrain brain, CancellationToken ct) =>
-            Results.Ok(await Directory(brain).InviteAsync(workspaceId, input.Email, input.Role, ct)));
-        routes.MapPost("/identity/invitations/{code}/accept", async (string code, AcceptRequest input, IDigitalBrain brain, CancellationToken ct) =>
-            Results.Ok(await Directory(brain).AcceptInvitationAsync(code, input.PrincipalId, input.DisplayName, ct)));
+        routes.MapPost("/identity/workspaces", CreateWorkspaceAsync);
+        routes.MapGet("/identity/accounts/{accountId}/members", async (string accountId, HttpContext http, IDigitalBrain brain, CancellationToken ct) =>
+            http.User.FindFirstValue(AccountClaim) != accountId ? Results.Forbid() : Results.Ok(await Directory(brain).ListMembersAsync(accountId, ct)));
+        routes.MapPost("/identity/workspaces/{workspaceId}/invitations", async (string workspaceId, InviteRequest input, HttpContext http, IDigitalBrain brain, CancellationToken ct) =>
+        {
+            var principal = http.User.FindFirstValue(PrincipalClaim);
+            var member = principal is null ? null : await Directory(brain).FindMemberAsync(principal, ct);
+            return member?.WorkspaceId != workspaceId || member.Role != MemberRole.Owner
+                ? Results.Forbid() : Results.Ok(await Directory(brain).InviteAsync(workspaceId, input.Email, input.Role, ct));
+        });
+        routes.MapPost("/identity/invitations/{code}/accept", async (string code, AcceptRequest input, HttpContext http, IDigitalBrain brain, CancellationToken ct) =>
+            http.User.FindFirstValue(PrincipalClaim) != input.PrincipalId ? Results.Forbid() : Results.Ok(await Directory(brain).AcceptInvitationAsync(code, input.PrincipalId, input.DisplayName, ct)));
         var grants = routes.MapGroup("/workspaces/{workspaceId}/grants")
             .AddEndpointFilter(DigitalBrain.Core.Enforcement.WorkspaceAccessFilter.EnforceAsync);
         grants.MapGet("", async (string workspaceId, IDigitalBrain brain, CancellationToken ct) =>
@@ -50,17 +56,43 @@ internal static class IdentityEndpoints
         });
     }
 
+    internal static async Task<IResult> CreateWorkspaceAsync(HttpContext http, IDigitalBrain brain, CancellationToken ct)
+    {
+        var principal = http.User.FindFirstValue(PrincipalClaim);
+        var account = http.User.FindFirstValue(AccountClaim);
+        if (http.User.Identity?.IsAuthenticated != true || string.IsNullOrEmpty(principal) || string.IsNullOrEmpty(account))
+        {
+            return Results.Unauthorized();
+        }
+        var directory = Directory(brain);
+        var owner = await directory.FindMemberAsync(principal, ct);
+        if (owner is null || owner.AccountId != account || owner.Role != MemberRole.Owner)
+        {
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
+        }
+        var workspaceId = "workspace-" + Guid.NewGuid().ToString("N");
+        return Results.Ok(await directory.ShareWorkspaceAsync(account, workspaceId, principal, owner.DisplayName, MemberRole.Owner, ct));
+    }
+
     private static async Task<IResult> LoginAsync(LoginRequest input, HttpContext http, IDigitalBrain brain, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(input.PrincipalId) || input.PrincipalId.Length > 200 || input.PrincipalId.Any(char.IsControl))
+        var member = await Directory(brain).AuthenticateAsync(input.PrincipalId, input.Password ?? "", ct);
+        return member is null ? Results.Unauthorized() : await SignInAsync(member, http);
+    }
+
+    private static async Task<IResult> RegisterAsync(RegisterRequest input, HttpContext http, IDigitalBrain brain, CancellationToken ct)
+    {
+        try
         {
-            return Results.BadRequest(new { error = "A principal id of 1-200 characters is required." });
+            var member = await Directory(brain).RegisterAsync(input.PrincipalId, input.Password ?? "", input.DisplayName ?? input.PrincipalId, ct);
+            return await SignInAsync(member, http);
         }
+        catch (ArgumentException error) { return Results.BadRequest(new { error = error.Message }); }
+        catch (InvalidOperationException error) { return Results.Conflict(new { error = error.Message }); }
+    }
 
-        var workspace = string.IsNullOrWhiteSpace(input.WorkspaceId) ? DefaultWorkspace : input.WorkspaceId;
-        var display = string.IsNullOrWhiteSpace(input.DisplayName) ? input.PrincipalId : input.DisplayName;
-        var member = await Directory(brain).EnsureOwnerAsync(input.PrincipalId, workspace, display, ct);
-
+    private static async Task<IResult> SignInAsync(Member member, HttpContext http)
+    {
         var identity = new ClaimsIdentity(
         [
             new Claim(PrincipalClaim, member.PrincipalId),
@@ -91,7 +123,8 @@ internal static class IdentityEndpoints
 
     private static IGrantStore Grants(IDigitalBrain brain, string workspaceId) => brain.Get<IGrantStore>(IdentityGrains.Grants(workspaceId));
 
-    internal sealed record LoginRequest(string PrincipalId, string? DisplayName = null, string? WorkspaceId = null);
+    internal sealed record LoginRequest(string PrincipalId, string? Password = null);
+    internal sealed record RegisterRequest(string PrincipalId, string? Password = null, string? DisplayName = null);
     internal sealed record InviteRequest(string? Email = null, MemberRole Role = MemberRole.Member);
     internal sealed record AcceptRequest(string PrincipalId, string DisplayName);
     internal sealed record RevokeGrant(string AppId, string SemanticTypeId, GrantMode Mode);

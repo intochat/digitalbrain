@@ -8,6 +8,8 @@ import 'package:uuid/uuid.dart';
 import 'agent_events.dart';
 import 'basic_credentials.dart';
 import 'cookie_http_client.dart';
+import 'session_http_client_io.dart'
+    if (dart.library.html) 'session_http_client_web.dart' as transport;
 import 'host_environment.dart';
 import 'models/app_manifest.dart';
 import 'models/brain_models.dart';
@@ -32,7 +34,7 @@ final class DigitalBrainUiClient {
        _http = httpClient is CookieHttpClient
            ? httpClient
            : CookieHttpClient(
-               httpClient ?? http.Client(),
+               httpClient ?? transport.createSessionHttpClient(),
                credentials: credentials,
              ),
        _ownsClient = httpClient == null;
@@ -75,7 +77,58 @@ final class DigitalBrainUiClient {
   final Uri baseUri;
 
   /// Non-secret scope for local workspace preferences; never includes credentials.
-  final String workspaceIdentity;
+  String workspaceIdentity;
+  String? principalId;
+  String? accountId;
+  String? defaultWorkspaceId;
+
+  void _useSession(Map<String, dynamic> session) {
+    principalId = session['principalId'] as String;
+    accountId = session['accountId'] as String;
+    defaultWorkspaceId = session['workspaceId'] as String;
+    workspaceIdentity = '$principalId|$accountId';
+  }
+
+  Future<void> readSession() async {
+    final response = await _request(
+      'GET',
+      '/identity/session',
+      timeout: const Duration(seconds: 10),
+    );
+    if (response.statusCode == 200 && response.body.isNotEmpty) {
+      _useSession(jsonDecode(response.body) as Map<String, dynamic>);
+    }
+  }
+
+  Future<void> signIn(
+    String username,
+    String password, {
+    bool register = false,
+  }) async {
+    final response = await _request(
+      'POST',
+      register ? '/identity/register' : '/identity/login',
+      body: {'principalId': username, 'password': password},
+      timeout: const Duration(seconds: 15),
+    );
+    _useSession(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  /// Creates an owned workspace; clients never choose or claim an existing id.
+  Future<String> createWorkspace() async {
+    final response = await _request('POST', '/identity/workspaces',
+      body: const {}, timeout: const Duration(seconds: 15));
+    return (jsonDecode(response.body) as Map<String, dynamic>)['workspaceId'] as String;
+  }
+
+  Future<void> signOut() async {
+    await _request(
+      'POST',
+      '/identity/logout',
+      timeout: const Duration(seconds: 10),
+    );
+  }
+
   final CookieHttpClient _http;
   final bool _ownsClient;
 
@@ -771,27 +824,31 @@ final class DigitalBrainUiClient {
   }
 
   /// The consent sheet for an app before it is installed.
-  Future<ConsentSheet> consentSheet(String workspace, String appId) async =>
-      ConsentSheet.fromJson(
-        Map<String, dynamic>.from(
-          await _tableRequest(
-            'GET',
-            '/workspaces/${Uri.encodeComponent(workspace)}/apps/${Uri.encodeComponent(appId)}/consent',
-          ) as Map,
-        ),
-      );
+  Future<ConsentSheet> consentSheet(
+    String workspace,
+    String appId,
+  ) async => ConsentSheet.fromJson(
+    Map<String, dynamic>.from(
+      await _tableRequest(
+        'GET',
+        '/workspaces/${Uri.encodeComponent(workspace)}/apps/${Uri.encodeComponent(appId)}/consent',
+      ) as Map,
+    ),
+  );
 
   /// Records approval of an app's consent sheet; the manifest installs in the same step.
-  Future<ConsentSheet> approveConsent(String workspace, String appId) async =>
-      ConsentSheet.fromJson(
-        Map<String, dynamic>.from(
-          await _tableRequest(
-            'POST',
-            '/workspaces/${Uri.encodeComponent(workspace)}/apps/${Uri.encodeComponent(appId)}/consent/approve',
-            body: const <String, Object?>{},
-          ) as Map,
-        ),
-      );
+  Future<ConsentSheet> approveConsent(
+    String workspace,
+    String appId,
+  ) async => ConsentSheet.fromJson(
+    Map<String, dynamic>.from(
+      await _tableRequest(
+        'POST',
+        '/workspaces/${Uri.encodeComponent(workspace)}/apps/${Uri.encodeComponent(appId)}/consent/approve',
+        body: const <String, Object?>{},
+      ) as Map,
+    ),
+  );
 
   /// The live grants an owner has given to apps in this workspace.
   Future<List<GrantSummary>> listGrants(String workspace) async {
@@ -866,5 +923,19 @@ final class DigitalBrainUiClient {
     if (_ownsClient) {
       _http.close();
     }
+  }
+
+  Future<dynamic> appStudioRequest(
+    String method,
+    String path, [
+    Object? body,
+  ]) async {
+    final response = await _request(
+      method,
+      path,
+      body: body == null ? null : Map<String, Object?>.from(body as Map),
+      timeout: const Duration(seconds: 30),
+    );
+    return response.body.isEmpty ? null : jsonDecode(response.body);
   }
 }

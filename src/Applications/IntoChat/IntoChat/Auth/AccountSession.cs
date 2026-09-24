@@ -33,6 +33,30 @@ internal static class AccountSession
 
         app.Use(async (context, next) =>
         {
+            if (credential is not null && context.Request.Path == "/identity/register")
+            {
+                context.Request.EnableBuffering();
+                try
+                {
+                    using var body = await System.Text.Json.JsonDocument.ParseAsync(context.Request.Body);
+                    if (body.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object &&
+                        body.RootElement.EnumerateObject().Any(property =>
+                            string.Equals(property.Name, "principalId", StringComparison.OrdinalIgnoreCase) &&
+                            property.Value.ValueKind == System.Text.Json.JsonValueKind.String &&
+                            property.Value.GetString() == credential.Username))
+                    {
+                        context.Response.StatusCode = StatusCodes.Status409Conflict;
+                        return;
+                    }
+                }
+                catch (System.Text.Json.JsonException)
+                {
+                    context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                    return;
+                }
+                finally { context.Request.Body.Position = 0; }
+            }
+
             if (IsAnonymous(context.Request))
             {
                 await next(context).ConfigureAwait(false);
@@ -49,6 +73,18 @@ internal static class AccountSession
             }
 
             CallerContextStamper.Stamp(principal);
+            var workspace = context.Request.RouteValues["workspaceId"] as string
+                ?? context.Request.RouteValues["workspace"] as string;
+            if (!string.IsNullOrWhiteSpace(workspace) &&
+                context.User.Identity?.IsAuthenticated == true)
+            {
+                var access = context.RequestServices.GetRequiredService<IWorkspaceAccess>();
+                if (!await access.CanAccessAsync(principal.PrincipalId, workspace, context.RequestAborted))
+                {
+                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    return;
+                }
+            }
 
             await next(context).ConfigureAwait(false);
         });
@@ -119,7 +155,7 @@ internal static class AccountSession
         }
 
         // The login and session endpoints exist to establish the session the gate would require.
-        if (request.Path.StartsWithSegments("/identity", StringComparison.OrdinalIgnoreCase))
+        if (request.Path.Value?.ToLowerInvariant() is "/identity/register" or "/identity/login" or "/identity/session" or "/identity/logout")
         {
             return true;
         }

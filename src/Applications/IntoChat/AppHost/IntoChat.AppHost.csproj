@@ -9,7 +9,9 @@
   <ItemGroup>
     <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Behaviors/DigitalBrain.Behaviors.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../IntoChat/IntoChat.csproj" />
+    <!-- AddApp<T> uses the built-in app types at AppHost runtime as well as at compile time.
+         Aspire resource references otherwise exclude runtime assets and disable copying. -->
+    <ProjectReference Include="../IntoChat/IntoChat.csproj" ReferenceOutputAssembly="true" ExcludeAssets="none" Private="true" />
     <ProjectReference Include="../../../Modules/MyData/MyData/DigitalBrain.Modules.MyData.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Connections/Connections/DigitalBrain.Modules.Connections.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" IsAspireProjectResource="false" />

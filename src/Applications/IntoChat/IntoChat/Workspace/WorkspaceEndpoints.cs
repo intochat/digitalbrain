@@ -73,7 +73,7 @@ internal static class WorkspaceEndpoints
     }
 
     internal static IWorkspace GetWorkspace(IDigitalBrain brain, BasicAuthOptions auth, string workspaceId)
-        => brain.Get<IWorkspace>(WorkspaceScope.Create(auth.Username is { Length: > 0 } owner ? owner : AccountSession.DefaultLogin, workspaceId).Id);
+        => brain.Get<IWorkspace>(WorkspaceScope.Current(auth, workspaceId).Id);
 
     private static async Task<ISupabaseTable> ResolveTable(IDigitalBrain brain, BasicAuthOptions auth, string workspaceId, string tableId, CancellationToken ct)
     {

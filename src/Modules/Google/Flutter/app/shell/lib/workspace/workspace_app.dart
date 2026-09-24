@@ -18,12 +18,15 @@ import 'inbox_panel.dart';
 import 'workspace_islands.dart';
 import 'behaviors/behavior_manager.dart';
 import 'apps/consent_sheet_view.dart';
+import 'apps/app_studio.dart';
+import 'apps/built_in_app_view.dart';
 import 'mydata/mydata_window.dart';
 
 class WorkspaceApp extends StatefulWidget {
   const WorkspaceApp({
     super.key,
     this.store,
+    this.onSwitchAccount,
     this.initialLocation,
     this.persistenceKey = 'intocaht.workspace.v1',
     this.onRun,
@@ -38,6 +41,7 @@ class WorkspaceApp extends StatefulWidget {
     this.connectedSources = const [],
   });
   final WorkspaceStore? store;
+  final Future<void> Function()? onSwitchAccount;
   final Uri? initialLocation;
   final String persistenceKey;
   final AgentRunner? onRun;
@@ -81,6 +85,21 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         unawaited(_remoteAction(workspace, window, open));
     for (final project in store.projects) {
       if (_remote.containsKey(project.id)) continue;
+      unawaited(
+        client
+            .appStudioRequest(
+              'POST',
+              '/workspaces/${Uri.encodeComponent(project.id)}/app-runtime/activate',
+            )
+            .catchError((Object error) {
+              if (mounted) {
+                _messenger.currentState?.showSnackBar(
+                  SnackBar(content: Text('Apps could not start: $error')),
+                );
+              }
+              return null;
+            }),
+      );
       if (_sourcesSynced.add(project.id)) {
         unawaited(
           client
@@ -169,7 +188,28 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
 
   Future<void> _load() async {
     await store.load();
-    if (store.projects.isEmpty) store.createProject('Personal');
+    if (!mounted) return;
+    if (store.projects.isEmpty) {
+      final owned = widget.programmingClient?.defaultWorkspaceId;
+      if (owned == null) {
+        store.createProject('Personal');
+      } else {
+        final conversation = WorkspaceConversation(
+          id: 'initial',
+          title: 'New conversation',
+        );
+        store.projects.add(
+          WorkspaceProject(
+            id: owned,
+            title: 'Personal',
+            conversations: [conversation],
+            selectedConversationId: conversation.id,
+          ),
+        );
+        store.selectedProjectId = owned;
+        store.save();
+      }
+    }
     if (!mounted) return;
     setState(() => _ready = true);
     _connectWorkspaces();
@@ -202,14 +242,18 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         _navigator.currentState?.push(
           MaterialPageRoute<void>(
             settings: RouteSettings(name: '/settings/$section'),
-            builder: (_) => WorkspaceSettings(
-              store: store,
-              initialSection: section,
-              kernelBaseUri: widget.kernelBaseUri,
-              onOpen: widget.onOpenUrl,
-              connectionsRequest: _connectionsRequest,
-              onClose: () => _navigator.currentState?.pop(),
-            ),
+            builder: (_) =>
+                widget.programmingClient != null &&
+                    (section == 'profile' || section == 'appearance')
+                ? _settingsApp(() => _navigator.currentState?.pop())
+                : WorkspaceSettings(
+                    store: store,
+                    initialSection: section,
+                    kernelBaseUri: widget.kernelBaseUri,
+                    onOpen: widget.onOpenUrl,
+                    connectionsRequest: _connectionsRequest,
+                    onClose: () => _navigator.currentState?.pop(),
+                  ),
           ),
         );
         if (segments.length > 2 && segments[2] == 'gallery') {
@@ -818,6 +862,29 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                       ),
                     ),
                   ),
+                  if (widget.onSwitchAccount != null)
+                    TextButton.icon(
+                      onPressed: widget.onSwitchAccount,
+                      icon: const Icon(Icons.switch_account, size: 18),
+                      label: const Text('Switch account'),
+                    ),
+                  if (widget.programmingClient != null)
+                    IconButton(
+                      tooltip: 'App studio',
+                      icon: const Icon(Icons.apps),
+                      onPressed: () => _navigator.currentState?.push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => AppStudio(
+                            key: ValueKey(
+                              '${widget.programmingClient!.workspaceIdentity}/${store.currentProject.id}',
+                            ),
+                            workspaceId: store.currentProject.id,
+                            request: widget.programmingClient!.appStudioRequest,
+                            onClose: () => _navigator.currentState?.pop(),
+                          ),
+                        ),
+                      ),
+                    ),
                   IconButton(
                     tooltip: 'New conversation',
                     onPressed: () => store.createConversation(),
@@ -1057,7 +1124,25 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         ),
       );
       if (name != null && mounted) {
-        store.createProject(name.trim().isEmpty ? 'Untitled workspace' : name);
+        try {
+          final client = widget.programmingClient;
+          final id = client?.accountId != null
+              ? await client!.createWorkspace()
+              : null;
+          if (!mounted) return;
+          store.createProject(
+            name.trim().isEmpty ? 'Untitled workspace' : name,
+            id: id,
+          );
+        } on Object {
+          if (mounted) {
+            _messenger.currentState?.showSnackBar(
+              const SnackBar(
+                content: Text('Could not create workspace. Please try again.'),
+              ),
+            );
+          }
+        }
       }
     },
     onSavedWork: () => _projectFiles(context),
@@ -1068,13 +1153,15 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     onSettings: () => Navigator.of(context).push(
       MaterialPageRoute<void>(
         settings: const RouteSettings(name: '/settings/profile'),
-        builder: (_) => WorkspaceSettings(
-          store: store,
-          kernelBaseUri: widget.kernelBaseUri,
-          onOpen: widget.onOpenUrl,
-          connectionsRequest: _connectionsRequest,
-          onClose: () => Navigator.of(context).pop(),
-        ),
+        builder: (_) => widget.programmingClient != null
+            ? _settingsApp(() => Navigator.of(context).pop())
+            : WorkspaceSettings(
+                store: store,
+                kernelBaseUri: widget.kernelBaseUri,
+                onOpen: widget.onOpenUrl,
+                connectionsRequest: _connectionsRequest,
+                onClose: () => Navigator.of(context).pop(),
+              ),
       ),
     ),
   );
@@ -1089,6 +1176,33 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       ),
     );
   }
+
+  Widget _settingsApp(VoidCallback onClose) => BuiltInAppView(
+    key: ValueKey(
+      '${widget.programmingClient!.workspaceIdentity}/${store.currentProject.id}/settings',
+    ),
+    client: widget.programmingClient!,
+    workspaceId: store.currentProject.id,
+    appId: 'settings',
+    onClose: onClose,
+    onMoreSettings: () => Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => WorkspaceSettings(
+          store: store,
+          kernelBaseUri: widget.kernelBaseUri,
+          onOpen: widget.onOpenUrl,
+          connectionsRequest: _connectionsRequest,
+          onClose: () => Navigator.of(context).pop(),
+        ),
+      ),
+    ),
+    onPreferences: (preferences) {
+      if (!mounted) return;
+      store.settings.displayName = preferences['displayName'] as String? ?? '';
+      store.settings.theme = preferences['theme'] as String? ?? 'system';
+      unawaited(store.save());
+    },
+  );
 
   ConnectionsRequest? get _connectionsRequest {
     final client = widget.programmingClient;
@@ -1117,13 +1231,13 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       return;
     }
     try {
-      final consent = await client.consentSheet(store.currentProject.id, launchKey);
+      final consent = await client.consentSheet(
+        store.currentProject.id,
+        launchKey,
+      );
       if (!consent.approved) {
         if (!mounted) return;
-        final approved = await showConsentSheet(
-          context,
-          sheet: consent,
-        );
+        final approved = await showConsentSheet(context, sheet: consent);
         if (!approved) return;
         await client.approveConsent(store.currentProject.id, launchKey);
       }

@@ -10,6 +10,82 @@ public sealed class CreatorPublishingFacts
 {
     private const string Marketplace = "marketplace-publishing";
 
+    [Theory]
+    [InlineData("owner/saved-app", "owner", "owner", true)]
+    [InlineData("victim/saved-app", "owner", "owner", false)]
+    [InlineData("owner/saved-app", "victim", "owner", false)]
+    public async Task NamespacedPublicationRequiresTheAuthenticatedPublisher(string id, string publisher, string principal, bool allowed)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<CreatorPublishingModule>().StartAsync(ct);
+        var publishing = brain.Get<ICreatorPublishing>(Marketplace);
+
+        var result = await publishing.Publish(Publish(Manifest("1.0.0") with { Id = id, Publisher = publisher }, principal));
+
+        Assert.Equal(allowed ? CreatorPublishOutcome.Published : CreatorPublishOutcome.IdentityDenied, result.Outcome);
+        Assert.Equal(allowed ? 1 : 0, (await publishing.List()).Count);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PublishedVersionsCannotBeReplaced(bool publishNewer)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<CreatorPublishingModule>().StartAsync(ct);
+        var publishing = brain.Get<ICreatorPublishing>(Marketplace);
+        await publishing.Publish(Publish(Manifest("1.0.0"), "owner"));
+        if (publishNewer) { await publishing.Publish(Publish(Manifest("1.0.1"), "owner")); }
+
+        var conflict = await publishing.Publish(Publish(Manifest("1.0.0") with { DescriptionForModel = "Changed executable instructions." }, "owner"));
+
+        Assert.Equal(CreatorPublishOutcome.VersionConflict, conflict.Outcome);
+        Assert.Equal(publishNewer ? "1.0.1" : "1.0.0", (await publishing.Read("test.saved-app"))!.Version);
+        Assert.Equal("Read and submit the saved app.", (await publishing.Read("test.saved-app"))!.Manifest.DescriptionForModel);
+    }
+
+    [Fact]
+    public async Task RetryingAnOlderVersionPreservesItsListingAndTheLatestVersion()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<CreatorPublishingModule>().StartAsync(ct);
+        var publishing = brain.Get<ICreatorPublishing>(Marketplace);
+        var first = await publishing.Publish(Publish(Manifest("1.0.0"), "owner"));
+        await publishing.Publish(Publish(Manifest("1.0.1"), "owner"));
+
+        var retry = await publishing.Publish(Publish(Manifest("1.0.0"), "owner"));
+
+        Assert.Equal(CreatorPublishOutcome.Published, retry.Outcome);
+        Assert.Equal(first.Listing!.PublishedAt, retry.Listing!.PublishedAt);
+        Assert.Equal("1.0.1", (await publishing.Read("test.saved-app"))!.Version);
+        Assert.Equal("1.0.1", Assert.Single(await publishing.List()).Version);
+        Assert.Equal(first.Listing.PublishedAt, (await publishing.ReadVersion("test.saved-app", "1.0.0"))!.PublishedAt);
+        Assert.Null(await publishing.ReadVersion("test.saved-app", "2.0.0"));
+    }
+
+    [Fact]
+    public async Task EquivalentDictionaryOrderIsAnIdempotentRetry()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<CreatorPublishingModule>().StartAsync(ct);
+        var publishing = brain.Get<ICreatorPublishing>(Marketplace);
+        var original = Manifest("1.0.0");
+        original = original with
+        {
+            Operations = [original.Operations[0] with { InputTypeIds = new Dictionary<string, string> { ["note"] = "plain-text", ["title"] = "plain-text" } }],
+        };
+        var first = await publishing.Publish(Publish(original, "owner"));
+        var reordered = original with
+        {
+            Operations = [original.Operations[0] with { InputTypeIds = new Dictionary<string, string> { ["title"] = "plain-text", ["note"] = "plain-text" } }],
+        };
+
+        var retry = await publishing.Publish(Publish(reordered, "owner"));
+
+        Assert.Equal(CreatorPublishOutcome.Published, retry.Outcome);
+        Assert.Equal(first.Listing!.PublishedAt, retry.Listing!.PublishedAt);
+    }
+
     [Fact]
     public async Task ConsumerAndPrepaidFlagsDefaultOff()
     {

@@ -14,6 +14,13 @@ public sealed class DigitalBrainBuilder
     private bool _materialized;
     private readonly Dictionary<Type, IConfiguration> _compiledConfiguration = [];
 
+    public DigitalBrainBuilder AddApp<TApp>() where TApp : Neuron, IAppDefinition
+    {
+        _composition.AddApp<TApp>();
+        _hasDeclarations = true;
+        return this;
+    }
+
     internal void SetModuleConfiguration(ModuleDefinition module)
         => _compiledConfiguration[module.ModuleType] = new ConfigurationBuilder().AddInMemoryCollection(module.Configuration).Build();
 

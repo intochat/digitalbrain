@@ -37,23 +37,33 @@ public sealed class CrossWorkspaceFacts
         using var bob = CookieClient(brain.HttpClient);
 
         using var aliceLogin = await alice.PostAsJsonAsync(
-            "/identity/login",
-            new { principalId = "alice", displayName = "Alice", workspaceId = "workspace-alice" }, ct);
+            "/identity/register",
+            new { principalId = "alice", displayName = "Alice", password = "alice-password-123" }, ct);
         Assert.Equal(HttpStatusCode.OK, aliceLogin.StatusCode);
 
         using var bobLogin = await bob.PostAsJsonAsync(
-            "/identity/login",
-            new { principalId = "bob", displayName = "Bob", workspaceId = "workspace-bob" }, ct);
+            "/identity/register",
+            new { principalId = "bob", displayName = "Bob", password = "bob-password-123" }, ct);
         Assert.Equal(HttpStatusCode.OK, bobLogin.StatusCode);
 
+        var aliceMember = await aliceLogin.Content.ReadFromJsonAsync<DigitalBrain.Identity.Member>(Json, ct);
+        var bobMember = await bobLogin.Content.ReadFromJsonAsync<DigitalBrain.Identity.Member>(Json, ct);
+        var aliceWorkspace = aliceMember!.WorkspaceId;
+        var bobWorkspace = bobMember!.WorkspaceId;
+
         // Bob reaches his own workspace but is forbidden from Alice's scoped value and app node.
-        using var ownUi = await bob.GetAsync("/workspaces/workspace-bob/ui/sliders/volume", ct);
+        using var ownUi = await bob.GetAsync($"/workspaces/{bobWorkspace}/ui/sliders/volume", ct);
         Assert.Equal(HttpStatusCode.OK, ownUi.StatusCode);
 
-        using var foreignUi = await bob.GetAsync("/workspaces/workspace-alice/ui/sliders/volume", ct);
+        using var foreignWorkspace = await bob.GetAsync($"/workspaces/{aliceWorkspace}", ct);
+        Assert.Equal(HttpStatusCode.Forbidden, foreignWorkspace.StatusCode);
+        using var foreignSources = await bob.PostAsJsonAsync($"/workspaces/{aliceWorkspace}/connected-sources", new { sources = new[] { "stolen" } }, ct);
+        Assert.Equal(HttpStatusCode.Forbidden, foreignSources.StatusCode);
+
+        using var foreignUi = await bob.GetAsync($"/workspaces/{aliceWorkspace}/ui/sliders/volume", ct);
         Assert.Equal(HttpStatusCode.Forbidden, foreignUi.StatusCode);
 
-        using var foreignNode = await bob.GetAsync("/workspaces/workspace-alice/apps/node?kind=text&name=workspace-alice/apps/forms/intake", ct);
+        using var foreignNode = await bob.GetAsync($"/workspaces/{aliceWorkspace}/apps/node?kind=text&name={aliceWorkspace}/apps/forms/intake", ct);
         Assert.Equal(HttpStatusCode.Forbidden, foreignNode.StatusCode);
     }
 

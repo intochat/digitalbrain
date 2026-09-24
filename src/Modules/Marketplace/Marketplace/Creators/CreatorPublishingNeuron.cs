@@ -4,6 +4,7 @@ using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Enforcement;
 using Orleans.Runtime;
+using System.Text.Json.Nodes;
 
 namespace DigitalBrain.Marketplace.Creators;
 
@@ -48,6 +49,14 @@ internal sealed class CreatorPublishingNeuron(
             return Reject(CreatorPublishOutcome.InvalidManifest, invalid.Message);
         }
 
+        var namespaceEnd = request.Manifest.Id.IndexOf('/');
+        if (namespaceEnd >= 0 &&
+            (!string.Equals(request.Manifest.Id[..namespaceEnd], caller.PrincipalId, StringComparison.Ordinal) ||
+             !string.Equals(request.Manifest.Publisher, caller.PrincipalId, StringComparison.Ordinal)))
+        {
+            return Reject(CreatorPublishOutcome.IdentityDenied, "The app namespace and publisher must match the authenticated principal.");
+        }
+
         var versions = Versions(request.Manifest.Id);
         var latest = versions.Count > 0 ? versions[^1] : null;
         if (latest is not null && !string.Equals(latest.CreatorPrincipal, caller.PrincipalId, StringComparison.Ordinal))
@@ -73,9 +82,15 @@ internal sealed class CreatorPublishingNeuron(
             return Reject(CreatorPublishOutcome.KillSwitchActive, "The app is switched off and cannot publish.");
         }
 
-        if (latest is not null && string.Equals(latest.Version, request.Manifest.Version, StringComparison.Ordinal))
+        var existing = versions.FirstOrDefault(version => string.Equals(version.Version, request.Manifest.Version, StringComparison.Ordinal));
+        if (existing is not null)
         {
-            return new PublishResult { Outcome = CreatorPublishOutcome.Published, Listing = latest, Certification = latest.Certification };
+            if (!JsonNode.DeepEquals(JsonNode.Parse(AppManifestJson.Serialize(existing.Manifest)), JsonNode.Parse(AppManifestJson.Serialize(request.Manifest))))
+            {
+                return Reject(CreatorPublishOutcome.VersionConflict, "Published versions are immutable; publish changes under a new version.");
+            }
+
+            return new PublishResult { Outcome = CreatorPublishOutcome.Published, Listing = existing, Certification = existing.Certification };
         }
 
         var report = await certifier.CertifyAsync(request.Manifest);
@@ -140,6 +155,9 @@ internal sealed class CreatorPublishingNeuron(
             .Select(versions => versions[^1])];
         return Task.FromResult(active);
     }
+
+    public Task<CreatorListing?> ReadVersion(string appId, string version) =>
+        Task.FromResult(Versions(appId).FirstOrDefault(listing => string.Equals(listing.Version, version, StringComparison.Ordinal)));
 
     public async Task<CreatorListing> Kill(string appId, string reason)
     {

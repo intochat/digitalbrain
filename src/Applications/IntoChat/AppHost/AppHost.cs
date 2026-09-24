@@ -34,6 +34,7 @@ using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
 using DigitalBrain.Time;
 using IntoChat.AppHost;
+using IntoChat.Apps.BuiltIn;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 
@@ -83,7 +84,9 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<BrokerModule>()
     .WithModule<InboxModule>()
     .WithModule<MarketplaceModule>()
-    .WithModule<CreatorPublishingModule>();
+    .WithModule<CreatorPublishingModule>()
+    .AddApp<AssistantApp>()
+    .AddApp<SettingsApp>();
 
 if (developerProfile)
 {

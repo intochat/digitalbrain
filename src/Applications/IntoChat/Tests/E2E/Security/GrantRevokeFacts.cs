@@ -9,7 +9,7 @@ namespace IntoChat.Tests.E2E.Security;
 // value look missing again, and the grants list/revoke routes are scoped to the caller's workspace.
 public sealed class GrantRevokeFacts
 {
-    private const string Workspace = "workspace-grants";
+
 
     [Fact(Timeout = 300_000)]
     public async Task GrantThenRevokeMakesTheValueLookEmptyAndForeignWorkspacesAreForbidden()
@@ -20,14 +20,16 @@ public sealed class GrantRevokeFacts
         using var alice = CookieClient(brain.HttpClient);
         using var bob = CookieClient(brain.HttpClient);
         using var aliceLogin = await alice.PostAsJsonAsync(
-            "/identity/login",
-            new { principalId = "alice", displayName = "Alice", workspaceId = Workspace }, ct);
+            "/identity/register",
+            new { principalId = "alice", displayName = "Alice", password = "alice-password-123" }, ct);
         Assert.Equal(HttpStatusCode.OK, aliceLogin.StatusCode);
         using var bobLogin = await bob.PostAsJsonAsync(
-            "/identity/login",
-            new { principalId = "bob", displayName = "Bob", workspaceId = "workspace-bob" }, ct);
+            "/identity/register",
+            new { principalId = "bob", displayName = "Bob", password = "bob-password-123" }, ct);
         Assert.Equal(HttpStatusCode.OK, bobLogin.StatusCode);
 
+        var member = await aliceLogin.Content.ReadFromJsonAsync<DigitalBrain.Identity.Member>(ct);
+        var workspace = member!.WorkspaceId;
         var proxy = brain.Get<IAppProxy>("grant-gate");
         var appRead = new AppProxyRequest
         {
@@ -35,8 +37,8 @@ public sealed class GrantRevokeFacts
             Operation = "Read",
             TargetNeuron = "vault",
             PrincipalId = "alice",
-            AccountId = "alice",
-            WorkspaceId = Workspace,
+            AccountId = member.AccountId,
+            WorkspaceId = workspace,
             SemanticTypeIds = ["person.birthDate"],
         };
 
@@ -45,12 +47,12 @@ public sealed class GrantRevokeFacts
         Assert.Equal("MissingGrant", before.Denial);
 
         using var create = await alice.PostAsJsonAsync(
-            $"/workspaces/{Workspace}/grants",
-            new { appId = "app-1", semanticTypeId = "person.birthDate", mode = 2, workspaceId = Workspace },
+            $"/workspaces/{workspace}/grants",
+            new { appId = "app-1", semanticTypeId = "person.birthDate", mode = 2, workspaceId = workspace },
             ct);
         Assert.Equal(HttpStatusCode.OK, create.StatusCode);
 
-        using var listed = await alice.GetAsync($"/workspaces/{Workspace}/grants", ct);
+        using var listed = await alice.GetAsync($"/workspaces/{workspace}/grants", ct);
         Assert.Equal(HttpStatusCode.OK, listed.StatusCode);
         var listedJson = await listed.Content.ReadAsStringAsync(ct);
         var grants = JsonSerializer.Deserialize<JsonElement[]>(listedJson)!;
@@ -60,11 +62,11 @@ public sealed class GrantRevokeFacts
         var allowed = await proxy.Invoke(appRead);
         Assert.True(allowed.Allowed, $"{allowed.Denial}: {allowed.Explanation}; listed={listedJson}");
 
-        using var foreign = await bob.GetAsync($"/workspaces/{Workspace}/grants", ct);
+        using var foreign = await bob.GetAsync($"/workspaces/{workspace}/grants", ct);
         Assert.Equal(HttpStatusCode.Forbidden, foreign.StatusCode);
 
         using var revoke = await alice.PostAsJsonAsync(
-            $"/workspaces/{Workspace}/grants/revoke",
+            $"/workspaces/{workspace}/grants/revoke",
             new { appId = "app-1", semanticTypeId = "person.birthDate", mode = 2 },
             ct);
         Assert.Equal(HttpStatusCode.NoContent, revoke.StatusCode);
@@ -73,7 +75,7 @@ public sealed class GrantRevokeFacts
         Assert.False(after.Allowed);
         Assert.Equal("MissingGrant", after.Denial);
 
-        using var emptied = await alice.GetAsync($"/workspaces/{Workspace}/grants", ct);
+        using var emptied = await alice.GetAsync($"/workspaces/{workspace}/grants", ct);
         Assert.Empty(JsonSerializer.Deserialize<JsonElement[]>(await emptied.Content.ReadAsStringAsync(ct))!);
     }
 

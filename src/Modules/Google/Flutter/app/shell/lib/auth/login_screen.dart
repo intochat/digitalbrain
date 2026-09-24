@@ -9,12 +9,14 @@ final class LoginScreen extends StatefulWidget {
   const LoginScreen({
     super.key,
     required this.onSubmit,
+    this.onRegister,
     this.initialUsername = '',
     this.errorMessage,
   });
 
   /// Resolves to an error message to display, or null once signed in.
   final Future<String?> Function(String username, String password) onSubmit;
+  final Future<String?> Function(String username, String password)? onRegister;
   final String initialUsername;
   final String? errorMessage;
 
@@ -31,6 +33,7 @@ final class _LoginScreenState extends State<LoginScreen> {
 
   late String? _error = widget.errorMessage;
   bool _busy = false;
+  bool _register = false;
 
   @override
   void dispose() {
@@ -56,7 +59,10 @@ final class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
 
-    final failure = await widget.onSubmit(username, password);
+    final failure = await (_register ? widget.onRegister! : widget.onSubmit)(
+      username,
+      password,
+    );
 
     // The gate swaps this screen out on success, so only failure lands here.
     if (!mounted) {
@@ -115,8 +121,22 @@ final class _LoginScreenState extends State<LoginScreen> {
                           width: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Sign in'),
+                      : Text(_register ? 'Create account' : 'Sign in'),
                 ),
+                if (widget.onRegister != null)
+                  TextButton(
+                    onPressed: _busy
+                        ? null
+                        : () => setState(() {
+                            _register = !_register;
+                            _error = null;
+                          }),
+                    child: Text(
+                      _register
+                          ? 'Already have an account? Sign in'
+                          : 'Create account',
+                    ),
+                  ),
                 if (_error case final error?) ...[
                   const SizedBox(height: 16),
                   Text(

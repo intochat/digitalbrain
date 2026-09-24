@@ -38,6 +38,9 @@ public sealed record Invitation
 // neuron so a login can resolve a principal without knowing which account it belongs to yet.
 public interface IIdentityDirectory : IGrainWithStringKey
 {
+    Task<Member> RegisterAsync(string principalId, string password, string displayName, CancellationToken cancellationToken = default);
+    Task<Member?> AuthenticateAsync(string principalId, string password, CancellationToken cancellationToken = default);
+
     Task<Account> CreateAccountAsync(string principalId, string name, string workspaceId, CancellationToken cancellationToken = default);
 
     Task<Member> EnsureOwnerAsync(string principalId, string workspaceId, string displayName, CancellationToken cancellationToken = default);
