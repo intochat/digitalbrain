@@ -13,7 +13,11 @@ public static class CSharpExpertEndpoints
     public static void MapCSharpExpert(this IEndpointRouteBuilder routes)
     {
         routes.MapGet($"{Prefix}/runs/{{runId}}", (string runId, IDigitalBrain brain, CancellationToken ct) =>
-            Respond(async () => Results.Ok(await brain.Get<ICodingRun>(runId).Read().WaitAsync(ct))));
+            Respond(async () =>
+            {
+                var snapshot = await brain.Get<ICodingRun>(runId).Read().WaitAsync(ct);
+                return snapshot.Request is null ? Results.NotFound() : Results.Ok(snapshot);
+            }));
 
         routes.MapPost($"{Prefix}/runs/{{runId}}/clarify", (string runId, ClarifyCodingRun input, IDigitalBrain brain, CancellationToken ct) =>
             Respond(async () =>

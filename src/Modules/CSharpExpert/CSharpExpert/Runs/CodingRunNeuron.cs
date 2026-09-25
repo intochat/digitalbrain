@@ -13,12 +13,16 @@ internal sealed class CodingRunNeuron(
 {
     private string Key => this.GetPrimaryKeyString();
 
-    private CodingRunState Current => state.State ?? CodingRunState.Empty;
+    private CodingRunState Current => state.RecordExists ? state.State : CodingRunState.Empty;
 
     public async Task Request(FeatureRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        EnsureOpen();
+        if (Current.Request is not null && Current.Status != CodingRunStatus.Failed)
+        {
+            throw new InvalidOperationException("This run is already in progress.");
+        }
+
         await PersistAsync(CodingRunState.Empty with { Request = request, Status = CodingRunStatus.Requested },
             new FeatureRequested(Key, request));
     }
@@ -33,9 +37,9 @@ internal sealed class CodingRunNeuron(
             throw new InvalidOperationException("Request the feature before clarifying its plan.");
         }
 
-        if (current.Model is null)
+        if (current.Status is not (CodingRunStatus.ContextReady or CodingRunStatus.PlanDrafted))
         {
-            throw new InvalidOperationException("Clarify the plan after its context is ready.");
+            throw new InvalidOperationException("Clarify the plan before it is approved.");
         }
 
         var clarifications = current.Clarifications.Append(clarification).ToArray();
@@ -46,9 +50,9 @@ internal sealed class CodingRunNeuron(
     {
         EnsureOpen();
         var current = Current;
-        if (current.Plan is null)
+        if (current.Plan is null || current.Status != CodingRunStatus.PlanDrafted)
         {
-            throw new InvalidOperationException("Approve after the plan is drafted.");
+            throw new InvalidOperationException("Approve a drafted plan that is waiting for approval.");
         }
 
         await PersistAsync(current with { Status = CodingRunStatus.PlanApproved }, new PlanApproved(Key, current.Plan));
@@ -57,7 +61,7 @@ internal sealed class CodingRunNeuron(
     public async Task Stop()
     {
         var current = Current;
-        if (current.Status == CodingRunStatus.Stopped)
+        if (IsClosed(current.Status))
         {
             return;
         }
@@ -83,9 +87,9 @@ internal sealed class CodingRunNeuron(
         ArgumentNullException.ThrowIfNull(plan);
         EnsureOpen();
         var current = Current;
-        if (current.Model is null)
+        if (current.Model is null || current.Status is not (CodingRunStatus.ContextReady or CodingRunStatus.PlanDrafted))
         {
-            throw new InvalidOperationException("Record the project context before a plan.");
+            throw new InvalidOperationException("Record a plan while the run is planning.");
         }
 
         await PersistAsync(current with { Plan = plan, Status = CodingRunStatus.PlanDrafted }, new PlanDrafted(Key, plan));
@@ -217,7 +221,11 @@ internal sealed class CodingRunNeuron(
     public async Task Fail(string reason)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
-        EnsureOpen();
+        if (IsClosed(Current.Status))
+        {
+            return;
+        }
+
         await PersistAsync(Current with { Status = CodingRunStatus.Failed, FailureReason = reason }, new RunFailed(Key, reason));
     }
 
@@ -274,9 +282,12 @@ internal sealed class CodingRunNeuron(
         }
     }
 
+    private static bool IsClosed(CodingRunStatus status)
+        => status is CodingRunStatus.Stopped or CodingRunStatus.Finished or CodingRunStatus.Failed or CodingRunStatus.NeedsHuman;
+
     private void EnsureOpen()
     {
-        if (Current.Status is CodingRunStatus.Stopped or CodingRunStatus.Finished or CodingRunStatus.NeedsHuman)
+        if (IsClosed(Current.Status))
         {
             throw new InvalidOperationException("This run is closed.");
         }

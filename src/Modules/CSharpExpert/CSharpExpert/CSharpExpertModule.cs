@@ -26,6 +26,7 @@ public sealed class CSharpExpertModule : IModule
         silo.Services.TryAddSingleton<IProcessRunner, ProcessRunner>();
         silo.Services.TryAddSingleton<WorkspacePreparer>();
         silo.Services.AddOptions<CSharpExpertModuleOptions>().BindConfiguration("DigitalBrain:CSharpExpert");
+        silo.Services.AddSingleton<SolutionPolicy>();
         silo.Services.AddSingleton<CodingRunHost>();
         silo.Services.TryAddSingleton<ICodingAgentBackend, AgentCodingBackend>();
     }

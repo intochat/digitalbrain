@@ -65,6 +65,8 @@ public sealed class PlanFeature(IDigitalBrain brain, string runId) : IBehavior, 
             }
         }
 
+        builder.AppendLine("Use only file paths exactly as listed in the map (relative to the solution folder); a new file goes next to its siblings.");
+        builder.AppendLine("Keep steps small and ordered; each step must build and keep tests green on its own.");
         builder.AppendLine("JSON shape: {\"summary\":\"...\",\"steps\":[{\"number\":1,\"title\":\"...\",\"files\":[\"path\"],\"detail\":\"...\"}],\"openQuestions\":[\"...\"]}");
         return builder.ToString();
     }

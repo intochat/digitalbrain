@@ -6,9 +6,9 @@ internal static class StepSources
 {
     private const int MaxCharactersPerFile = 20_000;
 
-    public static string Read(string? workspaceRoot, IReadOnlyList<string> files)
+    public static string Read(string? solutionFolder, IReadOnlyList<string> files)
     {
-        if (workspaceRoot is null)
+        if (solutionFolder is null)
         {
             return string.Empty;
         }
@@ -16,8 +16,8 @@ internal static class StepSources
         var sources = new StringBuilder();
         foreach (var file in files)
         {
-            var path = Path.GetFullPath(Path.Combine(workspaceRoot, file));
-            if (!path.StartsWith(Path.GetFullPath(workspaceRoot), StringComparison.OrdinalIgnoreCase) || !File.Exists(path))
+            var path = Path.GetFullPath(Path.Combine(solutionFolder, file));
+            if (!SolutionPolicy.IsUnder(path, solutionFolder) || !File.Exists(path))
             {
                 continue;
             }

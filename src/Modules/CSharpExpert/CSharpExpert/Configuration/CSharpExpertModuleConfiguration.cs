@@ -7,6 +7,8 @@ public sealed class CSharpExpertModuleOptions
     // Root for the isolated per-run workspace. Defaults to a sibling "wt-runs" of a git repository
     // (or the temp folder for a plain folder copy) when omitted.
     public string? WorkspaceRoot { get; set; }
+
+    public List<string> AllowedSolutionRoots { get; set; } = [];
 }
 
 public sealed class CSharpExpertConfigurationContract() : ModuleConfigurationContract<CSharpExpertModule, CSharpExpertModuleOptions>

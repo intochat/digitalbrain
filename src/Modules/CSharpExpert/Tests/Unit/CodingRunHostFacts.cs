@@ -40,8 +40,11 @@ public sealed class CodingRunHostFacts
         await using var harness = await CSharpExpertHarness.StartAsync(ct, new ScriptedAgentScript { Reply = OneStepPlan });
         const string runId = "run-duplicate";
         await harness.Host.StartAsync(new FeatureRequest(CSharpExpertTestHost.SampleSolution, "Add a clear operation."), ct, runId);
-        await Assert.ThrowsAsync<InvalidOperationException>(
+        var duplicate = await Assert.ThrowsAsync<InvalidOperationException>(
             () => harness.Host.StartAsync(new FeatureRequest(CSharpExpertTestHost.SampleSolution, "Again."), ct, runId));
+
+        Assert.Equal("This run is already active.", duplicate.Message);
+        Assert.Equal("Add a clear operation.", (await harness.Brain.Get<ICodingRun>(runId).Read()).Request!.Description);
     }
 
     private static async Task WaitUntilAsync(Func<bool> condition, CancellationToken cancellationToken)

@@ -1,6 +1,7 @@
 using DigitalBrain.CSharpExpert;
 using DigitalBrain.Microsoft.DotNet;
 using DigitalBrain.Microsoft.Roslyn;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -57,7 +58,10 @@ internal sealed class CSharpExpertHarness : IAsyncDisposable
             })
             .StartAsync(cancellationToken);
         var preparer = new WorkspacePreparer(new ScriptedProcessRunner(processScript), Options.Create(new CSharpExpertModuleOptions { WorkspaceRoot = workspaceRoot }));
-        var host = new CodingRunHost(brain, preparer, NullLogger<CodingRunHost>.Instance);
+        var policy = new SolutionPolicy(
+            Options.Create(new CSharpExpertModuleOptions { AllowedSolutionRoots = [Path.GetDirectoryName(CSharpExpertTestHost.SampleSolution)!] }),
+            new ConfigurationBuilder().Build());
+        var host = new CodingRunHost(brain, preparer, policy, NullLogger<CodingRunHost>.Instance);
         return new CSharpExpertHarness(brain, host, agentScript, processScript, workspaceRoot);
     }
 

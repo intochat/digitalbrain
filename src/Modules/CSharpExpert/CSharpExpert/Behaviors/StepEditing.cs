@@ -13,7 +13,7 @@ internal static class StepEditing
         var agent = brain.Get<ICodingAgent>(profile.ImplementerAgentId);
         var roslyn = brain.Get<IRoslyn>(CodingWorkspace.Id(RunWorkspace.SolutionPath(snapshot)));
         var proposal = new EditProposal(snapshot.RunId, step.Number, step.Title, step.Detail, step.Files, snapshot.Model?.MapText ?? string.Empty, failure,
-            StepSources.Read(snapshot.WorkspaceRoot, step.Files));
+            StepSources.Read(Path.GetDirectoryName(snapshot.WorkspaceSolutionPath), step.Files));
         IReadOnlyList<EditRequest> edits;
         try
         {

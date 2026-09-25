@@ -17,15 +17,14 @@ internal sealed class CreateCodingRunTool(IServiceProvider services, IConfigurat
         }
 
         async Task<object> Create(
-            [Description("The feature to add to the C# solution, in one or two sentences.")] string description,
-            [Description("Optional path to the solution file; defaults to the configured coding solution.")] string? solutionPath)
+            [Description("The feature to add to the C# solution, in one or two sentences.")] string description)
         {
             if (string.IsNullOrWhiteSpace(description) || description.Length > 2000)
             {
                 return new { isError = true, message = "Describe the feature in 1–2000 characters." };
             }
 
-            var path = string.IsNullOrWhiteSpace(solutionPath) ? configuration["DigitalBrain:Coding:SolutionPath"] : solutionPath;
+            var path = configuration["DigitalBrain:Coding:SolutionPath"];
             if (string.IsNullOrWhiteSpace(path))
             {
                 return new { isError = true, message = "No coding solution is configured." };

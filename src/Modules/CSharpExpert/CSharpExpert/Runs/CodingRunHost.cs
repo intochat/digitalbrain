@@ -6,7 +6,7 @@ using Orleans;
 
 namespace DigitalBrain.CSharpExpert;
 
-public sealed class CodingRunHost(IDigitalBrain brain, WorkspacePreparer preparer, ILogger<CodingRunHost> log) : IAsyncDisposable
+public sealed class CodingRunHost(IDigitalBrain brain, WorkspacePreparer preparer, SolutionPolicy policy, ILogger<CodingRunHost> log) : IAsyncDisposable
 {
     private readonly ConcurrentDictionary<string, CodingRunSession> sessions = new();
 
@@ -15,6 +15,7 @@ public sealed class CodingRunHost(IDigitalBrain brain, WorkspacePreparer prepare
     public async Task<CodingRunSnapshot> StartAsync(FeatureRequest request, CancellationToken cancellation, string? runId = null)
     {
         ArgumentNullException.ThrowIfNull(request);
+        request = request with { SolutionPath = policy.Validate(request.SolutionPath) };
         runId ??= "run-" + Guid.NewGuid().ToString("N");
         var run = brain.Get<ICodingRun>(runId);
         var session = new CodingRunSession(brain, runId, preparer, log);
@@ -66,6 +67,19 @@ public sealed class CodingRunHost(IDigitalBrain brain, WorkspacePreparer prepare
         {
             await session.StopAsync(CancellationToken.None).ConfigureAwait(false);
         }
+
+        var snapshot = await brain.Get<ICodingRun>(runId).Read().ConfigureAwait(false);
+        if (snapshot.Status is CodingRunStatus.Failed or CodingRunStatus.Stopped && snapshot.WorkspaceRoot is { } workspace)
+        {
+            try
+            {
+                await preparer.ReleaseAsync(workspace, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception error)
+            {
+                log.LogWarning(error, "Could not remove the workspace {Workspace} of run {RunId}.", workspace, runId);
+            }
+        }
     }
 }
 
@@ -101,7 +115,9 @@ internal sealed class CodingRunSession
 
     public Task Completion => terminal.Task;
 
-    public Task WhenReadyAsync(CancellationToken cancellation) => ready.Task.WaitAsync(cancellation);
+    private static readonly TimeSpan ReadyTimeout = TimeSpan.FromSeconds(30);
+
+    public Task WhenReadyAsync(CancellationToken cancellation) => ready.Task.WaitAsync(ReadyTimeout, cancellation);
 
     public async Task StopAsync(CancellationToken cancellation)
     {
@@ -132,6 +148,10 @@ internal sealed class CodingRunSession
         catch (Exception error)
         {
             log.LogError(error, "Coding run {RunId} behaviors stopped.", runId);
+        }
+        finally
+        {
+            ready.TrySetException(new InvalidOperationException("The run's behaviors stopped before they were listening."));
         }
     }
 

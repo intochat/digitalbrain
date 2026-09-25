@@ -59,6 +59,7 @@ internal sealed class SampleSolutionLoader : ISolutionLoader
 
     private static IEnumerable<string> SourceFiles(string folder)
         => Directory.GetFiles(folder, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !Path.GetRelativePath(folder, path).Split(Path.DirectorySeparatorChar).Any(segment => segment is "bin" or "obj"))
             .OrderBy(path => path, StringComparer.Ordinal);
 
     private static IEnumerable<ProjectId> ProjectReferences(string projectFile, IReadOnlyDictionary<string, ProjectId> byPath)

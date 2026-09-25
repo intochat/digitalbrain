@@ -20,14 +20,46 @@ public sealed class WorkspacePreparer(IProcessRunner processes, IOptions<CSharpE
             var root = options.Value.WorkspaceRoot ?? Path.Combine(Path.GetDirectoryName(repository)!, "wt-runs");
             var worktree = Path.Combine(root, runId);
             Directory.CreateDirectory(root);
+            await ReleaseAsync(worktree, cancellationToken).ConfigureAwait(false);
             await GitAsync(repository, ["worktree", "add", "--detach", "--force", worktree], cancellationToken).ConfigureAwait(false);
             return new WorkspaceLocation(worktree, Path.Combine(worktree, Path.GetRelativePath(repository, full)));
         }
 
         var copyRoot = options.Value.WorkspaceRoot ?? Path.Combine(Path.GetTempPath(), "csharp-expert-runs");
         var folder = Path.Combine(copyRoot, runId);
+        await ReleaseAsync(folder, cancellationToken).ConfigureAwait(false);
         CopyDirectory(Path.GetDirectoryName(full)!, folder);
         return new WorkspaceLocation(folder, Path.Combine(folder, Path.GetFileName(full)));
+    }
+
+    public async Task ReleaseAsync(string workspaceRoot, CancellationToken cancellationToken)
+    {
+        var gitLink = Path.Combine(workspaceRoot, ".git");
+        if (File.Exists(gitLink) && WorktreeRepository(await File.ReadAllTextAsync(gitLink, cancellationToken).ConfigureAwait(false)) is { } repository)
+        {
+            await GitAsync(repository, ["worktree", "remove", "--force", workspaceRoot], cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (Directory.Exists(workspaceRoot))
+        {
+            Directory.Delete(workspaceRoot, recursive: true);
+        }
+    }
+
+    // A worktree's .git file reads "gitdir: <repository>/.git/worktrees/<name>".
+    private static string? WorktreeRepository(string gitLink)
+    {
+        const string Prefix = "gitdir:";
+        var line = gitLink.Trim();
+        if (!line.StartsWith(Prefix, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var gitDirectory = Path.GetFullPath(line[Prefix.Length..].Trim());
+        var worktrees = Directory.GetParent(gitDirectory);
+        return worktrees?.Name == "worktrees" ? worktrees.Parent?.Parent?.FullName : null;
     }
 
     private async Task<string?> RepositoryRootAsync(string solutionPath, CancellationToken cancellationToken)

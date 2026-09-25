@@ -6,6 +6,13 @@ internal static class CodingPlanReader
 {
     private static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
 
+    private static string JsonObjectIn(string reply)
+    {
+        var start = reply.IndexOf('{', StringComparison.Ordinal);
+        var end = reply.LastIndexOf('}');
+        return start >= 0 && end > start ? reply[start..(end + 1)] : reply;
+    }
+
     public static CodingPlan Read(string reply)
     {
         if (string.IsNullOrWhiteSpace(reply))
@@ -16,7 +23,7 @@ internal static class CodingPlanReader
         PlanPayload? payload;
         try
         {
-            payload = JsonSerializer.Deserialize<PlanPayload>(reply, Options);
+            payload = JsonSerializer.Deserialize<PlanPayload>(JsonObjectIn(reply), Options);
         }
         catch (JsonException error)
         {
