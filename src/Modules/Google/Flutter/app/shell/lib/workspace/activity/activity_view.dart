@@ -1,7 +1,85 @@
+import 'dart:async';
+
+import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:flutter/material.dart';
 
 import 'activity_controller.dart';
+
+class ActivityScreen extends StatefulWidget {
+  const ActivityScreen({
+    super.key,
+    required this.workspaceId,
+    required this.client,
+    required this.active,
+  });
+  final String workspaceId;
+  final DigitalBrainUiClient client;
+  final bool active;
+
+  @override
+  State<ActivityScreen> createState() => _ActivityScreenState();
+}
+
+class _ActivityScreenState extends State<ActivityScreen> {
+  ActivityController? controller;
+  String? error;
+
+  @override
+  void initState() {
+    super.initState();
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(covariant ActivityScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.workspaceId != widget.workspaceId ||
+        oldWidget.client != widget.client ||
+        oldWidget.active != widget.active) {
+      controller?.dispose();
+      controller = null;
+      _sync();
+    }
+  }
+
+  void _sync() {
+    if (!widget.active) return;
+    error = null;
+    final next = ActivityController(
+      read: () => widget.client.readActivity(widget.workspaceId),
+      watch: (cursor) => widget.client.watchActivity(
+        widget.workspaceId,
+        afterSequence: cursor,
+      ),
+    );
+    controller = next;
+    unawaited(
+      next.start().catchError((Object failure) {
+        if (mounted && identical(controller, next)) {
+          setState(() => error = '$failure');
+        }
+      }),
+    );
+  }
+
+  @override
+  void dispose() {
+    controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.active) {
+      return const Center(child: Text('Activity paused while hidden.'));
+    }
+    if (error != null) {
+      return Center(child: Text('Could not load activity: $error'));
+    }
+    return ActivityView(controller: controller!);
+  }
+}
 
 class ActivityView extends StatelessWidget {
   const ActivityView({super.key, required this.controller});

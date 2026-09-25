@@ -32,7 +32,7 @@ public abstract class Neuron : Grain, INeuron
         if ((IntentContext.Current?.ScopeId ?? RequestContext.Get(NeuronCallObservation.ScopeKey) as string) is { } scope)
         {
             ServiceProvider.GetService<ActivityFeed>()?.Append(new ActivityEvent(scope, 0, Guid.NewGuid(),
-                Guid.NewGuid(), IntentContext.Current?.IntentId, DateTimeOffset.UtcNow,
+                Guid.NewGuid(), NeuronCallObservation.Correlation(), DateTimeOffset.UtcNow,
                 NeuronActivityKind.SignalPublished, this.GetGrainId().ToString(), null,
                 signal.GetType().Name, "published", null, null));
         }

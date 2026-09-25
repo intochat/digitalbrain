@@ -60,6 +60,7 @@ public sealed class NeuronActivityFacts
         Assert.Equal(42, await brain.Get<IActivityCaller>("caller").Run());
         Assert.Equal(events.Count, feed.Snapshot("workspace-one").Events.Count);
         Assert.Contains(events, e => e.Kind == NeuronActivityKind.SignalPublished && e.Type == nameof(ActivityTestSignal));
+        Assert.Contains(events, e => e.Kind == NeuronActivityKind.SignalPublished && e.CorrelationId == "intent");
         Assert.Contains(events, e => e.Kind == NeuronActivityKind.CallStarted && e.SourceId?.Contains("caller") == true && e.TargetId?.Contains("target") == true);
         Assert.Contains(events, e => e.Kind == NeuronActivityKind.CallArrived && e.TargetId?.Contains("target") == true);
         var json = System.Text.Json.JsonSerializer.Serialize(events);

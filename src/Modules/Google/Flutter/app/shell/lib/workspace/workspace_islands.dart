@@ -49,6 +49,7 @@ class WorkspaceIslands extends StatelessWidget {
     'files' => Icons.folder_outlined,
     'images' => Icons.tune,
     'behaviors' => Icons.account_tree_outlined,
+    'activity' => Icons.hub_outlined,
     'table' => Icons.table_chart_outlined,
     _ => Icons.web_asset_outlined,
   };
@@ -223,6 +224,15 @@ class WorkspaceIslands extends StatelessWidget {
                   ),
                 ),
                 const PopupMenuDivider(),
+                const PopupMenuItem(
+                  value: 'activity',
+                  child: ListTile(
+                    leading: Icon(Icons.hub_outlined),
+                    title: Text('Activity'),
+                    subtitle: Text('Live neuron calls and signals'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
                 const PopupMenuItem(
                   value: 'behaviors',
                   child: ListTile(

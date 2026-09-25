@@ -17,7 +17,7 @@ internal sealed class NeuronCallObservation(ActivityFeed feed) : IIncomingGrainC
     private static string? Scope()
         => IntentContext.Current?.ScopeId ?? RequestContext.Get(ScopeKey) as string;
 
-    private static string? Correlation()
+    internal static string? Correlation()
         => IntentContext.Current?.IntentId ?? RequestContext.Get(CorrelationKey) as string;
 
     private static Guid Operation()

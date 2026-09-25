@@ -15,6 +15,7 @@ import 'workspace_chat.dart';
 import 'app_surface_host.dart';
 import 'workspace_islands.dart';
 import 'behaviors/behavior_manager.dart';
+import 'activity/activity_view.dart';
 
 class WorkspaceApp extends StatefulWidget {
   const WorkspaceApp({
@@ -317,7 +318,10 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       existing.content = artifact.content;
       existing.data = artifact.data;
       if (artifact.editorState.isNotEmpty) {
-        existing.editorState = {...existing.editorState, ...artifact.editorState};
+        existing.editorState = {
+          ...existing.editorState,
+          ...artifact.editorState,
+        };
       }
       store.save();
     }
@@ -475,6 +479,15 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
             setState(() => _mobileWork = false);
             store.save();
           },
+        );
+      }
+      if (a.data['app'] == 'activity') {
+        return ActivityScreen(
+          key: ValueKey('${store.currentProject.id}-${a.id}'),
+          workspaceId: store.currentProject.id,
+          client: client,
+          active: !store.currentProject.presentation.minimizedArtifactIds
+              .contains(a.id),
         );
       }
       return Semantics(

@@ -12,6 +12,7 @@ class ActivityController extends ChangeNotifier {
   final ReadActivity read;
   final WatchActivity watch;
   StreamSubscription<ActivityUpdate>? _subscription;
+  bool _disposed = false;
   List<ActivityRecord> _events = [];
   int visibleCursor = 0;
   int _latestCursor = 0;
@@ -20,6 +21,7 @@ class ActivityController extends ChangeNotifier {
   bool gap = false;
   bool loaded = false;
   String? selectedOperationId;
+  String? selectedCorrelationId;
   String search = '';
   String kindFilter = 'All';
   String statusFilter = 'All';
@@ -40,7 +42,10 @@ class ActivityController extends ChangeNotifier {
   List<ActivityRecord> get selectedSteps => _events
       .where(
         (e) =>
-            e.sequence <= visibleCursor && e.operationId == selectedOperationId,
+            e.sequence <= visibleCursor &&
+            (selectedCorrelationId != null
+                ? e.correlationId == selectedCorrelationId
+                : e.operationId == selectedOperationId),
       )
       .toList(growable: false);
 
@@ -113,12 +118,14 @@ class ActivityController extends ChangeNotifier {
 
   Future<void> start() async {
     final snapshot = await read();
+    if (_disposed) return;
     _replace(snapshot);
     loaded = true;
     notifyListeners();
     _subscription = watch(snapshot.nextSequence).listen(
       _onUpdate,
       onError: (_) {
+        if (_disposed) return;
         stale = true;
         notifyListeners();
       },
@@ -134,6 +141,7 @@ class ActivityController extends ChangeNotifier {
   }
 
   void _onUpdate(ActivityUpdate update) {
+    if (_disposed) return;
     switch (update) {
       case ActivityItem(:final event):
         if (event.sequence > _latestCursor) {
@@ -158,6 +166,7 @@ class ActivityController extends ChangeNotifier {
     for (final event in visibleEvents) {
       if (event.id == id) {
         selectedOperationId = event.operationId;
+        selectedCorrelationId = event.correlationId;
         notifyListeners();
         return;
       }
@@ -171,6 +180,7 @@ class ActivityController extends ChangeNotifier {
 
   void clearSelection() {
     selectedOperationId = null;
+    selectedCorrelationId = null;
     search = '';
     notifyListeners();
   }
@@ -209,6 +219,7 @@ class ActivityController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     unawaited(_subscription?.cancel());
     super.dispose();
   }

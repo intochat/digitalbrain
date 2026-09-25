@@ -26,6 +26,21 @@ void main() {
       hasLength(1),
     );
   });
+  test('activity opens once as a workspace application', () {
+    final store = WorkspaceStore(
+      persistence: MemoryPersistence(),
+      seedProject: false,
+    )..createProject('Personal');
+    final first = store.launchLocalApp('activity');
+    final again = store.launchLocalApp('activity');
+    expect(first.id, 'app-activity');
+    expect(first.title, 'Activity');
+    expect(again.id, first.id);
+    expect(
+      store.currentProject.artifacts.where((a) => a.id == first.id),
+      hasLength(1),
+    );
+  });
   testWidgets(
     'empty installation starts in a workspace with floating controls',
     (tester) async {

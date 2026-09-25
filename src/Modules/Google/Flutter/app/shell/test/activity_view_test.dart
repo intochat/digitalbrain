@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_flutter_shell/workspace/activity/activity_controller.dart';
 import 'package:digitalbrain_flutter_shell/workspace/activity/activity_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 ActivityRecord item(int sequence, String kind) => ActivityRecord(
   id: 'event-$sequence',
@@ -69,6 +72,46 @@ void main() {
     controller.dispose();
   });
 
+  test('selection includes separate signal in the same correlation', () async {
+    final controller = ActivityController(
+      read: () async => ActivitySnapshot(
+        events: [
+          ActivityRecord(
+            id: 'call',
+            operationId: 'call-op',
+            correlationId: 'intent',
+            sequence: 1,
+            at: DateTime.utc(2026, 9, 25),
+            kind: 'CallStarted',
+            type: 'Run',
+            status: 'started',
+            sourceId: 'caller',
+            targetId: 'target',
+          ),
+          ActivityRecord(
+            id: 'signal',
+            operationId: 'signal-op',
+            correlationId: 'intent',
+            sequence: 2,
+            at: DateTime.utc(2026, 9, 25),
+            kind: 'SignalPublished',
+            type: 'Changed',
+            status: 'published',
+            sourceId: 'target',
+          ),
+        ],
+        nextSequence: 2,
+        gap: false,
+        observedAt: DateTime.utc(2026, 9, 25),
+      ),
+      watch: (_) => const Stream<ActivityUpdate>.empty(),
+    );
+    await controller.start();
+    controller.selectActivity('call');
+    expect(controller.selectedSteps.map((e) => e.id), ['call', 'signal']);
+    controller.dispose();
+  });
+
   testWidgets('gap and unknown target are visible without invented edge', (
     tester,
   ) async {
@@ -108,5 +151,53 @@ void main() {
     await tester.pump();
     expect(find.textContaining('Unknown target'), findsWidgets);
     controller.dispose();
+  });
+
+  testWidgets('activity screen reads the product snapshot', (tester) async {
+    final paths = <String>[];
+    final client = DigitalBrainUiClient(
+      baseUri: Uri.parse('http://localhost:5000'),
+      httpClient: MockClient((request) async {
+        paths.add(request.url.path);
+        if (request.url.path.endsWith('/events')) return http.Response('', 200);
+        return http.Response(
+          jsonEncode({
+            'events': [
+              {
+                'id': 'one',
+                'operationId': 'operation',
+                'sequence': 1,
+                'at': '2026-09-25T12:00:00Z',
+                'kind': 4,
+                'type': 'SignalSeen',
+                'status': 'published',
+                'sourceId': 'neuron',
+              },
+            ],
+            'nextSequence': 1,
+            'gap': false,
+            'observedAt': '2026-09-25T12:00:00Z',
+          }),
+          200,
+        );
+      }),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ActivityScreen(
+            workspaceId: 'one',
+            client: client,
+            active: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('SignalSeen'), findsOneWidget);
+    expect(paths, contains('/workspaces/one/activity'));
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 1));
+    client.close();
   });
 }
