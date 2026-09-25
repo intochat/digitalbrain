@@ -318,6 +318,7 @@ class WorkspaceStore extends ChangeNotifier {
   void Function(String workspaceId, String windowId, bool open)?
   onRemoteWindowAction;
   final Map<String, int> remoteRevisions = {};
+  final Map<String, Map<String, int>> _locallyClosedWindows = {};
 
   void reconcileWorkspace(
     WorkspaceProject project,
@@ -360,8 +361,14 @@ class WorkspaceStore extends ChangeNotifier {
         }
       }
       artifact.title = window.title;
+      final closed = _locallyClosedWindows[project.id];
+      final closedAt = closed?[window.id];
+      if (closedAt != null && snapshot.revision > closedAt) {
+        closed!.remove(window.id);
+      }
+      final locallyClosed = closedAt != null && snapshot.revision <= closedAt;
       if (window.isOpen) {
-        if (!layout.openArtifactIds.contains(window.id)) {
+        if (!locallyClosed && !layout.openArtifactIds.contains(window.id)) {
           layout.openArtifactIds.add(window.id);
           layout.windowModes.putIfAbsent(window.id, () => 'floating');
           if (project.id == selectedProjectId) {
@@ -704,10 +711,10 @@ class WorkspaceStore extends ChangeNotifier {
   }
 
   void closeArtifact(String id) {
-    if (currentProject.artifacts.any((a) => a.id == id && a.remoteManaged)) {
-      onRemoteWindowAction?.call(currentProject.id, id, false);
-      return;
-    }
+    final workspace = currentProject.id;
+    final remote = currentProject.artifacts.any(
+      (a) => a.id == id && a.remoteManaged,
+    );
     final p = currentProject.presentation;
     p.materializeWindowModes();
     p.openArtifactIds.remove(id);
@@ -716,6 +723,12 @@ class WorkspaceStore extends ChangeNotifier {
       p.activeArtifactId = p.openArtifactIds
           .where((id) => !p.minimizedArtifactIds.contains(id))
           .lastOrNull;
+    }
+    if (remote) {
+      _locallyClosedWindows
+          .putIfAbsent(workspace, () => {})[id] =
+          remoteRevisions[workspace] ?? 0;
+      onRemoteWindowAction?.call(workspace, id, false);
     }
     save();
   }
