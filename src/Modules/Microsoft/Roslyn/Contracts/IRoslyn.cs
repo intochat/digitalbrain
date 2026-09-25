@@ -10,6 +10,8 @@ public interface IRoslyn : INeuron
 
     Task<WorkspaceReceipt> Reload();
 
+    Task Close();
+
     [ReadOnly]
     Task<WorkspaceSnapshot> Read();
 

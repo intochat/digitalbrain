@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
+using DigitalBrain.Microsoft.Roslyn;
 using Microsoft.Extensions.Logging;
 using Orleans;
 
@@ -69,6 +70,11 @@ public sealed class CodingRunHost(IDigitalBrain brain, WorkspacePreparer prepare
         }
 
         var snapshot = await brain.Get<ICodingRun>(runId).Read().ConfigureAwait(false);
+        if (snapshot.WorkspaceSolutionPath is { } runSolution)
+        {
+            await brain.Get<IRoslyn>(CodingWorkspace.Id(runSolution)).Close().ConfigureAwait(false);
+        }
+
         if (snapshot.Status is CodingRunStatus.Failed or CodingRunStatus.Stopped && snapshot.WorkspaceRoot is { } workspace)
         {
             try
