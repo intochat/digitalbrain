@@ -27,6 +27,7 @@ final class GraphNode {
     this.dimmed = false,
     this.cluster,
     this.position,
+    this.iconKey,
   });
 
   final String id;
@@ -39,6 +40,7 @@ final class GraphNode {
 
   /// Explicit world coordinate. When null, `layoutGraph` derives a stable one.
   final GraphPoint? position;
+  final String? iconKey;
 }
 
 final class GraphEdge {
@@ -62,13 +64,17 @@ final class GraphPulse {
     required this.fromId,
     required this.toId,
     required this.signature,
+    this.operationId,
     this.outcome = GraphPulseOutcome.inFlight,
+    this.at,
   });
 
   final String fromId;
   final String toId;
   final String signature;
+  final String? operationId;
   final GraphPulseOutcome outcome;
+  final DateTime? at;
 
   bool get local => fromId == toId;
 }

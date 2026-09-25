@@ -82,58 +82,105 @@ class _ActivityScreenState extends State<ActivityScreen> {
   }
 }
 
-class ActivityView extends StatelessWidget {
-  const ActivityView({super.key, required this.controller});
+enum ActivityGraphMode { lumen, graph, spatial }
+
+class ActivityView extends StatefulWidget {
+  const ActivityView({
+    super.key,
+    required this.controller,
+    this.spatialSceneFactory,
+  });
   final ActivityController controller;
+  final GraphSceneFactory? spatialSceneFactory;
+
+  @override
+  State<ActivityView> createState() => _ActivityViewState();
+}
+
+class _ActivityViewState extends State<ActivityView> {
+  ActivityGraphMode mode = ActivityGraphMode.graph;
+  Timer? _indicatorExpiry;
+  bool _openedLumen = false;
+  bool _openedSpatial = false;
+  ActivityController get controller => widget.controller;
+
+  void _scheduleIndicatorExpiry() {
+    _indicatorExpiry?.cancel();
+    if (controller.paused || mode != ActivityGraphMode.lumen) return;
+    final now = DateTime.now().toUtc();
+    final expiries =
+        controller.pulses
+            .where((pulse) => pulse.at != null)
+            .map((pulse) => pulse.at!.add(const Duration(milliseconds: 2500)))
+            .where((expiry) => expiry.isAfter(now))
+            .toList()
+          ..sort();
+    if (expiries.isNotEmpty) {
+      _indicatorExpiry = Timer(expiries.first.difference(now), () {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _indicatorExpiry?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: controller,
-    builder: (context, _) => LayoutBuilder(
-      builder: (context, constraints) {
-        final compact = constraints.maxWidth < 700;
-        final graph = _graph();
-        final list = _list(context);
-        final detail = _detail(context);
-        return Column(
-          children: [
-            _toolbar(context),
-            if (controller.gap)
-              const MaterialBanner(
-                content: Text(
-                  'Some earlier activity was lost. This path may be incomplete.',
+    builder: (context, _) {
+      _scheduleIndicatorExpiry();
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 700;
+          final graph = _graph();
+          final list = _list(context);
+          final detail = _detail(context);
+          return Column(
+            children: [
+              _toolbar(context),
+              if (controller.gap)
+                const MaterialBanner(
+                  content: Text(
+                    'Some earlier activity was lost. This path may be incomplete.',
+                  ),
+                  actions: [SizedBox.shrink()],
                 ),
-                actions: [SizedBox.shrink()],
+              if (controller.stale)
+                const MaterialBanner(
+                  content: Text(
+                    'Activity connection interrupted. Reconnecting…',
+                  ),
+                  actions: [SizedBox.shrink()],
+                ),
+              Expanded(
+                child: compact
+                    ? Column(
+                        children: [
+                          Expanded(child: graph),
+                          Expanded(
+                            child: controller.selectedOperationId == null
+                                ? list
+                                : detail,
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          SizedBox(width: 270, child: list),
+                          Expanded(child: graph),
+                          SizedBox(width: 310, child: detail),
+                        ],
+                      ),
               ),
-            if (controller.stale)
-              const MaterialBanner(
-                content: Text('Activity connection interrupted. Reconnecting…'),
-                actions: [SizedBox.shrink()],
-              ),
-            Expanded(
-              child: compact
-                  ? Column(
-                      children: [
-                        Expanded(child: graph),
-                        Expanded(
-                          child: controller.selectedOperationId == null
-                              ? list
-                              : detail,
-                        ),
-                      ],
-                    )
-                  : Row(
-                      children: [
-                        SizedBox(width: 270, child: list),
-                        Expanded(child: graph),
-                        SizedBox(width: 310, child: detail),
-                      ],
-                    ),
-            ),
-          ],
-        );
-      },
-    ),
+            ],
+          );
+        },
+      );
+    },
   );
 
   Widget _toolbar(BuildContext context) {
@@ -141,13 +188,37 @@ class ActivityView extends StatelessWidget {
     final max = controller.replayLastSequence;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: Row(
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           const Text(
             'Neuron activity',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           ),
-          const Spacer(),
+          SegmentedButton<ActivityGraphMode>(
+            segments: const [
+              ButtonSegment(
+                value: ActivityGraphMode.lumen,
+                label: Text('Lumen'),
+              ),
+              ButtonSegment(
+                value: ActivityGraphMode.graph,
+                label: Text('Graph'),
+              ),
+              ButtonSegment(
+                value: ActivityGraphMode.spatial,
+                label: Text('3D'),
+              ),
+            ],
+            selected: {mode},
+            onSelectionChanged: (selection) => setState(() {
+              mode = selection.single;
+              if (mode == ActivityGraphMode.lumen) _openedLumen = true;
+              if (mode == ActivityGraphMode.spatial) _openedSpatial = true;
+            }),
+          ),
           if (controller.paused)
             SizedBox(
               width: 160,
@@ -170,10 +241,104 @@ class ActivityView extends StatelessWidget {
     );
   }
 
-  Widget _graph() => UiGraph(
+  Widget _graph() => Stack(
+    fit: StackFit.expand,
+    children: [
+      if (_openedLumen)
+        Offstage(
+          key: const ValueKey('activity_lumen_pane'),
+          offstage: mode != ActivityGraphMode.lumen,
+          child: _lumenGraph(),
+        ),
+      Offstage(
+        key: const ValueKey('activity_graph_pane'),
+        offstage: mode != ActivityGraphMode.graph,
+        child: _compactGraph(),
+      ),
+      if (_openedSpatial)
+        Offstage(
+          key: const ValueKey('activity_spatial_pane'),
+          offstage: mode != ActivityGraphMode.spatial,
+          child: SpatialGraph(
+            nodes: controller.nodes,
+            edges: controller.edges,
+            pulses: controller.paused ? const [] : controller.pulses,
+            active: mode == ActivityGraphMode.spatial,
+            playing: !controller.paused && !controller.stale,
+            selectedEdgeId: controller.highlightEdgeId,
+            selectedNodeId:
+                controller.selectedEvent?.targetId ??
+                controller.selectedEvent?.sourceId,
+            onNodeTap: (node) => controller.selectNode(node.id),
+            onEdgeTap: (edge) =>
+                controller.selectRoute(edge.sourceId, edge.targetId),
+            onFallback: () => setState(() => mode = ActivityGraphMode.graph),
+            sceneFactory: widget.spatialSceneFactory,
+          ),
+        ),
+    ],
+  );
+
+  Widget _lumenGraph() => LumenBrainGraph(
+    snapshot: BrainSnapshot(
+      rootId: 'activity',
+      observedAt: DateTime.now().toUtc(),
+      nodes: [
+        for (final node in controller.nodes)
+          BrainNeuron(
+            id: node.id,
+            type: 'neuron',
+            name: node.id,
+            label: node.label,
+            module: node.cluster ?? '',
+            iconKey: node.iconKey,
+          ),
+      ],
+      synapses: [
+        for (final edge in controller.edges)
+          BrainSynapse(
+            id: edge.id,
+            sourceId: edge.sourceId,
+            targetId: edge.targetId,
+            signalType: '',
+            kind: 'observed call',
+          ),
+      ],
+    ),
+    selectedId:
+        controller.selectedEvent?.targetId ??
+        controller.selectedEvent?.sourceId,
+    activeNodes: {
+      for (final pulse in controller.pulses)
+        if (!controller.paused &&
+            pulse.at != null &&
+            DateTime.now().toUtc().difference(pulse.at!).inMilliseconds < 2500)
+          pulse.fromId,
+    },
+    signalNodes: {
+      for (final pulse in controller.pulses)
+        if (!controller.paused &&
+            pulse.outcome == GraphPulseOutcome.signal &&
+            pulse.at != null &&
+            DateTime.now().toUtc().difference(pulse.at!).inMilliseconds < 2500)
+          pulse.fromId,
+    },
+    activeEdges: {
+      for (final pulse in controller.pulses)
+        if (!controller.paused &&
+            !pulse.local &&
+            pulse.at != null &&
+            DateTime.now().toUtc().difference(pulse.at!).inMilliseconds < 2500)
+          '${pulse.fromId}|${pulse.toId}|call',
+    },
+    onNeuron: (node) => controller.selectNode(node.id),
+    onSynapse: (edge) => controller.selectRoute(edge.sourceId, edge.targetId),
+  );
+
+  Widget _compactGraph() => UiGraph(
     nodes: controller.nodes,
     edges: controller.edges,
-    pulse: controller.pulse,
+    pulses: controller.paused ? const [] : controller.pulses,
     highlightEdgeId: controller.highlightEdgeId,
     onNodeTap: (node) => controller.selectNode(node.id),
     onEdgeTap: (edge) => controller.selectRoute(edge.sourceId, edge.targetId),

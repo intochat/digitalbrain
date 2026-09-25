@@ -23,6 +23,7 @@ dependencies:
   flutter_chat_core: ^2.9.0
   flutter_chat_ui: ^2.11.1
   fl_chart: ^1.2.0
+  three_js: ^0.3.0
 
 dev_dependencies:
   flutter_lints: ^6.0.0
@@ -36,3 +37,4 @@ flutter:
     - assets/brands/gmail.svg
     - assets/brands/salesforce.svg
     - assets/brands/github.svg
+    - assets/brands/supabase.svg

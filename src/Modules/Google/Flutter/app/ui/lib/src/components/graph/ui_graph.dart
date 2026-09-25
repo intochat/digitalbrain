@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'graph_geometry.dart';
 import 'graph_models.dart';
 import 'graph_painter.dart';
+import '../../lumen/neuron_icon.dart';
 
 /// Product graph control: depth-projected nodes with directed edges.
 /// Same widget for surface galleries, the Brain view, and future diagrams.
@@ -12,6 +15,7 @@ final class UiGraph extends StatefulWidget {
     required this.nodes,
     required this.edges,
     this.pulse,
+    this.pulses = const [],
     this.highlightEdgeId,
     this.onNodeTap,
     this.onEdgeTap,
@@ -21,6 +25,7 @@ final class UiGraph extends StatefulWidget {
   final List<GraphNode> nodes;
   final List<GraphEdge> edges;
   final GraphPulse? pulse;
+  final List<GraphPulse> pulses;
   final String? highlightEdgeId;
   final ValueChanged<GraphNode>? onNodeTap;
   final ValueChanged<GraphEdge>? onEdgeTap;
@@ -33,37 +38,64 @@ final class UiGraph extends StatefulWidget {
 final class _UiGraphState extends State<UiGraph>
     with SingleTickerProviderStateMixin {
   late final AnimationController _pulse;
+  final TransformationController _viewport = TransformationController();
   double _rotationX = -0.18;
   double _rotationY = 0.42;
+  Timer? _pulseExpiry;
 
   @override
   void initState() {
     super.initState();
     _pulse = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1100),
+      duration: const Duration(milliseconds: 1400),
     );
-    if (widget.pulse != null) {
+    if (widget.pulse != null || widget.pulses.isNotEmpty) {
       _pulse.forward();
     }
+    _schedulePulseExpiry();
   }
 
   @override
   void didUpdateWidget(covariant UiGraph oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final pulseChanged = widget.pulse?.signature != oldWidget.pulse?.signature;
-    if (widget.pulse == null) {
-      if (pulseChanged || oldWidget.pulse != null) {
+    final pulseChanged =
+        widget.pulse?.signature != oldWidget.pulse?.signature ||
+        widget.pulses.lastOrNull?.signature !=
+            oldWidget.pulses.lastOrNull?.signature;
+    if (widget.pulse == null && widget.pulses.isEmpty) {
+      if (pulseChanged) {
         _pulse.reset();
       }
-    } else if (pulseChanged || oldWidget.pulse == null) {
+    } else if (pulseChanged) {
       _pulse.forward(from: 0);
+    }
+    if (pulseChanged) _schedulePulseExpiry();
+  }
+
+  void _schedulePulseExpiry() {
+    _pulseExpiry?.cancel();
+    final now = DateTime.now().toUtc();
+    final expiries =
+        [widget.pulse, ...widget.pulses]
+            .whereType<GraphPulse>()
+            .where((pulse) => pulse.at != null)
+            .map((pulse) => pulse.at!.add(const Duration(milliseconds: 1350)))
+            .where((expiry) => expiry.isAfter(now))
+            .toList()
+          ..sort();
+    if (expiries.isNotEmpty) {
+      _pulseExpiry = Timer(expiries.last.difference(now), () {
+        if (mounted) setState(() {});
+      });
     }
   }
 
   @override
   void dispose() {
     _pulse.dispose();
+    _pulseExpiry?.cancel();
+    _viewport.dispose();
     super.dispose();
   }
 
@@ -98,43 +130,90 @@ final class _UiGraphState extends State<UiGraph>
               final canvasCenter = Offset(size.width * 0.5, size.height * 0.51);
               final pulseValue = disableAnimations ? 1.0 : _pulse.value;
 
-              return GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onPanUpdate: _rotate,
-                onTapUp: (details) {
-                  final node = hitTestGraphNodes(
-                    projected,
-                    details.localPosition,
-                  );
-                  if (node != null) {
-                    widget.onNodeTap?.call(node.node);
-                    return;
-                  }
-                  final edge = hitTestGraphEdges(
-                    projectedEdges,
-                    details.localPosition,
-                    canvasCenter,
-                  );
-                  if (edge != null) {
-                    widget.onEdgeTap?.call(edge.edge);
-                  }
-                },
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    CustomPaint(
-                      painter: GraphPainter(
-                        nodes: projected,
-                        edges: projectedEdges,
-                        pulse: widget.pulse,
-                        pulseValue: pulseValue,
-                        highlightEdgeId: widget.highlightEdgeId,
+              return Stack(
+                children: [
+                  InteractiveViewer(
+                    transformationController: _viewport,
+                    minScale: 0.2,
+                    maxScale: 4,
+                    boundaryMargin: const EdgeInsets.all(1000),
+                    child: SizedBox(
+                      width: size.width,
+                      height: size.height,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onPanUpdate: _rotate,
+                        onTapUp: (details) {
+                          final node = hitTestGraphNodes(
+                            projected,
+                            details.localPosition,
+                          );
+                          if (node != null) {
+                            widget.onNodeTap?.call(node.node);
+                            return;
+                          }
+                          final edge = hitTestGraphEdges(
+                            projectedEdges,
+                            details.localPosition,
+                            canvasCenter,
+                          );
+                          if (edge != null) {
+                            widget.onEdgeTap?.call(edge.edge);
+                          }
+                        },
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            CustomPaint(
+                              painter: GraphPainter(
+                                nodes: projected,
+                                edges: projectedEdges,
+                                pulse: widget.pulse,
+                                pulses: widget.pulses,
+                                now: DateTime.now().toUtc(),
+                                reducedMotion: disableAnimations,
+                                pulseValue: pulseValue,
+                                highlightEdgeId: widget.highlightEdgeId,
+                              ),
+                            ),
+                            for (final node in projected)
+                              Positioned(
+                                left: node.center.dx - 9,
+                                top: node.center.dy - 9,
+                                child: IgnorePointer(
+                                  child: NeuronIcon(
+                                    kind: NeuronIconKind.fromKey(
+                                      node.node.iconKey,
+                                    ),
+                                    size: 18,
+                                  ),
+                                ),
+                              ),
+                            for (final edge in projectedEdges)
+                              IgnorePointer(
+                                key: Key('graph_edge_${edge.edge.id}'),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
-                    for (final edge in projectedEdges)
-                      IgnorePointer(key: Key('graph_edge_${edge.edge.id}')),
-                  ],
-                ),
+                  ),
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: IconButton(
+                      tooltip: 'Fit graph',
+                      icon: const Icon(Icons.center_focus_strong_outlined),
+                      onPressed: () {
+                        _viewport.value = Matrix4.identity();
+                        setState(() {
+                          _rotationX = -0.18;
+                          _rotationY = 0.42;
+                        });
+                      },
+                    ),
+                  ),
+                ],
               );
             },
           );

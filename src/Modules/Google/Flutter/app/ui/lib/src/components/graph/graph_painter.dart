@@ -11,6 +11,9 @@ final class GraphPainter extends CustomPainter {
     required this.nodes,
     required this.edges,
     required this.pulse,
+    this.pulses = const [],
+    this.now,
+    this.reducedMotion = false,
     required this.pulseValue,
     this.highlightEdgeId,
   });
@@ -18,40 +21,18 @@ final class GraphPainter extends CustomPainter {
   final List<ProjectedGraphNode> nodes;
   final List<ProjectedGraphEdge> edges;
   final GraphPulse? pulse;
+  final List<GraphPulse> pulses;
+  final DateTime? now;
+  final bool reducedMotion;
   final double pulseValue;
   final String? highlightEdgeId;
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width * 0.5, size.height * 0.51);
-    _paintHull(canvas, size, center);
     _paintEdges(canvas, center);
     _paintPulse(canvas, center, size);
     _paintNodes(canvas);
-  }
-
-  void _paintHull(Canvas canvas, Size size, Offset center) {
-    final hull = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1
-      ..color = UiPalette.lineStrong.withValues(alpha: 0.55);
-    final radius = math.min(size.width, size.height) * 0.34;
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: center,
-        width: radius * 2.15,
-        height: radius * 1.55,
-      ),
-      hull,
-    );
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: center,
-        width: radius * 1.35,
-        height: radius * 2.05,
-      ),
-      hull..color = UiPalette.line.withValues(alpha: 0.5),
-    );
   }
 
   void _paintEdges(Canvas canvas, Offset center) {
@@ -145,10 +126,26 @@ final class GraphPainter extends CustomPainter {
   }
 
   void _paintPulse(Canvas canvas, Offset center, Size size) {
-    final active = pulse;
-    if (active == null) {
-      return;
+    for (final active in pulses.isEmpty ? [?pulse] : pulses) {
+      _paintOnePulse(canvas, center, size, active);
     }
+  }
+
+  void _paintOnePulse(
+    Canvas canvas,
+    Offset center,
+    Size size,
+    GraphPulse active,
+  ) {
+    final age = active.at == null || now == null
+        ? null
+        : now!.difference(active.at!).inMilliseconds;
+    if (age != null && (age < 0 || age >= 1350)) return;
+    final progress = reducedMotion
+        ? 0.5
+        : age == null
+        ? pulseValue
+        : age / 1350;
 
     final target = nodes
         .where((node) => node.node.id == active.toId)
@@ -161,7 +158,7 @@ final class GraphPainter extends CustomPainter {
         .firstOrNull;
 
     final radius = math.min(size.width, size.height) * 0.34;
-    final wave = math.sin(pulseValue * math.pi).abs();
+    final wave = math.sin(progress * math.pi).abs();
     final color = switch (active.outcome) {
       GraphPulseOutcome.completed => UiPalette.success,
       GraphPulseOutcome.failed => Colors.redAccent,
@@ -184,10 +181,10 @@ final class GraphPainter extends CustomPainter {
           ..strokeWidth = 2.4
           ..color = color.withValues(alpha: 0.25 + wave * 0.7),
       );
-      if (active.outcome == GraphPulseOutcome.inFlight) {
+      if (active.outcome == GraphPulseOutcome.inFlight && !reducedMotion) {
         final metric = path.computeMetrics().first;
         final point = metric
-            .getTangentForOffset(metric.length * pulseValue)
+            .getTangentForOffset(metric.length * progress)
             ?.position;
         if (point != null) {
           canvas.drawCircle(point, 5, Paint()..color = color);
@@ -281,6 +278,9 @@ final class GraphPainter extends CustomPainter {
       oldDelegate.nodes != nodes ||
       oldDelegate.edges != edges ||
       oldDelegate.pulse != pulse ||
+      oldDelegate.pulses != pulses ||
+      oldDelegate.now != now ||
+      oldDelegate.reducedMotion != reducedMotion ||
       oldDelegate.pulseValue != pulseValue ||
       oldDelegate.highlightEdgeId != highlightEdgeId;
 }

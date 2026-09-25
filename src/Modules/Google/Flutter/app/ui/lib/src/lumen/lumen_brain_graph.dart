@@ -18,6 +18,7 @@ final class LumenBrainGraph extends StatefulWidget {
     this.stale = false,
     this.activeNodes = const {},
     this.activeEdges = const {},
+    this.signalNodes = const {},
   });
   final BrainSnapshot snapshot;
   final ValueChanged<BrainNeuron> onNeuron;
@@ -26,6 +27,7 @@ final class LumenBrainGraph extends StatefulWidget {
   final String? selectedId;
   final bool stale;
   final Set<String> activeNodes, activeEdges;
+  final Set<String> signalNodes;
   @override
   State<LumenBrainGraph> createState() => _LumenBrainGraphState();
 }
@@ -230,6 +232,9 @@ final class _LumenBrainGraphState extends State<LumenBrainGraph> {
                                               NeuronIconKind.assistant &&
                                           assistantWorking)),
                               stale: widget.stale,
+                              signalRecent: widget.signalNodes.contains(
+                                node.id,
+                              ),
                               onTap: () => widget.onNeuron(node),
                             ),
                           ),
@@ -278,10 +283,12 @@ final class _NeuronTile extends StatelessWidget {
     required this.selected,
     required this.active,
     required this.stale,
+    required this.signalRecent,
     required this.onTap,
   });
   final BrainNeuron node;
   final bool selected, active, stale;
+  final bool signalRecent;
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) {
@@ -354,6 +361,18 @@ final class _NeuronTile extends StatelessWidget {
                                 : InoPresenceState.idle,
                           )
                         : NeuronIcon(kind: brainNeuronIcon(node), size: 32),
+                    if (signalRecent)
+                      Positioned(
+                        right: 2,
+                        bottom: 2,
+                        child: Icon(
+                          Icons.bolt_rounded,
+                          key: Key('lumen_signal_${node.id}'),
+                          size: 17,
+                          color: const Color(0xff25a46f),
+                          semanticLabel: '${node.label} published a signal',
+                        ),
+                      ),
                   ],
                 ),
               ),

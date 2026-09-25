@@ -11,6 +11,7 @@ enum NeuronIconKind {
   salesforce,
   aspire,
   github,
+  supabase,
   review,
   architecture,
   quality,
@@ -29,6 +30,16 @@ enum NeuronIconKind {
     }
     return generic;
   }
+
+  /// Grain IDs begin with an exact grain-type segment. Never scan the key or
+  /// display label for a provider name.
+  static NeuronIconKind forGrainId(String id) => switch (id.split('/').first) {
+    'supabase' || 'supabase-table' => supabase,
+    'gmail' => gmail,
+    'salesforce' => salesforce,
+    'github.repository' || 'github.connections' => github,
+    _ => generic,
+  };
 }
 
 /// One allowlisted local icon vocabulary for graph tiles and their inspectors.
@@ -84,5 +95,6 @@ final class NeuronIcon extends StatelessWidget {
     NeuronIconKind.salesforce: 'assets/brands/salesforce.svg',
     NeuronIconKind.aspire: 'assets/brands/aspire-icon-32.svg',
     NeuronIconKind.github: 'assets/brands/github.svg',
+    NeuronIconKind.supabase: 'assets/brands/supabase.svg',
   };
 }

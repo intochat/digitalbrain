@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 
 import 'graph_models.dart';
+import 'spatial_layout.dart';
 
 final class ProjectedGraphNode {
   const ProjectedGraphNode({
@@ -38,27 +39,8 @@ List<ProjectedGraphNode> projectGraphNodes(
   double rotationX,
   double rotationY,
 ) {
-  final hubs = nodes.where((node) => node.kind == GraphNodeKind.hub).toList();
-  final leaves = nodes.where((node) => node.kind != GraphNodeKind.hub).toList();
-
-  final placed = <({GraphNode node, double x, double y, double z})>[
-    for (var index = 0; index < hubs.length; index++)
-      (
-        node: hubs[index],
-        x: _position(hubs[index], 0.88, 0).x,
-        y: _position(hubs[index], 0.88, 0).y,
-        z: _position(hubs[index], 0.88, 0).z,
-      ),
-    for (var index = 0; index < leaves.length; index++)
-      (
-        node: leaves[index],
-        x: _position(leaves[index], 0.62, 1.3).x,
-        y: _position(leaves[index], 0.62, 1.3).y,
-        z: _position(leaves[index], 0.62, 1.3).z,
-      ),
-  ];
-
-  final base = math.min(size.width, size.height) * 0.36;
+  final placed = spatialLayoutGraph(nodes);
+  final base = math.min(size.width, size.height) * 0.105;
   final center = Offset(size.width * 0.5, size.height * 0.51);
   final cosY = math.cos(rotationY);
   final sinY = math.sin(rotationY);
@@ -66,19 +48,19 @@ List<ProjectedGraphNode> projectGraphNodes(
   final sinX = math.sin(rotationX);
 
   final projected = <ProjectedGraphNode>[];
-  for (final entry in placed) {
-    final xY = entry.x * cosY + entry.z * sinY;
-    final zY = -entry.x * sinY + entry.z * cosY;
-    final yX = entry.y * cosX - zY * sinX;
-    final zX = entry.y * sinX + zY * cosX;
-    final perspective = 1.0 / (1.85 - zX * 0.36);
+  for (final node in nodes) {
+    final point = placed[node.id]!;
+    final xY = point.x * cosY + point.z * sinY;
+    final zY = -point.x * sinY + point.z * cosY;
+    final yX = point.y * cosX - zY * sinX;
+    final zX = point.y * sinX + zY * cosX;
+    final perspective = 1.0 / (1.4 - zX * 0.08);
     final radius =
-        (entry.node.kind == GraphNodeKind.hub ? 10.0 : 6.0) *
-        (0.72 + perspective);
+        (node.kind == GraphNodeKind.hub ? 10.0 : 6.0) * (0.72 + perspective);
 
     projected.add(
       ProjectedGraphNode(
-        node: entry.node,
+        node: node,
         center: Offset(
           center.dx + xY * base * perspective,
           center.dy + yX * base * perspective,
@@ -156,26 +138,4 @@ ProjectedGraphEdge? hitTestGraphEdges(
     }
   }
   return null;
-}
-
-({double x, double y, double z}) _position(
-  GraphNode node,
-  double radius,
-  double phase,
-) {
-  if (node.position case final point?) {
-    return (x: point.x, y: point.y, z: point.z);
-  }
-  var hash = 2166136261;
-  for (final unit in node.id.codeUnits) {
-    hash = ((hash ^ unit) * 16777619) & 0xffffffff;
-  }
-  final y = 1 - 2 * (((hash & 0xffff) + 0.5) / 65536);
-  final ring = math.sqrt(math.max(0, 1 - y * y));
-  final theta = ((hash >> 16) / 65536) * 2 * math.pi + phase;
-  return (
-    x: math.cos(theta) * ring * radius,
-    y: y * radius,
-    z: math.sin(theta) * ring * radius,
-  );
 }

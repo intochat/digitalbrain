@@ -26,5 +26,19 @@ internal sealed class GraphNeuron([PersistentState("state", DigitalBrainNames.De
         return Save(next, new GraphChanged(this.GetPrimaryKeyString(), next.Version));
     }
 
+    public Task Emit(GraphActivityPulse pulse)
+    {
+        ArgumentNullException.ThrowIfNull(pulse);
+        ArgumentException.ThrowIfNullOrWhiteSpace(pulse.EventId);
+        if (!Snapshot.Nodes.Any(node => node.Id == pulse.SourceId))
+        { throw new ArgumentException("Activity source must be a rendered graph node.", nameof(pulse)); }
+        if (pulse.TargetId is { } target && !Snapshot.Nodes.Any(node => node.Id == target))
+        { throw new ArgumentException("Activity target must be a rendered graph node.", nameof(pulse)); }
+        if (pulse.Kind == "SignalPublished" && pulse.TargetId is not null)
+        { throw new ArgumentException("A publication cannot imply signal delivery.", nameof(pulse)); }
+        return PublishAsync(new GraphActivityObserved(this.GetPrimaryKeyString(), pulse.EventId,
+            pulse.SourceId, pulse.TargetId, pulse.Kind, pulse.Status, pulse.Sequence));
+    }
+
     [ReadOnly] public Task<GraphState> Read() { Snapshot.Name = this.GetPrimaryKeyString(); return Task.FromResult(Snapshot); }
 }

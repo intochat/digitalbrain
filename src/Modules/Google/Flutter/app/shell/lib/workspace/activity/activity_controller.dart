@@ -84,6 +84,7 @@ class ActivityController extends ChangeNotifier {
           id: id,
           label: id.split('/').last,
           kind: graph.GraphNodeKind.hub,
+          iconKey: graph.NeuronIconKind.forGrainId(id).name,
         ),
     ];
   }
@@ -106,32 +107,39 @@ class ActivityController extends ChangeNotifier {
     return routes.values.toList(growable: false);
   }
 
-  graph.GraphPulse? get pulse {
-    final event = selectedEvent ?? visibleEvents.lastOrNull;
-    if (event?.sourceId == null) {
-      return null;
+  List<graph.GraphPulse> get pulses {
+    final latest = <String, ActivityRecord>{};
+    for (final event in visibleEvents.reversed.take(48).toList().reversed) {
+      latest[event.operationId] = event;
     }
-    if (event!.kind == 'SignalPublished') {
-      return graph.GraphPulse(
-        fromId: event.sourceId!,
-        toId: event.sourceId!,
-        signature: event.id,
-        outcome: graph.GraphPulseOutcome.signal,
-      );
-    }
-    if (event.targetId == null) return null;
-    return graph.GraphPulse(
-      fromId: event.sourceId!,
-      toId: event.targetId!,
-      signature: event.id,
-      outcome: switch (event.kind) {
-        'CallArrived' => graph.GraphPulseOutcome.arrived,
-        'CallCompleted' => graph.GraphPulseOutcome.completed,
-        'CallFailed' => graph.GraphPulseOutcome.failed,
-        _ => graph.GraphPulseOutcome.inFlight,
-      },
-    );
+    final operations = latest.values.toList()
+      ..sort((a, b) => a.sequence.compareTo(b.sequence));
+    return [
+      for (final event in operations)
+        if (event.sourceId != null &&
+            (event.kind == 'SignalPublished' || event.targetId != null))
+          graph.GraphPulse(
+            fromId: event.sourceId!,
+            toId: event.kind == 'SignalPublished'
+                ? event.sourceId!
+                : event.targetId!,
+          signature: event.id,
+          operationId: event.operationId,
+            at: event.at,
+            outcome: switch (event.kind) {
+              'CallArrived' => graph.GraphPulseOutcome.arrived,
+              'CallCompleted' => graph.GraphPulseOutcome.completed,
+              'CallFailed' => graph.GraphPulseOutcome.failed,
+              'SignalPublished' => graph.GraphPulseOutcome.signal,
+              _ => graph.GraphPulseOutcome.inFlight,
+            },
+          ),
+    ];
   }
+
+  graph.GraphPulse? get pulse => selectedEvent == null
+      ? pulses.lastOrNull
+      : pulses.where((p) => p.signature == selectedEvent!.id).firstOrNull;
 
   String? get highlightEdgeId {
     final event = selectedEvent;
