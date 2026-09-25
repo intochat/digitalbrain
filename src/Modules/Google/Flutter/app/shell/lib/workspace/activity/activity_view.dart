@@ -107,16 +107,19 @@ class _ActivityViewState extends State<ActivityView> {
   void _scheduleIndicatorExpiry() {
     _indicatorExpiry?.cancel();
     if (controller.paused || mode != ActivityGraphMode.lumen) return;
-    final now = DateTime.now().toUtc();
+    final now = controller.visualNow;
     final expiries =
         controller.pulses
             .where((pulse) => pulse.at != null)
-            .map((pulse) => pulse.at!.add(const Duration(milliseconds: 2500)))
+            .map(
+              (pulse) =>
+                  (pulse.updatedAt ?? pulse.at!).add(GraphPulse.trailLifetime),
+            )
             .where((expiry) => expiry.isAfter(now))
             .toList()
           ..sort();
     if (expiries.isNotEmpty) {
-      _indicatorExpiry = Timer(expiries.first.difference(now), () {
+      _indicatorExpiry = Timer(const Duration(milliseconds: 80), () {
         if (mounted) setState(() {});
       });
     }
@@ -262,9 +265,10 @@ class _ActivityViewState extends State<ActivityView> {
           child: SpatialGraph(
             nodes: controller.nodes,
             edges: controller.edges,
-            pulses: controller.paused ? const [] : controller.pulses,
+            pulses: controller.pulses,
             active: mode == ActivityGraphMode.spatial,
             playing: !controller.paused && !controller.stale,
+            now: controller.visualNow,
             selectedEdgeId: controller.highlightEdgeId,
             selectedNodeId:
                 controller.selectedEvent?.targetId ??
@@ -282,7 +286,7 @@ class _ActivityViewState extends State<ActivityView> {
   Widget _lumenGraph() => LumenBrainGraph(
     snapshot: BrainSnapshot(
       rootId: 'activity',
-      observedAt: DateTime.now().toUtc(),
+      observedAt: controller.visualNow,
       nodes: [
         for (final node in controller.nodes)
           BrainNeuron(
@@ -308,27 +312,26 @@ class _ActivityViewState extends State<ActivityView> {
     selectedId:
         controller.selectedEvent?.targetId ??
         controller.selectedEvent?.sourceId,
+    activityPulses: controller.pulses,
+    activityNow: controller.visualNow,
     activeNodes: {
       for (final pulse in controller.pulses)
-        if (!controller.paused &&
-            pulse.at != null &&
-            DateTime.now().toUtc().difference(pulse.at!).inMilliseconds < 2500)
+        if (pulse.ageAt(controller.visualNow) >= 0 &&
+            pulse.ageAt(controller.visualNow) < 1)
           pulse.fromId,
     },
     signalNodes: {
       for (final pulse in controller.pulses)
-        if (!controller.paused &&
-            pulse.outcome == GraphPulseOutcome.signal &&
-            pulse.at != null &&
-            DateTime.now().toUtc().difference(pulse.at!).inMilliseconds < 2500)
+        if (pulse.outcome == GraphPulseOutcome.signal &&
+            pulse.ageAt(controller.visualNow) >= 0 &&
+            pulse.ageAt(controller.visualNow) < 1)
           pulse.fromId,
     },
     activeEdges: {
       for (final pulse in controller.pulses)
-        if (!controller.paused &&
-            !pulse.local &&
-            pulse.at != null &&
-            DateTime.now().toUtc().difference(pulse.at!).inMilliseconds < 2500)
+        if (!pulse.local &&
+            pulse.ageAt(controller.visualNow) >= 0 &&
+            pulse.ageAt(controller.visualNow) < 1)
           '${pulse.fromId}|${pulse.toId}|call',
     },
     onNeuron: (node) => controller.selectNode(node.id),
@@ -338,7 +341,9 @@ class _ActivityViewState extends State<ActivityView> {
   Widget _compactGraph() => UiGraph(
     nodes: controller.nodes,
     edges: controller.edges,
-    pulses: controller.paused ? const [] : controller.pulses,
+    pulses: controller.pulses,
+    now: controller.visualNow,
+    playing: !controller.paused && !controller.stale,
     highlightEdgeId: controller.highlightEdgeId,
     onNodeTap: (node) => controller.selectNode(node.id),
     onEdgeTap: (edge) => controller.selectRoute(edge.sourceId, edge.targetId),

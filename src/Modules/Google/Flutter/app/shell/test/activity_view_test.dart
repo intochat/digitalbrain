@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_flutter_shell/workspace/activity/activity_controller.dart';
 import 'package:digitalbrain_flutter_shell/workspace/activity/activity_view.dart';
 import 'package:digitalbrain_ui/digitalbrain_ui.dart' as graph;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -62,6 +64,40 @@ ActivityRecord item(int sequence, String kind) => ActivityRecord(
 );
 
 void main() {
+  test('activity keeps only ten distinct interaction trails', () async {
+    final controller = ActivityController(
+      read: () async => ActivitySnapshot(
+        events: [
+          for (var i = 1; i <= 12; i++)
+            ActivityRecord(
+              id: 'event-$i',
+              operationId: 'operation-$i',
+              sequence: i,
+              at: DateTime.now().toUtc(),
+              kind: 'CallStarted',
+              type: 'Read',
+              status: 'started',
+              sourceId: 'caller',
+              targetId: 'target',
+            ),
+        ],
+        nextSequence: 12,
+        gap: false,
+        observedAt: DateTime.now().toUtc(),
+      ),
+      watch: (_, _) => const Stream<ActivityUpdate>.empty(),
+    );
+    await controller.start();
+    expect(controller.pulses.length, 10);
+    expect(controller.pulses.first.signature, 'event-3');
+    expect(controller.pulses.last.signature, 'event-12');
+    controller.pause();
+    final frozen = controller.visualNow;
+    await Future<void>.delayed(const Duration(milliseconds: 2));
+    expect(controller.visualNow, frozen);
+    controller.dispose();
+  });
+
   testWidgets('selection links activity list to path and details', (
     tester,
   ) async {
@@ -215,6 +251,70 @@ void main() {
     expect(selected, 'ab');
   });
 
+  testWidgets('3D paints a visible trail between projected neurons', (
+    tester,
+  ) async {
+    final scene = FakeGraphScene()
+      ..projections = {
+        'a': const Offset(100, 150),
+        'b': const Offset(300, 150),
+      };
+    final start = DateTime.utc(2026, 9, 25, 12);
+    const boundaryKey = Key('trail_image');
+    Widget view(List<graph.GraphPulse> pulses) => MaterialApp(
+      home: Center(
+        child: RepaintBoundary(
+          key: boundaryKey,
+          child: SizedBox(
+            width: 400,
+            height: 300,
+            child: graph.SpatialGraph(
+              nodes: const [
+                graph.GraphNode(id: 'a', label: 'A'),
+                graph.GraphNode(id: 'b', label: 'B'),
+              ],
+              edges: const [],
+              pulses: pulses,
+              now: start.add(const Duration(seconds: 1)),
+              playing: false,
+              sceneFactory: () => scene,
+            ),
+          ),
+        ),
+      ),
+    );
+    Future<List<int>> pixels() async => (await tester.runAsync(() async {
+      final boundary = tester.renderObject<RenderRepaintBoundary>(
+        find.byKey(boundaryKey),
+      );
+      final image = await boundary.toImage();
+      final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      image.dispose();
+      return data!.buffer.asUint8List().toList();
+    }))!;
+
+    await tester.pumpWidget(view(const []));
+    final quiet = await pixels();
+    await tester.pumpWidget(
+      view([
+        graph.GraphPulse(fromId: 'a', toId: 'b', signature: 'call', at: start),
+      ]),
+    );
+    final active = await pixels();
+    var changed = 0;
+    for (var y = 80; y < 160; y++) {
+      for (var x = 140; x < 260; x++) {
+        final offset = (y * 400 + x) * 4;
+        if (quiet[offset] != active[offset] ||
+            quiet[offset + 1] != active[offset + 1] ||
+            quiet[offset + 2] != active[offset + 2]) {
+          changed++;
+        }
+      }
+    }
+    expect(changed, greaterThan(100));
+  });
+
   testWidgets('3D highlights a selected retained route without live pulses', (
     tester,
   ) async {
@@ -321,7 +421,7 @@ void main() {
     expect(scene.shownPulses, isEmpty);
   });
 
-  testWidgets('pausing 3D clears a particle already in flight', (tester) async {
+  testWidgets('pausing 3D freezes an activity trail in flight', (tester) async {
     final scene = FakeGraphScene();
     Widget view(bool playing, List<graph.GraphPulse> pulses) => MaterialApp(
       home: SizedBox(
@@ -337,23 +437,23 @@ void main() {
       ),
     );
     await tester.pumpWidget(view(true, const []));
-    await tester.pumpWidget(
-      view(true, [
-        graph.GraphPulse(
-          fromId: 'a',
-          toId: 'a',
-          signature: 'new',
-          at: DateTime.now().toUtc(),
-          outcome: graph.GraphPulseOutcome.signal,
-        ),
-      ]),
-    );
+    final pulses = [
+      graph.GraphPulse(
+        fromId: 'a',
+        toId: 'a',
+        signature: 'new',
+        at: DateTime.now().toUtc(),
+        outcome: graph.GraphPulseOutcome.signal,
+      ),
+    ];
+    await tester.pumpWidget(view(true, pulses));
     await tester.pump(const Duration(milliseconds: 30));
     expect(scene.advanceCalls, greaterThan(0));
     final beforePause = scene.advanceCalls;
-    await tester.pumpWidget(view(false, const []));
+    await tester.pumpWidget(view(false, pulses));
     await tester.pump(const Duration(milliseconds: 30));
-    expect(scene.cleared, isTrue);
+    expect(scene.cleared, isFalse);
+    expect(scene.shownPulses.map((pulse) => pulse.signature), ['new']);
     expect(scene.advanceCalls, beforePause);
   });
 
@@ -554,6 +654,67 @@ void main() {
       await controller.start();
       expect(controller.pulses, hasLength(1));
       expect(controller.pulses.single.outcome, graph.GraphPulseOutcome.arrived);
+      controller.dispose();
+    },
+  );
+
+  test(
+    'completion recolors the original route without restarting travel',
+    () async {
+      final start = DateTime.utc(2026, 9, 25, 12);
+      final controller = ActivityController(
+        read: () async => ActivitySnapshot(
+          events: [
+            ActivityRecord(
+              id: 'started',
+              operationId: 'operation',
+              sequence: 1,
+              at: start,
+              kind: 'CallStarted',
+              type: 'Run',
+              status: 'started',
+              sourceId: 'a',
+              targetId: 'b',
+            ),
+            ActivityRecord(
+              id: 'published',
+              operationId: 'operation',
+              sequence: 2,
+              at: start.add(const Duration(milliseconds: 400)),
+              kind: 'SignalPublished',
+              type: 'Changed',
+              status: 'published',
+              sourceId: 'b',
+            ),
+            ActivityRecord(
+              id: 'completed',
+              operationId: 'operation',
+              sequence: 3,
+              at: start.add(const Duration(seconds: 2)),
+              kind: 'CallCompleted',
+              type: 'Run',
+              status: 'completed',
+              sourceId: 'a',
+              targetId: 'b',
+            ),
+          ],
+          nextSequence: 3,
+          gap: false,
+          observedAt: start,
+        ),
+        watch: (_, _) => const Stream<ActivityUpdate>.empty(),
+      );
+      await controller.start();
+      expect(controller.pulses.map((pulse) => pulse.signature), [
+        'published',
+        'completed',
+      ]);
+      expect(controller.pulses.last.at, start);
+      expect(
+        controller.pulses.last.updatedAt,
+        start.add(const Duration(seconds: 2)),
+      );
+      expect(controller.pulses.first.local, isTrue);
       controller.dispose();
     },
   );

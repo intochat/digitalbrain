@@ -277,13 +277,17 @@ final class ThreeGraphScene
       final from = _meshById[pulse.fromId];
       final to = _meshById[pulse.toId];
       active.elapsed += seconds;
-      if (from == null || to == null || active.elapsed >= 1.35) {
+      if (from == null ||
+          to == null ||
+          active.elapsed >= GraphPulse.travelTime.inMilliseconds / 1000) {
         _threeJs.scene.remove(active.mesh);
         _disposeObject(active.mesh);
         _activePulses.remove(entry.key);
         continue;
       }
-      final progress = (active.elapsed / 1.35).clamp(0.0, 1.0);
+      final progress =
+          (active.elapsed / (GraphPulse.travelTime.inMilliseconds / 1000))
+              .clamp(0.0, 1.0);
       final point = pulse.local
           ? from.position
           : _curve(from.position, to.position).getPoint(progress)

@@ -17,6 +17,8 @@ final class UiGraph extends StatefulWidget {
     this.pulse,
     this.pulses = const [],
     this.highlightEdgeId,
+    this.now,
+    this.playing = true,
     this.onNodeTap,
     this.onEdgeTap,
     this.semanticsLabel = 'Interactive three-dimensional graph. Drag to rotate; tap a node or edge to inspect it.',
@@ -27,6 +29,8 @@ final class UiGraph extends StatefulWidget {
   final GraphPulse? pulse;
   final List<GraphPulse> pulses;
   final String? highlightEdgeId;
+  final DateTime? now;
+  final bool playing;
   final ValueChanged<GraphNode>? onNodeTap;
   final ValueChanged<GraphEdge>? onEdgeTap;
   final String semanticsLabel;
@@ -42,6 +46,7 @@ final class _UiGraphState extends State<UiGraph>
   double _rotationX = -0.18;
   double _rotationY = 0.42;
   Timer? _pulseExpiry;
+  Timer? _trailTicker;
 
   @override
   void initState() {
@@ -54,6 +59,7 @@ final class _UiGraphState extends State<UiGraph>
       _pulse.forward();
     }
     _schedulePulseExpiry();
+    _syncTrailTicker();
   }
 
   @override
@@ -71,6 +77,30 @@ final class _UiGraphState extends State<UiGraph>
       _pulse.forward(from: 0);
     }
     if (pulseChanged) _schedulePulseExpiry();
+    if (pulseChanged || oldWidget.playing != widget.playing) {
+      _syncTrailTicker();
+    }
+  }
+
+  void _syncTrailTicker() {
+    _trailTicker?.cancel();
+    if (!widget.playing) return;
+    _trailTicker = Timer.periodic(const Duration(milliseconds: 60), (timer) {
+      final now = DateTime.now().toUtc();
+      final visible = [widget.pulse, ...widget.pulses]
+          .whereType<GraphPulse>()
+          .any(
+            (pulse) =>
+                pulse.at != null &&
+                pulse.ageAt(now) >= 0 &&
+                pulse.ageAt(now) < 1,
+          );
+      if (!visible) {
+        timer.cancel();
+        return;
+      }
+      if (mounted) setState(() {});
+    });
   }
 
   void _schedulePulseExpiry() {
@@ -80,7 +110,10 @@ final class _UiGraphState extends State<UiGraph>
         [widget.pulse, ...widget.pulses]
             .whereType<GraphPulse>()
             .where((pulse) => pulse.at != null)
-            .map((pulse) => pulse.at!.add(const Duration(milliseconds: 1350)))
+            .map(
+              (pulse) =>
+                  (pulse.updatedAt ?? pulse.at!).add(GraphPulse.trailLifetime),
+            )
             .where((expiry) => expiry.isAfter(now))
             .toList()
           ..sort();
@@ -95,6 +128,7 @@ final class _UiGraphState extends State<UiGraph>
   void dispose() {
     _pulse.dispose();
     _pulseExpiry?.cancel();
+    _trailTicker?.cancel();
     _viewport.dispose();
     super.dispose();
   }
@@ -170,7 +204,7 @@ final class _UiGraphState extends State<UiGraph>
                                 edges: projectedEdges,
                                 pulse: widget.pulse,
                                 pulses: widget.pulses,
-                                now: DateTime.now().toUtc(),
+                                now: widget.now ?? DateTime.now().toUtc(),
                                 reducedMotion: disableAnimations,
                                 pulseValue: pulseValue,
                                 highlightEdgeId: widget.highlightEdgeId,

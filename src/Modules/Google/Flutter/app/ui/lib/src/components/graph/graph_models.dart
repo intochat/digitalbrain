@@ -67,6 +67,7 @@ final class GraphPulse {
     this.operationId,
     this.outcome = GraphPulseOutcome.inFlight,
     this.at,
+    this.updatedAt,
   });
 
   final String fromId;
@@ -76,7 +77,28 @@ final class GraphPulse {
   final GraphPulseOutcome outcome;
   final DateTime? at;
 
+  /// A later arrival or completion refreshes the fade, not the travel.
+  final DateTime? updatedAt;
+
   bool get local => fromId == toId;
+
+  /// Activity remains readable after its initial movement has finished.
+  static const trailLifetime = Duration(seconds: 15);
+  static const travelTime = Duration(milliseconds: 1800);
+
+  double ageAt(DateTime now) => (updatedAt ?? at) == null
+      ? 0
+      : now.difference(updatedAt ?? at!).inMicroseconds /
+            trailLifetime.inMicroseconds;
+
+  double opacityAt(DateTime now) => (1 - ageAt(now)).clamp(0.0, 1.0);
+
+  double travelAt(DateTime now) => at == null
+      ? 0
+      : (now.difference(at!).inMicroseconds / travelTime.inMicroseconds).clamp(
+          0.0,
+          1.0,
+        );
 }
 
 enum GraphPulseOutcome { inFlight, arrived, completed, failed, signal }

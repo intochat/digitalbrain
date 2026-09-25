@@ -137,15 +137,15 @@ final class GraphPainter extends CustomPainter {
     Size size,
     GraphPulse active,
   ) {
-    final age = active.at == null || now == null
-        ? null
-        : now!.difference(active.at!).inMilliseconds;
-    if (age != null && (age < 0 || age >= 1350)) return;
+    final clock = now ?? DateTime.now().toUtc();
+    final age = active.ageAt(clock);
+    if (age < 0 || age >= 1) return;
+    final opacity = active.opacityAt(clock);
     final progress = reducedMotion
-        ? 0.5
-        : age == null
+        ? 1.0
+        : active.at == null
         ? pulseValue
-        : age / 1350;
+        : active.travelAt(clock);
 
     final target = nodes
         .where((node) => node.node.id == active.toId)
@@ -178,26 +178,41 @@ final class GraphPainter extends CustomPainter {
         path,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.4
-          ..color = color.withValues(alpha: 0.25 + wave * 0.7),
+          ..strokeWidth = 2 + opacity * 3.5
+          ..color = color.withValues(alpha: 0.12 + opacity * 0.83),
       );
-      if (active.outcome == GraphPulseOutcome.inFlight && !reducedMotion) {
+      if (progress < 1 && !reducedMotion) {
         final metric = path.computeMetrics().first;
         final point = metric
             .getTangentForOffset(metric.length * progress)
             ?.position;
         if (point != null) {
-          canvas.drawCircle(point, 5, Paint()..color = color);
+          final tangent = metric.getTangentForOffset(
+            (metric.length * progress - 22).clamp(0.0, metric.length),
+          );
+          if (tangent != null) {
+            canvas.drawLine(
+              tangent.position,
+              point,
+              Paint()
+                ..color = color.withValues(alpha: opacity)
+                ..strokeWidth = 5
+                ..strokeCap = StrokeCap.round,
+            );
+          }
         }
       }
     }
+    final reaction = active.local || progress >= 0.85;
     canvas.drawCircle(
-      target.center,
-      target.radius + 8 + wave * 16,
+      reaction ? target.center : source?.center ?? target.center,
+      (reaction ? target.radius : source?.radius ?? target.radius) +
+          8 +
+          wave * 16,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..color = color.withValues(alpha: 0.7 - wave * 0.3),
+        ..strokeWidth = 2.5
+        ..color = color.withValues(alpha: opacity * (0.85 - wave * 0.3)),
     );
   }
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -21,6 +22,7 @@ final class SpatialGraph extends StatefulWidget {
     this.pulses = const [],
     this.active = true,
     this.playing = true,
+    this.now,
     this.onNodeTap,
     this.onEdgeTap,
     this.onFallback,
@@ -34,6 +36,7 @@ final class SpatialGraph extends StatefulWidget {
   final List<GraphPulse> pulses;
   final bool active;
   final bool playing;
+  final DateTime? now;
   final ValueChanged<GraphNode>? onNodeTap;
   final ValueChanged<GraphEdge>? onEdgeTap;
   final VoidCallback? onFallback;
@@ -93,6 +96,13 @@ final class _SpatialGraphState extends State<SpatialGraph>
         if (_scene case final AnimatedGraphScene animated) {
           animated.advance(seconds);
         }
+        if (widget.active &&
+            widget.pulses.any((pulse) {
+              final age = pulse.ageAt(DateTime.now().toUtc());
+              return pulse.at != null && age >= 0 && age < 1;
+            })) {
+          _frames.value++;
+        }
       }
     })..start();
     _ticker.muted = !widget.active;
@@ -119,8 +129,8 @@ final class _SpatialGraphState extends State<SpatialGraph>
             : [
                 for (final pulse in freshPulses)
                   if (pulse.at != null &&
-                      now.difference(pulse.at!).inMilliseconds >= 0 &&
-                      now.difference(pulse.at!).inMilliseconds < 2500)
+                      pulse.ageAt(now) >= 0 &&
+                      pulse.travelAt(now) < 1)
                     pulse,
               ],
       );
@@ -131,11 +141,6 @@ final class _SpatialGraphState extends State<SpatialGraph>
   void didUpdateWidget(covariant SpatialGraph oldWidget) {
     super.didUpdateWidget(oldWidget);
     _ticker.muted = !widget.active;
-    if (oldWidget.playing && !widget.playing) {
-      if (_scene case final AnimatedGraphScene animated) {
-        animated.clearPulses();
-      }
-    }
     if (oldWidget.nodes != widget.nodes ||
         oldWidget.edges != widget.edges ||
         oldWidget.pulses != widget.pulses) {
@@ -238,6 +243,19 @@ final class _SpatialGraphState extends State<SpatialGraph>
                             ),
                           ),
                         ),
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _SpatialTrailPainter(
+                          widget.pulses,
+                          {
+                            for (final node in widget.nodes)
+                              node.id: ?_scene.project(node.id),
+                          },
+                          widget.now ?? DateTime.now().toUtc(),
+                          _reduceMotion,
+                        ),
+                      ),
+                    ),
                     for (final node in widget.nodes)
                       if (_scene.project(node.id) case final point?)
                         Positioned(
@@ -307,6 +325,90 @@ final class _SelectedRoutePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _SelectedRoutePainter oldDelegate) =>
       oldDelegate.from != from || oldDelegate.to != to;
+}
+
+/// Bright, bounded activity remains readable even after the GL particle ends.
+final class _SpatialTrailPainter extends CustomPainter {
+  const _SpatialTrailPainter(
+    this.pulses,
+    this.positions,
+    this.now,
+    this.reducedMotion,
+  );
+  final List<GraphPulse> pulses;
+  final Map<String, Offset> positions;
+  final DateTime now;
+  final bool reducedMotion;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final pulse in pulses) {
+      final age = pulse.ageAt(now);
+      if (age < 0 || age >= 1) continue;
+      final from = positions[pulse.fromId];
+      final to = positions[pulse.toId];
+      if (from == null || to == null) continue;
+      final alpha = pulse.opacityAt(now);
+      final color = switch (pulse.outcome) {
+        GraphPulseOutcome.signal => const Color(0xff43e4a1),
+        GraphPulseOutcome.failed => const Color(0xfff06978),
+        GraphPulseOutcome.completed => const Color(0xff7ee6ca),
+        _ => const Color(0xfffff0bd),
+      };
+      if (!pulse.local) {
+        final control = Offset(
+          (from.dx + to.dx) / 2,
+          (from.dy + to.dy) / 2 - math.min(35, (to - from).distance * .18),
+        );
+        final path = Path()
+          ..moveTo(from.dx, from.dy)
+          ..quadraticBezierTo(control.dx, control.dy, to.dx, to.dy);
+        canvas.drawPath(
+          path,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2 + 4 * alpha
+            ..color = color.withValues(alpha: .12 + alpha * .85),
+        );
+        final travel = pulse.travelAt(now);
+        if (travel < 1 && !reducedMotion) {
+          final metric = path.computeMetrics().first;
+          final head = metric.getTangentForOffset(metric.length * travel);
+          final tail = metric.getTangentForOffset(
+            (metric.length * travel - 25).clamp(0.0, metric.length),
+          );
+          if (head != null && tail != null) {
+            canvas.drawLine(
+              tail.position,
+              head.position,
+              Paint()
+                ..strokeWidth = 7
+                ..strokeCap = StrokeCap.round
+                ..color = color.withValues(alpha: alpha),
+            );
+          }
+        }
+      }
+      final center = pulse.local || reducedMotion || pulse.travelAt(now) >= .85
+          ? to
+          : from;
+      canvas.drawCircle(
+        center,
+        19 + (1 - alpha) * 12,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.5
+          ..color = color.withValues(alpha: alpha * .8),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SpatialTrailPainter oldDelegate) =>
+      oldDelegate.now != now ||
+      oldDelegate.reducedMotion != reducedMotion ||
+      oldDelegate.pulses != pulses ||
+      oldDelegate.positions != positions;
 }
 
 final class _UnavailableGraphScene implements GraphScene {

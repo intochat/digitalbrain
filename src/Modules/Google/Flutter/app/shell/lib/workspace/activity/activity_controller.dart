@@ -21,6 +21,8 @@ class ActivityController extends ChangeNotifier {
   int visibleCursor = 0;
   int _latestCursor = 0;
   bool paused = false;
+  DateTime? _pausedAt;
+  DateTime get visualNow => _pausedAt ?? DateTime.now().toUtc();
   bool stale = false;
   bool gap = false;
   bool loaded = false;
@@ -109,13 +111,22 @@ class ActivityController extends ChangeNotifier {
 
   List<graph.GraphPulse> get pulses {
     final latest = <String, ActivityRecord>{};
-    for (final event in visibleEvents.reversed.take(48).toList().reversed) {
-      latest[event.operationId] = event;
+    final starts = <String, DateTime>{};
+    for (final event in visibleEvents.reversed.take(80).toList().reversed) {
+      if (event.kind == 'CallStarted') {
+        starts.putIfAbsent(event.operationId, () => event.at);
+      }
+      // A publication is an observation in its own right even if subsequent
+      // calls share the operation id. The correlation remains in the list.
+      final key = event.kind == 'SignalPublished'
+          ? event.id
+          : event.operationId;
+      latest[key] = event;
     }
     final operations = latest.values.toList()
       ..sort((a, b) => a.sequence.compareTo(b.sequence));
     return [
-      for (final event in operations)
+      for (final event in operations.reversed.take(10).toList().reversed)
         if (event.sourceId != null &&
             (event.kind == 'SignalPublished' || event.targetId != null))
           graph.GraphPulse(
@@ -123,9 +134,14 @@ class ActivityController extends ChangeNotifier {
             toId: event.kind == 'SignalPublished'
                 ? event.sourceId!
                 : event.targetId!,
-          signature: event.id,
-          operationId: event.operationId,
-            at: event.at,
+            signature: event.id,
+            operationId: event.kind == 'SignalPublished'
+                ? event.id
+                : event.operationId,
+            at: event.kind == 'SignalPublished'
+                ? event.at
+                : starts[event.operationId] ?? event.at,
+            updatedAt: event.at,
             outcome: switch (event.kind) {
               'CallArrived' => graph.GraphPulseOutcome.arrived,
               'CallCompleted' => graph.GraphPulseOutcome.completed,
@@ -245,6 +261,7 @@ class ActivityController extends ChangeNotifier {
 
   void pause() {
     paused = true;
+    _pausedAt = DateTime.now().toUtc();
     _pausedEvents = List.of(_events);
     notifyListeners();
   }
@@ -259,6 +276,7 @@ class ActivityController extends ChangeNotifier {
     final snapshot = await read();
     if (_disposed) return;
     paused = false;
+    _pausedAt = null;
     _pausedEvents = null;
     _replace(snapshot);
     notifyListeners();

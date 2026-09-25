@@ -4,6 +4,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:digitalbrain_ui/src/components/graph/graph_painter.dart';
 
 void main() {
+  test('interaction trail travels then fades over fifteen seconds', () {
+    final start = DateTime.utc(2026, 9, 25);
+    final pulse = GraphPulse(
+      fromId: 'a',
+      toId: 'b',
+      signature: 'call',
+      at: start,
+    );
+    expect(pulse.travelAt(start), 0);
+    expect(pulse.travelAt(start.add(const Duration(seconds: 2))), 1);
+    expect(
+      pulse.opacityAt(start.add(const Duration(seconds: 10))),
+      closeTo(1 / 3, .001),
+    );
+    expect(pulse.opacityAt(start.add(const Duration(seconds: 15))), 0);
+  });
+
   testWidgets('compact graph renders allowlisted neuron icon', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(

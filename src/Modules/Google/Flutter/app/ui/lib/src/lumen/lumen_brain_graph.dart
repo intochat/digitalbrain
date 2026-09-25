@@ -19,6 +19,8 @@ final class LumenBrainGraph extends StatefulWidget {
     this.activeNodes = const {},
     this.activeEdges = const {},
     this.signalNodes = const {},
+    this.activityPulses = const [],
+    this.activityNow,
   });
   final BrainSnapshot snapshot;
   final ValueChanged<BrainNeuron> onNeuron;
@@ -28,6 +30,8 @@ final class LumenBrainGraph extends StatefulWidget {
   final bool stale;
   final Set<String> activeNodes, activeEdges;
   final Set<String> signalNodes;
+  final List<GraphPulse> activityPulses;
+  final DateTime? activityNow;
   @override
   State<LumenBrainGraph> createState() => _LumenBrainGraphState();
 }
@@ -160,6 +164,9 @@ final class _LumenBrainGraphState extends State<LumenBrainGraph> {
                             routes,
                             widget.activeEdges,
                             widget.selectedId,
+                            widget.activityPulses,
+                            widget.activityNow ?? DateTime.now().toUtc(),
+                            MediaQuery.disableAnimationsOf(context),
                           ),
                         ),
                       ),
@@ -509,10 +516,20 @@ List<_SynapseRoute> _synapseRoutes(
 }
 
 final class _SynapsePainter extends CustomPainter {
-  _SynapsePainter(this.routes, this.active, this.selected);
+  _SynapsePainter(
+    this.routes,
+    this.active,
+    this.selected,
+    this.pulses,
+    this.now,
+    this.reducedMotion,
+  );
   final List<_SynapseRoute> routes;
   final Set<String> active;
   final String? selected;
+  final List<GraphPulse> pulses;
+  final DateTime now;
+  final bool reducedMotion;
   @override
   void paint(Canvas canvas, Size size) {
     for (final route in routes) {
@@ -532,6 +549,45 @@ final class _SynapsePainter extends CustomPainter {
         }
       } else {
         canvas.drawPath(route.path, paint);
+      }
+      for (final pulse in pulses) {
+        if (pulse.local ||
+            pulse.fromId != edge.sourceId ||
+            pulse.toId != edge.targetId) {
+          continue;
+        }
+        final age = pulse.ageAt(now);
+        if (age < 0 || age >= 1) continue;
+        final alpha = pulse.opacityAt(now);
+        final color = switch (pulse.outcome) {
+          GraphPulseOutcome.failed => const Color(0xffd74f5e),
+          GraphPulseOutcome.completed => const Color(0xff188052),
+          _ => const Color(0xff319c75),
+        };
+        canvas.drawPath(
+          route.path,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2 + 4 * alpha
+            ..color = color.withValues(alpha: .15 + alpha * .8),
+        );
+        final travel = pulse.travelAt(now);
+        if (travel < 1 && !reducedMotion) {
+          final head = metric.getTangentForOffset(metric.length * travel);
+          final tail = metric.getTangentForOffset(
+            (metric.length * travel - 24).clamp(0.0, metric.length),
+          );
+          if (head != null && tail != null) {
+            canvas.drawLine(
+              tail.position,
+              head.position,
+              Paint()
+                ..strokeWidth = 6
+                ..strokeCap = StrokeCap.round
+                ..color = color.withValues(alpha: alpha),
+            );
+          }
+        }
       }
       final tangent = metric.getTangentForOffset(metric.length)!;
       final b = tangent.position;
