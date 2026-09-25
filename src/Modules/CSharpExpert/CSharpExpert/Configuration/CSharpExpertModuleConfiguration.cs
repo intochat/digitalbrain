@@ -4,8 +4,8 @@ namespace DigitalBrain.CSharpExpert;
 
 public sealed class CSharpExpertModuleOptions
 {
-    // Root for the isolated per-run workspace. Defaults to a sibling "wt-runs" of a git repository
-    // (or the temp folder for a plain folder copy) when omitted.
+    // Root for the isolated per-run workspaces. Defaults to a "wt-runs" folder beside the git repository,
+    // or beside the solution's folder for a plain copy.
     public string? WorkspaceRoot { get; set; }
 
     public List<string> AllowedSolutionRoots { get; set; } = [];

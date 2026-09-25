@@ -43,7 +43,18 @@ public sealed class PlanFeature(IDigitalBrain brain, string runId) : IBehavior, 
         var profile = await brain.Get<ICodingProfile>(CodingWorkspace.Id(request.SolutionPath)).Read().ConfigureAwait(false);
         var agent = brain.Get<ICodingAgent>(profile.PlannerAgentId);
         var reply = await agent.Ask(PlannerPrompt(request, model, snapshot.Clarifications), cancellation).ConfigureAwait(false);
-        await run.RecordPlan(CodingPlanReader.Read(reply)).ConfigureAwait(false);
+        var plan = CodingPlanReader.Read(reply);
+        await run.RecordPlan(WithSolutionRelativeFiles(plan, request.SolutionPath)).ConfigureAwait(false);
+    }
+
+    private static CodingPlan WithSolutionRelativeFiles(CodingPlan plan, string solutionPath)
+    {
+        var solutionFolder = Path.GetDirectoryName(Path.GetFullPath(solutionPath))!;
+        string Relative(string file) => Path.IsPathRooted(file) && SolutionPolicy.IsUnder(Path.GetFullPath(file), solutionFolder)
+            ? Path.GetRelativePath(solutionFolder, file).Replace('\\', '/')
+            : file;
+
+        return plan with { Steps = [.. plan.Steps.Select(step => step with { Files = [.. step.Files.Select(Relative)] })] };
     }
 
     private static string PlannerPrompt(FeatureRequest request, ProjectModel model, IReadOnlyList<string> clarifications)

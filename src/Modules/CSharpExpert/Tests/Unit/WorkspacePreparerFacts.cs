@@ -31,6 +31,29 @@ public sealed class WorkspacePreparerFacts
     }
 
     [Fact]
+    public async Task AnEmptyConfiguredRootFallsBackToTheDefaultRunFolder()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var preparer = new WorkspacePreparer(
+            new ScriptedProcessRunner(new ScriptedProcessScript { IsGitRepository = false }),
+            Options.Create(new CSharpExpertModuleOptions { WorkspaceRoot = string.Empty }));
+
+        var location = await preparer.PrepareAsync(CSharpExpertTestHost.SampleSolution, "run-default-root", ct);
+        try
+        {
+            var solutionParent = Path.GetDirectoryName(Path.GetDirectoryName(Path.GetFullPath(CSharpExpertTestHost.SampleSolution)))!;
+            Assert.Equal(Path.Combine(solutionParent, "wt-runs", "run-default-root"), location.Root);
+            Assert.True(File.Exists(location.SolutionPath));
+        }
+        finally
+        {
+            await preparer.ReleaseAsync(location.Root, ct);
+        }
+
+        Assert.False(Directory.Exists(location.Root));
+    }
+
+    [Fact]
     public async Task ASolutionInsideARepositoryGetsAWorktree()
     {
         var ct = TestContext.Current.CancellationToken;

@@ -9,6 +9,8 @@ public sealed class WorkspacePreparer(IProcessRunner processes, IOptions<CSharpE
 {
     private static readonly TimeSpan GitTimeout = TimeSpan.FromSeconds(60);
 
+    private string? ConfiguredRoot => string.IsNullOrWhiteSpace(options.Value.WorkspaceRoot) ? null : options.Value.WorkspaceRoot;
+
     public async Task<WorkspaceLocation> PrepareAsync(string solutionPath, string runId, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(solutionPath);
@@ -17,7 +19,7 @@ public sealed class WorkspacePreparer(IProcessRunner processes, IOptions<CSharpE
         var repository = await RepositoryRootAsync(full, cancellationToken).ConfigureAwait(false);
         if (repository is not null)
         {
-            var root = options.Value.WorkspaceRoot ?? Path.Combine(Path.GetDirectoryName(repository)!, "wt-runs");
+            var root = ConfiguredRoot ?? Path.Combine(Path.GetDirectoryName(repository)!, "wt-runs");
             var worktree = Path.Combine(root, runId);
             Directory.CreateDirectory(root);
             await ReleaseAsync(worktree, cancellationToken).ConfigureAwait(false);
@@ -25,7 +27,7 @@ public sealed class WorkspacePreparer(IProcessRunner processes, IOptions<CSharpE
             return new WorkspaceLocation(worktree, Path.Combine(worktree, Path.GetRelativePath(repository, full)));
         }
 
-        var copyRoot = options.Value.WorkspaceRoot ?? Path.Combine(Path.GetTempPath(), "csharp-expert-runs");
+        var copyRoot = ConfiguredRoot ?? Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(full)!)!, "wt-runs");
         var folder = Path.Combine(copyRoot, runId);
         await ReleaseAsync(folder, cancellationToken).ConfigureAwait(false);
         CopyDirectory(Path.GetDirectoryName(full)!, folder);
