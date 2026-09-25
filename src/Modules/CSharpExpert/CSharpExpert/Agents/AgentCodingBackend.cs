@@ -36,8 +36,8 @@ internal sealed class AgentCodingBackend(IGrainFactory grains) : ICodingAgentBac
         prompt.AppendLine("Edit kinds and their fields:");
         prompt.AppendLine("- InsertMember: symbolId is the EXISTING type that receives the member (\"T:Namespace.Type\" from the map), source is the whole new member");
         prompt.AppendLine("- ReplaceMember: symbolId (\"M:Namespace.Type.Method\"), source");
-        prompt.AppendLine("- AddUsing: path, namespace");
-        prompt.AppendLine("- ReplaceRange: path, startLine, endLine, source");
+        prompt.AppendLine("- AddUsing: path (a file path from the map), namespace");
+        prompt.AppendLine("- ReplaceRange: path (a file path from the map), startLine, endLine, source");
         prompt.AppendLine("Example: [{\"kind\":\"InsertMember\",\"symbolId\":\"T:Sample.Inbox\",\"source\":\"public void Clear() => _items.Clear();\"}]");
         prompt.AppendLine("Rules: no /// <summary> comments, self-explanatory names, inline comments only when truly needed.");
         prompt.AppendLine("Project map:");

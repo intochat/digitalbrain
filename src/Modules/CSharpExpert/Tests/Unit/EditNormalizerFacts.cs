@@ -25,4 +25,17 @@ public sealed class EditNormalizerFacts
 
         Assert.Equal("M:SampleInbox.Inbox.Add(System.String)", edit.SymbolId);
     }
+
+    [Fact]
+    public void RelativePathsResolveAgainstTheSolutionFolder()
+    {
+        var solutionFolder = Path.GetFullPath("solution-root");
+        var edits = EditNormalizer.ResolvePaths(
+            [new EditRequest(EditKind.AddUsing, Path: "SampleInbox.Tests/InboxTests.cs", Namespace: "SampleInbox"),
+             new EditRequest(EditKind.AddUsing, Path: Path.Combine(solutionFolder, "Inbox.cs"), Namespace: "System")],
+            solutionFolder);
+
+        Assert.Equal(Path.Combine(solutionFolder, "SampleInbox.Tests", "InboxTests.cs"), edits[0].Path);
+        Assert.Equal(Path.Combine(solutionFolder, "Inbox.cs"), edits[1].Path);
+    }
 }

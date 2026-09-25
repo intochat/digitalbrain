@@ -10,6 +10,11 @@ public static class EditNormalizer
             ? edit with { SymbolId = ContainingType(id) }
             : edit)];
 
+    public static IReadOnlyList<EditRequest> ResolvePaths(IReadOnlyList<EditRequest> edits, string solutionFolder)
+        => [.. edits.Select(edit => edit.Path is { Length: > 0 } path && !Path.IsPathRooted(path)
+            ? edit with { Path = Path.GetFullPath(Path.Combine(solutionFolder, path)) }
+            : edit)];
+
     private static string ContainingType(string memberId)
     {
         var name = memberId[(memberId.IndexOf(':', StringComparison.Ordinal) + 1)..];

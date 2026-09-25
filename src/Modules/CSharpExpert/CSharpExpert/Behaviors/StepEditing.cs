@@ -31,6 +31,7 @@ internal static class StepEditing
             return;
         }
 
+        edits = EditNormalizer.ResolvePaths(edits, Path.GetDirectoryName(RunWorkspace.SolutionPath(snapshot))!);
         var check = await roslyn.CheckEdits(edits, cancellationToken).ConfigureAwait(false);
         if (check.HasErrors)
         {
