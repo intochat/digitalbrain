@@ -17,7 +17,7 @@ internal sealed class AgentCodingBackend(IGrainFactory grains) : ICodingAgentBac
     public async Task<IReadOnlyList<EditRequest>> ProposeEditsAsync(string agentId, EditProposal proposal, CancellationToken cancellationToken)
     {
         var reply = await AskAsync(agentId, EditPrompt(proposal), cancellationToken).ConfigureAwait(false);
-        return EditReplyReader.Read(reply);
+        return EditNormalizer.Normalize(EditReplyReader.Read(reply));
     }
 
     private static string EditPrompt(EditProposal proposal)
@@ -34,7 +34,7 @@ internal sealed class AgentCodingBackend(IGrainFactory grains) : ICodingAgentBac
         }
 
         prompt.AppendLine("Edit kinds and their fields:");
-        prompt.AppendLine("- InsertMember: symbolId (\"T:Namespace.Type\"), source");
+        prompt.AppendLine("- InsertMember: symbolId is the EXISTING type that receives the member (\"T:Namespace.Type\" from the map), source is the whole new member");
         prompt.AppendLine("- ReplaceMember: symbolId (\"M:Namespace.Type.Method\"), source");
         prompt.AppendLine("- AddUsing: path, namespace");
         prompt.AppendLine("- ReplaceRange: path, startLine, endLine, source");
