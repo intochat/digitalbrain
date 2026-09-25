@@ -4,8 +4,10 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.CSharpExpert;
 
-public sealed class PlanFeature(IDigitalBrain brain, string runId) : IBehavior
+public sealed class PlanFeature(IDigitalBrain brain, string runId) : IBehavior, IBehaviorSignals
 {
+    public IReadOnlyList<Type> Signals => [typeof(ContextReady), typeof(PlanClarified)];
+
     public Task RunAsync(CancellationToken cancellation = default)
     {
         var run = brain.Get<ICodingRun>(runId);

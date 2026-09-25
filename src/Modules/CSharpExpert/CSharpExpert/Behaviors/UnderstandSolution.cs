@@ -5,8 +5,10 @@ using DigitalBrain.Microsoft.Roslyn;
 
 namespace DigitalBrain.CSharpExpert;
 
-public sealed class UnderstandSolution(IDigitalBrain brain, string runId) : IBehavior
+public sealed class UnderstandSolution(IDigitalBrain brain, string runId) : IBehavior, IBehaviorSignals
 {
+    public IReadOnlyList<Type> Signals => [typeof(FeatureRequested)];
+
     public async Task RunAsync(CancellationToken cancellation = default)
     {
         var run = brain.Get<ICodingRun>(runId);
