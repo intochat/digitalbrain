@@ -45,16 +45,16 @@ List<ProjectedGraphNode> projectGraphNodes(
     for (var index = 0; index < hubs.length; index++)
       (
         node: hubs[index],
-        x: _spherePosition(index, hubs.length, 0.88, 0).x,
-        y: _spherePosition(index, hubs.length, 0.88, 0).y,
-        z: _spherePosition(index, hubs.length, 0.88, 0).z,
+        x: _position(hubs[index], 0.88, 0).x,
+        y: _position(hubs[index], 0.88, 0).y,
+        z: _position(hubs[index], 0.88, 0).z,
       ),
     for (var index = 0; index < leaves.length; index++)
       (
         node: leaves[index],
-        x: _spherePosition(index, leaves.length, 0.62, 1.3).x,
-        y: _spherePosition(index, leaves.length, 0.62, 1.3).y,
-        z: _spherePosition(index, leaves.length, 0.62, 1.3).z,
+        x: _position(leaves[index], 0.62, 1.3).x,
+        y: _position(leaves[index], 0.62, 1.3).y,
+        z: _position(leaves[index], 0.62, 1.3).z,
       ),
   ];
 
@@ -158,18 +158,21 @@ ProjectedGraphEdge? hitTestGraphEdges(
   return null;
 }
 
-({double x, double y, double z}) _spherePosition(
-  int index,
-  int count,
+({double x, double y, double z}) _position(
+  GraphNode node,
   double radius,
   double phase,
 ) {
-  if (count <= 1) {
-    return (x: 0, y: 0, z: radius);
+  if (node.position case final point?) {
+    return (x: point.x, y: point.y, z: point.z);
   }
-  final y = 1 - (2 * (index + 0.5) / count);
+  var hash = 2166136261;
+  for (final unit in node.id.codeUnits) {
+    hash = ((hash ^ unit) * 16777619) & 0xffffffff;
+  }
+  final y = 1 - 2 * (((hash & 0xffff) + 0.5) / 65536);
   final ring = math.sqrt(math.max(0, 1 - y * y));
-  final theta = index * math.pi * (3 - math.sqrt(5)) + phase;
+  final theta = ((hash >> 16) / 65536) * 2 * math.pi + phase;
   return (
     x: math.cos(theta) * ring * radius,
     y: y * radius,
