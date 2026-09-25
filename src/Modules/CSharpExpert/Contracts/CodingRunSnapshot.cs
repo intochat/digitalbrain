@@ -9,4 +9,5 @@ public sealed record CodingRunSnapshot(
     [property: Id(2)] FeatureRequest? Request,
     [property: Id(3)] ProjectModel? Model,
     [property: Id(4)] CodingPlan? Plan,
-    [property: Id(5)] string? FailureReason);
+    [property: Id(5)] string? FailureReason,
+    [property: Id(6)] IReadOnlyList<string> Clarifications);

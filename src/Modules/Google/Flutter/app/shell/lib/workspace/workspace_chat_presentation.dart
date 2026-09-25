@@ -153,6 +153,7 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
       'brain',
       'image',
       'document',
+      'coding-run',
     ].contains(kind)) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

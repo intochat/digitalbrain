@@ -668,6 +668,29 @@ final class DigitalBrainUiClient {
         : Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
+  Future<Map<String, dynamic>> readCodingRun(String runId) async {
+    final response = await _request(
+      'GET',
+      '/csharp-expert/runs/${Uri.encodeComponent(runId)}',
+      timeout: const Duration(seconds: 10),
+    );
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+  }
+
+  Future<Map<String, dynamic>> codingRunRequest(
+    String runId,
+    String action, {
+    Map<String, Object?>? body,
+  }) async {
+    final response = await _request(
+      'POST',
+      '/csharp-expert/runs/${Uri.encodeComponent(runId)}/$action',
+      body: body ?? const <String, Object?>{},
+      timeout: const Duration(seconds: 30),
+    );
+    return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+  }
+
   Future<Uint8List> appAsset(String workspace, String assetId) async {
     final response = await _request(
       'GET',

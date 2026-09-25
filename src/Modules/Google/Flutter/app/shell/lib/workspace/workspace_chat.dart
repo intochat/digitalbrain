@@ -419,6 +419,7 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
                 'brain',
                 'image',
                 'document',
+                'coding-run',
               ].contains(value['kind'])) {
             widget.onArtifact(Map<String, dynamic>.from(value));
           }

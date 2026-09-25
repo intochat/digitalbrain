@@ -6,32 +6,45 @@ namespace DigitalBrain.CSharpExpert;
 
 public sealed class PlanFeature(IDigitalBrain brain, string runId) : IBehavior
 {
-    public async Task RunAsync(CancellationToken cancellation = default)
+    public Task RunAsync(CancellationToken cancellation = default)
     {
         var run = brain.Get<ICodingRun>(runId);
-        await foreach (var context in brain.On<ContextReady>(run, cancellation).ConfigureAwait(false))
+        return Task.WhenAll(
+            ListenAsync<ContextReady>(run, cancellation),
+            ListenAsync<PlanClarified>(run, cancellation));
+    }
+
+    private async Task ListenAsync<TSignal>(ICodingRun run, CancellationToken cancellation) where TSignal : Signal
+    {
+        await foreach (var _ in brain.On<TSignal>(run, cancellation).ConfigureAwait(false))
         {
-            var snapshot = await run.Read().ConfigureAwait(false);
-            var request = snapshot.Request ?? throw new InvalidOperationException("Context arrived before the feature request.");
-            var profile = await brain.Get<ICodingProfile>(CodingWorkspace.Id(request.SolutionPath)).Read().ConfigureAwait(false);
-            var agent = brain.Get<ICodingAgent>(profile.PlannerAgentId);
-            var reply = await agent.Ask(PlannerPrompt(request, context.Model), cancellation).ConfigureAwait(false);
-            CodingPlan plan;
             try
             {
-                plan = CodingPlanReader.Read(reply);
+                await DraftAsync(run, cancellation).ConfigureAwait(false);
             }
-            catch (FormatException error)
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
             {
-                await run.Fail(error.Message).ConfigureAwait(false);
-                continue;
+                throw;
             }
-
-            await run.RecordPlan(plan).ConfigureAwait(false);
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                await run.Fail($"Planning failed: {error.Message}").ConfigureAwait(false);
+            }
         }
     }
 
-    private static string PlannerPrompt(FeatureRequest request, ProjectModel model)
+    private async Task DraftAsync(ICodingRun run, CancellationToken cancellation)
+    {
+        var snapshot = await run.Read().ConfigureAwait(false);
+        var request = snapshot.Request ?? throw new InvalidOperationException("Planning started before the feature request.");
+        var model = snapshot.Model ?? throw new InvalidOperationException("Planning started before the project context.");
+        var profile = await brain.Get<ICodingProfile>(CodingWorkspace.Id(request.SolutionPath)).Read().ConfigureAwait(false);
+        var agent = brain.Get<ICodingAgent>(profile.PlannerAgentId);
+        var reply = await agent.Ask(PlannerPrompt(request, model, snapshot.Clarifications), cancellation).ConfigureAwait(false);
+        await run.RecordPlan(CodingPlanReader.Read(reply)).ConfigureAwait(false);
+    }
+
+    private static string PlannerPrompt(FeatureRequest request, ProjectModel model, IReadOnlyList<string> clarifications)
     {
         var builder = new StringBuilder();
         builder.AppendLine("Plan a change to a C# solution. Reply with one JSON object and nothing else.");
@@ -41,6 +54,15 @@ public sealed class PlanFeature(IDigitalBrain brain, string runId) : IBehavior
         builder.AppendLine($"Target frameworks: {string.Join(", ", model.TargetFrameworks)}");
         builder.AppendLine("Map:");
         builder.AppendLine(model.MapText);
+        if (clarifications.Count > 0)
+        {
+            builder.AppendLine("Clarifications from the user (honor every one):");
+            foreach (var clarification in clarifications)
+            {
+                builder.AppendLine($"- {clarification}");
+            }
+        }
+
         builder.AppendLine("JSON shape: {\"summary\":\"...\",\"steps\":[{\"number\":1,\"title\":\"...\",\"files\":[\"path\"],\"detail\":\"...\"}],\"openQuestions\":[\"...\"]}");
         return builder.ToString();
     }

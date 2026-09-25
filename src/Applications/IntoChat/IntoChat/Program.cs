@@ -26,6 +26,7 @@ builder.Services.AddSingleton<ImageSaveCoordinator>();
 builder.Services.AddSingleton<LiveTableWindows>();
 builder.Services.AddSingleton<IAgentToolFactory, WorkspaceTableTools>();
 builder.Services.AddSingleton<IAgentToolFactory, WorkspaceChartTools>();
+builder.Services.AddSingleton<IAgentToolFactory, CreateCodingRunTool>();
 
 var app = builder.Build();
 

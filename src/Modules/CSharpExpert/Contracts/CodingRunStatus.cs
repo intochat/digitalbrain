@@ -9,4 +9,6 @@ public enum CodingRunStatus
     ContextReady = 1,
     PlanDrafted = 2,
     Failed = 3,
+    PlanApproved = 4,
+    Stopped = 5,
 }

@@ -8,6 +8,12 @@ public interface ICodingRun : INeuron
 {
     Task Request(FeatureRequest request);
 
+    Task Clarify(string clarification);
+
+    Task Approve();
+
+    Task Stop();
+
     Task RecordContext(ProjectModel model);
 
     Task RecordPlan(CodingPlan plan);

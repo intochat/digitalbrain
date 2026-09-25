@@ -8,6 +8,8 @@ internal sealed class ScriptedAgentScript
 {
     public string Reply { get; set; } = "{}";
 
+    public Exception? Throw { get; set; }
+
     public string? LastPrompt { get; set; }
 }
 
@@ -17,7 +19,9 @@ internal sealed class ScriptedCodingAgent(ScriptedAgentScript script) : Neuron, 
     public Task<string> Ask(string prompt, CancellationToken cancellationToken = default)
     {
         script.LastPrompt = prompt;
-        return Task.FromResult(script.Reply);
+        return script.Throw is null
+            ? Task.FromResult(script.Reply)
+            : Task.FromException<string>(script.Throw);
     }
 }
 

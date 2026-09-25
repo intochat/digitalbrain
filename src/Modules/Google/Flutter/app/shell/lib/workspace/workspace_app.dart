@@ -16,6 +16,7 @@ import 'app_surface_host.dart';
 import 'workspace_islands.dart';
 import 'behaviors/behavior_manager.dart';
 import 'activity/activity_view.dart';
+import 'coding/coding_run_screen.dart';
 
 class WorkspaceApp extends StatefulWidget {
   const WorkspaceApp({
@@ -404,6 +405,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     'image' => Icons.image_outlined,
     'brain' => Icons.hub_outlined,
     'diagram' => Icons.draw_outlined,
+    'coding-run' => Icons.terminal_outlined,
     _ => Icons.description_outlined,
   };
   Future<void> _hydrateTable(
@@ -528,6 +530,29 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
             }
           },
         ),
+      );
+    }
+
+    if (a.kind == 'coding-run') {
+      final client = widget.programmingClient;
+      if (client == null) {
+        return const Center(
+          child: Text('Connect to IntoChat to open the coding run.'),
+        );
+      }
+      final runId = a.data['runId'] as String?;
+      if (runId == null) {
+        return _region(
+          a.title,
+          const Center(child: Text('This coding run is missing its identifier.')),
+        );
+      }
+      return CodingRunScreen(
+        key: ValueKey('${store.currentProject.id}-${a.id}'),
+        runId: runId,
+        client: client,
+        active: !store.currentProject.presentation.minimizedArtifactIds
+            .contains(a.id),
       );
     }
 
