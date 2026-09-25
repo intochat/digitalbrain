@@ -34,7 +34,8 @@ internal static class StepEditing
         var check = await roslyn.CheckEdits(edits, cancellationToken).ConfigureAwait(false);
         if (check.HasErrors)
         {
-            await run.RecordBrokenEdit(step.Number, check.Diff, Problems(check.Diagnostics, check.FailingEdit, check.Detail)).ConfigureAwait(false);
+            var hint = await SymbolHintAsync(roslyn, edits, check.FailingEdit, cancellationToken).ConfigureAwait(false);
+            await run.RecordBrokenEdit(step.Number, check.Diff, Problems(check.Diagnostics, check.FailingEdit, check.Detail + hint)).ConfigureAwait(false);
             return;
         }
 
@@ -58,5 +59,19 @@ internal static class StepEditing
 
         var editLabel = failingEdit is { } index ? $"edit {index + 1}" : "edits";
         return [new DiagnosticGroup("edit", editLabel, [detail]), .. groups];
+    }
+
+    private static async Task<string> SymbolHintAsync(IRoslyn roslyn, IReadOnlyList<EditRequest> edits, int? failingEdit, CancellationToken cancellationToken)
+    {
+        if (failingEdit is not { } index || index < 0 || index >= edits.Count || edits[index].SymbolId is not { } symbolId)
+        {
+            return string.Empty;
+        }
+
+        var simpleName = symbolId[(symbolId.IndexOf(':', StringComparison.Ordinal) + 1)..].Split('(')[0].Split('.')[^1];
+        var matches = await roslyn.FindSymbols(new SymbolSearch(simpleName, Limit: 5), cancellationToken).ConfigureAwait(false);
+        return matches.Items.Count == 0
+            ? string.Empty
+            : $" Existing symbols named '{simpleName}': {string.Join(", ", matches.Items.Select(hit => hit.Id))}";
     }
 }

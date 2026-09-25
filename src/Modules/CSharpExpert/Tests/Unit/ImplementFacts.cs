@@ -218,7 +218,7 @@ public sealed class ImplementFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var agent = new ScriptedAgentScript { Reply = OneStepPlan };
-        agent.QueueEdits([new EditRequest(EditKind.InsertMember, SymbolId: "T:SampleInbox.Missing", Source: "public void Clear() { }")]);
+        agent.QueueEdits([new EditRequest(EditKind.InsertMember, SymbolId: "T:Wrong.Inbox", Source: "public void Clear() { }")]);
         agent.QueueEdits([ClearEdit]);
         await using var harness = await CSharpExpertHarness.StartAsync(ct, agent);
         const string runId = "run-rejected-edit";
@@ -233,6 +233,6 @@ public sealed class ImplementFacts
 
         var retry = agent.Proposals[^1].Failure!;
         Assert.Contains("edit 1", retry);
-        Assert.True(retry.Length > "Build failed:".Length + 20, retry);
+        Assert.Contains("T:SampleInbox.Inbox", retry);
     }
 }
