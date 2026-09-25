@@ -8,7 +8,7 @@ public static class AgentToolPolicy
     public const string BehaviorAuthoringFallback =
         "Authoring C# behaviors isn't supported outside developer mode yet; it arrives in Phase 1.";
 
-    public static readonly IReadOnlyList<string> ProductTools = ["supabase_schema", "show_supabase_query_table", "table_read", "table_refine"];
+    public static readonly IReadOnlyList<string> ProductTools = ["supabase_schema", "show_supabase_query_table", "table_read", "table_refine", "render_chart"];
 
     public static IReadOnlyList<string> SelectTools(bool developerMode, IReadOnlyList<string> developerTools)
     {

@@ -98,6 +98,7 @@ public sealed class AgentToolFacts
             ["code_contracts", "code_draft_save", "behavior_read", "behavior_deploy", "behavior_start"]);
         Assert.True(selected.Count <= AgentToolPolicy.MaxDefaultTools);
         Assert.DoesNotContain(selected, AgentToolPolicy.IsBehaviorTool);
+        Assert.Contains("render_chart", selected);
         Assert.Equal(AgentToolPolicy.ProductTools, selected);
     }
 

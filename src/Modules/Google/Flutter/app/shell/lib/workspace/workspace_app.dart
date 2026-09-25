@@ -563,6 +563,22 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     if (a.kind == 'table') {
       return _region(a.title, UiDataTable(controller: _tables[a.id]!));
     }
+    if (a.kind == 'chart') {
+      return _region(
+        a.title,
+        LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            padding: const EdgeInsets.all(12),
+            child: UiChart(
+              part: UiChartPart.fromMetadata({...a.data, 'title': a.title}),
+              height: constraints.hasBoundedHeight
+                  ? (constraints.maxHeight - 24).clamp(200.0, 720.0)
+                  : 320,
+            ),
+          ),
+        ),
+      );
+    }
     return _region(
       a.title,
       Center(child: Text('This window type is not available yet: ${a.kind}')),
