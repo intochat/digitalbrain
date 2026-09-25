@@ -40,14 +40,13 @@ List<ProjectedGraphNode> projectGraphNodes(
   double rotationY,
 ) {
   final placed = spatialLayoutGraph(nodes);
-  final base = math.min(size.width, size.height) * 0.105;
   final center = Offset(size.width * 0.5, size.height * 0.51);
   final cosY = math.cos(rotationY);
   final sinY = math.sin(rotationY);
   final cosX = math.cos(rotationX);
   final sinX = math.sin(rotationX);
 
-  final projected = <ProjectedGraphNode>[];
+  final rotated = <(GraphNode, double, double, double, double)>[];
   for (final node in nodes) {
     final point = placed[node.id]!;
     final xY = point.x * cosY + point.z * sinY;
@@ -55,6 +54,21 @@ List<ProjectedGraphNode> projectGraphNodes(
     final yX = point.y * cosX - zY * sinX;
     final zX = point.y * sinX + zY * cosX;
     final perspective = 1.0 / (1.4 - zX * 0.08);
+    rotated.add((node, xY * perspective, yX * perspective, zX, perspective));
+  }
+
+  if (rotated.isEmpty) return const [];
+  final minX = rotated.map((item) => item.$2).reduce(math.min);
+  final maxX = rotated.map((item) => item.$2).reduce(math.max);
+  final minY = rotated.map((item) => item.$3).reduce(math.min);
+  final maxY = rotated.map((item) => item.$3).reduce(math.max);
+  final scaleX = size.width * 0.72 / math.max(maxX - minX, 1);
+  final scaleY = size.height * 0.70 / math.max(maxY - minY, 1);
+  final originX = (minX + maxX) / 2;
+  final originY = (minY + maxY) / 2;
+
+  final projected = <ProjectedGraphNode>[];
+  for (final (node, x, y, depth, perspective) in rotated) {
     final radius =
         (node.kind == GraphNodeKind.hub ? 10.0 : 6.0) * (0.72 + perspective);
 
@@ -62,11 +76,11 @@ List<ProjectedGraphNode> projectGraphNodes(
       ProjectedGraphNode(
         node: node,
         center: Offset(
-          center.dx + xY * base * perspective,
-          center.dy + yX * base * perspective,
+          center.dx + (x - originX) * scaleX,
+          center.dy + (y - originY) * scaleY,
         ),
         radius: radius,
-        depth: zX,
+        depth: depth,
       ),
     );
   }

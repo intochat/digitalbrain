@@ -222,6 +222,11 @@ class _ActivityViewState extends State<ActivityView> {
               if (mode == ActivityGraphMode.spatial) _openedSpatial = true;
             }),
           ),
+          if (controller.edges.any((edge) => edge.dotted))
+            const Text(
+              'Solid: call · Dotted: same intent order',
+              style: TextStyle(fontSize: 11),
+            ),
           if (controller.paused)
             SizedBox(
               width: 160,
@@ -274,10 +279,22 @@ class _ActivityViewState extends State<ActivityView> {
                 controller.selectedEvent?.targetId ??
                 controller.selectedEvent?.sourceId,
             onNodeTap: (node) => controller.selectNode(node.id),
-            onEdgeTap: (edge) =>
-                controller.selectRoute(edge.sourceId, edge.targetId),
+            onEdgeTap: (edge) => controller.selectRoute(
+              edge.sourceId,
+              edge.targetId,
+              sequence: edge.dotted,
+            ),
             onFallback: () => setState(() => mode = ActivityGraphMode.graph),
             sceneFactory: widget.spatialSceneFactory,
+          ),
+        ),
+      if (controller.loaded && controller.nodes.isEmpty)
+        Center(
+          child: Text(
+            controller.gap
+                ? 'Earlier activity expired. New calls will appear here.'
+                : 'No neuron activity yet. Start a workspace action to see routes.',
+            textAlign: TextAlign.center,
           ),
         ),
     ],
@@ -304,8 +321,8 @@ class _ActivityViewState extends State<ActivityView> {
             id: edge.id,
             sourceId: edge.sourceId,
             targetId: edge.targetId,
-            signalType: '',
-            kind: 'observed call',
+            signalType: edge.dotted ? 'time order' : '',
+            kind: edge.dotted ? 'Observed sequence' : 'Observed call',
           ),
       ],
     ),
@@ -335,7 +352,11 @@ class _ActivityViewState extends State<ActivityView> {
           '${pulse.fromId}|${pulse.toId}|call',
     },
     onNeuron: (node) => controller.selectNode(node.id),
-    onSynapse: (edge) => controller.selectRoute(edge.sourceId, edge.targetId),
+    onSynapse: (edge) => controller.selectRoute(
+      edge.sourceId,
+      edge.targetId,
+      sequence: edge.kind == 'Observed sequence',
+    ),
   );
 
   Widget _compactGraph() => UiGraph(
@@ -346,7 +367,11 @@ class _ActivityViewState extends State<ActivityView> {
     playing: !controller.paused && !controller.stale,
     highlightEdgeId: controller.highlightEdgeId,
     onNodeTap: (node) => controller.selectNode(node.id),
-    onEdgeTap: (edge) => controller.selectRoute(edge.sourceId, edge.targetId),
+    onEdgeTap: (edge) => controller.selectRoute(
+      edge.sourceId,
+      edge.targetId,
+      sequence: edge.dotted,
+    ),
   );
 
   Widget _list(BuildContext context) => Column(
@@ -470,7 +495,7 @@ class _ActivityViewState extends State<ActivityView> {
                 ListTile(
                   title: Text('${item.kind}: ${item.type}'),
                   subtitle: Text(
-                    '${item.sourceId ?? 'External'} → ${item.targetId ?? 'Unknown target'}\n${item.at.toLocal()}${item.durationMs == null ? '' : ' · ${item.durationMs!.toStringAsFixed(1)} ms'}${item.failureCode == null ? '' : ' · ${item.failureCode}'}',
+                    '${_pathLabel(item)}\n${item.at.toLocal()}${item.durationMs == null ? '' : ' · ${item.durationMs!.toStringAsFixed(1)} ms'}${item.failureCode == null ? '' : ' · ${item.failureCode}'}',
                   ),
                   isThreeLine: true,
                 ),
@@ -480,4 +505,8 @@ class _ActivityViewState extends State<ActivityView> {
       ],
     );
   }
+
+  String _pathLabel(ActivityRecord item) => item.kind == 'SignalPublished'
+      ? 'Published at ${item.sourceId ?? 'Unknown neuron'}'
+      : '${item.sourceId ?? 'External'} → ${item.targetId ?? 'Unknown target'}';
 }

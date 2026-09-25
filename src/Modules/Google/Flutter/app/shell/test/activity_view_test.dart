@@ -16,6 +16,7 @@ import 'package:digitalbrain_ui/src/components/graph/graph_scene.dart';
 
 final class FakeGraphScene implements GraphScene, AnimatedGraphScene {
   List<graph.GraphPulse> shownPulses = const [];
+  List<graph.GraphEdge> loadedEdges = const [];
   Offset? projectedNode;
   Map<String, Offset>? projections;
   int advanceCalls = 0;
@@ -27,6 +28,7 @@ final class FakeGraphScene implements GraphScene, AnimatedGraphScene {
     List<graph.GraphEdge> edges,
     Map<String, graph.GraphPoint> layout,
   ) async {
+    loadedEdges = edges;
     if (failLoad) throw StateError('Renderer initialization failed');
   }
 
@@ -64,6 +66,114 @@ ActivityRecord item(int sequence, String kind) => ActivityRecord(
 );
 
 void main() {
+  testWidgets('real root calls connect to an ingress in every view', (
+    tester,
+  ) async {
+    final observed = DateTime.now().toUtc().subtract(
+      const Duration(minutes: 4),
+    );
+    final controller = ActivityController(
+      read: () async => ActivitySnapshot(
+        events: [
+          ActivityRecord(
+            id: 'root-start',
+            operationId: 'root-op',
+            correlationId: 'intent-one',
+            sequence: 1,
+            at: observed,
+            kind: 'CallStarted',
+            type: 'Run',
+            status: 'started',
+            targetId: 'ai-intent-usage/one',
+          ),
+          ActivityRecord(
+            id: 'root-end',
+            operationId: 'root-op',
+            correlationId: 'intent-one',
+            sequence: 2,
+            at: observed.add(const Duration(milliseconds: 20)),
+            kind: 'CallCompleted',
+            type: 'Run',
+            status: 'completed',
+            targetId: 'ai-intent-usage/one',
+          ),
+          ActivityRecord(
+            id: 'next-root',
+            operationId: 'next-op',
+            correlationId: 'intent-one',
+            sequence: 3,
+            at: observed.add(const Duration(seconds: 2)),
+            kind: 'CallStarted',
+            type: 'Read',
+            status: 'started',
+            targetId: 'supabase-table/two',
+          ),
+        ],
+        nextSequence: 3,
+        gap: false,
+        observedAt: observed,
+      ),
+      watch: (_, _) => const Stream<ActivityUpdate>.empty(),
+    );
+    await controller.start();
+    expect(
+      controller.nodes.map((node) => node.id),
+      contains(ActivityController.externalSourceId),
+    );
+    expect(
+      controller.nodes
+          .singleWhere((node) => node.id == 'ai-intent-usage/one')
+          .label,
+      'Ai Intent Usage one',
+    );
+    expect(controller.edges, hasLength(3));
+    expect(controller.edges.where((edge) => edge.dotted), hasLength(1));
+    expect(controller.pulses, hasLength(2));
+    final scene = FakeGraphScene();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: graph.UiThemeScope(
+            child: ActivityView(
+              controller: controller,
+              spatialSceneFactory: () => scene,
+            ),
+          ),
+        ),
+      ),
+    );
+    final compact = tester.widget<graph.UiGraph>(find.byType(graph.UiGraph));
+    expect(compact.edges, hasLength(3));
+    await tester.tap(find.text('Lumen'));
+    await tester.pump();
+    final lumen = tester.widget<graph.LumenBrainGraph>(
+      find.byType(graph.LumenBrainGraph),
+    );
+    expect(lumen.snapshot.synapses, hasLength(3));
+    await tester.tap(find.text('3D'));
+    await tester.pump();
+    expect(scene.loadedEdges, hasLength(3));
+    controller.selectRoute(
+      ActivityController.externalSourceId,
+      'ai-intent-usage/one',
+    );
+    expect(controller.visibleEvents.map((event) => event.id), [
+      'root-start',
+      'root-end',
+    ]);
+    controller.selectRoute(
+      'ai-intent-usage/one',
+      'supabase-table/two',
+      sequence: true,
+    );
+    expect(controller.visibleEvents.map((event) => event.id), [
+      'root-start',
+      'root-end',
+      'next-root',
+    ]);
+    controller.dispose();
+  });
+
   test('activity keeps only ten distinct interaction trails', () async {
     final controller = ActivityController(
       read: () async => ActivitySnapshot(
@@ -95,6 +205,56 @@ void main() {
     final frozen = controller.visualNow;
     await Future<void>.delayed(const Duration(milliseconds: 2));
     expect(controller.visualNow, frozen);
+    controller.dispose();
+  });
+
+  test('activity order never claims an uncorrelated or distant call', () async {
+    final start = DateTime.utc(2026, 9, 25);
+    final controller = ActivityController(
+      read: () async => ActivitySnapshot(
+        events: [
+          ActivityRecord(
+            id: 'one',
+            operationId: 'one',
+            correlationId: 'intent',
+            sequence: 1,
+            at: start,
+            kind: 'CallStarted',
+            type: 'Run',
+            status: 'started',
+            targetId: 'neuron/a',
+          ),
+          ActivityRecord(
+            id: 'uncorrelated',
+            operationId: 'two',
+            sequence: 2,
+            at: start.add(const Duration(seconds: 1)),
+            kind: 'CallStarted',
+            type: 'Run',
+            status: 'started',
+            targetId: 'neuron/b',
+          ),
+          ActivityRecord(
+            id: 'late',
+            operationId: 'three',
+            correlationId: 'intent',
+            sequence: 3,
+            at: start.add(const Duration(minutes: 1)),
+            kind: 'CallStarted',
+            type: 'Run',
+            status: 'started',
+            targetId: 'neuron/c',
+          ),
+        ],
+        nextSequence: 3,
+        gap: false,
+        observedAt: start,
+      ),
+      watch: (_, _) => const Stream<ActivityUpdate>.empty(),
+    );
+    await controller.start();
+    expect(controller.edges.where((edge) => edge.dotted), isEmpty);
+    expect(controller.edges, hasLength(3));
     controller.dispose();
   });
 
@@ -261,28 +421,37 @@ void main() {
       };
     final start = DateTime.utc(2026, 9, 25, 12);
     const boundaryKey = Key('trail_image');
-    Widget view(List<graph.GraphPulse> pulses) => MaterialApp(
-      home: Center(
-        child: RepaintBoundary(
-          key: boundaryKey,
-          child: SizedBox(
-            width: 400,
-            height: 300,
-            child: graph.SpatialGraph(
-              nodes: const [
-                graph.GraphNode(id: 'a', label: 'A'),
-                graph.GraphNode(id: 'b', label: 'B'),
-              ],
-              edges: const [],
-              pulses: pulses,
-              now: start.add(const Duration(seconds: 1)),
-              playing: false,
-              sceneFactory: () => scene,
+    Widget view(List<graph.GraphPulse> pulses, {bool connect = false}) =>
+        MaterialApp(
+          home: Center(
+            child: RepaintBoundary(
+              key: boundaryKey,
+              child: SizedBox(
+                width: 400,
+                height: 300,
+                child: graph.SpatialGraph(
+                  nodes: const [
+                    graph.GraphNode(id: 'a', label: 'A'),
+                    graph.GraphNode(id: 'b', label: 'B'),
+                  ],
+                  edges: connect
+                      ? const [
+                          graph.GraphEdge(
+                            id: 'ab',
+                            sourceId: 'a',
+                            targetId: 'b',
+                          ),
+                        ]
+                      : const [],
+                  pulses: pulses,
+                  now: start.add(const Duration(seconds: 1)),
+                  playing: false,
+                  sceneFactory: () => scene,
+                ),
+              ),
             ),
           ),
-        ),
-      ),
-    );
+        );
     Future<List<int>> pixels() async => (await tester.runAsync(() async {
       final boundary = tester.renderObject<RenderRepaintBoundary>(
         find.byKey(boundaryKey),
@@ -295,24 +464,31 @@ void main() {
 
     await tester.pumpWidget(view(const []));
     final quiet = await pixels();
+    await tester.pumpWidget(view(const [], connect: true));
+    final connected = await pixels();
     await tester.pumpWidget(
       view([
         graph.GraphPulse(fromId: 'a', toId: 'b', signature: 'call', at: start),
-      ]),
+      ], connect: true),
     );
     final active = await pixels();
-    var changed = 0;
-    for (var y = 80; y < 160; y++) {
-      for (var x = 140; x < 260; x++) {
-        final offset = (y * 400 + x) * 4;
-        if (quiet[offset] != active[offset] ||
-            quiet[offset + 1] != active[offset + 1] ||
-            quiet[offset + 2] != active[offset + 2]) {
-          changed++;
+    int changedPixels(List<int> before, List<int> after) {
+      var changed = 0;
+      for (var y = 80; y < 160; y++) {
+        for (var x = 140; x < 260; x++) {
+          final offset = (y * 400 + x) * 4;
+          if (before[offset] != after[offset] ||
+              before[offset + 1] != after[offset + 1] ||
+              before[offset + 2] != after[offset + 2]) {
+            changed++;
+          }
         }
       }
+      return changed;
     }
-    expect(changed, greaterThan(100));
+
+    expect(changedPixels(quiet, connected), greaterThan(100));
+    expect(changedPixels(connected, active), greaterThan(100));
   });
 
   testWidgets('3D highlights a selected retained route without live pulses', (

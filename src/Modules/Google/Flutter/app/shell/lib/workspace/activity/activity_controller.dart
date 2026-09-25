@@ -12,6 +12,15 @@ typedef WatchActivity = Stream<ActivityUpdate> Function(
 
 class ActivityController extends ChangeNotifier {
   ActivityController({required this.read, required this.watch});
+
+  /// The observed boundary for calls initiated outside a neuron.
+  static const externalSourceId = 'activity:external';
+
+  static String? _sourceFor(ActivityRecord event) =>
+      event.sourceId ??
+      (event.kind != 'SignalPublished' && event.targetId != null
+          ? externalSourceId
+          : null);
   final ReadActivity read;
   final WatchActivity watch;
   StreamSubscription<ActivityUpdate>? _subscription;
@@ -33,6 +42,7 @@ class ActivityController extends ChangeNotifier {
   String statusFilter = 'All';
   String? routeSourceId;
   String? routeTargetId;
+  String? _routeSequenceIntent;
 
   List<ActivityRecord> get _frame => _pausedEvents ?? _events;
   int get replayFirstSequence => _frame.isEmpty ? 0 : _frame.first.sequence;
@@ -46,12 +56,17 @@ class ActivityController extends ChangeNotifier {
       .where(
         (e) =>
             routeSourceId == null ||
-            (e.sourceId == routeSourceId && e.targetId == routeTargetId),
+            (_routeSequenceIntent != null
+                ? e.correlationId == _routeSequenceIntent &&
+                      (e.targetId == routeSourceId ||
+                          e.targetId == routeTargetId)
+                : _sourceFor(e) == routeSourceId &&
+                      e.targetId == routeTargetId),
       )
       .where(
         (e) =>
             search.isEmpty ||
-            '${e.type} ${e.sourceId} ${e.targetId}'.toLowerCase().contains(
+            '${e.type} ${_sourceFor(e)} ${e.targetId}'.toLowerCase().contains(
               search.toLowerCase(),
             ),
       )
@@ -77,32 +92,80 @@ class ActivityController extends ChangeNotifier {
   List<graph.GraphNode> get nodes {
     final ids = <String>{};
     for (final event in _frameEvents) {
-      if (event.sourceId != null) ids.add(event.sourceId!);
+      if (_sourceFor(event) case final source?) ids.add(source);
       if (event.targetId != null) ids.add(event.targetId!);
+    }
+    final typeCounts = <String, int>{};
+    for (final id in ids) {
+      final type = id.split('/').first;
+      typeCounts[type] = (typeCounts[type] ?? 0) + 1;
     }
     return [
       for (final id in ids.toList()..sort())
         graph.GraphNode(
           id: id,
-          label: id.split('/').last,
-          kind: graph.GraphNodeKind.hub,
-          iconKey: graph.NeuronIconKind.forGrainId(id).name,
+          label: _nodeLabel(id, typeCounts[id.split('/').first] ?? 1),
+          kind: id == externalSourceId
+              ? graph.GraphNodeKind.entity
+              : graph.GraphNodeKind.hub,
+          iconKey: id == externalSourceId
+              ? graph.NeuronIconKind.conversation.name
+              : graph.NeuronIconKind.forGrainId(id).name,
         ),
     ];
   }
 
+  static String _nodeLabel(String id, int count) {
+    if (id == externalSourceId) return 'External call';
+    final parts = id.split('/');
+    if (parts.length == 1) return id;
+    final words = parts.first.split(RegExp(r'[-.]'));
+    final type = words
+        .map(
+          (word) => word.isEmpty
+              ? word
+              : '${word[0].toUpperCase()}${word.substring(1)}',
+        )
+        .join(' ');
+    final instance = parts.last;
+    if (instance.length <= 16 && !instance.contains('-')) {
+      return '$type $instance';
+    }
+    return count > 1 ? '$type · ${instance.substring(0, 4)}' : type;
+  }
+
   List<graph.GraphEdge> get edges {
     final routes = <String, graph.GraphEdge>{};
+    final previousByIntent = <String, ActivityRecord>{};
     for (final event in _frameEvents) {
-      if (event.kind != 'CallStarted' ||
-          event.sourceId == null ||
-          event.targetId == null) {
+      final intent = event.correlationId;
+      if (event.kind == 'CallStarted' &&
+          event.sourceId == null &&
+          event.targetId != null &&
+          intent != null) {
+        final previous = previousByIntent[intent];
+        if (previous?.targetId != null &&
+            previous!.targetId != event.targetId &&
+            event.at.difference(previous.at).inMilliseconds >= 0 &&
+            event.at.difference(previous.at) <= const Duration(seconds: 30)) {
+          final id = '${previous.targetId}|${event.targetId}|sequence';
+          routes[id] = graph.GraphEdge(
+            id: id,
+            sourceId: previous.targetId!,
+            targetId: event.targetId!,
+            dotted: true,
+          );
+        }
+        previousByIntent[intent] = event;
+      }
+      if (event.kind == 'SignalPublished' || event.targetId == null) {
         continue;
       }
-      final id = '${event.sourceId}|${event.targetId}|call';
+      final source = _sourceFor(event)!;
+      final id = '$source|${event.targetId}|call';
       routes[id] = graph.GraphEdge(
         id: id,
-        sourceId: event.sourceId!,
+        sourceId: source,
         targetId: event.targetId!,
       );
     }
@@ -127,12 +190,12 @@ class ActivityController extends ChangeNotifier {
       ..sort((a, b) => a.sequence.compareTo(b.sequence));
     return [
       for (final event in operations.reversed.take(10).toList().reversed)
-        if (event.sourceId != null &&
+        if (_sourceFor(event) != null &&
             (event.kind == 'SignalPublished' || event.targetId != null))
           graph.GraphPulse(
-            fromId: event.sourceId!,
+            fromId: _sourceFor(event)!,
             toId: event.kind == 'SignalPublished'
-                ? event.sourceId!
+                ? _sourceFor(event)!
                 : event.targetId!,
             signature: event.id,
             operationId: event.kind == 'SignalPublished'
@@ -159,8 +222,8 @@ class ActivityController extends ChangeNotifier {
 
   String? get highlightEdgeId {
     final event = selectedEvent;
-    if (event?.sourceId == null || event?.targetId == null) return null;
-    return '${event!.sourceId}|${event.targetId}|call';
+    if (event?.targetId == null) return null;
+    return '${_sourceFor(event!)}|${event.targetId}|call';
   }
 
   Future<void> start() async {
@@ -225,14 +288,41 @@ class ActivityController extends ChangeNotifier {
     search = id;
     routeSourceId = null;
     routeTargetId = null;
+    _routeSequenceIntent = null;
     notifyListeners();
   }
 
-  void selectRoute(String sourceId, String targetId) {
+  void selectRoute(String sourceId, String targetId, {bool sequence = false}) {
     routeSourceId = sourceId;
     routeTargetId = targetId;
+    _routeSequenceIntent = sequence
+        ? _findSequenceIntent(sourceId, targetId)
+        : null;
     search = '';
     notifyListeners();
+  }
+
+  String? _findSequenceIntent(String sourceId, String targetId) {
+    final calls = _frameEvents
+        .where(
+          (event) => event.kind == 'CallStarted' && event.correlationId != null,
+        )
+        .toList();
+    for (var i = calls.length - 1; i > 0; i--) {
+      final target = calls[i];
+      if (target.targetId != targetId) continue;
+      for (var j = i - 1; j >= 0; j--) {
+        final source = calls[j];
+        if (target.at.difference(source.at) > const Duration(seconds: 30)) {
+          break;
+        }
+        if (source.correlationId == target.correlationId &&
+            source.targetId == sourceId) {
+          return target.correlationId;
+        }
+      }
+    }
+    return null;
   }
 
   void clearSelection() {
@@ -241,6 +331,7 @@ class ActivityController extends ChangeNotifier {
     search = '';
     routeSourceId = null;
     routeTargetId = null;
+    _routeSequenceIntent = null;
     notifyListeners();
   }
 

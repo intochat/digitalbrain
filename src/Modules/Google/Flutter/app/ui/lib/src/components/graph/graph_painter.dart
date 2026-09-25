@@ -40,7 +40,12 @@ final class GraphPainter extends CustomPainter {
       final control = graphEdgeControl(edge, center);
       final depthAlpha = (0.45 + (edge.depth + 1) * 0.2).clamp(0.3, 0.9);
       final recent = edge.edge.id == highlightEdgeId;
-      final color = recent ? UiPalette.signal : UiPalette.line;
+      final color = recent ? UiPalette.signal : UiPalette.owner;
+      final alpha = recent
+          ? 0.95
+          : edge.edge.dotted
+          ? 0.78
+          : math.max(depthAlpha, 0.68);
 
       final path = Path()
         ..moveTo(edge.from.center.dx, edge.from.center.dy)
@@ -54,8 +59,12 @@ final class GraphPainter extends CustomPainter {
         edge.edge.dotted ? _dashed(path) : path,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = recent ? 2.4 : 1.4
-          ..color = color.withValues(alpha: recent ? 0.95 : depthAlpha),
+          ..strokeWidth = recent
+              ? 2.6
+              : edge.edge.dotted
+              ? 2.2
+              : 1.8
+          ..color = color.withValues(alpha: alpha),
       );
 
       final tip = graphQuadraticPoint(
@@ -83,10 +92,7 @@ final class GraphPainter extends CustomPainter {
           tip.dy - arrow * math.sin(direction + 0.45),
         )
         ..close();
-      canvas.drawPath(
-        head,
-        Paint()..color = color.withValues(alpha: recent ? 0.95 : depthAlpha),
-      );
+      canvas.drawPath(head, Paint()..color = color.withValues(alpha: alpha));
 
       if (edge.edge.decorated) {
         final bead = graphQuadraticPoint(

@@ -230,6 +230,14 @@ final class _SpatialGraphState extends State<SpatialGraph>
               builder: (context, _, _) => IgnorePointer(
                 child: Stack(
                   children: [
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _SpatialConnectionPainter(widget.edges, {
+                          for (final node in widget.nodes)
+                            node.id: ?_scene.project(node.id),
+                        }),
+                      ),
+                    ),
                     for (final edge in widget.edges)
                       if (edge.id == widget.selectedEdgeId &&
                           _scene.project(edge.sourceId) != null &&
@@ -325,6 +333,58 @@ final class _SelectedRoutePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _SelectedRoutePainter oldDelegate) =>
       oldDelegate.from != from || oldDelegate.to != to;
+}
+
+/// Projected base routes stay legible when there is no recent activity.
+final class _SpatialConnectionPainter extends CustomPainter {
+  const _SpatialConnectionPainter(this.edges, this.positions);
+  final List<GraphEdge> edges;
+  final Map<String, Offset> positions;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final line = Paint()
+      ..color = const Color(0xff8ea8d8).withValues(alpha: .72)
+      ..strokeWidth = 2.2
+      ..style = PaintingStyle.stroke;
+    for (final edge in edges) {
+      final from = positions[edge.sourceId];
+      final to = positions[edge.targetId];
+      if (from == null || to == null) continue;
+      if (edge.dotted) {
+        final delta = to - from;
+        final distance = delta.distance;
+        if (distance < 1) continue;
+        for (var offset = 0.0; offset < distance; offset += 13) {
+          canvas.drawLine(
+            from + delta * (offset / distance),
+            from + delta * (math.min(offset + 7, distance) / distance),
+            line,
+          );
+        }
+      } else {
+        canvas.drawLine(from, to, line);
+      }
+      final direction = (to - from).direction;
+      final tip = from + (to - from) * .82;
+      final arrow = Path()
+        ..moveTo(tip.dx, tip.dy)
+        ..lineTo(
+          tip.dx - 9 * math.cos(direction - .5),
+          tip.dy - 9 * math.sin(direction - .5),
+        )
+        ..moveTo(tip.dx, tip.dy)
+        ..lineTo(
+          tip.dx - 9 * math.cos(direction + .5),
+          tip.dy - 9 * math.sin(direction + .5),
+        );
+      canvas.drawPath(arrow, line);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SpatialConnectionPainter oldDelegate) =>
+      oldDelegate.edges != edges || oldDelegate.positions != positions;
 }
 
 /// Bright, bounded activity remains readable even after the GL particle ends.

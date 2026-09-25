@@ -5,14 +5,48 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('adding a neuron keeps existing graph positions stable', () {
-    final initial = projectGraphNodes(
-      const [GraphNode(id: 'caller', label: 'Caller')],
-      const Size(800, 600),
+  test('graph fits connected neurons across the available canvas', () {
+    final projected = projectGraphNodes(
+      const [
+        GraphNode(
+          id: 'external',
+          label: 'External',
+          position: GraphPoint(2.1, -1.2, 0),
+        ),
+        GraphNode(
+          id: 'agent',
+          label: 'Agent',
+          position: GraphPoint(3.8, .4, 0),
+        ),
+        GraphNode(
+          id: 'table',
+          label: 'Table',
+          position: GraphPoint(.1, -1.3, 0),
+        ),
+        GraphNode(
+          id: 'workspace',
+          label: 'Workspace',
+          position: GraphPoint(.3, -2.5, 0),
+        ),
+        GraphNode(
+          id: 'usage',
+          label: 'Usage',
+          position: GraphPoint(.4, 4.6, 0),
+        ),
+      ],
+      const Size(600, 300),
       0,
       0,
     );
-    final expanded = projectGraphNodes(
+    final xs = projected.map((node) => node.center.dx);
+    expect(
+      xs.reduce((a, b) => a > b ? a : b) - xs.reduce((a, b) => a < b ? a : b),
+      greaterThan(250),
+    );
+  });
+
+  test('fitted graph positions are independent of input order', () {
+    final initial = projectGraphNodes(
       const [
         GraphNode(id: 'caller', label: 'Caller'),
         GraphNode(id: 'target', label: 'Target'),
@@ -21,9 +55,18 @@ void main() {
       0,
       0,
     );
+    final reversed = projectGraphNodes(
+      const [
+        GraphNode(id: 'target', label: 'Target'),
+        GraphNode(id: 'caller', label: 'Caller'),
+      ],
+      const Size(800, 600),
+      0,
+      0,
+    );
     expect(
-      expanded.singleWhere((e) => e.node.id == 'caller').center,
-      initial.single.center,
+      reversed.singleWhere((e) => e.node.id == 'caller').center,
+      initial.singleWhere((e) => e.node.id == 'caller').center,
     );
   });
 
