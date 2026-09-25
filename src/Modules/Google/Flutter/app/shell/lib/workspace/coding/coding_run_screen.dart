@@ -23,9 +23,21 @@ class CodingRunView {
 
   final Map<String, dynamic> snapshot;
 
+  int get statusCode => (snapshot['status'] as num?)?.toInt() ?? 0;
   String get status => codingRunStatusLabel(snapshot['status']);
-  bool get stopped => (snapshot['status'] as num?)?.toInt() == 5;
-  bool get approved => (snapshot['status'] as num?)?.toInt() == 4;
+  bool get closed => const {3, 5, 13, 14}.contains(statusCode);
+  bool get awaitingApproval => statusCode == 2;
+  int get currentStep => (snapshot['currentStep'] as num?)?.toInt() ?? 0;
+  int get totalSteps => (snapshot['totalSteps'] as num?)?.toInt() ?? 0;
+  int get fixAttempts => (snapshot['fixAttempts'] as num?)?.toInt() ?? 0;
+  String get diff => snapshot['diff'] as String? ?? '';
+  Map<String, dynamic>? get build =>
+      snapshot['build'] is Map ? Map<String, dynamic>.from(snapshot['build'] as Map) : null;
+  Map<String, dynamic>? get test =>
+      snapshot['test'] is Map ? Map<String, dynamic>.from(snapshot['test'] as Map) : null;
+  List<String> get reviewFindings => snapshot['reviewFindings'] is List
+      ? (snapshot['reviewFindings'] as List).whereType<String>().toList()
+      : const [];
   String? get failureReason => snapshot['failureReason'] as String?;
   Map<String, dynamic>? get plan =>
       snapshot['plan'] is Map ? Map<String, dynamic>.from(snapshot['plan'] as Map) : null;
@@ -50,6 +62,16 @@ String codingRunStatusLabel(Object? value) {
     3 => 'Failed',
     4 => 'Plan approved',
     5 => 'Stopped',
+    6 => 'Workspace ready',
+    7 => 'Implementing',
+    8 => 'Step drafted',
+    9 => 'Build passed',
+    10 => 'Build failed',
+    11 => 'Tests passed',
+    12 => 'Tests failed',
+    13 => 'Needs you',
+    14 => 'Finished',
+    15 => 'Review rejected',
     _ => 'Unknown',
   };
 }
@@ -187,6 +209,25 @@ class _CodingRunScreenState extends State<CodingRunScreen> {
         ListTile(title: Text('Open questions', style: Theme.of(context).textTheme.titleSmall)),
         for (final question in current.openQuestions) ListTile(dense: true, leading: const Icon(Icons.help_outline), title: Text(question)),
       ],
+      if (current.totalSteps > 0 && current.statusCode >= 6) ...[
+        const Divider(),
+        ListTile(
+          key: const Key('coding-run-progress'),
+          title: Text('Step ${current.currentStep} of ${current.totalSteps}'),
+          subtitle: Text(_results(current)),
+        ),
+        for (final finding in current.reviewFindings)
+          ListTile(dense: true, leading: const Icon(Icons.rate_review_outlined), title: Text(finding)),
+      ],
+      if (current.diff.isNotEmpty) ...[
+        const Divider(),
+        ListTile(title: Text('Diff', style: Theme.of(context).textTheme.titleSmall)),
+        SelectableText(
+          current.diff,
+          key: const Key('coding-run-diff'),
+          style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+        ),
+      ],
       if (current.clarifications.isNotEmpty) ...[
         const Divider(),
         ListTile(title: Text('Clarifications', style: Theme.of(context).textTheme.titleSmall)),
@@ -194,6 +235,21 @@ class _CodingRunScreenState extends State<CodingRunScreen> {
       ],
     ],
   );
+
+  static String _results(CodingRunView current) {
+    final parts = <String>[];
+    final build = current.build;
+    if (build != null) {
+      final errors = build['errors'] is List ? (build['errors'] as List).length : 0;
+      parts.add(build['succeeded'] == true ? 'Build passed' : 'Build failed ($errors errors)');
+    }
+    final test = current.test;
+    if (test != null) {
+      parts.add('Tests ${test['passed'] ?? 0}/${test['total'] ?? 0} passed');
+    }
+    if (current.fixAttempts > 0) parts.add('${current.fixAttempts} fix attempts');
+    return parts.isEmpty ? 'Working…' : parts.join(' · ');
+  }
 
   static String _files(Map<String, dynamic> step) {
     final files = step['files'];
@@ -204,7 +260,7 @@ class _CodingRunScreenState extends State<CodingRunScreen> {
   Widget _clarify(BuildContext context, CodingRunView current) => TextField(
     key: const Key('coding-run-clarify'),
     controller: _clarification,
-    enabled: !current.stopped,
+    enabled: !current.closed,
     minLines: 1,
     maxLines: 3,
     onChanged: (_) => setState(() {}),
@@ -218,7 +274,7 @@ class _CodingRunScreenState extends State<CodingRunScreen> {
     children: [
       FilledButton(
         key: const Key('coding-run-send-clarify'),
-        onPressed: current.stopped || busy || _clarification.text.trim().isEmpty
+        onPressed: current.closed || busy || _clarification.text.trim().isEmpty
             ? null
             : () => _act('clarify', body: {'text': _clarification.text.trim()}),
         child: const Text('Send clarification'),
@@ -226,13 +282,13 @@ class _CodingRunScreenState extends State<CodingRunScreen> {
       const SizedBox(width: 8),
       FilledButton(
         key: const Key('coding-run-approve'),
-        onPressed: current.plan == null || current.stopped || current.approved || busy ? null : () => _act('approve'),
+        onPressed: !current.awaitingApproval || busy ? null : () => _act('approve'),
         child: const Text('Approve'),
       ),
       const SizedBox(width: 8),
       OutlinedButton(
         key: const Key('coding-run-stop'),
-        onPressed: current.stopped || busy ? null : () => _act('stop'),
+        onPressed: current.closed || busy ? null : () => _act('stop'),
         child: const Text('Stop'),
       ),
     ],

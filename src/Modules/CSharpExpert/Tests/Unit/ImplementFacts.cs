@@ -38,6 +38,10 @@ public sealed class ImplementFacts
     private static readonly EditRequest BrokenEdit = new(
         EditKind.InsertMember, SymbolId: "T:SampleInbox.Inbox", Source: "public void Broken() { Missing(); }");
 
+    private static readonly EditRequest DocumentedClearEdit = new(
+        EditKind.InsertMember, SymbolId: "T:SampleInbox.Inbox",
+        Source: "/// <summary>Clears.</summary>\npublic void Clear() => _messages.Clear();");
+
     private static readonly EditRequest CountEdit = new(
         EditKind.InsertMember, SymbolId: "T:SampleInbox.Inbox", Source: "public int Count() => _messages.Count;");
 
@@ -178,5 +182,34 @@ public sealed class ImplementFacts
         Assert.True(snapshot.Test!.Succeeded);
         Assert.Equal(2, agent.Proposals.Count);
         Assert.Contains("ClearRemovesMessages", agent.Proposals[^1].Failure);
+    }
+
+    [Fact]
+    public async Task AReviewRejectionIsFixedAndTheRunFinishes()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var agent = new ScriptedAgentScript { Reply = OneStepPlan };
+        agent.QueueEdits([DocumentedClearEdit]);
+        agent.QueueEdits([CountEdit]);
+        await using var harness = await CSharpExpertHarness.StartAsync(ct, agent);
+        const string runId = "run-review";
+        var run = harness.Brain.Get<ICodingRun>(runId);
+        await using var drafted = await harness.Brain.Observe<PlanDrafted>(run, ct);
+        await using var rejected = await harness.Brain.Observe<ReviewRejected>(run, ct);
+        await using var finished = await harness.Brain.Observe<RunFinished>(run, ct);
+
+        await harness.Host.StartAsync(new FeatureRequest(CSharpExpertTestHost.SampleSolution, "Add a clear operation."), ct, runId);
+        await drafted.NextAsync(ct: ct);
+        await run.Approve();
+        var rejection = await rejected.NextAsync(ct: ct);
+        var summary = await finished.NextAsync(ct: ct);
+
+        Assert.Contains(rejection.Findings, finding => finding.Contains("doc comment", StringComparison.Ordinal));
+        Assert.Contains("Review rejected", agent.Proposals[^1].Failure);
+        var snapshot = await run.Read();
+        Assert.Equal(CodingRunStatus.Finished, snapshot.Status);
+        Assert.Equal(1, snapshot.FixAttempts);
+        Assert.Empty(snapshot.ReviewFindings);
+        Assert.Contains("Count", summary.Diff);
     }
 }

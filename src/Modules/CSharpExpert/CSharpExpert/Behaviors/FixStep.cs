@@ -5,14 +5,15 @@ namespace DigitalBrain.CSharpExpert;
 
 public sealed class FixStep(IDigitalBrain brain, string runId) : IBehavior, IBehaviorSignals
 {
-    public IReadOnlyList<Type> Signals => [typeof(BuildFailed), typeof(TestsFailed)];
+    public IReadOnlyList<Type> Signals => [typeof(BuildFailed), typeof(TestsFailed), typeof(ReviewRejected)];
 
     public Task RunAsync(CancellationToken cancellation = default)
     {
         var run = brain.Get<ICodingRun>(runId);
         return Task.WhenAll(
             ListenAsync<BuildFailed>(run, BuildFailureText, cancellation),
-            ListenAsync<TestsFailed>(run, TestFailureText, cancellation));
+            ListenAsync<TestsFailed>(run, TestFailureText, cancellation),
+            ListenAsync<ReviewRejected>(run, ReviewFindingsText, cancellation));
     }
 
     private static string BuildFailureText(BuildFailed signal)
@@ -22,6 +23,9 @@ public sealed class FixStep(IDigitalBrain brain, string runId) : IBehavior, IBeh
     private static string TestFailureText(TestsFailed signal)
         => "Tests failed:" + Environment.NewLine
             + string.Join(Environment.NewLine, signal.Failures.Select(failure => $"{failure.Name}: {failure.Message}"));
+
+    private static string ReviewFindingsText(ReviewRejected signal)
+        => "Review rejected the step:" + Environment.NewLine + string.Join(Environment.NewLine, signal.Findings);
 
     private async Task ListenAsync<TSignal>(ICodingRun run, Func<TSignal, string> describe, CancellationToken cancellation) where TSignal : Signal
     {

@@ -17,8 +17,10 @@ internal sealed record CodingRunState(
     [property: Id(10)] string? Diff,
     [property: Id(11)] BuildOutcome? Build,
     [property: Id(12)] TestOutcome? Test,
-    [property: Id(13)] IReadOnlyList<DiagnosticGroup> Diagnostics)
+    [property: Id(13)] IReadOnlyList<DiagnosticGroup> Diagnostics,
+    [property: Id(14)] IReadOnlyList<string> ReviewFindings,
+    [property: Id(15)] IReadOnlyList<string> CompletedStepDiffs)
 {
     public static readonly CodingRunState Empty = new(
-        CodingRunStatus.Requested, null, null, null, null, [], null, null, 0, 0, null, null, null, []);
+        CodingRunStatus.Requested, null, null, null, null, [], null, null, 0, 0, null, null, null, [], [], []);
 }

@@ -20,4 +20,5 @@ public enum CodingRunStatus
     TestsFailed = 12,
     NeedsHuman = 13,
     Finished = 14,
+    ReviewRejected = 15,
 }

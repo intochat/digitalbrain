@@ -83,4 +83,36 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     client.close();
   });
+
+  testWidgets('a finished run shows progress, results and the diff with controls closed', (tester) async {
+    final finished = {
+      ..._snapshot(status: 14, plan: _plan()),
+      'currentStep': 1,
+      'totalSteps': 1,
+      'fixAttempts': 1,
+      'diff': '+    public int UnreadCount() => 0;',
+      'build': {'succeeded': true, 'errors': []},
+      'test': {'passed': 3, 'total': 3},
+      'reviewFindings': <String>[],
+    };
+    final client = DigitalBrainUiClient(
+      baseUri: Uri.parse('http://test'),
+      httpClient: MockClient((request) async =>
+          http.Response(jsonEncode(finished), 200, headers: {'content-type': 'application/json'})),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: Scaffold(body: CodingRunScreen(runId: 'run-1', client: client, active: true))),
+    );
+    await tester.pump();
+
+    expect(find.text('Finished'), findsOneWidget);
+    expect(find.text('Step 1 of 1'), findsOneWidget);
+    expect(find.text('Build passed · Tests 3/3 passed · 1 fix attempts'), findsOneWidget);
+    await tester.scrollUntilVisible(find.byKey(const Key('coding-run-diff')), 200, scrollable: find.descendant(of: find.byType(ListView), matching: find.byType(Scrollable)));
+    expect(find.byKey(const Key('coding-run-diff')), findsOneWidget);
+    expect(tester.widget<FilledButton>(find.byKey(const Key('coding-run-approve'))).onPressed, isNull);
+    expect(tester.widget<OutlinedButton>(find.byKey(const Key('coding-run-stop'))).onPressed, isNull);
+    await tester.pumpWidget(const SizedBox());
+    client.close();
+  });
 }

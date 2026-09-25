@@ -30,7 +30,7 @@ internal static class CSharpExpertTestHost
                 silo.Services.Replace(ServiceDescriptor.Singleton<ISolutionLoader>(new SampleSolutionLoader()));
                 if (script is not null)
                 {
-                    silo.Services.AddSingleton(script);
+                    silo.Services.Replace(ServiceDescriptor.Singleton<ICodingAgentBackend>(new ScriptedCodingBackend(script)));
                 }
             });
         return builder.StartAsync(cancellationToken);

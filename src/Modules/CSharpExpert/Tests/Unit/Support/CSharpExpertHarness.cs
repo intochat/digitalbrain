@@ -53,7 +53,7 @@ internal sealed class CSharpExpertHarness : IAsyncDisposable
             {
                 silo.Services.Replace(ServiceDescriptor.Singleton<ISolutionLoader>(new SampleSolutionLoader()));
                 silo.Services.Replace(ServiceDescriptor.Singleton<IProcessRunner>(new ScriptedProcessRunner(processScript)));
-                silo.Services.AddSingleton(agentScript);
+                silo.Services.Replace(ServiceDescriptor.Singleton<ICodingAgentBackend>(new ScriptedCodingBackend(agentScript)));
             })
             .StartAsync(cancellationToken);
         var preparer = new WorkspacePreparer(new ScriptedProcessRunner(processScript), Options.Create(new CSharpExpertModuleOptions { WorkspaceRoot = workspaceRoot }));

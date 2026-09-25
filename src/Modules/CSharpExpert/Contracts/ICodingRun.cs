@@ -30,6 +30,8 @@ public interface ICodingRun : INeuron
 
     Task RecordTests(TestOutcome outcome);
 
+    Task RecordReview(IReadOnlyList<string> findings);
+
     Task RecordNeedsHuman(string reason);
 
     Task Fail(string reason);

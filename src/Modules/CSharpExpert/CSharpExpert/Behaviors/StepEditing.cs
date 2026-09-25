@@ -12,8 +12,19 @@ internal static class StepEditing
         var profile = await brain.Get<ICodingProfile>(CodingWorkspace.Id(request.SolutionPath)).Read().ConfigureAwait(false);
         var agent = brain.Get<ICodingAgent>(profile.ImplementerAgentId);
         var roslyn = brain.Get<IRoslyn>(CodingWorkspace.Id(RunWorkspace.SolutionPath(snapshot)));
-        var proposal = new EditProposal(snapshot.RunId, step.Number, step.Title, step.Detail, step.Files, snapshot.Model?.MapText ?? string.Empty, failure);
-        var edits = await agent.ProposeEdits(proposal, cancellationToken).ConfigureAwait(false);
+        var proposal = new EditProposal(snapshot.RunId, step.Number, step.Title, step.Detail, step.Files, snapshot.Model?.MapText ?? string.Empty, failure,
+            StepSources.Read(snapshot.WorkspaceRoot, step.Files));
+        IReadOnlyList<EditRequest> edits;
+        try
+        {
+            edits = await agent.ProposeEdits(proposal, cancellationToken).ConfigureAwait(false);
+        }
+        catch (FormatException unreadable)
+        {
+            await run.RecordBrokenEdit(step.Number, string.Empty, [new DiagnosticGroup("edit", "reply", [unreadable.Message])]).ConfigureAwait(false);
+            return;
+        }
+
         if (edits.Count == 0)
         {
             await run.RecordBrokenEdit(step.Number, string.Empty, [new DiagnosticGroup("edit", "none", ["the implementer proposed no edits for this step"])]).ConfigureAwait(false);

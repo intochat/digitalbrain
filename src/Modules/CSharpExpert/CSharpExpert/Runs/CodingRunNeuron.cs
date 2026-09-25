@@ -184,7 +184,27 @@ internal sealed class CodingRunNeuron(
 
         await PersistAsync(current with { Status = CodingRunStatus.TestsPassed, Test = outcome },
             new TestsPassed(Key, step, outcome.Passed, outcome.Total));
-        await AdvanceAsync(current with { Test = outcome }, step);
+    }
+
+    public async Task RecordReview(IReadOnlyList<string> findings)
+    {
+        ArgumentNullException.ThrowIfNull(findings);
+        EnsureOpen();
+        var current = Current;
+        if (current.Status != CodingRunStatus.TestsPassed)
+        {
+            throw new InvalidOperationException("Record a review after the tests pass.");
+        }
+
+        var step = CurrentStep(current);
+        if (findings.Count > 0)
+        {
+            await PersistAsync(current with { Status = CodingRunStatus.ReviewRejected, ReviewFindings = findings },
+                new ReviewRejected(Key, step, findings));
+            return;
+        }
+
+        await AdvanceAsync(current with { ReviewFindings = [] }, step);
     }
 
     public async Task RecordNeedsHuman(string reason)
@@ -209,29 +229,30 @@ internal sealed class CodingRunNeuron(
         return Task.FromResult(new CodingRunSnapshot(
             Key, current.Status, current.Request, current.Model, current.Plan, current.FailureReason, current.Clarifications,
             current.WorkspaceRoot, current.WorkspaceSolutionPath, total == 0 ? 0 : Math.Min(current.StepsCompleted + 1, total), total,
-            current.FixAttempts, current.Diff, current.Build, current.Test, current.Diagnostics));
+            current.FixAttempts, current.Diff, current.Build, current.Test, current.Diagnostics,
+            current.ReviewFindings, current.CompletedStepDiffs));
     }
 
-    // Until Review exists, a passing test is what closes a step: the run either opens the next one or finishes.
     private async Task AdvanceAsync(CodingRunState current, int stepNumber)
     {
         var total = current.Plan?.Steps.Count ?? 0;
         var completed = Math.Max(current.StepsCompleted, stepNumber);
+        var closed = current with { StepsCompleted = completed, CompletedStepDiffs = [.. current.CompletedStepDiffs, current.Diff ?? string.Empty] };
         if (completed >= total)
         {
             // Keep the final step's fix attempts in the finished snapshot; a fresh step clears them.
-            await PersistAsync(current with { StepsCompleted = completed, Status = CodingRunStatus.Finished },
-                new RunFinished(Key, current.Diff ?? string.Empty));
+            await PersistAsync(closed with { Status = CodingRunStatus.Finished },
+                new RunFinished(Key, string.Join(Environment.NewLine, closed.CompletedStepDiffs)));
             return;
         }
 
-        await PersistAsync(current with { StepsCompleted = completed, Status = CodingRunStatus.Implementing, FixAttempts = 0 },
+        await PersistAsync(closed with { Status = CodingRunStatus.Implementing, FixAttempts = 0 },
             new StepDone(Key, stepNumber));
     }
 
-    // A draft that follows a failed build or test is a fix attempt; the first draft of a step is not.
+    // A draft that follows a failed build, test or review is a fix attempt; the first draft of a step is not.
     private static int NextFixAttempts(CodingRunState current)
-        => current.Status is CodingRunStatus.BuildFailed or CodingRunStatus.TestsFailed ? current.FixAttempts + 1 : current.FixAttempts;
+        => current.Status is CodingRunStatus.BuildFailed or CodingRunStatus.TestsFailed or CodingRunStatus.ReviewRejected ? current.FixAttempts + 1 : current.FixAttempts;
 
     private static int CurrentStep(CodingRunState current)
     {
@@ -263,7 +284,6 @@ internal sealed class CodingRunNeuron(
 
     private async Task PersistAsync(CodingRunState next, Signal changed)
     {
-        Console.Error.WriteLine($"[csx] {Key} -> {next.Status} (fix {next.FixAttempts}) {changed.GetType().Name}");
         state.State = next;
         await state.WriteStateAsync();
         await PublishAsync(changed);

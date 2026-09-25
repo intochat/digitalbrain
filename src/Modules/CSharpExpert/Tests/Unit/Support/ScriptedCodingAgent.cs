@@ -1,7 +1,6 @@
 using DigitalBrain.CSharpExpert;
 using DigitalBrain.Core;
 using DigitalBrain.Microsoft.Roslyn;
-using Orleans.Hosting;
 
 namespace DigitalBrain.Tests;
 
@@ -55,10 +54,9 @@ internal sealed class ScriptedAgentScript
     }
 }
 
-[GrainType("csharp-expert.coding-agent")]
-internal sealed class ScriptedCodingAgent(ScriptedAgentScript script) : Neuron, ICodingAgent
+internal sealed class ScriptedCodingBackend(ScriptedAgentScript script) : ICodingAgentBackend
 {
-    public Task<string> Ask(string prompt, CancellationToken cancellationToken = default)
+    public Task<string> AskAsync(string agentId, string prompt, CancellationToken cancellationToken)
     {
         script.LastPrompt = prompt;
         return script.Throw is null
@@ -66,16 +64,11 @@ internal sealed class ScriptedCodingAgent(ScriptedAgentScript script) : Neuron, 
             : Task.FromException<string>(script.Throw);
     }
 
-    public Task<IReadOnlyList<EditRequest>> ProposeEdits(EditProposal proposal, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<EditRequest>> ProposeEditsAsync(string agentId, EditProposal proposal, CancellationToken cancellationToken)
     {
         script.RecordProposal(proposal);
         return script.Throw is null
             ? Task.FromResult(script.NextEdits())
             : Task.FromException<IReadOnlyList<EditRequest>>(script.Throw);
     }
-}
-
-public sealed class ScriptedAgentModule : IModule
-{
-    public void Configure(ISiloBuilder silo) { }
 }

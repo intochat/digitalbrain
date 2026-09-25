@@ -11,5 +11,6 @@
     <ProjectReference Include="../../DigitalBrain/Behaviors/Runtime/DigitalBrain.Behavior.csproj" />
     <ProjectReference Include="../../Microsoft/Roslyn/Contracts/DigitalBrain.Modules.Microsoft.Roslyn.Contracts.csproj" />
     <ProjectReference Include="../../Microsoft/DotNet/DotNet/DigitalBrain.Modules.Microsoft.DotNet.csproj" />
+    <ProjectReference Include="../../AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
   </ItemGroup>
 </Project>

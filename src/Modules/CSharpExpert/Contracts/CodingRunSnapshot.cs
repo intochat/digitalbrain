@@ -20,4 +20,6 @@ public sealed record CodingRunSnapshot(
     [property: Id(12)] string? Diff,
     [property: Id(13)] BuildOutcome? Build,
     [property: Id(14)] TestOutcome? Test,
-    [property: Id(15)] IReadOnlyList<DiagnosticGroup> Diagnostics);
+    [property: Id(15)] IReadOnlyList<DiagnosticGroup> Diagnostics,
+    [property: Id(16)] IReadOnlyList<string> ReviewFindings,
+    [property: Id(17)] IReadOnlyList<string> CompletedStepDiffs);

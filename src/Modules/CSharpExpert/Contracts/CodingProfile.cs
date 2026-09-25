@@ -9,7 +9,8 @@ public sealed record CodingProfile(
     [property: Id(2)] int MaxFixAttempts,
     [property: Id(3)] bool BuildAndTestEachStep,
     [property: Id(4)] string ReviewRules,
-    [property: Id(5)] string NuGetPolicy)
+    [property: Id(5)] string NuGetPolicy,
+    [property: Id(6)] string? ReviewerAgentId = null)
 {
     public static readonly CodingProfile Default = new(
         PlannerAgentId: "planner",

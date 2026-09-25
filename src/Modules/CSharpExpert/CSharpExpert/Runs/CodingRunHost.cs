@@ -91,6 +91,7 @@ internal sealed class CodingRunSession
             new BuildSolution(observed, runId),
             new RunTests(observed, runId),
             new FixStep(observed, runId),
+            new ReviewStep(observed, runId),
         ];
         observed.Expect(behaviors.OfType<IBehaviorSignals>()
             .SelectMany(behavior => behavior.Signals)

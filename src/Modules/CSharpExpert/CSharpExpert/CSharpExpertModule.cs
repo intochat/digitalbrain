@@ -27,6 +27,7 @@ public sealed class CSharpExpertModule : IModule
         silo.Services.TryAddSingleton<WorkspacePreparer>();
         silo.Services.AddOptions<CSharpExpertModuleOptions>().BindConfiguration("DigitalBrain:CSharpExpert");
         silo.Services.AddSingleton<CodingRunHost>();
+        silo.Services.TryAddSingleton<ICodingAgentBackend, AgentCodingBackend>();
     }
 
     public void Configure(IEndpointRouteBuilder endpoints)

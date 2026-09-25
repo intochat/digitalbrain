@@ -41,3 +41,18 @@ diff, build/test/review results.
 
 ## Out of scope for this round
 NuGet behavior, hot-deploy through `IBehaviorProgram`, packaging (behavior-packages branch).
+
+## Status (2026-09-25)
+Implemented in `src/Modules/CSharpExpert`, registered in the developer profile only.
+- Behaviors: UnderstandSolution, PlanFeature (re-plans on clarification), PrepareWorkspace (git worktree or
+  folder copy, own Roslyn workspace per run), ImplementStep, BuildSolution, RunTests, FixStep (build, test and
+  review failures, capped by `MaxFixAttempts`, then NeedsHuman), ReviewStep (rule checks on added diff lines, plus an
+  optional reviewer agent from `ReviewerAgentId`).
+- Run control: `CodingRunHost` starts one session per run, waits until every behavior's signals are subscribed,
+  and releases the session on Finished, Failed, Stopped or NeedsHuman. HTTP under `/csharp-expert/runs`, assistant tool
+  `CreateCodingRunTool`, Flutter "Coding run" window (plan, clarify, approve, stop, progress, results, diff).
+- Agents: `CodingAgentNeuron` delegates to `ICodingAgentBackend`; production uses one `IAgent` per role
+  (`csharp-expert.<agentId>`, history cleared per call), tests swap in a scripted backend. The implementer gets the
+  step's current file sources and replies with a JSON edit list; an unreadable reply counts as a broken edit.
+- Not yet: NuGet behavior, hot-deploy
+  through `IBehaviorProgram`, packaging. Sessions live in host memory, so a host restart drops running runs.
