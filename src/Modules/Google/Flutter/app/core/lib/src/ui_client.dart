@@ -10,6 +10,7 @@ import 'basic_credentials.dart';
 import 'cookie_http_client.dart';
 import 'host_environment.dart';
 import 'models/brain_models.dart';
+import 'models/activity_models.dart';
 import 'models/table_models.dart';
 import 'models/workspace_models.dart';
 
@@ -393,6 +394,78 @@ final class DigitalBrainUiClient {
     return controller.stream;
   }
 
+  Future<ActivitySnapshot> readActivity(String workspaceId) async {
+    final response = await _request(
+      'GET',
+      '/workspaces/${Uri.encodeComponent(workspaceId)}/activity',
+      timeout: const Duration(seconds: 10),
+    );
+    return ActivitySnapshot.fromJson(
+      Map<String, dynamic>.from(jsonDecode(response.body) as Map),
+    );
+  }
+
+  Stream<ActivityUpdate> watchActivity(
+    String workspaceId, {
+    required int afterSequence,
+  }) async* {
+    var cursor = afterSequence;
+    while (true) {
+      final abort = Completer<void>();
+      try {
+        final request = http.AbortableRequest(
+          'GET',
+          baseUri.resolve(
+            '/workspaces/${Uri.encodeComponent(workspaceId)}/activity/events?after=$cursor',
+          ),
+          abortTrigger: abort.future,
+        )..headers['accept'] = 'text/event-stream';
+        final response = await _http.send(request);
+        if (response.statusCode != 200) {
+          throw StateError('Activity stream unavailable (${response.statusCode}).');
+        }
+        String? event;
+        final data = <String>[];
+        await for (final line in response.stream
+            .transform(utf8.decoder)
+            .transform(const LineSplitter())) {
+          if (line.startsWith('event:')) event = line.substring(6).trim();
+          if (line.startsWith('data:')) data.add(line.substring(5).trimLeft());
+          if (line.isNotEmpty) continue;
+          if (data.isNotEmpty && event == 'activity') {
+            final item = ActivityRecord.fromJson(
+              Map<String, dynamic>.from(jsonDecode(data.join('\n')) as Map),
+            );
+            if (item.sequence > cursor) {
+              if (item.sequence > cursor + 1) {
+                final snapshot = await readActivity(workspaceId);
+                cursor = snapshot.nextSequence;
+                yield ActivityGap(snapshot);
+              } else {
+                cursor = item.sequence;
+                yield ActivityItem(item);
+              }
+            }
+          } else if (data.isNotEmpty && event == 'gap') {
+            final snapshot = ActivitySnapshot.fromJson(
+              Map<String, dynamic>.from(jsonDecode(data.join('\n')) as Map),
+            );
+            cursor = snapshot.nextSequence;
+            yield ActivityGap(snapshot);
+          }
+          event = null;
+          data.clear();
+        }
+      } catch (_) {
+        // The controller reports disconnection and retries from the last cursor.
+      } finally {
+        if (!abort.isCompleted) abort.complete();
+      }
+      yield const ActivityDisconnected();
+      await Future<void>.delayed(const Duration(seconds: 1));
+    }
+  }
+
   Stream<BrainSnapshot> watchBrain({required String chatName}) {
     final abort = Completer<void>();
     late StreamController<BrainSnapshot> controller;
@@ -587,8 +660,9 @@ final class DigitalBrainUiClient {
     final response = await http.Response.fromStream(
       await _http.send(request).timeout(const Duration(seconds: 60)),
     ).timeout(const Duration(seconds: 60));
-    if (response.statusCode != 200)
+    if (response.statusCode != 200) {
       throw StateError('Save failed: ${response.body}');
+    }
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
