@@ -59,9 +59,9 @@ public sealed class NeuronActivityFacts
         var events = feed.Snapshot("workspace-one").Events;
         Assert.Equal(42, await brain.Get<IActivityCaller>("caller").Run());
         Assert.Equal(events.Count, feed.Snapshot("workspace-one").Events.Count);
-        Assert.Contains(events, e => e.Kind == ActivityKind.SignalPublished && e.Type == nameof(ActivityTestSignal));
-        Assert.Contains(events, e => e.Kind == ActivityKind.CallStarted && e.SourceId?.Contains("caller") == true && e.TargetId?.Contains("target") == true);
-        Assert.Contains(events, e => e.Kind == ActivityKind.CallArrived && e.TargetId?.Contains("target") == true);
+        Assert.Contains(events, e => e.Kind == NeuronActivityKind.SignalPublished && e.Type == nameof(ActivityTestSignal));
+        Assert.Contains(events, e => e.Kind == NeuronActivityKind.CallStarted && e.SourceId?.Contains("caller") == true && e.TargetId?.Contains("target") == true);
+        Assert.Contains(events, e => e.Kind == NeuronActivityKind.CallArrived && e.TargetId?.Contains("target") == true);
         var json = System.Text.Json.JsonSerializer.Serialize(events);
         Assert.DoesNotContain("Payload", json);
         Assert.DoesNotContain("Result", json);
@@ -81,6 +81,6 @@ public sealed class NeuronActivityFacts
             var error = await Assert.ThrowsAsync<InvalidOperationException>(() => brain.Get<IActivityCaller>("caller").Fail());
             Assert.Equal("expected test failure", error.Message);
         }
-        Assert.Contains(feed.Snapshot("workspace-one").Events, e => e.Kind == ActivityKind.CallFailed && e.FailureCode == nameof(InvalidOperationException));
+        Assert.Contains(feed.Snapshot("workspace-one").Events, e => e.Kind == NeuronActivityKind.CallFailed && e.FailureCode == nameof(InvalidOperationException));
     }
 }

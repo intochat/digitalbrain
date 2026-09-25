@@ -23,7 +23,7 @@ internal sealed class NeuronCallObservation(ActivityFeed feed) : IIncomingGrainC
     private static Guid Operation()
         => RequestContext.Get(OperationKey) is Guid id ? id : Guid.NewGuid();
 
-    private void Record(string scope, Guid operation, ActivityKind kind, string? source, string? target,
+    private void Record(string scope, Guid operation, NeuronActivityKind kind, string? source, string? target,
         string type, string status, double? duration = null, string? failure = null)
         => feed.Append(new ActivityEvent(scope, 0, Guid.NewGuid(), operation, Correlation(), DateTimeOffset.UtcNow,
             kind, source, target, type, status, duration, failure));
@@ -41,18 +41,18 @@ internal sealed class NeuronCallObservation(ActivityFeed feed) : IIncomingGrainC
         RequestContext.Set(ScopeKey, scope);
         RequestContext.Set(OperationKey, operation);
         if (Correlation() is { } correlation) { RequestContext.Set(CorrelationKey, correlation); }
-        Record(scope, operation, ActivityKind.CallStarted, source, target,
+        Record(scope, operation, NeuronActivityKind.CallStarted, source, target,
             context.InterfaceMethod.Name, "started");
         var start = Stopwatch.GetTimestamp();
         try
         {
             await context.Invoke();
-            Record(scope, operation, ActivityKind.CallCompleted, source, target,
+            Record(scope, operation, NeuronActivityKind.CallCompleted, source, target,
                 context.InterfaceMethod.Name, "completed", Stopwatch.GetElapsedTime(start).TotalMilliseconds);
         }
         catch (Exception error)
         {
-            Record(scope, operation, ActivityKind.CallFailed, source, target,
+            Record(scope, operation, NeuronActivityKind.CallFailed, source, target,
                 context.InterfaceMethod.Name, "failed", Stopwatch.GetElapsedTime(start).TotalMilliseconds,
                 error.GetType().Name);
             throw;
@@ -66,7 +66,7 @@ internal sealed class NeuronCallObservation(ActivityFeed feed) : IIncomingGrainC
         if (IsObserved(context.InterfaceMethod.DeclaringType!, context.InterfaceMethod.Name)
             && Scope() is { } scope)
         {
-            Record(scope, Operation(), ActivityKind.CallArrived, previousSource as string, target,
+            Record(scope, Operation(), NeuronActivityKind.CallArrived, previousSource as string, target,
                 context.InterfaceMethod.Name, "arrived");
             RequestContext.Set(SourceKey, target);
         }

@@ -1,6 +1,6 @@
 namespace DigitalBrain.Core;
 
-public enum ActivityKind { CallStarted, CallArrived, CallCompleted, CallFailed, SignalPublished }
+public enum NeuronActivityKind { CallStarted, CallArrived, CallCompleted, CallFailed, SignalPublished }
 
 public sealed record ActivityEvent(
     string ScopeId,
@@ -9,7 +9,7 @@ public sealed record ActivityEvent(
     Guid OperationId,
     string? CorrelationId,
     DateTimeOffset At,
-    ActivityKind Kind,
+    NeuronActivityKind Kind,
     string? SourceId,
     string? TargetId,
     string Type,

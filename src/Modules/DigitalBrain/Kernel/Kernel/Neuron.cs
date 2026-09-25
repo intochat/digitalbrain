@@ -33,7 +33,7 @@ public abstract class Neuron : Grain, INeuron
         {
             ServiceProvider.GetService<ActivityFeed>()?.Append(new ActivityEvent(scope, 0, Guid.NewGuid(),
                 Guid.NewGuid(), IntentContext.Current?.IntentId, DateTimeOffset.UtcNow,
-                ActivityKind.SignalPublished, this.GetGrainId().ToString(), null,
+                NeuronActivityKind.SignalPublished, this.GetGrainId().ToString(), null,
                 signal.GetType().Name, "published", null, null));
         }
         ServiceProvider.GetService<LocalSignalHub>()?.Publish(this.GetGrainId(), signal);

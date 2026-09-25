@@ -3,6 +3,7 @@ using DigitalBrain.Aspire;
 using DigitalBrain.Sdk;
 using IntoChat;
 using IntoChat.Agent;
+using IntoChat.Activity;
 using IntoChat.Apps;
 using IntoChat.LocalFiles;
 using IntoChat.ServiceDefaults;
@@ -37,6 +38,7 @@ app.MapBehaviors();
 app.MapDigitalBrainModules();
 app.MapWorkspaceDataEndpoints();
 app.MapWorkspaceAgent();
+app.MapNeuronActivity();
 app.MapLocalApps();
 
 app.Run();

@@ -13,7 +13,7 @@ public sealed class ActivityFeedFacts
 
     private static ActivityEvent Event(string scope, DateTimeOffset at) => new(
         scope, 0, Guid.NewGuid(), Guid.NewGuid(), null, at,
-        ActivityKind.CallStarted, "source", "target", "Read", "started", null, null);
+        NeuronActivityKind.CallStarted, "source", "target", "Read", "started", null, null);
 
     [Fact]
     public void RetainsNewestTwoThousandAndIsolatesScopes()
