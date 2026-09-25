@@ -212,4 +212,27 @@ public sealed class ImplementFacts
         Assert.Empty(snapshot.ReviewFindings);
         Assert.Contains("Count", summary.Diff);
     }
+
+    [Fact]
+    public async Task ARejectedEditTellsTheImplementerWhy()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var agent = new ScriptedAgentScript { Reply = OneStepPlan };
+        agent.QueueEdits([new EditRequest(EditKind.InsertMember, SymbolId: "T:SampleInbox.Missing", Source: "public void Clear() { }")]);
+        agent.QueueEdits([ClearEdit]);
+        await using var harness = await CSharpExpertHarness.StartAsync(ct, agent);
+        const string runId = "run-rejected-edit";
+        var run = harness.Brain.Get<ICodingRun>(runId);
+        await using var drafted = await harness.Brain.Observe<PlanDrafted>(run, ct);
+        await using var finished = await harness.Brain.Observe<RunFinished>(run, ct);
+
+        await harness.Host.StartAsync(new FeatureRequest(CSharpExpertTestHost.SampleSolution, "Add a clear operation."), ct, runId);
+        await drafted.NextAsync(ct: ct);
+        await run.Approve();
+        await finished.NextAsync(ct: ct);
+
+        var retry = agent.Proposals[^1].Failure!;
+        Assert.Contains("edit 1", retry);
+        Assert.True(retry.Length > "Build failed:".Length + 20, retry);
+    }
 }

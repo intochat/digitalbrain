@@ -34,17 +34,29 @@ internal static class StepEditing
         var check = await roslyn.CheckEdits(edits, cancellationToken).ConfigureAwait(false);
         if (check.HasErrors)
         {
-            await run.RecordBrokenEdit(step.Number, check.Diff, DiagnosticGroups.From(check.Diagnostics)).ConfigureAwait(false);
+            await run.RecordBrokenEdit(step.Number, check.Diff, Problems(check.Diagnostics, check.FailingEdit, check.Detail)).ConfigureAwait(false);
             return;
         }
 
         var commit = await roslyn.CommitEdits(edits, cancellationToken).ConfigureAwait(false);
         if (commit.HasErrors)
         {
-            await run.RecordBrokenEdit(step.Number, commit.Diff, DiagnosticGroups.From(commit.Diagnostics)).ConfigureAwait(false);
+            await run.RecordBrokenEdit(step.Number, commit.Diff, Problems(commit.Diagnostics, null, commit.Detail)).ConfigureAwait(false);
             return;
         }
 
         await run.RecordStepDrafted(step.Number, commit.Diff).ConfigureAwait(false);
+    }
+
+    private static IReadOnlyList<DiagnosticGroup> Problems(IReadOnlyList<DiagnosticHit> diagnostics, int? failingEdit, string? detail)
+    {
+        var groups = DiagnosticGroups.From(diagnostics);
+        if (detail is not { Length: > 0 })
+        {
+            return groups;
+        }
+
+        var editLabel = failingEdit is { } index ? $"edit {index + 1}" : "edits";
+        return [new DiagnosticGroup("edit", editLabel, [detail]), .. groups];
     }
 }
