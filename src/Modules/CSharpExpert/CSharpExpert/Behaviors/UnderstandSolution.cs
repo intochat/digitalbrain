@@ -33,7 +33,7 @@ public sealed class UnderstandSolution(IDigitalBrain brain, string runId) : IBeh
     private async Task<ProjectModel> ReadModelAsync(FeatureRequest request, CancellationToken cancellation)
     {
         var roslyn = brain.Get<IRoslyn>(CodingWorkspace.Id(request.SolutionPath));
-        await roslyn.Open(new OpenWorkspace(request.SolutionPath)).ConfigureAwait(false);
+        await RoslynWorkspace.OpenAsync(roslyn, request.SolutionPath, cancellation).ConfigureAwait(false);
         var map = await roslyn.Map(new MapQuery(), cancellation).ConfigureAwait(false);
         var diagnostics = await roslyn.Diagnostics(new DiagnosticsQuery(), cancellation).ConfigureAwait(false);
         var projects = map.Projects

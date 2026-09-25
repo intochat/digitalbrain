@@ -19,7 +19,7 @@ public sealed class PrepareWorkspace(IDigitalBrain brain, string runId, Workspac
                 var request = snapshot.Request ?? throw new InvalidOperationException("Workspace preparation started before the feature request.");
                 var location = await preparer.PrepareAsync(request.SolutionPath, runId, cancellation).ConfigureAwait(false);
                 var roslyn = brain.Get<IRoslyn>(CodingWorkspace.Id(location.SolutionPath));
-                await roslyn.Open(new OpenWorkspace(location.SolutionPath)).ConfigureAwait(false);
+                await RoslynWorkspace.OpenAsync(roslyn, location.SolutionPath, cancellation).ConfigureAwait(false);
                 await run.PrepareWorkspace(location.Root, location.SolutionPath).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
