@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Qdrant neuron contracts: upsert, search, delete and collection reads.</Description>
+    <RootNamespace>DigitalBrain.Qdrant</RootNamespace>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../DigitalBrain/Kernel/Contracts/DigitalBrain.Contracts.csproj" />
+  </ItemGroup>
+</Project>

@@ -4,7 +4,7 @@ using DigitalBrain.ClickHouse;
 using DigitalBrain.Coding;
 using DigitalBrain.Flutter;
 using DigitalBrain.Google.Gmail;
-using DigitalBrain.Memory;
+using DigitalBrain.Qdrant;
 using DigitalBrain.Microsoft.Aspire;
 using DigitalBrain.Microsoft.GitHub;
 using DigitalBrain.Salesforce;
@@ -25,7 +25,7 @@ internal static class IntoChatE2ETest
             .WithExecutionRoot("IntoChat:BehaviorAuthoring:Root")
             .ConfigureModule<AIModule>(ai => ai.WithoutLocalModels().WithoutVoiceToText().WithoutWebSearch()
                 .WithDefaultLlm<IGpt56Luna>().WithModelEndpoint(AiProvider.OpenAI, new(UnconfiguredProvider, "v1/")))
-            .ConfigureModule<MemoryModule>(memory => memory.WithQdrant())
+            .ConfigureModule<QdrantModule>(qdrant => qdrant.WithQdrant())
             .ConfigureModule<ClickHouseModule>(database => database.WithClickHouse(options =>
             {
                 options.PersistentStorage = false;

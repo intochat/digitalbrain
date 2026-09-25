@@ -13,7 +13,7 @@ using DigitalBrain.Core;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Google.Gmail;
-using DigitalBrain.Memory;
+using DigitalBrain.Qdrant;
 using DigitalBrain.Microsoft.Aspire;
 using DigitalBrain.Microsoft.GitHub;
 using DigitalBrain.Microsoft.DotNet;
@@ -48,7 +48,7 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
             .WithVoiceToText<IWhisperLargeV3Turbo>()
             .WithTavilySearch();
     })
-    .WithModule<MemoryModule>(memory => memory.WithQdrant())
+    .WithModule<QdrantModule>(qdrant => qdrant.WithQdrant())
     .WithModule<ClickHouseModule>(database => database.WithClickHouse(options => options.WithSeed("leads")))
     .WithModule<SupabaseModule>(database => database.WithConnection("supabase"))
     .WithModule<TimeModule>()

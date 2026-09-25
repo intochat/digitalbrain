@@ -21,10 +21,10 @@
 #     ConnectionStrings__reminders
 #     ConnectionStrings__grainstate
 #
-#   Qdrant vector memory (platform dependency — not this image)
-#     DigitalBrain__Memory__Provider=Qdrant
-#     DigitalBrain__Memory__Qdrant__ConnectionName=memory-qdrant
-#     ConnectionStrings__memory-qdrant             # Endpoint=http://qdrant:6334;Key=...
+#   Qdrant (platform dependency — not this image)
+#     DigitalBrain__Qdrant__Provider=Qdrant
+#     DigitalBrain__Qdrant__ConnectionName=qdrant
+#     ConnectionStrings__qdrant                    # Endpoint=http://qdrant:6334;Key=...
 #
 #   Module manifest defaults are set below; override DigitalBrain__Modules__N if needed.
 #
@@ -53,7 +53,7 @@ COPY --chmod=755 src/Applications/IntoChat/IntoChat/docker-entrypoint.sh /app/do
 ENV ASPNETCORE_ENVIRONMENT=Production \
     DOTNET_EnableDiagnostics=0 \
     DigitalBrain__Modules__0="DigitalBrain.AI.AIModule, DigitalBrain.Modules.AI" \
-    DigitalBrain__Modules__1="DigitalBrain.Memory.MemoryModule, DigitalBrain.Modules.Memory" \
+    DigitalBrain__Modules__1="DigitalBrain.Qdrant.QdrantModule, DigitalBrain.Modules.Qdrant" \
     DigitalBrain__Modules__2="DigitalBrain.ClickHouse.ClickHouseModule, DigitalBrain.Modules.ClickHouse" \
     DigitalBrain__Modules__3="DigitalBrain.Supabase.SupabaseModule, DigitalBrain.Modules.Supabase" \
     DigitalBrain__Modules__4="DigitalBrain.Time.TimeModule, DigitalBrain.Modules.Time" \

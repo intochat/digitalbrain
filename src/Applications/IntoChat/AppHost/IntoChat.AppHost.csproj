@@ -16,7 +16,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../../Modules/AI/Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../../../Modules/Memory/Aspire.Hosting/DigitalBrain.Modules.Memory.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Qdrant/Aspire.Hosting/DigitalBrain.Modules.Qdrant.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/ClickHouse/Aspire.Hosting/DigitalBrain.Modules.ClickHouse.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Supabase/Aspire.Hosting/DigitalBrain.Modules.Supabase.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Google/Gmail/Aspire.Hosting/DigitalBrain.Modules.Google.Gmail.Aspire.Hosting.csproj" IsAspireProjectResource="false" />

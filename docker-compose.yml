@@ -22,7 +22,7 @@ services:
       - "10002:10002"
 
   # External platform dependency — not the digitalbrain product image.
-  # Uncomment for an in-compose Qdrant; otherwise set ConnectionStrings__memory-qdrant
+  # Uncomment for an in-compose Qdrant; otherwise set ConnectionStrings__qdrant
   # to a host/remote instance (e.g. http://host.docker.internal:6334).
   # qdrant:
   #   image: qdrant/qdrant:v1.18.0
@@ -55,10 +55,10 @@ services:
       ConnectionStrings__clustering: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;TableEndpoint=http://azurite:10002/devstoreaccount1;"
       ConnectionStrings__reminders: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;TableEndpoint=http://azurite:10002/devstoreaccount1;"
       ConnectionStrings__grainstate: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
-      DigitalBrain__Memory__Provider: Qdrant
-      DigitalBrain__Memory__Qdrant__ConnectionName: memory-qdrant
+      DigitalBrain__Qdrant__Provider: Qdrant
+      DigitalBrain__Qdrant__ConnectionName: qdrant
       # Point at external Qdrant (host or uncommented qdrant service):
-      ConnectionStrings__memory-qdrant: "Endpoint=http://host.docker.internal:6334"
+      ConnectionStrings__qdrant: "Endpoint=http://host.docker.internal:6334"
     depends_on:
       - azurite
     extra_hosts:

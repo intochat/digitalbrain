@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Aspire AppHost integration for the DigitalBrain Qdrant module.</Description>
+    <RootNamespace>DigitalBrain.Qdrant.Aspire.Hosting</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Qdrant" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Qdrant/DigitalBrain.Modules.Qdrant.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
+  </ItemGroup>
+</Project>

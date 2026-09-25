@@ -90,7 +90,7 @@ public sealed class PathTruthFacts
         string[] live =
         [
             "DigitalBrain.AI.AIModule, DigitalBrain.Modules.AI",
-            "DigitalBrain.Memory.MemoryModule, DigitalBrain.Modules.Memory",
+            "DigitalBrain.Qdrant.QdrantModule, DigitalBrain.Modules.Qdrant",
             "DigitalBrain.ClickHouse.ClickHouseModule, DigitalBrain.Modules.ClickHouse",
             "DigitalBrain.Supabase.SupabaseModule, DigitalBrain.Modules.Supabase",
             "DigitalBrain.Time.TimeModule, DigitalBrain.Modules.Time",

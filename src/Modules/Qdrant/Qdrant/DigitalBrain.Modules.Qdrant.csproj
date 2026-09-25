@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Qdrant module: one stateless neuron over the configured collection.</Description>
+    <RootNamespace>DigitalBrain.Qdrant</RootNamespace>
+    <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Qdrant.Tests.Unit" />
+  </ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Qdrant.Client" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Contracts/DigitalBrain.Modules.Qdrant.Contracts.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
+  </ItemGroup>
+</Project>

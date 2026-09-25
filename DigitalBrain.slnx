@@ -60,11 +60,11 @@
     <Project Path="src/Modules/Google/Gmail/Contracts/DigitalBrain.Modules.Google.Gmail.Contracts.csproj" />
     <Project Path="src/Modules/Google/Gmail/Gmail/DigitalBrain.Modules.Google.Gmail.csproj" />
   </Folder>
-  <Folder Name="/Modules/Memory/">
-    <Project Path="src/Modules/Memory/Tests/Unit/DigitalBrain.Modules.Memory.Tests.Unit.csproj" />
-    <Project Path="src/Modules/Memory/Aspire.Hosting/DigitalBrain.Modules.Memory.Aspire.Hosting.csproj" />
-    <Project Path="src/Modules/Memory/Contracts/DigitalBrain.Modules.Memory.Contracts.csproj" />
-    <Project Path="src/Modules/Memory/Memory/DigitalBrain.Modules.Memory.csproj" />
+  <Folder Name="/Modules/Qdrant/">
+    <Project Path="src/Modules/Qdrant/Tests/Unit/DigitalBrain.Modules.Qdrant.Tests.Unit.csproj" />
+    <Project Path="src/Modules/Qdrant/Aspire.Hosting/DigitalBrain.Modules.Qdrant.Aspire.Hosting.csproj" />
+    <Project Path="src/Modules/Qdrant/Contracts/DigitalBrain.Modules.Qdrant.Contracts.csproj" />
+    <Project Path="src/Modules/Qdrant/Qdrant/DigitalBrain.Modules.Qdrant.csproj" />
   </Folder>
   <Folder Name="/Modules/Microsoft/" />
   <Folder Name="/Modules/Microsoft/Aspire/">
