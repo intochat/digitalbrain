@@ -23,7 +23,7 @@ public static class ActivityEndpoints
             catch (ArgumentException) { return Results.BadRequest(); }
         });
 
-        routes.MapGet("/workspaces/{workspaceId}/activity/events", async (string workspaceId, long? after,
+        routes.MapGet("/workspaces/{workspaceId}/activity/events", async (string workspaceId, long? after, Guid? generation,
             ActivityFeed feed, IOptions<BasicAuthOptions> auth, HttpContext http) =>
         {
             string scope;
@@ -33,6 +33,12 @@ public static class ActivityEndpoints
             http.Response.ContentType = "text/event-stream";
             http.Response.Headers.CacheControl = "no-cache";
             var cursor = after ?? feed.Snapshot(scope).NextSequence;
+            if (generation.HasValue && generation.Value != feed.Generation)
+            {
+                var fresh = feed.Snapshot(scope);
+                await Emit(http, "gap", fresh, null);
+                cursor = fresh.NextSequence;
+            }
             await foreach (var update in feed.Watch(scope, cursor, http.RequestAborted))
             {
                 if (update.Gap)

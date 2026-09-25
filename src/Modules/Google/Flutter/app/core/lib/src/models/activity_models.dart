@@ -56,11 +56,13 @@ final class ActivitySnapshot {
     required this.nextSequence,
     required this.gap,
     required this.observedAt,
+    this.generation,
   });
   final List<ActivityRecord> events;
   final int nextSequence;
   final bool gap;
   final DateTime observedAt;
+  final String? generation;
 
   factory ActivitySnapshot.fromJson(Map<String, dynamic> json) =>
       ActivitySnapshot(
@@ -71,6 +73,7 @@ final class ActivitySnapshot {
         nextSequence: (json['nextSequence'] as num).toInt(),
         gap: json['gap'] == true,
         observedAt: DateTime.parse(json['observedAt'] as String),
+        generation: json['generation'] as String?,
       );
 }
 

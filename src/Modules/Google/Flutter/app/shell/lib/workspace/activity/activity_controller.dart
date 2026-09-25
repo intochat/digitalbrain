@@ -5,7 +5,10 @@ import 'package:digitalbrain_ui/digitalbrain_ui.dart' as graph;
 import 'package:flutter/foundation.dart';
 
 typedef ReadActivity = Future<ActivitySnapshot> Function();
-typedef WatchActivity = Stream<ActivityUpdate> Function(int afterSequence);
+typedef WatchActivity = Stream<ActivityUpdate> Function(
+  int afterSequence,
+  String? generation,
+);
 
 class ActivityController extends ChangeNotifier {
   ActivityController({required this.read, required this.watch});
@@ -14,6 +17,7 @@ class ActivityController extends ChangeNotifier {
   StreamSubscription<ActivityUpdate>? _subscription;
   bool _disposed = false;
   List<ActivityRecord> _events = [];
+  List<ActivityRecord>? _pausedEvents;
   int visibleCursor = 0;
   int _latestCursor = 0;
   bool paused = false;
@@ -25,11 +29,23 @@ class ActivityController extends ChangeNotifier {
   String search = '';
   String kindFilter = 'All';
   String statusFilter = 'All';
+  String? routeSourceId;
+  String? routeTargetId;
 
-  List<ActivityRecord> get visibleEvents => _events
-      .where((e) => e.sequence <= visibleCursor)
+  List<ActivityRecord> get _frame => _pausedEvents ?? _events;
+  int get replayFirstSequence => _frame.isEmpty ? 0 : _frame.first.sequence;
+  int get replayLastSequence => _frame.isEmpty ? 0 : _frame.last.sequence;
+  List<ActivityRecord> get _frameEvents =>
+      _frame.where((e) => e.sequence <= visibleCursor).toList(growable: false);
+
+  List<ActivityRecord> get visibleEvents => _frameEvents
       .where((e) => kindFilter == 'All' || e.kind == kindFilter)
       .where((e) => statusFilter == 'All' || e.status == statusFilter)
+      .where(
+        (e) =>
+            routeSourceId == null ||
+            (e.sourceId == routeSourceId && e.targetId == routeTargetId),
+      )
       .where(
         (e) =>
             search.isEmpty ||
@@ -39,7 +55,7 @@ class ActivityController extends ChangeNotifier {
       )
       .toList(growable: false);
 
-  List<ActivityRecord> get selectedSteps => _events
+  List<ActivityRecord> get selectedSteps => _frame
       .where(
         (e) =>
             e.sequence <= visibleCursor &&
@@ -58,7 +74,7 @@ class ActivityController extends ChangeNotifier {
 
   List<graph.GraphNode> get nodes {
     final ids = <String>{};
-    for (final event in visibleEvents) {
+    for (final event in _frameEvents) {
       if (event.sourceId != null) ids.add(event.sourceId!);
       if (event.targetId != null) ids.add(event.targetId!);
     }
@@ -74,7 +90,7 @@ class ActivityController extends ChangeNotifier {
 
   List<graph.GraphEdge> get edges {
     final routes = <String, graph.GraphEdge>{};
-    for (final event in visibleEvents) {
+    for (final event in _frameEvents) {
       if (event.kind != 'CallStarted' ||
           event.sourceId == null ||
           event.targetId == null) {
@@ -100,6 +116,7 @@ class ActivityController extends ChangeNotifier {
         fromId: event.sourceId!,
         toId: event.sourceId!,
         signature: event.id,
+        outcome: graph.GraphPulseOutcome.signal,
       );
     }
     if (event.targetId == null) return null;
@@ -107,6 +124,12 @@ class ActivityController extends ChangeNotifier {
       fromId: event.sourceId!,
       toId: event.targetId!,
       signature: event.id,
+      outcome: switch (event.kind) {
+        'CallArrived' => graph.GraphPulseOutcome.arrived,
+        'CallCompleted' => graph.GraphPulseOutcome.completed,
+        'CallFailed' => graph.GraphPulseOutcome.failed,
+        _ => graph.GraphPulseOutcome.inFlight,
+      },
     );
   }
 
@@ -122,7 +145,7 @@ class ActivityController extends ChangeNotifier {
     _replace(snapshot);
     loaded = true;
     notifyListeners();
-    _subscription = watch(snapshot.nextSequence).listen(
+    _subscription = watch(snapshot.nextSequence, snapshot.generation).listen(
       _onUpdate,
       onError: (_) {
         if (_disposed) return;
@@ -148,6 +171,7 @@ class ActivityController extends ChangeNotifier {
           _events.add(event);
           if (_events.length > 2000) {
             _events.removeRange(0, _events.length - 2000);
+            gap = true;
           }
           _latestCursor = event.sequence;
           if (!paused) visibleCursor = _latestCursor;
@@ -175,6 +199,15 @@ class ActivityController extends ChangeNotifier {
 
   void selectNode(String id) {
     search = id;
+    routeSourceId = null;
+    routeTargetId = null;
+    notifyListeners();
+  }
+
+  void selectRoute(String sourceId, String targetId) {
+    routeSourceId = sourceId;
+    routeTargetId = targetId;
+    search = '';
     notifyListeners();
   }
 
@@ -182,6 +215,8 @@ class ActivityController extends ChangeNotifier {
     selectedOperationId = null;
     selectedCorrelationId = null;
     search = '';
+    routeSourceId = null;
+    routeTargetId = null;
     notifyListeners();
   }
 
@@ -202,18 +237,22 @@ class ActivityController extends ChangeNotifier {
 
   void pause() {
     paused = true;
+    _pausedEvents = List.of(_events);
     notifyListeners();
   }
 
   void seek(int sequence) {
-    paused = true;
-    visibleCursor = sequence;
+    if (!paused) pause();
+    visibleCursor = sequence.clamp(replayFirstSequence, replayLastSequence);
     notifyListeners();
   }
 
-  void resumeLive() {
+  Future<void> resumeLive() async {
+    final snapshot = await read();
+    if (_disposed) return;
     paused = false;
-    visibleCursor = _latestCursor;
+    _pausedEvents = null;
+    _replace(snapshot);
     notifyListeners();
   }
 

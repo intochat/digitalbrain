@@ -408,62 +408,96 @@ final class DigitalBrainUiClient {
   Stream<ActivityUpdate> watchActivity(
     String workspaceId, {
     required int afterSequence,
-  }) async* {
+    String? generation,
+  }) {
     var cursor = afterSequence;
-    while (true) {
-      final abort = Completer<void>();
-      try {
-        final request = http.AbortableRequest(
-          'GET',
-          baseUri.resolve(
-            '/workspaces/${Uri.encodeComponent(workspaceId)}/activity/events?after=$cursor',
-          ),
-          abortTrigger: abort.future,
-        )..headers['accept'] = 'text/event-stream';
-        final response = await _http.send(request);
-        if (response.statusCode != 200) {
-          throw StateError('Activity stream unavailable (${response.statusCode}).');
-        }
-        String? event;
-        final data = <String>[];
-        await for (final line in response.stream
-            .transform(utf8.decoder)
-            .transform(const LineSplitter())) {
-          if (line.startsWith('event:')) event = line.substring(6).trim();
-          if (line.startsWith('data:')) data.add(line.substring(5).trimLeft());
-          if (line.isNotEmpty) continue;
-          if (data.isNotEmpty && event == 'activity') {
-            final item = ActivityRecord.fromJson(
-              Map<String, dynamic>.from(jsonDecode(data.join('\n')) as Map),
+    var currentGeneration = generation;
+    var cancelled = false;
+    Completer<void>? activeAbort;
+    final stopped = Completer<void>();
+    late StreamController<ActivityUpdate> controller;
+    Future<void> run() async {
+      while (!cancelled) {
+        final abort = Completer<void>();
+        activeAbort = abort;
+        try {
+          final request = http.AbortableRequest(
+            'GET',
+            baseUri.resolve(
+              '/workspaces/${Uri.encodeComponent(workspaceId)}/activity/events?after=$cursor${currentGeneration == null ? '' : '&generation=${Uri.encodeQueryComponent(currentGeneration!)}'}',
+            ),
+            abortTrigger: abort.future,
+          )..headers['accept'] = 'text/event-stream';
+          final response = await _http.send(request);
+          if (response.statusCode != 200) {
+            throw StateError(
+              'Activity stream unavailable (${response.statusCode}).',
             );
-            if (item.sequence > cursor) {
-              if (item.sequence > cursor + 1) {
-                final snapshot = await readActivity(workspaceId);
-                cursor = snapshot.nextSequence;
-                yield ActivityGap(snapshot);
-              } else {
-                cursor = item.sequence;
-                yield ActivityItem(item);
-              }
-            }
-          } else if (data.isNotEmpty && event == 'gap') {
-            final snapshot = ActivitySnapshot.fromJson(
-              Map<String, dynamic>.from(jsonDecode(data.join('\n')) as Map),
-            );
-            cursor = snapshot.nextSequence;
-            yield ActivityGap(snapshot);
           }
-          event = null;
-          data.clear();
+          String? event;
+          final data = <String>[];
+          await for (final line
+              in response.stream
+                  .transform(utf8.decoder)
+                  .transform(const LineSplitter())) {
+            if (cancelled) break;
+            if (line.startsWith('event:')) event = line.substring(6).trim();
+            if (line.startsWith('data:')) {
+              data.add(line.substring(5).trimLeft());
+            }
+            if (line.isNotEmpty) continue;
+            if (data.isNotEmpty && event == 'activity') {
+              final item = ActivityRecord.fromJson(
+                Map<String, dynamic>.from(jsonDecode(data.join('\n')) as Map),
+              );
+              if (item.sequence > cursor) {
+                if (item.sequence > cursor + 1) {
+                  final snapshot = await readActivity(workspaceId);
+                  cursor = snapshot.nextSequence;
+                  currentGeneration = snapshot.generation;
+                  if (!cancelled) controller.add(ActivityGap(snapshot));
+                } else {
+                  cursor = item.sequence;
+                  if (!cancelled) controller.add(ActivityItem(item));
+                }
+              }
+            } else if (data.isNotEmpty && event == 'gap') {
+              final snapshot = ActivitySnapshot.fromJson(
+                Map<String, dynamic>.from(jsonDecode(data.join('\n')) as Map),
+              );
+              cursor = snapshot.nextSequence;
+              currentGeneration = snapshot.generation;
+              if (!cancelled) controller.add(ActivityGap(snapshot));
+            }
+            event = null;
+            data.clear();
+          }
+        } catch (_) {
+          // The controller reports disconnection and retries from the last cursor.
+        } finally {
+          if (!abort.isCompleted) abort.complete();
+          if (identical(activeAbort, abort)) activeAbort = null;
         }
-      } catch (_) {
-        // The controller reports disconnection and retries from the last cursor.
-      } finally {
-        if (!abort.isCompleted) abort.complete();
+        if (cancelled) break;
+        controller.add(const ActivityDisconnected());
+        await Future.any<void>([
+          Future<void>.delayed(const Duration(seconds: 1)),
+          stopped.future,
+        ]);
       }
-      yield const ActivityDisconnected();
-      await Future<void>.delayed(const Duration(seconds: 1));
+      if (!controller.isClosed) await controller.close();
     }
+
+    controller = StreamController<ActivityUpdate>(
+      onListen: () => unawaited(run()),
+      onCancel: () {
+        cancelled = true;
+        if (!stopped.isCompleted) stopped.complete();
+        final abort = activeAbort;
+        if (abort != null && !abort.isCompleted) abort.complete();
+      },
+    );
+    return controller.stream;
   }
 
   Stream<BrainSnapshot> watchBrain({required String chatName}) {

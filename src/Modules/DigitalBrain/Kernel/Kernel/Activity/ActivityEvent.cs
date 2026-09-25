@@ -21,6 +21,7 @@ public sealed record ActivitySnapshot(
     IReadOnlyList<ActivityEvent> Events,
     long NextSequence,
     bool Gap,
-    DateTimeOffset ObservedAt);
+    DateTimeOffset ObservedAt,
+    Guid Generation = default);
 
 public sealed record ActivityUpdate(ActivityEvent? Event, bool Gap);

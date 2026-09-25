@@ -9,6 +9,7 @@ public sealed class ActivityFeed(TimeProvider? clock = null)
     private sealed class Scope
     {
         public long Sequence;
+        public long LastUsed;
         public LinkedList<ActivityEvent> Events { get; } = new();
         public HashSet<Channel<ActivityUpdate>> Subscribers { get; } = [];
     }
@@ -18,8 +19,12 @@ public sealed class ActivityFeed(TimeProvider? clock = null)
     private readonly TimeProvider _clock = clock ?? TimeProvider.System;
     private const int ScopeLimit = 2_000;
     private const int GlobalLimit = 20_000;
+    private const int RegistryLimit = 256;
     private static readonly TimeSpan Retention = TimeSpan.FromMinutes(15);
     private int _count;
+    private long _usage;
+    private Guid _generation = Guid.NewGuid();
+    public Guid Generation { get { lock (_gate) { return _generation; } } }
 
     public void Append(ActivityEvent item)
     {
@@ -48,7 +53,11 @@ public sealed class ActivityFeed(TimeProvider? clock = null)
         ArgumentException.ThrowIfNullOrWhiteSpace(scopeId);
         lock (_gate)
         {
-            var scope = GetScope(scopeId);
+            if (!_scopes.TryGetValue(scopeId, out var scope))
+            {
+                return new ActivitySnapshot([], 0, afterSequence is > 0, _clock.GetUtcNow(), Generation);
+            }
+            scope.LastUsed = ++_usage;
             Prune(scope);
             return SnapshotOf(scope, afterSequence);
         }
@@ -96,16 +105,32 @@ public sealed class ActivityFeed(TimeProvider? clock = null)
 
     private Scope GetScope(string id)
     {
-        if (!_scopes.TryGetValue(id, out var scope)) { _scopes.Add(id, scope = new Scope()); }
+        if (!_scopes.TryGetValue(id, out var scope))
+        {
+            if (_scopes.Count >= RegistryLimit)
+            {
+                var victim = _scopes.MinBy(pair => pair.Value.LastUsed);
+                if (victim.Value is not null)
+                {
+                    _count -= victim.Value.Events.Count;
+                    foreach (var subscriber in victim.Value.Subscribers) { subscriber.Writer.TryComplete(); }
+                    _scopes.Remove(victim.Key);
+                    _generation = Guid.NewGuid();
+                }
+            }
+            _scopes.Add(id, scope = new Scope());
+        }
+        scope.LastUsed = ++_usage;
         return scope;
     }
 
     private ActivitySnapshot SnapshotOf(Scope scope, long? after)
     {
         var oldest = scope.Events.First?.Value.Sequence ?? scope.Sequence + 1;
-        var gap = after.HasValue && after.Value < oldest - 1;
+        var gap = (after.HasValue && (after.Value < oldest - 1 || after.Value > scope.Sequence))
+            || (!after.HasValue && oldest > 1);
         return new(scope.Events.Where(e => !after.HasValue || e.Sequence > after.Value).ToArray(),
-            scope.Sequence, gap, _clock.GetUtcNow());
+            scope.Sequence, gap, _clock.GetUtcNow(), Generation);
     }
 
     private void Prune(Scope scope)

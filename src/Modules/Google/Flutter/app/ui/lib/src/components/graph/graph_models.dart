@@ -62,11 +62,15 @@ final class GraphPulse {
     required this.fromId,
     required this.toId,
     required this.signature,
+    this.outcome = GraphPulseOutcome.inFlight,
   });
 
   final String fromId;
   final String toId;
   final String signature;
+  final GraphPulseOutcome outcome;
 
   bool get local => fromId == toId;
 }
+
+enum GraphPulseOutcome { inFlight, arrived, completed, failed, signal }

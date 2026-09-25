@@ -44,4 +44,28 @@ public sealed class ActivityFeedFacts
         clock.Now += TimeSpan.FromTicks(1);
         Assert.Single(feed.Snapshot("one").Events);
     }
+
+    [Fact]
+    public void InvalidatesCursorFromPreviousProcessAndReportsTruncation()
+    {
+        var clock = new Clock();
+        var feed = new ActivityFeed(clock);
+        Assert.True(feed.Snapshot("one", 500).Gap);
+        for (var i = 0; i < 2001; i++) { feed.Append(Event("one", clock.Now)); }
+        Assert.True(feed.Snapshot("one").Gap);
+        Assert.NotEqual(feed.Generation, new ActivityFeed(clock).Generation);
+    }
+
+    [Fact]
+    public void ManyScopesDoNotGrowTheRegistryWithoutBound()
+    {
+        var clock = new Clock();
+        var feed = new ActivityFeed(clock);
+        var originalGeneration = feed.Generation;
+        for (var i = 0; i < 5000; i++) { Assert.Empty(feed.Snapshot($"empty-{i}").Events); }
+        for (var i = 0; i < 500; i++) { feed.Append(Event($"active-{i}", clock.Now)); }
+        Assert.NotEqual(originalGeneration, feed.Generation);
+        Assert.True(feed.Snapshot("active-0", 1).Gap);
+        Assert.Single(feed.Snapshot("active-499").Events);
+    }
 }

@@ -72,5 +72,10 @@ public sealed class ActivityEndpointFacts
             HttpCompletionOption.ResponseHeadersRead, TestContext.Current.CancellationToken);
         using var reader = new StreamReader(await streamResponse.Content.ReadAsStreamAsync(TestContext.Current.CancellationToken));
         Assert.Equal("event: gap", await reader.ReadLineAsync(TestContext.Current.CancellationToken));
+
+        using var restarted = await http.GetAsync($"/workspaces/one/activity/events?after=2001&generation={Guid.NewGuid()}",
+            HttpCompletionOption.ResponseHeadersRead, TestContext.Current.CancellationToken);
+        using var restartReader = new StreamReader(await restarted.Content.ReadAsStreamAsync(TestContext.Current.CancellationToken));
+        Assert.Equal("event: gap", await restartReader.ReadLineAsync(TestContext.Current.CancellationToken));
     }
 }

@@ -48,9 +48,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
     error = null;
     final next = ActivityController(
       read: () => widget.client.readActivity(widget.workspaceId),
-      watch: (cursor) => widget.client.watchActivity(
+      watch: (cursor, generation) => widget.client.watchActivity(
         widget.workspaceId,
         afterSequence: cursor,
+        generation: generation,
       ),
     );
     controller = next;
@@ -136,9 +137,8 @@ class ActivityView extends StatelessWidget {
   );
 
   Widget _toolbar(BuildContext context) {
-    final events = controller.visibleEvents;
-    final min = events.isEmpty ? 0 : events.first.sequence;
-    final max = events.isEmpty ? 0 : events.last.sequence;
+    final min = controller.replayFirstSequence;
+    final max = controller.replayLastSequence;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Row(
@@ -176,7 +176,7 @@ class ActivityView extends StatelessWidget {
     pulse: controller.pulse,
     highlightEdgeId: controller.highlightEdgeId,
     onNodeTap: (node) => controller.selectNode(node.id),
-    onEdgeTap: (edge) => controller.selectNode(edge.sourceId),
+    onEdgeTap: (edge) => controller.selectRoute(edge.sourceId, edge.targetId),
   );
 
   Widget _list(BuildContext context) => Column(
@@ -268,6 +268,13 @@ class ActivityView extends StatelessWidget {
     }
     return Column(
       children: [
+        if (controller.gap)
+          const Padding(
+            padding: EdgeInsets.all(8),
+            child: Text(
+              'Retained observations only; earlier steps may be missing.',
+            ),
+          ),
         Row(
           children: [
             const Expanded(

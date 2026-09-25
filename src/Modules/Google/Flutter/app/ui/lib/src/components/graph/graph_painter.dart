@@ -162,6 +162,12 @@ final class GraphPainter extends CustomPainter {
 
     final radius = math.min(size.width, size.height) * 0.34;
     final wave = math.sin(pulseValue * math.pi).abs();
+    final color = switch (active.outcome) {
+      GraphPulseOutcome.completed => UiPalette.success,
+      GraphPulseOutcome.failed => Colors.redAccent,
+      GraphPulseOutcome.arrived => Colors.lightBlueAccent,
+      _ => UiPalette.signal,
+    };
     if (source != null && source.node.id != target.node.id) {
       final path = Path()
         ..moveTo(source.center.dx, source.center.dy)
@@ -176,8 +182,17 @@ final class GraphPainter extends CustomPainter {
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.4
-          ..color = UiPalette.signal.withValues(alpha: 0.25 + wave * 0.7),
+          ..color = color.withValues(alpha: 0.25 + wave * 0.7),
       );
+      if (active.outcome == GraphPulseOutcome.inFlight) {
+        final metric = path.computeMetrics().first;
+        final point = metric
+            .getTangentForOffset(metric.length * pulseValue)
+            ?.position;
+        if (point != null) {
+          canvas.drawCircle(point, 5, Paint()..color = color);
+        }
+      }
     }
     canvas.drawCircle(
       target.center,
@@ -185,7 +200,7 @@ final class GraphPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2
-        ..color = UiPalette.signal.withValues(alpha: 0.7 - wave * 0.3),
+        ..color = color.withValues(alpha: 0.7 - wave * 0.3),
     );
   }
 

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_flutter_shell/workspace/activity/activity_controller.dart';
 import 'package:digitalbrain_flutter_shell/workspace/activity/activity_view.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart' as graph;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -32,7 +33,7 @@ void main() {
         gap: false,
         observedAt: DateTime.utc(2026, 9, 25, 12),
       ),
-      watch: (_) => const Stream<ActivityUpdate>.empty(),
+      watch: (_, _) => const Stream<ActivityUpdate>.empty(),
     );
     await controller.start();
     await tester.pumpWidget(
@@ -52,23 +53,73 @@ void main() {
 
   test('pause keeps frame fixed while new observations arrive', () async {
     final updates = StreamController<ActivityUpdate>();
+    var latest = 1;
     final controller = ActivityController(
       read: () async => ActivitySnapshot(
-        events: [item(1, 'CallStarted')],
-        nextSequence: 1,
+        events: [
+          for (var i = 1; i <= latest; i++)
+            item(i, i == 1 ? 'CallStarted' : 'CallCompleted'),
+        ],
+        nextSequence: latest,
         gap: false,
         observedAt: DateTime.utc(2026, 9, 25, 12),
       ),
-      watch: (_) => updates.stream,
+      watch: (_, _) => updates.stream,
     );
     await controller.start();
     controller.pause();
+    latest = 2;
     updates.add(ActivityItem(item(2, 'CallCompleted')));
     await Future<void>.delayed(Duration.zero);
     expect(controller.visibleCursor, 1);
-    controller.resumeLive();
+    await controller.resumeLive();
     expect(controller.visibleCursor, 2);
     await updates.close();
+    controller.dispose();
+  });
+
+  test('paused replay survives live eviction and can seek forward', () async {
+    final updates = StreamController<ActivityUpdate>();
+    final controller = ActivityController(
+      read: () async => ActivitySnapshot(
+        events: [item(1, 'CallStarted'), item(2, 'CallCompleted')],
+        nextSequence: 2,
+        gap: false,
+        observedAt: DateTime.utc(2026, 9, 25),
+      ),
+      watch: (_, _) => updates.stream,
+    );
+    await controller.start();
+    controller.pause();
+    controller.seek(1);
+    expect(controller.replayLastSequence, 2);
+    controller.seek(2);
+    expect(controller.visibleEvents.map((e) => e.sequence), [1, 2]);
+    for (var i = 3; i <= 2003; i++) {
+      updates.add(ActivityItem(item(i, 'CallCompleted')));
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(controller.replayFirstSequence, 1);
+    expect(controller.visibleEvents.map((e) => e.sequence), [1, 2]);
+    await updates.close();
+    controller.dispose();
+  });
+
+  test('failure filter preserves the graph route', () async {
+    final controller = ActivityController(
+      read: () async => ActivitySnapshot(
+        events: [item(1, 'CallStarted'), item(2, 'CallFailed')],
+        nextSequence: 2,
+        gap: false,
+        observedAt: DateTime.utc(2026, 9, 25),
+      ),
+      watch: (_, _) => const Stream<ActivityUpdate>.empty(),
+    );
+    await controller.start();
+    controller.setKindFilter('CallFailed');
+    expect(controller.visibleEvents.length, 1);
+    expect(controller.edges.length, 1);
+    expect(controller.pulse?.outcome, graph.GraphPulseOutcome.failed);
     controller.dispose();
   });
 
@@ -104,7 +155,7 @@ void main() {
         gap: false,
         observedAt: DateTime.utc(2026, 9, 25),
       ),
-      watch: (_) => const Stream<ActivityUpdate>.empty(),
+      watch: (_, _) => const Stream<ActivityUpdate>.empty(),
     );
     await controller.start();
     controller.selectActivity('call');
@@ -133,7 +184,7 @@ void main() {
         gap: true,
         observedAt: DateTime.utc(2026, 9, 25),
       ),
-      watch: (_) => const Stream<ActivityUpdate>.empty(),
+      watch: (_, _) => const Stream<ActivityUpdate>.empty(),
     );
     await controller.start();
     await tester.pumpWidget(
