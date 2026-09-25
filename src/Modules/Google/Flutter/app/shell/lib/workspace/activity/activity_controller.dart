@@ -42,7 +42,6 @@ class ActivityController extends ChangeNotifier {
   String statusFilter = 'All';
   String? routeSourceId;
   String? routeTargetId;
-  String? _routeSequenceIntent;
 
   List<ActivityRecord> get _frame => _pausedEvents ?? _events;
   int get replayFirstSequence => _frame.isEmpty ? 0 : _frame.first.sequence;
@@ -56,12 +55,7 @@ class ActivityController extends ChangeNotifier {
       .where(
         (e) =>
             routeSourceId == null ||
-            (_routeSequenceIntent != null
-                ? e.correlationId == _routeSequenceIntent &&
-                      (e.targetId == routeSourceId ||
-                          e.targetId == routeTargetId)
-                : _sourceFor(e) == routeSourceId &&
-                      e.targetId == routeTargetId),
+            (_sourceFor(e) == routeSourceId && e.targetId == routeTargetId),
       )
       .where(
         (e) =>
@@ -136,28 +130,7 @@ class ActivityController extends ChangeNotifier {
 
   List<graph.GraphEdge> get edges {
     final routes = <String, graph.GraphEdge>{};
-    final previousByIntent = <String, ActivityRecord>{};
     for (final event in _frameEvents) {
-      final intent = event.correlationId;
-      if (event.kind == 'CallStarted' &&
-          event.sourceId == null &&
-          event.targetId != null &&
-          intent != null) {
-        final previous = previousByIntent[intent];
-        if (previous?.targetId != null &&
-            previous!.targetId != event.targetId &&
-            event.at.difference(previous.at).inMilliseconds >= 0 &&
-            event.at.difference(previous.at) <= const Duration(seconds: 30)) {
-          final id = '${previous.targetId}|${event.targetId}|sequence';
-          routes[id] = graph.GraphEdge(
-            id: id,
-            sourceId: previous.targetId!,
-            targetId: event.targetId!,
-            dotted: true,
-          );
-        }
-        previousByIntent[intent] = event;
-      }
       if (event.kind == 'SignalPublished' || event.targetId == null) {
         continue;
       }
@@ -170,6 +143,30 @@ class ActivityController extends ChangeNotifier {
       );
     }
     return routes.values.toList(growable: false);
+  }
+
+  List<graph.GraphEdge> get tracePath {
+    final correlation = selectedCorrelationId;
+    if (correlation == null) return const [];
+    final calls =
+        _frameEvents
+            .where(
+              (event) =>
+                  event.kind == 'CallStarted' &&
+                  event.correlationId == correlation &&
+                  event.targetId != null,
+            )
+            .toList()
+          ..sort((a, b) => a.sequence.compareTo(b.sequence));
+    return [
+      for (var i = 0; i < calls.length; i++)
+        graph.GraphEdge(
+          id: 'trace:$correlation:${i + 1}',
+          sourceId: _sourceFor(calls[i])!,
+          targetId: calls[i].targetId!,
+          label: '${i + 1}',
+        ),
+    ];
   }
 
   List<graph.GraphPulse> get pulses {
@@ -288,41 +285,14 @@ class ActivityController extends ChangeNotifier {
     search = id;
     routeSourceId = null;
     routeTargetId = null;
-    _routeSequenceIntent = null;
     notifyListeners();
   }
 
-  void selectRoute(String sourceId, String targetId, {bool sequence = false}) {
+  void selectRoute(String sourceId, String targetId) {
     routeSourceId = sourceId;
     routeTargetId = targetId;
-    _routeSequenceIntent = sequence
-        ? _findSequenceIntent(sourceId, targetId)
-        : null;
     search = '';
     notifyListeners();
-  }
-
-  String? _findSequenceIntent(String sourceId, String targetId) {
-    final calls = _frameEvents
-        .where(
-          (event) => event.kind == 'CallStarted' && event.correlationId != null,
-        )
-        .toList();
-    for (var i = calls.length - 1; i > 0; i--) {
-      final target = calls[i];
-      if (target.targetId != targetId) continue;
-      for (var j = i - 1; j >= 0; j--) {
-        final source = calls[j];
-        if (target.at.difference(source.at) > const Duration(seconds: 30)) {
-          break;
-        }
-        if (source.correlationId == target.correlationId &&
-            source.targetId == sourceId) {
-          return target.correlationId;
-        }
-      }
-    }
-    return null;
   }
 
   void clearSelection() {
@@ -331,7 +301,6 @@ class ActivityController extends ChangeNotifier {
     search = '';
     routeSourceId = null;
     routeTargetId = null;
-    _routeSequenceIntent = null;
     notifyListeners();
   }
 

@@ -12,6 +12,7 @@ final class GraphPainter extends CustomPainter {
     required this.edges,
     required this.pulse,
     this.pulses = const [],
+    this.traceEdges = const [],
     this.now,
     this.reducedMotion = false,
     required this.pulseValue,
@@ -22,6 +23,7 @@ final class GraphPainter extends CustomPainter {
   final List<ProjectedGraphEdge> edges;
   final GraphPulse? pulse;
   final List<GraphPulse> pulses;
+  final List<ProjectedGraphEdge> traceEdges;
   final DateTime? now;
   final bool reducedMotion;
   final double pulseValue;
@@ -31,6 +33,7 @@ final class GraphPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width * 0.5, size.height * 0.51);
     _paintEdges(canvas, center);
+    _paintTracePath(canvas, center);
     _paintPulse(canvas, center, size);
     _paintNodes(canvas);
   }
@@ -41,11 +44,7 @@ final class GraphPainter extends CustomPainter {
       final depthAlpha = (0.45 + (edge.depth + 1) * 0.2).clamp(0.3, 0.9);
       final recent = edge.edge.id == highlightEdgeId;
       final color = recent ? UiPalette.signal : UiPalette.owner;
-      final alpha = recent
-          ? 0.95
-          : edge.edge.dotted
-          ? 0.78
-          : math.max(depthAlpha, 0.68);
+      final alpha = recent ? 0.95 : math.max(depthAlpha, 0.68);
 
       final path = Path()
         ..moveTo(edge.from.center.dx, edge.from.center.dy)
@@ -56,14 +55,10 @@ final class GraphPainter extends CustomPainter {
           edge.to.center.dy,
         );
       canvas.drawPath(
-        edge.edge.dotted ? _dashed(path) : path,
+        path,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = recent
-              ? 2.6
-              : edge.edge.dotted
-              ? 2.2
-              : 1.8
+          ..strokeWidth = recent ? 2.6 : 1.8
           ..color = color.withValues(alpha: alpha),
       );
 
@@ -118,17 +113,46 @@ final class GraphPainter extends CustomPainter {
     }
   }
 
-  static Path _dashed(Path path, {double dash = 5, double gap = 4}) {
-    final dashed = Path();
-    for (final metric in path.computeMetrics()) {
-      var distance = 0.0;
-      while (distance < metric.length) {
-        final end = math.min(distance + dash, metric.length);
-        dashed.addPath(metric.extractPath(distance, end), Offset.zero);
-        distance = end + gap;
-      }
+  void _paintTracePath(Canvas canvas, Offset center) {
+    for (final edge in traceEdges) {
+      final control = graphEdgeControl(edge, center);
+      final path = Path()
+        ..moveTo(edge.from.center.dx, edge.from.center.dy)
+        ..quadraticBezierTo(
+          control.dx,
+          control.dy,
+          edge.to.center.dx,
+          edge.to.center.dy,
+        );
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3
+          ..color = UiPalette.signal.withValues(alpha: 0.95),
+      );
+      final label = edge.edge.label;
+      if (label == null) continue;
+      final mid = graphQuadraticPoint(
+        edge.from.center,
+        control,
+        edge.to.center,
+        0.5,
+      );
+      final text = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: UiType.metaStrong.copyWith(color: UiPalette.surface),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      canvas.drawCircle(
+        mid,
+        math.max(text.width, text.height) / 2 + 5,
+        Paint()..color = UiPalette.signal,
+      );
+      text.paint(canvas, mid - Offset(text.width / 2, text.height / 2));
     }
-    return dashed;
   }
 
   void _paintPulse(Canvas canvas, Offset center, Size size) {
@@ -300,6 +324,7 @@ final class GraphPainter extends CustomPainter {
       oldDelegate.edges != edges ||
       oldDelegate.pulse != pulse ||
       oldDelegate.pulses != pulses ||
+      oldDelegate.traceEdges != traceEdges ||
       oldDelegate.now != now ||
       oldDelegate.reducedMotion != reducedMotion ||
       oldDelegate.pulseValue != pulseValue ||

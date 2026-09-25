@@ -197,11 +197,7 @@ final class ThreeGraphScene
       three.LineBasicMaterial.fromMap({
         'color': edge.decorated ? 0x65C5A0 : 0x7B9BE3,
         'transparent': true,
-        'opacity': edge.dotted
-            ? 0.12
-            : edge.decorated
-            ? 0.65
-            : 0.34,
+        'opacity': edge.decorated ? 0.65 : 0.34,
         'blending': three.AdditiveBlending,
       }),
     );

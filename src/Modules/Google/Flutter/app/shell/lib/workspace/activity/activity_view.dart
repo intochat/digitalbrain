@@ -222,11 +222,6 @@ class _ActivityViewState extends State<ActivityView> {
               if (mode == ActivityGraphMode.spatial) _openedSpatial = true;
             }),
           ),
-          if (controller.edges.any((edge) => edge.dotted))
-            const Text(
-              'Solid: call · Dotted: same intent order',
-              style: TextStyle(fontSize: 11),
-            ),
           if (controller.paused)
             SizedBox(
               width: 160,
@@ -270,6 +265,7 @@ class _ActivityViewState extends State<ActivityView> {
           child: SpatialGraph(
             nodes: controller.nodes,
             edges: controller.edges,
+            tracePath: controller.tracePath,
             pulses: controller.pulses,
             active: mode == ActivityGraphMode.spatial,
             playing: !controller.paused && !controller.stale,
@@ -279,11 +275,8 @@ class _ActivityViewState extends State<ActivityView> {
                 controller.selectedEvent?.targetId ??
                 controller.selectedEvent?.sourceId,
             onNodeTap: (node) => controller.selectNode(node.id),
-            onEdgeTap: (edge) => controller.selectRoute(
-              edge.sourceId,
-              edge.targetId,
-              sequence: edge.dotted,
-            ),
+            onEdgeTap: (edge) =>
+                controller.selectRoute(edge.sourceId, edge.targetId),
             onFallback: () => setState(() => mode = ActivityGraphMode.graph),
             sceneFactory: widget.spatialSceneFactory,
           ),
@@ -321,14 +314,15 @@ class _ActivityViewState extends State<ActivityView> {
             id: edge.id,
             sourceId: edge.sourceId,
             targetId: edge.targetId,
-            signalType: edge.dotted ? 'time order' : '',
-            kind: edge.dotted ? 'Observed sequence' : 'Observed call',
+            signalType: '',
+            kind: 'Observed call',
           ),
       ],
     ),
     selectedId:
         controller.selectedEvent?.targetId ??
         controller.selectedEvent?.sourceId,
+    tracePath: controller.tracePath,
     activityPulses: controller.pulses,
     activityNow: controller.visualNow,
     activeNodes: {
@@ -352,26 +346,21 @@ class _ActivityViewState extends State<ActivityView> {
           '${pulse.fromId}|${pulse.toId}|call',
     },
     onNeuron: (node) => controller.selectNode(node.id),
-    onSynapse: (edge) => controller.selectRoute(
-      edge.sourceId,
-      edge.targetId,
-      sequence: edge.kind == 'Observed sequence',
-    ),
+    onSynapse: (edge) =>
+        controller.selectRoute(edge.sourceId, edge.targetId),
   );
 
   Widget _compactGraph() => UiGraph(
     nodes: controller.nodes,
     edges: controller.edges,
+    tracePath: controller.tracePath,
     pulses: controller.pulses,
     now: controller.visualNow,
     playing: !controller.paused && !controller.stale,
     highlightEdgeId: controller.highlightEdgeId,
     onNodeTap: (node) => controller.selectNode(node.id),
-    onEdgeTap: (edge) => controller.selectRoute(
-      edge.sourceId,
-      edge.targetId,
-      sequence: edge.dotted,
-    ),
+    onEdgeTap: (edge) =>
+        controller.selectRoute(edge.sourceId, edge.targetId),
   );
 
   Widget _list(BuildContext context) => Column(

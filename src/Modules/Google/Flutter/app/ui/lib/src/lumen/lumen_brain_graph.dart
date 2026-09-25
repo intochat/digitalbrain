@@ -13,6 +13,7 @@ final class LumenBrainGraph extends StatefulWidget {
     required this.snapshot,
     required this.onNeuron,
     required this.onSynapse,
+    this.tracePath = const [],
     this.onActivity,
     this.selectedId,
     this.stale = false,
@@ -26,6 +27,7 @@ final class LumenBrainGraph extends StatefulWidget {
   final ValueChanged<BrainNeuron> onNeuron;
   final ValueChanged<BrainSynapse> onSynapse;
   final ValueChanged<BrainActivity>? onActivity;
+  final List<GraphEdge> tracePath;
   final String? selectedId;
   final bool stale;
   final Set<String> activeNodes, activeEdges;
@@ -127,6 +129,7 @@ final class _LumenBrainGraphState extends State<LumenBrainGraph> {
       ),
     );
     final routes = _synapseRoutes(positions, widget.snapshot.synapses);
+    final traceRoutes = _traceRoutes(positions, routes, widget.tracePath);
     final delegations = widget.stale
         ? <BrainActivity>[]
         : widget.snapshot.activeDelegations
@@ -162,6 +165,7 @@ final class _LumenBrainGraphState extends State<LumenBrainGraph> {
                         child: CustomPaint(
                           painter: _SynapsePainter(
                             routes,
+                            traceRoutes,
                             widget.activeEdges,
                             widget.selectedId,
                             widget.activityPulses,
@@ -459,6 +463,13 @@ final class _SynapseRoute {
   final Offset controlPosition;
 }
 
+final class _TraceRoute {
+  const _TraceRoute(this.path, this.midpoint, this.label);
+  final Path path;
+  final Offset midpoint;
+  final String label;
+}
+
 // The drawing and its inspector button share one route. Group both directions
 // together so parallel subscriptions remain individually reachable.
 List<_SynapseRoute> _synapseRoutes(
@@ -515,9 +526,75 @@ List<_SynapseRoute> _synapseRoutes(
   return routes;
 }
 
+// Trace steps reuse the route they highlight, so revisits stay on the drawn
+// synapse. Repeated pairs fan their numbered badges along the path.
+List<_TraceRoute> _traceRoutes(
+  Map<String, Offset> positions,
+  List<_SynapseRoute> routes,
+  List<GraphEdge> tracePath,
+) {
+  final byPair = <String, _SynapseRoute>{
+    for (final route in routes)
+      '${route.edge.sourceId}|${route.edge.targetId}': route,
+  };
+  final totals = <String, int>{};
+  for (final edge in tracePath) {
+    totals[_pairOf(edge)] = (totals[_pairOf(edge)] ?? 0) + 1;
+  }
+  final seen = <String, int>{};
+  final traces = <_TraceRoute>[];
+  for (final edge in tracePath) {
+    final label = edge.label;
+    if (label == null) continue;
+    final key = _pairOf(edge);
+    final path = byPair[key]?.path ?? _directTraceRoute(positions, edge);
+    if (path == null) continue;
+    final metric = path.computeMetrics().firstOrNull;
+    if (metric == null || metric.length <= 0) continue;
+    final total = totals[key]!;
+    final index = seen[key] = (seen[key] ?? 0) + 1;
+    final fraction = total > 1 ? index / (total + 1) : 0.5;
+    final midpoint = metric.getTangentForOffset(metric.length * fraction)
+        ?.position;
+    if (midpoint == null) continue;
+    traces.add(_TraceRoute(path, midpoint, label));
+  }
+  return traces;
+}
+
+String _pairOf(GraphEdge edge) => '${edge.sourceId}|${edge.targetId}';
+
+Path? _directTraceRoute(Map<String, Offset> positions, GraphEdge edge) {
+  final from = positions[edge.sourceId];
+  final to = positions[edge.targetId];
+  if (from == null || to == null) return null;
+  final delta = to - from;
+  final path = Path();
+  if (delta.distance < 1) {
+    const reach = 86.0;
+    path.moveTo(from.dx + 30, from.dy);
+    path.cubicTo(
+      from.dx + reach,
+      from.dy - reach,
+      from.dx - reach,
+      from.dy - reach,
+      from.dx - 30,
+      from.dy,
+    );
+  } else {
+    final a = from + delta / delta.distance * 36;
+    final b = to - delta / delta.distance * 36;
+    final control = Offset((a.dx + b.dx) / 2, (a.dy + b.dy) / 2 - 40);
+    path.moveTo(a.dx, a.dy);
+    path.quadraticBezierTo(control.dx, control.dy, b.dx, b.dy);
+  }
+  return path;
+}
+
 final class _SynapsePainter extends CustomPainter {
   _SynapsePainter(
     this.routes,
+    this.traceRoutes,
     this.active,
     this.selected,
     this.pulses,
@@ -525,6 +602,7 @@ final class _SynapsePainter extends CustomPainter {
     this.reducedMotion,
   );
   final List<_SynapseRoute> routes;
+  final List<_TraceRoute> traceRoutes;
   final Set<String> active;
   final String? selected;
   final List<GraphPulse> pulses;
@@ -540,9 +618,7 @@ final class _SynapsePainter extends CustomPainter {
         ..strokeWidth = emphasis ? 2.5 : 1.5
         ..style = PaintingStyle.stroke;
       final metric = route.path.computeMetrics().first;
-      if (edge.kind == 'Learned' ||
-          edge.kind == 'Observed' ||
-          edge.kind == 'Observed sequence') {
+      if (edge.kind == 'Learned' || edge.kind == 'Observed') {
         for (double distance = 0; distance < metric.length; distance += 12) {
           canvas.drawPath(
             metric.extractPath(distance, math.min(metric.length, distance + 6)),
@@ -606,6 +682,40 @@ final class _SynapsePainter extends CustomPainter {
           b.dy - 9 * math.sin(angle + .5),
         );
       canvas.drawPath(arrow, paint);
+    }
+    _paintTrace(canvas);
+  }
+
+  void _paintTrace(Canvas canvas) {
+    for (final trace in traceRoutes) {
+      canvas.drawPath(
+        trace.path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3.5
+          ..strokeCap = StrokeCap.round
+          ..color = const Color(0xff25a46f).withValues(alpha: .95),
+      );
+      final text = TextPainter(
+        text: TextSpan(
+          text: trace.label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      canvas.drawCircle(
+        trace.midpoint,
+        math.max(text.width, text.height) / 2 + 5,
+        Paint()..color = const Color(0xff25a46f),
+      );
+      text.paint(
+        canvas,
+        trace.midpoint - Offset(text.width / 2, text.height / 2),
+      );
     }
   }
 

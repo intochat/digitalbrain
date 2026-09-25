@@ -14,6 +14,7 @@ final class UiGraph extends StatefulWidget {
     super.key,
     required this.nodes,
     required this.edges,
+    this.tracePath = const [],
     this.pulse,
     this.pulses = const [],
     this.highlightEdgeId,
@@ -26,6 +27,7 @@ final class UiGraph extends StatefulWidget {
 
   final List<GraphNode> nodes;
   final List<GraphEdge> edges;
+  final List<GraphEdge> tracePath;
   final GraphPulse? pulse;
   final List<GraphPulse> pulses;
   final String? highlightEdgeId;
@@ -161,6 +163,10 @@ final class _UiGraphState extends State<UiGraph>
                 _rotationY,
               );
               final projectedEdges = projectGraphEdges(widget.edges, projected);
+              final projectedTrace = projectGraphEdges(
+                widget.tracePath,
+                projected,
+              );
               final canvasCenter = Offset(size.width * 0.5, size.height * 0.51);
               final pulseValue = disableAnimations ? 1.0 : _pulse.value;
 
@@ -202,6 +208,7 @@ final class _UiGraphState extends State<UiGraph>
                               painter: GraphPainter(
                                 nodes: projected,
                                 edges: projectedEdges,
+                                traceEdges: projectedTrace,
                                 pulse: widget.pulse,
                                 pulses: widget.pulses,
                                 now: widget.now ?? DateTime.now().toUtc(),

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../../lumen/neuron_icon.dart';
+import '../../theme/ui_theme.dart';
 import 'graph_camera.dart';
 import 'graph_models.dart';
 import 'graph_scene.dart';
@@ -19,6 +20,7 @@ final class SpatialGraph extends StatefulWidget {
     super.key,
     required this.nodes,
     required this.edges,
+    this.tracePath = const [],
     this.pulses = const [],
     this.active = true,
     this.playing = true,
@@ -33,6 +35,7 @@ final class SpatialGraph extends StatefulWidget {
 
   final List<GraphNode> nodes;
   final List<GraphEdge> edges;
+  final List<GraphEdge> tracePath;
   final List<GraphPulse> pulses;
   final bool active;
   final bool playing;
@@ -141,6 +144,9 @@ final class _SpatialGraphState extends State<SpatialGraph>
   void didUpdateWidget(covariant SpatialGraph oldWidget) {
     super.didUpdateWidget(oldWidget);
     _ticker.muted = !widget.active;
+    if (oldWidget.tracePath != widget.tracePath) {
+      _frames.value++;
+    }
     if (oldWidget.nodes != widget.nodes ||
         oldWidget.edges != widget.edges ||
         oldWidget.pulses != widget.pulses) {
@@ -232,10 +238,15 @@ final class _SpatialGraphState extends State<SpatialGraph>
                   children: [
                     Positioned.fill(
                       child: CustomPaint(
-                        painter: _SpatialConnectionPainter(widget.edges, {
-                          for (final node in widget.nodes)
-                            node.id: ?_scene.project(node.id),
-                        }),
+                        key: const Key('spatial_connections'),
+                        painter: _SpatialConnectionPainter(
+                          widget.edges,
+                          widget.tracePath,
+                          {
+                            for (final node in widget.nodes)
+                              node.id: ?_scene.project(node.id),
+                          },
+                        ),
                       ),
                     ),
                     for (final edge in widget.edges)
@@ -337,8 +348,9 @@ final class _SelectedRoutePainter extends CustomPainter {
 
 /// Projected base routes stay legible when there is no recent activity.
 final class _SpatialConnectionPainter extends CustomPainter {
-  const _SpatialConnectionPainter(this.edges, this.positions);
+  const _SpatialConnectionPainter(this.edges, this.tracePath, this.positions);
   final List<GraphEdge> edges;
+  final List<GraphEdge> tracePath;
   final Map<String, Offset> positions;
 
   @override
@@ -351,20 +363,7 @@ final class _SpatialConnectionPainter extends CustomPainter {
       final from = positions[edge.sourceId];
       final to = positions[edge.targetId];
       if (from == null || to == null) continue;
-      if (edge.dotted) {
-        final delta = to - from;
-        final distance = delta.distance;
-        if (distance < 1) continue;
-        for (var offset = 0.0; offset < distance; offset += 13) {
-          canvas.drawLine(
-            from + delta * (offset / distance),
-            from + delta * (math.min(offset + 7, distance) / distance),
-            line,
-          );
-        }
-      } else {
-        canvas.drawLine(from, to, line);
-      }
+      canvas.drawLine(from, to, line);
       final direction = (to - from).direction;
       final tip = from + (to - from) * .82;
       final arrow = Path()
@@ -380,11 +379,57 @@ final class _SpatialConnectionPainter extends CustomPainter {
         );
       canvas.drawPath(arrow, line);
     }
+    _paintTrace(canvas);
   }
+
+  void _paintTrace(Canvas canvas) {
+    final totals = <String, int>{};
+    for (final edge in tracePath) {
+      totals[_pair(edge)] = (totals[_pair(edge)] ?? 0) + 1;
+    }
+    final seen = <String, int>{};
+    for (final edge in tracePath) {
+      final label = edge.label;
+      if (label == null) continue;
+      final from = positions[edge.sourceId];
+      final to = positions[edge.targetId];
+      if (from == null || to == null) continue;
+      final key = _pair(edge);
+      final total = totals[key]!;
+      final index = seen[key] = (seen[key] ?? 0) + 1;
+      final fraction = total > 1 ? index / (total + 1) : 0.5;
+      canvas.drawLine(
+        from,
+        to,
+        Paint()
+          ..color = UiPalette.signal.withValues(alpha: .95)
+          ..strokeWidth = 3.5
+          ..style = PaintingStyle.stroke,
+      );
+      final mid = Offset.lerp(from, to, fraction)!;
+      final text = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: UiType.metaStrong.copyWith(color: UiPalette.surface),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      canvas.drawCircle(
+        mid,
+        math.max(text.width, text.height) / 2 + 5,
+        Paint()..color = UiPalette.signal,
+      );
+      text.paint(canvas, mid - Offset(text.width / 2, text.height / 2));
+    }
+  }
+
+  static String _pair(GraphEdge edge) => '${edge.sourceId}|${edge.targetId}';
 
   @override
   bool shouldRepaint(covariant _SpatialConnectionPainter oldDelegate) =>
-      oldDelegate.edges != edges || oldDelegate.positions != positions;
+      oldDelegate.edges != edges ||
+      oldDelegate.tracePath != tracePath ||
+      oldDelegate.positions != positions;
 }
 
 /// Bright, bounded activity remains readable even after the GL particle ends.

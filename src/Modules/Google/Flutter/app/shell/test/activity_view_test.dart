@@ -126,8 +126,7 @@ void main() {
           .label,
       'Ai Intent Usage one',
     );
-    expect(controller.edges, hasLength(3));
-    expect(controller.edges.where((edge) => edge.dotted), hasLength(1));
+    expect(controller.edges, hasLength(2));
     expect(controller.pulses, hasLength(2));
     final scene = FakeGraphScene();
     await tester.pumpWidget(
@@ -143,16 +142,16 @@ void main() {
       ),
     );
     final compact = tester.widget<graph.UiGraph>(find.byType(graph.UiGraph));
-    expect(compact.edges, hasLength(3));
+    expect(compact.edges, hasLength(2));
     await tester.tap(find.text('Lumen'));
     await tester.pump();
     final lumen = tester.widget<graph.LumenBrainGraph>(
       find.byType(graph.LumenBrainGraph),
     );
-    expect(lumen.snapshot.synapses, hasLength(3));
+    expect(lumen.snapshot.synapses, hasLength(2));
     await tester.tap(find.text('3D'));
     await tester.pump();
-    expect(scene.loadedEdges, hasLength(3));
+    expect(scene.loadedEdges, hasLength(2));
     controller.selectRoute(
       ActivityController.externalSourceId,
       'ai-intent-usage/one',
@@ -161,15 +160,11 @@ void main() {
       'root-start',
       'root-end',
     ]);
-    controller.selectRoute(
+    controller.selectActivity('root-start');
+    expect(controller.tracePath.map((edge) => edge.label), ['1', '2']);
+    expect(controller.tracePath.map((edge) => edge.targetId), [
       'ai-intent-usage/one',
       'supabase-table/two',
-      sequence: true,
-    );
-    expect(controller.visibleEvents.map((event) => event.id), [
-      'root-start',
-      'root-end',
-      'next-root',
     ]);
     controller.dispose();
   });
@@ -253,8 +248,135 @@ void main() {
       watch: (_, _) => const Stream<ActivityUpdate>.empty(),
     );
     await controller.start();
-    expect(controller.edges.where((edge) => edge.dotted), isEmpty);
     expect(controller.edges, hasLength(3));
+    controller.selectActivity('one');
+    expect(controller.tracePath.map((edge) => edge.targetId), [
+      'neuron/a',
+      'neuron/c',
+    ]);
+    controller.dispose();
+  });
+
+  test('trace path numbers revisits without inferring a return edge', () async {
+    final start = DateTime.utc(2026, 9, 25, 12);
+    ActivityRecord call(int sequence, String target) => ActivityRecord(
+      id: 'call-$sequence',
+      operationId: 'operation-$sequence',
+      correlationId: 'visit',
+      sequence: sequence,
+      at: start.add(Duration(seconds: sequence)),
+      kind: 'CallStarted',
+      type: 'Run',
+      status: 'started',
+      targetId: target,
+    );
+    final controller = ActivityController(
+      read: () async => ActivitySnapshot(
+        events: [
+          call(1, 'neuron/a'),
+          call(2, 'neuron/b'),
+          call(3, 'neuron/a'),
+        ],
+        nextSequence: 3,
+        gap: false,
+        observedAt: start,
+      ),
+      watch: (_, _) => const Stream<ActivityUpdate>.empty(),
+    );
+    await controller.start();
+    controller.selectActivity('call-1');
+    expect(controller.tracePath.map((edge) => edge.label), ['1', '2', '3']);
+    expect(controller.tracePath.map((edge) => edge.targetId), [
+      'neuron/a',
+      'neuron/b',
+      'neuron/a',
+    ]);
+    expect(controller.edges, hasLength(2));
+    expect(
+      controller.edges.any(
+        (edge) => edge.sourceId == 'neuron/b' && edge.targetId == 'neuron/a',
+      ),
+      isFalse,
+    );
+    controller.dispose();
+  });
+
+  testWidgets('all three activity modes carry the numbered revisit trace', (
+    tester,
+  ) async {
+    final start = DateTime.utc(2026, 9, 25, 12);
+    ActivityRecord call(int sequence, String target) => ActivityRecord(
+      id: 'call-$sequence',
+      operationId: 'operation-$sequence',
+      correlationId: 'visit',
+      sequence: sequence,
+      at: start.add(Duration(seconds: sequence)),
+      kind: 'CallStarted',
+      type: 'Run',
+      status: 'started',
+      targetId: target,
+    );
+    final controller = ActivityController(
+      read: () async => ActivitySnapshot(
+        events: [
+          call(1, 'neuron/a'),
+          call(2, 'neuron/b'),
+          call(3, 'neuron/a'),
+        ],
+        nextSequence: 3,
+        gap: false,
+        observedAt: start,
+      ),
+      watch: (_, _) => const Stream<ActivityUpdate>.empty(),
+    );
+    await controller.start();
+    controller.selectActivity('call-1');
+    expect(controller.tracePath.map((edge) => edge.label), ['1', '2', '3']);
+    expect(controller.edges, hasLength(2));
+
+    final scene = FakeGraphScene()
+      ..projections = {
+        ActivityController.externalSourceId: const Offset(80, 150),
+        'neuron/a': const Offset(200, 90),
+        'neuron/b': const Offset(320, 210),
+      };
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: graph.UiThemeScope(
+            child: ActivityView(
+              controller: controller,
+              spatialSceneFactory: () => scene,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final compact = tester.widget<graph.UiGraph>(find.byType(graph.UiGraph));
+    expect(compact.tracePath.map((edge) => edge.label), ['1', '2', '3']);
+    expect(compact.tracePath.map((edge) => edge.targetId), [
+      'neuron/a',
+      'neuron/b',
+      'neuron/a',
+    ]);
+
+    await tester.tap(find.text('Lumen'));
+    await tester.pump();
+    final lumen = tester.widget<graph.LumenBrainGraph>(
+      find.byType(graph.LumenBrainGraph),
+    );
+    expect(lumen.tracePath.map((edge) => edge.label), ['1', '2', '3']);
+    expect(lumen.snapshot.synapses, hasLength(2));
+    expect(find.byKey(const Key('lumen_graph_canvas')), findsOneWidget);
+
+    await tester.tap(find.text('3D'));
+    await tester.pump();
+    final spatial = tester.widget<graph.SpatialGraph>(
+      find.byType(graph.SpatialGraph),
+    );
+    expect(spatial.tracePath.map((edge) => edge.label), ['1', '2', '3']);
+    expect(find.byKey(const Key('spatial_connections')), findsOneWidget);
     controller.dispose();
   });
 
