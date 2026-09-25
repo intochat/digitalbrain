@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>C# Expert module: coding runs, profiles and the Understand/Plan behaviors.</Description>
+    <RootNamespace>DigitalBrain.CSharpExpert</RootNamespace>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Contracts/DigitalBrain.Modules.CSharpExpert.Contracts.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Behaviors/Runtime/DigitalBrain.Behavior.csproj" />
+    <ProjectReference Include="../../Microsoft/Roslyn/Contracts/DigitalBrain.Modules.Microsoft.Roslyn.Contracts.csproj" />
+  </ItemGroup>
+</Project>

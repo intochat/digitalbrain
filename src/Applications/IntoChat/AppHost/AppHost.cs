@@ -7,6 +7,7 @@ using DigitalBrain.AI.OpenAI;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.ClickHouse;
 using DigitalBrain.Coding;
+using DigitalBrain.CSharpExpert;
 using DigitalBrain.Behavior;
 using DigitalBrain.Behavior.Aspire.Hosting;
 using DigitalBrain.Core;
@@ -66,6 +67,7 @@ if (developerProfile)
             .WithAspire(Path.Combine(builder.AppHostDirectory, "IntoChat.AppHost.csproj")))
         .WithModule<RoslynModule>()
         .WithModule<DotNetModule>()
+        .WithModule<CSharpExpertModule>()
         .WithModule<CodingModule>(coding => coding.WithSolution(Path.GetFullPath(
             Path.Combine(builder.AppHostDirectory, "..", "..", "..", "..", "DigitalBrain.slnx"))))
         .WithModule<BehaviorModule>(behavior =>

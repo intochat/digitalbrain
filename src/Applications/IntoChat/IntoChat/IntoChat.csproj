@@ -31,6 +31,7 @@
     <ProjectReference Include="../../../Modules/Microsoft/GitHub/GitHub/DigitalBrain.Modules.Microsoft.GitHub.csproj" />
     <ProjectReference Include="../../../Modules/Microsoft/Aspire/Aspire/DigitalBrain.Modules.Microsoft.Aspire.csproj" />
     <ProjectReference Include="../../../Modules/Coding/Coding/DigitalBrain.Modules.Coding.csproj" />
+    <ProjectReference Include="../../../Modules/CSharpExpert/CSharpExpert/DigitalBrain.Modules.CSharpExpert.csproj" />
     <ProjectReference Include="../../../Modules/Microsoft/Roslyn/Roslyn/DigitalBrain.Modules.Microsoft.Roslyn.csproj" />
     <ProjectReference Include="../../../Modules/Microsoft/DotNet/DotNet/DigitalBrain.Modules.Microsoft.DotNet.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Behaviors/Behavior/DigitalBrain.Modules.Behavior.csproj" />

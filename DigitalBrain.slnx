@@ -44,6 +44,11 @@
     <Project Path="src/Modules/Coding/Coding/DigitalBrain.Modules.Coding.csproj" />
     <Project Path="src/Modules/Coding/Contracts/DigitalBrain.Modules.Coding.Contracts.csproj" />
   </Folder>
+  <Folder Name="/Modules/CSharpExpert/">
+    <Project Path="src/Modules/CSharpExpert/Tests/Unit/DigitalBrain.Modules.CSharpExpert.Tests.Unit.csproj" />
+    <Project Path="src/Modules/CSharpExpert/CSharpExpert/DigitalBrain.Modules.CSharpExpert.csproj" />
+    <Project Path="src/Modules/CSharpExpert/Contracts/DigitalBrain.Modules.CSharpExpert.Contracts.csproj" />
+  </Folder>
   <Folder Name="/Modules/Google/" />
   <Folder Name="/Modules/Google/Flutter/">
     <Project Path="src/Modules/Google/Flutter/Testing/DigitalBrain.Modules.Flutter.Testing.csproj" />

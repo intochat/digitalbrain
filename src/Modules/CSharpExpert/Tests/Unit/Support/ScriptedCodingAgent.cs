@@ -1,0 +1,27 @@
+using DigitalBrain.CSharpExpert;
+using DigitalBrain.Core;
+using Orleans.Hosting;
+
+namespace DigitalBrain.Tests;
+
+internal sealed class ScriptedAgentScript
+{
+    public string Reply { get; set; } = "{}";
+
+    public string? LastPrompt { get; set; }
+}
+
+[GrainType("csharp-expert.coding-agent")]
+internal sealed class ScriptedCodingAgent(ScriptedAgentScript script) : Neuron, ICodingAgent
+{
+    public Task<string> Ask(string prompt, CancellationToken cancellationToken = default)
+    {
+        script.LastPrompt = prompt;
+        return Task.FromResult(script.Reply);
+    }
+}
+
+public sealed class ScriptedAgentModule : IModule
+{
+    public void Configure(ISiloBuilder silo) { }
+}

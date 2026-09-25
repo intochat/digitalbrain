@@ -24,6 +24,7 @@
     <ProjectReference Include="../../../Modules/Microsoft/GitHub/Aspire.Hosting/DigitalBrain.Modules.Microsoft.GitHub.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Microsoft/Aspire/Aspire.Hosting/DigitalBrain.Modules.Microsoft.Aspire.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Coding/Coding/DigitalBrain.Modules.Coding.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/CSharpExpert/CSharpExpert/DigitalBrain.Modules.CSharpExpert.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Microsoft/Roslyn/Roslyn/DigitalBrain.Modules.Microsoft.Roslyn.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Microsoft/DotNet/DotNet/DigitalBrain.Modules.Microsoft.DotNet.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Behaviors/Aspire.Hosting/DigitalBrain.Modules.Behavior.Aspire.Hosting.csproj" IsAspireProjectResource="false" />

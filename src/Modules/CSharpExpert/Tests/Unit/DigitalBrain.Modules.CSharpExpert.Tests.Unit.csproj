@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
+    <ProjectReference Include="../../CSharpExpert/DigitalBrain.Modules.CSharpExpert.csproj" />
+    <ProjectReference Include="../../../Microsoft/Roslyn/Roslyn/DigitalBrain.Modules.Microsoft.Roslyn.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Assets/**/*.cs" />
+    <None Remove="Assets/**/*" />
+    <None Include="Assets/**/*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
