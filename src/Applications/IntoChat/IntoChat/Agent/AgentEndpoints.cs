@@ -8,7 +8,6 @@ using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core.Enforcement;
 using IntoChat.Apps.BuiltIn;
-using DigitalBrain.Receipts;
 using IntoChat.Workspace;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -59,8 +58,7 @@ internal static class AgentEndpoints
             // A rejected concurrent submission must never mutate the owner's conversation turn.
             var ownsRun = false;
             var activity = new IntentActivity();
-            var outcome = ReceiptOutcome.Succeeded;
-            string? failure = null;
+            var outcome = AgentRunOutcome.Succeeded;
             async Task KeepFailedTurn(string failure)
             {
                 try { await agent.CompleteConversation(new(input.RunId, userText, failure, []), CancellationToken.None); }
@@ -107,20 +105,18 @@ internal static class AgentEndpoints
                 catch (OperationCanceledException) when (http.RequestAborted.IsCancellationRequested)
                 {
                     // The client disconnected; the run is interrupted and its turn is dropped.
-                    outcome = ReceiptOutcome.Cancelled;
+                    outcome = AgentRunOutcome.Cancelled;
                 }
                 catch (WorkspaceQueryException error)
                 {
-                    outcome = ReceiptOutcome.Failed;
-                    failure = error.Message;
+                    outcome = AgentRunOutcome.Failed;
                     if (ownsRun) { await KeepFailedTurn(error.Message); }
                     if (!http.RequestAborted.IsCancellationRequested)
                     { await Emit(new { type = "RUN_ERROR", message = "The table could not be opened: " + error.Message, code = "QUERY_INVALID" }); }
                 }
                 catch (Exception error)
                 {
-                    outcome = ReceiptOutcome.Failed;
-                    failure = error.Message;
+                    outcome = AgentRunOutcome.Failed;
                     http.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("IntoChat.Agent.AgentEndpoints").LogWarning(error, "Workspace agent run failed");
                     if (ownsRun) { await KeepFailedTurn(error.Message); }
                     if (!http.RequestAborted.IsCancellationRequested)
@@ -139,28 +135,28 @@ internal static class AgentEndpoints
                 try { await usage.FlushAsync(intent, CancellationToken.None); }
                 catch (Exception error)
                 { http.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("IntoChat.Agent.AgentEndpoints").LogWarning(error, "Workspace agent usage flush failed"); }
-                // One durable receipt per intent, from the usage batch and the captured activity.
+                // Send a receipt card from the intent's usage and captured activity.
                 try
                 {
-                    var receipt = await AgentReceipts.TryWriteAsync(brain, priceBook, intent, scope.Id, input.ThreadId, activity, outcome, failure ?? activity.FailureExplanation);
-                    if (receipt is not null && !http.RequestAborted.IsCancellationRequested)
+                    if (!http.RequestAborted.IsCancellationRequested)
                     {
+                        var receipt = AgentReceipts.Create(priceBook, intent, activity, outcome);
                         await Emit(new
                         {
                             type = "RECEIPT",
                             outcome = receipt.Outcome.ToString(),
                             summary = receipt.Summary,
                             modelCalls = receipt.ModelCalls,
-                            compute = receipt.ActualCompute,
-                            computeUsd = ComputeUnits.ToUsd(receipt.ActualCompute),
-                            shadow = receipt.ShadowPriced,
+                            compute = receipt.Compute,
+                            computeUsd = ComputeUnits.ToUsd(receipt.Compute),
+                            shadow = true,
                             calls = receipt.Calls.Select(call => new { appId = call.AppId, operation = call.Operation, discovered = call.Discovered, succeeded = call.Succeeded }),
                             touched = receipt.Touched.Select(entry => new { source = entry.Source, semanticTypeId = entry.SemanticTypeId, readOnly = entry.ReadOnly, rowsRead = entry.RowsRead }),
                         });
                     }
                 }
                 catch (Exception error)
-                { http.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("IntoChat.Agent.AgentEndpoints").LogWarning(error, "Workspace agent receipt write failed"); }
+                { http.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("IntoChat.Agent.AgentEndpoints").LogWarning(error, "Workspace agent receipt emission failed"); }
             }
         });
     }
@@ -267,7 +263,7 @@ internal static class AgentEndpoints
         {
             // A non-JSON tool result is still a call, just without a row count.
         }
-        activity.RecordTool(tool.Name, succeeded, title, rowsRead, message);
+        activity.RecordTool(tool.Name, succeeded, title, rowsRead);
     }
     internal sealed record AgentInput(string WorkspaceId, string ThreadId, string RunId, IReadOnlyList<AgentMessage> Messages);
     internal sealed record AgentMessage(string Role, string Content, string? Class = null);

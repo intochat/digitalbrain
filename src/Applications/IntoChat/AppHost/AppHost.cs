@@ -26,7 +26,6 @@ using DigitalBrain.Compute;
 using DigitalBrain.Discovery;
 using DigitalBrain.Connections;
 using DigitalBrain.Sdk.Secrets;
-using DigitalBrain.Receipts;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
 using DigitalBrain.Time;
@@ -73,7 +72,6 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
     .WithModule<GitHubModule>(github => github.WithGitHubRepositories(repositories))
     .WithModule<FlutterModule>(flutter => flutter.RunDesktopApp())
-    .WithModule<ReceiptsModule>()
     .WithModule<ComputeModule>()
     .WithModule<DiscoveryModule>()
     .WithModule<AppsModule>()

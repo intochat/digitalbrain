@@ -60,11 +60,10 @@ ENV ASPNETCORE_ENVIRONMENT=Production \
     DigitalBrain__Modules__10="DigitalBrain.Salesforce.SalesforceModule, DigitalBrain.Modules.Salesforce" \
     DigitalBrain__Modules__11="DigitalBrain.Microsoft.GitHub.GitHubModule, DigitalBrain.Modules.Microsoft.GitHub" \
     DigitalBrain__Modules__12="DigitalBrain.Flutter.FlutterModule, DigitalBrain.Modules.Flutter" \
-    DigitalBrain__Modules__13="DigitalBrain.Receipts.ReceiptsModule, DigitalBrain.Modules.Receipts" \
-    DigitalBrain__Modules__14="DigitalBrain.Compute.ComputeModule, DigitalBrain.Modules.Compute" \
-    DigitalBrain__Modules__15="DigitalBrain.Discovery.DiscoveryModule, DigitalBrain.Modules.Discovery" \
-    DigitalBrain__Modules__16="DigitalBrain.Apps.AppsModule, DigitalBrain.Modules.Apps" \
-    DigitalBrain__Modules__17="DigitalBrain.Inbox.InboxModule, DigitalBrain.Modules.Inbox"
+    DigitalBrain__Modules__13="DigitalBrain.Compute.ComputeModule, DigitalBrain.Modules.Compute" \
+    DigitalBrain__Modules__14="DigitalBrain.Discovery.DiscoveryModule, DigitalBrain.Modules.Discovery" \
+    DigitalBrain__Modules__15="DigitalBrain.Apps.AppsModule, DigitalBrain.Modules.Apps" \
+    DigitalBrain__Modules__16="DigitalBrain.Inbox.InboxModule, DigitalBrain.Modules.Inbox"
 
 EXPOSE 8080
 

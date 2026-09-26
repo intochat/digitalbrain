@@ -16,8 +16,7 @@ public interface IAutomationActionInvoker
     Task<AutomationActionResult> InvokeAsync(AutomationDefinition definition, AutomationAction action, string intentId, CancellationToken cancellationToken = default);
 }
 
-// Run history goes to durable receipts; the result or failure reaches the Inbox. The Inbox and
-// Receipts implementations are built in parallel, so this journal is the single seam they plug into.
+// Run history is held by the automation grain; the journal notifies the owner through Inbox.
 public interface IAutomationJournal
 {
     Task RecordRunAsync(AutomationDefinition definition, JobRun run, CancellationToken cancellationToken = default);

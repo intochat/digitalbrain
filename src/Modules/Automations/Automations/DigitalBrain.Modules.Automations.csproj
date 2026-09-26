@@ -8,7 +8,6 @@
     <InternalsVisibleTo Include="DigitalBrain.Modules.Automations.Tests.Unit" />
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Automations.Contracts.csproj" />
     <ProjectReference Include="../../Inbox/Contracts/DigitalBrain.Modules.Inbox.Contracts.csproj" />
-    <ProjectReference Include="../../Receipts/Contracts/DigitalBrain.Modules.Receipts.Contracts.csproj" />
     <ProjectReference Include="../../Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <ProjectReference Include="../../DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
   </ItemGroup>

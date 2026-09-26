@@ -1,73 +1,52 @@
 using DigitalBrain.AI.Metering;
 using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
-using DigitalBrain.Receipts;
 
 namespace IntoChat.Agent;
 
-// What one intent actually did, collected while the turn runs so the receipt is written once at
-// the end from durable facts rather than sampled traces.
+internal enum AgentRunOutcome { Succeeded, Failed, Cancelled }
+
+internal sealed record AgentCall(string AppId, string Operation, bool Discovered, bool Succeeded);
+
+internal sealed record AgentTouchedData(string Source, string SemanticTypeId, bool ReadOnly, long RowsRead);
+
+internal sealed record AgentReceipt(
+    AgentRunOutcome Outcome,
+    string Summary,
+    IReadOnlyList<AgentCall> Calls,
+    IReadOnlyList<AgentTouchedData> Touched,
+    int ModelCalls,
+    decimal Compute);
+
+// Collected during a turn for the receipt card sent in the agent stream.
 internal sealed class IntentActivity
 {
-    private readonly Dictionary<string, TouchedData> _touched = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, AgentTouchedData> _touched = new(StringComparer.Ordinal);
 
-    public List<AppCall> Calls { get; } = [];
-    public IReadOnlyList<TouchedData> Touched => [.. _touched.Values];
-    public int Failures { get; private set; }
-    public string? FailureExplanation { get; set; }
+    public List<AgentCall> Calls { get; } = [];
+    public IReadOnlyList<AgentTouchedData> Touched => [.. _touched.Values];
 
-    public void RecordTool(string name, bool succeeded, string? source, long rowsRead, string? failure = null)
+    public void RecordTool(string name, bool succeeded, string? source, long rowsRead)
     {
-        Calls.Add(new AppCall { AppId = name, Operation = name, Discovered = false, Succeeded = succeeded });
+        Calls.Add(new AgentCall(name, name, false, succeeded));
         if (!succeeded)
         {
-            Failures++;
-            FailureExplanation ??= failure;
             return;
         }
         if (rowsRead <= 0 && string.IsNullOrWhiteSpace(source)) { return; }
         var key = string.IsNullOrWhiteSpace(source) ? name : source;
         _touched[key] = _touched.TryGetValue(key, out var existing)
             ? existing with { RowsRead = existing.RowsRead + rowsRead }
-            : new TouchedData { Source = key, SemanticTypeId = "table", ReadOnly = true, RowsRead = rowsRead };
+            : new AgentTouchedData(key, "table", true, rowsRead);
     }
 }
 
 internal static class AgentReceipts
 {
-    public static async Task<ReceiptDraft?> TryWriteAsync(IDigitalBrain brain, IPriceBook priceBook,
-        IntentContext intent, string workspaceId, string conversationId, IntentActivity activity,
-        ReceiptOutcome outcome, string? failure)
+    public static AgentReceipt Create(IPriceBook priceBook, IntentContext intent, IntentActivity activity, AgentRunOutcome outcome)
     {
-        try
-        {
-            var (modelCalls, compute) = ShadowPrice(intent, priceBook);
-            var draft = new ReceiptDraft
-            {
-                WorkspaceId = workspaceId,
-                ConversationId = conversationId,
-                Outcome = outcome,
-                Summary = Summarize(activity),
-                Calls = activity.Calls,
-                Touched = activity.Touched,
-                ModelCalls = modelCalls,
-                EstimatedCompute = compute,
-                ApprovedComputeLimit = 0m,
-                ActualCompute = compute,
-                ShadowPriced = true,
-                FirstTry = activity.Failures == 0,
-                Retries = 0,
-                Repairs = activity.Failures,
-                FailureExplanation = failure,
-            };
-            await brain.Get<IReceipt>(intent.IntentId).Write(draft);
-            return draft;
-        }
-        catch
-        {
-            // A receipt observer must never fail or hide the run the user already saw.
-            return null;
-        }
+        var (modelCalls, compute) = ShadowPrice(intent, priceBook);
+        return new AgentReceipt(outcome, Summarize(activity), activity.Calls, activity.Touched, modelCalls, compute);
     }
 
     // Model calls and shadow Compute come from the intent's durable usage batch, priced by the

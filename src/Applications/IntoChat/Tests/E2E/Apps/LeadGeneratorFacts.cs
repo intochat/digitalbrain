@@ -3,7 +3,6 @@ using DigitalBrain.Automations;
 using DigitalBrain.Discovery;
 using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Inbox;
-using DigitalBrain.Receipts;
 using IntoChat.Apps;
 using IntoChat.Workspace;
 using Xunit;
@@ -85,10 +84,8 @@ public sealed class LeadGeneratorFacts
         Assert.Contains(inbox.Items, item =>
             item.AppId == AppId && item.Kind == InboxItemKind.AutomationResult);
 
-        var receipt = await brain.Get<IReceipt>(run.IntentId).Read();
-        Assert.NotNull(receipt);
-        Assert.Equal(ReceiptOutcome.Succeeded, receipt!.Content.Outcome);
-        Assert.True(receipt.Content.ShadowPriced);
-        Assert.Equal(0m, receipt.Content.ActualCompute);
+        var recorded = Assert.Single(await automation.ReadRuns());
+        Assert.Equal(run.IntentId, recorded.IntentId);
+        Assert.Equal(JobOutcome.Succeeded, recorded.Outcome);
     }
 }

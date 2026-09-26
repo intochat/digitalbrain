@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 namespace IntoChat.Operations;
 
 // A "Report a problem" entry always carries the intent id it was raised from, so support can join
-// it to the durable receipt, trace and statement line for that intent.
+// it to the intent's usage, trace and statement line.
 internal sealed record ProblemReport(string IntentId, string WorkspaceId, string Message, DateTimeOffset ReportedAt);
 
 internal interface IProblemReportStore

@@ -105,11 +105,6 @@
     <Project Path="src/Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <Project Path="src/Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
   </Folder>
-  <Folder Name="/Modules/Receipts/">
-    <Project Path="src/Modules/Receipts/Tests/Unit/DigitalBrain.Modules.Receipts.Tests.Unit.csproj" />
-    <Project Path="src/Modules/Receipts/Contracts/DigitalBrain.Modules.Receipts.Contracts.csproj" />
-    <Project Path="src/Modules/Receipts/Receipts/DigitalBrain.Modules.Receipts.csproj" />
-  </Folder>
   <Folder Name="/Modules/DigitalBrain/Compute/">
     <Project Path="src/Modules/DigitalBrain/Compute/Tests/Unit/DigitalBrain.Modules.Compute.Tests.Unit.csproj" />
     <Project Path="src/Modules/DigitalBrain/Compute/Contracts/DigitalBrain.Modules.Compute.Contracts.csproj" />
