@@ -75,7 +75,7 @@ public static class BehaviorApp
             var behavior = ActivatorUtilities.CreateInstance<TBehavior>(new BehaviorServices(host.Services, scoped));
             var run = behavior.RunAsync(stopping.Token);
             var loss = readiness.WaitForLossAsync(generationId);
-            if (await Task.WhenAny(run, loss).ConfigureAwait(false) == loss)
+            if (await Task.WhenAny(run, loss).ConfigureAwait(false) == loss && !run.IsCompletedSuccessfully)
             {
                 await stopping.CancelAsync().ConfigureAwait(false);
                 try { await run.WaitAsync(TimeSpan.FromSeconds(15)).ConfigureAwait(false); }

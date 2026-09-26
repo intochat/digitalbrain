@@ -6,7 +6,7 @@ namespace DigitalBrain.Tests;
 
 public sealed class CodeValidationFacts
 {
-    [Theory]
+    [WindowsTheory]
     [InlineData("public sealed class UserTests { [Xunit.Fact] public void Fails() { Xunit.Assert.Fail(\"expected failure\"); } }", false)]
     [InlineData("public sealed class UserTests { [Xunit.Fact] public async Task Hangs() { await Task.Delay(60000); } }", true)]
     public async Task FailingOrHangingTestsCannotProduceArtifacts(string tests, bool timeout)
@@ -28,7 +28,7 @@ public sealed class CodeValidationFacts
         finally { if (Directory.Exists(root)) { Directory.Delete(root, true); } }
     }
 
-    [Fact]
+    [WindowsFact]
     public async Task RealBuildAndTestsProduceAnArtifact()
     {
         var ct = TestContext.Current.CancellationToken;

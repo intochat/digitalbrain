@@ -7,7 +7,7 @@ namespace DigitalBrain.Tests;
 
 public sealed class CodeDraftNeuronFacts
 {
-    [Fact]
+    [WindowsFact]
     public async Task NeuronChecksTheSavedRevisionAndRecoversAfterDeactivation()
     {
         var ct = TestContext.Current.CancellationToken;

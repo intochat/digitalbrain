@@ -12,7 +12,7 @@ public sealed class ProfileCompositionFacts
     private static readonly string[] DeveloperOnlyModules = ["Aspire", "Roslyn", "DotNet", "Coding", "Behavior"];
 
     private static readonly string[] UserPathModules =
-        ["AI", "Memory", "ClickHouse", "Supabase", "Time", "Gmail", "Salesforce", "GitHub", "Flutter"];
+        ["AI", "Qdrant", "ClickHouse", "Supabase", "Time", "Gmail", "Salesforce", "GitHub", "Flutter"];
 
     [Fact]
     public async Task DeveloperProfileComposesDeveloperOnlyModules()
