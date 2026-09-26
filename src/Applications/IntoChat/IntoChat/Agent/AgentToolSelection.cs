@@ -92,7 +92,8 @@ internal sealed class AgentToolSelection(IDigitalBrain brain)
         try
         {
             var result = await brain.Get<ICapabilityCatalog>("catalog").Search(message, scope, 5).WaitAsync(ct);
-            return [.. result.Hits.Select(hit => hit.Id)];
+            return [.. result.Hits.Where(hit => hit.Kind is CapabilityKind.App or CapabilityKind.Operation)
+                .Select(hit => hit.Id)];
         }
         catch
         {

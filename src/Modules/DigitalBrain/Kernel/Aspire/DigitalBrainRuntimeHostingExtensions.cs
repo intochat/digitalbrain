@@ -1,6 +1,7 @@
 using Azure.Data.Tables;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Registry;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -42,6 +43,7 @@ public static class DigitalBrainRuntimeHostingExtensions
             silo.AddDigitalBrain();
             foreach (var module in LoadModules(builder.Configuration))
             {
+                NeuronRegistry.AddContributions(silo.Services, module);
                 module.Configure(silo);
                 silo.Services.AddSingleton(module);
             }

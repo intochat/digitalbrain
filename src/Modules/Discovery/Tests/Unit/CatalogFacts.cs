@@ -1,6 +1,10 @@
 using DigitalBrain.Apps;
 using DigitalBrain.Discovery;
 using DigitalBrain.Discovery.Search;
+using DigitalBrain.Core.Registry;
+using DigitalBrain.Contracts;
+using DigitalBrain.Core;
+using Orleans.Hosting;
 using DigitalBrain.Testing.Unit;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,6 +14,66 @@ namespace DigitalBrain.Tests;
 
 public sealed class CatalogFacts
 {
+    [Fact]
+    public async Task SearchIncludesOnlyRoutableNeuronContractsFromSelectedModules()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<DiscoveryModule>()
+            .WithModule<FixtureNeuronModule>()
+            .ConfigureSilo(silo => silo.Services.AddSingleton<IManifestSource>(
+                new FixtureManifestSource([ScopedAppManifest.Global(InvoiceManifest())])))
+            .StartAsync(ct);
+
+        var catalog = brain.Get<ICapabilityCatalog>("catalog");
+        var neuron = await catalog.Search("emit a registry signal", "workspace-a", 5);
+        Assert.Contains(neuron.Hits, hit => hit.Id == "test.registry-emitter" && hit.Kind == CapabilityKind.Neuron);
+        var details = await catalog.ReadNeuron("test.registry-emitter");
+        Assert.Equal(typeof(IRegistryEmitter).FullName, details?.ContractType);
+        Assert.Null(await catalog.ReadNeuron("test.registry-monitor"));
+
+        var privateNeuron = await catalog.Search("hidden registry monitor", "workspace-a", 5);
+        Assert.DoesNotContain(privateNeuron.Hits, hit => hit.Id == "test.registry-monitor");
+
+        var app = await catalog.Search("summarize my outstanding invoices", "workspace-a", 5);
+        Assert.Contains(app.Hits, hit => hit.Kind == CapabilityKind.Operation);
+    }
+
+    [Fact]
+    public async Task ManifestSourceFailureKeepsRegistrySearchAvailable()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<DiscoveryModule>()
+            .WithModule<FixtureNeuronModule>()
+            .ConfigureSilo(silo => silo.Services.AddSingleton<IManifestSource>(new ThrowingManifestSource()))
+            .StartAsync(ct);
+
+        var result = await brain.Get<ICapabilityCatalog>("catalog")
+            .Search("emit a registry signal", "workspace-a", 5);
+
+        Assert.True(result.Degraded);
+        Assert.Contains(result.Hits, hit => hit.Id == "test.registry-emitter");
+    }
+
+    [Fact]
+    public async Task ManifestFailureAfterWarmupRetainsExistingAppIndex()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var source = new SwitchableManifestSource([ScopedAppManifest.Global(InvoiceManifest())]);
+        await using var brain = await UnitTest.Create().WithModule<DiscoveryModule>()
+            .WithModule<FixtureNeuronModule>()
+            .ConfigureSilo(silo => silo.Services.AddSingleton<IManifestSource>(source))
+            .StartAsync(ct);
+        var catalog = brain.Get<ICapabilityCatalog>("catalog");
+        Assert.Contains((await catalog.Search("summarize invoices", "workspace-a", 5)).Hits,
+            hit => hit.Id == "intochat.invoices/summarize_invoices");
+
+        source.Fail = true;
+        brain.SiloServices.GetRequiredService<CapabilityCatalog>().Invalidate();
+        var result = await catalog.Search("summarize invoices", "workspace-a", 5);
+
+        Assert.Contains(result.Hits, hit => hit.Id == "intochat.invoices/summarize_invoices");
+        Assert.True(result.Degraded);
+    }
     [Fact]
     public async Task SearchReturnsCapabilityIdsFromTheManifestAndResolvesAliases()
     {
@@ -209,6 +273,33 @@ public sealed class CatalogFacts
             },
         ];
     }
+}
+
+public interface IRegistryEmitter : INeuron;
+public interface IRegistryMonitor : INeuron;
+
+public sealed class FixtureNeuronModule : IModule, INeuronRegistryContributor
+{
+    public IReadOnlyList<NeuronDescriptor> Neurons =>
+    [
+        new("test.registry-emitter", typeof(IRegistryEmitter), "Registry emitter", "Emit a registry signal", true),
+        new("test.registry-monitor", typeof(IRegistryMonitor), "Registry monitor", "Hidden registry monitor", false),
+    ];
+
+    public void Configure(ISiloBuilder silo) { }
+}
+
+internal sealed class ThrowingManifestSource : IManifestSource
+{
+    public Task<IReadOnlyList<ScopedAppManifest>> ReadAsync(CancellationToken cancellationToken = default)
+        => throw new InvalidOperationException("manifest source unavailable");
+}
+
+internal sealed class SwitchableManifestSource(IReadOnlyList<ScopedAppManifest> manifests) : IManifestSource
+{
+    public bool Fail { get; set; }
+    public Task<IReadOnlyList<ScopedAppManifest>> ReadAsync(CancellationToken cancellationToken = default)
+        => Fail ? throw new InvalidOperationException("manifest source unavailable") : Task.FromResult(manifests);
 }
 
 internal sealed class FixtureManifestSource(IReadOnlyList<ScopedAppManifest> manifests) : IManifestSource

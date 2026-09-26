@@ -1,4 +1,7 @@
 using DigitalBrain.Core;
+using DigitalBrain.Core.Registry;
+using DigitalBrain.Time.Reminders;
+using DigitalBrain.Time.Timers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -8,8 +11,14 @@ using Orleans.Hosting;
 namespace DigitalBrain.Time;
 
 [ModuleConfiguration(typeof(TimeConfigurationContract))]
-public sealed class TimeModule : IModule
+public sealed class TimeModule : IModule, INeuronRegistryContributor
 {
+    public IReadOnlyList<NeuronDescriptor> Neurons =>
+    [
+        new("time.timer", typeof(DigitalBrain.Time.Timers.ITimer), "Timer", "Schedule one-shot or repeating activation-local ticks", true),
+        new("time.reminder", typeof(IReminder), "Reminder", "Schedule persistent periodic ticks or jobs", true),
+    ];
+
     public static ModuleDefinition Define() => new(typeof(TimeModule));
     public void Configure(ISiloBuilder silo)
     {

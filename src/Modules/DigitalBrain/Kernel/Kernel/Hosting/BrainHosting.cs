@@ -1,6 +1,7 @@
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Core.Registry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace DigitalBrain.Core;
@@ -23,6 +24,7 @@ public static class BrainHosting
         AddOptions(services);
         services.TryAddSingleton<BrainClient>();
         services.TryAddSingleton<IDigitalBrain>(sp => sp.GetRequiredService<BrainClient>());
+        services.TryAddSingleton<INeuronRegistry>(sp => NeuronRegistry.FromServices(sp.GetServices<NeuronDescriptor>()));
         // The one enforcement point. Stages are additive: modules register their own; the kernel
         // pipeline itself stays empty so grants (P2), allowances (P3) and the broker (P4) all
         // plug into the same filter.

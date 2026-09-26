@@ -9,6 +9,7 @@ public enum CapabilityKind
     Agent = 2,
     SemanticType = 3,
     WorkspaceInstance = 4,
+    Neuron = 5,
 }
 
 [GenerateSerializer, Alias("discovery.hit")]
@@ -26,10 +27,21 @@ public sealed record CapabilitySearchResult
     [Id(1)] public bool Degraded { get; init; }
 }
 
+[GenerateSerializer, Alias("discovery.neuron-details")]
+public sealed record NeuronCapabilityDetails
+{
+    [Id(0)] public required string Id { get; init; }
+    [Id(1)] public required string Name { get; init; }
+    [Id(2)] public required string Description { get; init; }
+    [Id(3)] public required string ContractType { get; init; }
+    [Id(4)] public required string ModuleId { get; init; }
+}
+
 // Search returns ids only; the manifest catalog is the truth.
 [Alias("capability-catalog")]
 [Orleans.Metadata.DefaultGrainType("capability-catalog")]
 public interface ICapabilityCatalog : INeuron
 {
     Task<CapabilitySearchResult> Search(string query, string workspaceId, int take);
+    Task<NeuronCapabilityDetails?> ReadNeuron(string id);
 }
