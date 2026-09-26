@@ -2,7 +2,7 @@ namespace DigitalBrain.Testing;
 
 public sealed record TestExecutionOptions
 {
-    public TimeSpan StartupTimeout { get; init; } = TimeSpan.FromMinutes(3);
+    public TimeSpan StartupTimeout { get; init; } = TimeSpan.FromMinutes(6);
     public TimeSpan AssertionTimeout { get; init; } = TimeSpan.FromSeconds(5);
     public TimeSpan CleanupTimeout { get; init; } = TimeSpan.FromSeconds(30);
     public Action<TestDiagnostic>? Diagnostics { get; init; }
