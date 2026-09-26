@@ -9,7 +9,13 @@
     <PackageReference Include="Microsoft.Orleans.Sdk" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ImportantMail.cs" />
+    <Compile Include="TimerReport.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../Modules/DigitalBrain/Behaviors/Runtime/DigitalBrain.Behavior.csproj" />
     <ProjectReference Include="../Modules/Google/Flutter/Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
+    <ProjectReference Include="../Modules/Google/Gmail/Contracts/DigitalBrain.Modules.Google.Gmail.Contracts.csproj" />
+    <ProjectReference Include="../Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
   </ItemGroup>
 </Project>

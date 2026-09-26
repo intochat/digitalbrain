@@ -9,6 +9,8 @@ public sealed class BehaviorOptions
     public string? ClusterId { get; set; }
     public string? ServiceId { get; set; }
     public string DotnetPath { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet", "dotnet.exe");
+    public string? SandboxImage { get; set; }
+    public string DockerPath { get; set; } = "docker";
     public TimeSpan StartupTimeout { get; set; } = TimeSpan.FromSeconds(30);
     public TimeSpan StopTimeout { get; set; } = TimeSpan.FromSeconds(15);
     public TimeSpan HeartbeatInterval { get; set; } = TimeSpan.FromSeconds(5);

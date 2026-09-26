@@ -18,13 +18,18 @@ public sealed class GmailConnectedFacts
         await using var connected = await brain.Observe<GmailConnected>(gmail, ct);
         await gmail.AcceptAuthorizationCode("fake-code");
         Assert.Equal("user@gmail.com", (await connected.NextAsync(ct: ct)).EmailAddress);
+        var mailbox = brain.Get<IGmail>("user@gmail.com");
+        Assert.True(await mailbox.IsMailboxConnected());
+        await brain.DeactivateAsync(mailbox, ct);
+        Assert.True(await mailbox.IsMailboxConnected());
+        Assert.False(await gmail.IsMailboxConnected());
     }
 }
 
 internal sealed class FakeGmailTokens : IGmailTokenExchange
 {
     public Task<GmailTokenGrant> ExchangeAsync(string refreshToken, CancellationToken cancellationToken)
-        => throw new NotSupportedException();
+        => Task.FromResult(new GmailTokenGrant("access-token", null, GmailOAuthConfiguration.ReadScope, 3600, "user@gmail.com"));
 
     public Task<GmailTokenGrant> ExchangeAuthorizationCodeAsync(string authorizationCode, CancellationToken cancellationToken)
         => Task.FromResult(new GmailTokenGrant("access-token", "refresh-token", GmailOAuthConfiguration.ReadScope, 3600, "user@gmail.com"));

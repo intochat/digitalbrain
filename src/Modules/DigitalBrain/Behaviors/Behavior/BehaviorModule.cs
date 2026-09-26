@@ -19,6 +19,8 @@ public sealed class BehaviorModule : IModule
             [BehaviorOptions.SectionName + ":ClusterId"] = options.ClusterId,
             [BehaviorOptions.SectionName + ":ServiceId"] = options.ServiceId,
             [BehaviorOptions.SectionName + ":DotnetPath"] = options.DotnetPath,
+            [BehaviorOptions.SectionName + ":SandboxImage"] = options.SandboxImage,
+            [BehaviorOptions.SectionName + ":DockerPath"] = options.DockerPath,
             [BehaviorOptions.SectionName + ":StartupTimeout"] = options.StartupTimeout.ToString("c"),
             [BehaviorOptions.SectionName + ":StopTimeout"] = options.StopTimeout.ToString("c"),
             [BehaviorOptions.SectionName + ":HeartbeatInterval"] = options.HeartbeatInterval.ToString("c"),
@@ -43,7 +45,13 @@ public sealed class BehaviorModule : IModule
                 && o.HeartbeatInterval > TimeSpan.Zero && o.HeartbeatLossTimeout > o.HeartbeatInterval
                 && o.MaximumLogBytes > 0, "Invalid behavior execution limits.")
             .ValidateOnStart();
-        builder.Services.TryAddSingleton<IBehaviorExecutor, LocalBehaviorExecutor>();
+        builder.Services.TryAddSingleton<IBehaviorExecutor>(static services =>
+        {
+            var options = services.GetRequiredService<IOptions<BehaviorOptions>>();
+            return string.IsNullOrWhiteSpace(options.Value.SandboxImage)
+                ? new LocalBehaviorExecutor(options)
+                : new ContainerBehaviorExecutor(options);
+        });
         builder.Services.TryAddSingleton<BehaviorSupervisor>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<BehaviorSupervisor>());
     }

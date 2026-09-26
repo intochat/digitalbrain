@@ -3,7 +3,7 @@ using DigitalBrain.Core;
 namespace DigitalBrain.Behavior;
 
 public sealed class BehaviorConfigurationContract() : ModuleConfigurationContract<BehaviorModule, BehaviorOptions>(
-    "Root", "CodeRoot", "Gateways", "ClusterId", "ServiceId", "DotnetPath", "StartupTimeout", "StopTimeout", "HeartbeatInterval", "HeartbeatLossTimeout", "MaximumLogBytes")
+    "Root", "CodeRoot", "Gateways", "ClusterId", "ServiceId", "DotnetPath", "SandboxImage", "DockerPath", "StartupTimeout", "StopTimeout", "HeartbeatInterval", "HeartbeatLossTimeout", "MaximumLogBytes")
 {
     protected override ModuleDefinition Compile(BehaviorOptions options) => BehaviorModule.Define(options);
 }
@@ -18,6 +18,12 @@ public static class BehaviorModuleConfiguration
             o.Root = Path.Combine(Path.GetFullPath(root), "behaviors");
             o.CodeRoot = Path.Combine(Path.GetFullPath(root), "coding");
         }, "Root", "CodeRoot");
+        return module;
+    }
+
+    public static ModuleConfiguration<BehaviorModule> WithSandbox(this ModuleConfiguration<BehaviorModule> module)
+    {
+        module.ConfigureOptions<BehaviorOptions>(options => options.SandboxImage = BehaviorSandbox.ImageName, "SandboxImage");
         return module;
     }
 }

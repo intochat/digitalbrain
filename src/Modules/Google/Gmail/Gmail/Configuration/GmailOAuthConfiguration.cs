@@ -11,6 +11,7 @@ internal sealed class GmailOAuthConfiguration(IOptions<GmailOAuthOptions> option
     internal const string Root = GmailModule.GmailOAuthConfigurationRoot;
     internal const string ReadScope = "https://www.googleapis.com/auth/gmail.readonly";
     internal const string ComposeScope = "https://www.googleapis.com/auth/gmail.compose";
+    internal string TopicName => options.Value.TopicName ?? "";
     internal string ClientId => options.Value.ClientId ?? "";
     internal string ClientSecret => options.Value.ClientSecret ?? "";
     internal string TokenEndpoint => string.IsNullOrWhiteSpace(options.Value.TokenEndpoint)

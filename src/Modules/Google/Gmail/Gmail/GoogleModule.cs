@@ -1,6 +1,7 @@
 using DigitalBrain.Core;
 using DigitalBrain.Sdk;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -39,7 +40,10 @@ public sealed class GmailModule : IModule
         services.AddOptions<GmailOAuthOptions>().Bind(silo.Configuration.GetSection(GmailOAuthOptions.SectionName));
         services.TryAddSingleton(static services => new GmailOAuthConfiguration(services.GetRequiredService<IOptions<GmailOAuthOptions>>()));
         services.TryAddSingleton<GmailLogins>();
+        services.AddDataProtection();
+        services.TryAddSingleton<GmailSecrets>();
         services.TryAddSingleton<IGmailTokenExchange, GmailTokenExchange>();
+        services.TryAddSingleton<IGmailMailbox, GmailMailboxClient>();
         services.AddSingleton<IHttpSurface>(static services => new BrowserLoginSurface(services.GetRequiredService<GmailLogins>()));
     }
 
