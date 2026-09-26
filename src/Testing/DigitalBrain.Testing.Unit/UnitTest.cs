@@ -20,7 +20,6 @@ public static class UnitTest
         deadline.Token.ThrowIfCancellationRequested();
         var modules = ModuleComposition.Resolve(options.Modules);
         ModuleSettingsValidation.ValidatePublicSettings(modules);
-        var registry = NeuronRegistry.FromModules(modules);
         var builder = new InProcessTestClusterBuilder(1);
         builder.Options.ConfigureFileLogging = false;
         builder.ConfigureHost(host =>
@@ -34,7 +33,7 @@ public static class UnitTest
         });
         builder.ConfigureSilo((_, silo) =>
         {
-            silo.AddDigitalBrain().AddNeuronRegistry(registry);
+            silo.AddDigitalBrain().AddNeuronRegistry(modules.Select(module => module.ModuleType));
             foreach (var module in modules) { module.Configure(silo); }
             silo.AddMemoryGrainStorage("Default");
             if (options.UseReminders) { silo.UseInMemoryReminderService(); }

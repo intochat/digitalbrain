@@ -3,7 +3,6 @@ using DigitalBrain.Discovery;
 using DigitalBrain.Discovery.Search;
 using DigitalBrain.Core.Registry;
 using DigitalBrain.Contracts;
-using DigitalBrain.Contracts.Registry;
 using DigitalBrain.Core;
 using Orleans.Hosting;
 using DigitalBrain.Testing.Unit;
@@ -16,7 +15,7 @@ namespace DigitalBrain.Tests;
 public sealed class CatalogFacts
 {
     [Fact]
-    public async Task SearchIncludesOnlyRoutableNeuronContractsFromSelectedModules()
+    public async Task SearchIncludesPublicNeuronContractsFromSelectedModules()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().WithModule<DiscoveryModule>()
@@ -30,26 +29,25 @@ public sealed class CatalogFacts
         Assert.Contains(neuron.Hits, hit => hit.Id == "test.registry-emitter" && hit.Kind == CapabilityKind.Neuron);
         var details = await catalog.ReadNeuron("test.registry-emitter");
         Assert.Equal(typeof(IRegistryEmitter).FullName, details?.ContractType);
-        Assert.Null(await catalog.ReadNeuron("test.registry-monitor"));
+        Assert.NotNull(await catalog.ReadNeuron("test.registry-monitor"));
 
-        var privateNeuron = await catalog.Search("hidden registry monitor", "workspace-a", 5);
-        Assert.DoesNotContain(privateNeuron.Hits, hit => hit.Id == "test.registry-monitor");
+        var monitor = await catalog.Search("registry monitor", "workspace-a", 5);
+        Assert.Contains(monitor.Hits, hit => hit.Id == "test.registry-monitor");
 
         var app = await catalog.Search("summarize my outstanding invoices", "workspace-a", 5);
         Assert.Contains(app.Hits, hit => hit.Kind == CapabilityKind.Operation);
     }
 
     [Fact]
-    public async Task DiscoveryReadsPublishedRegistry()
+    public async Task DiscoveryReadsLocalRegistry()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().WithModule<DiscoveryModule>()
             .WithModule<FixtureNeuronModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<IManifestSource>(new FixtureManifestSource([])))
             .StartAsync(ct);
-        var selected = brain.SiloServices.GetRequiredService<INeuronRegistry>();
-        var registry = brain.Get<INeuronRegistryGrain>(selected.Version);
-        Assert.Contains(await registry.Read(), record => record.Id == "test.registry-emitter");
+        var registry = brain.SiloServices.GetRequiredService<NeuronRegistry>();
+        Assert.Equal(typeof(IRegistryEmitter), registry.Find("test.registry-emitter")?.Interface);
 
         var catalog = brain.Get<ICapabilityCatalog>("catalog");
         var result = await catalog.Search("emit a registry signal", "workspace-a", 5);
@@ -334,25 +332,18 @@ public sealed class CatalogFacts
     }
 }
 
-public interface IRegistryEmitter : INeuron;
+[Alias("test.registry-emitter")]
+public interface IRegistryEmitter : INeuron { Task EmitRegistrySignal(); }
+[Alias("test.registry-monitor")]
 public interface IRegistryMonitor : INeuron;
 
-public sealed class FixtureNeuronModule : IModule, INeuronRegistryContributor
+public sealed class FixtureNeuronModule : IModule
 {
-    public IReadOnlyList<NeuronDescriptor> Neurons =>
-    [
-        new("test.registry-emitter", typeof(IRegistryEmitter), "Registry emitter", "Emit a registry signal", true),
-        new("test.registry-monitor", typeof(IRegistryMonitor), "Registry monitor", "Hidden registry monitor", false),
-    ];
-
     public void Configure(ISiloBuilder silo) { }
 }
 
-public sealed class CrowdingNeuronModule : IModule, INeuronRegistryContributor
+public sealed class CrowdingNeuronModule : IModule
 {
-    public IReadOnlyList<NeuronDescriptor> Neurons => Enumerable.Range(0, 10)
-        .Select(index => new NeuronDescriptor($"test.invoice-neuron-{index}", typeof(IRegistryEmitter),
-            $"Invoice neuron {index}", "Summarize outstanding invoices", true)).ToArray();
     public void Configure(ISiloBuilder silo) { }
 }
 

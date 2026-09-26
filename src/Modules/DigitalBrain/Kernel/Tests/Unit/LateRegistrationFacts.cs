@@ -6,6 +6,7 @@ using Orleans.Concurrency;
 using Xunit;
 namespace DigitalBrain.Tests;
 
+[Alias("test.late-source")]
 public interface ILateSource : INeuron
 {
     Task HoldNextWatch();

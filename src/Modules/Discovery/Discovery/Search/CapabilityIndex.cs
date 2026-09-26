@@ -1,5 +1,5 @@
 using DigitalBrain.Apps;
-using DigitalBrain.Contracts.Registry;
+using DigitalBrain.Core.Registry;
 
 namespace DigitalBrain.Discovery.Search;
 
@@ -42,7 +42,7 @@ internal sealed class CapabilityIndex
         IReadOnlyList<ScopedAppManifest> manifests,
         Func<string, CancellationToken, ValueTask<float[]?>>? embed,
         CancellationToken cancellationToken,
-        IReadOnlyList<NeuronRegistration>? neurons = null)
+        IReadOnlyList<NeuronContract>? neurons = null)
     {
         ArgumentNullException.ThrowIfNull(manifests);
         var entries = new List<IndexedCapability>();
@@ -82,8 +82,7 @@ internal sealed class CapabilityIndex
 
         foreach (var neuron in neurons ?? [])
         {
-            if (!neuron.AgentRoutable) { continue; }
-            var text = string.Join(' ', neuron.Name, neuron.Description, neuron.Id);
+            var text = neuron.SearchText;
             var entry = new IndexedCapability(neuron.Id, CapabilityKind.Neuron, neuron.Name,
                 [neuron.Id], Tokenize(text), await EmbedAsync(embed, text, cancellationToken).ConfigureAwait(false));
             entries.Add(entry);

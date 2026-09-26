@@ -3,7 +3,6 @@ using System.Text;
 using DigitalBrain.Apps;
 using DigitalBrain.Discovery.Search;
 using DigitalBrain.Discovery.Vector;
-using DigitalBrain.Contracts.Registry;
 using DigitalBrain.Core.Registry;
 using Microsoft.Extensions.Logging;
 
@@ -12,8 +11,7 @@ namespace DigitalBrain.Discovery;
 // Manifests are the truth. The catalog is rebuilt idempotently and falls back to keyword search.
 internal sealed class CapabilityCatalog(
     IEnumerable<IManifestSource> sources,
-    INeuronRegistry selectedRegistry,
-    IGrainFactory grains,
+    NeuronRegistry neurons,
     ICapabilityEmbedder embedder,
     ICapabilityVectorIndex vectors,
     ILogger<CapabilityCatalog> logger)
@@ -47,10 +45,8 @@ internal sealed class CapabilityCatalog(
             }
         }
 
-        var registry = await grains.GetGrain<INeuronRegistryGrain>(selectedRegistry.Version)
-            .Read().ConfigureAwait(false);
-        var neurons = registry.Where(static item => item.AgentRoutable).ToArray();
-        if (unreadable > 0 && read.Count == 0 && (_signature is not null || neurons.Length == 0))
+        var contracts = neurons.All;
+        if (unreadable > 0 && read.Count == 0 && (_signature is not null || contracts.Count == 0))
         {
             Degraded = true;
             return;
@@ -62,7 +58,7 @@ internal sealed class CapabilityCatalog(
             .Select(static group => group.Last())
             .ToList();
 
-        var signature = Signature(manifests, neurons);
+        var signature = Signature(manifests, contracts);
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -88,7 +84,7 @@ internal sealed class CapabilityCatalog(
                 }
             }
 
-            _index = await CapabilityIndex.BuildAsync(manifests, Embed, cancellationToken, neurons).ConfigureAwait(false);
+            _index = await CapabilityIndex.BuildAsync(manifests, Embed, cancellationToken, contracts).ConfigureAwait(false);
             await PersistAsync(_index, cancellationToken).ConfigureAwait(false);
             _signature = signature;
             _indexDegraded = degraded;
@@ -132,7 +128,7 @@ internal sealed class CapabilityCatalog(
         return await _index.SearchAsync(query, workspaceId, take, Degraded, cancellationToken, appsOnly).ConfigureAwait(false);
     }
 
-    private static string Signature(IReadOnlyList<ScopedAppManifest> manifests, IReadOnlyList<NeuronRegistration> neurons)
+    private static string Signature(IReadOnlyList<ScopedAppManifest> manifests, IReadOnlyList<NeuronContract> neurons)
     {
         var builder = new StringBuilder();
         foreach (var scoped in manifests.OrderBy(static scoped => scoped.Manifest.Id, StringComparer.Ordinal))
@@ -149,8 +145,7 @@ internal sealed class CapabilityCatalog(
 
         foreach (var neuron in neurons.OrderBy(static item => item.Id, StringComparer.Ordinal))
         {
-            builder.Append(neuron.Id).Append('|').Append(neuron.ModuleId).Append('|')
-                .Append(neuron.Name).Append('|').Append(neuron.Description).Append(';');
+            builder.Append(neuron.Id).Append('|').Append(neuron.SearchText).Append(';');
         }
 
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString())));

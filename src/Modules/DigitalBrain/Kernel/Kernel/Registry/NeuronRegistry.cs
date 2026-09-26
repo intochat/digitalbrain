@@ -1,78 +1,60 @@
+using System.Reflection;
+using System.Text.RegularExpressions;
 using DigitalBrain.Contracts;
-using DigitalBrain.Contracts.Registry;
-using System.Security.Cryptography;
-using System.Text.Json;
 
 namespace DigitalBrain.Core.Registry;
 
-public sealed record NeuronDescriptor(
-    string Id,
-    Type ContractType,
-    string Name,
-    string Description,
-    bool AgentRoutable)
+public sealed record NeuronContract(string Id, Type Interface, string ModuleId)
 {
-    public string ModuleId { get; init; } = "";
+    public string Name => Interface.Name is { Length: > 1 } name && name[0] == 'I' && char.IsUpper(name[1])
+        ? name[1..] : Interface.Name;
+
+    public string SearchText => Regex.Replace(string.Join(' ', new[] { Id, Name }
+        .Concat(Interface.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Select(method => method.Name))), "(?<=[a-z])(?=[A-Z])", " ");
 }
 
-public interface INeuronRegistryContributor
+public sealed class NeuronRegistry(IEnumerable<Type> moduleTypes)
 {
-    IReadOnlyList<NeuronDescriptor> Neurons { get; }
-}
+    private readonly Type[] _moduleTypes = [.. moduleTypes];
+    private IReadOnlyList<NeuronContract>? _contracts;
 
-public interface INeuronRegistry
-{
-    IReadOnlyList<NeuronDescriptor> All { get; }
-    string Version { get; }
-    NeuronDescriptor? Find(string id);
-}
+    public IReadOnlyList<NeuronContract> All => _contracts
+        ?? throw new InvalidOperationException("Neuron discovery has not completed.");
 
-public sealed class NeuronRegistry : INeuronRegistry
-{
-    private readonly Dictionary<string, NeuronDescriptor> _byId;
+    public NeuronContract? Find(string id) => All.FirstOrDefault(contract => contract.Id == id);
 
-    private NeuronRegistry(IEnumerable<NeuronDescriptor> descriptors)
+    internal void Discover()
     {
-        _byId = new(StringComparer.Ordinal);
-        foreach (var descriptor in descriptors)
+        var byId = new Dictionary<string, NeuronContract>(StringComparer.Ordinal);
+        foreach (var moduleType in _moduleTypes)
         {
-            if (string.IsNullOrWhiteSpace(descriptor.Id)
-                || string.IsNullOrWhiteSpace(descriptor.Name)
-                || string.IsNullOrWhiteSpace(descriptor.Description)
-                || string.IsNullOrWhiteSpace(descriptor.ModuleId))
-            { throw new ArgumentException("Neuron descriptors require an ID, name, description, and module ID."); }
-            if (!typeof(INeuron).IsAssignableFrom(descriptor.ContractType) || !descriptor.ContractType.IsInterface)
-            { throw new ArgumentException($"{descriptor.Id} must name an INeuron interface."); }
-            if (!_byId.TryAdd(descriptor.Id, descriptor))
-            { throw new InvalidOperationException($"Duplicate neuron registry ID '{descriptor.Id}'."); }
+            var assembly = moduleType.Assembly;
+            var contractAssemblies = assembly.GetReferencedAssemblies()
+                .Where(reference => reference.Name == assembly.GetName().Name + ".Contracts")
+                .Select(Assembly.Load)
+                .ToArray();
+            // Test modules can declare their contracts in the same assembly as the module.
+            if (contractAssemblies.Length == 0) { contractAssemblies = [assembly]; }
+            foreach (var contractAssembly in contractAssemblies)
+            {
+                foreach (var type in contractAssembly.GetExportedTypes())
+                {
+                    if (!type.IsInterface || type == typeof(INeuron) || !typeof(INeuron).IsAssignableFrom(type))
+                    { continue; }
+                    var id = type.GetCustomAttribute<AliasAttribute>()?.Alias;
+                    if (string.IsNullOrWhiteSpace(id))
+                    { throw new InvalidOperationException($"Public neuron contract {type.FullName} requires an Orleans alias."); }
+                    if (byId.TryGetValue(id, out var existing))
+                    {
+                        if (existing.Interface != type)
+                        { throw new InvalidOperationException($"Duplicate neuron alias '{id}'."); }
+                        continue;
+                    }
+                    byId.Add(id, new NeuronContract(id, type, moduleType.FullName!));
+                }
+            }
         }
-        All = Array.AsReadOnly(_byId.Values.OrderBy(item => item.Id, StringComparer.Ordinal).ToArray());
-        Version = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(ToRegistrations(this))));
+        _contracts = Array.AsReadOnly(byId.Values.OrderBy(contract => contract.Id, StringComparer.Ordinal).ToArray());
     }
-
-    public IReadOnlyList<NeuronDescriptor> All { get; }
-    public string Version { get; }
-    public NeuronDescriptor? Find(string id) => _byId.GetValueOrDefault(id);
-
-    public static NeuronRegistry FromModules(IEnumerable<ModuleDefinition> modules)
-        => new(modules.SelectMany(module => Describe(module.CreateModule(), module.Id)));
-
-    public static NeuronRegistry FromInstances(IEnumerable<IModule> modules)
-        => new(modules.SelectMany(module => Describe(module, module.GetType().FullName!)));
-
-    public static NeuronRegistration[] ToRegistrations(INeuronRegistry registry)
-        => registry.All.Select(item => new NeuronRegistration
-        {
-            Id = item.Id,
-            ContractType = item.ContractType.FullName!,
-            ModuleId = item.ModuleId,
-            Name = item.Name,
-            Description = item.Description,
-            AgentRoutable = item.AgentRoutable,
-        }).ToArray();
-
-    private static IEnumerable<NeuronDescriptor> Describe(IModule module, string moduleId)
-        => module is INeuronRegistryContributor contributor
-            ? contributor.Neurons.Select(descriptor => descriptor with { ModuleId = moduleId })
-            : [];
 }

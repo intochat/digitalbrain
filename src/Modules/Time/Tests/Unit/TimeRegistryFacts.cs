@@ -1,7 +1,8 @@
-using DigitalBrain.Core;
+using DigitalBrain.Core.Registry;
 using DigitalBrain.Time;
 using DigitalBrain.Time.Reminders;
 using DigitalBrain.Time.Timers;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace DigitalBrain.Tests;
@@ -9,12 +10,13 @@ namespace DigitalBrain.Tests;
 public sealed class TimeRegistryFacts
 {
     [Fact]
-    public void SelectedTimeModuleContributesStableNeuronContracts()
+    public async Task SelectedTimeModuleDiscoversItsContracts()
     {
-        var registry = new BrainCompositionBuilder().WithModule<TimeModule>().Build().NeuronRegistry;
+        await using var brain = await UnitTest.Create().WithModule<TimeModule>().WithReminders()
+            .StartAsync(TestContext.Current.CancellationToken);
+        var registry = brain.SiloServices.GetRequiredService<NeuronRegistry>();
 
-        Assert.Equal(typeof(ITimer), registry.Find("time.timer")?.ContractType);
-        Assert.Equal(typeof(IReminder), registry.Find("time.reminder")?.ContractType);
-        Assert.Null(new BrainCompositionBuilder().Build().NeuronRegistry.Find("time.timer"));
+        Assert.Equal(typeof(ITimer), registry.Find("timer")?.Interface);
+        Assert.Equal(typeof(IReminder), registry.Find("reminder")?.Interface);
     }
 }

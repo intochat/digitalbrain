@@ -1,4 +1,3 @@
-using DigitalBrain.Contracts.Registry;
 using DigitalBrain.Core.Registry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -13,11 +12,11 @@ public static class BrainHosting
         silo.Services.TryAddSingleton<ILocalSignalHub>(sp => sp.GetRequiredService<LocalSignalHub>());
         return silo;
     }
-    public static ISiloBuilder AddNeuronRegistry(this ISiloBuilder silo, INeuronRegistry registry)
+    public static ISiloBuilder AddNeuronRegistry(this ISiloBuilder silo, IEnumerable<Type> moduleTypes)
     {
-        ArgumentNullException.ThrowIfNull(registry);
-        silo.Services.AddSingleton(registry);
-        silo.AddStartupTask<NeuronRegistrationStartupTask>();
+        ArgumentNullException.ThrowIfNull(moduleTypes);
+        silo.Services.AddSingleton(new NeuronRegistry(moduleTypes));
+        silo.AddStartupTask<NeuronDiscoveryStartupTask>();
         return silo;
     }
 }

@@ -35,8 +35,7 @@ public sealed class BrainCompositionBuilder
         if (_built is not null) { return _built; }
         var modules = ModuleComposition.Resolve(_modules.Values.Select(m => m.Compile()).ToArray());
         ModuleSettingsValidation.ValidatePublicSettings(modules);
-        return _built = new(modules, _modules.Values.SelectMany(m => m.LocalServices).ToArray(),
-            Registry.NeuronRegistry.FromModules(modules));
+        return _built = new(modules, _modules.Values.SelectMany(m => m.LocalServices).ToArray());
     }
 
     public BrainCompositionBuilder ApplyOverrides(string envelope)

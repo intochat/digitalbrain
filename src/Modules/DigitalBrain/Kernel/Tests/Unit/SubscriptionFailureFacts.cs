@@ -5,6 +5,7 @@ using Xunit;
 
 namespace DigitalBrain.Tests;
 
+[Alias("test.controlled-source")]
 public interface IControlledSource : INeuron
 {
     Task Configure(string mode);

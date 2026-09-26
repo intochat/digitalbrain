@@ -1,7 +1,5 @@
 # Neuron registry
 
-Selected modules may implement `INeuronRegistryContributor` to declare stable neuron contract IDs. Composition validates an immutable local registry; `NeuronRegistrationStartupTask` publishes its serializable records to the persistent `INeuronRegistryGrain` before the silo finishes starting. Discovery reads that grain. There is no lazy DI factory or assembly scan.
+`NeuronDiscoveryStartupTask` scans the contract assembly of each selected module for public interfaces extending `INeuron`. Every such interface needs a unique Orleans `[Alias]`; that alias is its discovery ID. The resulting registry lives in the silo's service provider. Discovery reads it directly.
 
-The registry lists contracts, not grain instances. `AgentRoutable` controls Discovery indexing, not execution permission. A registry read before startup registration completes fails instead of returning a misleading empty inventory. The registry content hash is the grain key: silos with the same selected modules publish idempotently to one grain, while different module sets use separate grains. Discovery reads the version selected by its local silo, so an older silo cannot overwrite a newer registry during a rolling deployment.
-
-Current contributions: `TimeModule` declares `time.timer` (`ITimer`) and `time.reminder` (`IReminder`). Other modules can opt in incrementally; the current inventory is not a complete list of every neuron in the repository.
+The registry lists contracts, not grain instances. It does not register implementations, grant access, persist state, or coordinate silos. The interface name and method names provide searchable text without a second metadata declaration.

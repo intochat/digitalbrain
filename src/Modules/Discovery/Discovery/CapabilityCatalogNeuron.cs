@@ -1,13 +1,12 @@
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
-using DigitalBrain.Contracts.Registry;
 using DigitalBrain.Core.Registry;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Discovery;
 
 [GrainType("capability-catalog")]
-internal sealed class CapabilityCatalogNeuron(CapabilityCatalog catalog, INeuronRegistry selectedRegistry, TimeProvider time) : Neuron, ICapabilityCatalog
+internal sealed class CapabilityCatalogNeuron(CapabilityCatalog catalog, NeuronRegistry registry, TimeProvider time) : Neuron, ICapabilityCatalog
 {
     private const int MaxTake = 25;
     private const string UnmetIntentBoardKey = "unmet-intents";
@@ -31,19 +30,19 @@ internal sealed class CapabilityCatalogNeuron(CapabilityCatalog catalog, INeuron
         return catalog.SearchAsync(query, workspaceId, Math.Clamp(take, 1, MaxTake), CancellationToken.None, appsOnly: true).AsTask();
     }
 
-    public async Task<NeuronCapabilityDetails?> ReadNeuron(string id)
+    public Task<NeuronCapabilityDetails?> ReadNeuron(string id)
     {
-        var descriptor = await GrainFactory.GetGrain<INeuronRegistryGrain>(selectedRegistry.Version).Find(id);
-        return descriptor is { AgentRoutable: true }
+        var descriptor = registry.Find(id);
+        return Task.FromResult(descriptor is not null
             ? new NeuronCapabilityDetails
             {
                 Id = descriptor.Id,
                 Name = descriptor.Name,
-                Description = descriptor.Description,
-                ContractType = descriptor.ContractType,
+                Description = descriptor.SearchText,
+                ContractType = descriptor.Interface.FullName!,
                 ModuleId = descriptor.ModuleId,
             }
-            : null;
+            : null);
     }
 
     private async Task RecordUnmetIntentAsync(string workspaceId, string query)

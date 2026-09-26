@@ -29,7 +29,6 @@ public static class DigitalBrainRuntimeHostingExtensions
         builder.AddKeyedAzureTableServiceClient(DigitalBrainNames.Reminders);
         builder.AddKeyedAzureBlobServiceClient(DigitalBrainNames.GrainState);
         var modules = LoadModules(builder.Configuration);
-        var registry = NeuronRegistry.FromInstances(modules);
         builder.UseOrleans(silo =>
         {
             ConfigureStandaloneAzureClustering(silo, builder.Configuration);
@@ -42,7 +41,7 @@ public static class DigitalBrainRuntimeHostingExtensions
             // Orleans hosting already registers one activity-propagation filter pair. An explicit
             // `silo.AddActivityPropagation()` here registered a second pair and doubled every grain
             // call to 4 spans (measured); it was removed so exactly one registration remains.
-            silo.AddDigitalBrain().AddNeuronRegistry(registry);
+            silo.AddDigitalBrain().AddNeuronRegistry(modules.Select(module => module.GetType()));
             foreach (var module in modules)
             {
                 module.Configure(silo);

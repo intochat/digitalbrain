@@ -9,12 +9,14 @@ namespace DigitalBrain.Tests;
 public sealed record Number([property: Id(0)] int Value) : Signal;
 [GenerateSerializer]
 public sealed record Text([property: Id(0)] string Value) : Signal;
+[Alias("test.emitter")]
 public interface ITestEmitter : INeuron
 {
     Task Emit(int value);
     Task EmitText(string value);
     Task Deactivate();
 }
+[Alias("test.other-emitter")]
 public interface IOtherEmitter : INeuron { Task Emit(int value); }
 [GrainType("test-emitter")]
 public sealed class TestEmitter : Neuron, ITestEmitter

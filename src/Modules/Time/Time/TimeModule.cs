@@ -11,14 +11,8 @@ using Orleans.Hosting;
 namespace DigitalBrain.Time;
 
 [ModuleConfiguration(typeof(TimeConfigurationContract))]
-public sealed class TimeModule : IModule, INeuronRegistryContributor
+public sealed class TimeModule : IModule
 {
-    public IReadOnlyList<NeuronDescriptor> Neurons =>
-    [
-        new("time.timer", typeof(DigitalBrain.Time.Timers.ITimer), "Timer", "Schedule one-shot or repeating activation-local ticks", true),
-        new("time.reminder", typeof(IReminder), "Reminder", "Schedule persistent periodic ticks or jobs", true),
-    ];
-
     public static ModuleDefinition Define() => new(typeof(TimeModule));
     public void Configure(ISiloBuilder silo)
     {

@@ -7,6 +7,7 @@ using Orleans.Runtime;
 using Xunit;
 namespace DigitalBrain.Tests;
 
+[Alias("test.counter")]
 public interface ICounter : INeuron
 {
     Task<int> Read();
