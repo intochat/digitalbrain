@@ -587,8 +587,9 @@ final class DigitalBrainUiClient {
     final response = await http.Response.fromStream(
       await _http.send(request).timeout(const Duration(seconds: 60)),
     ).timeout(const Duration(seconds: 60));
-    if (response.statusCode != 200)
+    if (response.statusCode != 200) {
       throw StateError('Save failed: ${response.body}');
+    }
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
