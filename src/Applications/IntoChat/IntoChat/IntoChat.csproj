@@ -40,7 +40,6 @@
     <ProjectReference Include="../../../Modules/Microsoft/Roslyn/Roslyn/DigitalBrain.Modules.Microsoft.Roslyn.csproj" />
     <ProjectReference Include="../../../Modules/Microsoft/DotNet/DotNet/DigitalBrain.Modules.Microsoft.DotNet.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Behaviors/Behavior/DigitalBrain.Modules.Behavior.csproj" />
-    <ProjectReference Include="../../../Modules/MyData/MyData/DigitalBrain.Modules.MyData.csproj" />
     <ProjectReference Include="../../../Modules/Discovery/Discovery/DigitalBrain.Modules.Discovery.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Apps/Apps/DigitalBrain.Modules.Apps.csproj" />
     <ProjectReference Include="../../../Modules/Connections/Connections/DigitalBrain.Modules.Connections.csproj" />

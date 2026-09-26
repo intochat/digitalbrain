@@ -1,4 +1,4 @@
-namespace DigitalBrain.MyData;
+namespace DigitalBrain.Sdk.Secrets;
 
 // Wraps the per-owner data key so only ciphertext is persisted. Local runs use DPAPI; hosted runs
 // substitute the Key Vault adapter backed by IKeyVault.

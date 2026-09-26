@@ -785,7 +785,7 @@ class _SecretInputState extends State<_SecretInput> {
         suffixIcon: IconButton(
           key: const Key('form_secret_save'),
           icon: const Icon(Icons.check),
-          tooltip: 'Store in My Data',
+          tooltip: 'Store secret',
           onPressed: widget.enabled && !saving ? submit : null,
         ),
       ),

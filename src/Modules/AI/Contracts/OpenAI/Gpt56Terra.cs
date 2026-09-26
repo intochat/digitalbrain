@@ -7,5 +7,5 @@ public sealed class Gpt56Terra : LLMModel<IGpt56Terra>
     public override AiProvider Provider => AiProvider.OpenAI;
 }
 
-[Orleans.Metadata.DefaultGrainType("ai.llm.gpt56terra")]
+[Alias("ai.llm.gpt56terra"), Orleans.Metadata.DefaultGrainType("ai.llm.gpt56terra")]
 public interface IGpt56Terra : ILLM;

@@ -2,31 +2,28 @@ using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Contracts.Types;
 using DigitalBrain.Core;
-using DigitalBrain.MyData;
+using DigitalBrain.Sdk.Secrets;
 using Orleans;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Connections;
 
-// The owner's connection registry. A credential is written to the owner's My Data vault and the
+// The owner's connection registry. A credential is written to the shared secrets grain and the
 // record holds only its SecretRef; the value is released only inside the read-only probe.
 [GrainType(ConnectionsNames.NeuronType)]
 internal sealed class ConnectionsNeuron : Neuron<ConnectionsState>, IConnections
 {
     private readonly IGrainFactory _grains;
-    private readonly ISecretResolver _secrets;
     private readonly IConnectionProbe _probe;
     private readonly TimeProvider _time;
 
     public ConnectionsNeuron(
         [PersistentState("connections", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ConnectionsState> store,
         IGrainFactory grains,
-        ISecretResolver secrets,
         IConnectionProbe probe,
         TimeProvider time) : base(store)
     {
         _grains = grains;
-        _secrets = secrets;
         _probe = probe;
         _time = time;
     }
@@ -112,9 +109,9 @@ internal sealed class ConnectionsNeuron : Neuron<ConnectionsState>, IConnections
             throw new ArgumentException("A principal is required to store a connection credential.", nameof(caller));
         }
 
-        var vault = _grains.GetGrain<IVault>(caller.PrincipalId);
+        var vault = _grains.GetGrain<ISecrets>(caller.PrincipalId);
         var fieldPath = FieldPath(source, request.ConnectionId);
-        return await vault.SetSecret(caller, fieldPath, request.Label ?? source, request.Value, cancellationToken);
+        return await vault.Set(caller, fieldPath, request.Label ?? source, request.Value, cancellationToken);
     }
 
     private async Task<ConnectionProbeResult> RunProbeAsync(string source, SecretRef credential, CallerContext caller, CancellationToken cancellationToken)
@@ -122,7 +119,7 @@ internal sealed class ConnectionsNeuron : Neuron<ConnectionsState>, IConnections
         string value;
         try
         {
-            value = await _secrets.ResolveAsync(credential, Platform(caller), cancellationToken);
+            value = await _grains.GetGrain<ISecrets>(credential.Owner).Resolve(Platform(caller), credential, cancellationToken);
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {

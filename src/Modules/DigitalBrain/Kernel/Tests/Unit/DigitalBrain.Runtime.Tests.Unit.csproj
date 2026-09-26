@@ -2,5 +2,6 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Sdk" />
     <ProjectReference Include="../../../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
+    <ProjectReference Include="../../Sdk/DigitalBrain.Sdk.csproj" />
   </ItemGroup>
 </Project>

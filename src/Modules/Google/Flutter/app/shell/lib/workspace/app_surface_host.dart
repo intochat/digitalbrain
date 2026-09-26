@@ -143,14 +143,10 @@ class _AppSurfaceHostState extends State<AppSurfaceHost> {
         'node?${Uri(queryParameters: {'kind': kind, 'name': name}).query}',
       );
   Future<String?> saveSecret(String fieldName, String value) async {
-    final result = await widget.client.myDataRequest(
-      widget.workspace,
-      'secrets',
-      body: {
-        'fieldPath': 'form.$fieldName',
-        'label': fieldName,
-        'value': value,
-      },
+    final result = await widget.client.storeSecret(
+      'form.$fieldName',
+      fieldName,
+      value,
     );
     return result['reference'] as String?;
   }

@@ -1,5 +1,5 @@
 using System.Text.Json;
-using DigitalBrain.MyData;
+using DigitalBrain.Sdk.Secrets;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Salesforce.Signals;
 using DigitalBrain.Sdk;
@@ -31,10 +31,6 @@ public sealed class SalesforceFacts
         Assert.Equal(connection.InstanceUrl, published.Connection.InstanceUrl);
         Assert.False(fixture.Handoff.TryPeek(nonce, out _));
 
-        var export = await fixture.Brain.Get<IVault>(Owner).Export(UserCaller(), ct);
-        var text = string.Join("\n", export.Fields.Select(field => $"{field.FieldPath}={field.Value}"));
-        Assert.DoesNotContain("access-token", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("refresh-token", text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -171,19 +167,10 @@ public sealed class SalesforceFacts
         return salesforce;
     }
 
-    private static DigitalBrain.Contracts.Enforcement.CallerContext UserCaller() => new()
-    {
-        PrincipalId = Owner,
-        AccountId = Owner,
-        WorkspaceId = Owner,
-        Kind = DigitalBrain.Contracts.Enforcement.CallerKind.User,
-        StampedBy = DigitalBrain.Contracts.Enforcement.TrustedEdge.AuthenticatedHttp,
-    };
-
     private static async Task<Fixture> StartAsync(FakeSalesforceProvider provider, FakeTokenExchange? exchange, CancellationToken cancellationToken)
     {
         var handoff = new TokenHandoff(TimeProvider.System);
-        var brain = await UnitTest.Create().WithModule<MyDataModule>().WithModule<SalesforceModule>()
+        var brain = await UnitTest.Create().WithModule<SecretsModule>().WithModule<SalesforceModule>()
             .ConfigureSilo(silo =>
             {
                 silo.Services.AddSingleton<ISalesforceProvider>(provider);

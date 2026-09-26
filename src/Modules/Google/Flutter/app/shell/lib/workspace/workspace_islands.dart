@@ -55,7 +55,6 @@ class WorkspaceIslands extends StatelessWidget {
     'files' => Icons.folder_outlined,
     'images' => Icons.tune,
     'behaviors' => Icons.account_tree_outlined,
-    'mydata' => Icons.shield_outlined,
     'table' => Icons.table_chart_outlined,
     _ => Icons.web_asset_outlined,
   };

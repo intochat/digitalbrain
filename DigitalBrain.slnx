@@ -115,11 +115,6 @@
     <Project Path="src/Modules/DigitalBrain/Compute/Contracts/DigitalBrain.Modules.Compute.Contracts.csproj" />
     <Project Path="src/Modules/DigitalBrain/Compute/Compute/DigitalBrain.Modules.Compute.csproj" />
   </Folder>
-  <Folder Name="/Modules/MyData/">
-    <Project Path="src/Modules/MyData/Tests/Unit/DigitalBrain.Modules.MyData.Tests.Unit.csproj" />
-    <Project Path="src/Modules/MyData/Contracts/DigitalBrain.Modules.MyData.Contracts.csproj" />
-    <Project Path="src/Modules/MyData/MyData/DigitalBrain.Modules.MyData.csproj" />
-  </Folder>
   <Folder Name="/Modules/Identity/">
     <Project Path="src/Modules/Identity/Tests/Unit/DigitalBrain.Modules.Identity.Tests.Unit.csproj" />
     <Project Path="src/Modules/Identity/Contracts/DigitalBrain.Modules.Identity.Contracts.csproj" />

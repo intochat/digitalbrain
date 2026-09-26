@@ -37,12 +37,11 @@ List<AppLauncherEntry> launcherEntries(List<AppManifestSummary> apps) {
   return entries;
 }
 
-const _openableLaunchKeys = {'files', 'images', 'mydata', 'behaviors'};
+const _openableLaunchKeys = {'files', 'images', 'behaviors'};
 
 const _firstPartyIds = {
   'intochat.files',
   'intochat.image-editor',
-  'intochat.mydata',
   'intochat.customer-tables',
   'intochat.forms',
 };
@@ -67,12 +66,6 @@ AppLauncherEntry entryFor(AppManifestSummary app) => switch (app.id) {
     title: 'Image Editor',
     subtitle: 'Draw, crop and export',
     icon: Icons.tune,
-  ),
-  'intochat.mydata' => const AppLauncherEntry(
-    launchKey: 'mydata',
-    title: 'My Data',
-    subtitle: 'Your facts and secrets',
-    icon: Icons.shield_outlined,
   ),
   'intochat.customer-tables' => const AppLauncherEntry(
     launchKey: 'tables',
@@ -106,12 +99,6 @@ const defaultLauncherEntries = <AppLauncherEntry>[
     title: 'Image Editor',
     subtitle: 'Draw, crop and export',
     icon: Icons.tune,
-  ),
-  AppLauncherEntry(
-    launchKey: 'mydata',
-    title: 'My Data',
-    subtitle: 'Your facts and secrets',
-    icon: Icons.shield_outlined,
   ),
 ];
 

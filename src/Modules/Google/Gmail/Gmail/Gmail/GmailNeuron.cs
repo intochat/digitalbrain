@@ -1,7 +1,7 @@
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core;
-using DigitalBrain.MyData;
+using DigitalBrain.Sdk.Secrets;
 using DigitalBrain.Sdk;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
@@ -35,9 +35,9 @@ internal sealed class GmailNeuron(
         var email = grant.Email ?? this.GetPrimaryKeyString();
         ArgumentException.ThrowIfNullOrWhiteSpace(email);
         var owner = string.IsNullOrWhiteSpace(secretOwner) ? this.GetPrimaryKeyString() : secretOwner;
-        var vault = GrainFactory.GetGrain<IVault>(owner);
+        var vault = GrainFactory.GetGrain<ISecrets>(owner);
         var platform = Platform();
-        var credential = await vault.SetSecret(platform, "gmail.access", "Gmail access token", grant.AccessToken, CancellationToken.None)
+        var credential = await vault.Set(platform, "gmail.access", "Gmail access token", grant.AccessToken, CancellationToken.None)
             .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         if (!credential.IsSet)
         {
@@ -46,7 +46,7 @@ internal sealed class GmailNeuron(
 
         var refreshCredential = grant.RefreshToken is null
             ? null
-            : await vault.SetSecret(platform, "gmail.refresh", "Gmail refresh token", grant.RefreshToken, CancellationToken.None)
+            : await vault.Set(platform, "gmail.refresh", "Gmail refresh token", grant.RefreshToken, CancellationToken.None)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext);
         var expiresAt = GmailTokenPolicy.Expiry(grant.ExpiresInSeconds, ServiceProvider.GetRequiredService<TimeProvider>());
         await Save(Snapshot with

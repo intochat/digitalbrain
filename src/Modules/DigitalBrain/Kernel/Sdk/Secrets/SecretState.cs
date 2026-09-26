@@ -1,18 +1,19 @@
 using DigitalBrain.Contracts.Types;
 
-namespace DigitalBrain.MyData;
+namespace DigitalBrain.Sdk.Secrets;
 
+// Aliases and field IDs match the old MyData state so existing credentials still load.
 [GenerateSerializer, Alias("mydata.state")]
-internal sealed class VaultState
+internal sealed class SecretsState
 {
     [Id(0)] public string Owner { get; set; } = "";
     [Id(1)] public string WrappedOwnerKey { get; set; } = "";
-    [Id(2)] public Dictionary<string, VaultFieldRecord> Fields { get; set; } = [];
-    [Id(3)] public List<VaultAuditRecord> Audit { get; set; } = [];
+    [Id(2)] public Dictionary<string, SecretRecord> Fields { get; set; } = [];
+    [Id(3)] public List<LegacyAuditRecord> Audit { get; set; } = [];
 }
 
 [GenerateSerializer, Alias("mydata.field-record")]
-internal sealed class VaultFieldRecord
+internal sealed class SecretRecord
 {
     [Id(0)] public string FieldPath { get; set; } = "";
     [Id(1)] public FieldKind Kind { get; set; }
@@ -25,7 +26,7 @@ internal sealed class VaultFieldRecord
 }
 
 [GenerateSerializer, Alias("mydata.audit-record")]
-internal sealed class VaultAuditRecord
+internal sealed class LegacyAuditRecord
 {
     [Id(0)] public string Action { get; set; } = "";
     [Id(1)] public string FieldPath { get; set; } = "";

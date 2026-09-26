@@ -1,4 +1,4 @@
-namespace DigitalBrain.MyData;
+namespace DigitalBrain.Sdk.Secrets;
 
 // Hosted key-management adapter (Azure Key Vault or equivalent). The fake keeps hosted
 // composition and tests deterministic without reaching a real vault.

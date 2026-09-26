@@ -1,13 +1,12 @@
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Contracts.Types;
-using DigitalBrain.MyData;
+using DigitalBrain.Sdk.Secrets;
 
 namespace DigitalBrain.Salesforce;
 
-// The Salesforce tokens live only in the owner's My Data vault. This type writes them on connect
+// The Salesforce tokens live in the owner's secrets grain. This type writes them on connect
 // and refresh, and resolves a value only inside the neuron that is about to make the outbound call.
 internal sealed class SalesforceCredentialStore(
-    ISecretResolver secrets,
     IGrainFactory grains,
     SalesforceTokenRefresh refresh,
     TimeProvider time)
@@ -19,17 +18,17 @@ internal sealed class SalesforceCredentialStore(
         string owner, SalesforceState connection, string accessToken, string? refreshToken, DateTimeOffset expiresAt, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(owner);
-        var vault = grains.GetGrain<IVault>(owner);
+        var vault = grains.GetGrain<ISecrets>(owner);
         var platform = Platform();
         connection = connection with
         {
-            AccessToken = await vault.SetSecret(platform, AccessFieldPath, "Salesforce access token", accessToken, cancellationToken),
+            AccessToken = await vault.Set(platform, AccessFieldPath, "Salesforce access token", accessToken, cancellationToken),
         };
         if (refreshToken is not null)
         {
             connection = connection with
             {
-                RefreshToken = await vault.SetSecret(platform, RefreshFieldPath, "Salesforce refresh token", refreshToken, cancellationToken),
+                RefreshToken = await vault.Set(platform, RefreshFieldPath, "Salesforce refresh token", refreshToken, cancellationToken),
             };
         }
 
@@ -46,15 +45,16 @@ internal sealed class SalesforceCredentialStore(
     }
 
     internal async Task<string> AccessTokenAsync(SalesforceState connection, CancellationToken cancellationToken)
-        => await secrets.ResolveAsync(
-            connection.AccessToken ?? throw new SalesforceNotConnectedException(),
-            Platform(),
-            cancellationToken).ConfigureAwait(false);
+    {
+        var secret = connection.AccessToken ?? throw new SalesforceNotConnectedException();
+        return await grains.GetGrain<ISecrets>(secret.Owner).Resolve(Platform(), secret, cancellationToken).ConfigureAwait(false);
+    }
 
     internal async Task<string> RefreshTokenAsync(SalesforceState connection, CancellationToken cancellationToken)
-        => connection.RefreshToken is null
-            ? throw new SalesforceNotConnectedException()
-            : await secrets.ResolveAsync(connection.RefreshToken, Platform(), cancellationToken).ConfigureAwait(false);
+    {
+        var secret = connection.RefreshToken ?? throw new SalesforceNotConnectedException();
+        return await grains.GetGrain<ISecrets>(secret.Owner).Resolve(Platform(), secret, cancellationToken).ConfigureAwait(false);
+    }
 
     private DateTimeOffset Expiry(double? seconds)
     {
@@ -70,8 +70,7 @@ internal sealed class SalesforceCredentialStore(
 
     private static string OwnerOf(SecretRef secret)
     {
-        var parts = secret.Reference.Split('/');
-        return parts.Length >= 4 ? parts[2] : "";
+        return secret.Owner;
     }
 
     // The outbound call resolves the secret as trusted platform code, never as the user turn.

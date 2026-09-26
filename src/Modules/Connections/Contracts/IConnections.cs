@@ -9,7 +9,7 @@ public static class ConnectionsNames
     public const string DefaultNeuron = "connections";
 }
 
-// The owner's registry of external sources. A credential is written to the My Data vault as a
+// The owner's registry of external sources. A credential is written to the SDK secrets grain as a
 // SecretRef and is resolved only inside the probe that makes the outbound call.
 [Alias("connections")]
 [Orleans.Metadata.DefaultGrainType(ConnectionsNames.NeuronType)]

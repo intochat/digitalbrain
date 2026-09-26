@@ -2,7 +2,7 @@ using DigitalBrain.Compute;
 using DigitalBrain.Connections;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Contracts.Types;
-using DigitalBrain.MyData;
+using DigitalBrain.Sdk.Secrets;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -18,12 +18,11 @@ public sealed class ConnectFlowFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create()
-            .WithModule<MyDataModule>()
+            .WithModule<SecretsModule>()
             .WithModule<ComputeModule>()
             .WithModule<ConnectionsModule>()
             .StartAsync(ct);
         var connections = brain.Get<IConnections>(Owner);
-        var vault = brain.Get<IVault>(Owner);
 
         var record = await connections.Connect(new ConnectConnection
         {
@@ -41,9 +40,7 @@ public sealed class ConnectFlowFacts
         var list = await connections.List(ct);
         Assert.Single(list);
 
-        var export = await vault.Export(UserCaller(), ct);
-        var text = string.Join("\n", export.Fields.Select(field => $"{field.FieldPath}={field.Value}"));
-        Assert.DoesNotContain(Canary, text, StringComparison.Ordinal);
+        Assert.DoesNotContain(Canary, System.Text.Json.JsonSerializer.Serialize(record), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -52,7 +49,7 @@ public sealed class ConnectFlowFacts
         var ct = TestContext.Current.CancellationToken;
         var scripted = new ScriptedProbe(ConnectionProbeOutcome.Expired, ConnectionProbeOutcome.Failing);
         await using var brain = await UnitTest.Create()
-            .WithModule<MyDataModule>()
+            .WithModule<SecretsModule>()
             .WithModule<ComputeModule>()
             .WithModule<ConnectionsModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<IConnectionProbe>(scripted))
@@ -77,7 +74,7 @@ public sealed class ConnectFlowFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create()
-            .WithModule<MyDataModule>()
+            .WithModule<SecretsModule>()
             .WithModule<ComputeModule>()
             .WithModule<ConnectionsModule>()
             .StartAsync(ct);
@@ -102,7 +99,7 @@ public sealed class ConnectFlowFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create()
-            .WithModule<MyDataModule>()
+            .WithModule<SecretsModule>()
             .WithModule<ComputeModule>()
             .WithModule<ConnectionsModule>()
             .StartAsync(ct);
@@ -116,7 +113,7 @@ public sealed class ConnectFlowFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create()
-            .WithModule<MyDataModule>()
+            .WithModule<SecretsModule>()
             .WithModule<ComputeModule>()
             .WithModule<ConnectionsModule>()
             .StartAsync(ct);

@@ -20,7 +20,6 @@ import 'behaviors/behavior_manager.dart';
 import 'apps/consent_sheet_view.dart';
 import 'apps/built_in_app_view.dart';
 import 'apps/packages_screen.dart';
-import 'mydata/mydata_window.dart';
 
 class WorkspaceApp extends StatefulWidget {
   const WorkspaceApp({
@@ -594,26 +593,6 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
             setState(() => _mobileWork = false);
             store.save();
           },
-        );
-      }
-      if (a.data['app'] == 'mydata') {
-        return Semantics(
-          container: true,
-          explicitChildNodes: true,
-          role: SemanticsRole.region,
-          label: a.title,
-          child: MyDataWindow(
-            key: ValueKey('${store.currentProject.id}-${a.id}'),
-            request: (path, {body}) =>
-                client.myDataRequest(store.currentProject.id, path, body: body),
-            loadGrants: () => client.listGrants(store.currentProject.id),
-            revokeGrant: (grant) => client.revokeGrant(
-              store.currentProject.id,
-              appId: grant.appId,
-              semanticTypeId: grant.semanticTypeId,
-              mode: grant.mode,
-            ),
-          ),
         );
       }
       return Semantics(
@@ -1219,7 +1198,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
 
   Future<void> _launchApp(String launchKey) async {
     if (launchKey == 'behaviors' && !store.developerMode) return;
-    if (const {'files', 'images', 'mydata', 'behaviors'}.contains(launchKey)) {
+    if (const {'files', 'images', 'behaviors'}.contains(launchKey)) {
       store.launchLocalApp(launchKey);
       return;
     }

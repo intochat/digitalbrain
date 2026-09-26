@@ -1,9 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
 
-namespace DigitalBrain.MyData;
+namespace DigitalBrain.Sdk.Secrets;
 
-internal static class VaultCipher
+internal static class SecretCipher
 {
     internal const int KeySize = 32;
     private const int NonceSize = 12;

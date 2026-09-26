@@ -7,5 +7,5 @@ public sealed class Opus5 : LLMModel<IOpus5>
     public override AiProvider Provider => AiProvider.Anthropic;
 }
 
-[Orleans.Metadata.DefaultGrainType("ai.llm.opus5")]
+[Alias("ai.llm.opus5"), Orleans.Metadata.DefaultGrainType("ai.llm.opus5")]
 public interface IOpus5 : ILLM;

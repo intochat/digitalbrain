@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 
-namespace DigitalBrain.MyData;
+namespace DigitalBrain.Sdk.Secrets;
 
 public sealed class DpapiKeyWrapper : IKeyWrapper
 {

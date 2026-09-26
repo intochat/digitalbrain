@@ -25,7 +25,7 @@ using DigitalBrain.Microsoft.Roslyn;
 using DigitalBrain.Compute;
 using DigitalBrain.Discovery;
 using DigitalBrain.Connections;
-using DigitalBrain.MyData;
+using DigitalBrain.Sdk.Secrets;
 using DigitalBrain.Receipts;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
@@ -65,7 +65,7 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<SupabaseModule>(database => database.WithConnection("supabase"))
     // Durable reminders drive customer automations (T8); the module also validates the reminder provider.
     .WithModule<TimeModule>()
-    .WithModule<MyDataModule>()
+    .WithModule<SecretsModule>()
     .WithModule<ConnectionsModule>()
     .WithModule<IdentityModule>()
     .WithModule<AutomationsModule>()

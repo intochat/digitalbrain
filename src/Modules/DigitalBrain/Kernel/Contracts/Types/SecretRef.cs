@@ -15,6 +15,24 @@ public sealed record SecretRef
 
     public bool IsSet => Status == SecretStatus.Set;
 
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string Owner
+    {
+        get
+        {
+            if (!IsReference(Reference))
+            {
+                throw new InvalidOperationException("Invalid secret reference.");
+            }
+            var slash = Reference.IndexOf('/', "secret://".Length);
+            if (slash <= "secret://".Length)
+            {
+                throw new InvalidOperationException("The secret reference has no owner.");
+            }
+            return Reference["secret://".Length..slash];
+        }
+    }
+
     public static SecretRef For(string owner, string secretId, string label, bool isSet)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(owner);

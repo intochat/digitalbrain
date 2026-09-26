@@ -7,5 +7,5 @@ public sealed class Gemini36Flash : LLMModel<IGemini36Flash>
     public override AiProvider Provider => AiProvider.Google;
 }
 
-[Orleans.Metadata.DefaultGrainType("ai.llm.gemini36flash")]
+[Alias("ai.llm.gemini36flash"), Orleans.Metadata.DefaultGrainType("ai.llm.gemini36flash")]
 public interface IGemini36Flash : ILLM;

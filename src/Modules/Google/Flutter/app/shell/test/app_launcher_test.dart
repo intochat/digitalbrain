@@ -5,19 +5,13 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('the launcher falls back to the built-in first-party entries', () {
     final entries = launcherEntries(const []);
-    expect(entries.map((e) => e.launchKey), ['files', 'images', 'mydata']);
+    expect(entries.map((e) => e.launchKey), ['files', 'images']);
     expect(entries.first.title, 'Files');
     expect(entries.first.subtitle, 'On this computer');
   });
 
   test('first-party manifests drive the launcher keys and labels', () {
     final entries = launcherEntries(const [
-      AppManifestSummary(
-        id: 'intochat.mydata',
-        name: 'My Data',
-        description: 'ignored for known apps',
-        kind: 'declarative',
-      ),
       AppManifestSummary(
         id: 'intochat.files',
         name: 'Files',
@@ -32,7 +26,7 @@ void main() {
         kind: 'declarative',
       ),
     ]);
-    expect(entries.map((e) => e.launchKey), ['files', 'images', 'mydata']);
+    expect(entries.map((e) => e.launchKey), ['files', 'images']);
     expect(
       entries.singleWhere((e) => e.launchKey == 'files').subtitle,
       'On this computer',

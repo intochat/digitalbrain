@@ -583,7 +583,7 @@ class WorkspaceStore extends ChangeNotifier {
   }
 
   WorkspaceArtifact launchLocalApp(String app) {
-    if (!['files', 'images', 'behaviors', 'mydata'].contains(app)) {
+    if (!['files', 'images', 'behaviors'].contains(app)) {
       throw ArgumentError('Application not implemented.');
     }
     if (app == 'behaviors' && !_developerMode) {
@@ -597,7 +597,6 @@ class WorkspaceStore extends ChangeNotifier {
           title: switch (app) {
             'files' => 'Files',
             'behaviors' => 'Behaviors',
-            'mydata' => 'My Data',
             _ => 'Image Editor',
           },
           kind: 'app',
