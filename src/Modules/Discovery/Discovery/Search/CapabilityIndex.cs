@@ -93,7 +93,7 @@ internal sealed class CapabilityIndex
         return new CapabilityIndex(entries, BuildIdf(entries), aliases, embed);
     }
 
-    public async ValueTask<CapabilitySearchResult> SearchAsync(string query, string? workspaceId, int take, bool degraded, CancellationToken cancellationToken)
+    public async ValueTask<CapabilitySearchResult> SearchAsync(string query, string? workspaceId, int take, bool degraded, CancellationToken cancellationToken, bool appsOnly = false)
     {
         if (string.IsNullOrWhiteSpace(query) || take < 1 || _entries.Count == 0)
         {
@@ -101,12 +101,13 @@ internal sealed class CapabilityIndex
         }
 
         if (_aliases.TryGetValue(query.Trim(), out var aliasMatches)
-            && aliasMatches.FirstOrDefault(entry => IsVisible(entry, workspaceId)) is { } aliasMatch)
+            && aliasMatches.FirstOrDefault(entry => IsVisible(entry, workspaceId) && (!appsOnly || entry.Kind is CapabilityKind.App or CapabilityKind.Operation)) is { } aliasMatch)
         {
             return new CapabilitySearchResult { Hits = [Hit(aliasMatch, 1d)], Degraded = degraded };
         }
 
-        var visible = _entries.Where(entry => IsVisible(entry, workspaceId)).ToArray();
+        var visible = _entries.Where(entry => IsVisible(entry, workspaceId)
+            && (!appsOnly || entry.Kind is CapabilityKind.App or CapabilityKind.Operation)).ToArray();
         var queryTokens = TextTokens.Split(query).Distinct(StringComparer.Ordinal).ToArray();
         var totalWeight = queryTokens.Sum(TokenIdf);
         if (totalWeight <= 0)

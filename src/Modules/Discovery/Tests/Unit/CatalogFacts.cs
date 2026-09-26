@@ -73,6 +73,45 @@ public sealed class CatalogFacts
 
         Assert.Contains(result.Hits, hit => hit.Id == "intochat.invoices/summarize_invoices");
         Assert.True(result.Degraded);
+
+        source.Fail = false;
+        var recovered = await catalog.Search("summarize invoices", "workspace-a", 5);
+        Assert.False(recovered.Degraded);
+    }
+
+    [Fact]
+    public async Task ManifestSourceRecoveryAfterStartupRestoresAppSearch()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var source = new SwitchableManifestSource([ScopedAppManifest.Global(InvoiceManifest())]) { Fail = true };
+        await using var brain = await UnitTest.Create().WithModule<DiscoveryModule>()
+            .WithModule<FixtureNeuronModule>()
+            .ConfigureSilo(silo => silo.Services.AddSingleton<IManifestSource>(source))
+            .StartAsync(ct);
+        var catalog = brain.Get<ICapabilityCatalog>("catalog");
+        Assert.Contains((await catalog.Search("emit a registry signal", "workspace-a", 5)).Hits,
+            hit => hit.Id == "test.registry-emitter");
+
+        source.Fail = false;
+        var recovered = await catalog.Search("summarize outstanding invoices", "workspace-a", 5);
+        Assert.Contains(recovered.Hits, hit => hit.Id == "intochat.invoices/summarize_invoices");
+        Assert.False(recovered.Degraded);
+    }
+
+    [Fact]
+    public async Task AppOnlySearchDoesNotLoseAppsToNeuronResultLimit()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<DiscoveryModule>()
+            .WithModule<CrowdingNeuronModule>()
+            .ConfigureSilo(silo => silo.Services.AddSingleton<IManifestSource>(
+                new FixtureManifestSource([ScopedAppManifest.Global(InvoiceManifest())])))
+            .StartAsync(ct);
+
+        var result = await brain.Get<ICapabilityCatalog>("catalog")
+            .SearchApps("summarize outstanding invoices", "workspace-a", 5);
+        Assert.Contains(result.Hits, hit => hit.Id == "intochat.invoices/summarize_invoices");
+        Assert.All(result.Hits, hit => Assert.True(hit.Kind is CapabilityKind.App or CapabilityKind.Operation));
     }
     [Fact]
     public async Task SearchReturnsCapabilityIdsFromTheManifestAndResolvesAliases()
@@ -286,6 +325,14 @@ public sealed class FixtureNeuronModule : IModule, INeuronRegistryContributor
         new("test.registry-monitor", typeof(IRegistryMonitor), "Registry monitor", "Hidden registry monitor", false),
     ];
 
+    public void Configure(ISiloBuilder silo) { }
+}
+
+public sealed class CrowdingNeuronModule : IModule, INeuronRegistryContributor
+{
+    public IReadOnlyList<NeuronDescriptor> Neurons => Enumerable.Range(0, 10)
+        .Select(index => new NeuronDescriptor($"test.invoice-neuron-{index}", typeof(IRegistryEmitter),
+            $"Invoice neuron {index}", "Summarize outstanding invoices", true)).ToArray();
     public void Configure(ISiloBuilder silo) { }
 }
 

@@ -24,6 +24,12 @@ internal sealed class CapabilityCatalogNeuron(CapabilityCatalog catalog, INeuron
         return result;
     }
 
+    public Task<CapabilitySearchResult> SearchApps(string query, string workspaceId, int take)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(query);
+        return catalog.SearchAsync(query, workspaceId, Math.Clamp(take, 1, MaxTake), CancellationToken.None, appsOnly: true).AsTask();
+    }
+
     public Task<NeuronCapabilityDetails?> ReadNeuron(string id)
     {
         var descriptor = registry.Find(id);

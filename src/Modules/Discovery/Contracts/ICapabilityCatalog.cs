@@ -43,5 +43,6 @@ public sealed record NeuronCapabilityDetails
 public interface ICapabilityCatalog : INeuron
 {
     Task<CapabilitySearchResult> Search(string query, string workspaceId, int take);
+    Task<CapabilitySearchResult> SearchApps(string query, string workspaceId, int take);
     Task<NeuronCapabilityDetails?> ReadNeuron(string id);
 }

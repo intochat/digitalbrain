@@ -19,6 +19,7 @@ internal sealed class CapabilityCatalog(
     private readonly SemaphoreSlim _gate = new(1, 1);
     private CapabilityIndex _index = CapabilityIndex.Empty;
     private string? _signature;
+    private bool _indexDegraded;
     private volatile bool _dirty = true;
 
     public bool Degraded { get; private set; }
@@ -63,11 +64,12 @@ internal sealed class CapabilityCatalog(
         {
             if (signature == _signature)
             {
-                _dirty = false;
+                _dirty = unreadable > 0 && read.Count == 0;
+                Degraded = _indexDegraded || _dirty;
                 return;
             }
 
-            var degraded = unreadable > 0 && read.Count == 0;
+            var degraded = false;
             async ValueTask<float[]?> Embed(string text, CancellationToken token)
             {
                 try
@@ -85,8 +87,9 @@ internal sealed class CapabilityCatalog(
             _index = await CapabilityIndex.BuildAsync(manifests, Embed, cancellationToken, neurons).ConfigureAwait(false);
             await PersistAsync(_index, cancellationToken).ConfigureAwait(false);
             _signature = signature;
-            Degraded = degraded;
-            _dirty = false;
+            _indexDegraded = degraded;
+            Degraded = degraded || unreadable > 0 && read.Count == 0;
+            _dirty = unreadable > 0 && read.Count == 0;
         }
         finally
         {
@@ -113,7 +116,7 @@ internal sealed class CapabilityCatalog(
         }
     }
 
-    public async ValueTask<CapabilitySearchResult> SearchAsync(string query, string? workspaceId, int take, CancellationToken cancellationToken)
+    public async ValueTask<CapabilitySearchResult> SearchAsync(string query, string? workspaceId, int take, CancellationToken cancellationToken, bool appsOnly = false)
     {
         // The index is rebuilt at startup and whenever a manifest-change signal invalidates it, so
         // a per-turn search is only a read; a stale or never-built index rebuilds on the first use.
@@ -122,7 +125,7 @@ internal sealed class CapabilityCatalog(
             await RebuildAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        return await _index.SearchAsync(query, workspaceId, take, Degraded, cancellationToken).ConfigureAwait(false);
+        return await _index.SearchAsync(query, workspaceId, take, Degraded, cancellationToken, appsOnly).ConfigureAwait(false);
     }
 
     private static string Signature(IReadOnlyList<ScopedAppManifest> manifests, IReadOnlyList<NeuronDescriptor> neurons)
