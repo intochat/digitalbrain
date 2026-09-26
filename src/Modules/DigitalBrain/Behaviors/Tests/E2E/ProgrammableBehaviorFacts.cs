@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.AI;
@@ -21,7 +22,7 @@ namespace DigitalBrain.Tests;
 
 public sealed class ProgrammableBehaviorFacts
 {
-    [Fact]
+    [WindowsBehaviorFact]
     public async Task AgentAuthoredCSharpRunsUpdatesStopsAndRollsBackInASeparateWorker()
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
@@ -34,7 +35,8 @@ public sealed class ProgrammableBehaviorFacts
         try
         {
             DigitalBrain.Testing.E2E.E2ETestBuilder CreateHost() => E2ETest.Create().WithModule<AIModule>(m => m.WithOptions(ai))
-                .WithModule<CodingModule>().WithModule<BehaviorModule>().WithModule<TimeModule>().WithModule<FlutterModule>()
+                .WithModule<CodingModule>().WithModule<BehaviorModule>().WithModule<TimeModule>()
+                .WithModule<FlutterModule>(flutter => flutter.BackendOnly())
                 .WithModule<BehaviorFixtureModule>().WithExecution(new TestExecutionOptions
                 {
                     PrivateConfiguration = new Dictionary<string, string?>
@@ -98,7 +100,7 @@ public sealed class ProgrammableBehaviorFacts
                 }
                 """, "public sealed class UserTests { [Xunit.Fact] public async Task Completes() { await new Example().RunAsync(); } }", []), ct);
             var checkedCompletion = await Check(completedDraft, 1, ct);
-            Assert.True(checkedCompletion.Artifact is not null, string.Join("\n", checkedCompletion.Diagnostics.Select(x => x.Message)));
+            Assert.True(checkedCompletion.Artifact is not null, string.Join("\r\n", checkedCompletion.Diagnostics.Select(x => x.Message)));
             var completedProgram = brain.Get<IBehaviorProgram>("completed-example");
             await completedProgram.Deploy(new(0, Guid.NewGuid(), checkedCompletion.Artifact!, "{}"), ct);
             var completed = await State(completedProgram, BehaviorExecutionState.Completed, ct);
@@ -116,7 +118,7 @@ public sealed class ProgrammableBehaviorFacts
                 "await Task.Delay(Timeout.Infinite, cancellation); await using var ticks = await brain.SubscribeAsync<TimerTick>(brain.Get<Timer>(\"stage2-timer\"), cancellation);", StringComparison.Ordinal);
             await completedDraft.Save(new(2, Guid.NewGuid(), unavailableSource, Tests, ["time", "flutter"]), ct);
             var unavailable = await Check(completedDraft, 3, ct);
-            Assert.True(unavailable.Artifact is not null, string.Join("\n", unavailable.Diagnostics.Select(x => x.Message)));
+            Assert.True(unavailable.Artifact is not null, string.Join("\r\n", unavailable.Diagnostics.Select(x => x.Message)));
             var unhealthy = brain.Get<IBehaviorProgram>("unready-example");
             await unhealthy.Deploy(new(0, Guid.NewGuid(), unavailable.Artifact!, "{}"), ct);
             var unready = await State(unhealthy, BehaviorExecutionState.Failed, ct);
@@ -137,7 +139,7 @@ public sealed class ProgrammableBehaviorFacts
             await completedDraft.Save(new(3, Guid.NewGuid(), crashSource,
                 "public sealed class UserTests { [Xunit.Fact] public async Task ReportsFailure() { await Xunit.Assert.ThrowsAsync<InvalidOperationException>(() => new Example().RunAsync()); } }", []), ct);
             var crash = await Check(completedDraft, 4, ct);
-            Assert.True(crash.Artifact is not null, string.Join("\n", crash.Diagnostics.Select(x => x.Message)));
+            Assert.True(crash.Artifact is not null, string.Join("\r\n", crash.Diagnostics.Select(x => x.Message)));
             var crashing = brain.Get<IBehaviorProgram>("crashing-example");
             await crashing.Deploy(new(0, Guid.NewGuid(), crash.Artifact!, "{}"), ct);
             var crashed = await State(crashing, BehaviorExecutionState.Failed, ct);
@@ -197,7 +199,7 @@ public sealed class ProgrammableBehaviorFacts
             if (state.State == BehaviorExecutionState.Failed)
             {
                 var logs = await program.ReadLogs(0, 100, timeout.Token);
-                Assert.Fail(state.Error + "\n" + string.Join("\n", logs.Entries.Select(x => x.Message)));
+                Assert.Fail(state.Error + "\r\n" + string.Join("\r\n", logs.Entries.Select(x => x.Message)));
             }
             await Task.Delay(50, timeout.Token);
         }
@@ -211,7 +213,7 @@ public sealed class ProgrammableBehaviorFacts
             var state = await program.Read(timeout.Token);
             if (state.State == expected) { return state; }
             if (state.State == BehaviorExecutionState.Failed)
-            { Assert.Fail(state.Error + "\n" + string.Join("\n", (await program.ReadLogs(0, 100, timeout.Token)).Entries.Select(x => x.Message))); }
+            { Assert.Fail(state.Error + "\r\n" + string.Join("\r\n", (await program.ReadLogs(0, 100, timeout.Token)).Entries.Select(x => x.Message))); }
             await Task.Delay(50, timeout.Token);
         }
     }
@@ -256,6 +258,8 @@ public sealed class ProgrammableBehaviorFacts
     private sealed class ScriptedModel : IDisposable
     {
         private readonly HttpListener _listener = new();
+        private readonly Task _serve;
+        private (string Source, string Tests, TaskCompletionSource FirstResponse)? _reply;
         public string Url { get; }
         public ScriptedModel()
         {
@@ -263,29 +267,60 @@ public sealed class ProgrammableBehaviorFacts
             reservation.Start();
             var port = ((IPEndPoint)reservation.LocalEndpoint).Port;
             reservation.Stop();
-            Url = $"http://localhost:{port}/";
+            Url = $"http://127.0.0.1:{port}/";
             _listener.Prefixes.Add(Url);
             _listener.Start();
+            _serve = Task.Run(Serve);
         }
-        public async Task Reply(string source, string tests, CancellationToken ct)
+        public Task Reply(string source, string tests, CancellationToken ct)
         {
-            var context = await _listener.GetContextAsync().WaitAsync(ct);
-            using var reader = new StreamReader(context.Request.InputStream);
-            await reader.ReadToEndAsync(ct);
-            var response = JsonSerializer.Serialize(new
-            {
-                id = Guid.NewGuid().ToString("N"),
-                @object = "chat.completion",
-                created = 1,
-                model = "fixture",
-                choices = new[] { new { index = 0, message = new { role = "assistant", content = JsonSerializer.Serialize(new { source, tests, moduleIds = new[] { "time", "flutter" } }) }, finish_reason = "stop" } },
-            });
-            var bytes = Encoding.UTF8.GetBytes(response);
-            context.Response.ContentType = "application/json";
-            await context.Response.OutputStream.WriteAsync(bytes, ct);
-            context.Response.Close();
+            var firstResponse = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            lock (_listener) { _reply = (source, tests, firstResponse); }
+            return firstResponse.Task.WaitAsync(ct);
         }
-        public void Dispose() { _listener.Close(); }
+        private async Task Serve()
+        {
+            while (_listener.IsListening)
+            {
+                HttpListenerContext context;
+                try { context = await _listener.GetContextAsync(); }
+                catch (HttpListenerException) when (!_listener.IsListening) { return; }
+                catch (ObjectDisposedException) when (!_listener.IsListening) { return; }
+                (string Source, string Tests, TaskCompletionSource FirstResponse)? reply;
+                lock (_listener) { reply = _reply; }
+                if (reply is null)
+                {
+                    context.Response.StatusCode = 503;
+                    context.Response.Close();
+                    continue;
+                }
+                using var reader = new StreamReader(context.Request.InputStream);
+                await reader.ReadToEndAsync();
+                var response = JsonSerializer.Serialize(new
+                {
+                    id = Guid.NewGuid().ToString("N"),
+                    @object = "chat.completion",
+                    created = 1,
+                    model = "fixture",
+                    choices = new[] { new { index = 0, message = new { role = "assistant", content = JsonSerializer.Serialize(new { source = reply.Value.Source, tests = reply.Value.Tests, moduleIds = new[] { "time", "flutter" } }) }, finish_reason = "stop" } },
+                });
+                var bytes = Encoding.UTF8.GetBytes(response);
+                context.Response.ContentType = "application/json";
+                await context.Response.OutputStream.WriteAsync(bytes);
+                context.Response.Close();
+                reply.Value.FirstResponse.TrySetResult();
+            }
+        }
+        public void Dispose() { _listener.Close(); _serve.GetAwaiter().GetResult(); }
+    }
+}
+
+internal sealed class WindowsBehaviorFactAttribute : FactAttribute
+{
+    public WindowsBehaviorFactAttribute([CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
+    {
+        if (!OperatingSystem.IsWindows()) { Skip = "Managed behavior execution requires Windows job containment."; }
     }
 }
 

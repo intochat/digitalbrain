@@ -28,13 +28,13 @@ void main() {
     );
     final picture = recorder.endRecording();
     final source = await picture.toImage(120, 80);
-    final recipe = ImageRecipe(
-      crop: const Rect.fromLTWH(10, 10, 60, 40),
+    const recipe = ImageRecipe(
+      crop: Rect.fromLTWH(10, 10, 60, 40),
       strokes: [
         PenStroke(
-          color: const Color(0xffff0000),
+          color: Color(0xffff0000),
           width: 6,
-          points: [const Offset(20, 20), const Offset(40, 20)],
+          points: [Offset(20, 20), Offset(40, 20)],
         ),
       ],
     );
@@ -53,10 +53,10 @@ void main() {
     picture.dispose();
   });
   test('recipe json round trip retains crop and strokes', () {
-    final recipe = ImageRecipe(
-      crop: const Rect.fromLTWH(1, 2, 30, 40),
+    const recipe = ImageRecipe(
+      crop: Rect.fromLTWH(1, 2, 30, 40),
       strokes: [
-        PenStroke(color: Colors.blue, width: 3, points: [const Offset(4, 5)]),
+        PenStroke(color: Colors.blue, width: 3, points: [Offset(4, 5)]),
       ],
     );
     expect(ImageRecipe.fromJson(recipe.toJson()).toJson(), recipe.toJson());

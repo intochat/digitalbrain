@@ -1,30 +1,32 @@
 using System.Collections.Concurrent;
-using System.IO.Pipes;
+using System.Diagnostics;
+using System.Net;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text.Json;
-using DigitalBrain.Coding;
 using DigitalBrain.Core;
 using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Behavior;
 
-internal sealed class LocalBehaviorExecutor(IOptions<BehaviorOptions> options) : IBehaviorExecutor, IDisposable
+internal sealed class ContainerBehaviorExecutor(IOptions<BehaviorOptions> options) : IBehaviorExecutor, IDisposable
 {
     private readonly ConcurrentDictionary<Guid, Worker> _workers = new();
 
-    public Task<BehaviorExecution> StartAsync(BehaviorLaunch launch, CancellationToken cancellationToken)
+    public async Task<BehaviorExecution> StartAsync(BehaviorLaunch launch, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var settings = options.Value;
+        if (string.IsNullOrWhiteSpace(settings.SandboxImage))
+        { throw new InvalidOperationException("Behavior sandbox image is required."); }
         if (string.IsNullOrWhiteSpace(settings.Gateways) || string.IsNullOrWhiteSpace(settings.ClusterId) || string.IsNullOrWhiteSpace(settings.ServiceId))
         { throw new InvalidOperationException("Explicit behavior brain connection settings are required."); }
         BehaviorProgramStore.ValidateConfiguration(launch.ConfigurationJson);
-        var pipeName = "brain-behavior-" + Guid.NewGuid().ToString("N");
         var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-        var pipe = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        var name = "digitalbrain-behavior-" + launch.GenerationId.ToString("N");
         var environment = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["BRAIN_CONTROL_PIPE"] = pipeName,
+            ["BRAIN_CONTROL_PIPE"] = BehaviorSandboxControl.Listen,
             ["BRAIN_CONTROL_TOKEN"] = token,
             ["BRAIN_GENERATION"] = launch.GenerationId.ToString(),
             ["Gateways"] = settings.Gateways,
@@ -33,32 +35,47 @@ internal sealed class LocalBehaviorExecutor(IOptions<BehaviorOptions> options) :
             ["BRAIN_HEARTBEAT_MS"] = settings.HeartbeatInterval.TotalMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["BRAIN_HEARTBEAT_LOSS_MS"] = settings.HeartbeatLossTimeout.TotalMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture),
         };
-        // The worker continues the launching trace: without this a behavior's grain calls start a
-        // brand-new root trace and the intent cannot be followed through the child process.
-        if (System.Diagnostics.Activity.Current is { } activity)
+        if (Activity.Current is { } activity)
         {
             environment["TRACEPARENT"] = "00-" + activity.TraceId.ToHexString() + "-" + activity.SpanId.ToHexString()
-                + "-" + (activity.ActivityTraceFlags.HasFlag(System.Diagnostics.ActivityTraceFlags.Recorded) ? "01" : "00");
+                + "-" + (activity.ActivityTraceFlags.HasFlag(ActivityTraceFlags.Recorded) ? "01" : "00");
             if (activity.TraceStateString is { Length: > 0 } traceState) { environment["TRACESTATE"] = traceState; }
         }
         using var config = JsonDocument.Parse(launch.ConfigurationJson);
         foreach (var item in config.RootElement.EnumerateObject()) { environment.Add(item.Name, item.Value.GetString()!); }
-        var dotnet = settings.DotnetPath;
-        if (!File.Exists(dotnet)) { dotnet = Environment.ProcessPath ?? "dotnet"; }
-        WindowsContainedProcess child;
+        var port = FreePort();
+        var arguments = BehaviorSandbox.Arguments(new BehaviorSandboxRequest(
+            settings.SandboxImage, name, launch.Artifact.LaunchDirectory, launch.Artifact.EntryAssembly, port, environment));
+        var process = new Process
+        {
+            StartInfo = new ProcessStartInfo(settings.DockerPath)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            },
+        };
+        foreach (var argument in arguments) { process.StartInfo.ArgumentList.Add(argument); }
+        if (!process.Start()) { throw new InvalidOperationException("Docker did not start the behavior sandbox."); }
+        var worker = new Worker(process, name, port);
+        if (!_workers.TryAdd(launch.GenerationId, worker))
+        {
+            worker.Dispose();
+            throw new InvalidOperationException("Generation already exists.");
+        }
         try
         {
-            child = OperatingSystem.IsWindows()
-                ? WindowsContainedProcess.Start(dotnet,
-                    [Path.Combine(launch.Artifact.LaunchDirectory, launch.Artifact.EntryAssembly)], launch.Artifact.LaunchDirectory, environment)
-                : WindowsContainedProcess.StartWithoutJob(dotnet,
-                    [Path.Combine(launch.Artifact.LaunchDirectory, launch.Artifact.EntryAssembly)], launch.Artifact.LaunchDirectory, environment);
+            worker.Stream = await ConnectAsync(port, settings.StartupTimeout, worker.Lifetime.Token).ConfigureAwait(false);
         }
-        catch { pipe.Dispose(); throw; }
-        var worker = new Worker(child, pipe);
-        if (!_workers.TryAdd(launch.GenerationId, worker)) { worker.Dispose(); throw new InvalidOperationException("Generation already exists."); }
+        catch
+        {
+            Kill(worker);
+            _workers.TryRemove(launch.GenerationId, out _);
+            throw;
+        }
         var completion = Monitor(launch, worker, token);
-        return Task.FromResult(new BehaviorExecution(launch.GenerationId, child.Process.Id, completion));
+        return new BehaviorExecution(launch.GenerationId, process.Id, completion);
     }
 
     public async Task StopAsync(Guid generationId, CancellationToken cancellationToken)
@@ -66,47 +83,42 @@ internal sealed class LocalBehaviorExecutor(IOptions<BehaviorOptions> options) :
         if (!_workers.TryGetValue(generationId, out var worker)) { return; }
         worker.StopRequested = true;
         try { await worker.Finished.Task.WaitAsync(options.Value.StopTimeout, cancellationToken).ConfigureAwait(false); }
-        catch (TimeoutException) { worker.Child.Terminate(); }
+        catch (TimeoutException) { Kill(worker); }
         finally
         {
-            worker.Child.Terminate();
+            Kill(worker);
             await worker.Finished.Task.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None).ConfigureAwait(false);
         }
     }
 
     private async Task<BehaviorExit> Monitor(BehaviorLaunch launch, Worker worker, string token)
     {
-        var output = Capture(worker.Child.Output, "stdout", launch, worker.Lifetime.Token);
-        var error = Capture(worker.Child.Error, "stderr", launch, worker.Lifetime.Token);
+        var output = Capture(worker.Process.StandardOutput, "stdout", launch, worker.Lifetime.Token);
+        var error = Capture(worker.Process.StandardError, "stderr", launch, worker.Lifetime.Token);
         var control = Control(launch, worker, token);
         string? failure = null;
         var code = -1;
         try
         {
-            var exited = worker.Child.Process.WaitForExitAsync(worker.Lifetime.Token);
+            var exited = worker.Process.WaitForExitAsync(worker.Lifetime.Token);
             if (await Task.WhenAny(exited, control).ConfigureAwait(false) == control && !exited.IsCompleted)
             {
                 try { await control.ConfigureAwait(false); }
-                catch (EndOfStreamException)
-                {
-                    // The app closes its pipe while unwinding before the OS reports process exit.
-                    await exited.WaitAsync(options.Value.StopTimeout).ConfigureAwait(false);
-                }
+                catch (EndOfStreamException) { await exited.WaitAsync(options.Value.StopTimeout).ConfigureAwait(false); }
                 if (!exited.IsCompleted) { await exited.WaitAsync(options.Value.StopTimeout).ConfigureAwait(false); }
             }
             await exited.ConfigureAwait(false);
-            code = worker.Child.Process.ExitCode;
+            code = worker.Process.ExitCode;
         }
         catch (Exception exception) { failure = exception.Message; }
         finally
         {
-            worker.Child.Terminate();
-            try { await worker.Child.Process.WaitForExitAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None).ConfigureAwait(false); }
+            Kill(worker);
+            try { await worker.Process.WaitForExitAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None).ConfigureAwait(false); }
             catch (Exception exception)
             {
                 await worker.Lifetime.CancelAsync().ConfigureAwait(false);
                 worker.Finished.TrySetException(exception);
-                // Retain the worker and fault completion: a replacement must never start without confirmed exit.
                 throw;
             }
             await worker.Lifetime.CancelAsync().ConfigureAwait(false);
@@ -121,11 +133,11 @@ internal sealed class LocalBehaviorExecutor(IOptions<BehaviorOptions> options) :
 
     private async Task Control(BehaviorLaunch launch, Worker worker, string token)
     {
+        var stream = worker.Stream ?? throw new InvalidOperationException("Sandbox control stream is missing.");
+        using var reader = new StreamReader(stream, leaveOpen: true);
+        using var writer = new StreamWriter(stream, leaveOpen: true) { AutoFlush = true };
         using var startup = CancellationTokenSource.CreateLinkedTokenSource(worker.Lifetime.Token);
         startup.CancelAfter(options.Value.StartupTimeout);
-        await worker.Pipe.WaitForConnectionAsync(startup.Token).ConfigureAwait(false);
-        using var reader = new StreamReader(worker.Pipe, leaveOpen: true);
-        using var writer = new StreamWriter(worker.Pipe, leaveOpen: true) { AutoFlush = true };
         var hello = JsonSerializer.Deserialize<BehaviorControlMessage>(await BehaviorApp.ReadControlLineAsync(reader, startup.Token).ConfigureAwait(false));
         if (hello is null || hello.Version != 1 || hello.GenerationId != launch.GenerationId || hello.Kind != "hello" || hello.Token != token)
         { throw new IOException("Invalid worker handshake."); }
@@ -155,15 +167,62 @@ internal sealed class LocalBehaviorExecutor(IOptions<BehaviorOptions> options) :
         { await launch.Log(stream, new string(buffer, 0, read)).ConfigureAwait(false); }
     }
 
-    public void Dispose() { foreach (var worker in _workers.Values) { worker.Child.Terminate(); } }
-
-    private sealed class Worker(WindowsContainedProcess child, NamedPipeServerStream pipe) : IDisposable
+    private static int FreePort()
     {
-        public WindowsContainedProcess Child { get; } = child;
-        public NamedPipeServerStream Pipe { get; } = pipe;
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
+    }
+
+    private static async Task<NetworkStream> ConnectAsync(int port, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(timeout);
+        while (true)
+        {
+            var client = new TcpClient();
+            try
+            {
+                await client.ConnectAsync(IPAddress.Loopback, port, deadline.Token).ConfigureAwait(false);
+                return client.GetStream();
+            }
+            catch (SocketException) when (!deadline.IsCancellationRequested)
+            {
+                client.Dispose();
+                await Task.Delay(TimeSpan.FromMilliseconds(50), deadline.Token).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private void Kill(Worker worker)
+    {
+        try
+        {
+            using var kill = Process.Start(new ProcessStartInfo(options.Value.DockerPath, $"kill {worker.Name}")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+            kill?.WaitForExit(5_000);
+        }
+        catch (Exception) { }
+        try { if (!worker.Process.HasExited) { worker.Process.Kill(entireProcessTree: true); } }
+        catch (Exception) { }
+    }
+
+    public void Dispose() { foreach (var worker in _workers.Values) { Kill(worker); } }
+
+    private sealed class Worker(Process process, string name, int port) : IDisposable
+    {
+        public Process Process { get; } = process;
+        public string Name { get; } = name;
+        public int Port { get; } = port;
+        public NetworkStream? Stream { get; set; }
         public CancellationTokenSource Lifetime { get; } = new();
         public TaskCompletionSource Finished { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public volatile bool StopRequested;
-        public void Dispose() { Child.Dispose(); Pipe.Dispose(); Lifetime.Dispose(); }
+        public void Dispose() { Stream?.Dispose(); Process.Dispose(); Lifetime.Dispose(); }
     }
 }

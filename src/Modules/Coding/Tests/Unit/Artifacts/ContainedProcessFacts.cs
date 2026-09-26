@@ -1,11 +1,30 @@
+using System.Runtime.CompilerServices;
 using DigitalBrain.Coding;
 using Xunit;
 
 namespace DigitalBrain.Tests;
 
+internal sealed class WindowsFactAttribute : FactAttribute
+{
+    public WindowsFactAttribute([CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
+    {
+        if (!OperatingSystem.IsWindows()) { Skip = "Windows job objects only."; }
+    }
+}
+
+internal sealed class WindowsTheoryAttribute : TheoryAttribute
+{
+    public WindowsTheoryAttribute([CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
+    {
+        if (!OperatingSystem.IsWindows()) { Skip = "Windows job objects only."; }
+    }
+}
+
 public sealed class ContainedProcessFacts
 {
-    [Fact]
+    [WindowsFact]
     public async Task ExcessOutputIsDrainedButBounded()
     {
         var result = await new ContainedProcessRunner().RunAsync(PowerShell,
@@ -14,7 +33,7 @@ public sealed class ContainedProcessFacts
         Assert.Equal(65536, result.Output.Length);
     }
 
-    [Fact]
+    [WindowsFact]
     public async Task RootCompletionAlsoTerminatesDescendants()
     {
         var runner = new ContainedProcessRunner();
@@ -31,7 +50,7 @@ public sealed class ContainedProcessFacts
         catch (ArgumentException) { /* Already reaped by the OS. */ }
     }
 
-    [Fact]
+    [WindowsFact]
     public async Task CapturesOutputWithoutInheritingApplicationSecrets()
     {
         Environment.SetEnvironmentVariable("BRAIN_TEST_PRIVATE_VALUE", "must-not-inherit");
@@ -46,7 +65,7 @@ public sealed class ContainedProcessFacts
         finally { Environment.SetEnvironmentVariable("BRAIN_TEST_PRIVATE_VALUE", null); }
     }
 
-    [Fact]
+    [WindowsFact]
     public async Task DeadlineTerminatesTheContainedProcess()
     {
         var runner = new ContainedProcessRunner();
@@ -56,7 +75,7 @@ public sealed class ContainedProcessFacts
         Assert.True(result.Duration < TimeSpan.FromSeconds(5));
     }
 
-    [Fact]
+    [WindowsFact]
     public async Task ChildInheritsTheAmbientW3cTraceContext()
     {
         using var activity = new System.Diagnostics.Activity("propagation-probe").Start();

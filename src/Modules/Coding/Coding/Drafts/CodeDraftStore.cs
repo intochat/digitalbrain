@@ -159,7 +159,7 @@ public sealed class DurableDocumentStore<T>(string root, Func<T> create) where T
         {
             ct.ThrowIfCancellationRequested();
             try { return new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None); }
-            catch (IOException error) when ((error.HResult & 0xffff) is 32 or 33)
+            catch (IOException)
             { await Task.Delay(20, ct).ConfigureAwait(false); }
         }
     }

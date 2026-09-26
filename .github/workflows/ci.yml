@@ -19,7 +19,7 @@ env:
 
 jobs:
   dotnet-build-test:
-    name: .NET build and test
+    name: .NET build and module tests
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -28,17 +28,6 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
-
-      - name: Install Flutter for module and product browser tests
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          flutter-version: '3.47.2'
-          cache: true
-
-      - name: Resolve Flutter workspace
-        working-directory: src/Modules/Google/Flutter/app
-        run: flutter pub get --enforce-lockfile
 
       - name: Cache NuGet packages
         uses: actions/cache@v6
@@ -75,11 +64,87 @@ jobs:
       - name: Validate NuGet packages
         run: dotnet pack DigitalBrain.slnx -c Release --no-build -o artifacts
 
-      - name: Install browser and system dependencies
-        run: pwsh src/Modules/Google/Flutter/Tests/E2E/bin/Release/net11.0/playwright.ps1 install --with-deps chromium
+      - name: Run module tests
+        run: dotnet test --test-modules '**/bin/Release/net11.0/DigitalBrain.*Tests.*.dll' --max-parallel-test-modules 3 --ignore-exit-code 8
+        env:
+          DIGITALBRAIN_E2E_LIVE_MODEL: '0'
+          DIGITALBRAIN_E2E_HEADED: '0'
 
-      - name: Run tests
-        run: dotnet test --solution DigitalBrain.slnx -c Release --no-build --max-parallel-test-modules 1 --ignore-exit-code 8
+      - name: Run IntoChat unit tests
+        run: dotnet test --project src/Applications/IntoChat/Tests/Unit/IntoChat.Tests.Unit.csproj -c Release --no-build --ignore-exit-code 8
+        env:
+          DIGITALBRAIN_E2E_LIVE_MODEL: '0'
+          DIGITALBRAIN_E2E_HEADED: '0'
+
+  intochat-e2e:
+    name: IntoChat E2E (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Agent table
+            filter: --filter-class '*AgentTableJourneyFacts'
+            browser: true
+          - name: Agent workflow
+            filter: --filter-class '*AgentWorkflowFacts' '*LiveAgentTableJourneyFacts'
+            browser: false
+          - name: Workspace table
+            filter: --filter-class '*SupabaseTableDisplayFacts'
+            browser: true
+          - name: Workspace state
+            filter: --filter-class '*WorkspaceRestoreFacts' '*WorkspaceDataFacts'
+            browser: true
+          - name: Security
+            filter: --filter-namespace IntoChat.Tests.E2E.Security
+            browser: false
+          - name: LocalApps
+            filter: --filter-namespace IntoChat.Tests.E2E.LocalApps
+            browser: true
+          - name: Diagnostics
+            filter: --filter-namespace IntoChat.Tests.E2E.Diagnostics
+            browser: false
+          - name: Composition
+            filter: --filter-namespace IntoChat.Tests.E2E.Composition
+            browser: false
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Install Flutter for browser scenarios
+        if: matrix.browser
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.2'
+          cache: true
+
+      - name: Resolve Flutter workspace
+        if: matrix.browser
+        working-directory: src/Modules/Google/Flutter/app
+        run: flutter pub get --enforce-lockfile
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', 'global.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Build E2E project
+        run: dotnet build src/Applications/IntoChat/Tests/E2E/IntoChat.Tests.E2E.csproj -c Release -p:CodeGraphRefresh=false
+
+      - name: Install browser and system dependencies
+        if: matrix.browser
+        run: pwsh src/Applications/IntoChat/Tests/E2E/bin/Release/net11.0/playwright.ps1 install --with-deps chromium
+
+      - name: Run ${{ matrix.name }} scenarios
+        run: dotnet test --project src/Applications/IntoChat/Tests/E2E/IntoChat.Tests.E2E.csproj -c Release --no-build ${{ matrix.filter }} --ignore-exit-code 8
         env:
           DIGITALBRAIN_E2E_LIVE_MODEL: '0'
           DIGITALBRAIN_E2E_HEADED: '0'

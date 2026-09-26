@@ -59,5 +59,6 @@ class ImageRecipe {
     );
   }
 
-  bool sameAs(ImageRecipe other) => jsonEncode(toJson()) == jsonEncode(other.toJson());
+  bool sameAs(ImageRecipe other) =>
+      jsonEncode(toJson()) == jsonEncode(other.toJson());
 }

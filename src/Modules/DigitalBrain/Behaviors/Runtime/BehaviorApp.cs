@@ -56,14 +56,13 @@ public static class BehaviorApp
         var readiness = new BehaviorReadiness();
         readiness.End(readiness.Begin(typeof(TBehavior).FullName!, []));
         var pipeName = Environment.GetEnvironmentVariable("BRAIN_CONTROL_PIPE");
-        using var pipe = pipeName is null ? null : new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+        await using var pipe = await OpenControlAsync(pipeName, stopping.Token).ConfigureAwait(false);
         Task control = Task.CompletedTask;
         Task report = Task.CompletedTask;
         try
         {
             if (pipe is not null)
             {
-                await pipe.ConnectAsync(30000, stopping.Token).ConfigureAwait(false);
                 var generation = Guid.Parse(Environment.GetEnvironmentVariable("BRAIN_GENERATION") ?? throw new InvalidOperationException("Missing generation."));
                 var token = Environment.GetEnvironmentVariable("BRAIN_CONTROL_TOKEN") ?? throw new InvalidOperationException("Missing control token.");
                 control = ReceiveControl(pipe, generation, stopping);
@@ -78,10 +77,13 @@ public static class BehaviorApp
             var loss = readiness.WaitForLossAsync(generationId);
             if (await Task.WhenAny(run, loss).ConfigureAwait(false) == loss)
             {
-                await stopping.CancelAsync().ConfigureAwait(false);
-                try { await run.WaitAsync(TimeSpan.FromSeconds(15)).ConfigureAwait(false); }
-                catch (OperationCanceledException) { }
-                throw new InvalidOperationException("A required subscription closed; live signals may have been missed.");
+                try { await run.WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false); }
+                catch (TimeoutException) { }
+                if (!run.IsCompletedSuccessfully)
+                {
+                    await stopping.CancelAsync().ConfigureAwait(false);
+                    throw new InvalidOperationException("A required subscription closed; live signals may have been missed.");
+                }
             }
             await run.ConfigureAwait(false);
         }
@@ -99,6 +101,64 @@ public static class BehaviorApp
     private sealed class BehaviorServices(IServiceProvider services, IDigitalBrain brain) : IServiceProvider
     {
         public object? GetService(Type serviceType) => serviceType == typeof(IDigitalBrain) ? brain : services.GetService(serviceType);
+    }
+
+    private static async Task<Stream?> OpenControlAsync(string? pipeName, CancellationToken cancellationToken)
+    {
+        if (pipeName is null)
+        {
+            return null;
+        }
+
+        if (pipeName == BehaviorSandboxControl.Listen)
+        {
+            // Published ports are forwarded to the container's external interfaces, not its loopback.
+            var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Any, BehaviorSandboxControl.Port);
+            listener.Start();
+            try
+            {
+                using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                deadline.CancelAfter(TimeSpan.FromSeconds(30));
+                var client = await listener.AcceptTcpClientAsync(deadline.Token).ConfigureAwait(false);
+                return new SandboxControlStream(listener, client);
+            }
+            catch
+            {
+                listener.Stop();
+                throw;
+            }
+        }
+
+        var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+        await pipe.ConnectAsync(30000, cancellationToken).ConfigureAwait(false);
+        return pipe;
+    }
+
+    private sealed class SandboxControlStream(System.Net.Sockets.TcpListener listener, System.Net.Sockets.TcpClient client) : Stream
+    {
+        private readonly Stream _stream = client.GetStream();
+        public override bool CanRead => _stream.CanRead;
+        public override bool CanSeek => false;
+        public override bool CanWrite => _stream.CanWrite;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() => _stream.Flush();
+        public override int Read(byte[] buffer, int offset, int count) => _stream.Read(buffer, offset, count);
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => _stream.Write(buffer, offset, count);
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) => _stream.ReadAsync(buffer, cancellationToken);
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) => _stream.WriteAsync(buffer, cancellationToken);
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _stream.Dispose();
+                client.Dispose();
+                listener.Stop();
+            }
+            base.Dispose(disposing);
+        }
     }
 
     private static async Task ReceiveControl(Stream pipe, Guid generation, CancellationTokenSource stopping)

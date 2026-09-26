@@ -22,11 +22,13 @@ internal sealed class FlutterWebBuildHealthCheck(Func<CancellationToken, IAsyncE
         var ready = false;
         await foreach (var line in readLines(cancellationToken).WithCancellation(cancellationToken))
         {
+            if (line.Contains(" is being served at http", StringComparison.Ordinal))
+            {
+                return HealthCheckResult.Healthy();
+            }
             if (line.Contains("Starting process...", StringComparison.Ordinal)
                 || line.Contains("Launching lib", StringComparison.Ordinal))
             { ready = false; }
-            else if (line.Contains(" is being served at http", StringComparison.Ordinal))
-            { ready = true; }
         }
         return ready ? HealthCheckResult.Healthy() : HealthCheckResult.Unhealthy("Waiting for the current Flutter web compilation.");
     }

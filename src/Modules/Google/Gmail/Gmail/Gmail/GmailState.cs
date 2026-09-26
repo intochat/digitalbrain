@@ -10,4 +10,6 @@ internal sealed record GmailState(
     [property: Id(5)] DateTimeOffset? ExpiresAt = null,
     [property: Id(6)] bool CanCompose = false,
     [property: Id(7)] GmailDraftPreview? PendingDraft = null,
-    [property: Id(8)] GmailDraftPreview? SubmittingDraft = null);
+    [property: Id(8)] GmailDraftPreview? SubmittingDraft = null,
+    [property: Id(9)] string? HistoryId = null,
+    [property: Id(10)] DateTimeOffset? WatchExpiresAt = null);

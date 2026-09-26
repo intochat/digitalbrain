@@ -8,14 +8,16 @@ final class WorkspaceWindow {
   });
   final String id, title, tableId;
   final bool isOpen;
-  final Map<String,dynamic>? surface;
+  final Map<String, dynamic>? surface;
   factory WorkspaceWindow.fromJson(Map<String, dynamic> json) =>
       WorkspaceWindow(
         id: json['id'] as String,
         title: json['title'] as String,
         tableId: (json['view'] as Map)['id'] as String,
         isOpen: json['isOpen'] as bool,
-        surface: json['surface'] == null ? null : Map<String,dynamic>.from(json['surface'] as Map),
+        surface: json['surface'] == null
+            ? null
+            : Map<String, dynamic>.from(json['surface'] as Map),
       );
 }
 

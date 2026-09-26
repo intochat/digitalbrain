@@ -8,4 +8,5 @@ public sealed class GmailOAuthOptions
     public string ClientSecret { get; set; } = "";
     public string PublicOrigin { get; set; } = "";
     public string TokenEndpoint { get; set; } = "";
+    public string TopicName { get; set; } = "";
 }

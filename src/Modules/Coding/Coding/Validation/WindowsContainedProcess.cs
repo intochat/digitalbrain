@@ -10,10 +10,39 @@ namespace DigitalBrain.Coding;
 // https://devblogs.microsoft.com/oldnewthing/20230209-00/?p=107812
 public sealed class WindowsContainedProcess : IDisposable
 {
-    private readonly SafeFileHandle _job;
+    private readonly SafeFileHandle? _job;
     public Process Process { get; }
     public StreamReader Output { get; }
     public StreamReader Error { get; }
+
+    public static WindowsContainedProcess StartWithoutJob(string fileName, IReadOnlyList<string> arguments, string directory,
+        IReadOnlyDictionary<string, string>? additionalEnvironment = null)
+    {
+        var start = new ProcessStartInfo(fileName)
+        {
+            WorkingDirectory = directory,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (var argument in arguments) { start.ArgumentList.Add(argument); }
+        if (additionalEnvironment is not null)
+        {
+            foreach (var item in additionalEnvironment) { start.Environment[item.Key] = item.Value; }
+        }
+        var process = new Process { StartInfo = start };
+        if (!process.Start()) { throw new InvalidOperationException("The behavior process did not start."); }
+        return new WindowsContainedProcess(null, process, process.StandardOutput, process.StandardError);
+    }
+
+    private WindowsContainedProcess(SafeFileHandle? job, Process process, StreamReader output, StreamReader error)
+    {
+        _job = job;
+        Process = process;
+        Output = output;
+        Error = error;
+    }
 
     private WindowsContainedProcess(SafeFileHandle job, Process process, SafeFileHandle output, SafeFileHandle error)
     {
@@ -116,8 +145,16 @@ public sealed class WindowsContainedProcess : IDisposable
         }
     }
 
-    public void Terminate() => _job.Dispose();
-    public void Dispose() { _job.Dispose(); Output.Dispose(); Error.Dispose(); Process.Dispose(); }
+    public void Terminate()
+    {
+        if (_job is null)
+        {
+            try { if (!Process.HasExited) { Process.Kill(entireProcessTree: true); } } catch (Exception) { }
+            return;
+        }
+        _job.Dispose();
+    }
+    public void Dispose() { _job?.Dispose(); Output.Dispose(); Error.Dispose(); Process.Dispose(); }
 
     private static string? AmbientTraceParent()
         => Activity.Current is { } activity

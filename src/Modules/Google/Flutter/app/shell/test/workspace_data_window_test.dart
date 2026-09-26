@@ -83,7 +83,7 @@ void main() {
     tester,
   ) async {
     final store = WorkspaceStore(persistence: MemoryPersistence());
-      final events = StreamController<AgentEvent>.broadcast();
+    final events = StreamController<AgentEvent>.broadcast();
     await tester.pumpWidget(
       WorkspaceApp(
         store: store,

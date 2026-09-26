@@ -28,7 +28,7 @@ internal static class GmailPubSub
         byte[] bytes;
         try
         {
-            bytes = Convert.FromBase64String(data);
+            bytes = Convert.FromBase64String(PadBase64(data.Replace('-', '+').Replace('_', '/')));
         }
         catch (FormatException)
         {
@@ -48,4 +48,11 @@ internal static class GmailPubSub
             && !string.IsNullOrWhiteSpace(push.EmailAddress)
             && !string.IsNullOrWhiteSpace(push.HistoryId);
     }
+
+    private static string PadBase64(string value) => (value.Length % 4) switch
+    {
+        2 => value + "==",
+        3 => value + "=",
+        _ => value,
+    };
 }

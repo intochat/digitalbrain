@@ -70,6 +70,13 @@ if (developerProfile)
             Path.Combine(builder.AppHostDirectory, "..", "..", "..", "..", "DigitalBrain.slnx"))))
         .WithModule<BehaviorModule>(behavior =>
         {
+            var sandbox = Path.GetFullPath(Path.Combine(
+                builder.AppHostDirectory, "..", "..", "..", "Modules", "DigitalBrain", "Behaviors", "Sandbox"));
+            builder.AddContainer("behavior-sandbox", "digitalbrain-behavior-sandbox")
+                .WithImageTag("local")
+                .WithDockerfile(sandbox)
+                .WithExplicitStart();
+            behavior.WithSandbox();
             if (builder.Configuration["IntoChat:BehaviorAuthoring:Root"] is { Length: > 0 } root)
             { behavior.WithLocalExecution(root); }
         });
