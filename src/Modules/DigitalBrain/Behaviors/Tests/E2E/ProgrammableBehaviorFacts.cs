@@ -257,6 +257,8 @@ public sealed class ProgrammableBehaviorFacts
     private sealed class ScriptedModel : IDisposable
     {
         private readonly HttpListener _listener = new();
+        private readonly Task _serve;
+        private (string Source, string Tests, TaskCompletionSource FirstResponse)? _reply;
         public string Url { get; }
         public ScriptedModel()
         {
@@ -267,26 +269,48 @@ public sealed class ProgrammableBehaviorFacts
             Url = $"http://127.0.0.1:{port}/";
             _listener.Prefixes.Add(Url);
             _listener.Start();
+            _serve = Task.Run(Serve);
         }
-        public async Task Reply(string source, string tests, CancellationToken ct)
+        public Task Reply(string source, string tests, CancellationToken ct)
         {
-            var context = await _listener.GetContextAsync().WaitAsync(ct);
-            using var reader = new StreamReader(context.Request.InputStream);
-            await reader.ReadToEndAsync(ct);
-            var response = JsonSerializer.Serialize(new
-            {
-                id = Guid.NewGuid().ToString("N"),
-                @object = "chat.completion",
-                created = 1,
-                model = "fixture",
-                choices = new[] { new { index = 0, message = new { role = "assistant", content = JsonSerializer.Serialize(new { source, tests, moduleIds = new[] { "time", "flutter" } }) }, finish_reason = "stop" } },
-            });
-            var bytes = Encoding.UTF8.GetBytes(response);
-            context.Response.ContentType = "application/json";
-            await context.Response.OutputStream.WriteAsync(bytes, ct);
-            context.Response.Close();
+            var firstResponse = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            lock (_listener) { _reply = (source, tests, firstResponse); }
+            return firstResponse.Task.WaitAsync(ct);
         }
-        public void Dispose() { _listener.Close(); }
+        private async Task Serve()
+        {
+            while (_listener.IsListening)
+            {
+                HttpListenerContext context;
+                try { context = await _listener.GetContextAsync(); }
+                catch (HttpListenerException) when (!_listener.IsListening) { return; }
+                catch (ObjectDisposedException) when (!_listener.IsListening) { return; }
+                (string Source, string Tests, TaskCompletionSource FirstResponse)? reply;
+                lock (_listener) { reply = _reply; }
+                if (reply is null)
+                {
+                    context.Response.StatusCode = 503;
+                    context.Response.Close();
+                    continue;
+                }
+                using var reader = new StreamReader(context.Request.InputStream);
+                await reader.ReadToEndAsync();
+                var response = JsonSerializer.Serialize(new
+                {
+                    id = Guid.NewGuid().ToString("N"),
+                    @object = "chat.completion",
+                    created = 1,
+                    model = "fixture",
+                    choices = new[] { new { index = 0, message = new { role = "assistant", content = JsonSerializer.Serialize(new { source = reply.Value.Source, tests = reply.Value.Tests, moduleIds = new[] { "time", "flutter" } }) }, finish_reason = "stop" } },
+                });
+                var bytes = Encoding.UTF8.GetBytes(response);
+                context.Response.ContentType = "application/json";
+                await context.Response.OutputStream.WriteAsync(bytes);
+                context.Response.Close();
+                reply.Value.FirstResponse.TrySetResult();
+            }
+        }
+        public void Dispose() { _listener.Close(); _serve.GetAwaiter().GetResult(); }
     }
 }
 
