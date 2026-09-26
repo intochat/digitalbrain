@@ -1,7 +1,9 @@
 using IntoChat.Packages;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Aspire;
-using DigitalBrain.Automations;
+using DigitalBrain.Compute;
+using DigitalBrain.Contracts;
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Sdk;
 using IntoChat;
 using IntoChat.Agent;
@@ -45,8 +47,6 @@ builder.Services.AddSingleton<IAgentToolFactory, WorkspaceFormTools>();
 builder.Services.AddSingleton<IAgentToolFactory, DiscoveryTools>();
 builder.Services.AddSingleton<IAgentToolFactory, LeadGeneratorTools>();
 builder.Services.AddSingleton<IAgentToolFactory, ImageEditorTools>();
-builder.Services.AddSingleton<IAutomationActionCatalog, FirstPartyAutomationActionCatalog>();
-builder.Services.AddSingleton<IAutomationActionInvoker, LeadGeneratorAutomationInvoker>();
 builder.Services.AddSingleton<IProblemReportStore, ProblemReportStore>();
 builder.Services.AddSingleton<IWorkspaceVectorPurge, MemoryWorkspaceVectorPurge>();
 builder.Services.AddSingleton<IWorkspaceBackupPurge, HostedWorkspaceBackupPurge>();
@@ -63,6 +63,8 @@ app.MapOrleansDashboard("/orleans");
 app.MapBehaviors();
 app.MapPackages();
 app.MapDigitalBrainModules();
+app.MapGet("/compute/limits", static async (IDigitalBrain brain, CancellationToken ct) =>
+    Results.Ok(await brain.Get<IAllowanceLedger>(CallerContextStamper.Require().AccountId).ReadLimitsAsync(ct)));
 app.MapWorkspaceDataEndpoints();
 app.MapWorkspaceAgent();
 app.MapLocalApps();

@@ -6,7 +6,7 @@ using DigitalBrain.Core.Enforcement;
 
 namespace IntoChat;
 
-// The authenticated edge. A cookie session (issued by the identity module) or, for the
+// The authenticated edge. A cookie session (issued by IntoChat identity) or, for the
 // single-owner bootstrap, the configured Basic credential decides the principal; when neither is
 // configured the kernel stays open, which is the local and test posture. Resolving a principal
 // stamps a CallerContext on the Orleans RequestContext so it travels with grain calls. Replaces
@@ -23,7 +23,7 @@ internal static class AccountSession
     private const int MaxEncodedCredentialChars = 1024;
 
     // Probed by the shell's login screen and by container probes; never gated.
-    private static readonly string[] AnonymousPaths = ["/health", "/alive", "/ui/inbox"];
+    private static readonly string[] AnonymousPaths = ["/health", "/alive"];
 
     public static WebApplication UseAccountSession(this WebApplication app)
     {

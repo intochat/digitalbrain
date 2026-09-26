@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Reusable auth, secrets, HTTP surfaces, and webhooks for DigitalBrain modules.</Description>
+    <Description>Reusable auth, secrets, connectors, HTTP surfaces, and webhooks for DigitalBrain modules.</Description>
     <RootNamespace>DigitalBrain.Sdk</RootNamespace>
   </PropertyGroup>
   <ItemGroup>

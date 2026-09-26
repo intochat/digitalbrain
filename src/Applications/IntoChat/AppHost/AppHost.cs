@@ -6,7 +6,6 @@ using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.OpenAI;
 using DigitalBrain.Apps;
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Automations;
 using DigitalBrain.ClickHouse;
 using DigitalBrain.Coding;
 using DigitalBrain.Behavior;
@@ -15,8 +14,7 @@ using DigitalBrain.Core;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Google.Gmail;
-using DigitalBrain.Identity;
-using DigitalBrain.Inbox;
+using IntoChat.Identity;
 using DigitalBrain.Memory;
 using DigitalBrain.Microsoft.Aspire;
 using DigitalBrain.Microsoft.GitHub;
@@ -24,12 +22,13 @@ using DigitalBrain.Microsoft.DotNet;
 using DigitalBrain.Microsoft.Roslyn;
 using DigitalBrain.Compute;
 using DigitalBrain.Discovery;
-using DigitalBrain.Connections;
+using DigitalBrain.Sdk.Connectors;
 using DigitalBrain.Sdk.Secrets;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
 using DigitalBrain.Time;
 using IntoChat.AppHost;
+using IntoChat.Apps;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 
@@ -62,20 +61,18 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<MemoryModule>(memory => memory.WithQdrant())
     .WithModule<ClickHouseModule>(database => database.WithClickHouse(options => options.WithSeed("leads")))
     .WithModule<SupabaseModule>(database => database.WithConnection("supabase"))
-    // Durable reminders drive customer automations (T8); the module also validates the reminder provider.
     .WithModule<TimeModule>()
     .WithModule<SecretsModule>()
-    .WithModule<ConnectionsModule>()
+    .WithModule<ConnectorModule>()
+    .WithModule<LeadGeneratorModule>()
     .WithModule<IdentityModule>()
-    .WithModule<AutomationsModule>()
     .WithModule<GmailModule>(gmail => gmail.WithGmail())
     .WithModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
     .WithModule<GitHubModule>(github => github.WithGitHubRepositories(repositories))
     .WithModule<FlutterModule>(flutter => flutter.RunDesktopApp())
     .WithModule<ComputeModule>()
     .WithModule<DiscoveryModule>()
-    .WithModule<AppsModule>()
-    .WithModule<InboxModule>();
+    .WithModule<AppsModule>();
 
 if (developerProfile)
 {

@@ -1,4 +1,3 @@
-using DigitalBrain.Connections;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core;

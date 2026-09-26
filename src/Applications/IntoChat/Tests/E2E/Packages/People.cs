@@ -19,7 +19,7 @@ internal static class People
         using var registered = await client.PostAsJsonAsync("/identity/register",
             new { principalId = principal, displayName = principal, password = principal + "-password-123" }, Json, ct);
         Assert.Equal(HttpStatusCode.OK, registered.StatusCode);
-        var member = await registered.Content.ReadFromJsonAsync<DigitalBrain.Identity.Member>(Json, ct);
+        var member = await registered.Content.ReadFromJsonAsync<IntoChat.Identity.Member>(Json, ct);
         return new(client, member!.WorkspaceId);
     }
 

@@ -31,7 +31,6 @@ final class RendererRegistry {
     'layout',
     'collection',
     'imagecanvas',
-    'inbox',
     'button',
     'toggle',
     'text',

@@ -151,6 +151,11 @@ services.AddMcpAgentTools("accounts", new Uri("https://your-server.example/mcp")
 // AgentDefinition.Tools = ["mcp_accounts_lookup_invoice"];
 ```
 
+The AI module can also register server tools from
+`DigitalBrain:AI:McpServers`, using semicolon-separated
+`id=https://endpoint` entries. For example,
+`accounts=https://your-server.example/mcp`. An empty value registers no servers.
+
 The MCP transport-factory overload supports host-owned authentication. A run opens
 only selected servers, discovers schemas and closes clients/transports afterward.
 Missing/ambiguous tools, provider error results and duplicate call IDs fail the run.

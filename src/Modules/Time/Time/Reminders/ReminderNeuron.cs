@@ -8,7 +8,6 @@ namespace DigitalBrain.Time.Reminders;
 internal sealed class ReminderNeuron(TimeProvider time, IReminderRegistry reminders) : Neuron, IReminder, IRemindable
 {
     private const string Name = "tick";
-    private const string JobName = "job";
 
     public async Task Start(TimeSpan dueTime, TimeSpan period)
     {
@@ -22,23 +21,18 @@ internal sealed class ReminderNeuron(TimeProvider time, IReminderRegistry remind
         if (reminder is not null) { await reminders.UnregisterReminder(this.GetGrainId(), reminder); }
     }
 
-    public async Task StartJob(TimeSpan dueTime, TimeSpan period)
-        => await reminders.RegisterOrUpdateReminder(this.GetGrainId(), JobName, dueTime, period);
-
-    public async Task StopJob()
+    public async Task ReceiveReminder(string reminderName, TickStatus status)
     {
-        var reminder = await reminders.GetReminder(this.GetGrainId(), JobName);
-        if (reminder is not null) { await reminders.UnregisterReminder(this.GetGrainId(), reminder); }
-    }
-
-    public Task ReceiveReminder(string reminderName, TickStatus status)
-    {
-        var observedAt = time.GetUtcNow();
-        return reminderName switch
+        if (reminderName == Name)
         {
-            Name => PublishAsync(new ReminderTick(this.GetPrimaryKeyString(), observedAt)),
-            JobName => GrainFactory.GetGrain<IReminderJob>(this.GetPrimaryKeyString()).RunJob(observedAt),
-            _ => Task.CompletedTask,
-        };
+            await PublishAsync(new ReminderTick(this.GetPrimaryKeyString(), time.GetUtcNow()));
+            return;
+        }
+
+        if (reminderName != "job") { return; }
+
+        // Retire registrations left by the removed automation job runner.
+        var obsolete = await reminders.GetReminder(this.GetGrainId(), reminderName);
+        if (obsolete is not null) { await reminders.UnregisterReminder(this.GetGrainId(), obsolete); }
     }
 }

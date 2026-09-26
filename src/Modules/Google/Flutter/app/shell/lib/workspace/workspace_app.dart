@@ -14,7 +14,7 @@ import 'workspace_settings.dart';
 import 'workspace_routes.dart';
 import 'workspace_chat.dart';
 import 'app_surface_host.dart';
-import 'inbox_panel.dart';
+import 'compute_limits_panel.dart';
 import 'workspace_islands.dart';
 import 'behaviors/behavior_manager.dart';
 import 'apps/consent_sheet_view.dart';
@@ -1126,9 +1126,9 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     },
     onSavedWork: () => _projectFiles(context),
     onSearch: () => _search(context),
-    onInbox: widget.programmingClient == null
+    onCompute: widget.programmingClient == null
         ? null
-        : () => _openInbox(context),
+        : () => _openCompute(context),
     onSettings: () => Navigator.of(context).push(
       MaterialPageRoute<void>(
         settings: const RouteSettings(name: '/settings/profile'),
@@ -1145,14 +1145,12 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     ),
   );
 
-  void _openInbox(BuildContext context) {
+  void _openCompute(BuildContext context) {
     final client = widget.programmingClient;
     if (client == null) return;
     showDialog<void>(
       context: context,
-      builder: (_) => Dialog(
-        child: InboxPanel(client: client, workspaceId: store.currentProject.id),
-      ),
+      builder: (_) => Dialog(child: ComputeLimitsPanel(client: client)),
     );
   }
 

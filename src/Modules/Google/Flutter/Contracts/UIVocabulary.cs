@@ -6,7 +6,6 @@ public static class UIVocabulary
     public const string LayoutType = "layout";
     public const string CollectionType = "collection";
     public const string ImageCanvasType = "imagecanvas";
-    public const string InboxType = "inbox";
     public const string ButtonType = "button";
     public const string ToggleType = "toggle";
     public const string TextType = "text";

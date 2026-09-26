@@ -3,7 +3,6 @@ using DigitalBrain.Compute.Allowances;
 using DigitalBrain.Compute.Billing;
 using DigitalBrain.Compute.Metering;
 using DigitalBrain.Contracts.Enforcement;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Tests;
 
@@ -193,10 +192,7 @@ public sealed class AllowanceFacts
     public async Task ConcurrentRetriesReserveAChargeOnce()
     {
         var ct = TestContext.Current.CancellationToken;
-        var recording = new RecordingAlertSink();
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>()
-            .ConfigureSilo(silo => silo.Services.AddSingleton<IComputeAlertSink>(recording))
-            .StartAsync(ct);
+        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         var ledger = brain.Get<IAllowanceLedger>("account");
         await ledger.GrantAsync(AllowanceOf("budget", "ws-1", ApprovalLevel.StandingBudget, AllowanceScope.Always, 100m), ct);
         var request = Paid("account", "ws-1", "chat-1", 5m, intent: "intent-chaos", operation: "Render");
@@ -208,13 +204,10 @@ public sealed class AllowanceFacts
     }
 
     [Fact]
-    public async Task AlertsPostToTheInboxSinkAtEachThreshold()
+    public async Task LimitLevelIsStoredInTheAllowanceLedger()
     {
         var ct = TestContext.Current.CancellationToken;
-        var recording = new RecordingAlertSink();
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>()
-            .ConfigureSilo(silo => silo.Services.AddSingleton<IComputeAlertSink>(recording))
-            .StartAsync(ct);
+        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         var ledger = brain.Get<IAllowanceLedger>("account");
         await ledger.SetLimitsAsync(new LimitPolicy { AccountLimitCompute = 100m }, ct);
         await ledger.GrantAsync(AllowanceOf("budget", "ws-1", ApprovalLevel.StandingBudget, AllowanceScope.Always, 100m), ct);
@@ -223,9 +216,9 @@ public sealed class AllowanceFacts
         await ledger.AuthorizeAsync(Paid("account", "ws-1", "chat-1", 15m, intent: "i-2"), ct);
         await ledger.AuthorizeAsync(Paid("account", "ws-1", "chat-1", 5m, intent: "i-3"), ct);
 
-        Assert.Contains(recording.Alerts, alert => alert.Level == LimitAlert.At75);
-        Assert.Contains(recording.Alerts, alert => alert.Level == LimitAlert.At90);
-        Assert.Contains(recording.Alerts, alert => alert.Level == LimitAlert.At100);
+        var report = await ledger.ReadLimitsAsync(ct);
+        Assert.Equal(LimitAlert.At100, report.HighestAlert);
+        Assert.Equal(100m, report.SpentCompute);
     }
 
     [Fact]
@@ -373,16 +366,5 @@ public sealed class AllowanceFacts
     {
         public ValueTask<AllowanceDecision> AuthorizeAsync(CallRequest request, CancellationToken cancellationToken)
             => ValueTask.FromResult(decision);
-    }
-
-    private sealed class RecordingAlertSink : IComputeAlertSink
-    {
-        public List<ComputeLimitAlert> Alerts { get; } = [];
-
-        public Task RaiseAsync(ComputeLimitAlert alert, CancellationToken cancellationToken = default)
-        {
-            Alerts.Add(alert);
-            return Task.CompletedTask;
-        }
     }
 }

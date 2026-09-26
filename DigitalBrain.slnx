@@ -110,31 +110,11 @@
     <Project Path="src/Modules/DigitalBrain/Compute/Contracts/DigitalBrain.Modules.Compute.Contracts.csproj" />
     <Project Path="src/Modules/DigitalBrain/Compute/Compute/DigitalBrain.Modules.Compute.csproj" />
   </Folder>
-  <Folder Name="/Modules/Identity/">
-    <Project Path="src/Modules/Identity/Tests/Unit/DigitalBrain.Modules.Identity.Tests.Unit.csproj" />
-    <Project Path="src/Modules/Identity/Contracts/DigitalBrain.Modules.Identity.Contracts.csproj" />
-    <Project Path="src/Modules/Identity/Identity/DigitalBrain.Modules.Identity.csproj" />
-  </Folder>
-  <Folder Name="/Modules/Connections/">
-    <Project Path="src/Modules/Connections/Tests/Unit/DigitalBrain.Modules.Connections.Tests.Unit.csproj" />
-    <Project Path="src/Modules/Connections/Contracts/DigitalBrain.Modules.Connections.Contracts.csproj" />
-    <Project Path="src/Modules/Connections/Connections/DigitalBrain.Modules.Connections.csproj" />
-  </Folder>
   <Folder Name="/Modules/DigitalBrain/Apps/">
     <Project Path="src/Modules/DigitalBrain/Apps/Tests/E2E/DigitalBrain.Modules.Apps.Tests.E2E.csproj" />
     <Project Path="src/Modules/DigitalBrain/Apps/Tests/Unit/DigitalBrain.Modules.Apps.Tests.Unit.csproj" />
     <Project Path="src/Modules/DigitalBrain/Apps/Contracts/DigitalBrain.Modules.Apps.Contracts.csproj" />
     <Project Path="src/Modules/DigitalBrain/Apps/Apps/DigitalBrain.Modules.Apps.csproj" />
-  </Folder>
-  <Folder Name="/Modules/Automations/">
-    <Project Path="src/Modules/Automations/Tests/Unit/DigitalBrain.Modules.Automations.Tests.Unit.csproj" />
-    <Project Path="src/Modules/Automations/Contracts/DigitalBrain.Modules.Automations.Contracts.csproj" />
-    <Project Path="src/Modules/Automations/Automations/DigitalBrain.Modules.Automations.csproj" />
-  </Folder>
-  <Folder Name="/Modules/Inbox/">
-    <Project Path="src/Modules/Inbox/Tests/Unit/DigitalBrain.Modules.Inbox.Tests.Unit.csproj" />
-    <Project Path="src/Modules/Inbox/Contracts/DigitalBrain.Modules.Inbox.Contracts.csproj" />
-    <Project Path="src/Modules/Inbox/Inbox/DigitalBrain.Modules.Inbox.csproj" />
   </Folder>
   <Folder Name="/Modules/Discovery/">
     <Project Path="src/Modules/Discovery/Tests/Unit/DigitalBrain.Modules.Discovery.Tests.Unit.csproj" />

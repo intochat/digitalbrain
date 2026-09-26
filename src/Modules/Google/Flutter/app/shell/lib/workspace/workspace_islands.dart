@@ -17,13 +17,13 @@ class WorkspaceIslands extends StatelessWidget {
     required this.onSavedWork,
     required this.onSearch,
     required this.onSettings,
-    this.onInbox,
+    this.onCompute,
   });
   final WorkspaceStore store;
   final List<AppManifestSummary> apps;
   final ValueChanged<String> onLaunch, onRestore;
   final VoidCallback onNewWorkspace, onSavedWork, onSearch, onSettings;
-  final VoidCallback? onInbox;
+  final VoidCallback? onCompute;
   Widget island(BuildContext context, Widget child) => ClipRRect(
     borderRadius: BorderRadius.circular(19),
     child: BackdropFilter(
@@ -234,11 +234,11 @@ class WorkspaceIslands extends StatelessWidget {
                 ],
               ],
             ),
-            if (onInbox != null)
+            if (onCompute != null)
               IconButton(
-                tooltip: 'Inbox',
-                onPressed: onInbox,
-                icon: const Icon(Icons.inbox_outlined, size: 21),
+                tooltip: 'Compute',
+                onPressed: onCompute,
+                icon: const Icon(Icons.speed_outlined, size: 21),
               ),
             IconButton(
               tooltip: 'Search',

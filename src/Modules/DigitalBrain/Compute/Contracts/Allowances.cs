@@ -132,22 +132,6 @@ public enum FailureClass
     ThirdPartyFault = 7,
 }
 
-[GenerateSerializer, Alias("compute.alert")]
-public sealed record ComputeLimitAlert
-{
-    [Id(0)] public required string WorkspaceId { get; init; }
-    [Id(1)] public required LimitAlert Level { get; init; }
-    [Id(2)] public required decimal SpentCompute { get; init; }
-    [Id(3)] public required decimal LimitCompute { get; init; }
-}
-
-// Best-effort notification hook. The product implementation posts an InboxItemDraft to IInboxFeed;
-// a failed notification must never fail the charging decision.
-public interface IComputeAlertSink
-{
-    Task RaiseAsync(ComputeLimitAlert alert, CancellationToken cancellationToken = default);
-}
-
 // A reservation id is derived from the intent and operation, so a retried or duplicated call
 // reserves once. The same function backs the ledger and any caller that later settles the call.
 public static class AllowanceReservations

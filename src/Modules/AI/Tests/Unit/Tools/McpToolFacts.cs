@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.AI.Agents;
+using DigitalBrain.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Client;
@@ -11,6 +12,29 @@ namespace DigitalBrain.Tests;
 
 public sealed class McpToolFacts
 {
+    [Fact]
+    public void TheMcpAllowlistRegistersExactlyTheListedServers()
+    {
+        var services = new ServiceCollection();
+        AIModule.RegisterMcpBridge(services, "salesforce=https://mcp.example.test/tools;github=https://github.example.test/mcp");
+        Assert.Equal(2, services.Count(descriptor => descriptor.ServiceType == typeof(IAgentToolSource)));
+    }
+
+    [Fact]
+    public void AnEmptyMcpAllowlistRegistersNoServer()
+    {
+        var services = new ServiceCollection();
+        AIModule.RegisterMcpBridge(services, null);
+        Assert.DoesNotContain(services, descriptor => descriptor.ServiceType == typeof(IAgentToolSource));
+    }
+
+    [Fact]
+    public void AMalformedMcpAllowlistEntryIsRejected()
+    {
+        var services = new ServiceCollection();
+        Assert.Throws<InvalidOperationException>(() => AIModule.RegisterMcpBridge(services, "salesforce"));
+    }
+
     [Fact]
     public async Task RunnerDisposesMcpSessionAndDoesNotCompleteAfterProviderFailure()
     {

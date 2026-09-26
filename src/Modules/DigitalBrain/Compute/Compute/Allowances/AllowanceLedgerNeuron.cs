@@ -24,17 +24,14 @@ internal sealed class AllowanceLedgerNeuron : Neuron<AllowanceLedgerState>, IAll
 {
     private readonly IPersistentState<AllowanceLedgerState> store;
     private readonly IPriceBook priceBook;
-    private readonly IComputeAlertSink alerts;
 
     public AllowanceLedgerNeuron(
         [PersistentState("allowance-ledger", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<AllowanceLedgerState> store,
-        IPriceBook priceBook,
-        IComputeAlertSink alerts)
+        IPriceBook priceBook)
         : base(store)
     {
         this.store = store;
         this.priceBook = priceBook;
-        this.alerts = alerts;
     }
 
     private string AccountId => this.GetPrimaryKeyString();
@@ -79,7 +76,7 @@ internal sealed class AllowanceLedgerNeuron : Neuron<AllowanceLedgerState>, IAll
         }
 
         if (result.HardStop) { next.HardStoppedAt ??= now; }
-        await RaiseAsync(next, request.Caller.WorkspaceId, result, cancellationToken).ConfigureAwait(true);
+        if (result.Alert > next.HighestAlert) { next.HighestAlert = result.Alert; }
         await store.WriteStateAsync().ConfigureAwait(true);
         return decision;
     }
@@ -200,19 +197,6 @@ internal sealed class AllowanceLedgerNeuron : Neuron<AllowanceLedgerState>, IAll
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult<AllowanceReservation[]>([.. Snapshot.Reservations]);
-    }
-
-    private async Task RaiseAsync(AllowanceLedgerState next, string workspaceId, AllowanceOutcome result, CancellationToken cancellationToken)
-    {
-        if (result.Alert <= next.HighestAlert) { return; }
-        next.HighestAlert = result.Alert;
-        await alerts.RaiseAsync(new ComputeLimitAlert
-        {
-            WorkspaceId = workspaceId,
-            Level = result.Alert,
-            SpentCompute = result.Spent,
-            LimitCompute = result.Cap,
-        }, cancellationToken).ConfigureAwait(true);
     }
 
     private static void AddPending(AllowanceLedgerState next, CallRequest request, string approvalId, DateTimeOffset now)
