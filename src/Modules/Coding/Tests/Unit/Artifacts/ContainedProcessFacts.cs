@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using DigitalBrain.Coding;
 using Xunit;
 
@@ -5,7 +6,8 @@ namespace DigitalBrain.Tests;
 
 internal sealed class WindowsFactAttribute : FactAttribute
 {
-    public WindowsFactAttribute()
+    public WindowsFactAttribute([CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (!OperatingSystem.IsWindows()) { Skip = "Windows job objects only."; }
     }
@@ -13,7 +15,8 @@ internal sealed class WindowsFactAttribute : FactAttribute
 
 internal sealed class WindowsTheoryAttribute : TheoryAttribute
 {
-    public WindowsTheoryAttribute()
+    public WindowsTheoryAttribute([CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (!OperatingSystem.IsWindows()) { Skip = "Windows job objects only."; }
     }
