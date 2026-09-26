@@ -34,7 +34,8 @@ public sealed class ProgrammableBehaviorFacts
         try
         {
             DigitalBrain.Testing.E2E.E2ETestBuilder CreateHost() => E2ETest.Create().WithModule<AIModule>(m => m.WithOptions(ai))
-                .WithModule<CodingModule>().WithModule<BehaviorModule>().WithModule<TimeModule>().WithModule<FlutterModule>()
+                .WithModule<CodingModule>().WithModule<BehaviorModule>().WithModule<TimeModule>()
+                .WithModule<FlutterModule>(flutter => flutter.BackendOnly())
                 .WithModule<BehaviorFixtureModule>().WithExecution(new TestExecutionOptions
                 {
                     PrivateConfiguration = new Dictionary<string, string?>
@@ -98,7 +99,7 @@ public sealed class ProgrammableBehaviorFacts
                 }
                 """, "public sealed class UserTests { [Xunit.Fact] public async Task Completes() { await new Example().RunAsync(); } }", []), ct);
             var checkedCompletion = await Check(completedDraft, 1, ct);
-            Assert.True(checkedCompletion.Artifact is not null, string.Join("\n", checkedCompletion.Diagnostics.Select(x => x.Message)));
+            Assert.True(checkedCompletion.Artifact is not null, string.Join("\r\n", checkedCompletion.Diagnostics.Select(x => x.Message)));
             var completedProgram = brain.Get<IBehaviorProgram>("completed-example");
             await completedProgram.Deploy(new(0, Guid.NewGuid(), checkedCompletion.Artifact!, "{}"), ct);
             var completed = await State(completedProgram, BehaviorExecutionState.Completed, ct);
@@ -116,7 +117,7 @@ public sealed class ProgrammableBehaviorFacts
                 "await Task.Delay(Timeout.Infinite, cancellation); await using var ticks = await brain.SubscribeAsync<TimerTick>(brain.Get<Timer>(\"stage2-timer\"), cancellation);", StringComparison.Ordinal);
             await completedDraft.Save(new(2, Guid.NewGuid(), unavailableSource, Tests, ["time", "flutter"]), ct);
             var unavailable = await Check(completedDraft, 3, ct);
-            Assert.True(unavailable.Artifact is not null, string.Join("\n", unavailable.Diagnostics.Select(x => x.Message)));
+            Assert.True(unavailable.Artifact is not null, string.Join("\r\n", unavailable.Diagnostics.Select(x => x.Message)));
             var unhealthy = brain.Get<IBehaviorProgram>("unready-example");
             await unhealthy.Deploy(new(0, Guid.NewGuid(), unavailable.Artifact!, "{}"), ct);
             var unready = await State(unhealthy, BehaviorExecutionState.Failed, ct);
@@ -137,7 +138,7 @@ public sealed class ProgrammableBehaviorFacts
             await completedDraft.Save(new(3, Guid.NewGuid(), crashSource,
                 "public sealed class UserTests { [Xunit.Fact] public async Task ReportsFailure() { await Xunit.Assert.ThrowsAsync<InvalidOperationException>(() => new Example().RunAsync()); } }", []), ct);
             var crash = await Check(completedDraft, 4, ct);
-            Assert.True(crash.Artifact is not null, string.Join("\n", crash.Diagnostics.Select(x => x.Message)));
+            Assert.True(crash.Artifact is not null, string.Join("\r\n", crash.Diagnostics.Select(x => x.Message)));
             var crashing = brain.Get<IBehaviorProgram>("crashing-example");
             await crashing.Deploy(new(0, Guid.NewGuid(), crash.Artifact!, "{}"), ct);
             var crashed = await State(crashing, BehaviorExecutionState.Failed, ct);
@@ -197,7 +198,7 @@ public sealed class ProgrammableBehaviorFacts
             if (state.State == BehaviorExecutionState.Failed)
             {
                 var logs = await program.ReadLogs(0, 100, timeout.Token);
-                Assert.Fail(state.Error + "\n" + string.Join("\n", logs.Entries.Select(x => x.Message)));
+                Assert.Fail(state.Error + "\r\n" + string.Join("\r\n", logs.Entries.Select(x => x.Message)));
             }
             await Task.Delay(50, timeout.Token);
         }
@@ -211,7 +212,7 @@ public sealed class ProgrammableBehaviorFacts
             var state = await program.Read(timeout.Token);
             if (state.State == expected) { return state; }
             if (state.State == BehaviorExecutionState.Failed)
-            { Assert.Fail(state.Error + "\n" + string.Join("\n", (await program.ReadLogs(0, 100, timeout.Token)).Entries.Select(x => x.Message))); }
+            { Assert.Fail(state.Error + "\r\n" + string.Join("\r\n", (await program.ReadLogs(0, 100, timeout.Token)).Entries.Select(x => x.Message))); }
             await Task.Delay(50, timeout.Token);
         }
     }

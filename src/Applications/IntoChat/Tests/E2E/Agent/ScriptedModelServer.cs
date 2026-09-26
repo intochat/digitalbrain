@@ -62,8 +62,11 @@ public sealed partial class ScriptedModelServer : IAsyncDisposable
         var lastUser = messages.LastOrDefault(m => m.GetProperty("role").GetString() == "user") is { } user
             ? user.GetProperty("content").GetString() ?? ""
             : "";
-        var wantsCount = lastUser.Contains("how many", StringComparison.OrdinalIgnoreCase);
-        var wantsRefine = RefineValue is not null && lastUser.Contains("only", StringComparison.OrdinalIgnoreCase);
+        // The UI appends artifact guidance to user content. Match the leading request, not
+        // incidental words such as "only" inside that guidance.
+        var userRequest = lastUser.TrimStart();
+        var wantsCount = userRequest.StartsWith("How many", StringComparison.OrdinalIgnoreCase);
+        var wantsRefine = RefineValue is not null && userRequest.StartsWith("Only ", StringComparison.OrdinalIgnoreCase);
         object message;
         var reason = "tool_calls";
         if (results.Length == 0)

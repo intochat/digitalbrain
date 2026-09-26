@@ -77,13 +77,37 @@ jobs:
           DIGITALBRAIN_E2E_HEADED: '0'
 
   intochat-e2e:
-    name: IntoChat E2E (${{ matrix.area }})
+    name: IntoChat E2E (${{ matrix.name }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        area: [Agent, Workspace, Security, LocalApps, Diagnostics, Composition]
+        include:
+          - name: Agent table
+            filter: --filter-class '*AgentTableJourneyFacts'
+            browser: true
+          - name: Agent workflow
+            filter: --filter-class '*AgentWorkflowFacts' '*LiveAgentTableJourneyFacts'
+            browser: false
+          - name: Workspace table
+            filter: --filter-class '*SupabaseTableDisplayFacts'
+            browser: true
+          - name: Workspace state
+            filter: --filter-class '*WorkspaceRestoreFacts' '*WorkspaceDataFacts'
+            browser: true
+          - name: Security
+            filter: --filter-namespace IntoChat.Tests.E2E.Security
+            browser: false
+          - name: LocalApps
+            filter: --filter-namespace IntoChat.Tests.E2E.LocalApps
+            browser: true
+          - name: Diagnostics
+            filter: --filter-namespace IntoChat.Tests.E2E.Diagnostics
+            browser: false
+          - name: Composition
+            filter: --filter-namespace IntoChat.Tests.E2E.Composition
+            browser: false
     steps:
       - uses: actions/checkout@v7
 
@@ -92,7 +116,7 @@ jobs:
           global-json-file: global.json
 
       - name: Install Flutter for browser scenarios
-        if: contains(fromJSON('["Agent", "Workspace", "LocalApps"]'), matrix.area)
+        if: matrix.browser
         uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -100,7 +124,7 @@ jobs:
           cache: true
 
       - name: Resolve Flutter workspace
-        if: contains(fromJSON('["Agent", "Workspace", "LocalApps"]'), matrix.area)
+        if: matrix.browser
         working-directory: src/Modules/Google/Flutter/app
         run: flutter pub get --enforce-lockfile
 
@@ -116,11 +140,11 @@ jobs:
         run: dotnet build src/Applications/IntoChat/Tests/E2E/IntoChat.Tests.E2E.csproj -c Release -p:CodeGraphRefresh=false
 
       - name: Install browser and system dependencies
-        if: contains(fromJSON('["Agent", "Workspace", "LocalApps"]'), matrix.area)
+        if: matrix.browser
         run: pwsh src/Applications/IntoChat/Tests/E2E/bin/Release/net11.0/playwright.ps1 install --with-deps chromium
 
-      - name: Run ${{ matrix.area }} scenarios
-        run: dotnet test --project src/Applications/IntoChat/Tests/E2E/IntoChat.Tests.E2E.csproj -c Release --no-build --filter-namespace "IntoChat.Tests.E2E.${{ matrix.area }}" --ignore-exit-code 8
+      - name: Run ${{ matrix.name }} scenarios
+        run: dotnet test --project src/Applications/IntoChat/Tests/E2E/IntoChat.Tests.E2E.csproj -c Release --no-build ${{ matrix.filter }} --ignore-exit-code 8
         env:
           DIGITALBRAIN_E2E_LIVE_MODEL: '0'
           DIGITALBRAIN_E2E_HEADED: '0'
