@@ -40,6 +40,10 @@ jobs:
         working-directory: src/Modules/Google/Flutter/app
         run: flutter pub get --enforce-lockfile
 
+      - name: Build the Flutter web shell
+        working-directory: src/Modules/Google/Flutter/app/shell
+        run: flutter build web --release
+
       - name: Cache NuGet packages
         uses: actions/cache@v6
         with:

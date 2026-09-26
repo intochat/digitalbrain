@@ -43,11 +43,16 @@ internal sealed class LocalBehaviorExecutor(IOptions<BehaviorOptions> options) :
         }
         using var config = JsonDocument.Parse(launch.ConfigurationJson);
         foreach (var item in config.RootElement.EnumerateObject()) { environment.Add(item.Name, item.Value.GetString()!); }
+        var dotnet = settings.DotnetPath;
+        if (!File.Exists(dotnet)) { dotnet = Environment.ProcessPath ?? "dotnet"; }
         WindowsContainedProcess child;
         try
         {
-            child = WindowsContainedProcess.Start(settings.DotnetPath,
-                [Path.Combine(launch.Artifact.LaunchDirectory, launch.Artifact.EntryAssembly)], launch.Artifact.LaunchDirectory, environment);
+            child = OperatingSystem.IsWindows()
+                ? WindowsContainedProcess.Start(dotnet,
+                    [Path.Combine(launch.Artifact.LaunchDirectory, launch.Artifact.EntryAssembly)], launch.Artifact.LaunchDirectory, environment)
+                : WindowsContainedProcess.StartWithoutJob(dotnet,
+                    [Path.Combine(launch.Artifact.LaunchDirectory, launch.Artifact.EntryAssembly)], launch.Artifact.LaunchDirectory, environment);
         }
         catch { pipe.Dispose(); throw; }
         var worker = new Worker(child, pipe);

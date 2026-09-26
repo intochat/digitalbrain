@@ -263,7 +263,7 @@ public sealed class ProgrammableBehaviorFacts
             reservation.Start();
             var port = ((IPEndPoint)reservation.LocalEndpoint).Port;
             reservation.Stop();
-            Url = $"http://localhost:{port}/";
+            Url = $"http://127.0.0.1:{port}/";
             _listener.Prefixes.Add(Url);
             _listener.Start();
         }
