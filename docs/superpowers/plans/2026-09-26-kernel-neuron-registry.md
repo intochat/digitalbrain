@@ -58,4 +58,3 @@
 - [x] Run test and observe failure.
 - [x] Add a small initial set of real descriptors; document coverage.
 - [x] Run affected suites and solution build; commit.
-
