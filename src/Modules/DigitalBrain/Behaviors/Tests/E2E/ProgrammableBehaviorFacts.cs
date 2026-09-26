@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.AI;
@@ -21,7 +22,7 @@ namespace DigitalBrain.Tests;
 
 public sealed class ProgrammableBehaviorFacts
 {
-    [Fact]
+    [WindowsBehaviorFact]
     public async Task AgentAuthoredCSharpRunsUpdatesStopsAndRollsBackInASeparateWorker()
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
@@ -311,6 +312,15 @@ public sealed class ProgrammableBehaviorFacts
             }
         }
         public void Dispose() { _listener.Close(); _serve.GetAwaiter().GetResult(); }
+    }
+}
+
+internal sealed class WindowsBehaviorFactAttribute : FactAttribute
+{
+    public WindowsBehaviorFactAttribute([CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
+    {
+        if (!OperatingSystem.IsWindows()) { Skip = "Managed behavior execution requires Windows job containment."; }
     }
 }
 
