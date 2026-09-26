@@ -15,33 +15,26 @@ public sealed class NeuronRegistryGrain(
     [PersistentState("neuron-registry", "Default")] IPersistentState<NeuronRegistryState> state)
     : Grain, INeuronRegistryGrain
 {
-    public async Task ReplaceSnapshot(NeuronRegistrySnapshot snapshot)
+    public async Task Register(NeuronRegistration[] records)
     {
-        ArgumentNullException.ThrowIfNull(snapshot);
-        if (string.IsNullOrWhiteSpace(snapshot.Version))
-        { throw new ArgumentException("A registry snapshot requires a version.", nameof(snapshot)); }
-        if (snapshot.Version != this.GetPrimaryKeyString())
-        { throw new ArgumentException("A registry snapshot must be published under its version key.", nameof(snapshot)); }
-        if (snapshot.Version == state.State.Version)
+        ArgumentNullException.ThrowIfNull(records);
+        var version = this.GetPrimaryKeyString();
+        if (state.State.Version.Length != 0)
         {
-            if (!state.State.Records.SequenceEqual(snapshot.Records))
+            if (!state.State.Records.SequenceEqual(records))
             { throw new InvalidOperationException("Conflicting registry records share a version."); }
             return;
         }
         var previous = state.State;
-        state.State = new NeuronRegistryState { Version = snapshot.Version, Records = snapshot.Records.ToArray() };
+        state.State = new NeuronRegistryState { Version = version, Records = records.ToArray() };
         try { await state.WriteStateAsync(); }
         catch { state.State = previous; throw; }
     }
 
-    public Task<NeuronRegistrySnapshot> Read()
+    public Task<NeuronRegistration[]> Read()
     {
         EnsureReady();
-        return Task.FromResult(new NeuronRegistrySnapshot
-        {
-            Version = state.State.Version,
-            Records = state.State.Records.ToArray(),
-        });
+        return Task.FromResult(state.State.Records.ToArray());
     }
 
     public Task<NeuronRegistration?> Find(string id)

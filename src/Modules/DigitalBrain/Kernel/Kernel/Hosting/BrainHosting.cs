@@ -17,7 +17,6 @@ public static class BrainHosting
     {
         ArgumentNullException.ThrowIfNull(registry);
         silo.Services.AddSingleton(registry);
-        silo.Services.AddSingleton(NeuronRegistry.CreateSnapshot(registry));
         silo.AddStartupTask<NeuronRegistrationStartupTask>();
         return silo;
     }

@@ -7,7 +7,7 @@ using Orleans.Runtime;
 namespace DigitalBrain.Discovery;
 
 [GrainType("capability-catalog")]
-internal sealed class CapabilityCatalogNeuron(CapabilityCatalog catalog, NeuronRegistrySnapshot selectedRegistry, TimeProvider time) : Neuron, ICapabilityCatalog
+internal sealed class CapabilityCatalogNeuron(CapabilityCatalog catalog, INeuronRegistry selectedRegistry, TimeProvider time) : Neuron, ICapabilityCatalog
 {
     private const int MaxTake = 25;
     private const string UnmetIntentBoardKey = "unmet-intents";

@@ -12,7 +12,7 @@ namespace DigitalBrain.Discovery;
 // Manifests are the truth. The catalog is rebuilt idempotently and falls back to keyword search.
 internal sealed class CapabilityCatalog(
     IEnumerable<IManifestSource> sources,
-    NeuronRegistrySnapshot selectedRegistry,
+    INeuronRegistry selectedRegistry,
     IGrainFactory grains,
     ICapabilityEmbedder embedder,
     ICapabilityVectorIndex vectors,
@@ -49,7 +49,7 @@ internal sealed class CapabilityCatalog(
 
         var registry = await grains.GetGrain<INeuronRegistryGrain>(selectedRegistry.Version)
             .Read().ConfigureAwait(false);
-        var neurons = registry.Records.Where(static item => item.AgentRoutable).ToArray();
+        var neurons = registry.Where(static item => item.AgentRoutable).ToArray();
         if (unreadable > 0 && read.Count == 0 && (_signature is not null || neurons.Length == 0))
         {
             Degraded = true;

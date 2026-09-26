@@ -56,13 +56,12 @@ public sealed class RegistryFacts
         await using var brain = await UnitTest.Create().WithModule<FirstModule>()
             .StartAsync(TestContext.Current.CancellationToken);
 
-        var selected = brain.SiloServices.GetRequiredService<NeuronRegistrySnapshot>();
-        var snapshot = await brain.Get<INeuronRegistryGrain>(selected.Version).Read();
-        var neuron = Assert.Single(snapshot.Records);
+        var selected = brain.SiloServices.GetRequiredService<INeuronRegistry>();
+        var neuron = Assert.Single(await brain.Get<INeuronRegistryGrain>(selected.Version).Read());
         Assert.Equal("test.emitter", neuron.Id);
         Assert.Equal(typeof(ITestEmitter).FullName, neuron.ContractType);
         Assert.Equal(typeof(FirstModule).FullName, neuron.ModuleId);
-        Assert.NotEmpty(snapshot.Version);
+        Assert.NotEmpty(selected.Version);
     }
 
     [Fact]
@@ -70,13 +69,13 @@ public sealed class RegistryFacts
     {
         await using var brain = await UnitTest.Create().WithModule<FirstModule>()
             .StartAsync(TestContext.Current.CancellationToken);
-        var selected = brain.SiloServices.GetRequiredService<NeuronRegistrySnapshot>();
+        var selected = brain.SiloServices.GetRequiredService<INeuronRegistry>();
         var first = brain.Get<INeuronRegistryGrain>(selected.Version);
         var other = brain.Get<INeuronRegistryGrain>("different-version");
-        await other.ReplaceSnapshot(new NeuronRegistrySnapshot { Version = "different-version" });
+        await other.Register([]);
 
-        Assert.Equal("test.emitter", Assert.Single((await first.Read()).Records).Id);
-        Assert.Empty((await other.Read()).Records);
+        Assert.Equal("test.emitter", Assert.Single(await first.Read()).Id);
+        Assert.Empty(await other.Read());
     }
 
     public sealed class FirstModule : IModule, INeuronRegistryContributor

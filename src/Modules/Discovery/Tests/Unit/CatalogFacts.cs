@@ -40,16 +40,16 @@ public sealed class CatalogFacts
     }
 
     [Fact]
-    public async Task DiscoveryReadsPublishedRegistrySnapshot()
+    public async Task DiscoveryReadsPublishedRegistry()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().WithModule<DiscoveryModule>()
             .WithModule<FixtureNeuronModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<IManifestSource>(new FixtureManifestSource([])))
             .StartAsync(ct);
-        var selected = brain.SiloServices.GetRequiredService<NeuronRegistrySnapshot>();
+        var selected = brain.SiloServices.GetRequiredService<INeuronRegistry>();
         var registry = brain.Get<INeuronRegistryGrain>(selected.Version);
-        Assert.Contains((await registry.Read()).Records, record => record.Id == "test.registry-emitter");
+        Assert.Contains(await registry.Read(), record => record.Id == "test.registry-emitter");
 
         var catalog = brain.Get<ICapabilityCatalog>("catalog");
         var result = await catalog.Search("emit a registry signal", "workspace-a", 5);

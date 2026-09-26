@@ -23,6 +23,7 @@ public interface INeuronRegistryContributor
 public interface INeuronRegistry
 {
     IReadOnlyList<NeuronDescriptor> All { get; }
+    string Version { get; }
     NeuronDescriptor? Find(string id);
 }
 
@@ -46,9 +47,11 @@ public sealed class NeuronRegistry : INeuronRegistry
             { throw new InvalidOperationException($"Duplicate neuron registry ID '{descriptor.Id}'."); }
         }
         All = Array.AsReadOnly(_byId.Values.OrderBy(item => item.Id, StringComparer.Ordinal).ToArray());
+        Version = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(ToRegistrations(this))));
     }
 
     public IReadOnlyList<NeuronDescriptor> All { get; }
+    public string Version { get; }
     public NeuronDescriptor? Find(string id) => _byId.GetValueOrDefault(id);
 
     public static NeuronRegistry FromModules(IEnumerable<ModuleDefinition> modules)
@@ -57,9 +60,8 @@ public sealed class NeuronRegistry : INeuronRegistry
     public static NeuronRegistry FromInstances(IEnumerable<IModule> modules)
         => new(modules.SelectMany(module => Describe(module, module.GetType().FullName!)));
 
-    public static NeuronRegistrySnapshot CreateSnapshot(INeuronRegistry registry)
-    {
-        var records = registry.All.Select(item => new NeuronRegistration
+    public static NeuronRegistration[] ToRegistrations(INeuronRegistry registry)
+        => registry.All.Select(item => new NeuronRegistration
         {
             Id = item.Id,
             ContractType = item.ContractType.FullName!,
@@ -68,12 +70,6 @@ public sealed class NeuronRegistry : INeuronRegistry
             Description = item.Description,
             AgentRoutable = item.AgentRoutable,
         }).ToArray();
-        return new NeuronRegistrySnapshot
-        {
-            Version = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(records))),
-            Records = records,
-        };
-    }
 
     private static IEnumerable<NeuronDescriptor> Describe(IModule module, string moduleId)
         => module is INeuronRegistryContributor contributor
