@@ -7,7 +7,12 @@ internal sealed class BehaviorScopedBrain(IDigitalBrain inner, BehaviorReadiness
 {
     private readonly List<IAsyncDisposable> _subscriptions = [];
     private bool _disposed;
-    public T Get<T>(string id) where T : class, IGrainWithStringKey => inner.Get<T>(id);
+    public T Get<T>(string id) where T : class, IGrainWithStringKey
+    {
+        // Installed synapses name account slots in source; each installation supplies its own ids.
+        var selected = Environment.GetEnvironmentVariable("Behavior__Account__" + id);
+        return inner.Get<T>(selected ?? id);
+    }
     public async Task<ISignalSubscription<T>> SubscribeAsync<T>(INeuron source, CancellationToken cancellationToken = default) where T : Signal
     {
         var subscription = await inner.SubscribeAsync<T>(source, cancellationToken).ConfigureAwait(false);

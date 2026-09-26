@@ -20,7 +20,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddIntoChatOptions();
 builder.AddServiceDefaults();
 builder.AddDigitalBrain();
-builder.AddBehaviors();
+builder.AddSynapses();
 builder.AddPackages();
 builder.AddKernelCors();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -60,7 +60,7 @@ app.UseAuthentication();
 app.UseAccountSession();
 app.MapDefaultEndpoints();
 app.MapOrleansDashboard("/orleans");
-app.MapBehaviors();
+app.MapSynapses();
 app.MapPackages();
 app.MapDigitalBrainModules();
 app.MapGet("/compute/limits", static async (IDigitalBrain brain, CancellationToken ct) =>

@@ -10,6 +10,64 @@ public sealed class AppFacts
     private static readonly PackageId Researcher = PackageId.Parse("alice/researcher");
 
     [Fact]
+    public async Task InstallationRequiresAccountBindingsAndPassesOnlySelectedIdsToTheProgram()
+    {
+        await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
+        Caller.As("alice");
+        var package = brain.Get<IPackage>(Researcher.ToString());
+        var content = PackageSamples.Researcher("Research");
+        var withAccount = content with { Manifest = content.Manifest with
+        {
+            Accounts = [new PackageAccount("twitter", "twitter", "Account to watch")]
+        } };
+        var revision = await package.Commit(brain.Commit(null, withAccount, "Add account slot"));
+        await package.Publish(new(Guid.NewGuid(), revision.Id));
+        Caller.Clear();
+        var app = brain.Get<IApp>(Key());
+        var reference = new PackageRevisionRef(Researcher, revision.Id);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => app.Install(new(Guid.NewGuid(), reference, new Dictionary<string, string>())));
+        var installed = await app.Install(new(Guid.NewGuid(), reference, new Dictionary<string, string>(),
+            new Dictionary<string, string> { ["twitter"] = "bob-twitter" }));
+
+        Assert.Equal("bob-twitter", installed.Accounts!["twitter"]);
+        Assert.Equal("bob-twitter", Configuration(Assert.Single(Program(installed).Deployments))["Behavior__Account__twitter"]);
+        Assert.DoesNotContain("Credential", Configuration(Assert.Single(Program(installed).Deployments)).Keys);
+        var changed = await app.Configure(new(Guid.NewGuid(), new Dictionary<string, string>(),
+            new Dictionary<string, string> { ["twitter"] = "other-twitter" }));
+        Assert.Equal("other-twitter", changed.Accounts!["twitter"]);
+        Assert.Equal("other-twitter", Configuration(Assert.Single(Program(changed).Deployments))["Behavior__Account__twitter"]);
+    }
+
+    [Fact]
+    public async Task UpgradeRetainsExistingAccountAndRequiresNewSlotsBeforeRetiringTheRunningProgram()
+    {
+        await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
+        Caller.As("alice");
+        var package = brain.Get<IPackage>(Researcher.ToString());
+        var source = PackageSamples.Researcher("Research");
+        var first = await package.Commit(brain.Commit(null, source with { Manifest = source.Manifest with
+        {
+            Accounts = [new PackageAccount("twitter", "twitter", "Watch")]
+        } }, "First"));
+        var second = await package.Commit(brain.Commit(first.Id, source with { Manifest = source.Manifest with
+        {
+            Accounts = [new PackageAccount("twitter", "twitter", "Watch"), new PackageAccount("notify", "notification", "Notify")]
+        } }, "Second"));
+        Caller.Clear();
+        var app = brain.Get<IApp>(Key());
+        var installed = await app.Install(new(Guid.NewGuid(), new(Researcher, first.Id), new Dictionary<string, string>(),
+            new Dictionary<string, string> { ["twitter"] = "alice-twitter" }));
+
+        await Assert.ThrowsAsync<ArgumentException>(() => app.Upgrade(new(Guid.NewGuid(), new(Researcher, second.Id))));
+        Assert.False(RecordingBehaviorProgram.Deleted.ContainsKey(installed.BehaviorProgram!));
+        var upgraded = await app.Upgrade(new(Guid.NewGuid(), new(Researcher, second.Id),
+            new Dictionary<string, string> { ["twitter"] = "alice-twitter", ["notify"] = "alice-ui" }));
+        Assert.Equal("alice-twitter", upgraded.Accounts!["twitter"]);
+        Assert.Equal("alice-ui", upgraded.Accounts["notify"]);
+    }
+
+    [Fact]
     public async Task InstallRunsTheRevisionArtifactWithTheAppAddressAndChosenSettings()
     {
         await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);

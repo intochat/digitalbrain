@@ -9,15 +9,15 @@ using Microsoft.Extensions.Options;
 
 namespace IntoChat;
 
-internal static class BehaviorEndpoints
+internal static class SynapseEndpoints
 {
-    public static void AddBehaviors(this IHostApplicationBuilder builder)
+    public static void AddSynapses(this IHostApplicationBuilder builder)
     {
         builder.Services.AddOptions<BehaviorAuthoringOptions>().BindConfiguration("IntoChat:BehaviorAuthoring");
         builder.Services.AddSingleton<BehaviorToolService>();
         builder.Services.AddSingleton<BehaviorCatalogStore>();
         builder.Services.AddSingleton<BehaviorManagement>();
-        builder.Services.AddSingleton<IAgentToolFactory, BehaviorAgentTools>();
+        builder.Services.AddSingleton<IAgentToolFactory, SynapseAgentTools>();
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddScoped(sp =>
         {
@@ -36,9 +36,19 @@ internal static class BehaviorEndpoints
         builder.Services.AddMcpServer().WithHttpTransport().WithTools(tools);
     }
 
-    public static void MapBehaviors(this IEndpointRouteBuilder routes)
+    public static void MapSynapses(this IEndpointRouteBuilder routes)
     {
-        var group = routes.MapGroup("/workspaces/{workspaceId}/behaviors");
+        MapSynapseRoutes(routes, "/workspaces/{workspaceId}/synapses");
+        MapSynapseRoutes(routes, "/workspaces/{workspaceId}/behaviors");
+        routes.MapMcp("/workspaces/{workspaceId}/synapse-mcp").AddEndpointFilter(async (context, next) =>
+            DeveloperModeEnabled(context.HttpContext.RequestServices) ? await next(context) : Results.NotFound());
+        routes.MapMcp("/workspaces/{workspaceId}/behavior-mcp").AddEndpointFilter(async (context, next) =>
+            DeveloperModeEnabled(context.HttpContext.RequestServices) ? await next(context) : Results.NotFound());
+    }
+
+    private static void MapSynapseRoutes(IEndpointRouteBuilder routes, string path)
+    {
+        var group = routes.MapGroup(path);
         group.AddEndpointFilter(async (context, next) =>
         {
             if (!DeveloperModeEnabled(context.HttpContext.RequestServices)) { return Results.NotFound(); }
@@ -67,8 +77,6 @@ internal static class BehaviorEndpoints
         group.MapPost("/{id}/rollback", (string workspaceId, string id, RollbackBehavior request, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).Rollback(id, request, ct));
         group.MapDelete("/{id}", (string workspaceId, string id, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).Delete(id, ct));
         group.MapGet("/{id}/logs", (string workspaceId, string id, long? after, int? limit, BehaviorToolService service, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Scope(workspaceId, service, auth).Logs(id, after ?? 0, limit ?? 100, ct));
-        routes.MapMcp("/workspaces/{workspaceId}/behavior-mcp").AddEndpointFilter(async (context, next) =>
-            DeveloperModeEnabled(context.HttpContext.RequestServices) ? await next(context) : Results.NotFound());
     }
 
     private static bool DeveloperModeEnabled(IServiceProvider services) =>

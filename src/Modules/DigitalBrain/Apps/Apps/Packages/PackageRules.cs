@@ -16,7 +16,7 @@ internal static partial class PackageRules
         var manifest = content.Manifest;
         Require(!string.IsNullOrWhiteSpace(manifest.Title) && manifest.Title.Length <= 100, "A package title is 1-100 characters.");
         Require(manifest.Description is { Length: <= 2000 }, "A package description is at most 2000 characters.");
-        Require(manifest.Operations is { Count: <= 32 } && manifest.Settings is { Count: <= 32 }, "A package declares at most 32 operations and 32 settings.");
+        Require(manifest.Operations is { Count: <= 32 } && manifest.Settings is { Count: <= 32 } && manifest.Accounts is null or { Count: <= 32 }, "A package declares at most 32 operations, settings and accounts.");
         Require(manifest.Operations.All(operation => operation is { Name: not null } && OperationName().IsMatch(operation.Name) && operation.Description is { Length: <= 500 }),
             "Operation names are lowercase words joined by hyphens, with descriptions of at most 500 characters.");
         Require(manifest.Operations.Select(operation => operation.Name).Distinct(StringComparer.Ordinal).Count() == manifest.Operations.Count, "Operation names must be unique.");
@@ -29,6 +29,14 @@ internal static partial class PackageRules
         }
         // Settings become configuration keys, which are case-insensitive.
         Require(manifest.Settings.Select(setting => setting.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() == manifest.Settings.Count, "Setting names must be unique.");
+        var accounts = manifest.Accounts ?? [];
+        Require(accounts.All(account => account is { Name: not null, Source: not null, Description: not null }
+            && SettingName().IsMatch(account.Name) && ModuleId().IsMatch(account.Source) && account.Description.Length <= 500),
+            "Account slots need a name, source and description.");
+        Require(accounts.Select(account => account.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() == accounts.Count,
+            "Account slot names must be unique.");
+        Require(!accounts.Any(account => manifest.Settings.Any(setting => string.Equals(setting.Name, account.Name, StringComparison.OrdinalIgnoreCase))),
+            "Account slots and settings cannot share a name.");
         Require(!string.IsNullOrWhiteSpace(content.Source) && System.Text.Encoding.UTF8.GetByteCount(content.Source) <= MaxCodeBytes, "Source is required and at most 128 KiB.");
         Require(!string.IsNullOrWhiteSpace(content.Tests) && System.Text.Encoding.UTF8.GetByteCount(content.Tests) <= MaxCodeBytes, "Tests are required and at most 128 KiB.");
         Require(content.ModuleIds.Count <= 32 && content.ModuleIds.All(module => ModuleId().IsMatch(module ?? "")), "At most 32 module ids of letters, digits, dots and hyphens.");

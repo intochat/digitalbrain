@@ -1,10 +1,42 @@
 using DigitalBrain.Core;
+using DigitalBrain.Contracts;
+using DigitalBrain.Behavior;
+using Orleans;
 using Xunit;
 
 namespace DigitalBrain.Tests;
 
 public sealed class BehaviorReadinessFacts
 {
+    [Fact]
+    public async Task InstalledSynapseResolvesADeclaredAccountSlotToTheInstallersSelection()
+    {
+        var slot = "account" + Guid.NewGuid().ToString("N");
+        Environment.SetEnvironmentVariable("Behavior__Account__" + slot, "bob-twitter");
+        var inner = new CapturingBrain();
+        var readiness = new BehaviorReadiness();
+        await using var scoped = new BehaviorScopedBrain(inner, readiness, readiness.Begin("synapse", []));
+        try
+        {
+            Assert.Throws<NotSupportedException>(() => scoped.Get<IBehaviorProgram>(slot));
+            Assert.Equal("bob-twitter", inner.LastId);
+        }
+        finally { Environment.SetEnvironmentVariable("Behavior__Account__" + slot, null); }
+    }
+
+    private sealed class CapturingBrain : IDigitalBrain
+    {
+        public string? LastId { get; private set; }
+        public T Get<T>(string id) where T : class, IGrainWithStringKey
+        {
+            LastId = id;
+            throw new NotSupportedException();
+        }
+        public Task<ISignalSubscription<T>> SubscribeAsync<T>(INeuron source, CancellationToken cancellationToken = default) where T : Signal
+            => throw new NotSupportedException();
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
     [Fact]
     public async Task RequiredSubscriptionLossNotifiesTheHost()
     {

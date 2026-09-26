@@ -45,29 +45,29 @@ internal sealed class CodeValidationService(CodeExecutionOptions options)
             Directory.CreateDirectory(app);
             Directory.CreateDirectory(tests);
             await File.WriteAllTextAsync(Path.Combine(app, "Program.cs"), draft.Source, ct).ConfigureAwait(false);
-            await File.WriteAllTextAsync(Path.Combine(app, "Behavior.csproj"), BehaviorBuildTemplate.Project(references, false), ct).ConfigureAwait(false);
+            await File.WriteAllTextAsync(Path.Combine(app, "Synapse.csproj"), BehaviorBuildTemplate.Project(references, false), ct).ConfigureAwait(false);
             var runner = new ContainedProcessRunner();
             await progress(CodeCheckStatus.Building).ConfigureAwait(false);
-            var built = await runner.RunAsync(options.DotnetPath, ["build", "Behavior.csproj", "-c", "Release", "--nologo"], app, options.BuildTimeout, ct).ConfigureAwait(false);
+            var built = await runner.RunAsync(options.DotnetPath, ["build", "Synapse.csproj", "-c", "Release", "--nologo"], app, options.BuildTimeout, ct).ConfigureAwait(false);
             RequireSuccess(built, "Build");
             var payload = Path.Combine(app, "bin", "Release", "net11.0");
-            var behaviorAssembly = Path.Combine(payload, "Behavior.dll");
+            var behaviorAssembly = Path.Combine(payload, "Synapse.dll");
             var payloadHashes = await ArtifactStore.HashFiles(payload, ct).ConfigureAwait(false);
             await File.WriteAllTextAsync(Path.Combine(tests, "Tests.cs"), draft.Tests, ct).ConfigureAwait(false);
             await File.WriteAllTextAsync(Path.Combine(tests, "Conformance.cs"), BehaviorBuildTemplate.Conformance, ct).ConfigureAwait(false);
-            await File.WriteAllTextAsync(Path.Combine(tests, "Behavior.Tests.csproj"), BehaviorBuildTemplate.Project(references.Concat(options.TestReferencePaths).Append(behaviorAssembly), true), ct).ConfigureAwait(false);
+            await File.WriteAllTextAsync(Path.Combine(tests, "Synapse.Tests.csproj"), BehaviorBuildTemplate.Project(references.Concat(options.TestReferencePaths).Append(behaviorAssembly), true), ct).ConfigureAwait(false);
             await progress(CodeCheckStatus.Testing).ConfigureAwait(false);
-            var testBuild = await runner.RunAsync(options.DotnetPath, ["build", "Behavior.Tests.csproj", "-c", "Release", "--nologo"], tests, options.BuildTimeout, ct).ConfigureAwait(false);
+            var testBuild = await runner.RunAsync(options.DotnetPath, ["build", "Synapse.Tests.csproj", "-c", "Release", "--nologo"], tests, options.BuildTimeout, ct).ConfigureAwait(false);
             RequireSuccess(testBuild, "Test build");
             var result = await runner.RunAsync(options.DotnetPath,
-                [Path.Combine(tests, "bin", "Release", "net11.0", "Behavior.Tests.dll"), "--report-xunit-xml", "--report-xunit-xml-filename", "report.xml", "--results-directory", tests],
+                [Path.Combine(tests, "bin", "Release", "net11.0", "Synapse.Tests.dll"), "--report-xunit-xml", "--report-xunit-xml-filename", "report.xml", "--results-directory", tests],
                 tests, options.TestTimeout, ct).ConfigureAwait(false);
             RequireSuccess(result, "Tests");
             var report = CodeTestReportReader.Read(await File.ReadAllTextAsync(Path.Combine(tests, "report.xml"), ct).ConfigureAwait(false));
             if (!payloadHashes.SequenceEqual(await ArtifactStore.HashFiles(payload, ct).ConfigureAwait(false))
                 || ArtifactStore.EnvironmentHash(environment) != ArtifactStore.EnvironmentHash(Environment()))
             { throw new InvalidDataException("Build inputs changed during validation."); }
-            var artifact = await Store().SealAsync(new(draft.Source, draft.Tests, environment, payload, "Behavior.dll", report), ct).ConfigureAwait(false);
+            var artifact = await Store().SealAsync(new(draft.Source, draft.Tests, environment, payload, "Synapse.dll", report), ct).ConfigureAwait(false);
             return operation with
             {
                 Status = CodeCheckStatus.Passed,

@@ -9,7 +9,7 @@ internal static class PackageEndpoints
     public static void AddPackages(this IHostApplicationBuilder builder)
     {
         builder.Services.AddSingleton<PackageService>();
-        builder.Services.AddSingleton<BehaviorSharing>();
+        builder.Services.AddSingleton<SynapseSharing>();
     }
 
     public static void MapPackages(this IEndpointRouteBuilder routes)
@@ -34,7 +34,11 @@ internal static class PackageEndpoints
         packages.MapPost("/{owner}/{name}/publish", (string owner, string name, PublishPackageRequest request, PackageService service)
             => service.Publish(PackageId.Create(owner, name), request));
 
-        routes.MapPost("/workspaces/{workspaceId}/behaviors/{id}/share", (string workspaceId, string id, ShareBehaviorRequest request, BehaviorSharing sharing, CancellationToken ct)
+        routes.MapPost("/workspaces/{workspaceId}/synapses/{id}/share", (string workspaceId, string id, ShareSynapseRequest request, SynapseSharing sharing, CancellationToken ct)
+                => sharing.Share(workspaceId, id, request, ct))
+            .AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync)
+            .AddEndpointFilter(Guard);
+        routes.MapPost("/workspaces/{workspaceId}/behaviors/{id}/share", (string workspaceId, string id, ShareSynapseRequest request, SynapseSharing sharing, CancellationToken ct)
                 => sharing.Share(workspaceId, id, request, ct))
             .AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync)
             .AddEndpointFilter(Guard);
@@ -44,6 +48,8 @@ internal static class PackageEndpoints
             .AddEndpointFilter(Guard);
         installed.MapGet("", (string workspaceId, string owner, string name, PackageService service)
             => service.ReadApp(workspaceId, PackageId.Create(owner, name)));
+        installed.MapGet("/accounts", (string workspaceId, string owner, string name, string? revision, PackageService service)
+            => service.AccountOptions(workspaceId, PackageId.Create(owner, name), revision));
         installed.MapPost("", (string workspaceId, string owner, string name, InstallPackageRequest request, PackageService service)
             => service.Install(workspaceId, PackageId.Create(owner, name), request));
         installed.MapPost("/configure", (string workspaceId, string owner, string name, ConfigurePackageRequest request, PackageService service)

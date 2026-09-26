@@ -107,6 +107,9 @@ public sealed class PackageCommitFacts
             valid with { Manifest = valid.Manifest with { Operations = [new PackageOperation("not valid", "Spaces are not allowed.")] } },
             valid with { Manifest = valid.Manifest with { Settings = [new PackageSetting("apiToken", "Credentials never ship in a package.", "")] } },
             valid with { Manifest = valid.Manifest with { Settings = [new PackageSetting("app", "Collides with Behavior__App.", "")] } },
+            valid with { Manifest = valid.Manifest with { Accounts = [new PackageAccount("twitter", "twitter", "Watch"), new PackageAccount("twitter", "gmail", "Duplicate")] } },
+            valid with { Manifest = valid.Manifest with { Accounts = [new PackageAccount("style", "twitter", "Collides with a setting")] } },
+            valid with { Manifest = valid.Manifest with { Accounts = [new PackageAccount("twitter", "invalid source", "Bad source")] } },
             valid with { Source = "" },
         })
         {

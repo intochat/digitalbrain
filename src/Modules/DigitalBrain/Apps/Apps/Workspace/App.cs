@@ -30,8 +30,9 @@ internal sealed class App(
         { throw new InvalidOperationException($"{Snapshot.Revision!.Package} is already installed here; configure or upgrade it instead."); }
         var revision = await GrainFactory.GetGrain<IPackage>(request.Revision.Package.ToString()).ReadRevision(request.Revision.Revision);
         var settings = Resolve(revision.Content.Manifest.Settings, new Dictionary<string, string>(), request.Settings);
+        var accounts = ResolveAccounts(revision.Content.Manifest.Accounts ?? [], request.Accounts ?? new Dictionary<string, string>());
         var generation = Snapshot.ProgramGeneration + 1;
-        await Deploy(generation, request.OperationId, revision.Artifact, settings);
+        await Deploy(generation, request.OperationId, revision.Artifact, settings, accounts);
         await Persist(Snapshot with
         {
             Status = AppStatus.Installed,
@@ -39,6 +40,7 @@ internal sealed class App(
             Artifact = revision.Artifact,
             Declared = [.. revision.Content.Manifest.Settings],
             Settings = settings,
+            Accounts = accounts,
             Operations = [.. revision.Content.Manifest.Operations],
             ProgramGeneration = generation,
             Receipts = Receipted(request.OperationId, request),
@@ -52,9 +54,13 @@ internal sealed class App(
         if (Replay(request.OperationId, request)) { return Describe(Snapshot); }
         RequireInstalled();
         var settings = Resolve(Snapshot.Declared, Snapshot.Settings, request.Settings);
+        var revision = await GrainFactory.GetGrain<IPackage>(Snapshot.Revision!.Package.ToString()).ReadRevision(Snapshot.Revision.Revision);
+        var selected = new Dictionary<string, string>(Snapshot.Accounts);
+        foreach (var (slot, account) in request.Accounts ?? new Dictionary<string, string>()) { selected[slot] = account; }
+        var accounts = ResolveAccounts(revision.Content.Manifest.Accounts ?? [], selected);
         await Retire(Snapshot.ProgramGeneration, request.OperationId);
-        await Deploy(Snapshot.ProgramGeneration + 1, request.OperationId, Snapshot.Artifact!, settings);
-        await Persist(Snapshot with { Settings = settings, ProgramGeneration = Snapshot.ProgramGeneration + 1, Receipts = Receipted(request.OperationId, request) });
+        await Deploy(Snapshot.ProgramGeneration + 1, request.OperationId, Snapshot.Artifact!, settings, accounts);
+        await Persist(Snapshot with { Settings = settings, Accounts = accounts, ProgramGeneration = Snapshot.ProgramGeneration + 1, Receipts = Receipted(request.OperationId, request) });
         return Describe(Snapshot);
     }
 
@@ -71,8 +77,9 @@ internal sealed class App(
         var declared = revision.Content.Manifest.Settings;
         var kept = Snapshot.Settings.Where(pair => declared.Any(setting => setting.Name == pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value);
         var settings = Resolve(declared, kept, new Dictionary<string, string>());
+        var accounts = ResolveAccounts(revision.Content.Manifest.Accounts ?? [], request.Accounts ?? Snapshot.Accounts);
         await Retire(Snapshot.ProgramGeneration, request.OperationId);
-        await Deploy(Snapshot.ProgramGeneration + 1, request.OperationId, revision.Artifact, settings);
+        await Deploy(Snapshot.ProgramGeneration + 1, request.OperationId, revision.Artifact, settings, accounts);
         await Persist(Snapshot with
         {
             Revision = request.Revision,
@@ -80,6 +87,7 @@ internal sealed class App(
             Artifact = revision.Artifact,
             Declared = [.. declared],
             Settings = settings,
+            Accounts = accounts,
             Operations = [.. revision.Content.Manifest.Operations],
             Receipts = Receipted(request.OperationId, request),
         });
@@ -154,8 +162,8 @@ internal sealed class App(
 
     // Every deployment gets a fresh program: its request never depends on program state, so a command
     // retried after a lost save replays the same deployment, and no program outgrows its deployment history.
-    private Task Deploy(int generation, Guid operationId, CodeArtifactRef artifact, IReadOnlyDictionary<string, string> settings)
-        => GrainFactory.GetGrain<IBehaviorProgram>(ProgramKey(generation)).Deploy(new DeployBehavior(0, operationId, artifact, Configuration(settings)));
+    private Task Deploy(int generation, Guid operationId, CodeArtifactRef artifact, IReadOnlyDictionary<string, string> settings, IReadOnlyDictionary<string, string> accounts)
+        => GrainFactory.GetGrain<IBehaviorProgram>(ProgramKey(generation)).Deploy(new DeployBehavior(0, operationId, artifact, Configuration(settings, accounts)));
 
     // Deleting an already deleted program is harmless, so a retry deletes again under a revision-specific operation id.
     private async Task Retire(int generation, Guid operationId)
@@ -168,11 +176,26 @@ internal sealed class App(
 
     // The behavior reads Behavior:App to find this neuron and Behavior:{name} for each setting,
     // the same keys an automation reads in the behavior console.
-    private string Configuration(IReadOnlyDictionary<string, string> settings)
+    private string Configuration(IReadOnlyDictionary<string, string> settings, IReadOnlyDictionary<string, string> accounts)
     {
         var values = new SortedDictionary<string, string>(StringComparer.Ordinal) { ["Behavior__App"] = this.GetPrimaryKeyString() };
         foreach (var (name, value) in settings) { values["Behavior__" + name] = value; }
+        foreach (var (name, id) in accounts) { values["Behavior__Account__" + name] = id; }
         return JsonSerializer.Serialize(values);
+    }
+
+    private static Dictionary<string, string> ResolveAccounts(IReadOnlyList<PackageAccount> declared, IReadOnlyDictionary<string, string> selected)
+    {
+        if (selected.Keys.Any(name => !declared.Any(slot => slot.Name == name)))
+        { throw new ArgumentException("The installation contains an undeclared account slot."); }
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var slot in declared)
+        {
+            if (!selected.TryGetValue(slot.Name, out var id) || string.IsNullOrWhiteSpace(id))
+            { throw new ArgumentException($"Choose an account for {slot.Name} ({slot.Source})."); }
+            result.Add(slot.Name, id);
+        }
+        return result;
     }
 
     private string ProgramKey(int generation)
@@ -216,8 +239,11 @@ internal sealed class App(
     // Settings are a set: the same keys sent in another order are the same command.
     private static string CommandHash(object request) => PackageHash.Of(request switch
     {
-        InstallApp install => install with { Settings = new SortedDictionary<string, string>(install.Settings.ToDictionary(), StringComparer.Ordinal) },
-        ConfigureApp configure => configure with { Settings = new SortedDictionary<string, string>(configure.Settings.ToDictionary(), StringComparer.Ordinal) },
+        InstallApp install => install with { Settings = new SortedDictionary<string, string>(install.Settings.ToDictionary(), StringComparer.Ordinal),
+            Accounts = new SortedDictionary<string, string>((install.Accounts ?? new Dictionary<string, string>()).ToDictionary(), StringComparer.Ordinal) },
+        ConfigureApp configure => configure with { Settings = new SortedDictionary<string, string>(configure.Settings.ToDictionary(), StringComparer.Ordinal),
+            Accounts = new SortedDictionary<string, string>((configure.Accounts ?? new Dictionary<string, string>()).ToDictionary(), StringComparer.Ordinal) },
+        UpgradeApp upgrade => upgrade with { Accounts = new SortedDictionary<string, string>((upgrade.Accounts ?? new Dictionary<string, string>()).ToDictionary(), StringComparer.Ordinal) },
         _ => request,
     });
 
@@ -228,5 +254,6 @@ internal sealed class App(
         state.Revision,
         new Dictionary<string, string>(state.Settings),
         state.Operations.ToArray(),
-        state.ProgramGeneration == 0 ? null : ProgramKey(state.ProgramGeneration));
+        state.ProgramGeneration == 0 ? null : ProgramKey(state.ProgramGeneration),
+        new Dictionary<string, string>(state.Accounts));
 }

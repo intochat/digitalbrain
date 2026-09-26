@@ -31,10 +31,10 @@ internal sealed class ScopedBehaviorTools(IDigitalBrain brain, ContractCatalog c
     private IBehaviorProgram ProgramOf(string id) => brain.Get<IBehaviorProgram>(BehaviorToolScope.Key(scope, id));
     private void RequireActivation() { if (!allowActivation) { throw new InvalidOperationException("Behavior activation is disabled by host policy."); } }
 
-    [McpServerTool(Name = "behavior_contracts"), Description("Discover installed module IDs, neuron contracts and a single-source behavior template before authoring C#. Pass modules=[] first to discover installed modules, then select exact returned IDs (for example time and flutter). A behavior name is not a module ID.")]
+    [McpServerTool(Name = "synapse_contracts"), Description("Discover installed module IDs, neuron contracts and a single-source synapse template before authoring C#. Pass modules=[] first to discover installed modules, then select exact returned IDs (for example time and flutter). A synapse name is not a module ID.")]
     public ContractCatalogSnapshot Contracts(string[] modules) => catalog.Read(modules);
 
-    [McpServerTool(Name = "behavior_draft"), Description("Read or write a behavior draft in one step. Omit request to read the current draft, description and latest validation. Supply request.source and request.tests to save them; the server reads the current revision itself, so never send a revision or operation id. Supply request.name to set the display metadata. Use meaningful xUnit tests that exercise the behavior.")]
+    [McpServerTool(Name = "synapse_draft"), Description("Read or write a synapse draft in one step. Omit request to read the current draft, description and latest validation. Supply request.source and request.tests to save them; the server reads the current revision itself, so never send a revision or operation id. Supply request.name to set the display metadata. Use meaningful xUnit tests that exercise the synapse.")]
     public async Task<BehaviorDraftView> EditDraft(string id, BehaviorDraftInput? request, CancellationToken ct)
     {
         var draftProxy = DraftOf(id);
@@ -59,7 +59,7 @@ internal sealed class ScopedBehaviorTools(IDigitalBrain brain, ContractCatalog c
         return new(draft, description, check);
     }
 
-    [McpServerTool(Name = "behavior_check"), Description("Compile and test the current draft revision in a contained process. The server reads the revision and mints the operation id. Set cancel=true to cancel the outstanding validation. Returns the terminal status, diagnostics and passing artifact reference.")]
+    [McpServerTool(Name = "synapse_check"), Description("Compile and test the current draft revision in a contained process. The server reads the revision and mints the operation id. Set cancel=true to cancel the outstanding validation. Returns the terminal status, diagnostics and passing artifact reference.")]
     public async Task<CodeCheckSnapshot> Check(string id, bool? cancel, CancellationToken ct)
     {
         var draft = DraftOf(id);
@@ -83,7 +83,7 @@ internal sealed class ScopedBehaviorTools(IDigitalBrain brain, ContractCatalog c
         return check;
     }
 
-    [McpServerTool(Name = "behavior_activate"), Description("Act on the current verified behavior. Use action=status to read authoritative deployment, readiness, execution and logs; deploy to activate the latest passing artifact; start, stop or rollback the deployment; delete to uninstall the behavior and stop its worker. The server reads the current revision and mints the operation id, so never send a revision or operation id.")]
+    [McpServerTool(Name = "synapse_activate"), Description("Act on the current verified synapse. Use action=status to read authoritative deployment, readiness, execution and logs; deploy to activate the latest passing artifact; start, stop or rollback the deployment; delete to uninstall the synapse and stop its worker. The server reads the current revision and mints the operation id, so never send a revision or operation id.")]
     public async Task<BehaviorInspection> Activate(string id, string action, CancellationToken ct)
     {
         var normalized = (action ?? "").Trim().ToLowerInvariant();

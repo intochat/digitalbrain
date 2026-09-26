@@ -14,4 +14,5 @@ public sealed record AppState
     [Id(6)] public int ProgramGeneration { get; init; }
     [Id(7)] public List<AppInvocation> Invocations { get; init; } = [];
     [Id(8)] public List<OperationReceipt> Receipts { get; init; } = [];
+    [Id(9)] public Dictionary<string, string> Accounts { get; init; } = [];
 }

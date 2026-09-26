@@ -2,17 +2,19 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using DigitalBrain.Behavior;
+using DigitalBrain.Contracts.Enforcement;
+using DigitalBrain.Sdk.Connectors;
 
 namespace IntoChat.Tests.E2E.Packages;
 
-// Alice builds an automation in her behavior console and shares it with one request; the package
-// carries its code and its deployed settings, and Bob runs it with his own value.
-public sealed class ShareBehaviorFacts
+// Alice builds a synapse and shares it with one request; the package
+// carries its code, but never Alice's deployed settings.
+public sealed class ShareSynapseFacts
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     [Fact(Timeout = 900_000)]
-    public async Task AnAutomationIsSharedAsAPackageThatOthersInstallWithTheirOwnSettings()
+    public async Task ASynapseIsSharedWithoutSettingsAndInstalledWithTheRecipientsAccount()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await IntoChatE2ETest.Create()
@@ -20,7 +22,7 @@ public sealed class ShareBehaviorFacts
             .StartAsync(ct);
         using var alice = await People.SignedIn(brain.HttpClient, "alice", ct);
         using var bob = await People.SignedIn(brain.HttpClient, "bob", ct);
-        var automation = $"/workspaces/{alice.Workspace}/behaviors/greeter";
+        var automation = $"/workspaces/{alice.Workspace}/synapses/greeter";
 
         using (var nothingToShare = await alice.Client.PostAsJsonAsync(automation + "/share", new { }, Json, ct))
         { Assert.True(nothingToShare.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Conflict, $"Sharing nothing returned {nothingToShare.StatusCode}."); }
@@ -36,8 +38,9 @@ public sealed class ShareBehaviorFacts
         await People.Send(alice.Client, HttpMethod.Post, automation + "/deploy",
             new { expectedRevision = 0, operationId = Guid.NewGuid(), artifact, configurationJson = """{"Behavior__Greeting":"hello"}""" }, ct);
 
-        var shared = await People.Send(alice.Client, HttpMethod.Post, automation + "/share", new { }, ct);
-        var reshared = await People.Send(alice.Client, HttpMethod.Post, automation + "/share", new { }, ct);
+        var share = new { accounts = new[] { new { name = "twitter", source = "twitter", description = "Account to watch" } } };
+        var shared = await People.Send(alice.Client, HttpMethod.Post, automation + "/share", share, ct);
+        var reshared = await People.Send(alice.Client, HttpMethod.Post, automation + "/share", share, ct);
 
         Assert.Equal("alice", shared.GetProperty("id").GetProperty("owner").GetString());
         Assert.Equal("greeter", shared.GetProperty("id").GetProperty("name").GetString());
@@ -48,15 +51,35 @@ public sealed class ShareBehaviorFacts
         var revision = await People.Send(bob.Client, HttpMethod.Get, $"/packages/alice/greeter/revisions/{published}", null, ct);
         var manifest = revision.GetProperty("content").GetProperty("manifest");
         Assert.Equal("Greeter", manifest.GetProperty("title").GetString());
-        var setting = Assert.Single(manifest.GetProperty("settings").EnumerateArray());
-        Assert.Equal(("Greeting", "hello"), (setting.GetProperty("name").GetString(), setting.GetProperty("defaultValue").GetString()));
+        Assert.Empty(manifest.GetProperty("settings").EnumerateArray());
+        Assert.Equal("twitter", Assert.Single(manifest.GetProperty("accounts").EnumerateArray()).GetProperty("name").GetString());
+
+        using (var missing = await bob.Client.PostAsJsonAsync($"/workspaces/{bob.Workspace}/packages/alice/greeter", new { }, Json, ct))
+        { Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode); }
+        await brain.Get<IConnectors>("bob").Connect(new ConnectRequest
+        {
+            Source = "twitter", ConnectionId = "bob-twitter", Value = "test-token"
+        }, new CallerContext
+        {
+            PrincipalId = "bob", AccountId = "bob", WorkspaceId = "bob",
+            Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp
+        }, ct);
+
+        var options = await People.Send(bob.Client, HttpMethod.Get,
+            $"/workspaces/{bob.Workspace}/packages/alice/greeter/accounts", null, ct);
+        Assert.Equal("bob-twitter", Assert.Single(options.GetProperty("slots").EnumerateArray())
+            .GetProperty("accounts").EnumerateArray().Single().GetProperty("id").GetString());
+        using (var wrong = await bob.Client.PostAsJsonAsync($"/workspaces/{bob.Workspace}/packages/alice/greeter",
+            new { accounts = new { twitter = "alice-twitter" } }, Json, ct))
+        { Assert.Equal(HttpStatusCode.BadRequest, wrong.StatusCode); }
 
         var installed = await People.Send(bob.Client, HttpMethod.Post, $"/workspaces/{bob.Workspace}/packages/alice/greeter",
-            new { settings = new { Greeting = "hi" } }, ct);
+            new { accounts = new { twitter = "bob-twitter" } }, ct);
+        Assert.Equal("bob-twitter", installed.GetProperty("app").GetProperty("accounts").GetProperty("twitter").GetString());
         var program = brain.Get<IBehaviorProgram>(installed.GetProperty("app").GetProperty("behaviorProgram").GetString()!);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(120));
-        while (!(await program.ReadLogs(0, 200, timeout.Token)).Entries.Any(entry => entry.Message.Contains("GREETING:hi", StringComparison.Ordinal)))
+        while (!(await program.ReadLogs(0, 200, timeout.Token)).Entries.Any(entry => entry.Message.Contains("GREETING:none", StringComparison.Ordinal)))
         {
             Assert.NotEqual(BehaviorExecutionState.Failed, (await program.Read(timeout.Token)).State);
             await Task.Delay(250, timeout.Token);
@@ -66,8 +89,8 @@ public sealed class ShareBehaviorFacts
     private const string GreeterSource = """
         using DigitalBrain.Core;
         using Microsoft.Extensions.Configuration;
-        await BehaviorApp.RunAsync<Greeter>(args, _ => []);
-        public sealed class Greeter(IConfiguration configuration) : IBehavior
+        await SynapseApp.RunAsync<Greeter>(args, _ => []);
+        public sealed class Greeter(IConfiguration configuration) : ISynapse
         {
             public static string Line(string? greeting) => "GREETING:" + (greeting ?? "none");
             public async Task RunAsync(CancellationToken cancellation = default)

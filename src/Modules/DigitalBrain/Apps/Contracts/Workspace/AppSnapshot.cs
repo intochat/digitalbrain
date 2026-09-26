@@ -6,4 +6,5 @@ public sealed record AppSnapshot(
     [property: Id(1)] PackageRevisionRef? Revision,
     [property: Id(2)] IReadOnlyDictionary<string, string> Settings,
     [property: Id(3)] IReadOnlyList<PackageOperation> Operations,
-    [property: Id(4)] string? BehaviorProgram);
+    [property: Id(4)] string? BehaviorProgram,
+    [property: Id(5)] IReadOnlyDictionary<string, string>? Accounts = null);

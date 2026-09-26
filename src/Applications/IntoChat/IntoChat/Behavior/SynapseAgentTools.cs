@@ -3,9 +3,9 @@ using Microsoft.Extensions.AI;
 
 namespace IntoChat;
 
-internal sealed class BehaviorAgentTools(BehaviorToolService service) : IAgentToolFactory
+internal sealed class SynapseAgentTools(BehaviorToolService service) : IAgentToolFactory
 {
-    public static readonly string[] Names = ["behavior_contracts", "behavior_draft", "behavior_check", "behavior_activate"];
+    public static readonly string[] Names = ["synapse_contracts", "synapse_draft", "synapse_check", "synapse_activate"];
     public IReadOnlyList<AIFunction> Create(Func<AgentToolContext> context)
     {
         // Context is evaluated at invocation, not while the runner is discovering tools.

@@ -5,6 +5,7 @@ using DigitalBrain.Behavior;
 using DigitalBrain.Coding;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Sdk.Connectors;
 using IntoChat.Workspace;
 using Microsoft.Extensions.Options;
 
@@ -76,13 +77,28 @@ internal sealed class PackageService(
 
     public async Task<InstalledPackageView> ReadApp(string workspaceId, PackageId id) => await View(await App(workspaceId, id).Read());
 
+    public async Task<SynapseAccountOptions> AccountOptions(string workspaceId, PackageId id, string? revisionId)
+    {
+        var revision = await Resolve(new(id.Owner, id.Name, revisionId), preferPublished: true);
+        var declared = (await Package(id).ReadRevision(revision.Revision)).Content.Manifest.Accounts ?? [];
+        var scope = WorkspaceScope.Current(auth.Value, workspaceId).Id;
+        var owner = CallerContextStamper.Require().PrincipalId;
+        var available = await brain.Get<IConnectors>(owner).List();
+        return new(revision.Revision, declared.Select(slot => new SynapseAccountSlot(slot.Name, slot.Source, slot.Description,
+            available.Where(account => account.Source == slot.Source && account.Status == ConnectorStatus.Connected
+                && (account.WorkspaceId == scope || account.WorkspaceId == owner))
+                .OrderBy(account => account.Id, StringComparer.Ordinal)
+                .Select(account => new SynapseAccountChoice(account.Id, account.Credential.Label)).ToArray())).ToArray());
+    }
+
     public async Task<InstalledPackageView> Install(string workspaceId, PackageId id, InstallPackageRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
         RequireActivation();
         var revision = await Resolve(new(id.Owner, id.Name, request.Revision), preferPublished: true);
+        await ValidateAccounts(workspaceId, revision, request.Accounts ?? []);
         var app = App(workspaceId, id);
-        return await View(await app.Install(new(request.OperationId ?? Guid.NewGuid(), revision, request.Settings ?? [])));
+        return await View(await app.Install(new(request.OperationId ?? Guid.NewGuid(), revision, request.Settings ?? [], request.Accounts ?? [])));
     }
 
     public async Task<InstalledPackageView> Configure(string workspaceId, PackageId id, ConfigurePackageRequest request)
@@ -90,7 +106,11 @@ internal sealed class PackageService(
         ArgumentNullException.ThrowIfNull(request);
         RequireActivation();
         var app = App(workspaceId, id);
-        return await View(await app.Configure(new(request.OperationId ?? Guid.NewGuid(), request.Settings ?? [])));
+        var existing = await app.Read();
+        var selected = new Dictionary<string, string>(existing.Accounts ?? new Dictionary<string, string>());
+        foreach (var (slot, account) in request.Accounts ?? []) { selected[slot] = account; }
+        await ValidateAccounts(workspaceId, existing.Revision ?? throw new InvalidOperationException("The package is not installed."), selected);
+        return await View(await app.Configure(new(request.OperationId ?? Guid.NewGuid(), request.Settings ?? [], request.Accounts ?? [])));
     }
 
     public async Task<InstalledPackageView> Upgrade(string workspaceId, PackageId id, UpgradePackageRequest request)
@@ -98,8 +118,15 @@ internal sealed class PackageService(
         ArgumentNullException.ThrowIfNull(request);
         RequireActivation();
         var revision = await Resolve(new(id.Owner, id.Name, request.Revision), preferPublished: true);
+        var existing = (await App(workspaceId, id).Read()).Accounts ?? new Dictionary<string, string>();
+        var selected = new Dictionary<string, string>(existing);
+        foreach (var (slot, account) in request.Accounts ?? []) { selected[slot] = account; }
+        // Slots removed by the new revision are discarded before validation.
+        var declared = (await Package(revision.Package).ReadRevision(revision.Revision)).Content.Manifest.Accounts ?? [];
+        selected = selected.Where(pair => declared.Any(slot => slot.Name == pair.Key)).ToDictionary();
+        await ValidateAccounts(workspaceId, revision, selected);
         var app = App(workspaceId, id);
-        return await View(await app.Upgrade(new(request.OperationId ?? Guid.NewGuid(), revision)));
+        return await View(await app.Upgrade(new(request.OperationId ?? Guid.NewGuid(), revision, selected)));
     }
 
     public async Task<InstalledPackageView> Uninstall(string workspaceId, PackageId id)
@@ -155,6 +182,26 @@ internal sealed class PackageService(
     private IPackage Package(PackageId id) => brain.Get<IPackage>(id.ToString());
 
     private IApp App(string workspaceId, PackageId id) => brain.Get<IApp>(WorkspaceScope.Current(auth.Value, workspaceId).Id + "/packages/" + id);
+
+    private async Task ValidateAccounts(string workspaceId, PackageRevisionRef revision, IReadOnlyDictionary<string, string> selected)
+    {
+        var declared = (await Package(revision.Package).ReadRevision(revision.Revision)).Content.Manifest.Accounts ?? [];
+        if (declared.Count == 0 && selected.Count == 0) { return; }
+        var scope = WorkspaceScope.Current(auth.Value, workspaceId).Id;
+        var owner = CallerContextStamper.Require().PrincipalId;
+        var available = await brain.Get<IConnectors>(owner).List();
+        foreach (var slot in declared)
+        {
+            if (!selected.TryGetValue(slot.Name, out var id) || string.IsNullOrWhiteSpace(id))
+            { throw new ArgumentException($"Choose an account for {slot.Name} ({slot.Source})."); }
+            var account = available.FirstOrDefault(item => item.Id == id && item.WorkspaceId is not null
+                && (item.WorkspaceId == scope || item.WorkspaceId == owner) && item.Source == slot.Source);
+            if (account is null || account.Status != ConnectorStatus.Connected)
+            { throw new ArgumentException($"Account {id} is not a connected {slot.Source} account in this workspace."); }
+        }
+        if (selected.Keys.Any(key => !declared.Any(slot => slot.Name == key)))
+        { throw new ArgumentException("The installation contains an undeclared account slot."); }
+    }
 
     private bool HasCoding => !string.IsNullOrWhiteSpace(coding.Value.Root);
 

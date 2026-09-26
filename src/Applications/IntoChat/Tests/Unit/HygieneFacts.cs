@@ -96,7 +96,7 @@ public sealed class HygieneFacts
         Assert.False(File.Exists(PathInRepo("src/Testing/DigitalBrain.Testing.E2E/Demo/ElonBitcoin.cs")), "The ElonBitcoin inbox feed demo is deleted with the volatile inbox.");
         Assert.True(File.Exists(PathInRepo("src/Testing/DigitalBrain.Testing.E2E/Demo/TwitterFakes.cs")), "TwitterFakes must live in the test host.");
         Assert.DoesNotContain("TestTwitterModule", Read("src/Applications/IntoChat/AppHost/AppHost.cs"));
-        Assert.DoesNotContain("AddBehavior<ElonBitcoin>", Read("src/Applications/IntoChat/IntoChat/Behavior/BehaviorEndpoints.cs"));
+        Assert.DoesNotContain("AddBehavior<ElonBitcoin>", Read("src/Applications/IntoChat/IntoChat/Behavior/SynapseEndpoints.cs"));
     }
 
     [Fact]

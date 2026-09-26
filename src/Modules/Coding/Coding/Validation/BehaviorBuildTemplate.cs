@@ -4,7 +4,7 @@ namespace DigitalBrain.Coding;
 
 internal static class BehaviorBuildTemplate
 {
-    public const string Version = "behavior-template-1";
+    public const string Version = "synapse-template-1";
 
     public static string Project(IEnumerable<string> references, bool tests)
     {
@@ -34,9 +34,9 @@ internal static class BehaviorBuildTemplate
             [Xunit.Fact]
             public void EntryPoint()
             {
-                var assembly = System.Reflection.Assembly.Load("Behavior");
+                var assembly = System.Reflection.Assembly.Load("Synapse");
                 Xunit.Assert.NotNull(assembly.EntryPoint);
-                Xunit.Assert.Contains(assembly.GetExportedTypes(), t => !t.IsAbstract && t.GetInterfaces().Any(i => i.FullName == "DigitalBrain.Core.IBehavior"));
+                Xunit.Assert.Contains(assembly.GetExportedTypes(), t => !t.IsAbstract && t.GetInterfaces().Any(i => i.FullName is "DigitalBrain.Core.IBehavior" or "DigitalBrain.Core.ISynapse"));
             }
         }
         """;

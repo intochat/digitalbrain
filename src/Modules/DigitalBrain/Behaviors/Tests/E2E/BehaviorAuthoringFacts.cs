@@ -19,8 +19,8 @@ public sealed class BehaviorAuthoringFacts
     {
         var registry = new BehaviorCatalogStore(new InMemoryDocumentStore<BehaviorCatalogIndex>(), new InMemoryDocumentStore<BehaviorCatalogDocument>());
         await using var fixture = new Fixture(registry);
-        var tools = new BehaviorAgentTools(fixture.Tools).Create(() => new("workspace-one", "run", "call"));
-        await tools.Single(x => x.Name == "behavior_draft").InvokeAsync(new AIFunctionArguments
+        var tools = new SynapseAgentTools(fixture.Tools).Create(() => new("workspace-one", "run", "call"));
+        await tools.Single(x => x.Name == "synapse_draft").InvokeAsync(new AIFunctionArguments
         {
             ["id"] = "timer",
             ["request"] = new BehaviorDraftInput("source", "tests", null, null, null, null, null),
@@ -42,10 +42,10 @@ public sealed class BehaviorAuthoringFacts
     {
         await using var fixture = new Fixture();
         await using var services = new ServiceCollection().AddSingleton<IChatClient, RepairClient>()
-            .AddSingleton<IAgentToolFactory>(new BehaviorAgentTools(fixture.Tools)).BuildServiceProvider();
+            .AddSingleton<IAgentToolFactory>(new SynapseAgentTools(fixture.Tools)).BuildServiceProvider();
         var events = new List<AgentTurnEvent>();
         await foreach (var item in new AgentTurnRunner(services).RunAsync(
-            new("agent", "run", "trusted", [], "read contracts", null, ToolNames: ["behavior_contracts"]), TestContext.Current.CancellationToken))
+            new("agent", "run", "trusted", [], "read contracts", null, ToolNames: ["synapse_contracts"]), TestContext.Current.CancellationToken))
         { events.Add(item); }
         Assert.Empty(events.OfType<AgentTurnEvent.Failed>());
         Assert.Equal(2, events.OfType<AgentTurnEvent.ToolCompleted>().Count());
@@ -67,7 +67,7 @@ public sealed class BehaviorAuthoringFacts
             }
             string[] modules = results.Length == 0 ? ["not-installed"] : [];
             return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant,
-                [new FunctionCallContent("call-" + results.Length, "behavior_contracts", new Dictionary<string, object?>
+                [new FunctionCallContent("call-" + results.Length, "synapse_contracts", new Dictionary<string, object?>
                     { ["modules"] = modules })])));
         }
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -79,8 +79,8 @@ public sealed class BehaviorAuthoringFacts
     public async Task InvalidContractSelectionReturnsAnActionableToolResult()
     {
         await using var fixture = new Fixture();
-        var tools = new BehaviorAgentTools(fixture.Tools).Create(() => new("trusted", "run", "call"));
-        var result = await tools.Single(x => x.Name == "behavior_contracts").InvokeAsync(
+        var tools = new SynapseAgentTools(fixture.Tools).Create(() => new("trusted", "run", "call"));
+        var result = await tools.Single(x => x.Name == "synapse_contracts").InvokeAsync(
             new AIFunctionArguments { ["modules"] = new[] { "missing" } }, TestContext.Current.CancellationToken);
         var json = JsonSerializer.SerializeToElement(result);
         Assert.True(json.GetProperty("isError").GetBoolean());
@@ -91,8 +91,8 @@ public sealed class BehaviorAuthoringFacts
     public async Task UnknownActivationActionReturnsRepairableToolResult()
     {
         await using var fixture = new Fixture();
-        var tools = new BehaviorAgentTools(fixture.Tools).Create(() => new("trusted", "run", "call"));
-        var result = await tools.Single(x => x.Name == "behavior_activate").InvokeAsync(
+        var tools = new SynapseAgentTools(fixture.Tools).Create(() => new("trusted", "run", "call"));
+        var result = await tools.Single(x => x.Name == "synapse_activate").InvokeAsync(
             new AIFunctionArguments { ["id"] = "timer", ["action"] = "explode" },
             TestContext.Current.CancellationToken);
         var json = JsonSerializer.SerializeToElement(result);
@@ -151,10 +151,10 @@ public sealed class BehaviorAuthoringFacts
     {
         await using var fixture = new Fixture();
         var scope = "first";
-        var native = new BehaviorAgentTools(fixture.Tools).Create(() => new(scope, "run", "call"));
-        Assert.Equal(BehaviorAgentTools.Names.Order(), native.Select(x => x.Name).Order());
+        var native = new SynapseAgentTools(fixture.Tools).Create(() => new(scope, "run", "call"));
+        Assert.Equal(SynapseAgentTools.Names.Order(), native.Select(x => x.Name).Order());
         scope = "trusted";
-        var result = await native.Single(x => x.Name == "behavior_draft").InvokeAsync(new AIFunctionArguments { ["id"] = "timer", ["request"] = new BehaviorDraftInput(null, null, null, null, null, null, null) }, TestContext.Current.CancellationToken);
+        var result = await native.Single(x => x.Name == "synapse_draft").InvokeAsync(new AIFunctionArguments { ["id"] = "timer", ["request"] = new BehaviorDraftInput(null, null, null, null, null, null, null) }, TestContext.Current.CancellationToken);
         var mcp = await fixture.Tools.ForScope(scope).ReadDraft("timer", TestContext.Current.CancellationToken);
         var decoded = JsonSerializer.SerializeToElement(result).Deserialize<BehaviorDraftView>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
         Assert.Equivalent(mcp, decoded!.Draft);

@@ -9,15 +9,14 @@ using Microsoft.Extensions.Options;
 
 namespace IntoChat.Packages;
 
-// Turns an automation from the behavior console into a published package owned by the signed-in
+// Turns a checked synapse into a published package owned by the signed-in
 // person. The draft's passing check vouches for the revision, so sharing never rebuilds.
-internal sealed class BehaviorSharing(IDigitalBrain brain, BehaviorToolService behaviors, IOptions<BasicAuthOptions> auth)
+internal sealed class SynapseSharing(IDigitalBrain brain, BehaviorToolService behaviors, IOptions<BasicAuthOptions> auth)
 {
     private const int MaxTitleLength = 100;
     private const int MaxDescriptionLength = 2000;
-    private const string SettingPrefix = "Behavior__";
 
-    public async Task<PackageSnapshot> Share(string workspaceId, string behaviorId, ShareBehaviorRequest request, CancellationToken cancellationToken)
+    public async Task<PackageSnapshot> Share(string workspaceId, string behaviorId, ShareSynapseRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         var automation = behaviors.ForScope(WorkspaceScope.Current(auth.Value, workspaceId).Id);
@@ -30,7 +29,8 @@ internal sealed class BehaviorSharing(IDigitalBrain brain, BehaviorToolService b
             Shorten(description.Name, MaxTitleLength),
             Shorten(description.Purpose, MaxDescriptionLength),
             [],
-            DeployedSettings(await automation.ReadBehavior(behaviorId, cancellationToken)));
+            [],
+            request.Accounts ?? []);
         var content = new PackageContent(manifest, draft.Source, draft.Tests, draft.ModuleIds);
         var package = brain.Get<IPackage>(PackageId.Create(CallerContextStamper.Require().PrincipalId, request.Name ?? PackageName(behaviorId)).ToString());
         var head = (await package.Read()).Head;
@@ -38,18 +38,6 @@ internal sealed class BehaviorSharing(IDigitalBrain brain, BehaviorToolService b
             ? head
             : (await package.Commit(new(Guid.NewGuid(), head, content, artifact, request.Message ?? "Shared from " + manifest.Title))).Id;
         return await package.Publish(new(Guid.NewGuid(), revision));
-    }
-
-    // The automation's current configuration becomes the package's settings, defaulting to the shared values.
-    private static PackageSetting[] DeployedSettings(BehaviorSnapshot program)
-    {
-        var deployment = program.Deployments.LastOrDefault(item => item.Revision == program.DesiredDeploymentRevision);
-        if (deployment is null) { return []; }
-        using var configuration = JsonDocument.Parse(deployment.ConfigurationJson);
-        return configuration.RootElement.EnumerateObject()
-            .Where(property => property.Name.StartsWith(SettingPrefix, StringComparison.Ordinal))
-            .Select(property => new PackageSetting(property.Name[SettingPrefix.Length..], "The value it ran with when it was shared.", property.Value.GetString() ?? ""))
-            .ToArray();
     }
 
     private static bool SameContent(PackageContent published, PackageContent candidate)
