@@ -99,7 +99,7 @@ Workspace neuron keys are derived from the authenticated application scope and a
 
 HTTP routes live under `/workspaces/{workspaceId}/behaviors`: draft read/save, check/start/read/cancel, program read/deploy/start/stop/rollback/logs. Mutation request contracts carry expected revision and operation IDs. MCP is at `/workspaces/{workspaceId}/behavior-mcp`, behind the application's existing authentication middleware.
 
-The repository's `src/Behaviors/timer-report.cs` demonstrates the SDK bootstrap as a single file. It retains standalone SDK directives; managed draft source omits those directives because the host supplies references. The separate-process test contains a complete Timer-to-Flutter source and corresponding tests.
+The repository's `src/Modules/DigitalBrain/Behaviors/Samples/timer-report.cs` demonstrates the SDK bootstrap as a single file. It retains standalone SDK directives; managed draft source omits those directives because the host supplies references. The separate-process test contains a complete Timer-to-Flutter source and corresponding tests.
 
 ## Verification
 

@@ -82,6 +82,13 @@ public static class BehaviorApp
             var loss = readiness.WaitForLossAsync(generationId);
             if (await Task.WhenAny(run, loss).ConfigureAwait(false) == loss)
             {
+                // A behavior can finish immediately after disposing its subscription.
+                // Treat that normal completion as the winning outcome.
+                if (await Task.WhenAny(run, Task.Delay(100, stopping.Token)).ConfigureAwait(false) == run)
+                {
+                    await run.ConfigureAwait(false);
+                    return;
+                }
                 await stopping.CancelAsync().ConfigureAwait(false);
                 try { await run.WaitAsync(TimeSpan.FromSeconds(15)).ConfigureAwait(false); }
                 catch (OperationCanceledException) { }

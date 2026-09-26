@@ -125,10 +125,6 @@
     <File Path=".editorconfig" />
     <File Path="Directory.Packages.props" />
   </Folder>
-  <Folder Name="/Behaviors/">
-    <Project Path="src/Behaviors/DigitalBrain.Behaviors.csproj" />
-    <Project Path="src/Behaviors/Tests/Unit/DigitalBrain.Behaviors.Tests.Unit.csproj" />
-  </Folder>
   <Folder Name="/Testing/">
     <Project Path="src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
     <Project Path="src/Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />

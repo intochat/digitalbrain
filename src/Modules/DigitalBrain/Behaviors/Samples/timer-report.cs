@@ -1,6 +1,6 @@
 #!/usr/bin/env dotnet
-#:project ../Modules/DigitalBrain/Behaviors/Runtime/DigitalBrain.Behavior.csproj
-#:project ../Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj
+#:project ../Runtime/DigitalBrain.Behavior.csproj
+#:project ../../../Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj
 #:property PublishAot=false
 
 using DigitalBrain.Contracts;
@@ -21,7 +21,8 @@ public sealed class TimerReportBehavior(IDigitalBrain brain, IConfiguration conf
     public async Task RunAsync(CancellationToken cancellation = default)
     {
         var timer = brain.Get<Timer>(configuration["TimerId"] ?? "tea");
-        await using var ticks = await brain.SubscribeAsync<TimerTick>(timer, cancellation);
+        var ticks = await brain.SubscribeAsync<TimerTick>(timer, cancellation);
+        Console.WriteLine("TimerReport ready");
         await foreach (var tick in ticks.ReadAllAsync(cancellation))
         {
             Console.WriteLine($"TimerTick {tick.TimerId} {tick.ObservedAt:O}");

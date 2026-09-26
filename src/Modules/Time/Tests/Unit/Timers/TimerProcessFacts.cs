@@ -35,7 +35,7 @@ public sealed class TimerProcessFacts
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
-        foreach (var argument in new[] { "run", "--file", "src/Behaviors/timer-report.cs", "-p:CodeGraphRefresh=false", "--",
+        foreach (var argument in new[] { "run", "--file", "src/Modules/DigitalBrain/Behaviors/Samples/timer-report.cs", "-p:CodeGraphRefresh=false", "--",
             "--Smoke", "true", "--TimerId", "process", "--ClusterId", cluster.Options.ClusterId,
             "--ServiceId", cluster.Options.ServiceId, "--Gateways", gateway.ToString() })
         { start.ArgumentList.Add(argument); }
@@ -44,7 +44,7 @@ public sealed class TimerProcessFacts
         {
             if (args.Data is not { } line) { return; }
             output.Enqueue(line);
-            if (line.Contains("SubscriptionReady", StringComparison.Ordinal)) { ready.TrySetResult(); }
+            if (line.Contains("TimerReport ready", StringComparison.Ordinal)) { ready.TrySetResult(); }
         }
         process.OutputDataReceived += OnLine;
         process.ErrorDataReceived += OnLine;
