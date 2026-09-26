@@ -1,5 +1,6 @@
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Registry;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
@@ -19,6 +20,7 @@ public static class UnitTest
         deadline.Token.ThrowIfCancellationRequested();
         var modules = ModuleComposition.Resolve(options.Modules);
         ModuleSettingsValidation.ValidatePublicSettings(modules);
+        var registry = NeuronRegistry.FromModules(modules);
         var builder = new InProcessTestClusterBuilder(1);
         builder.Options.ConfigureFileLogging = false;
         builder.ConfigureHost(host =>
@@ -32,7 +34,7 @@ public static class UnitTest
         });
         builder.ConfigureSilo((_, silo) =>
         {
-            silo.AddDigitalBrain();
+            silo.AddDigitalBrain().AddNeuronRegistry(registry);
             foreach (var module in modules) { module.Configure(silo); }
             silo.AddMemoryGrainStorage("Default");
             if (options.UseReminders) { silo.UseInMemoryReminderService(); }

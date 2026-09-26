@@ -1,5 +1,5 @@
 using DigitalBrain.Apps;
-using DigitalBrain.Core.Registry;
+using DigitalBrain.Contracts.Registry;
 
 namespace DigitalBrain.Discovery.Search;
 
@@ -42,7 +42,7 @@ internal sealed class CapabilityIndex
         IReadOnlyList<ScopedAppManifest> manifests,
         Func<string, CancellationToken, ValueTask<float[]?>>? embed,
         CancellationToken cancellationToken,
-        IReadOnlyList<NeuronDescriptor>? neurons = null)
+        IReadOnlyList<NeuronRegistration>? neurons = null)
     {
         ArgumentNullException.ThrowIfNull(manifests);
         var entries = new List<IndexedCapability>();

@@ -1,5 +1,7 @@
 using DigitalBrain.Contracts;
-using Microsoft.Extensions.DependencyInjection;
+using DigitalBrain.Contracts.Registry;
+using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace DigitalBrain.Core.Registry;
 
@@ -52,12 +54,25 @@ public sealed class NeuronRegistry : INeuronRegistry
     public static NeuronRegistry FromModules(IEnumerable<ModuleDefinition> modules)
         => new(modules.SelectMany(module => Describe(module.CreateModule(), module.Id)));
 
-    public static NeuronRegistry FromServices(IEnumerable<NeuronDescriptor> descriptors) => new(descriptors);
+    public static NeuronRegistry FromInstances(IEnumerable<IModule> modules)
+        => new(modules.SelectMany(module => Describe(module, module.GetType().FullName!)));
 
-    public static void AddContributions(IServiceCollection services, IModule module)
+    public static NeuronRegistrySnapshot CreateSnapshot(INeuronRegistry registry)
     {
-        foreach (var descriptor in Describe(module, module.GetType().FullName!))
-        { services.AddSingleton(descriptor); }
+        var records = registry.All.Select(item => new NeuronRegistration
+        {
+            Id = item.Id,
+            ContractType = item.ContractType.FullName!,
+            ModuleId = item.ModuleId,
+            Name = item.Name,
+            Description = item.Description,
+            AgentRoutable = item.AgentRoutable,
+        }).ToArray();
+        return new NeuronRegistrySnapshot
+        {
+            Version = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(records))),
+            Records = records,
+        };
     }
 
     private static IEnumerable<NeuronDescriptor> Describe(IModule module, string moduleId)

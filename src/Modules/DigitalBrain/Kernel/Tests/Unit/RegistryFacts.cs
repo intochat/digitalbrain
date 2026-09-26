@@ -1,5 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Registry;
+using DigitalBrain.Contracts.Registry;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Xunit;
@@ -47,6 +48,35 @@ public sealed class RegistryFacts
         var registry = brain.SiloServices.GetRequiredService<INeuronRegistry>();
         Assert.NotNull(registry.Find("test.emitter"));
         Assert.Null(registry.Find("test.other"));
+    }
+
+    [Fact]
+    public async Task StartupPublishesSelectedModulesToRegistryGrain()
+    {
+        await using var brain = await UnitTest.Create().WithModule<FirstModule>()
+            .StartAsync(TestContext.Current.CancellationToken);
+
+        var selected = brain.SiloServices.GetRequiredService<NeuronRegistrySnapshot>();
+        var snapshot = await brain.Get<INeuronRegistryGrain>(selected.Version).Read();
+        var neuron = Assert.Single(snapshot.Records);
+        Assert.Equal("test.emitter", neuron.Id);
+        Assert.Equal(typeof(ITestEmitter).FullName, neuron.ContractType);
+        Assert.Equal(typeof(FirstModule).FullName, neuron.ModuleId);
+        Assert.NotEmpty(snapshot.Version);
+    }
+
+    [Fact]
+    public async Task DifferentRegistryVersionsDoNotOverwriteEachOther()
+    {
+        await using var brain = await UnitTest.Create().WithModule<FirstModule>()
+            .StartAsync(TestContext.Current.CancellationToken);
+        var selected = brain.SiloServices.GetRequiredService<NeuronRegistrySnapshot>();
+        var first = brain.Get<INeuronRegistryGrain>(selected.Version);
+        var other = brain.Get<INeuronRegistryGrain>("different-version");
+        await other.ReplaceSnapshot(new NeuronRegistrySnapshot { Version = "different-version" });
+
+        Assert.Equal("test.emitter", Assert.Single((await first.Read()).Records).Id);
+        Assert.Empty((await other.Read()).Records);
     }
 
     public sealed class FirstModule : IModule, INeuronRegistryContributor

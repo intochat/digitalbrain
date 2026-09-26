@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using Microsoft.AspNetCore.Routing;
-using DigitalBrain.Core.Registry;
 
 namespace DigitalBrain.Core;
 
@@ -23,11 +22,6 @@ public sealed class ModuleDefinition : IModule
     public IReadOnlyDictionary<string, string?> Configuration { get; }
     public IReadOnlyList<ModuleDefinition> Dependencies { get; }
     public IModule CreateModule() => (IModule)Activator.CreateInstance(ModuleType)!;
-    public void Configure(Orleans.Hosting.ISiloBuilder silo)
-    {
-        var module = CreateModule();
-        NeuronRegistry.AddContributions(silo.Services, module);
-        module.Configure(silo);
-    }
+    public void Configure(Orleans.Hosting.ISiloBuilder silo) => CreateModule().Configure(silo);
     public void Configure(IEndpointRouteBuilder endpoints) => CreateModule().Configure(endpoints);
 }

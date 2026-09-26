@@ -3,6 +3,7 @@ using DigitalBrain.Discovery;
 using DigitalBrain.Discovery.Search;
 using DigitalBrain.Core.Registry;
 using DigitalBrain.Contracts;
+using DigitalBrain.Contracts.Registry;
 using DigitalBrain.Core;
 using Orleans.Hosting;
 using DigitalBrain.Testing.Unit;
@@ -36,6 +37,25 @@ public sealed class CatalogFacts
 
         var app = await catalog.Search("summarize my outstanding invoices", "workspace-a", 5);
         Assert.Contains(app.Hits, hit => hit.Kind == CapabilityKind.Operation);
+    }
+
+    [Fact]
+    public async Task DiscoveryReadsPublishedRegistrySnapshot()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<DiscoveryModule>()
+            .WithModule<FixtureNeuronModule>()
+            .ConfigureSilo(silo => silo.Services.AddSingleton<IManifestSource>(new FixtureManifestSource([])))
+            .StartAsync(ct);
+        var selected = brain.SiloServices.GetRequiredService<NeuronRegistrySnapshot>();
+        var registry = brain.Get<INeuronRegistryGrain>(selected.Version);
+        Assert.Contains((await registry.Read()).Records, record => record.Id == "test.registry-emitter");
+
+        var catalog = brain.Get<ICapabilityCatalog>("catalog");
+        var result = await catalog.Search("emit a registry signal", "workspace-a", 5);
+        Assert.Contains(result.Hits, hit => hit.Id == "test.registry-emitter");
+        Assert.Equal(typeof(FixtureNeuronModule).FullName,
+            (await catalog.ReadNeuron("test.registry-emitter"))?.ModuleId);
     }
 
     [Fact]

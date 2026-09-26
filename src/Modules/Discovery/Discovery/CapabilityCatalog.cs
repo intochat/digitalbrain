@@ -3,6 +3,7 @@ using System.Text;
 using DigitalBrain.Apps;
 using DigitalBrain.Discovery.Search;
 using DigitalBrain.Discovery.Vector;
+using DigitalBrain.Contracts.Registry;
 using DigitalBrain.Core.Registry;
 using Microsoft.Extensions.Logging;
 
@@ -11,7 +12,8 @@ namespace DigitalBrain.Discovery;
 // Manifests are the truth. The catalog is rebuilt idempotently and falls back to keyword search.
 internal sealed class CapabilityCatalog(
     IEnumerable<IManifestSource> sources,
-    INeuronRegistry registry,
+    NeuronRegistrySnapshot selectedRegistry,
+    IGrainFactory grains,
     ICapabilityEmbedder embedder,
     ICapabilityVectorIndex vectors,
     ILogger<CapabilityCatalog> logger)
@@ -45,7 +47,9 @@ internal sealed class CapabilityCatalog(
             }
         }
 
-        var neurons = registry.All.Where(static item => item.AgentRoutable).ToArray();
+        var registry = await grains.GetGrain<INeuronRegistryGrain>(selectedRegistry.Version)
+            .Read().ConfigureAwait(false);
+        var neurons = registry.Records.Where(static item => item.AgentRoutable).ToArray();
         if (unreadable > 0 && read.Count == 0 && (_signature is not null || neurons.Length == 0))
         {
             Degraded = true;
@@ -128,7 +132,7 @@ internal sealed class CapabilityCatalog(
         return await _index.SearchAsync(query, workspaceId, take, Degraded, cancellationToken, appsOnly).ConfigureAwait(false);
     }
 
-    private static string Signature(IReadOnlyList<ScopedAppManifest> manifests, IReadOnlyList<NeuronDescriptor> neurons)
+    private static string Signature(IReadOnlyList<ScopedAppManifest> manifests, IReadOnlyList<NeuronRegistration> neurons)
     {
         var builder = new StringBuilder();
         foreach (var scoped in manifests.OrderBy(static scoped => scoped.Manifest.Id, StringComparer.Ordinal))
