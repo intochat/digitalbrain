@@ -166,292 +166,289 @@ class _WorkspaceDesktopState extends State<WorkspaceDesktop> {
     final active = p.activeArtifactId == id;
     final narrow = area.width < 600;
     final chrome = Offstage(
-        offstage: hidden,
-        child: Listener(
-          onPointerDown: (_) => store.focusWindow(id),
-          child: Container(
-            color: mode == 'floating' && !narrow
-                ? Colors.transparent
-                : colors.surface,
-            padding: EdgeInsets.all(mode == 'floating' && !narrow ? 4 : 3),
-            child: Material(
-              color: colors.surfaceContainerLow,
-              elevation: mode == 'floating' ? (active ? 8 : 3) : 0,
-              shadowColor: colors.shadow.withValues(alpha: .25),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-                side: BorderSide(
-                  color: active
-                      ? colors.primary.withValues(alpha: .4)
-                      : colors.outlineVariant,
-                ),
+      offstage: hidden,
+      child: Listener(
+        onPointerDown: (_) => store.focusWindow(id),
+        child: Container(
+          color: mode == 'floating' && !narrow
+              ? Colors.transparent
+              : colors.surface,
+          padding: EdgeInsets.all(mode == 'floating' && !narrow ? 4 : 3),
+          child: Material(
+            color: colors.surfaceContainerLow,
+            elevation: mode == 'floating' ? (active ? 8 : 3) : 0,
+            shadowColor: colors.shadow.withValues(alpha: .25),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: BorderSide(
+                color: active
+                    ? colors.primary.withValues(alpha: .4)
+                    : colors.outlineVariant,
               ),
-              clipBehavior: Clip.antiAlias,
-              child: Stack(
-                children: [
-                  Column(
-                    children: [
-                      SizedBox(
-                        height: 44,
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: MouseRegion(
-                                cursor: narrow
-                                    ? SystemMouseCursors.basic
-                                    : SystemMouseCursors.move,
-                                child: GestureDetector(
-                                  key: ValueKey('window-drag-$id'),
-                                  behavior: HitTestBehavior.opaque,
-                                  onDoubleTap: narrow
-                                      ? null
-                                      : () => _toggle(id),
-                                  onPanStart: narrow
-                                      ? null
-                                      : (_) {
-                                          store.focusWindow(id);
-                                          _freezeEditors();
-                                          if (mode != 'floating') {
-                                            store.snapWindow(id, 'floating');
-                                            final restored =
-                                                workspaceWindowRect(
-                                                  area,
-                                                  'floating',
-                                                  _boundsOf(id),
-                                                  index,
-                                                );
-                                            _liveBounds[id] = [
-                                              restored.left,
-                                              restored.top,
-                                              restored.width,
-                                              restored.height,
-                                            ];
-                                          }
-                                          setState(() => _dragging = id);
-                                        },
-                                  onPanUpdate: narrow
-                                      ? null
-                                      : (details) {
-                                          final current = workspaceWindowRect(
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              children: [
+                Column(
+                  children: [
+                    SizedBox(
+                      height: 44,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: MouseRegion(
+                              cursor: narrow
+                                  ? SystemMouseCursors.basic
+                                  : SystemMouseCursors.move,
+                              child: GestureDetector(
+                                key: ValueKey('window-drag-$id'),
+                                behavior: HitTestBehavior.opaque,
+                                onDoubleTap: narrow ? null : () => _toggle(id),
+                                onPanStart: narrow
+                                    ? null
+                                    : (_) {
+                                        store.focusWindow(id);
+                                        _freezeEditors();
+                                        if (mode != 'floating') {
+                                          store.snapWindow(id, 'floating');
+                                          final restored = workspaceWindowRect(
                                             area,
                                             'floating',
                                             _boundsOf(id),
                                             index,
                                           );
-                                          final moved = workspaceWindowRect(
-                                            area,
-                                            'floating',
-                                            [
-                                              current.left + details.delta.dx,
-                                              current.top + details.delta.dy,
-                                              current.width,
-                                              current.height,
-                                            ],
-                                            index,
-                                          );
-                                          setState(() {
-                                            _liveBounds[id] = [
-                                              moved.left,
-                                              moved.top,
-                                              moved.width,
-                                              moved.height,
-                                            ];
-                                            _snap = () {
-                                              final box =
-                                                  _surface.currentContext!
-                                                          .findRenderObject()
-                                                      as RenderBox;
-                                              final local = box.globalToLocal(
-                                                details.globalPosition,
-                                              );
-                                              return local.dy < 24
-                                                  ? 'maximized'
-                                                  : local.dx < 28
-                                                  ? 'left'
-                                                  : local.dx > area.width - 28
-                                                  ? 'right'
-                                                  : null;
-                                            }();
-                                          });
-                                        },
-                                  onPanEnd: narrow
-                                      ? null
-                                      : (_) {
-                                          if (_snap == 'maximized') {
-                                            _liveBounds.remove(id);
-                                            store.maximizeWindow(id);
-                                          } else if (_snap != null) {
-                                            _liveBounds.remove(id);
-                                            store.snapWindow(id, _snap!);
-                                          } else {
-                                            _commitBounds(id);
-                                          }
-                                          setState(() {
-                                            _dragging = null;
-                                            _snap = null;
-                                          });
-                                        },
-                                  onPanCancel: () {
-                                    _commitBounds(id);
-                                    setState(() {
-                                      _dragging = null;
-                                      _snap = null;
-                                    });
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(left: 12),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          uiArtifactIcon(artifact.kind),
-                                          size: 17,
-                                          color: colors.onSurfaceVariant,
-                                        ),
-                                        const SizedBox(width: 9),
-                                        Expanded(
-                                          child: Text(
-                                            artifact.title,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w500,
-                                            ),
+                                          _liveBounds[id] = [
+                                            restored.left,
+                                            restored.top,
+                                            restored.width,
+                                            restored.height,
+                                          ];
+                                        }
+                                        setState(() => _dragging = id);
+                                      },
+                                onPanUpdate: narrow
+                                    ? null
+                                    : (details) {
+                                        final current = workspaceWindowRect(
+                                          area,
+                                          'floating',
+                                          _boundsOf(id),
+                                          index,
+                                        );
+                                        final moved = workspaceWindowRect(
+                                          area,
+                                          'floating',
+                                          [
+                                            current.left + details.delta.dx,
+                                            current.top + details.delta.dy,
+                                            current.width,
+                                            current.height,
+                                          ],
+                                          index,
+                                        );
+                                        setState(() {
+                                          _liveBounds[id] = [
+                                            moved.left,
+                                            moved.top,
+                                            moved.width,
+                                            moved.height,
+                                          ];
+                                          _snap = () {
+                                            final box =
+                                                _surface.currentContext!
+                                                        .findRenderObject()
+                                                    as RenderBox;
+                                            final local = box.globalToLocal(
+                                              details.globalPosition,
+                                            );
+                                            return local.dy < 24
+                                                ? 'maximized'
+                                                : local.dx < 28
+                                                ? 'left'
+                                                : local.dx > area.width - 28
+                                                ? 'right'
+                                                : null;
+                                          }();
+                                        });
+                                      },
+                                onPanEnd: narrow
+                                    ? null
+                                    : (_) {
+                                        if (_snap == 'maximized') {
+                                          _liveBounds.remove(id);
+                                          store.maximizeWindow(id);
+                                        } else if (_snap != null) {
+                                          _liveBounds.remove(id);
+                                          store.snapWindow(id, _snap!);
+                                        } else {
+                                          _commitBounds(id);
+                                        }
+                                        setState(() {
+                                          _dragging = null;
+                                          _snap = null;
+                                        });
+                                      },
+                                onPanCancel: () {
+                                  _commitBounds(id);
+                                  setState(() {
+                                    _dragging = null;
+                                    _snap = null;
+                                  });
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.only(left: 12),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        uiArtifactIcon(artifact.kind),
+                                        size: 17,
+                                        color: colors.onSurfaceVariant,
+                                      ),
+                                      const SizedBox(width: 9),
+                                      Expanded(
+                                        child: Text(
+                                          artifact.title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
                                           ),
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
                             ),
-                            PopupMenuButton<String>(
-                              tooltip: 'Window options',
-                              iconSize: 17,
-                              icon: const Icon(Icons.more_horiz),
-                              onSelected: (value) {
-                                if (value == 'attach') {
-                                  store.attachArtifact(id);
-                                } else {
-                                  store.snapWindow(id, value);
-                                }
-                              },
-                              itemBuilder: (_) => [
-                                if (!narrow) ...[
-                                  const PopupMenuItem(
-                                    value: 'left',
-                                    child: Text('Snap left'),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'right',
-                                    child: Text('Snap right'),
-                                  ),
-                                ],
+                          ),
+                          PopupMenuButton<String>(
+                            tooltip: 'Window options',
+                            iconSize: 17,
+                            icon: const Icon(Icons.more_horiz),
+                            onSelected: (value) {
+                              if (value == 'attach') {
+                                store.attachArtifact(id);
+                              } else {
+                                store.snapWindow(id, value);
+                              }
+                            },
+                            itemBuilder: (_) => [
+                              if (!narrow) ...[
                                 const PopupMenuItem(
-                                  value: 'attach',
-                                  child: Text('Attach to conversation'),
+                                  value: 'left',
+                                  child: Text('Snap left'),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'right',
+                                  child: Text('Snap right'),
                                 ),
                               ],
-                            ),
-                            _control(
-                              'Minimize editor',
-                              Icons.remove,
-                              () => store.minimizeArtifact(id),
-                            ),
-                            if (!narrow)
-                              _control(
-                                mode == 'maximized'
-                                    ? 'Restore window'
-                                    : 'Maximize editor',
-                                mode == 'maximized'
-                                    ? Icons.filter_none
-                                    : Icons.crop_square,
-                                () => _toggle(id),
+                              const PopupMenuItem(
+                                value: 'attach',
+                                child: Text('Attach to conversation'),
                               ),
-                            _control(
-                              'Close editor',
-                              Icons.close,
-                              () => store.closeArtifact(id),
-                            ),
-                            const SizedBox(width: 3),
-                          ],
-                        ),
-                      ),
-                      Divider(
-                        height: 1,
-                        color: colors.outlineVariant.withValues(alpha: .6),
-                      ),
-                      Expanded(
-                        child: RepaintBoundary(
-                          child: _PinnedEditor(
-                            token: _editorToken(artifact),
-                            builder: () => widget.editorBuilder(artifact),
+                            ],
                           ),
+                          _control(
+                            'Minimize editor',
+                            Icons.remove,
+                            () => store.minimizeArtifact(id),
+                          ),
+                          if (!narrow)
+                            _control(
+                              mode == 'maximized'
+                                  ? 'Restore window'
+                                  : 'Maximize editor',
+                              mode == 'maximized'
+                                  ? Icons.filter_none
+                                  : Icons.crop_square,
+                              () => _toggle(id),
+                            ),
+                          _control(
+                            'Close editor',
+                            Icons.close,
+                            () => store.closeArtifact(id),
+                          ),
+                          const SizedBox(width: 3),
+                        ],
+                      ),
+                    ),
+                    Divider(
+                      height: 1,
+                      color: colors.outlineVariant.withValues(alpha: .6),
+                    ),
+                    Expanded(
+                      child: RepaintBoundary(
+                        child: _PinnedEditor(
+                          token: _editorToken(artifact),
+                          builder: () => widget.editorBuilder(artifact),
                         ),
                       ),
-                    ],
-                  ),
-                  if (mode == 'floating' && !narrow)
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.resizeUpLeftDownRight,
-                        child: GestureDetector(
-                          key: ValueKey('window-resize-$id'),
-                          behavior: HitTestBehavior.opaque,
-                          onPanStart: (_) {
-                            _freezeEditors();
-                            setState(() => _resizing = true);
-                          },
-                          onPanEnd: (_) {
-                            _commitBounds(id);
-                            setState(() => _resizing = false);
-                          },
-                          onPanCancel: () {
-                            _commitBounds(id);
-                            setState(() => _resizing = false);
-                          },
-                          onPanUpdate: (d) {
-                            final current = workspaceWindowRect(
-                              area,
-                              mode,
-                              _boundsOf(id),
-                              index,
-                            );
-                            setState(() {
-                              _liveBounds[id] = [
-                                current.left,
-                                current.top,
-                                (current.width + d.delta.dx).clamp(
-                                  280,
-                                  area.width - current.left,
-                                ),
-                                (current.height + d.delta.dy).clamp(
-                                  220,
-                                  area.height - current.top,
-                                ),
-                              ];
-                            });
-                          },
-                          child: SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: Icon(
-                              Icons.south_east,
-                              size: 12,
-                              color: colors.onSurfaceVariant,
-                            ),
+                    ),
+                  ],
+                ),
+                if (mode == 'floating' && !narrow)
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.resizeUpLeftDownRight,
+                      child: GestureDetector(
+                        key: ValueKey('window-resize-$id'),
+                        behavior: HitTestBehavior.opaque,
+                        onPanStart: (_) {
+                          _freezeEditors();
+                          setState(() => _resizing = true);
+                        },
+                        onPanEnd: (_) {
+                          _commitBounds(id);
+                          setState(() => _resizing = false);
+                        },
+                        onPanCancel: () {
+                          _commitBounds(id);
+                          setState(() => _resizing = false);
+                        },
+                        onPanUpdate: (d) {
+                          final current = workspaceWindowRect(
+                            area,
+                            mode,
+                            _boundsOf(id),
+                            index,
+                          );
+                          setState(() {
+                            _liveBounds[id] = [
+                              current.left,
+                              current.top,
+                              (current.width + d.delta.dx).clamp(
+                                280,
+                                area.width - current.left,
+                              ),
+                              (current.height + d.delta.dy).clamp(
+                                220,
+                                area.height - current.top,
+                              ),
+                            ];
+                          });
+                        },
+                        child: SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: Icon(
+                            Icons.south_east,
+                            size: 12,
+                            color: colors.onSurfaceVariant,
                           ),
                         ),
                       ),
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
           ),
         ),
-      );
+      ),
+    );
     return AnimatedPositioned(
       key: ValueKey('window-$id'),
       duration: _interacting || MediaQuery.disableAnimationsOf(context)

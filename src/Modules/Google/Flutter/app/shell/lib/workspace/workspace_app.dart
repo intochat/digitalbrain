@@ -317,7 +317,10 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       existing.content = artifact.content;
       existing.data = artifact.data;
       if (artifact.editorState.isNotEmpty) {
-        existing.editorState = {...existing.editorState, ...artifact.editorState};
+        existing.editorState = {
+          ...existing.editorState,
+          ...artifact.editorState,
+        };
       }
       store.save();
     }

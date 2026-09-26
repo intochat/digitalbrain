@@ -210,9 +210,7 @@ final class UiChart extends StatelessWidget {
       fontWeight: FontWeight.w700,
       fontFamily: UiType.bodyFamily,
       fontFamilyFallback: UiType.bodyFallback,
-      shadows: [
-        Shadow(color: tone.percentShadow, blurRadius: 2),
-      ],
+      shadows: [Shadow(color: tone.percentShadow, blurRadius: 2)],
     );
 
     return ColoredBox(
@@ -363,8 +361,7 @@ final class UiChart extends StatelessWidget {
   FlGridData _gridData(_ChartTone tone) => FlGridData(
     show: true,
     drawVerticalLine: false,
-    getDrawingHorizontalLine: (_) =>
-        FlLine(color: tone.grid, strokeWidth: 1),
+    getDrawingHorizontalLine: (_) => FlLine(color: tone.grid, strokeWidth: 1),
   );
 }
 
@@ -406,9 +403,7 @@ final class _ChartTone {
       accent: light ? LumenPalette.accent : UiPalette.signal,
       tooltip: light ? LumenPalette.surfaceMuted : scheme.surfaceContainerHigh,
       percentInk: light ? LumenPalette.surface : scheme.onSurface,
-      percentShadow: light
-          ? const Color(0x66000000)
-          : const Color(0x88000000),
+      percentShadow: light ? const Color(0x66000000) : const Color(0x88000000),
       slices: light ? UiChart._lightSlices : UiChart._darkSlices,
     );
   }
