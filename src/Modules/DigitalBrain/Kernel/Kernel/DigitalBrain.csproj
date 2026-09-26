@@ -2,6 +2,6 @@
   <PropertyGroup><IsPackable>true</IsPackable><Description>Typed neurons and live subscriptions on Orleans.</Description></PropertyGroup>
   <ItemGroup><PackageReference Include="Microsoft.Orleans.Server" /></ItemGroup>
   <ItemGroup><FrameworkReference Include="Microsoft.AspNetCore.App" /></ItemGroup>
-  <ItemGroup><ProjectReference Include="../Contracts/DigitalBrain.Contracts.csproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../Client/DigitalBrain.Client.csproj" /></ItemGroup>
   <ItemGroup><InternalsVisibleTo Include="DigitalBrain.Runtime.Tests.Unit" /></ItemGroup>
 </Project>

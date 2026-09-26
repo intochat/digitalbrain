@@ -28,6 +28,7 @@
     <Project Path="src/Modules/DigitalBrain/Kernel/Tests/E2E/DigitalBrain.Runtime.Tests.E2E.csproj" />
     <Project Path="src/Modules/DigitalBrain/Kernel/Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
     <Project Path="src/Modules/DigitalBrain/Kernel/Aspire/DigitalBrain.Aspire.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Kernel/Client/DigitalBrain.Client.csproj" />
     <Project Path="src/Modules/DigitalBrain/Kernel/Contracts/DigitalBrain.Contracts.csproj" />
     <Project Path="src/Modules/DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
     <Project Path="src/Modules/DigitalBrain/Kernel/Sdk/DigitalBrain.Sdk.csproj" />

@@ -5,6 +5,7 @@
     <RootNamespace>DigitalBrain.Core</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../Kernel/Kernel/DigitalBrain.csproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../../Kernel/Client/DigitalBrain.Client.csproj" />
   </ItemGroup>
 </Project>

@@ -12,7 +12,7 @@ public sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObser
     private readonly BrainOptions _options;
     private readonly ILogger _logger;
     private readonly Action<IAsyncDisposable> _closed;
-    private readonly LocalSignalHub? _hub;
+    private readonly ILocalSignalHub? _hub;
     private readonly Channel<T> _messages;
     private readonly CancellationTokenSource _lifetime;
     private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -24,7 +24,7 @@ public sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObser
     private int _reader;
 
     internal SignalSubscription(IGrainFactory grains, INeuron source, BrainOptions options,
-        ILogger logger, Action<IAsyncDisposable> closed, LocalSignalHub? hub, CancellationToken cancellationToken)
+        ILogger logger, Action<IAsyncDisposable> closed, ILocalSignalHub? hub, CancellationToken cancellationToken)
     {
         _grains = grains;
         _source = source;

@@ -4,7 +4,7 @@ using Orleans.Runtime;
 
 namespace DigitalBrain.Core;
 
-internal sealed class LocalSignalHub
+internal sealed class LocalSignalHub : ILocalSignalHub
 {
     private readonly ConcurrentDictionary<GrainId, List<INeuronObserver>> _subscribers = new();
 
