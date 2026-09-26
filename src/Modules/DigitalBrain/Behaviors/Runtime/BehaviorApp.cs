@@ -75,12 +75,15 @@ public static class BehaviorApp
             var behavior = ActivatorUtilities.CreateInstance<TBehavior>(new BehaviorServices(host.Services, scoped));
             var run = behavior.RunAsync(stopping.Token);
             var loss = readiness.WaitForLossAsync(generationId);
-            if (await Task.WhenAny(run, loss).ConfigureAwait(false) == loss && !run.IsCompletedSuccessfully)
+            if (await Task.WhenAny(run, loss).ConfigureAwait(false) == loss)
             {
-                await stopping.CancelAsync().ConfigureAwait(false);
-                try { await run.WaitAsync(TimeSpan.FromSeconds(15)).ConfigureAwait(false); }
-                catch (OperationCanceledException) { }
-                throw new InvalidOperationException("A required subscription closed; live signals may have been missed.");
+                try { await run.WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false); }
+                catch (TimeoutException) { }
+                if (!run.IsCompletedSuccessfully)
+                {
+                    await stopping.CancelAsync().ConfigureAwait(false);
+                    throw new InvalidOperationException("A required subscription closed; live signals may have been missed.");
+                }
             }
             await run.ConfigureAwait(false);
         }
