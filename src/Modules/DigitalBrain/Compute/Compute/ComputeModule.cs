@@ -2,11 +2,13 @@ using DigitalBrain.Compute.Allowances;
 using DigitalBrain.Compute.Billing;
 using DigitalBrain.Compute.Ledger;
 using DigitalBrain.Compute.Metering;
+using DigitalBrain.Compute.Usage;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Enforcement;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Npgsql;
 using Orleans.Hosting;
 
@@ -32,11 +34,15 @@ public sealed class ComputeModule : IModule
             services.TryAddSingleton(_ => new ComputeDatabase(NpgsqlDataSource.Create(connectionString)));
             services.TryAddSingleton<IMeterStore, PostgresMeterStore>();
             services.TryAddSingleton<ILedgerStore, PostgresLedgerStore>();
+            services.TryAddSingleton<IUsageStore, PostgresUsageStore>();
         }
         else
         {
             services.TryAddSingleton<IMeterStore, InMemoryMeterStore>();
             services.TryAddSingleton<ILedgerStore, InMemoryLedgerStore>();
+            services.TryAddSingleton<IUsageStore>(provider => new FileUsageStore(silo.Configuration["DigitalBrain:Compute:UsageDirectory"]
+                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DigitalBrain", "compute-usage",
+                    UsagePaging.Hash(provider.GetService<IHostEnvironment>()?.ContentRootPath ?? AppContext.BaseDirectory))));
         }
         services.TryAddSingleton<IMeterSink, DurableMeterSink>();
         services.TryAddSingleton<IBatchMeterSink>(provider => (IBatchMeterSink)provider.GetRequiredService<IMeterSink>());

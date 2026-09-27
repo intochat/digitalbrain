@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/ui_part.dart';
 import 'renderer_registry.dart';
+import 'ui_collection_view.dart';
 
 typedef NeuronLoader = Future<Map<String, dynamic>> Function(
   String kind,
@@ -85,22 +86,22 @@ class _NeuronViewState extends State<NeuronView> {
         if (snapshot.hasError) {
           return WindowStateView(
             state: const WindowState(WindowStatus.failed),
-            onRetry: () => setState(
-              () => state = widget.load(widget.kind, widget.name),
-            ),
+            onRetry: () =>
+                setState(() => state = widget.load(widget.kind, widget.name)),
           );
         }
         if (!snapshot.hasData) {
-          return const WindowStateView(state: WindowState(WindowStatus.loading));
+          return const WindowStateView(
+            state: WindowState(WindowStatus.loading),
+          );
         }
         final data = snapshot.data!;
         final declared = WindowState.fromMetadata(data);
         if (declared != null) {
           return WindowStateView(
             state: declared,
-            onRetry: () => setState(
-              () => state = widget.load(widget.kind, widget.name),
-            ),
+            onRetry: () =>
+                setState(() => state = widget.load(widget.kind, widget.name)),
           );
         }
         final definition = Map<String, dynamic>.from(
@@ -270,96 +271,32 @@ class _NeuronViewState extends State<NeuronView> {
               ),
             );
           case 'collection':
-            final items = (definition['items'] as List? ?? []).cast<Map>();
-            if (items.isEmpty) {
-              return const Center(child: Text('This folder is empty.'));
-            }
-            return ListView.separated(
-              itemCount: items.length,
-              separatorBuilder: (_, _) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final item = Map<String, dynamic>.from(items[index]);
-                final enabled = item['canActivate'] == true;
-                final kind = item['kind'];
-                final bytes = (item['sizeBytes'] as num?)?.toInt();
-                final meta = kind == 'folder'
-                    ? 'Folder'
-                    : bytes == null
-                    ? ''
-                    : bytes < 1024
-                    ? '$bytes B'
-                    : bytes < 1048576
-                    ? '${(bytes / 1024).toStringAsFixed(1)} KB'
-                    : '${(bytes / 1048576).toStringAsFixed(1)} MB';
-                return Material(
-                  color: Colors.transparent,
-                  child: Semantics(
-                    explicitChildNodes: true,
-                    button: enabled,
-                    label: enabled
-                        ? 'Open ${item['label']}'
-                        : '${item['label']}, unsupported file',
-                    child: ListTile(
-                      selected:
-                          (selection ?? definition['selection']) == item['id'],
-                      onLongPress: () => selectItem(item, data),
-                      leading: Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary
-                              .withValues(alpha: .1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          kind == 'folder'
-                              ? Icons.folder_outlined
-                              : kind == 'image'
-                              ? Icons.image_outlined
-                              : Icons.insert_drive_file_outlined,
-                          size: 21,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                      title: Text(
-                        item['label'] as String,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            meta,
-                            style: Theme.of(context).textTheme.labelSmall,
-                          ),
-                          IconButton(
-                            tooltip: 'Select ${item['label']}',
-                            icon: Icon(
-                              (selection ?? definition['selection']) ==
-                                      item['id']
-                                  ? Icons.check_circle
-                                  : Icons.radio_button_unchecked,
-                              size: 18,
-                            ),
-                            onPressed: () => selectItem(item, data),
-                          ),
-                        ],
-                      ),
-                      subtitle: kind == 'file'
-                          ? const Text('Preview unavailable')
-                          : null,
-                      onTap: enabled
-                          ? () => widget.onActivate?.call({
-                              ...item,
-                              'collection': widget.name,
-                              'revision': data['revision'],
-                            })
-                          : null,
+            final items = (definition['items'] as List? ?? [])
+                .whereType<Map>()
+                .map((item) => Map<String, dynamic>.from(item))
+                .toList();
+            return UiCollectionView(
+              items: items,
+              fileMode: definition['fileMode'] != false,
+              selectionEnabled: definition['selectionEnabled'] != false,
+              selectedId: selection ?? definition['selection'] as String?,
+              emptyLabel: definition['emptyLabel'] as String?,
+              error: definition['error'] as String?,
+              onRetry: () =>
+                  setState(() => state = widget.load(widget.kind, widget.name)),
+              onSelect: !widget.enabled
+                  ? null
+                  : (id) => selectItem(
+                      items.firstWhere((item) => item['id'] == id),
+                      data,
                     ),
-                  ),
-                );
-              },
+              onActivate: !widget.enabled
+                  ? null
+                  : (item) => widget.onActivate?.call({
+                      ...item,
+                      'collection': widget.name,
+                      'revision': data['revision'],
+                    }),
             );
           case 'imagecanvas':
             return widget.imageBuilder?.call(definition) ??
@@ -567,7 +504,10 @@ class _FormRendererState extends State<_FormRenderer> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (widget.part.title.isNotEmpty) ...[
-            Text(widget.part.title, style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              widget.part.title,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
           ],
           for (final field in widget.part.fields) _field(context, field),

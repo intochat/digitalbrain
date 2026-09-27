@@ -13,6 +13,7 @@ import '../integrations/integrations_menu.dart';
 import 'receipt_card.dart';
 import 'workspace_store.dart';
 import 'workspace_voice.dart';
+import 'compute_usage_history.dart';
 
 part 'workspace_chat_presentation.dart';
 
@@ -23,6 +24,7 @@ class WorkspaceChat extends StatefulWidget {
     required this.store,
     this.onRun,
     this.onTranscribe,
+    this.onUsageChanged,
     this.onReadConversation,
     this.onOpenUrl,
     this.onSalesforceConnected,
@@ -42,6 +44,7 @@ class WorkspaceChat extends StatefulWidget {
   final ValueChanged<String>? onOpenCSharpFile;
   final AgentRunner? onRun;
   final Future<String> Function(Uint8List audio, String fileName)? onTranscribe;
+  final VoidCallback? onUsageChanged;
   final Future<Map<String, dynamic>> Function(
     String workspaceId,
     String threadId,
@@ -225,6 +228,7 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
   void _sync({bool persist = true}) {
     _controller.setMessages(
       _entries
+          .where((entry) => !isPassiveReceipt(entry))
           .map(
             (e) => CustomMessage(
               id: e['id'] as String,
@@ -374,6 +378,7 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
         _entries.add({'id': id, 'role': 'receipt', 'receipt': receipt});
       }
       _sync();
+      widget.onUsageChanged?.call();
       setState(() {});
       return;
     }
@@ -388,11 +393,15 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
         });
       }
       _sync();
+      if (card is Map && card['kind'] == 'charge-receipt') {
+        widget.onUsageChanged?.call();
+      }
       setState(() {});
       return;
     }
     if (event.type == 'RUN_FINISHED') {
       _finished = true;
+      widget.onUsageChanged?.call();
       return;
     } // Keep draining: session is saved after RUN_FINISHED.
     if (event.type == 'RUN_ERROR') {
@@ -462,6 +471,7 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
 
   void _finish(String? notice) {
     if (!mounted) return;
+    widget.onUsageChanged?.call();
     _subscription?.cancel();
     _subscription = null;
     setState(() {

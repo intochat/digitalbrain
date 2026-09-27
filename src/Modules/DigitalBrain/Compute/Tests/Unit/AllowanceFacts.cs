@@ -8,6 +8,30 @@ namespace DigitalBrain.Tests;
 
 public sealed class AllowanceFacts
 {
+    [Fact]
+    public async Task UsageSummaryKeepsWalletChargesSettlementsAndReservationsSeparateAfterReload()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        var ledger = brain.Get<IAllowanceLedger>("account");
+        await ledger.GrantAsync(AllowanceOf("budget", "ws-1", ApprovalLevel.StandingBudget, AllowanceScope.Always, 100m), ct);
+        var settled = await ledger.AuthorizeAsync(Paid("account", "ws-1", "chat", 5m, intent: "settled"), ct);
+        await ledger.SettleAsync(settled.ReservationId!, 3m, FailureClass.None, ct);
+        await ledger.AuthorizeAsync(Paid("account", "ws-1", "chat", 7m, intent: "reserved"), ct);
+        var wallet = brain.Get<IWallet>("account");
+        await wallet.ChargeAsync(new LedgerEntry { AccountId = "account", IdempotencyKey = "settled", IntentId = "settled", Kind = LedgerKind.WalletCharge, Amount = 3m, OccurredAt = Now }, ct);
+        await wallet.ChargeAsync(new LedgerEntry { AccountId = "account", IdempotencyKey = "other", IntentId = "other", Kind = LedgerKind.WalletCharge, Amount = 2m, OccurredAt = Now }, ct);
+        await brain.DeactivateAsync(ledger, ct);
+        Assert.Equal(5m, await wallet.ReadChargedAsync(cancellationToken: ct));
+        Assert.Equal(3m, await ledger.ReadSettledAsync(cancellationToken: ct));
+        Assert.Equal(3m, await ledger.ReadSettledAsync("ws-1", "settled", ct));
+        Assert.Equal(0m, await ledger.ReadSettledAsync("ws-1", "reserved", ct));
+        Assert.Equal(7m, await ledger.ReadReservedAsync(cancellationToken: ct));
+        Assert.Equal(0m, await ledger.ReadReservedAsync("other-workspace", cancellationToken: ct));
+        Assert.Equal(7m, await ledger.ReadReservedAsync("ws-1", "reserved", ct));
+        Assert.Equal(0m, await brain.Get<IAllowanceLedger>("other-account").ReadSettledAsync(cancellationToken: ct));
+    }
+
     private static readonly DateTimeOffset Now = new(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
     private static readonly string PriceVersion = new PriceBook().Version;
 

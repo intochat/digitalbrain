@@ -67,6 +67,7 @@ app.MapGet("/compute/limits", static async (IDigitalBrain brain, CancellationTok
     Results.Ok(await brain.Get<IAllowanceLedger>(CallerContextStamper.Require().AccountId).ReadLimitsAsync(ct)));
 app.MapWorkspaceDataEndpoints();
 app.MapWorkspaceAgent();
+app.MapComputeUsage();
 app.MapWorkspaceVoice();
 app.MapLocalApps();
 app.MapBuiltInApps();

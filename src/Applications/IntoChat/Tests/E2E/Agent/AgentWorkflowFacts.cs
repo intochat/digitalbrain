@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using Aspire.Hosting.Testing;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Agents;
@@ -39,7 +40,7 @@ public sealed class AgentWorkflowFacts
         Assert.Contains("RUN_ERROR", invalid);
         Assert.DoesNotContain("RUN_FINISHED", invalid);
         // The endpoint still flushes the failed intent's usage in one durable batch.
-        Assert.NotEmpty((await brain.Get<IIntentUsage>("invalid").ReadAsync(ct)).Entries);
+        Assert.NotEmpty((await brain.Get<IIntentUsage>(ComputeUsageEndpoints.IntentId(WorkspaceScope.Create("owner", "failures").Id, "thread", "invalid")).ReadAsync(ct)).Entries);
         // P1.2: a failed run keeps its turn in the conversation history.
         var failedAgent = brain.Get<IAgent>(AgentEndpoints.ConversationKey(WorkspaceScope.Create("owner", "failures").Id, "thread"));
         Assert.Contains((await failedAgent.ReadConversation(ct)).Turns, turn => turn.RunId == "invalid");
@@ -78,6 +79,28 @@ public sealed class AgentWorkflowFacts
         while ((await conversation.ReadConversation(ct)).ActiveRunId is not null) { await Task.Delay(100, deadline.Token); }
         Assert.Empty((await conversation.ReadConversation(ct)).Turns);
         Assert.Empty((await brain.Get<IWorkspace>(scope).Read()).Windows);
+
+        // An interrupted run can be retried with its original ID. Keep one activity, update its
+        // outcome, and include provider consumption already durably captured by the first attempt.
+        JsonElement cancelled;
+        do
+        {
+            using var page = JsonDocument.Parse(await brain.HttpClient.GetStringAsync("/workspaces/cancel/compute/usage", ct));
+            cancelled = page.RootElement.GetProperty("items").Clone();
+            if (cancelled.GetArrayLength() == 0) { await Task.Delay(100, deadline.Token); }
+        } while (cancelled.GetArrayLength() == 0);
+        Assert.Equal("Cancelled", Assert.Single(cancelled.EnumerateArray()).GetProperty("outcome").GetString());
+        var usageId = ComputeUsageEndpoints.IntentId(scope, "thread", "cancel-run");
+        await brain.Get<IIntentUsage>(usageId).RecordAsync(new(MeterKind.Chat, "OpenAI", "gpt-5.6-luna", 1234, 0, 0, 2, 1236, true, DateTimeOffset.UtcNow), ct);
+        model.Delay = TimeSpan.Zero;
+        using var retried = await brain.HttpClient.PostAsJsonAsync("/agent", input, ct);
+        Assert.Contains("RUN_FINISHED", await retried.Content.ReadAsStringAsync(ct));
+        using var history = JsonDocument.Parse(await brain.HttpClient.GetStringAsync("/workspaces/cancel/compute/usage", ct));
+        var row = Assert.Single(history.RootElement.GetProperty("items").EnumerateArray());
+        Assert.Equal("Succeeded", row.GetProperty("outcome").GetString());
+        Assert.Equal(usageId, row.GetProperty("id").GetString());
+        Assert.Contains(row.GetProperty("modelUsage").EnumerateArray(), entry => entry.GetProperty("inputTokens").GetInt64() == 1234);
+        Assert.True(row.GetProperty("modelUsage").GetArrayLength() > 1);
     }
 
     [Fact(Timeout = 180_000)]
@@ -97,7 +120,7 @@ public sealed class AgentWorkflowFacts
         Assert.DoesNotContain("RUN_ERROR", stream);
         Assert.Contains("TOOL_CALL_RESULT", stream);
         model.AssertCompleted();
-        var usage = brain.Get<IIntentUsage>("run");
+        var usage = brain.Get<IIntentUsage>(ComputeUsageEndpoints.IntentId(WorkspaceScope.Create("owner", "agent").Id, "thread", "run"));
         var recorded = await usage.ReadAsync(ct);
         Assert.NotEmpty(recorded.Entries);
         Assert.All(recorded.Entries, entry => Assert.True(entry.UsageReported, "The scripted model reports usage for every call."));

@@ -43,19 +43,22 @@ internal sealed class IntentActivity
 
 internal static class AgentReceipts
 {
-    public static AgentReceipt Create(IPriceBook priceBook, IntentContext intent, IntentActivity activity, AgentRunOutcome outcome)
+    public static AgentReceipt Create(IPriceBook priceBook, IntentContext intent, IntentActivity activity, AgentRunOutcome outcome, TokenUsageEntry[]? cumulativeUsage = null)
     {
-        var (modelCalls, compute) = ShadowPrice(intent, priceBook);
+        var (modelCalls, compute) = ShadowPrice(cumulativeUsage ?? intent.Usage.OfType<TokenUsageEntry>(), priceBook);
         return new AgentReceipt(outcome, Summarize(activity), activity.Calls, activity.Touched, modelCalls, compute);
     }
 
     // Model calls and shadow Compute come from the intent's durable usage batch, priced by the
     // one price book. Unknown meters and local models price at zero, so shadow never overcharges.
     internal static (int ModelCalls, decimal Compute) ShadowPrice(IntentContext intent, IPriceBook priceBook)
+        => ShadowPrice(intent.Usage.OfType<TokenUsageEntry>(), priceBook);
+
+    internal static (int ModelCalls, decimal Compute) ShadowPrice(IEnumerable<TokenUsageEntry> entries, IPriceBook priceBook)
     {
         var modelCalls = 0;
         var compute = 0m;
-        foreach (var entry in intent.Usage.OfType<TokenUsageEntry>())
+        foreach (var entry in entries)
         {
             modelCalls++;
             if (entry.Meter == MeterKind.Chat)

@@ -1,4 +1,5 @@
 using DigitalBrain.Compute.Metering;
+using DigitalBrain.Compute.Usage;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -6,13 +7,14 @@ namespace DigitalBrain.Compute;
 
 // Creates the meter table and warms the pool at startup, so the first meter batch of a turn
 // pays only its INSERT, never the schema DDL or a cold connection.
-internal sealed class ComputeSchemaWarmer(IMeterStore store, ILogger<ComputeSchemaWarmer> logger) : BackgroundService
+internal sealed class ComputeSchemaWarmer(IMeterStore store, IUsageStore usage, ILogger<ComputeSchemaWarmer> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         try
         {
             await store.EnsureCreatedAsync(stoppingToken).ConfigureAwait(false);
+            await usage.EnsureCreatedAsync(stoppingToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {

@@ -6,6 +6,13 @@ namespace DigitalBrain.Compute.Ledger;
 // writer shares the store, so two callers charging the same key insert exactly one row.
 internal sealed class InMemoryLedgerStore : ILedgerStore
 {
+    public ValueTask<decimal> ChargedAsync(string accountId, string? intentId, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(entries.Values.Where(entry => entry.AccountId == accountId
+            && entry.Kind == LedgerKind.WalletCharge && (intentId is null || entry.IntentId == intentId)).Sum(entry => entry.Amount));
+    }
+
     private readonly ConcurrentDictionary<(string AccountId, string IdempotencyKey), LedgerEntry> entries = new();
 
     public ValueTask<LedgerAppend> AppendAsync(LedgerEntry entry, CancellationToken cancellationToken = default)

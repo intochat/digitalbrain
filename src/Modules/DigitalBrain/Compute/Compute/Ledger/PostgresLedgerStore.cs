@@ -22,6 +22,17 @@ internal sealed class PostgresLedgerStore(ComputeDatabase database) : ILedgerSto
 
     private bool initialized;
 
+    public async ValueTask<decimal> ChargedAsync(string accountId, string? intentId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT COALESCE(SUM(amount), 0) FROM compute_ledger_entry WHERE account_id=$1 AND kind=$2 AND ($3::text IS NULL OR intent_id=$3)";
+        command.Parameters.Add(new NpgsqlParameter { Value = accountId });
+        command.Parameters.Add(new NpgsqlParameter { Value = (int)LedgerKind.WalletCharge });
+        command.Parameters.Add(new NpgsqlParameter { NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Text, Value = (object?)intentId ?? DBNull.Value });
+        return (decimal)(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!;
+    }
+
     public async ValueTask<LedgerAppend> AppendAsync(LedgerEntry entry, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entry);

@@ -148,6 +148,9 @@ public static class AllowanceReservations
 [Orleans.Metadata.DefaultGrainType("compute-allowance-ledger")]
 public interface IAllowanceLedger : INeuron
 {
+    Task<decimal> ReadReservedAsync(string? workspaceId = null, string? intentId = null, CancellationToken cancellationToken = default);
+    Task<decimal> ReadSettledAsync(string? workspaceId = null, string? intentId = null, CancellationToken cancellationToken = default);
+
     Task<AllowanceDecision> AuthorizeAsync(CallRequest request, CancellationToken cancellationToken = default);
 
     Task<Allowance> GrantAsync(Allowance allowance, CancellationToken cancellationToken = default);

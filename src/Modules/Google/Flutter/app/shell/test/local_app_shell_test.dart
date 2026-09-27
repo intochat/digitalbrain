@@ -39,7 +39,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Your projects'), findsNothing);
       expect(find.byTooltip('Applications'), findsOneWidget);
-      expect(find.text('Compute —'), findsOneWidget);
+      expect(find.byTooltip('Compute'), findsOneWidget);
+      expect(find.text('Compute'), findsNothing);
       expect(store.currentProject.title, 'Personal');
       await tester.pumpWidget(const SizedBox.shrink());
       tester.view.resetPhysicalSize();

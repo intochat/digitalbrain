@@ -65,6 +65,21 @@ public sealed class CrossWorkspaceFacts
 
         using var foreignNode = await bob.GetAsync($"/workspaces/{aliceWorkspace}/apps/node?kind=text&name={aliceWorkspace}/apps/forms/intake", ct);
         Assert.Equal(HttpStatusCode.Forbidden, foreignNode.StatusCode);
+
+        using var foreignCompute = await bob.GetAsync($"/workspaces/{aliceWorkspace}/compute/usage", ct);
+        Assert.Equal(HttpStatusCode.Forbidden, foreignCompute.StatusCode);
+        using var ownCompute = await bob.GetAsync($"/workspaces/{bobWorkspace}/compute/usage", ct);
+        Assert.Equal(HttpStatusCode.OK, ownCompute.StatusCode);
+
+        await brain.Get<DigitalBrain.Compute.IWallet>(aliceMember.AccountId).ChargeAsync(new DigitalBrain.Compute.LedgerEntry
+        {
+            AccountId = aliceMember.AccountId, IdempotencyKey = "private-charge", Kind = DigitalBrain.Compute.LedgerKind.WalletCharge,
+            Amount = 7m, OccurredAt = DateTimeOffset.UtcNow,
+        }, ct);
+        using var aliceSummary = JsonDocument.Parse(await alice.GetStringAsync("/compute/summary", ct));
+        using var bobSummary = JsonDocument.Parse(await bob.GetStringAsync("/compute/summary", ct));
+        Assert.Equal(7m, aliceSummary.RootElement.GetProperty("chargedCompute").GetDecimal());
+        Assert.Equal(0m, bobSummary.RootElement.GetProperty("chargedCompute").GetDecimal());
     }
 
     private static HttpClient CookieClient(HttpClient origin)

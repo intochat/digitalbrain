@@ -12,6 +12,9 @@ internal sealed class WalletNeuron : Neuron, IWallet
 
     private ILedgerStore Store => store ??= ServiceProvider.GetRequiredService<ILedgerStore>();
 
+    public async Task<decimal> ReadChargedAsync(string? intentId = null, CancellationToken cancellationToken = default)
+        => await Store.ChargedAsync(this.GetPrimaryKeyString(), intentId, cancellationToken).ConfigureAwait(true);
+
     public async Task<LedgerAppend> ChargeAsync(LedgerEntry charge, CancellationToken cancellationToken = default)
         => await AppendAsync(Require(charge, LedgerKind.WalletCharge), cancellationToken).ConfigureAwait(true);
 

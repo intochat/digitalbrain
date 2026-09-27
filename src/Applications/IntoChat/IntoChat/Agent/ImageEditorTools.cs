@@ -102,6 +102,8 @@ internal sealed class ImageEditorTools(IDigitalBrain brain, LocalFileStore files
             _ui = new
             {
                 kind = "charge-receipt",
+                id = intentId,
+                intentId,
                 planId,
                 chargedCompute = receipt.ChargedCompute,
                 maximum = receipt.MaximumCompute,

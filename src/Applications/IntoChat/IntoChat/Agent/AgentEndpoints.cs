@@ -5,6 +5,7 @@ using DigitalBrain.AI;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.AI.Metering;
 using DigitalBrain.Compute;
+using DigitalBrain.Compute.Usage;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core.Enforcement;
 using IntoChat.Apps.BuiltIn;
@@ -48,7 +49,8 @@ internal static class AgentEndpoints
                 await http.Response.WriteAsync("data: " + JsonSerializer.Serialize(value) + "\n\n", http.RequestAborted);
                 await http.Response.Body.FlushAsync(http.RequestAborted);
             }
-            using var intent = IntentContext.Begin(input.RunId, scope.Id);
+            var usageId = ComputeUsageEndpoints.IntentId(scope.Id, input.ThreadId, input.RunId);
+            using var intent = IntentContext.Begin(usageId, scope.Id);
             using var capture = ContentCaptureScope.Begin(
                 ContentCapturePolicy.IsLocalOwner(auth.Value, configuration, environment),
                 ContentCapturePolicy.ClassOf(input.Messages));
@@ -57,6 +59,8 @@ internal static class AgentEndpoints
             // Only the request that actually opened the active run may complete or interrupt it.
             // A rejected concurrent submission must never mutate the owner's conversation turn.
             var ownsRun = false;
+            var recordUsage = false;
+            var usageRevision = DateTimeOffset.UtcNow;
             var activity = new IntentActivity();
             var outcome = AgentRunOutcome.Succeeded;
             async Task KeepFailedTurn(string failure)
@@ -72,6 +76,8 @@ internal static class AgentEndpoints
                     var state = await agent.BeginConversation(new(input.RunId, userText), http.RequestAborted);
                     var replay = state.Turns.SingleOrDefault(turn => turn.RunId == input.RunId);
                     ownsRun = replay is null;
+                    recordUsage = ownsRun;
+                    usageRevision = DateTimeOffset.UtcNow;
                     await Emit(new { type = "RUN_STARTED", threadId = input.ThreadId, runId = input.RunId });
                     var messageId = input.RunId + "-reply";
                     await Emit(new { type = "TEXT_MESSAGE_START", messageId, role = "assistant" });
@@ -93,7 +99,7 @@ internal static class AgentEndpoints
                             var text = new StringBuilder();
                             var results = new List<string>();
                             var selection = await new AgentToolSelection(brain).ResolveAsync(scope.Id, userText, History(state), http.RequestAborted);
-                            var queryError = await RunModel(scope.Id, input.RunId, userText, developerMode, state, messageId, configuration, runner, selection, Emit, text, results, activity, http.RequestAborted);
+                            var queryError = await RunModel(scope.Id, usageId, userText, developerMode, state, messageId, configuration, runner, selection, Emit, text, results, activity, http.RequestAborted);
                             if (queryError is not null) { throw new WorkspaceQueryException(queryError); }
                             await agent.CompleteConversation(new(input.RunId, userText, text.ToString(), results), http.RequestAborted);
                         }
@@ -125,25 +131,51 @@ internal static class AgentEndpoints
             }
             finally
             {
-                if (ownsRun)
-                {
-                    try { await agent.InterruptConversation(input.RunId, CancellationToken.None); }
-                    catch { /* Interrupt is idempotent; a cancelled run is already settled. */ }
-                }
                 // Metering is an observer: one durable batch per completed intent, and a storage
                 // fault must never fail or hide the run the user already saw.
                 try { await usage.FlushAsync(intent, CancellationToken.None); }
                 catch (Exception error)
                 { http.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("IntoChat.Agent.AgentEndpoints").LogWarning(error, "Workspace agent usage flush failed"); }
+                if (ownsRun)
+                {
+                    // Release an interrupted run only after its usage batch is durable, so a
+                    // retry with the same id can price the cumulative provider consumption.
+                    try { await agent.InterruptConversation(input.RunId, CancellationToken.None); }
+                    catch { /* Interrupt is idempotent; a cancelled run is already settled. */ }
+                }
+                ComputeUsageItem? projection = null;
+                if (recordUsage)
+                {
+                    try
+                    {
+                        var tokens = await brain.Get<IIntentUsage>(usageId).ReadAsync(CancellationToken.None);
+                        projection = ComputeUsageEndpoints.Create(usageId, AgentReceipts.Create(priceBook, intent, activity, outcome, tokens.Entries), priceBook, tokens.Entries);
+                        await http.RequestServices.GetRequiredService<IUsageStore>().AppendAsync(scope.Owner, scope.Id, usageId,
+                            JsonSerializer.Serialize(projection), CancellationToken.None, usageRevision);
+                    }
+                    catch (Exception error)
+                    { http.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("IntoChat.Agent.AgentEndpoints").LogWarning(error, "Workspace compute history write failed"); }
+                }
                 // Send a receipt card from the intent's usage and captured activity.
                 try
                 {
-                    if (!http.RequestAborted.IsCancellationRequested)
+                    if (recordUsage && !http.RequestAborted.IsCancellationRequested)
                     {
-                        var receipt = AgentReceipts.Create(priceBook, intent, activity, outcome);
+                        var receipt = AgentReceipts.Create(priceBook, intent, activity, outcome, projection?.ModelUsage);
                         await Emit(new
                         {
                             type = "RECEIPT",
+                            id = usageId,
+                            intentId = usageId,
+                            occurredAt = DateTimeOffset.UtcNow,
+                            priceBookVersion = priceBook.Version,
+                            previewCompute = projection?.PreviewCompute,
+                            modelUsage = (projection?.ModelUsage ?? intent.Usage.OfType<TokenUsageEntry>()).Select(entry => new
+                            {
+                                provider = entry.Provider, model = entry.Model, inputTokens = entry.InputTokens,
+                                cachedInputTokens = entry.CachedInputTokens, reasoningTokens = entry.ReasoningTokens,
+                                outputTokens = entry.OutputTokens, totalTokens = entry.TotalTokens, usageReported = entry.UsageReported,
+                            }),
                             outcome = receipt.Outcome.ToString(),
                             summary = receipt.Summary,
                             modelCalls = receipt.ModelCalls,

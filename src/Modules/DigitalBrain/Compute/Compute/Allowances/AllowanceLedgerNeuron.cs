@@ -36,6 +36,22 @@ internal sealed class AllowanceLedgerNeuron : Neuron<AllowanceLedgerState>, IAll
 
     private string AccountId => this.GetPrimaryKeyString();
 
+    public Task<decimal> ReadSettledAsync(string? workspaceId = null, string? intentId = null, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(Snapshot.Reservations.Where(item => item.Settled
+            && (workspaceId is null || item.WorkspaceId == workspaceId)
+            && (intentId is null || item.IntentId == intentId)).Sum(item => item.SettledCompute));
+    }
+
+    public Task<decimal> ReadReservedAsync(string? workspaceId = null, string? intentId = null, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(Snapshot.Reservations.Where(item => !item.Settled
+            && (workspaceId is null || item.WorkspaceId == workspaceId)
+            && (intentId is null || item.IntentId == intentId)).Sum(item => item.ReservedCompute));
+    }
+
     public async Task<AllowanceDecision> AuthorizeAsync(CallRequest request, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();

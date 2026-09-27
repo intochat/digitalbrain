@@ -14,6 +14,7 @@ import 'host_environment.dart';
 import 'models/app_manifest.dart';
 import 'models/brain_models.dart';
 import 'models/consent_sheet.dart';
+import 'models/compute_usage.dart';
 import 'models/grant_summary.dart';
 import 'models/session_capabilities.dart';
 import 'models/table_models.dart';
@@ -573,6 +574,19 @@ final class DigitalBrainUiClient {
     );
     return controller.stream;
   }
+
+  Future<ComputeUsagePage> readComputeUsage(String workspaceId, {String? cursor, int limit = 20}) async {
+    final query = Uri(queryParameters: {
+      'limit': '$limit', if (cursor != null) 'cursor': cursor,
+    }).query;
+    return ComputeUsagePage.fromJson(Map<String, dynamic>.from(await _tableRequest(
+      'GET', '/workspaces/${Uri.encodeComponent(workspaceId)}/compute/usage?$query',
+    ) as Map));
+  }
+
+  Future<ComputeAccountSummary> readComputeSummary() async =>
+      ComputeAccountSummary.fromJson(Map<String, dynamic>.from(
+        await _tableRequest('GET', '/compute/summary') as Map));
 
   Future<Map<String, dynamic>> readComputeLimits() async {
     final response = await _request(

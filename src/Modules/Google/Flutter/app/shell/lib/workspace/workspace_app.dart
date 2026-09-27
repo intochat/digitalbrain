@@ -14,7 +14,8 @@ import 'workspace_settings.dart';
 import 'workspace_routes.dart';
 import 'workspace_chat.dart';
 import 'app_surface_host.dart';
-import 'compute_limits_panel.dart';
+import 'compute_usage_panel.dart';
+import 'compute_usage_history.dart';
 import 'workspace_islands.dart';
 import 'csharp/csharp_manager.dart';
 import 'apps/consent_sheet_view.dart';
@@ -76,6 +77,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   final _appsLoading = <String>{};
   final _sourcesSynced = <String>{};
   final _firstRunDismissed = <String>{};
+  final _computeRefresh = ValueNotifier<int>(0);
 
   void _connectWorkspaces() {
     final client = widget.programmingClient;
@@ -319,6 +321,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
 
   @override
   void dispose() {
+    _computeRefresh.dispose();
     _remoteCancelled.complete();
     for (final controller in _remote.values) {
       controller.dispose();
@@ -904,6 +907,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                             conversation.id == store.currentConversation.id,
                         store: store,
                         onRun: widget.onRun,
+                        onUsageChanged: () => _computeRefresh.value++,
                         onTranscribe: widget.programmingClient == null
                             ? null
                             : (audio, fileName) => widget.programmingClient!
@@ -1150,9 +1154,36 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   void _openCompute(BuildContext context) {
     final client = widget.programmingClient;
     if (client == null) return;
+    final project = store.currentProject;
+    Widget panel(BuildContext dialogContext) => ComputeUsagePanel(
+      client: client, workspaceId: project.id, workspaceName: project.title,
+      refreshSignal: _computeRefresh,
+      savedHistory: () => savedComputeHistory(project),
+      onClose: () => Navigator.of(dialogContext).pop(),
+    );
+    final size = MediaQuery.sizeOf(context);
+    if (size.width < 600) {
+      showModalBottomSheet<void>(
+        context: context, useSafeArea: true, isScrollControlled: true,
+        showDragHandle: true,
+        builder: (sheetContext) => SizedBox(
+          height: MediaQuery.sizeOf(sheetContext).height * .85,
+          child: panel(sheetContext),
+        ),
+      );
+      return;
+    }
     showDialog<void>(
       context: context,
-      builder: (_) => Dialog(child: ComputeLimitsPanel(client: client)),
+      builder: (dialogContext) => Dialog(
+        alignment: store.settings.dockTop ? Alignment.topRight : Alignment.bottomRight,
+        insetPadding: EdgeInsets.only(left: 12, right: 12,
+          top: store.settings.dockTop ? 76 : 12,
+          bottom: store.settings.dockTop ? 12 : 76),
+        clipBehavior: Clip.antiAlias,
+        child: SizedBox(width: 480, height: (size.height - 110).clamp(280.0, 680.0),
+          child: panel(dialogContext)),
+      ),
     );
   }
 

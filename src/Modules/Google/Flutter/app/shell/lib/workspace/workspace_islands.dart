@@ -234,12 +234,6 @@ class WorkspaceIslands extends StatelessWidget {
                 ],
               ],
             ),
-            if (onCompute != null)
-              IconButton(
-                tooltip: 'Compute',
-                onPressed: onCompute,
-                icon: const Icon(Icons.speed_outlined, size: 21),
-              ),
             IconButton(
               tooltip: 'Search',
               onPressed: onSearch,
@@ -253,12 +247,11 @@ class WorkspaceIslands extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10),
-              child: Text(
-                'Compute —',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-              ),
+            IconButton(
+              key: const Key('compute-usage-button'),
+              tooltip: 'Compute',
+              onPressed: onCompute,
+              icon: const Icon(Icons.speed_outlined, size: 18),
             ),
             if (!narrow)
               IconButton(

@@ -9,6 +9,19 @@ namespace DigitalBrain.Tests;
 public sealed class LedgerFacts
 {
     [Fact]
+    public async Task ChargeTotalsExcludeOtherAccountsIntentsAndPlatformCost()
+    {
+        var store = new InMemoryLedgerStore();
+        var ct = TestContext.Current.CancellationToken;
+        await store.AppendAsync(Charge("a", 7m) with { IntentId = "run" }, ct);
+        await store.AppendAsync(Charge("b", 3m) with { IntentId = "other" }, ct);
+        await store.AppendAsync(Charge("c", 9m) with { AccountId = "other", IntentId = "run" }, ct);
+        await store.AppendAsync(Cost("d", 8m) with { IntentId = "run" }, ct);
+        Assert.Equal(7m, await store.ChargedAsync("account", "run", ct));
+        Assert.Equal(10m, await store.ChargedAsync("account", null, ct));
+    }
+
+    [Fact]
     public async Task ConcurrentWritersNeverDoubleCharge()
     {
         var ct = TestContext.Current.CancellationToken;

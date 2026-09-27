@@ -38,6 +38,8 @@ public sealed record WalletBalance(
 [Orleans.Metadata.DefaultGrainType("compute-wallet")]
 public interface IWallet : INeuron
 {
+    Task<decimal> ReadChargedAsync(string? intentId = null, CancellationToken cancellationToken = default);
+
     Task<LedgerAppend> ChargeAsync(LedgerEntry charge, CancellationToken cancellationToken = default);
 
     Task<LedgerAppend> RecordCostAsync(LedgerEntry cost, CancellationToken cancellationToken = default);
