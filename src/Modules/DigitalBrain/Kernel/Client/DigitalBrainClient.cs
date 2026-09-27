@@ -43,15 +43,16 @@ public static class DigitalBrainClient
                 options.ServiceId = builder.Configuration["ServiceId"] ?? throw new InvalidOperationException("ServiceId is required.");
             });
         });
-        var host = builder.Build();
+        IHost? host = null;
         try
         {
+            host = builder.Build();
             await host.StartAsync(cancellationToken).ConfigureAwait(false);
             return new DigitalBrainConnection(host, relay);
         }
         catch
         {
-            host.Dispose();
+            host?.Dispose();
             if (relay is not null) { await relay.DisposeAsync().ConfigureAwait(false); }
             throw;
         }

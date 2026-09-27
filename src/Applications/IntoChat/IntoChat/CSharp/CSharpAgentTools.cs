@@ -1,21 +1,16 @@
 using DigitalBrain.AI.Agents;
 using Microsoft.Extensions.AI;
-using ModelContextProtocol.Server;
 
 namespace IntoChat;
 
 internal sealed class CSharpAgentTools(CSharpToolService service) : IAgentToolFactory
 {
-    public static readonly string[] Names = ["csharp_contracts", "csharp_write", "csharp_run"];
+    public static readonly string[] Names = [.. CSharpToolService.Tools.Select(tool => tool.Name)];
 
     public IReadOnlyList<AIFunction> Create(Func<AgentToolContext> context)
         // Context is evaluated at invocation, not while the runner is discovering tools.
-        => typeof(ScopedCSharpTools).GetMethods()
-            .Select(method => (Method: method, Tool: method.GetCustomAttributes(typeof(McpServerToolAttribute), false).OfType<McpServerToolAttribute>().FirstOrDefault()))
-            .Where(candidate => candidate.Tool is not null)
-            .Select(candidate => (AIFunction)new RecoverableTool(AIFunctionFactory.Create(candidate.Method,
-                _ => service.ForScope(context().ScopeId), new AIFunctionFactoryOptions { Name = candidate.Tool!.Name })))
-            .ToArray();
+        => [.. CSharpToolService.Tools.Select(tool => (AIFunction)new RecoverableTool(AIFunctionFactory.Create(tool.Method,
+            _ => service.ForScope(context().ScopeId), new AIFunctionFactoryOptions { Name = tool.Name })))];
 
     private sealed class RecoverableTool(AIFunction inner) : DelegatingAIFunction(inner)
     {

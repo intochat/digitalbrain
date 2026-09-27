@@ -5,16 +5,12 @@ using Microsoft.Extensions.Logging;
 
 namespace DigitalBrain.Core;
 
-internal sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObserver where T : Signal
+internal sealed class SignalSubscription<T>(IGrainFactory grains, INeuron source, BrainOptions options,
+    ILogger logger, Action<IAsyncDisposable> closed, ILocalSignalHub? hub, CancellationToken cancellationToken)
+    : ISignalSubscription<T>, INeuronObserver where T : Signal
 {
-    private readonly IGrainFactory _grains;
-    private readonly INeuron _source;
-    private readonly BrainOptions _options;
-    private readonly ILogger _logger;
-    private readonly Action<IAsyncDisposable> _closed;
-    private readonly ILocalSignalHub? _hub;
-    private readonly Channel<T> _messages;
-    private readonly CancellationTokenSource _lifetime;
+    private readonly Channel<T> _messages = Channel.CreateBounded<T>(new BoundedChannelOptions(options.BufferCapacity) { SingleReader = true });
+    private readonly CancellationTokenSource _lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
     private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Lock _gate = new();
     private INeuronObserver? _reference;
@@ -23,21 +19,6 @@ internal sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObs
     private Task? _cleanup;
     private int _reader;
 
-    internal SignalSubscription(IGrainFactory grains, INeuron source, BrainOptions options,
-        ILogger logger, Action<IAsyncDisposable> closed, ILocalSignalHub? hub, CancellationToken cancellationToken)
-    {
-        _grains = grains;
-        _source = source;
-        _options = options;
-        _logger = logger;
-        _closed = closed;
-        _hub = hub;
-        _lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _messages = Channel.CreateBounded<T>(new BoundedChannelOptions(options.BufferCapacity) { SingleReader = true });
-        _ = _completion.Task.ContinueWith(task => { _ = task.Exception; }, CancellationToken.None,
-            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
-    }
-
     public Task Completion => _completion.Task;
 
     internal async Task ConnectAsync()
@@ -45,10 +26,12 @@ internal sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObs
         try
         {
             var token = _lifetime.Token;
-            if (_hub is not null) { _hub.Subscribe(_source.GetGrainId(), this); }
+            // Only the remote path renews; the caller's token must end a silo-local subscription too.
+            token.Register(() => Finish(new OperationCanceledException(token)));
+            if (hub is not null) { hub.Subscribe(source.GetGrainId(), this); }
             else
             {
-                _reference = _grains.CreateObjectReference<INeuronObserver>(this);
+                _reference = grains.CreateObjectReference<INeuronObserver>(this);
                 var activation = await WatchAsync(token).ConfigureAwait(false);
                 lock (_gate)
                 {
@@ -56,7 +39,7 @@ internal sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObs
                     _renewal = RenewAsync(activation, token);
                 }
             }
-            _logger.LogInformation("SubscriptionReady {Source} {SignalType}", _source.GetGrainId(), typeof(T).Name);
+            logger.LogInformation("SubscriptionReady {Source} {SignalType}", source.GetGrainId(), typeof(T).Name);
         }
         catch (Exception error)
         {
@@ -71,8 +54,8 @@ internal sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObs
         lock (_gate)
         {
             token.ThrowIfCancellationRequested();
-            _watch = _source.Watch(_reference!);
-            return _watch.WaitAsync(_options.OperationTimeout, token);
+            _watch = source.Watch(_reference!);
+            return _watch.WaitAsync(options.OperationTimeout, token);
         }
     }
 
@@ -82,7 +65,7 @@ internal sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObs
         {
             while (true)
             {
-                await Task.Delay(_options.RenewEvery, token).ConfigureAwait(false);
+                await Task.Delay(options.RenewEvery, token).ConfigureAwait(false);
                 if (await WatchAsync(token).ConfigureAwait(false) != activation)
                 { throw new InvalidOperationException("Neuron reactivated; subscribe again. Live signals may have been missed."); }
             }
@@ -91,13 +74,11 @@ internal sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObs
         finally { await CleanupAsync().ConfigureAwait(false); }
     }
 
+    // The channel writer is thread-safe, and a completed writer rejects late signals, so no lock is needed.
     Task INeuronObserver.OnSignalAsync(Signal signal)
     {
-        lock (_gate)
-        {
-            if (!Completion.IsCompleted && signal is T typed && !_messages.Writer.TryWrite(typed))
-            { Finish(new InvalidOperationException("Signal subscription buffer overflowed.")); }
-        }
+        if (signal is T typed && !_messages.Writer.TryWrite(typed))
+        { Finish(new InvalidOperationException("Signal subscription buffer overflowed.")); }
         return Task.CompletedTask;
     }
 
@@ -119,7 +100,12 @@ internal sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObs
             if (Completion.IsCompleted) { return; }
             _messages.Writer.TryComplete(error);
             if (error is OperationCanceledException canceled) { _completion.SetCanceled(canceled.CancellationToken); }
-            else if (error is not null) { _completion.SetException(error); }
+            else if (error is not null)
+            {
+                _completion.SetException(error);
+                // Observed here so an unread failure never surfaces as an unobserved task exception.
+                _ = _completion.Task.Exception;
+            }
             else { _completion.SetResult(); }
             _lifetime.Cancel();
         }
@@ -141,17 +127,17 @@ internal sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObs
     {
         try
         {
-            _hub?.Unsubscribe(_source.GetGrainId(), this);
+            hub?.Unsubscribe(source.GetGrainId(), this);
             if (_reference is null) { return; }
             if (_watch is { IsCompleted: false }) { _ = CleanupLateWatchAsync(_watch); }
             else { _ = _watch?.Exception; }
             try { await UnwatchAsync().ConfigureAwait(false); }
-            finally { _grains.DeleteObjectReference<INeuronObserver>(_reference); }
+            finally { grains.DeleteObjectReference<INeuronObserver>(_reference); }
         }
         finally
         {
             _lifetime.Dispose();
-            _closed(this);
+            closed(this);
         }
     }
 
@@ -164,7 +150,7 @@ internal sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObs
 
     private async Task UnwatchAsync()
     {
-        try { await _source.Unwatch(_reference!).WaitAsync(_options.OperationTimeout).ConfigureAwait(false); }
-        catch (Exception error) { _logger.LogWarning(error, "Subscription cleanup failed; remote membership expires with its lease."); }
+        try { await source.Unwatch(_reference!).WaitAsync(options.OperationTimeout).ConfigureAwait(false); }
+        catch (Exception error) { logger.LogWarning(error, "Subscription cleanup failed; remote membership expires with its lease."); }
     }
 }

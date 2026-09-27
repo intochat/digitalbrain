@@ -36,6 +36,7 @@ public interface ISiloBrainListener : IGrainWithStringKey
     Task<bool> HubIsPresent();
     Task Listen(string sourceId);
     Task<int> Last();
+    Task<bool> CancelingTheTokenEndsASubscription(string sourceId);
 }
 
 [GrainType("silo-brain-listener")]
@@ -55,6 +56,16 @@ public sealed class SiloBrainListener : Grain, ISiloBrainListener
     }
 
     public Task<int> Last() => Task.FromResult(_last);
+
+    public async Task<bool> CancelingTheTokenEndsASubscription(string sourceId)
+    {
+        var brain = ServiceProvider.GetRequiredService<IDigitalBrain>();
+        using var cancellation = new CancellationTokenSource();
+        await using var subscription = await brain.SubscribeAsync<Number>(brain.Get<ITestEmitter>(sourceId), cancellation.Token);
+        await cancellation.CancelAsync();
+        await Task.WhenAny(subscription.Completion, Task.Delay(TimeSpan.FromSeconds(5)));
+        return subscription.Completion.IsCanceled;
+    }
 
     private async Task Drain()
     {

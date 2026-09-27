@@ -16,8 +16,7 @@ internal sealed class CSharpSharing(IDigitalBrain brain, CSharpToolService files
     {
         ArgumentNullException.ThrowIfNull(request);
         var workspace = files.ForScope(WorkspaceScope.Current(auth.Value, workspaceId).Id);
-        var description = await workspace.Description(fileId, cancellationToken);
-        var file = await workspace.ReadFile(fileId, cancellationToken);
+        var (description, file, _) = await workspace.Read(fileId, cancellationToken);
         if (string.IsNullOrWhiteSpace(file.Source)) { throw new InvalidOperationException($"{fileId} has no source to share."); }
         var manifest = new PackageManifest(Shorten(description.Name, MaxTitleLength), Shorten(description.Purpose, MaxDescriptionLength), [], [], request.Accounts ?? []);
         var content = new PackageContent(manifest, file.Source);

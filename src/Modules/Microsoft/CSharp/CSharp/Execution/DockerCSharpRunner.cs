@@ -114,7 +114,6 @@ internal sealed class DockerCSharpRunner(IProcessRunner processes, IOptions<CSha
             "--env", "Gateways=" + new UriBuilder("gwy.tcp", advertised.ToString(), endpoint.Value.GatewayPort, "0").Uri,
             "--env", "ClusterId=" + cluster.Value.ClusterId,
             "--env", "ServiceId=" + cluster.Value.ServiceId,
-            "--env", "CSharpFile__Id=" + fileId,
         ];
         // Orleans addresses the silo by its advertised IP; a container reaches a loopback silo only through a relay.
         if (IPAddress.IsLoopback(advertised)) { arguments.AddRange(["--env", "GatewayRelayHost=" + DockerHost]); }

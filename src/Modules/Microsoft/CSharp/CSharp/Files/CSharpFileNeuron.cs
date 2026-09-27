@@ -13,26 +13,26 @@ internal sealed partial class CSharpFileNeuron(
     : Neuron<CSharpFileState>(store), ICSharpFile
 {
     internal const int MaximumSourceBytes = 128 * 1024;
-    internal const int MaximumSettings = 64;
+    private const int MaximumSettings = 64;
     private string FileId => this.GetPrimaryKeyString();
 
     public async Task<CSharpFileSnapshot> Read(CancellationToken cancellationToken = default)
         => Describe(await runner.InspectAsync(FileId, cancellationToken));
 
-    public async Task<CSharpFileSnapshot> Write(string source, CancellationToken cancellationToken = default)
+    public Task Write(string source, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(source);
         if (Encoding.UTF8.GetByteCount(source) > MaximumSourceBytes) { throw new ArgumentException($"Source exceeds {MaximumSourceBytes} bytes.", nameof(source)); }
-        return await SaveAsync(new CSharpFileState { Source = source, Settings = new(Snapshot.Settings, StringComparer.Ordinal) }, cancellationToken);
+        return Save(Snapshot with { Source = source }, new CSharpFileChanged(FileId));
     }
 
-    public async Task<CSharpFileSnapshot> Configure(IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken = default)
+    public Task Configure(IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settings);
         if (settings.Count > MaximumSettings) { throw new ArgumentException($"At most {MaximumSettings} settings are allowed.", nameof(settings)); }
         if (settings.Keys.FirstOrDefault(name => !SettingName().IsMatch(name)) is { } invalid)
         { throw new ArgumentException($"Setting '{invalid}' must contain only letters, digits and underscores.", nameof(settings)); }
-        return await SaveAsync(new CSharpFileState { Source = Snapshot.Source, Settings = new(settings, StringComparer.Ordinal) }, cancellationToken);
+        return Save(Snapshot with { Settings = new(settings, StringComparer.Ordinal) }, new CSharpFileChanged(FileId));
     }
 
     public async Task<CSharpFileSnapshot> Start(CancellationToken cancellationToken = default)
@@ -54,26 +54,19 @@ internal sealed partial class CSharpFileNeuron(
     public async Task Delete(CancellationToken cancellationToken = default)
     {
         await runner.StopAsync(FileId, cancellationToken);
-        await Save(new CSharpFileState(), new CSharpFileChanged(FileId, CSharpFileStatus.Stopped));
+        await Save(new CSharpFileState(), new CSharpFileChanged(FileId));
         DeactivateOnIdle();
-    }
-
-    private async Task<CSharpFileSnapshot> SaveAsync(CSharpFileState next, CancellationToken cancellationToken)
-    {
-        var container = await runner.InspectAsync(FileId, cancellationToken);
-        await Save(next, new CSharpFileChanged(FileId, container.Status));
-        return Describe(container);
     }
 
     private async Task<CSharpFileSnapshot> Changed(CancellationToken cancellationToken)
     {
         var container = await runner.InspectAsync(FileId, cancellationToken);
-        await PublishAsync(new CSharpFileChanged(FileId, container.Status));
+        await PublishAsync(new CSharpFileChanged(FileId));
         return Describe(container);
     }
 
     private CSharpFileSnapshot Describe(CSharpContainerState container)
-        => new(FileId, Snapshot.Source, new Dictionary<string, string>(Snapshot.Settings, StringComparer.Ordinal),
+        => new(FileId, Snapshot.Source, Snapshot.Settings,
             container.Status, container.ExitCode, container.StartedAt);
 
     [GeneratedRegex("^[A-Za-z0-9_]{1,128}$")]

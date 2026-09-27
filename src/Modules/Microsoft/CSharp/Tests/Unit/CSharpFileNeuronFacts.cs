@@ -24,9 +24,8 @@ public sealed class CSharpFileNeuronFacts
         Assert.Equal(CSharpFileStatus.Running, running.Status);
         Assert.Equal("Console.WriteLine(\"hi\");", running.Source);
         var run = Assert.Single(docker.Calls, call => call[0] == "run");
-        Assert.Contains("CSharpFile__Id=workspace/report", run);
         Assert.Contains("CSharpFile__Settings__TimerId=tea", run);
-        Assert.Equal(CSharpFileStatus.Running, (await changes.NextAsync(change => change.Status == CSharpFileStatus.Running, ct)).Status);
+        Assert.Equal("workspace/report", (await changes.NextAsync(ct: ct)).FileId);
 
         await file.Delete(ct);
 

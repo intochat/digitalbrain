@@ -34,10 +34,10 @@ await foreach (var tick in brain.On<TimerTick>(timer, brain.Stopping))
 `Start` writes `app.cs` and `Directory.Build.props` into `<Root>/<container>/` and runs:
 
 ```
-docker run --detach --restart on-failure:5 --add-host host.docker.internal:host-gateway
+docker run --detach --label digitalbrain.csharp=<ServiceId> --restart on-failure:5 --add-host host.docker.internal:host-gateway
   -v <SourceRoot>:/brain:ro -v <work>:/work -v digitalbrain-csharp-nuget:/root/.nuget/packages
   -e Gateways=… -e ClusterId=… -e ServiceId=… [-e GatewayRelayHost=host.docker.internal]
-  -e CSharpFile__Id=… -e CSharpFile__Settings__<name>=<value>
+  -e CSharpFile__Settings__<name>=<value>
   mcr.microsoft.com/dotnet/sdk:11.0.100-rc.1 dotnet run app.cs -p:ArtifactsPath=/work/artifacts
 ```
 

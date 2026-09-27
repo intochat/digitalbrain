@@ -19,4 +19,13 @@ public sealed class SiloBrainSubscriptionFacts
         var last = await TestWait.UntilAsync(_ => listener.Last(), value => value == 42, TimeSpan.FromSeconds(5), ct);
         Assert.Equal(42, last);
     }
+
+    [Fact]
+    public async Task SiloHostedSubscriptionEndsWhenItsTokenIsCanceled()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().StartAsync(ct);
+
+        Assert.True(await brain.Get<ISiloBrainListener>("canceling-listener").CancelingTheTokenEndsASubscription("canceled-source"));
+    }
 }

@@ -19,10 +19,10 @@ public sealed class RecordingCSharpFile : Neuron, ICSharpFile
 
     public Task<CSharpFileSnapshot> Read(CancellationToken cancellationToken = default) => Task.FromResult(Current);
 
-    public Task<CSharpFileSnapshot> Write(string source, CancellationToken cancellationToken = default)
+    public Task Write(string source, CancellationToken cancellationToken = default)
         => Task.FromResult(Files[Key] = Current with { Source = source });
 
-    public Task<CSharpFileSnapshot> Configure(IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken = default)
+    public Task Configure(IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken = default)
         => Task.FromResult(Files[Key] = Current with { Settings = new Dictionary<string, string>(settings) });
 
     public Task<CSharpFileSnapshot> Start(CancellationToken cancellationToken = default)

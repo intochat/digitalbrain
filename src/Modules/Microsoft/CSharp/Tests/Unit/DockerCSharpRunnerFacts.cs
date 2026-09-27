@@ -33,7 +33,6 @@ public sealed class DockerCSharpRunnerFacts : IDisposable
         Assert.Contains("on-failure:5", run);
         Assert.Contains(@"E:\repo:/brain:ro", run);
         Assert.Contains("CSharpFile__Settings__Greeting=a = b c", run);
-        Assert.Contains("CSharpFile__Id=workspace/timer", run);
         Assert.Contains("ClusterId=cluster", run);
         Assert.Equal([DockerCSharpRunner.Image, "dotnet", "run", "app.cs", "-p:ArtifactsPath=/work/artifacts"], run.TakeLast(5));
         var work = Path.Combine(_root, container);

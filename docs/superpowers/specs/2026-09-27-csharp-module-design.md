@@ -66,7 +66,7 @@ State: `IPersistentState<CSharpFileState>` on the default blob grain storage, `C
 ### Execution (`DockerCSharpRunner`, uses the shared `IProcessRunner` from Microsoft/DotNet)
 
 * Work dir `<Root>/<sha(fileId)>/`: `app.cs` + generated `Directory.Build.props` (ProjectReference to Client, `PublishAot=false`).
-* `docker run -d --name csharp-<sha> --label digitalbrain.csharp=<ServiceId> --restart on-failure --add-host host.docker.internal:host-gateway -v <sourceRoot>:/brain:ro -v <workDir>:/work -v digitalbrain-csharp-nuget:/root/.nuget/packages -w /work -e Gateways=… -e ClusterId=… -e ServiceId=… -e CSharpFile__Id=… -e CSharpFile__Settings__<k>=<v> <image> dotnet run app.cs -p:ArtifactsPath=/work/artifacts`
+* `docker run -d --name csharp-<sha> --label digitalbrain.csharp=<ServiceId> --restart on-failure --add-host host.docker.internal:host-gateway -v <sourceRoot>:/brain:ro -v <workDir>:/work -v digitalbrain-csharp-nuget:/root/.nuget/packages -w /work -e Gateways=… -e ClusterId=… -e ServiceId=… -e CSharpFile__Settings__<k>=<v> <image> dotnet run app.cs -p:ArtifactsPath=/work/artifacts`
 * Stop/Delete = `docker rm -f`; status = `docker inspect`; logs = `docker logs --tail`.
 * `--restart on-failure` replaces supervisor + heartbeat: a script that loses the silo exits non-zero and Docker restarts it; a script that finishes stays `Exited(0)`.
 * Options `DigitalBrain:CSharp`: `Root`, `SourceRoot`, `Image` (default `mcr.microsoft.com/dotnet/sdk:11.0.100-rc.1`), `Gateways`/`ClusterId`/`ServiceId` (default from silo, gateway host rewritten to `host.docker.internal`).

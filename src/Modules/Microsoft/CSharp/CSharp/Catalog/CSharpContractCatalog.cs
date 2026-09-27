@@ -41,8 +41,8 @@ public sealed class CSharpContractCatalog(IOptions<CSharpOptions> options)
         { throw new ArgumentException($"Unknown module IDs: {string.Join(", ", unknown)}. Installed module IDs: {string.Join(", ", installed.Keys.Order(StringComparer.Ordinal))}.", nameof(moduleIds)); }
         var modules = installed.OrderBy(module => module.Key, StringComparer.Ordinal)
             .Select(module => new CSharpContractModule(module.Key, Directive(module.Value))).ToArray();
-        var selected = moduleIds.Count == 0 ? installed.Values : moduleIds.Select(id => installed[id]).Append(typeof(INeuron).Assembly).Distinct();
-        var contracts = selected.SelectMany(ExportedTypes)
+        // Discovery with no modules selected lists module ids and the kernel's own contracts only.
+        var contracts = moduleIds.Select(id => installed[id]).Prepend(typeof(INeuron).Assembly).Distinct().SelectMany(assembly => assembly.GetExportedTypes())
             .Where(type => type.IsInterface && typeof(INeuron).IsAssignableFrom(type) && type != typeof(INeuron) || typeof(Signal).IsAssignableFrom(type) && type != typeof(Signal)
                 || type == typeof(IDigitalBrain))
             .OrderBy(type => type.FullName, StringComparer.Ordinal)
@@ -76,12 +76,6 @@ public sealed class CSharpContractCatalog(IOptions<CSharpOptions> options)
         => Directory.GetFiles(AppContext.BaseDirectory, ModulePrefix + "*" + ContractsSuffix + ".dll")
             .Select(path => Assembly.Load(AssemblyName.GetAssemblyName(path)))
             .Prepend(typeof(INeuron).Assembly);
-
-    private static IEnumerable<Type> ExportedTypes(Assembly assembly)
-    {
-        try { return assembly.GetExportedTypes(); }
-        catch (ReflectionTypeLoadException error) { return error.Types.OfType<Type>().Where(type => type.IsPublic); }
-    }
 
     private static string Describe(Type type)
     {

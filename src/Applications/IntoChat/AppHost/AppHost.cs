@@ -128,11 +128,8 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
         if (assets is not null) { context.EnvironmentVariables["IntoChat__LocalFiles__AssetDirectory"] = assets; }
         if (builder.Configuration["IntoChat:Assistant:Model"] is { Length: > 0 } assistantModel)
         { context.EnvironmentVariables["IntoChat__Assistant__Model"] = assistantModel; }
-        foreach (var setting in new[] { "AllowActivation" })
-        {
-            if (builder.Configuration["IntoChat:CSharp:" + setting] is { } value)
-            { context.EnvironmentVariables["IntoChat__CSharp__" + setting] = value; }
-        }
+        if (builder.Configuration["IntoChat:CSharp:AllowActivation"] is { } allowActivation)
+        { context.EnvironmentVariables["IntoChat__CSharp__AllowActivation"] = allowActivation; }
         if (clusterId is not null)
         {
             context.EnvironmentVariables["Orleans__ClusterId"] = clusterId;
