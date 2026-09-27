@@ -6,10 +6,10 @@ namespace DigitalBrain.Tests;
 public sealed class DigitalBrainClientFacts
 {
     [Fact]
-    public async Task RequiresGatewaysUnlessLocalDevelopment()
+    public async Task RequiresTheScriptEdgeTheSandboxSupplies()
     {
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() => DigitalBrainClient.ConnectAsync([], TestContext.Current.CancellationToken));
 
-        Assert.Contains("LocalDevelopment", error.Message, StringComparison.Ordinal);
+        Assert.Contains("DigitalBrain:Edge", error.Message, StringComparison.Ordinal);
     }
 }

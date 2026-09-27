@@ -5,7 +5,7 @@ internal static class SandboxEndpoints
     public static void MapSandbox(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/health", () => TypedResults.Ok());
-        endpoints.MapPost("/runs", async (string identifier, RunRequest request, SandboxRuns runs, CancellationToken cancellationToken) =>
+        endpoints.MapPost("/runs/{identifier}", async (string identifier, RunRequest request, SandboxRuns runs, CancellationToken cancellationToken) =>
         {
             try { return Results.Accepted($"/runs/{identifier}", await runs.StartAsync(identifier, request, cancellationToken)); }
             catch (ArgumentException error) { return Results.BadRequest(error.Message); }

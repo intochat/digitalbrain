@@ -7,8 +7,8 @@ using DigitalBrain.Client;
 using DigitalBrain.Time.Timers.Signals;
 using ITimer = DigitalBrain.Time.Timers.ITimer;
 
-// Host run: dotnet run --file timer-report.cs -- --LocalDevelopment=true --CSharpFile:Settings:TimerId=tea
-// Inside a CSharpFile container the client project is referenced for you; keep only the contracts #:project line.
+// Run it as a C# file: the sandbox supplies DigitalBrain:Edge and DigitalBrain:Token and references the
+// client project for you, so keep only the contracts #:project line there.
 await using var brain = await DigitalBrainClient.ConnectAsync(args);
 var timer = brain.Get<ITimer>(brain.Setting("TimerId") ?? "tea");
 var stopAfterFirstTick = brain.Setting("Smoke") == "true";

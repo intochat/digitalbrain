@@ -30,6 +30,8 @@ internal sealed partial class SandboxRuns(IScriptLauncher launcher, IOptions<San
         return run.Describe();
     }
 
+    public bool AnyRunning => _runs.Values.Any(run => !run.Process.Completion.IsCompleted);
+
     public RunStatus? Find(string identifier) => _runs.TryGetValue(identifier, out var run) ? run.Describe() : null;
 
     public string? ReadLogs(string identifier, int tail) => _runs.TryGetValue(identifier, out var run) ? run.Log.Tail(tail) : null;

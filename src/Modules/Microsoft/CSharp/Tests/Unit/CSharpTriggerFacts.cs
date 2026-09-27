@@ -25,7 +25,7 @@ public sealed class CSharpTriggerFacts
         await pinger.Ping(8);
         await Eventually(() => sandbox.Started == 2, ct);
 
-        var runs = sandbox.Requests.Where(request => request is { Method: "POST", Path: "runs" }).ToArray();
+        var runs = sandbox.Requests.Where(FakeSandbox.IsStart).ToArray();
         Assert.Equal("""{"number":7}""", runs[0].Body!["environment"]!["CSharpFile__Trigger"]!.GetValue<string>());
         Assert.Equal("""{"number":8}""", runs[1].Body!["environment"]!["CSharpFile__Trigger"]!.GetValue<string>());
     }
@@ -113,8 +113,5 @@ public sealed class CSharpTriggerFacts
         while (!await condition()) { await Task.Delay(TimeSpan.FromMilliseconds(50), deadline.Token); }
     }
 
-    private static Task<UnitBrain> Brain(FakeSandbox sandbox, CancellationToken ct)
-        => UnitTest.Create().WithModule<CSharpModule>().WithReminders()
-            .ConfigureSilo(silo => silo.Services.AddHttpClient<SandboxCSharpRunner>().ConfigurePrimaryHttpMessageHandler(() => sandbox))
-            .StartAsync(ct);
+    private static Task<UnitBrain> Brain(FakeSandbox sandbox, CancellationToken ct) => SandboxBrain.StartAsync(sandbox, ct);
 }

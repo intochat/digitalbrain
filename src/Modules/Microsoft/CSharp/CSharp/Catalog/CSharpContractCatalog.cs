@@ -74,7 +74,7 @@ public sealed class CSharpContractCatalog(IOptions<CSharpOptions> options)
             : "#:project " + CSharpSandbox.SourceMount + "/" + Path.GetRelativePath(sourceRoot, project).Replace('\\', '/');
     }
 
-    private static IEnumerable<Assembly> ContractAssemblies()
+    internal static IEnumerable<Assembly> ContractAssemblies()
         => Directory.GetFiles(AppContext.BaseDirectory, ModulePrefix + "*" + ContractsSuffix + ".dll")
             .Select(path => Assembly.Load(AssemblyName.GetAssemblyName(path)))
             .Prepend(typeof(INeuron).Assembly);

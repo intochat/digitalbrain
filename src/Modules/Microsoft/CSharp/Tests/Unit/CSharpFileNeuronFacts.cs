@@ -22,7 +22,7 @@ public sealed class CSharpFileNeuronFacts
         var running = await file.Start(ct);
 
         Assert.Equal(CSharpFileStatus.Running, running.Status);
-        var start = Assert.Single(sandbox.Requests, request => request is { Method: "POST", Path: "runs" });
+        var start = Assert.Single(sandbox.Requests, FakeSandbox.IsStart);
         Assert.Equal("Console.WriteLine(\"hi\");", start.Body!["source"]!.GetValue<string>());
         Assert.Equal("tea", start.Body["environment"]!["CSharpFile__Settings__TimerId"]!.GetValue<string>());
         Assert.Equal("workspace/report", (await changes.NextAsync(ct: ct)).FileId);
@@ -48,7 +48,7 @@ public sealed class CSharpFileNeuronFacts
         await file.Start(ct);
         await file.Start(ct);
 
-        var runs = sandbox.Requests.Where(request => request is { Method: "POST", Path: "runs" }).ToArray();
+        var runs = sandbox.Requests.Where(FakeSandbox.IsStart).ToArray();
         Assert.Equal(2, runs.Length);
         Assert.Single(sandbox.Requests, request => request.Path.EndsWith("/stop", StringComparison.Ordinal));
         Assert.Equal(1, await brain.Get<IFakeAspireProbe>(new CSharpOptions().AspireApplication).Starts());
@@ -164,8 +164,5 @@ public sealed class CSharpFileNeuronFacts
     private static Task Reconcile(ICSharpFile file)
         => file.AsReference<IRemindable>().ReceiveReminder(CSharpFileNeuron.ReconcileReminder, default);
 
-    private static Task<UnitBrain> Brain(FakeSandbox sandbox, CancellationToken ct)
-        => UnitTest.Create().WithModule<CSharpModule>().WithReminders()
-            .ConfigureSilo(silo => silo.Services.AddHttpClient<SandboxCSharpRunner>().ConfigurePrimaryHttpMessageHandler(() => sandbox))
-            .StartAsync(ct);
+    private static Task<UnitBrain> Brain(FakeSandbox sandbox, CancellationToken ct) => SandboxBrain.StartAsync(sandbox, ct);
 }

@@ -15,7 +15,7 @@ public sealed class SandboxRunsFacts : IDisposable
         var ct = TestContext.Current.CancellationToken;
         var runs = Runs();
 
-        var started = await runs.StartAsync("run-1", new("Console.WriteLine(1);", new() { ["Gateways"] = "gwy.tcp://10.0.0.1:30000/0" }), ct);
+        var started = await runs.StartAsync("run-1", new("Console.WriteLine(1);", new() { ["DigitalBrain__Edge"] = "http://edge.test/" }), ct);
 
         Assert.Equal(RunStatuses.Running, started.Status);
         var work = Path.Combine(_workRoot, "run-1");
@@ -23,7 +23,7 @@ public sealed class SandboxRunsFacts : IDisposable
         Assert.Contains("/brain/client.csproj", await File.ReadAllTextAsync(Path.Combine(work, "Directory.Build.props"), ct), StringComparison.Ordinal);
         var launch = Assert.Single(_launcher.Launches);
         Assert.Equal(work, launch.WorkDirectory);
-        Assert.Equal("gwy.tcp://10.0.0.1:30000/0", launch.Environment["Gateways"]);
+        Assert.Equal("http://edge.test/", launch.Environment["DigitalBrain__Edge"]);
     }
 
     [Fact]

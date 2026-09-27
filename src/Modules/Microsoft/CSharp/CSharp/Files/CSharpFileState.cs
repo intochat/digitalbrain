@@ -1,3 +1,5 @@
+using DigitalBrain.Contracts.Enforcement;
+
 namespace DigitalBrain.Microsoft.CSharp;
 
 [GenerateSerializer, Alias("microsoft.csharp.file-state")]
@@ -14,4 +16,6 @@ internal sealed record CSharpFileState
     [Id(5)] public string Owner { get; init; } = "";
     // Set by Arm: runs start on this trigger's signals instead of staying up.
     [Id(6)] public CSharpTrigger? Trigger { get; init; }
+    // The caller who started or armed it; the script edge speaks for this caller as an app.
+    [Id(7)] public CallerContext? OwnerContext { get; init; }
 }
