@@ -21,6 +21,7 @@ internal sealed class PackageBrain(UnitBrain brain, FlakyGrainStorage storage) :
         var storage = new FlakyGrainStorage();
         var brain = await UnitTest.Create()
             .WithModule<AppsModule>()
+            .WithModule<DigitalBrain.Specs.SpecsModule>()
             .ConfigureSilo(silo =>
             {
                 silo.Services.AddKeyedSingleton<IGrainStorage>("Default", storage);

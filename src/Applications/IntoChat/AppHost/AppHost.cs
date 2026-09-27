@@ -5,6 +5,7 @@ using DigitalBrain.AI.FoundryLocal;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.OpenAI;
 using DigitalBrain.Apps;
+using DigitalBrain.Specs;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.ClickHouse;
 using DigitalBrain.Coding;
@@ -71,6 +72,7 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<FlutterModule>(flutter => flutter.RunDesktopApp())
     .WithModule<ComputeModule>()
     .WithModule<DiscoveryModule>()
+    .WithModule<SpecsModule>()
     .WithModule<AppsModule>();
 
 if (developerProfile)

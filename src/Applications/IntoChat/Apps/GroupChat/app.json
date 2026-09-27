@@ -1,0 +1,14 @@
+{
+  "name": "group-chat",
+  "title": "Group chat",
+  "description": "Two models brainstorm your question in turns, build on each other and agree on one answer.",
+  "runtime": "group-chat",
+  "operations": [
+    { "name": "ask", "description": "Ask the group a question." }
+  ],
+  "settings": [
+    { "name": "LunaModel", "description": "The model that speaks as Luna and writes the final answer.", "default": "IGpt56Luna" },
+    { "name": "GemmaModel", "description": "The model that speaks as Gemma.", "default": "IGemma4" },
+    { "name": "MaxRounds", "description": "How many rounds the discussion may take before it must conclude.", "default": "3" }
+  ]
+}

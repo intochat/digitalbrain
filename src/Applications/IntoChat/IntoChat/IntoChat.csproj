@@ -35,6 +35,11 @@
     <ProjectReference Include="../../../Modules/Microsoft/CSharp/CSharp/DigitalBrain.Modules.Microsoft.CSharp.csproj" />
     <ProjectReference Include="../../../Modules/Discovery/Discovery/DigitalBrain.Modules.Discovery.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Apps/Apps/DigitalBrain.Modules.Apps.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Specs/Specs/DigitalBrain.Modules.Specs.csproj" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../Apps/**/*" LogicalName="IntoChat.ShippedApps/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Marketplace/Agents/*.md" LogicalName="IntoChat.Agents.%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

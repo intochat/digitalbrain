@@ -1,8 +1,13 @@
 using DigitalBrain.AI.Agents;
+using DigitalBrain.Contracts;
 using DigitalBrain.Apps;
 using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Specs;
+using IntoChat.Marketplace;
 
 namespace IntoChat.Packages;
+
+internal sealed record DraftRequest(string Text);
 
 internal static class PackageEndpoints
 {
@@ -10,6 +15,12 @@ internal static class PackageEndpoints
     {
         builder.Services.AddSingleton<PackageService>();
         builder.Services.AddSingleton<CSharpSharing>();
+        builder.Services.AddSingleton<MarketplaceService>();
+        builder.Services.AddAppRuntime<GroupChatRuntime>();
+        builder.Services.AddAppRuntime<PromptRuntime>();
+        builder.Services.AddSingleton<StepLibrary, ModelSteps>();
+        builder.Services.AddSingleton<StepLibrary, GroupChatSteps>();
+        builder.Services.AddHostedService<ShippedAppPublisher>();
     }
 
     public static void MapPackages(this IEndpointRouteBuilder routes)
@@ -31,6 +42,19 @@ internal static class PackageEndpoints
             => service.Accept(PackageId.Create(owner, name), number));
         packages.MapPost("/{owner}/{name}/proposals/{number:int}/close", (string owner, string name, int number, PackageService service)
             => service.Close(PackageId.Create(owner, name), number));
+        packages.MapPost("/drafts/{id}", (string id, DraftRequest request, IDigitalBrain brain)
+            => Draft(brain, id).Draft(request.Text));
+        packages.MapGet("/drafts/{id}", (string id, IDigitalBrain brain) => Draft(brain, id).Read());
+        packages.MapPost("/drafts/{id}/revise", (string id, DraftRequest request, IDigitalBrain brain)
+            => Draft(brain, id).Revise(request.Text));
+        packages.MapPut("/drafts/{id}/spec", (string id, DraftRequest request, IDigitalBrain brain)
+            => Draft(brain, id).EditSpec(request.Text));
+        packages.MapPost("/drafts/{id}/build", (string id, IDigitalBrain brain) => Draft(brain, id).Build());
+        packages.MapGet("/steps", (MarketplaceService marketplace) => marketplace.Vocabulary());
+        packages.MapGet("/{owner}/{name}/spec", (string owner, string name, string? revision, MarketplaceService marketplace)
+            => marketplace.Spec(PackageId.Create(owner, name), revision));
+        packages.MapPost("/{owner}/{name}/verify", (string owner, string name, string? revision, MarketplaceService marketplace)
+            => marketplace.Verify(PackageId.Create(owner, name), revision));
         packages.MapPost("/{owner}/{name}/publish", (string owner, string name, PublishPackageRequest request, PackageService service)
             => service.Publish(PackageId.Create(owner, name), request));
 
@@ -56,8 +80,17 @@ internal static class PackageEndpoints
             => service.Uninstall(workspaceId, PackageId.Create(owner, name)));
         installed.MapPost("/invocations", (string workspaceId, string owner, string name, InvokePackageRequest request, PackageService service)
             => service.Invoke(workspaceId, PackageId.Create(owner, name), request));
+        installed.MapGet("/invocations/{invocationId:guid}/discussion", (string workspaceId, string owner, string name, Guid invocationId, PackageService service, MarketplaceService marketplace)
+            => marketplace.Discussion(service.AppKey(workspaceId, PackageId.Create(owner, name)), invocationId));
         installed.MapGet("/invocations/{invocationId:guid}", (string workspaceId, string owner, string name, Guid invocationId, PackageService service)
             => service.ReadInvocation(workspaceId, PackageId.Create(owner, name), invocationId));
+    }
+
+    // A draft belongs to whoever is signed in, and the app it builds is published under their name.
+    private static IAppDraft Draft(IDigitalBrain brain, string id)
+    {
+        if (!Guid.TryParse(id, out var draftId)) { throw new ArgumentException("A draft id is a GUID."); }
+        return brain.Get<IAppDraft>($"{CallerContextStamper.Require().PrincipalId}/drafts/{draftId:N}");
     }
 
     // Packages run code, so they share the C# console's developer-mode gate.

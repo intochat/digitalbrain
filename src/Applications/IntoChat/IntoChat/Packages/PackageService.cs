@@ -85,8 +85,8 @@ internal sealed class PackageService(
     public async Task<InstalledPackageView> Install(string workspaceId, PackageId id, InstallPackageRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        RequireActivation();
         var revision = await Resolve(new(id.Owner, id.Name, request.Revision), preferPublished: true);
+        await RequireActivation(revision);
         await ValidateAccounts(workspaceId, revision, request.Accounts ?? []);
         var app = App(workspaceId, id);
         return await View(await app.Install(new(request.OperationId ?? Guid.NewGuid(), revision, request.Settings ?? [], request.Accounts ?? [])));
@@ -95,9 +95,9 @@ internal sealed class PackageService(
     public async Task<InstalledPackageView> Configure(string workspaceId, PackageId id, ConfigurePackageRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        RequireActivation();
         var app = App(workspaceId, id);
         var existing = await app.Read();
+        await RequireActivation(existing.Revision ?? throw new InvalidOperationException("The package is not installed."));
         var selected = new Dictionary<string, string>(existing.Accounts ?? new Dictionary<string, string>());
         foreach (var (slot, account) in request.Accounts ?? []) { selected[slot] = account; }
         await ValidateAccounts(workspaceId, existing.Revision ?? throw new InvalidOperationException("The package is not installed."), selected);
@@ -107,8 +107,8 @@ internal sealed class PackageService(
     public async Task<InstalledPackageView> Upgrade(string workspaceId, PackageId id, UpgradePackageRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        RequireActivation();
         var revision = await Resolve(new(id.Owner, id.Name, request.Revision), preferPublished: true);
+        await RequireActivation(revision);
         var existing = (await App(workspaceId, id).Read()).Accounts ?? new Dictionary<string, string>();
         var selected = new Dictionary<string, string>(existing);
         foreach (var (slot, account) in request.Accounts ?? []) { selected[slot] = account; }
@@ -152,7 +152,9 @@ internal sealed class PackageService(
 
     private IPackage Package(PackageId id) => brain.Get<IPackage>(id.ToString());
 
-    private IApp App(string workspaceId, PackageId id) => brain.Get<IApp>(WorkspaceScope.Current(auth.Value, workspaceId).Id + "/packages/" + id);
+    public string AppKey(string workspaceId, PackageId id) => WorkspaceScope.Current(auth.Value, workspaceId).Id + "/packages/" + id;
+
+    private IApp App(string workspaceId, PackageId id) => brain.Get<IApp>(AppKey(workspaceId, id));
 
     private async Task ValidateAccounts(string workspaceId, PackageRevisionRef revision, IReadOnlyDictionary<string, string> selected)
     {
@@ -174,8 +176,11 @@ internal sealed class PackageService(
         { throw new ArgumentException("The installation contains an undeclared account slot."); }
     }
 
-    private void RequireActivation()
+    // Only a csharp app runs code in the sandbox; apps configured on top of neurons install anywhere.
+    private async Task RequireActivation(PackageRevisionRef revision)
     {
+        var runtime = (await Package(revision.Package).ReadRevision(revision.Revision)).Content.Manifest.RuntimeName;
+        if (runtime != PackageManifest.CSharpRuntime) { return; }
         if (!files.AllowActivation)
         { throw new InvalidOperationException("This host does not run shared packages. Compose CSharpModule and enable IntoChat:CSharp:AllowActivation in the developer profile."); }
     }

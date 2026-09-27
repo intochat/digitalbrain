@@ -9,6 +9,7 @@
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Apps.Contracts.csproj" />
     <ProjectReference Include="../../../Discovery/Contracts/DigitalBrain.Modules.Discovery.Contracts.csproj" />
     <ProjectReference Include="../../Kernel/Kernel/DigitalBrain.csproj" />
+    <ProjectReference Include="../../Specs/Specs/DigitalBrain.Modules.Specs.csproj" />
     <ProjectReference Include="../../../Microsoft/CSharp/Contracts/DigitalBrain.Modules.Microsoft.CSharp.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>

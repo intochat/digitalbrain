@@ -157,11 +157,21 @@ internal sealed class PackageNeuron(
         RequireOwner(id);
         if (Replay(request.OperationId, request) is null)
         {
-            if (!Snapshot.Revisions.ContainsKey(request.Revision ?? "")) { throw new KeyNotFoundException($"{id} has no revision {request.Revision}."); }
+            if (!Snapshot.Revisions.TryGetValue(request.Revision ?? "", out var revision)) { throw new KeyNotFoundException($"{id} has no revision {request.Revision}."); }
+            await RequireVerified(id, revision);
             await Persist(id, Snapshot with { Published = request.Revision, Receipts = Receipted(request.OperationId, request, request.Revision!) });
         }
         await GrainFactory.GetGrain<IPackageDirectory>(PackageDirectory.Key).Refresh(id);
         return Describe(id);
+    }
+
+    // A revision that states its behavior in app.feature is published only once that behavior was shown to hold.
+    private async Task RequireVerified(PackageId id, PackageRevision revision)
+    {
+        if (revision.Content.File(PackageContent.SpecPath) is null) { return; }
+        var verification = await GrainFactory.GetGrain<IAppVerification>(IAppVerification.Key(new(id, revision.Id))).Read();
+        if (verification is not { Green: true })
+        { throw new InvalidOperationException($"{id}@{revision.Id} has scenarios that have not passed yet. Verify the revision before publishing it."); }
     }
 
     // Copies the revisions this package lacks from the source's lineage and checks each id against its content.
@@ -250,9 +260,10 @@ internal sealed class PackageNeuron(
         return caller == id.Owner ? caller : throw new UnauthorizedAccessException($"Only {id.Owner} can change {id}.");
     }
 
+    // Platform callers are the host publishing its own shipped apps under its own name.
     private static string RequireCaller()
         => CallerContextStamper.TryGet(out var caller) && CallerContextStamper.IsTrusted(caller)
-            && caller.Kind is CallerKind.User or CallerKind.Assistant
+            && caller.Kind is CallerKind.User or CallerKind.Assistant or CallerKind.Platform
             ? caller.PrincipalId
             : throw new UnauthorizedAccessException("Sign in to change packages.");
 }

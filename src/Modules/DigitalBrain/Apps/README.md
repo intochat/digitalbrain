@@ -40,6 +40,18 @@ foreach (var missed in await app.Pending()) { await app.Respond(Answer(missed.Id
 await foreach (var invoked in invocations.ReadAllAsync(brain.Stopping)) { await app.Respond(Answer(invoked.InvocationId, invoked.Input)); }
 ```
 
+## Runtimes, scenarios and verification
+
+A package's manifest names its `Runtime`. `csharp` (the default) runs `Source` as above. Any other runtime is
+configuration on top of neurons: the host registers an `IAppRuntime` under that name, and `IAppRuntimeWorker`
+answers each invocation through it off the app neuron, responding with `Respond` like a script would.
+`PackageContent.Files` carries everything else an app is made of: prompts, runtime configuration and its spec.
+
+`app.feature` is the app's spec, written with Specs steps. `AppSteps` provides the steps every app can use
+(`I ask "..."`, `the answer is "..."`, `the setting "..." is "..."`). `IAppVerification` (keyed
+`{owner}/{name}@{revision}`) installs a fresh scratch app per scenario and runs the spec against it.
+`Publish` refuses a revision that has an `app.feature` until its verification is green.
+
 ## Sharing from the C# console
 
 IntoChat's `POST /workspaces/{workspaceId}/csharp/{id}/share` commits the file's current source to `{you}/{name}` and publishes it. The package's title and description come from the file's name and purpose, and the request may declare account slots. Settings are never shared. Sharing unchanged code again publishes the same revision.

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Runs .feature specs as scenarios against the brain through host-registered step libraries.</Description>
+    <RootNamespace>DigitalBrain.Specs</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Specs.Tests.Unit" />
+    <ProjectReference Include="../Contracts/DigitalBrain.Modules.Specs.Contracts.csproj" />
+    <ProjectReference Include="../../Kernel/Kernel/DigitalBrain.csproj" />
+  </ItemGroup>
+</Project>

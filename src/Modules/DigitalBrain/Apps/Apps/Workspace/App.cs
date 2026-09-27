@@ -29,11 +29,13 @@ internal sealed class App(
         var revision = await GrainFactory.GetGrain<IPackage>(request.Revision.Package.ToString()).ReadRevision(request.Revision.Revision);
         var settings = Resolve(revision.Content.Manifest.Settings, new Dictionary<string, string>(), request.Settings);
         var accounts = ResolveAccounts(revision.Content.Manifest.Accounts ?? [], request.Accounts ?? new Dictionary<string, string>());
+        var runtime = revision.Content.Manifest.RuntimeName;
         var generation = Snapshot.ProgramGeneration + 1;
-        await Deploy(generation, revision.Content.Source, settings, accounts);
+        await Deploy(runtime, generation, revision.Content.Source, settings, accounts);
         await Persist(Snapshot with
         {
             Status = AppStatus.Installed,
+            Runtime = runtime,
             Revision = request.Revision,
             Declared = [.. revision.Content.Manifest.Settings],
             Settings = settings,
@@ -55,8 +57,8 @@ internal sealed class App(
         var selected = new Dictionary<string, string>(Snapshot.Accounts);
         foreach (var (slot, account) in request.Accounts ?? new Dictionary<string, string>()) { selected[slot] = account; }
         var accounts = ResolveAccounts(revision.Content.Manifest.Accounts ?? [], selected);
-        await Retire(Snapshot.ProgramGeneration);
-        await Deploy(Snapshot.ProgramGeneration + 1, revision.Content.Source, settings, accounts);
+        await Retire(Snapshot.Runtime, Snapshot.ProgramGeneration);
+        await Deploy(Snapshot.Runtime, Snapshot.ProgramGeneration + 1, revision.Content.Source, settings, accounts);
         await Persist(Snapshot with { Settings = settings, Accounts = accounts, ProgramGeneration = Snapshot.ProgramGeneration + 1, Receipts = Receipted(request.OperationId, request) });
         return Describe(Snapshot);
     }
@@ -75,10 +77,12 @@ internal sealed class App(
         var kept = Snapshot.Settings.Where(pair => declared.Any(setting => setting.Name == pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value);
         var settings = Resolve(declared, kept, new Dictionary<string, string>());
         var accounts = ResolveAccounts(revision.Content.Manifest.Accounts ?? [], request.Accounts ?? Snapshot.Accounts);
-        await Retire(Snapshot.ProgramGeneration);
-        await Deploy(Snapshot.ProgramGeneration + 1, revision.Content.Source, settings, accounts);
+        var runtime = revision.Content.Manifest.RuntimeName;
+        await Retire(Snapshot.Runtime, Snapshot.ProgramGeneration);
+        await Deploy(runtime, Snapshot.ProgramGeneration + 1, revision.Content.Source, settings, accounts);
         await Persist(Snapshot with
         {
+            Runtime = runtime,
             Revision = request.Revision,
             ProgramGeneration = Snapshot.ProgramGeneration + 1,
             Declared = [.. declared],
@@ -95,7 +99,7 @@ internal sealed class App(
         ArgumentNullException.ThrowIfNull(request);
         if (Replay(request.OperationId, request)) { return Describe(Snapshot); }
         RequireInstalled();
-        await Retire(Snapshot.ProgramGeneration);
+        await Retire(Snapshot.Runtime, Snapshot.ProgramGeneration);
         var now = clock.GetUtcNow();
         var invocations = Snapshot.Invocations
             .Select(item => item.Status == InvocationStatus.Pending ? item with { Status = InvocationStatus.Failed, Error = "The app was uninstalled.", CompletedAt = now } : item)
@@ -124,6 +128,8 @@ internal sealed class App(
             invocations.RemoveAt(oldest);
         }
         await Save(Snapshot with { Invocations = invocations }, new AppInvoked(invocation.Id, invocation.Operation, invocation.Input));
+        if (!Snapshot.RunsScript)
+        { await GrainFactory.GetGrain<IAppRuntimeWorker>(0).Answer(this.GetPrimaryKeyString(), Snapshot.Revision!, invocation); }
         return invocation;
     }
 
@@ -158,8 +164,10 @@ internal sealed class App(
 
     // Every deployment gets a fresh file, so a command retried after a lost save rewrites and restarts
     // the same file instead of depending on what the previous generation left behind.
-    private async Task Deploy(int generation, string source, IReadOnlyDictionary<string, string> settings, IReadOnlyDictionary<string, string> accounts)
+    // Only a csharp app has a program to run; every other runtime answers through IAppRuntimeWorker.
+    private async Task Deploy(string runtime, int generation, string source, IReadOnlyDictionary<string, string> settings, IReadOnlyDictionary<string, string> accounts)
     {
+        if (runtime != PackageManifest.CSharpRuntime) { return; }
         var file = GrainFactory.GetGrain<ICSharpFile>(FileKey(generation));
         await file.Write(source);
         await file.Configure(Configuration(settings, accounts));
@@ -167,7 +175,9 @@ internal sealed class App(
     }
 
     // Deleting an already deleted file is harmless, so retries need no bookkeeping.
-    private Task Retire(int generation) => GrainFactory.GetGrain<ICSharpFile>(FileKey(generation)).Delete();
+    private Task Retire(string runtime, int generation) => runtime == PackageManifest.CSharpRuntime
+        ? GrainFactory.GetGrain<ICSharpFile>(FileKey(generation)).Delete()
+        : Task.CompletedTask;
 
     // The script reads brain.Setting("App") to find this neuron, brain.Setting(name) for each setting
     // and brain.Setting("Account__" + slot) for each connected account.
@@ -249,6 +259,6 @@ internal sealed class App(
         state.Revision,
         new Dictionary<string, string>(state.Settings),
         state.Operations.ToArray(),
-        state.ProgramGeneration == 0 ? null : FileKey(state.ProgramGeneration),
+        state.ProgramGeneration == 0 || !state.RunsScript ? null : FileKey(state.ProgramGeneration),
         new Dictionary<string, string>(state.Accounts));
 }

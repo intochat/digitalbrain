@@ -21,8 +21,12 @@ internal static class CSharpEndpoints
             return sp.GetRequiredService<CSharpToolService>().ForScope(WorkspaceScope.Current(sp.GetRequiredService<IOptions<BasicAuthOptions>>().Value, workspace).Id);
         });
         // WithTools<T> constructs T itself, bypassing the workspace-scoped factory; resolve it per invocation instead.
-        builder.Services.AddMcpServer().WithHttpTransport().WithTools(CSharpToolService.Tools.Select(tool =>
-            McpServerTool.Create(tool.Method, request => request.Services!.GetRequiredService<ScopedCSharpTools>())));
+        builder.Services.AddScoped<IntoChat.Marketplace.AppTools>();
+        builder.Services.AddMcpServer().WithHttpTransport()
+            .WithTools(CSharpToolService.Tools.Select(tool =>
+                McpServerTool.Create(tool.Method, request => request.Services!.GetRequiredService<ScopedCSharpTools>())))
+            .WithTools(IntoChat.Marketplace.AppTools.Methods.Select(method =>
+                McpServerTool.Create(method, request => request.Services!.GetRequiredService<IntoChat.Marketplace.AppTools>())));
     }
 
     public static void MapCSharp(this IEndpointRouteBuilder routes)

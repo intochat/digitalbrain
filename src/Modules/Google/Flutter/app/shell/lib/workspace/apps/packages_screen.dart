@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../csharp/csharp_manager.dart';
+import 'app_spec_screen.dart';
+import 'create_app_screen.dart';
 
 typedef PackagesRequest = Future<dynamic> Function(
   String method,
@@ -40,6 +42,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
   final Map<String, Map<String, dynamic>> _files = {};
   final Map<String, TextEditingController> _inputs = {};
   final Map<String, String> _outputs = {};
+  final Map<String, List<Map<String, dynamic>>> _discussions = {};
   bool _busy = false;
   String? _error;
   String? _notice;
@@ -143,10 +146,12 @@ class _PackagesScreenState extends State<PackagesScreen> {
         'input': input,
       }),
     );
-    final deadline = DateTime.now().add(const Duration(seconds: 30));
+    // A group chat can take minutes; its turns show up while it runs.
+    final deadline = DateTime.now().add(const Duration(minutes: 10));
     while (invocation['status'] == _pending &&
         DateTime.now().isBefore(deadline)) {
       await Future<void>.delayed(widget.pollInterval);
+      await _readDiscussion(id, '${invocation['id']}');
       invocation = _map(
         await widget.request(
           'GET',
@@ -154,6 +159,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
         ),
       );
     }
+    await _readDiscussion(id, '${invocation['id']}');
     if (!mounted) return;
     setState(
       () => _outputs[id] = invocation['status'] == _completed
@@ -164,17 +170,62 @@ class _PackagesScreenState extends State<PackagesScreen> {
     );
   });
 
+  Future<void> _readDiscussion(String id, String invocationId) async {
+    try {
+      final discussion = _map(
+        await widget.request(
+          'GET',
+          '${_appPath(id)}/invocations/$invocationId/discussion',
+        ),
+      );
+      final turns = discussion['turns'] is List
+          ? (discussion['turns'] as List).map(_map).toList()
+          : <Map<String, dynamic>>[];
+      if (mounted && turns.isNotEmpty) {
+        setState(() => _discussions[id] = turns);
+      }
+    } catch (_) {
+      // Only group chat apps hold a discussion.
+    }
+  }
+
+  void _openSpec(String id, String title) => Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => AppSpecScreen(
+        packageId: id,
+        title: title,
+        request: widget.request,
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Packages'),
+        title: const Text('Apps'),
         leading: IconButton(
           tooltip: 'Close',
           icon: const Icon(Icons.close),
           onPressed: widget.onClose,
         ),
         actions: [
+          TextButton.icon(
+            key: const ValueKey('create-app'),
+            onPressed: _busy
+                ? null
+                : () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) =>
+                            CreateAppScreen(request: widget.request),
+                      ),
+                    );
+                    if (mounted) await _refresh();
+                  },
+            icon: const Icon(Icons.add),
+            label: const Text('Create app'),
+          ),
           IconButton(
             tooltip: 'Refresh',
             icon: const Icon(Icons.refresh),
@@ -199,7 +250,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
           Expanded(
             child: _listings.isEmpty && !_busy
                 ? const Center(
-                    child: Text('No one has published a C# app yet.'),
+                    child: Text('No one has published an app yet.'),
                   )
                 : ListView(
                     padding: const EdgeInsets.all(12),
@@ -289,6 +340,11 @@ class _PackagesScreenState extends State<PackagesScreen> {
                     child: const Text('Uninstall'),
                   ),
                 OutlinedButton(
+                  key: ValueKey('scenarios-$id'),
+                  onPressed: () => _openSpec(id, '${listing['title'] ?? id}'),
+                  child: const Text('Scenarios'),
+                ),
+                OutlinedButton(
                   key: ValueKey('fork-$id'),
                   onPressed: _busy
                       ? null
@@ -323,6 +379,22 @@ class _PackagesScreenState extends State<PackagesScreen> {
                 ],
               ),
             ],
+            for (final turn in _discussions[id] ?? const <Map<String, dynamic>>[])
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '${turn['speaker']} · round ${turn['round']}: ',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      TextSpan(text: '${turn['text']}'),
+                    ],
+                  ),
+                  key: ValueKey('turn-$id-${turn['round']}-${turn['speaker']}'),
+                ),
+              ),
             if (_outputs[id] != null)
               SelectableText(_outputs[id]!, key: ValueKey('output-$id')),
           ],

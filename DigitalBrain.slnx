@@ -127,6 +127,11 @@
     <Project Path="src/Modules/DigitalBrain/Apps/Contracts/DigitalBrain.Modules.Apps.Contracts.csproj" />
     <Project Path="src/Modules/DigitalBrain/Apps/Apps/DigitalBrain.Modules.Apps.csproj" />
   </Folder>
+  <Folder Name="/Modules/DigitalBrain/Specs/">
+    <Project Path="src/Modules/DigitalBrain/Specs/Tests/Unit/DigitalBrain.Modules.Specs.Tests.Unit.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Specs/Contracts/DigitalBrain.Modules.Specs.Contracts.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Specs/Specs/DigitalBrain.Modules.Specs.csproj" />
+  </Folder>
   <Folder Name="/Modules/Discovery/">
     <Project Path="src/Modules/Discovery/Tests/Unit/DigitalBrain.Modules.Discovery.Tests.Unit.csproj" />
     <Project Path="src/Modules/Discovery/Contracts/DigitalBrain.Modules.Discovery.Contracts.csproj" />

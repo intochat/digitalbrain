@@ -9,6 +9,7 @@ internal static partial class PackageRules
     public const int MaxOpenProposals = 64;
     public const int MaxReceipts = 1024;
     private const int MaxCodeBytes = 128 * 1024;
+    private const int MaxFiles = 64;
     private static readonly HashSet<string> ReservedSettings = new(["App", "Account"], StringComparer.OrdinalIgnoreCase);
 
     public static void Validate(PackageContent content)
@@ -38,7 +39,15 @@ internal static partial class PackageRules
             "Account slot names must be unique.");
         Require(!accounts.Any(account => manifest.Settings.Any(setting => string.Equals(setting.Name, account.Name, StringComparison.OrdinalIgnoreCase))),
             "Account slots and settings cannot share a name.");
-        Require(!string.IsNullOrWhiteSpace(content.Source) && System.Text.Encoding.UTF8.GetByteCount(content.Source) <= MaxCodeBytes, "Source is required and at most 128 KiB.");
+        Require(RuntimeName().IsMatch(manifest.RuntimeName), "A runtime name is lowercase words joined by hyphens.");
+        Require(content.Source is not null && System.Text.Encoding.UTF8.GetByteCount(content.Source) <= MaxCodeBytes, "Source is at most 128 KiB.");
+        Require(manifest.RuntimeName != PackageManifest.CSharpRuntime || !string.IsNullOrWhiteSpace(content.Source), "A csharp app needs its script as source.");
+        var files = content.Files ?? new Dictionary<string, string>();
+        Require(files.Count <= MaxFiles && files.All(file => file.Key.Length <= 128 && FilePath().IsMatch(file.Key) && !file.Key.Contains("..", StringComparison.Ordinal) && file.Value is not null),
+            "A package has at most 64 files with relative paths of letters, digits, dots, hyphens and single slashes.");
+        Require(files.Keys.Distinct(StringComparer.OrdinalIgnoreCase).Count() == files.Count, "File paths must differ by more than letter case.");
+        Require(System.Text.Encoding.UTF8.GetByteCount(content.Source ?? "") + files.Values.Sum(System.Text.Encoding.UTF8.GetByteCount) <= MaxCodeBytes * 4,
+            "A package is at most 512 KiB of text.");
     }
 
     public static string Message(string? message)
@@ -63,4 +72,10 @@ internal static partial class PackageRules
 
     [GeneratedRegex("^[A-Za-z0-9.-]{1,64}$")]
     private static partial Regex ModuleId();
+
+    [GeneratedRegex("^[a-z][a-z0-9]*(-[a-z0-9]+)*$")]
+    private static partial Regex RuntimeName();
+
+    [GeneratedRegex("^[A-Za-z0-9_][A-Za-z0-9_.-]*(/[A-Za-z0-9_][A-Za-z0-9_.-]*)*$")]
+    private static partial Regex FilePath();
 }

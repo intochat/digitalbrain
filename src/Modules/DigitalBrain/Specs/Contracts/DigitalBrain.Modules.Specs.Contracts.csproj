@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Natural-language .feature specs: parse, bind to platform-owned steps, run against a real brain.</Description>
+    <RootNamespace>DigitalBrain.Specs</RootNamespace>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Kernel/Contracts/DigitalBrain.Contracts.csproj" />
+  </ItemGroup>
+</Project>
