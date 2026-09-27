@@ -18,7 +18,7 @@ namespace IntoChat.Agent;
 internal static class AgentEndpoints
 {
     private const string ProductInstructions = "You are the IntoChat workspace assistant. Choose tools that match the user's request. Only for database requests, use supabase_schema then show_supabase_query_table with read-only SQL; refine the same window with table_refine and answer counts or aggregates with table_read instead of opening a new window. To collect typed input (a card with fields, a sign-up, a password), call show_form with fields whose kind comes from the type catalog; then answer with the handle, never re-ask for values the form collects. Use show_view to reopen a form window. Never fabricate data or result identifiers. Tool results with isError=true are failures: repair the arguments or explain the configuration problem; never claim success.";
-    private const string DeveloperInstructions = "You are the IntoChat workspace assistant. Choose tools that match the user's request. Only for database requests, use supabase_schema then show_supabase_query_table with read-only SQL; refine the same window with table_refine and answer counts or aggregates with table_read instead of opening a new window. Never fabricate data or result identifiers. For new C# synapses use synapse_contracts to discover installed module IDs and concrete contracts, then synapse_draft to read or save source and meaningful xUnit tests with a readable name and purpose. Use synapse_check to compile and test the current draft; repair the reported diagnostics and check again. Use synapse_activate with action=status to read deployment, readiness and logs; deploy only a passing artifact when the user requested execution; start, stop, rollback or delete the synapse. Never send a revision or operation id: the server reads the current revision and mints ids itself. Resolve neurons by concrete contracts such as ITimer, never the INeuron base interface. Never claim a synapse is running until synapse_activate status reports readiness. Tool results with isError=true are failures: repair the arguments or explain the configuration problem; never claim success.";
+    private const string DeveloperInstructions = "You are the IntoChat workspace assistant. Choose tools that match the user's request. Only for database requests, use supabase_schema then show_supabase_query_table with read-only SQL; refine the same window with table_refine and answer counts or aggregates with table_read instead of opening a new window. Never fabricate data or result identifiers. To automate with C#, use csharp_contracts to discover installed module IDs, concrete neuron contracts and their #:project lines, then csharp_write to save one single-file C# app with a readable name and purpose; it connects with DigitalBrainClient.ConnectAsync(args) and operates neurons. Use csharp_run start only when the user asked to run it, then csharp_run status to read its output; compile errors appear there (status Restarting, then Exited), so repair the source, write it again and restart. Resolve neurons by concrete contracts such as ITimer, never the INeuron base interface. Never claim the app works until its output shows it. Tool results with isError=true are failures: repair the arguments or explain the configuration problem; never claim success.";
 
     public static string ConversationKey(string scope, string thread) =>
         "agent-conversation-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new[] { scope, thread })))).ToLowerInvariant();
@@ -82,7 +82,7 @@ internal static class AgentEndpoints
                     else
                     {
                         var developerMode = AgentToolPolicy.DeveloperModeEnabled(configuration["IntoChat:DeveloperMode"]);
-                        var fallback = AgentToolPolicy.UnsupportedBehaviorAuthoring(developerMode, userText);
+                        var fallback = AgentToolPolicy.UnsupportedCSharpAuthoring(developerMode, userText);
                         if (fallback is not null)
                         {
                             await Emit(new { type = "TEXT_MESSAGE_CONTENT", messageId, delta = fallback });
@@ -173,7 +173,7 @@ internal static class AgentEndpoints
         if (!string.IsNullOrEmpty(state.Summary)) { instructions += "\nEarlier conversation summary: " + state.Summary; }
         await foreach (var item in runner.RunAsync(new("workspace-assistant", run, scope, state.Turns, message, model,
             instructions,
-            AgentToolPolicy.SelectTools(developerMode, SynapseAgentTools.Names, selection.AppTools, selection.TableIntent)), ct))
+            AgentToolPolicy.SelectTools(developerMode, CSharpAgentTools.Names, selection.AppTools, selection.TableIntent)), ct))
         {
             switch (item)
             {

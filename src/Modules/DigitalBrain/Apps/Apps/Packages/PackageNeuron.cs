@@ -1,5 +1,4 @@
 using DigitalBrain.Apps.Signals;
-using DigitalBrain.Coding;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core;
@@ -11,7 +10,6 @@ namespace DigitalBrain.Apps;
 [GrainType("apps.package")]
 internal sealed class PackageNeuron(
     [PersistentState("package", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<PackageState> store,
-    ICodeArtifactStore artifacts,
     TimeProvider clock)
     : Neuron<PackageState>(store), IPackage
 {
@@ -50,8 +48,7 @@ internal sealed class PackageNeuron(
             { throw new InvalidOperationException($"{id} already contains {merge.Package}@{merge.Revision}; commit without merging."); }
             parents.Add(merge.Revision);
         }
-        await VerifyArtifact(request.Content, request.Artifact);
-        var revision = new PackageRevision(PackageHash.Revision(parents, request.Content), parents, request.Content, request.Artifact, author, message, clock.GetUtcNow());
+        var revision = new PackageRevision(PackageHash.Revision(parents, request.Content), parents, request.Content, author, message, clock.GetUtcNow());
         arrived[revision.Id] = revision;
         await Persist(id, Advance(revision.Id, arrived, request.OperationId, request, revision.Id));
         return revision;
@@ -165,17 +162,6 @@ internal sealed class PackageNeuron(
         }
         await GrainFactory.GetGrain<IPackageDirectory>(PackageDirectory.Key).Refresh(id);
         return Describe(id);
-    }
-
-    private async Task VerifyArtifact(PackageContent content, CodeArtifactRef artifact)
-    {
-        ArgumentNullException.ThrowIfNull(artifact);
-        VerifiedArtifact verified;
-        try { verified = await artifacts.OpenVerifiedAsync(artifact, CancellationToken.None); }
-        catch (Exception error) when (error is InvalidDataException or IOException or ArgumentException)
-        { throw new ArgumentException("The artifact could not be verified: " + error.Message, error); }
-        if (verified.Manifest.Source != content.Source || verified.Manifest.Tests != content.Tests)
-        { throw new ArgumentException("The artifact was built from different source or tests than this revision. Check the exact content before committing it."); }
     }
 
     // Copies the revisions this package lacks from the source's lineage and checks each id against its content.

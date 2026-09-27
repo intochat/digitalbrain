@@ -1,4 +1,5 @@
 using DigitalBrain.Core;
+using Microsoft.Extensions.Configuration;
 using Xunit;
 
 namespace DigitalBrain.Tests;
@@ -20,5 +21,18 @@ public sealed class DigitalBrainClientFacts
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() => DigitalBrainClient.ConnectAsync([], TestContext.Current.CancellationToken));
 
         Assert.Contains("LocalDevelopment", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ScriptSettingsReadTheKeysEnvironmentVariablesProduce()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["CSharpFile:Settings:style"] = "bullets",
+            ["CSharpFile:Settings:Account:twitter"] = "bob-twitter",
+        }).Build();
+
+        Assert.Equal("bullets", configuration[DigitalBrainConnection.SettingKey("style")]);
+        Assert.Equal("bob-twitter", configuration[DigitalBrainConnection.SettingKey("Account__twitter")]);
     }
 }

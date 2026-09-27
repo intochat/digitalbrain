@@ -96,7 +96,7 @@ public sealed class HygieneFacts
         Assert.False(File.Exists(PathInRepo("src/Testing/DigitalBrain.Testing.E2E/Demo/ElonBitcoin.cs")), "The ElonBitcoin inbox feed demo is deleted with the volatile inbox.");
         Assert.True(File.Exists(PathInRepo("src/Testing/DigitalBrain.Testing.E2E/Demo/TwitterFakes.cs")), "TwitterFakes must live in the test host.");
         Assert.DoesNotContain("TestTwitterModule", Read("src/Applications/IntoChat/AppHost/AppHost.cs"));
-        Assert.DoesNotContain("AddBehavior<ElonBitcoin>", Read("src/Applications/IntoChat/IntoChat/Behavior/SynapseEndpoints.cs"));
+        Assert.DoesNotContain("ElonBitcoin", Read("src/Applications/IntoChat/IntoChat/CSharp/CSharpEndpoints.cs"));
     }
 
     [Fact]
@@ -113,7 +113,7 @@ public sealed class HygieneFacts
         var appHost = Read("src/Applications/IntoChat/AppHost/AppHost.cs");
         var gate = appHost.IndexOf("developerProfile", StringComparison.Ordinal);
         Assert.True(gate >= 0, "The AppHost must select a product/developer profile.");
-        foreach (var module in new[] { "WithModule<RoslynModule>", "WithModule<DotNetModule>", "WithModule<CodingModule>", "WithModule<BehaviorModule>" })
+        foreach (var module in new[] { "WithModule<RoslynModule>", "WithModule<DotNetModule>", "WithModule<CodingModule>", "WithModule<CSharpModule>" })
         {
             var index = appHost.IndexOf(module, StringComparison.Ordinal);
             Assert.True(index > gate, $"{module} is developer-only and must be gated behind the developer profile.");

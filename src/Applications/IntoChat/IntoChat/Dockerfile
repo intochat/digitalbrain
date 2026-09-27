@@ -18,7 +18,7 @@
 #   DigitalBrain__Memory__Provider=Qdrant
 #   ConnectionStrings__memory-qdrant  Endpoint=http://qdrant:6334;Key=...
 #
-# The product profile excludes the Windows developer executor: Coding, Behavior, Roslyn, DotNet
+# The product profile excludes the developer executors: Coding, CSharp, Roslyn, DotNet
 # and Aspire are not in the module list below.
 #
 # Ports: 8080 silo HTTP (broker + health).

@@ -15,12 +15,5 @@ internal static class PackageSamples
         {
             public static string Of(string question, string style) => "{{verb}} (" + style + "): " + question;
         }
-        """,
-        $$"""
-        public sealed class BriefFacts
-        {
-            [Xunit.Fact] public void Writes() => Xunit.Assert.StartsWith("{{verb}}", Brief.Of("q", "plain"));
-        }
-        """,
-        []);
+        """);
 }

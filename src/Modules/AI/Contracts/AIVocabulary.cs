@@ -1,7 +1,7 @@
 namespace DigitalBrain.AI;
 
 /// <summary>
-/// Legacy signal words retained for existing behavior consumers. New code uses IAgent,
+/// Legacy signal words retained for existing consumers. New code uses IAgent,
 /// ILLM and the typed lifecycle signals in their contracts.
 /// </summary>
 public static class AIVocabulary

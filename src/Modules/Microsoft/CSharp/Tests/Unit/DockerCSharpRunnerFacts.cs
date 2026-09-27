@@ -25,10 +25,11 @@ public sealed class DockerCSharpRunnerFacts : IDisposable
 
         var calls = processes.Calls.ToArray();
         var container = DockerCSharpRunner.ContainerName("workspace/timer");
-        Assert.Equal(["rm", "--force", container], calls[0]);
-        var run = calls[1];
+        Assert.Equal(["stop", "--time", "10", container], calls[0]);
+        Assert.Equal(["rm", "--force", container], calls[1]);
+        var run = calls[2];
         Assert.Equal(["run", "--detach", "--name", container], run.Take(4));
-        Assert.Contains("on-failure", run);
+        Assert.Contains("on-failure:5", run);
         Assert.Contains(@"E:\repo:/brain:ro", run);
         Assert.Contains("CSharpFile__Settings__Greeting=a = b c", run);
         Assert.Contains("CSharpFile__Id=workspace/timer", run);

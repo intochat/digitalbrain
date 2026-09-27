@@ -37,7 +37,7 @@ List<AppLauncherEntry> launcherEntries(List<AppManifestSummary> apps) {
   return entries;
 }
 
-const _openableLaunchKeys = {'files', 'images', 'behaviors'};
+const _openableLaunchKeys = {'files', 'images', 'csharp'};
 
 const _firstPartyIds = {
   'intochat.files',
@@ -102,9 +102,9 @@ const defaultLauncherEntries = <AppLauncherEntry>[
   ),
 ];
 
-const behaviorsLauncherEntry = AppLauncherEntry(
-  launchKey: 'behaviors',
-  title: 'Behaviors',
-  subtitle: 'Create and manage automations',
-  icon: Icons.account_tree_outlined,
+const csharpLauncherEntry = AppLauncherEntry(
+  launchKey: 'csharp',
+  title: 'C# files',
+  subtitle: 'Write and run single-file C# apps',
+  icon: Icons.code,
 );

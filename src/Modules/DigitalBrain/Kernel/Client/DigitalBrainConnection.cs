@@ -26,7 +26,10 @@ public sealed class DigitalBrainConnection : IDigitalBrain
     public CancellationToken Stopping => _host.Services.GetService(typeof(IHostApplicationLifetime)) is IHostApplicationLifetime lifetime
         ? lifetime.ApplicationStopping : CancellationToken.None;
 
-    public string? Setting(string name) => Configuration[$"CSharpFile:Settings:{name}"];
+    // Environment variables spell configuration sections with "__", so "Account__twitter" arrives as "Account:twitter".
+    public string? Setting(string name) => Configuration[SettingKey(name)];
+
+    internal static string SettingKey(string name) => "CSharpFile:Settings:" + name.Replace("__", ":", StringComparison.Ordinal);
 
     public T Get<T>(string id) where T : class, IGrainWithStringKey => _brain.Get<T>(id);
 

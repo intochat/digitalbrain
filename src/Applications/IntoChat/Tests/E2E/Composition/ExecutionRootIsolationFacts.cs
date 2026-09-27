@@ -3,24 +3,21 @@ using Microsoft.Extensions.Configuration;
 
 namespace IntoChat.Tests.E2E.Composition;
 
-/// <summary>
-/// Regression guard for the startup collision where the test AppHost inherited the developer's
-/// persisted <c>IntoChat:BehaviorAuthoring:Root</c> from the shared user secrets and failed to open
-/// <c>execution.lock</c>. The harness must hand the AppHost a unique per-run temporary root instead.
-/// </summary>
+// Regression guard: the test AppHost must not inherit the developer's persisted IntoChat:CSharp:Root
+// from the shared user secrets. The harness hands the AppHost a unique per-run temporary root instead.
 public sealed class ExecutionRootIsolationFacts
 {
-    private const string BehaviorRootKey = "IntoChat:BehaviorAuthoring:Root";
+    private const string CSharpRootKey = "IntoChat:CSharp:Root";
 
     [Fact]
-    public async Task HarnessSuppliesAUniqueTemporaryBehaviorRoot()
+    public async Task HarnessSuppliesAUniqueTemporaryCSharpRoot()
     {
         var builder = IntoChatE2ETest.Create();
         var args = builder.HostArguments("test-" + Guid.NewGuid().ToString("N"));
         var root = builder.ExecutionRoot;
 
         Assert.NotNull(root);
-        Assert.Equal(BehaviorRootKey, root.ConfigurationKey);
+        Assert.Equal(CSharpRootKey, root.ConfigurationKey);
         Assert.StartsWith(Path.GetTempPath(), root.Path, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(root.Argument, args);
 
@@ -42,7 +39,7 @@ public sealed class ExecutionRootIsolationFacts
         try
         {
             var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.IntoChat_AppHost>([.. args], ct);
-            var effectiveRoot = new ConfigurationBuilder().AddConfiguration(appHost.Configuration).Build()[BehaviorRootKey];
+            var effectiveRoot = new ConfigurationBuilder().AddConfiguration(appHost.Configuration).Build()[CSharpRootKey];
 
             Assert.Equal(root.Path, effectiveRoot);
         }

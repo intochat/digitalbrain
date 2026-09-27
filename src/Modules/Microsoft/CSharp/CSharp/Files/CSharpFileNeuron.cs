@@ -23,10 +23,9 @@ internal sealed partial class CSharpFileNeuron(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(source);
         if (Encoding.UTF8.GetByteCount(source) > MaximumSourceBytes) { throw new ArgumentException($"Source exceeds {MaximumSourceBytes} bytes.", nameof(source)); }
-        var next = Snapshot;
-        next.Source = source;
         var container = await runner.InspectAsync(FileId, cancellationToken);
-        await Save(next, new CSharpFileChanged(FileId, container.Status));
+        await Save(new CSharpFileState { Source = source, Settings = new(Snapshot.Settings, StringComparer.Ordinal) },
+            new CSharpFileChanged(FileId, container.Status));
         return Describe(container);
     }
 
@@ -36,10 +35,9 @@ internal sealed partial class CSharpFileNeuron(
         if (settings.Count > MaximumSettings) { throw new ArgumentException($"At most {MaximumSettings} settings are allowed.", nameof(settings)); }
         if (settings.Keys.FirstOrDefault(name => !SettingName().IsMatch(name)) is { } invalid)
         { throw new ArgumentException($"Setting '{invalid}' must contain only letters, digits and underscores.", nameof(settings)); }
-        var next = Snapshot;
-        next.Settings = new Dictionary<string, string>(settings, StringComparer.Ordinal);
         var container = await runner.InspectAsync(FileId, cancellationToken);
-        await Save(next, new CSharpFileChanged(FileId, container.Status));
+        await Save(new CSharpFileState { Source = Snapshot.Source, Settings = new(settings, StringComparer.Ordinal) },
+            new CSharpFileChanged(FileId, container.Status));
         return Describe(container);
     }
 

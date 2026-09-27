@@ -39,25 +39,19 @@ loads the composed list from `DigitalBrain:Modules` (`TypeFullName, AssemblyName
 that list as `DigitalBrain__Modules__N`, and the container images pin the same list.
 
 Modules: AI; Memory; ClickHouse; Supabase; Time; Google (Gmail); Salesforce; Microsoft (Aspire,
-GitHub, Roslyn, DotNet); Coding; Behavior; Flutter.
+GitHub, Roslyn, DotNet, CSharp); Coding; Flutter.
 
-## Behavior
+## C# files
 
-**Behavior program**
-`IBehaviorProgram`, implemented by `BehaviorProgramNeuron`, deploys saved code artifacts and owns
-their lifecycle: `Deploy`, `Start`, `Stop`, `Rollback`, `Read` and `ReadLogs`. Deployment verifies the
-artifact before use; revisions and logs are persisted; changes publish deployment, execution and log
-signals.
-
-**Behavior runtime**
-`IBehavior` is a program run outside the silo by `BehaviorApp.RunAsync<TBehavior>`. It connects an
-Orleans client, subscribes through a scoped `IDigitalBrain`, reports readiness over a control pipe,
-and stops when a required subscription closes.
+**C# file**
+`ICSharpFile` (Microsoft/CSharp) holds one single-file C# app as a source string in grain state and
+runs it with `dotnet run app.cs` in a .NET SDK container: `Write`, `Configure`, `Start`, `Stop`,
+`ReadLogs`, `Delete`. The container's state is the file's status; its console output is the log.
 
 **Script**
-C# authored against module contracts. Saving a script creates a draft and artifact; deploying and
-starting it is a behavior-program lifecycle action.
-_Avoid_: plugin, capability
+The C# app itself. It connects with `DigitalBrainClient.ConnectAsync(args)` and operates neurons
+through `brain.Get<T>(id)` and `brain.On<TSignal>(neuron)`; settings arrive through `brain.Setting(name)`.
+_Avoid_: behavior, synapse, plugin, capability
 
 ## Providers
 

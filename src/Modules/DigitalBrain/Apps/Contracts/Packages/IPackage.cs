@@ -4,7 +4,7 @@ using Orleans.Metadata;
 
 namespace DigitalBrain.Apps;
 
-// A shareable behavior, keyed "owner/name". Reads are public; changes require the owner.
+// A shareable C# script, keyed "owner/name". Reads are public; changes require the owner.
 // Reads interleave because packages read each other while forking, merging and accepting.
 [Alias("apps.package"), DefaultGrainType("apps.package")]
 public interface IPackage : INeuron

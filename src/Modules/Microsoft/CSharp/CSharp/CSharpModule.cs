@@ -39,13 +39,14 @@ public sealed class CSharpModule : IModule
         builder.Services.AddOptions<CSharpOptions>().BindConfiguration(CSharpOptions.SectionName)
             .Configure<IOptions<EndpointOptions>, IOptions<ClusterOptions>>((o, endpoint, cluster) =>
             {
-                o.Root ??= Path.Combine(Path.GetTempPath(), "digitalbrain-csharp");
-                o.SourceRoot ??= RepositoryRoot.Find();
+                // Unset composition values arrive as empty strings, not nulls.
+                if (string.IsNullOrWhiteSpace(o.Root)) { o.Root = Path.Combine(Path.GetTempPath(), "digitalbrain-csharp"); }
+                if (string.IsNullOrWhiteSpace(o.SourceRoot)) { o.SourceRoot = RepositoryRoot.Find(); }
                 if (string.IsNullOrWhiteSpace(o.Gateways))
                 {
                     var advertised = endpoint.Value.AdvertisedIPAddress ?? IPAddress.Loopback;
                     o.Gateways = new UriBuilder("gwy.tcp", advertised.ToString(), endpoint.Value.GatewayPort, "0").Uri.ToString();
-                    if (IPAddress.IsLoopback(advertised)) { o.GatewayRelayHost ??= ContainerHost; }
+                    if (IPAddress.IsLoopback(advertised) && string.IsNullOrWhiteSpace(o.GatewayRelayHost)) { o.GatewayRelayHost = ContainerHost; }
                 }
                 if (string.IsNullOrWhiteSpace(o.ClusterId)) { o.ClusterId = cluster.Value.ClusterId; }
                 if (string.IsNullOrWhiteSpace(o.ServiceId)) { o.ServiceId = cluster.Value.ServiceId; }

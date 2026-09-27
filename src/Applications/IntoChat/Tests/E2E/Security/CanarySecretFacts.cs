@@ -139,7 +139,7 @@ public sealed class CanarySecretFacts
     }
 
     [Fact(Timeout = 300_000)]
-    public async Task BehaviorConsoleIsGatedByServerDeveloperMode()
+    public async Task CSharpConsoleIsGatedByServerDeveloperMode()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var on = await IntoChatE2ETest.Create().StartAsync(ct);
@@ -156,8 +156,8 @@ public sealed class CanarySecretFacts
 
         var gated = await off.HttpClient.GetFromJsonAsync<JsonElement>("/session/capabilities", ct);
         Assert.False(gated.GetProperty("developerMode").GetBoolean());
-        using var behaviors = await off.HttpClient.GetAsync($"/workspaces/{Owner}/behaviors/", ct);
-        Assert.Equal(System.Net.HttpStatusCode.NotFound, behaviors.StatusCode);
+        using var files = await off.HttpClient.GetAsync($"/workspaces/{Owner}/csharp/", ct);
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, files.StatusCode);
     }
 
     private static string Scope(string owner, string workspace)

@@ -16,8 +16,6 @@ internal static class PackageHash
         operations = content.Manifest.Operations.Select(operation => new[] { operation.Name, operation.Description }),
         settings = content.Manifest.Settings.Select(setting => new[] { setting.Name, setting.Description, setting.DefaultValue }),
         source = content.Source,
-        tests = content.Tests,
-        moduleIds = content.ModuleIds,
     });
 
     public static string Of<T>(T value) => Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(value, Canonical)));

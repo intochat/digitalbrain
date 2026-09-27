@@ -11,6 +11,9 @@ internal sealed class DockerCSharpRunner(IProcessRunner processes, IOptions<CSha
     internal const string SourceMount = "/brain";
     internal const string WorkMount = "/work";
     internal const string PackagesVolume = "digitalbrain-csharp-nuget";
+    private const string GracefulStopSeconds = "10";
+    // Rides out a silo restart, yet lets a script that does not compile settle as Exited.
+    internal const int MaximumRestarts = 5;
     internal const string ClientProject = SourceMount + "/src/Modules/DigitalBrain/Kernel/Client/DigitalBrain.Client.csproj";
 
     internal static readonly string BuildProps = $"""
@@ -32,7 +35,9 @@ internal sealed class DockerCSharpRunner(IProcessRunner processes, IOptions<CSha
 
     public async Task StartAsync(string fileId, string source, IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken)
     {
-        var sourceRoot = Settings.SourceRoot ?? throw new InvalidOperationException("CSharp SourceRoot is not configured.");
+        var sourceRoot = string.IsNullOrWhiteSpace(Settings.SourceRoot)
+            ? throw new InvalidOperationException("CSharp SourceRoot is not configured; the container cannot mount the DigitalBrain sources.")
+            : Settings.SourceRoot;
         var container = ContainerName(fileId);
         var workDirectory = Path.Combine(Settings.Root!, container);
         Directory.CreateDirectory(workDirectory);
@@ -63,7 +68,7 @@ internal sealed class DockerCSharpRunner(IProcessRunner processes, IOptions<CSha
         [
             "run", "--detach", "--name", container,
             "--label", "digitalbrain.csharp=" + Settings.ServiceId,
-            "--restart", "on-failure",
+            "--restart", "on-failure:" + MaximumRestarts,
             "--add-host", "host.docker.internal:host-gateway",
             "--volume", sourceRoot + ":" + SourceMount + ":ro",
             "--volume", workDirectory + ":" + WorkMount,
@@ -100,8 +105,11 @@ internal sealed class DockerCSharpRunner(IProcessRunner processes, IOptions<CSha
     internal static string ContainerName(string fileId)
         => "csharp-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(fileId)))[..24];
 
+    // A killed script never unsubscribes, and every neuron it watched then waits on a dead observer.
+    // Stopping first lets the script's host dispose its subscriptions on SIGTERM.
     private async Task RemoveAsync(string container, CancellationToken cancellationToken)
     {
+        await DockerAsync(["stop", "--time", GracefulStopSeconds, container], cancellationToken).ConfigureAwait(false);
         var removed = await DockerAsync(["rm", "--force", container], cancellationToken).ConfigureAwait(false);
         if (removed.ExitCode != 0 && !removed.Error.Contains("No such container", StringComparison.OrdinalIgnoreCase))
         { throw new InvalidOperationException("docker rm failed: " + removed.Error.Trim()); }

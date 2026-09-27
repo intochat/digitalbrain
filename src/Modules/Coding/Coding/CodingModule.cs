@@ -2,7 +2,6 @@ using DigitalBrain.Core;
 using DigitalBrain.Microsoft.DotNet;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 
 namespace DigitalBrain.Coding;
@@ -39,36 +38,5 @@ public sealed class CodingModule : IModule
             .ValidateOnStart();
         services.TryAddSingleton<IProcessRunner, ProcessRunner>();
         services.TryAddSingleton<GitRunner>();
-        services.AddOptions<CodeExecutionOptions>().BindConfiguration(CodeExecutionOptions.SectionName);
-        services.PostConfigure<CodeExecutionOptions>(o =>
-        {
-            if (o.ReferencePaths.Length == 0)
-            {
-                o.ReferencePaths = Directory.GetFiles(AppContext.BaseDirectory, "*.dll")
-                    .Where(p => !Path.GetFileName(p).Contains(".Tests", StringComparison.Ordinal) && IsManagedAssembly(p)).ToArray();
-                foreach (var (module, file) in new (string Module, string File)[]
-                {
-                    ("time", "DigitalBrain.Modules.Time.Contracts.dll"),
-                    ("flutter", "DigitalBrain.Modules.Flutter.Contracts.dll"),
-                    ("ai", "DigitalBrain.Modules.AI.Contracts.dll"),
-                    ("google", "DigitalBrain.Modules.Google.Gmail.Contracts.dll"),
-                })
-                {
-                    var path = Path.Combine(AppContext.BaseDirectory, file);
-                    if (File.Exists(path)) { o.Modules.TryAdd(module, [path]); }
-                }
-            }
-        });
-        services.TryAddSingleton<CodeCheckCoordinator>();
-        services.TryAddSingleton<ContractCatalog>();
-        services.TryAddSingleton<ICodeArtifactStore>(sp => new CodeValidationService(sp.GetRequiredService<IOptions<CodeExecutionOptions>>().Value).Store());
-        services.AddHostedService(sp => sp.GetRequiredService<CodeCheckCoordinator>());
-    }
-
-    private static bool IsManagedAssembly(string path)
-    {
-        using var stream = File.OpenRead(path);
-        using var reader = new System.Reflection.PortableExecutable.PEReader(stream);
-        return reader.HasMetadata;
     }
 }

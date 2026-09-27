@@ -92,12 +92,12 @@ public sealed class AgentToolFacts
     }
 
     [Fact]
-    public void DefaultAllowlistIsAtMostEightToolsAndExcludesBehaviorTools()
+    public void DefaultAllowlistIsAtMostEightToolsAndExcludesCSharpTools()
     {
         var selected = AgentToolPolicy.SelectTools(developerMode: false,
-            ["code_contracts", "code_draft_save", "behavior_read", "behavior_deploy", "behavior_start"]);
+            ["csharp_contracts", "csharp_write", "csharp_run"]);
         Assert.True(selected.Count <= AgentToolPolicy.MaxDefaultTools);
-        Assert.DoesNotContain(selected, AgentToolPolicy.IsBehaviorTool);
+        Assert.DoesNotContain(selected, AgentToolPolicy.IsCSharpTool);
         Assert.Equal(AgentToolPolicy.ProductTools, selected);
     }
 
@@ -132,20 +132,20 @@ public sealed class AgentToolFacts
     }
 
     [Fact]
-    public void ExplicitDeveloperModeIncludesBehaviorTools()
+    public void ExplicitDeveloperModeIncludesCSharpTools()
     {
-        string[] developerTools = ["code_contracts", "behavior_read", "behavior_deploy"];
+        string[] developerTools = ["csharp_contracts", "csharp_write", "csharp_run"];
         var selected = AgentToolPolicy.SelectTools(developerMode: true, developerTools);
         Assert.Equal(AgentToolPolicy.ProductTools.Concat(developerTools), selected);
-        Assert.Contains("behavior_read", selected);
+        Assert.Contains("csharp_run", selected);
     }
 
     [Fact]
-    public void DeveloperModeOffRefusesBehaviorAuthoringWithOneLinePhase1Fallback()
+    public void DeveloperModeOffRefusesCSharpAuthoringWithOneLinePhase1Fallback()
     {
-        var fallback = AgentToolPolicy.UnsupportedBehaviorAuthoring(developerMode: false, "write a C# behavior that saves invoices");
+        var fallback = AgentToolPolicy.UnsupportedCSharpAuthoring(developerMode: false, "write C# code that saves invoices");
         Assert.NotNull(fallback);
-        Assert.Equal(AgentToolPolicy.BehaviorAuthoringFallback, fallback);
+        Assert.Equal(AgentToolPolicy.CSharpAuthoringFallback, fallback);
         Assert.Contains("Phase 1", fallback!);
         Assert.DoesNotContain('\n', fallback!);
     }
@@ -153,8 +153,8 @@ public sealed class AgentToolFacts
     [Fact]
     public void DeveloperModeOffStillAnswersOrdinaryTableRequests()
     {
-        Assert.Null(AgentToolPolicy.UnsupportedBehaviorAuthoring(developerMode: false, "show me all customers"));
-        Assert.Equal(AgentToolPolicy.ProductTools, AgentToolPolicy.SelectTools(developerMode: false, ["behavior_read"]));
+        Assert.Null(AgentToolPolicy.UnsupportedCSharpAuthoring(developerMode: false, "show me all customers"));
+        Assert.Equal(AgentToolPolicy.ProductTools, AgentToolPolicy.SelectTools(developerMode: false, ["csharp_run"]));
     }
 
     [Theory]

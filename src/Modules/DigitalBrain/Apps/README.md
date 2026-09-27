@@ -1,12 +1,12 @@
 # Apps
 
-Shared behaviors (packages), their marketplace directory, and packages installed into workspaces as apps. The module also keeps first-party app manifests, the per-workspace catalog and consent for the existing app surfaces.
+Shared C# apps (packages), their marketplace directory, and packages installed into workspaces as apps. The module also keeps first-party app manifests, the per-workspace catalog and consent for the existing app surfaces.
 
 ## Packages
 
-A package is a shareable behavior addressed as `owner/name`, where the owner is the publishing account's username. `IPackage` holds content-addressed revisions: a revision id hashes its parents and content, so forks share ancestry.
+A package is a shareable single-file C# app addressed as `owner/name`, where the owner is the publishing account's username. `IPackage` holds content-addressed revisions: a revision id hashes its parents and content, so forks share ancestry.
 
-A revision is accepted only with a Coding check artifact built from exactly its source and tests. Every revision that anyone installs, forks or accepts has passed its own tests.
+A revision is its manifest and source. Nothing compiles it at commit time: a broken script shows up as an `Exited` file with its compiler output in the logs.
 
 | Git | Package |
 | --- | --- |
@@ -20,37 +20,33 @@ Reads are public. Changes require the stamped caller to own the package. Proposa
 
 ## Installed apps
 
-`IApp : INeuron` is one package revision installed in one workspace. Behaviors run out of process and cannot host neurons, so the app is the behavior's address in the brain:
+`IApp : INeuron` is one package revision installed in one workspace. Scripts run in containers and cannot host neurons, so the app is the script's address in the brain:
 
-- `Install`, `Configure`, `Upgrade` deploy the revision's verified artifact through `IBehaviorProgram` with `Behavior__App` and `Behavior__{name}` configuration, the same keys an automation reads in the behavior console. Configuring declared settings customizes a package without forking it.
-- `Invoke` stores a pending invocation and publishes `AppInvoked`. The behavior answers with `Respond`. `Pending` returns work that arrived before the behavior subscribed, because signals are not durable.
-- Each installation runs under its own behavior program key, because deleted programs cannot be redeployed.
+- `Install`, `Configure`, `Upgrade` write the revision's source into a fresh `ICSharpFile`, configure it and start it. The script reads `brain.Setting("App")` for the app's key, `brain.Setting(name)` for each declared setting and `brain.Setting("Account__" + slot)` for each connected account. Configuring declared settings customizes a package without forking it.
+- `Invoke` stores a pending invocation and publishes `AppInvoked`. The script answers with `Respond`. `Pending` returns work that arrived before the script subscribed, because signals are not durable.
+- Each generation runs in its own file; the previous one is deleted, which stops its container.
 
-A package behavior:
+A package script:
 
 ```csharp
-var settings = new ConfigurationBuilder().AddEnvironmentVariables().AddCommandLine(args).Build();
-await BehaviorApp.RunAsync<Researcher>(args, brain => [SubscriptionRequirement.For<AppInvoked>(brain.Get<IApp>(settings["Behavior:App"]!))]);
+#:project /brain/src/Modules/DigitalBrain/Apps/Contracts/DigitalBrain.Modules.Apps.Contracts.csproj
+using DigitalBrain.Apps;
+using DigitalBrain.Apps.Signals;
 
-public sealed class Researcher(IDigitalBrain brain, IConfiguration configuration) : IBehavior
-{
-    public async Task RunAsync(CancellationToken cancellation = default)
-    {
-        var app = brain.Get<IApp>(configuration["Behavior:App"]!);
-        await using var invocations = await brain.SubscribeAsync<AppInvoked>(app, cancellation);
-        foreach (var missed in await app.Pending()) { await app.Respond(Answer(missed.Id, missed.Input)); }
-        await foreach (var invoked in invocations.ReadAllAsync(cancellation)) { await app.Respond(Answer(invoked.InvocationId, invoked.Input)); }
-    }
-}
+await using var brain = await DigitalBrainClient.ConnectAsync(args);
+var app = brain.Get<IApp>(brain.Setting("App")!);
+await using var invocations = await brain.SubscribeAsync<AppInvoked>(app, brain.Stopping);
+foreach (var missed in await app.Pending()) { await app.Respond(Answer(missed.Id, missed.Input)); }
+await foreach (var invoked in invocations.ReadAllAsync(brain.Stopping)) { await app.Respond(Answer(invoked.InvocationId, invoked.Input)); }
 ```
 
-## Sharing from the behavior console
+## Sharing from the C# console
 
-IntoChat's `POST /workspaces/{workspaceId}/behaviors/{id}/share` (the console's "Share as package" button) commits the automation's draft to `{you}/{name}`, using its passing check as the revision's artifact, and publishes it. The package's title and description come from the automation. Its settings are the automation's current `Behavior__*` configuration, and their current values become the published defaults, so never keep secrets there. Sharing unchanged code again publishes the same revision.
+IntoChat's `POST /workspaces/{workspaceId}/csharp/{id}/share` commits the file's current source to `{you}/{name}` and publishes it. The package's title and description come from the file's name and purpose, and the request may declare account slots. Settings are never shared. Sharing unchanged code again publishes the same revision.
 
 ## Trust
 
-Installing a package runs its code with the behavior worker's privileges; the worker is not a sandbox. IntoChat composes workers only in the developer profile. Its package routes need `IntoChat:DeveloperMode`, and running packages also needs `IntoChat:BehaviorAuthoring:AllowActivation`. A public marketplace needs an isolated executor first.
+Installing a package runs its code in a container with full client access to the brain; the container is not a permission boundary. IntoChat composes the CSharp module only in the developer profile. Its package routes need `IntoChat:DeveloperMode`, and running packages also needs `IntoChat:CSharp:AllowActivation`. A public marketplace needs per-app identities first.
 
 ## Tests
 
@@ -59,4 +55,4 @@ dotnet test --project src/Modules/DigitalBrain/Apps/Tests/Unit/DigitalBrain.Modu
 dotnet test --project src/Modules/DigitalBrain/Apps/Tests/E2E/DigitalBrain.Modules.Apps.Tests.E2E.csproj -p:CodeGraphRefresh=false
 ```
 
-The E2E compiles real package behaviors and runs them in workers. IntoChat's `Packages/PackageSharingFacts` drives the same journey over HTTP with two registered accounts.
+The E2E runs real package scripts in .NET SDK containers, so it needs a Docker daemon. IntoChat's `Packages/PackageSharingFacts` drives the same journey over HTTP with two registered accounts.

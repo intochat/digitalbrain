@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Coding module contracts: drafts, change sets and artifacts.</Description>
+    <Description>Coding module contracts: change sets.</Description>
     <RootNamespace>DigitalBrain.Coding</RootNamespace>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>

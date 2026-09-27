@@ -1,7 +1,6 @@
-using System.Text.Json;
 using DigitalBrain.Apps;
 using DigitalBrain.Apps.Signals;
-using DigitalBrain.Behavior;
+using DigitalBrain.Microsoft.CSharp;
 
 namespace DigitalBrain.Modules.Apps.Tests.Unit.Workspace;
 
@@ -10,7 +9,7 @@ public sealed class AppFacts
     private static readonly PackageId Researcher = PackageId.Parse("alice/researcher");
 
     [Fact]
-    public async Task InstallationRequiresAccountBindingsAndPassesOnlySelectedIdsToTheProgram()
+    public async Task InstallationRequiresAccountBindingsAndPassesOnlySelectedIdsToTheFile()
     {
         await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
         Caller.As("alice");
@@ -31,16 +30,16 @@ public sealed class AppFacts
             new Dictionary<string, string> { ["twitter"] = "bob-twitter" }));
 
         Assert.Equal("bob-twitter", installed.Accounts!["twitter"]);
-        Assert.Equal("bob-twitter", Configuration(Assert.Single(Program(installed).Deployments))["Behavior__Account__twitter"]);
-        Assert.DoesNotContain("Credential", Configuration(Assert.Single(Program(installed).Deployments)).Keys);
+        Assert.Equal("bob-twitter", File(installed).Settings["Account__twitter"]);
+        Assert.DoesNotContain("Credential", File(installed).Settings.Keys);
         var changed = await app.Configure(new(Guid.NewGuid(), new Dictionary<string, string>(),
             new Dictionary<string, string> { ["twitter"] = "other-twitter" }));
         Assert.Equal("other-twitter", changed.Accounts!["twitter"]);
-        Assert.Equal("other-twitter", Configuration(Assert.Single(Program(changed).Deployments))["Behavior__Account__twitter"]);
+        Assert.Equal("other-twitter", File(changed).Settings["Account__twitter"]);
     }
 
     [Fact]
-    public async Task UpgradeRetainsExistingAccountAndRequiresNewSlotsBeforeRetiringTheRunningProgram()
+    public async Task UpgradeRetainsExistingAccountAndRequiresNewSlotsBeforeRetiringTheRunningFile()
     {
         await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
         Caller.As("alice");
@@ -60,7 +59,7 @@ public sealed class AppFacts
             new Dictionary<string, string> { ["twitter"] = "alice-twitter" }));
 
         await Assert.ThrowsAsync<ArgumentException>(() => app.Upgrade(new(Guid.NewGuid(), new(Researcher, second.Id))));
-        Assert.False(RecordingBehaviorProgram.Deleted.ContainsKey(installed.BehaviorProgram!));
+        Assert.False(RecordingCSharpFile.Deleted.ContainsKey(installed.CSharpFile!));
         var upgraded = await app.Upgrade(new(Guid.NewGuid(), new(Researcher, second.Id),
             new Dictionary<string, string> { ["twitter"] = "alice-twitter", ["notify"] = "alice-ui" }));
         Assert.Equal("alice-twitter", upgraded.Accounts!["twitter"]);
@@ -68,7 +67,7 @@ public sealed class AppFacts
     }
 
     [Fact]
-    public async Task InstallRunsTheRevisionArtifactWithTheAppAddressAndChosenSettings()
+    public async Task InstallRunsTheRevisionSourceWithTheAppAddressAndChosenSettings()
     {
         await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
         var revision = await Publish(brain, "Research");
@@ -80,11 +79,11 @@ public sealed class AppFacts
         Assert.Equal(new PackageRevisionRef(Researcher, revision.Id), installed.Revision);
         Assert.Equal("bullets", installed.Settings["style"]);
         Assert.Equal("research", Assert.Single(installed.Operations).Name);
-        var deployment = Assert.Single(Program(installed).Deployments);
-        Assert.Equal(revision.Artifact, deployment.Artifact);
-        var configuration = Configuration(deployment);
-        Assert.Equal(key, configuration["Behavior__App"]);
-        Assert.Equal("bullets", configuration["Behavior__style"]);
+        var file = File(installed);
+        Assert.Equal(CSharpFileStatus.Running, file.Status);
+        Assert.Equal(revision.Content.Source, file.Source);
+        Assert.Equal(key, file.Settings["App"]);
+        Assert.Equal("bullets", file.Settings["style"]);
     }
 
     [Fact]
@@ -104,7 +103,7 @@ public sealed class AppFacts
     }
 
     [Fact]
-    public async Task ConfiguringRunsTheSameArtifactInAFreshProgramWithoutForking()
+    public async Task ConfiguringRunsTheSameSourceInAFreshFileWithoutForking()
     {
         await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
         var revision = await Publish(brain, "Research");
@@ -116,12 +115,11 @@ public sealed class AppFacts
         var repeated = await app.Configure(configure);
 
         Assert.Equal("brief", configured.Settings["style"]);
-        Assert.Equal(configured.BehaviorProgram, repeated.BehaviorProgram);
-        Assert.NotEqual(installed.BehaviorProgram, configured.BehaviorProgram);
-        Assert.True(RecordingBehaviorProgram.Deleted.ContainsKey(installed.BehaviorProgram!));
-        var deployment = Assert.Single(Program(configured).Deployments);
-        Assert.Equal(revision.Artifact, deployment.Artifact);
-        Assert.Equal("brief", Configuration(deployment)["Behavior__style"]);
+        Assert.Equal(configured.CSharpFile, repeated.CSharpFile);
+        Assert.NotEqual(installed.CSharpFile, configured.CSharpFile);
+        Assert.True(RecordingCSharpFile.Deleted.ContainsKey(installed.CSharpFile!));
+        Assert.Equal(revision.Content.Source, File(configured).Source);
+        Assert.Equal("brief", File(configured).Settings["style"]);
     }
 
     [Fact]
@@ -135,20 +133,20 @@ public sealed class AppFacts
         brain.Storage.FailNextWrite = state => state is AppState { Status: AppStatus.Installed };
         await Assert.ThrowsAnyAsync<Exception>(() => app.Install(install));
         var installed = await app.Install(install);
-        Assert.Single(Program(installed).Deployments);
+        Assert.Equal(CSharpFileStatus.Running, File(installed).Status);
 
         var configure = new ConfigureApp(Guid.NewGuid(), new Dictionary<string, string> { ["style"] = "brief" });
         brain.Storage.FailNextWrite = state => state is AppState { Status: AppStatus.Installed } app && app.Settings["style"] == "brief";
         await Assert.ThrowsAnyAsync<Exception>(() => app.Configure(configure));
         var configured = await app.Configure(configure);
-        Assert.Single(Program(configured).Deployments);
-        Assert.True(RecordingBehaviorProgram.Deleted.ContainsKey(installed.BehaviorProgram!));
+        Assert.Equal("brief", File(configured).Settings["style"]);
+        Assert.True(RecordingCSharpFile.Deleted.ContainsKey(installed.CSharpFile!));
 
         var uninstall = new UninstallApp(Guid.NewGuid());
         brain.Storage.FailNextWrite = state => state is AppState { Status: AppStatus.Uninstalled };
         await Assert.ThrowsAnyAsync<Exception>(() => app.Uninstall(uninstall));
         Assert.Equal(AppStatus.Uninstalled, (await app.Uninstall(uninstall)).Status);
-        Assert.True(RecordingBehaviorProgram.Deleted.ContainsKey(configured.BehaviorProgram!));
+        Assert.True(RecordingCSharpFile.Deleted.ContainsKey(configured.CSharpFile!));
     }
 
     [Fact]
@@ -179,14 +177,14 @@ public sealed class AppFacts
 
         Assert.Equal(second.Id, upgraded.Revision!.Revision);
         Assert.Equal("bullets", upgraded.Settings["style"]);
-        Assert.Equal(second.Artifact, Assert.Single(Program(upgraded).Deployments).Artifact);
+        Assert.Equal(second.Content.Source, File(upgraded).Source);
         Caller.As("bob");
         await brain.Get<IPackage>("bob/researcher").Fork(new(Guid.NewGuid(), new(Researcher, second.Id)));
         await Assert.ThrowsAsync<ArgumentException>(() => app.Upgrade(new(Guid.NewGuid(), new(PackageId.Parse("bob/researcher"), second.Id))));
     }
 
     [Fact]
-    public async Task AnInvocationIsSignalledToTheBehaviorAndCompletedByItsResponse()
+    public async Task AnInvocationIsSignalledToTheScriptAndCompletedByItsResponse()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await PackageBrain.StartAsync(ct);
@@ -215,7 +213,7 @@ public sealed class AppFacts
     }
 
     [Fact]
-    public async Task UninstallingStopsTheBehaviorAndAReinstallGetsAFreshProgram()
+    public async Task UninstallingStopsTheScriptAndAReinstallGetsAFreshFile()
     {
         await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
         var revision = await Publish(brain, "Research");
@@ -226,13 +224,13 @@ public sealed class AppFacts
         var uninstalled = await app.Uninstall(new(Guid.NewGuid()));
 
         Assert.Equal(AppStatus.Uninstalled, uninstalled.Status);
-        Assert.True(RecordingBehaviorProgram.Deleted.ContainsKey(installed.BehaviorProgram!));
+        Assert.True(RecordingCSharpFile.Deleted.ContainsKey(installed.CSharpFile!));
         Assert.Equal(InvocationStatus.Failed, (await app.ReadInvocation(waiting.Id)).Status);
         await Assert.ThrowsAsync<InvalidOperationException>(() => app.Invoke(new(Guid.NewGuid(), "research", "After uninstall")));
 
         var reinstalled = await app.Install(new(Guid.NewGuid(), new(Researcher, revision.Id), new Dictionary<string, string>()));
-        Assert.NotEqual(installed.BehaviorProgram, reinstalled.BehaviorProgram);
-        Assert.Single(Program(reinstalled).Deployments);
+        Assert.NotEqual(installed.CSharpFile, reinstalled.CSharpFile);
+        Assert.Equal(CSharpFileStatus.Running, File(reinstalled).Status);
     }
 
     private static async Task<PackageRevision> Publish(PackageBrain brain, string verb)
@@ -247,8 +245,5 @@ public sealed class AppFacts
 
     private static string Key() => "workspace-test/apps/" + Guid.NewGuid().ToString("N");
 
-    private static BehaviorSnapshot Program(AppSnapshot app) => RecordingBehaviorProgram.Programs[app.BehaviorProgram!];
-
-    private static Dictionary<string, string> Configuration(BehaviorDeployment deployment)
-        => JsonSerializer.Deserialize<Dictionary<string, string>>(deployment.ConfigurationJson)!;
+    private static CSharpFileSnapshot File(AppSnapshot app) => RecordingCSharpFile.Files[app.CSharpFile!];
 }

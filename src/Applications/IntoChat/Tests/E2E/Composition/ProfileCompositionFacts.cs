@@ -4,12 +4,12 @@ namespace IntoChat.Tests.E2E.Composition;
 
 /// <summary>
 /// P0.3 profile guard. The AppHost composes developer-only modules (Aspire project path, Roslyn,
-/// DotNet, Coding, Behavior) only in the developer profile; the product profile keeps user-path
+/// DotNet, Coding, CSharp) only in the developer profile; the product profile keeps user-path
 /// modules. This builds the real AppHost model without starting any resource.
 /// </summary>
 public sealed class ProfileCompositionFacts
 {
-    private static readonly string[] DeveloperOnlyModules = ["Aspire", "Roslyn", "DotNet", "Coding", "Behavior"];
+    private static readonly string[] DeveloperOnlyModules = ["Aspire", "Roslyn", "DotNet", "Coding", "CSharp"];
 
     private static readonly string[] UserPathModules =
         ["AI", "Memory", "ClickHouse", "Supabase", "Time", "Gmail", "Salesforce", "GitHub", "Flutter"];

@@ -171,8 +171,8 @@ per-request media model selection, image editing and realtime duplex voice sessi
 are not implemented. Inline bytes keep results usable until a shared artifact store
 exists. Provider adapters can allocate buffers before the media output limit is checked.
 
-Scheduling, UI callbacks, workspace operations, generated C# compilation and behavior
-deployment belong to stage two. This change does not add those methods to `IAgent`.
+Scheduling, UI callbacks, workspace operations and running generated C# belong to
+stage two. This change does not add those methods to `IAgent`.
 
 ## Verification
 
@@ -185,6 +185,6 @@ Unit tests use deterministic external providers and local HTTP fixtures, includi
 real OpenAI/Ollama SDK request mapping. E2E starts a separate Aspire host with
 disposable storage and calls a local provider fixture; Docker is required. These
 tests do not certify availability or current capabilities of hosted cloud models.
-# Behavior authoring composition
+# C# authoring composition
 
-IntoChat composes `IAgent` with Coding drafts/checks and Behavior lifecycle tools to author single-source C# applications. AI retains ownership of models and agent runs; validation, artifacts and worker supervision live in their own modules. See [programmable behaviors](../Behavior/README.md) for configuration, command contracts, recovery and tests.
+IntoChat composes `IAgent` with the Microsoft/CSharp tools (`csharp_contracts`, `csharp_write`, `csharp_run`) so the assistant writes single-file C# apps that operate neurons. AI retains ownership of models and agent runs; source storage and container execution live in the CSharp module. See [C# files](../Microsoft/CSharp/README.md).

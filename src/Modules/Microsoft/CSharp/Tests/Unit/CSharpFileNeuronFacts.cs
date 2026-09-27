@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using DigitalBrain.Microsoft.CSharp;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace DigitalBrain.Tests;
@@ -49,6 +50,20 @@ public sealed class CSharpFileNeuronFacts
         await Assert.ThrowsAsync<InvalidOperationException>(() => file.Start(ct));
         await Assert.ThrowsAsync<ArgumentException>(() => file.Configure(new Dictionary<string, string> { ["bad name"] = "x" }, ct));
         await Assert.ThrowsAsync<ArgumentException>(() => file.Write(new string('x', CSharpFileNeuron.MaximumSourceBytes + 1), ct));
+    }
+
+    [Fact]
+    public async Task UnsetComposedSettingsFallBackToTheRepositoryAndTheSiloGateway()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<CSharpModule>().StartAsync(ct);
+
+        var options = brain.SiloServices.GetRequiredService<IOptions<CSharpOptions>>().Value;
+
+        Assert.Equal(RepositoryRoot.Find(), options.SourceRoot);
+        Assert.False(string.IsNullOrWhiteSpace(options.Root));
+        Assert.StartsWith("gwy.tcp://", options.Gateways, StringComparison.Ordinal);
+        Assert.False(string.IsNullOrWhiteSpace(options.ClusterId));
     }
 
     private sealed class FakeRunner : ICSharpRunner

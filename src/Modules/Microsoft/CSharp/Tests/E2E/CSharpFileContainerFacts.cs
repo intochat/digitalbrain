@@ -60,6 +60,34 @@ public sealed class CSharpFileContainerFacts
         Assert.Equal(CSharpFileStatus.Stopped, (await file.Read(ct)).Status);
     }
 
+    [Fact]
+    public async Task ASourceThatDoesNotCompileSettlesAsExitedWithTheCompilerOutput()
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        deadline.CancelAfter(TimeSpan.FromMinutes(8));
+        var ct = deadline.Token;
+        var builder = new TestClusterBuilder(1);
+        builder.Options.ConnectionTransport = ConnectionTransportType.TcpSocket;
+        builder.AddSiloBuilderConfigurator<ContainerSilo>();
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync(ct);
+        var file = cluster.Client.GetGrain<ICSharpFile>("e2e/broken-" + Guid.NewGuid().ToString("N")[..8]);
+        try
+        {
+            await file.Write("Console.WriteLine(undefinedName);", ct);
+            await file.Start(ct);
+
+            var exited = await Until(file, snapshot => snapshot.Status == CSharpFileStatus.Exited, ct);
+
+            Assert.NotEqual(0, exited.ExitCode);
+            Assert.Contains("error CS0103", await file.ReadLogs(500, ct), StringComparison.Ordinal);
+        }
+        finally
+        {
+            await file.Delete(CancellationToken.None);
+        }
+    }
+
     private static async Task Logs(ICSharpFile file, string expected, CancellationToken ct)
     {
         var logs = "";

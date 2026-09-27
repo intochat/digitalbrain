@@ -583,11 +583,11 @@ class WorkspaceStore extends ChangeNotifier {
   }
 
   WorkspaceArtifact launchLocalApp(String app) {
-    if (!['files', 'images', 'behaviors'].contains(app)) {
+    if (!['files', 'images', 'csharp'].contains(app)) {
       throw ArgumentError('Application not implemented.');
     }
-    if (app == 'behaviors' && !_developerMode) {
-      throw ArgumentError('Behaviors are available in developer mode only.');
+    if (app == 'csharp' && !_developerMode) {
+      throw ArgumentError('C# files are available in developer mode only.');
     }
     final id = 'app-$app';
     final artifact =
@@ -596,7 +596,7 @@ class WorkspaceStore extends ChangeNotifier {
           id: id,
           title: switch (app) {
             'files' => 'Files',
-            'behaviors' => 'Behaviors',
+            'csharp' => 'C# files',
             _ => 'Image Editor',
           },
           kind: 'app',

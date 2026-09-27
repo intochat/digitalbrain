@@ -128,7 +128,7 @@ void main() {
           {'columnId': 'company', 'operator': 'eq', 'value': 'Filtered'},
         ],
       }),
-      update: (_, __, update) async {
+      update: (_, _, update) async {
         submitted = update;
         return TableSnapshot.fromJson(tableJson(2, 'All rows'));
       },
@@ -298,12 +298,12 @@ void main() {
     final controller = UiTableController(
       workspace: 'w',
       snapshot: TableSnapshot.fromJson(tableJson(1, 'old')),
-      read: (_, __, {offset = 0, limit = 25}) => ++calls == 1
+      read: (_, _, {offset = 0, limit = 25}) => ++calls == 1
           ? slow.future
           : calls == 2
           ? fast.future
           : Future.value(TableSnapshot.fromJson(tableJson(3, 'authoritative'))),
-      update: (_, __, update) async =>
+      update: (_, _, update) async =>
           throw const TableRequestException(409, 'conflict'),
     );
     final first = controller.reload();

@@ -9,7 +9,7 @@ internal static class PackageEndpoints
     public static void AddPackages(this IHostApplicationBuilder builder)
     {
         builder.Services.AddSingleton<PackageService>();
-        builder.Services.AddSingleton<SynapseSharing>();
+        builder.Services.AddSingleton<CSharpSharing>();
     }
 
     public static void MapPackages(this IEndpointRouteBuilder routes)
@@ -19,8 +19,8 @@ internal static class PackageEndpoints
         packages.MapGet("/{owner}/{name}", (string owner, string name, PackageService service) => service.Read(PackageId.Create(owner, name)));
         packages.MapGet("/{owner}/{name}/revisions/{revision}", (string owner, string name, string revision, PackageService service)
             => service.ReadRevision(PackageId.Create(owner, name), revision));
-        packages.MapPost("/{owner}/{name}/revisions", (string owner, string name, CommitPackageRequest request, PackageService service, CancellationToken ct)
-            => service.Commit(PackageId.Create(owner, name), request, ct));
+        packages.MapPost("/{owner}/{name}/revisions", (string owner, string name, CommitPackageRequest request, PackageService service)
+            => service.Commit(PackageId.Create(owner, name), request));
         packages.MapPost("/{owner}/{name}/fork", (string owner, string name, ForkPackageRequest request, PackageService service)
             => service.Fork(PackageId.Create(owner, name), request));
         packages.MapPost("/{owner}/{name}/pull", (string owner, string name, PullPackageRequest request, PackageService service)
@@ -34,11 +34,7 @@ internal static class PackageEndpoints
         packages.MapPost("/{owner}/{name}/publish", (string owner, string name, PublishPackageRequest request, PackageService service)
             => service.Publish(PackageId.Create(owner, name), request));
 
-        routes.MapPost("/workspaces/{workspaceId}/synapses/{id}/share", (string workspaceId, string id, ShareSynapseRequest request, SynapseSharing sharing, CancellationToken ct)
-                => sharing.Share(workspaceId, id, request, ct))
-            .AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync)
-            .AddEndpointFilter(Guard);
-        routes.MapPost("/workspaces/{workspaceId}/behaviors/{id}/share", (string workspaceId, string id, ShareSynapseRequest request, SynapseSharing sharing, CancellationToken ct)
+        routes.MapPost("/workspaces/{workspaceId}/csharp/{id}/share", (string workspaceId, string id, ShareCSharpRequest request, CSharpSharing sharing, CancellationToken ct)
                 => sharing.Share(workspaceId, id, request, ct))
             .AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync)
             .AddEndpointFilter(Guard);
@@ -64,17 +60,12 @@ internal static class PackageEndpoints
             => service.ReadInvocation(workspaceId, PackageId.Create(owner, name), invocationId));
     }
 
-    // Packages run code, so they share the behavior console's developer-mode gate.
+    // Packages run code, so they share the C# console's developer-mode gate.
     private static async ValueTask<object?> Guard(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         var configuration = context.HttpContext.RequestServices.GetRequiredService<IConfiguration>();
         if (!AgentToolPolicy.DeveloperModeEnabled(configuration["IntoChat:DeveloperMode"])) { return Results.NotFound(); }
         try { return await next(context); }
-        catch (PackageCheckFailedException error)
-        {
-            return Results.Problem(error.Message, statusCode: StatusCodes.Status422UnprocessableEntity,
-                extensions: new Dictionary<string, object?> { ["diagnostics"] = error.Check.Diagnostics, ["tests"] = error.Check.Tests });
-        }
         catch (ArgumentException error) { return Results.Problem(error.Message, statusCode: StatusCodes.Status400BadRequest); }
         catch (UnauthorizedAccessException error) { return Results.Problem(error.Message, statusCode: StatusCodes.Status403Forbidden); }
         catch (KeyNotFoundException error) { return Results.Problem(error.Message, statusCode: StatusCodes.Status404NotFound); }

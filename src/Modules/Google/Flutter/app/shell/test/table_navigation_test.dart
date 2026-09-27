@@ -12,7 +12,7 @@ void main() {
       final controller = UiTableController(
         workspace: 'w',
         snapshot: TableSnapshot.fromJson(tableJson(1, 'First page company')),
-        read: (_, __, {offset = 0, limit = 25}) async =>
+        read: (_, _, {offset = 0, limit = 25}) async =>
             TableSnapshot.fromJson({
           ...tableJson(
             1,
@@ -45,7 +45,7 @@ void main() {
       final controller = UiTableController(
         workspace: 'w',
         snapshot: TableSnapshot.fromJson(tableJson(1, 'Unsorted company')),
-        update: (_, __, update) async => TableSnapshot.fromJson({
+        update: (_, _, update) async => TableSnapshot.fromJson({
           ...tableJson(
             update.expectedRevision + 1,
             update.sort?.descending == true ? 'Zulu first' : 'Alpha first',

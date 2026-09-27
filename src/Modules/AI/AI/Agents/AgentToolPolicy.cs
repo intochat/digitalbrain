@@ -6,9 +6,9 @@ namespace DigitalBrain.AI.Agents;
 public static class AgentToolPolicy
 {
     public const int MaxDefaultTools = 8;
-    public const string BehaviorToolPrefix = "behavior_";
-    public const string BehaviorAuthoringFallback =
-        "Authoring C# behaviors isn't supported outside developer mode yet; it arrives in Phase 1.";
+    public const string CSharpToolPrefix = "csharp_";
+    public const string CSharpAuthoringFallback =
+        "Writing C# apps isn't supported outside developer mode yet; it arrives in Phase 1.";
 
     public static readonly IReadOnlyList<string> CoreTools =
         ["table_read", "table_refine", "show_form", "show_view", "find_capability"];
@@ -32,26 +32,25 @@ public static class AgentToolPolicy
         return product;
     }
 
-    public static bool IsBehaviorTool(string name)
+    public static bool IsCSharpTool(string name)
     {
         ArgumentNullException.ThrowIfNull(name);
-        return name.StartsWith(BehaviorToolPrefix, StringComparison.Ordinal);
+        return name.StartsWith(CSharpToolPrefix, StringComparison.Ordinal);
     }
 
     // Returns the one-line fallback when the owner explicitly disabled developer mode and
-    // asked for behavior authoring; the caller must not reach the model in that case.
-    public static string? UnsupportedBehaviorAuthoring(bool developerMode, string message) =>
-        !developerMode && RequestsBehaviorAuthoring(message) ? BehaviorAuthoringFallback : null;
+    // asked for C# authoring; the caller must not reach the model in that case.
+    public static string? UnsupportedCSharpAuthoring(bool developerMode, string message) =>
+        !developerMode && RequestsCSharpAuthoring(message) ? CSharpAuthoringFallback : null;
 
     // An absent setting is the required default-on for the local owner; an explicit but
     // unparseable value fails closed instead of silently granting developer tools.
     public static bool DeveloperModeEnabled(string? configured) =>
         configured is null || (bool.TryParse(configured, out var enabled) && enabled);
 
-    public static bool RequestsBehaviorAuthoring(string message)
+    public static bool RequestsCSharpAuthoring(string message)
     {
         if (string.IsNullOrWhiteSpace(message)) { return false; }
-        if (message.Contains("behavior", StringComparison.OrdinalIgnoreCase)) { return true; }
         var csharp = message.Contains("c#", StringComparison.OrdinalIgnoreCase)
             || message.Contains("csharp", StringComparison.OrdinalIgnoreCase);
         return csharp

@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:digitalbrain_flutter_shell/workspace/apps/packages_screen.dart';
 
 void main() {
-  testWidgets('installs a shared behavior in one tap, runs it and forks it', (
+  testWidgets('installs a shared C# app in one tap, runs it and forks it', (
     tester,
   ) async {
     final server = _FakePackagesServer();
@@ -32,6 +32,7 @@ void main() {
       find.byKey(const ValueKey('uninstall-alice/researcher')),
       findsOneWidget,
     );
+    expect(find.text('C# app: Running'), findsOneWidget);
 
     await tester.enterText(
       find.byKey(const ValueKey('input-alice/researcher')),
@@ -160,7 +161,18 @@ class _FakePackagesServer {
           'operations': [
             {'name': 'research', 'description': 'Research a question.'},
           ],
+          'csharpFile': installedRevision == null ? null : 'researcher',
         },
+        'file': installedRevision == null
+            ? null
+            : {
+                'id': 'researcher',
+                'source': 'Console.WriteLine("research");',
+                'settings': <String, String>{},
+                'status': 1,
+                'exitCode': null,
+                'startedAt': '2026-09-27T10:00:00Z',
+              },
       };
     }
     if (path == '$app/invocations') {

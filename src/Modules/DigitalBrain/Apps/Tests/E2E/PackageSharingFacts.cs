@@ -1,68 +1,60 @@
 using DigitalBrain.Apps;
-using DigitalBrain.Behavior;
-using DigitalBrain.Coding;
+using DigitalBrain.Microsoft.CSharp;
 
 namespace DigitalBrain.Modules.Apps.Tests.E2E;
 
-// Alice shares a behavior, Bob installs and customizes it, forks and changes its code, and his
-// change flows back upstream. Every revision is compiled and tested; every app runs in a real worker.
+// Alice shares a C# app, Bob installs and customizes it, forks and changes its code, and his change
+// flows back upstream. Every installed app runs as a real script in a .NET SDK container.
 public sealed class PackageSharingFacts
 {
     private static readonly PackageId Upstream = PackageId.Parse("alice/researcher");
     private static readonly PackageId Fork = PackageId.Parse("bob/researcher");
+    private static readonly TimeSpan BuildAndAnswer = TimeSpan.FromMinutes(3);
 
     [Fact]
-    public async Task ASharedBehaviorIsInstalledCustomizedForkedAndContributedBack()
+    public async Task ASharedCSharpAppIsInstalledCustomizedForkedAndContributedBack()
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        deadline.CancelAfter(TimeSpan.FromMinutes(10));
+        deadline.CancelAfter(TimeSpan.FromMinutes(15));
         var ct = deadline.Token;
         var root = Path.Combine(Path.GetTempPath(), "brain-packages-e2e", Guid.NewGuid().ToString("N"));
+        IApp? bobsApp = null;
+        IApp? bobsFork = null;
         try
         {
             await using var brain = await E2ETest.Create()
-                .WithModule<CodingModule>().WithModule<BehaviorModule>().WithModule<AppsModule>()
+                .WithModule<CSharpModule>().WithModule<AppsModule>()
                 .WithExecution(new TestExecutionOptions
                 {
-                    PrivateConfiguration = new Dictionary<string, string?>
-                    {
-                        [CodeExecutionOptions.SectionName + ":Root"] = Path.Combine(root, "coding"),
-                        [BehaviorOptions.SectionName + ":Root"] = Path.Combine(root, "behaviors"),
-                        [BehaviorOptions.SectionName + ":HeartbeatInterval"] = "00:00:00.250",
-                    },
+                    PrivateConfiguration = new Dictionary<string, string?> { [CSharpOptions.SectionName + ":Root"] = root },
                 })
                 .StartAsync(ct);
 
             Caller.As("alice");
             var upstream = brain.Get<IPackage>(Upstream.ToString());
-            var original = await CommitChecked(brain, upstream, null, ResearcherPackage.Content("Research"), "Research briefs", ct);
+            var original = await upstream.Commit(new(Guid.NewGuid(), null, ResearcherPackage.Content("Research"), "Research briefs"));
             await upstream.Publish(new(Guid.NewGuid(), original.Id));
             var listing = Assert.Single(await brain.Get<IPackageDirectory>(PackageDirectory.Key).List());
             Assert.Equal(original.Id, listing.Revision);
 
-            // One step from a marketplace listing to a running behavior in Bob's workspace.
-            var bobsApp = brain.Get<IApp>("workspace-bob/apps/alice/researcher");
+            // One step from a marketplace listing to a running script in Bob's workspace.
+            bobsApp = brain.Get<IApp>("workspace-bob/apps/alice/researcher");
             var installed = await bobsApp.Install(new(Guid.NewGuid(), new(listing.Package, listing.Revision), new Dictionary<string, string>()));
-            await Running(brain, installed, ct);
-            Assert.Equal("Research (plain): What is Orleans?", await Ask(bobsApp, "What is Orleans?", ct));
+            Assert.Equal("Research (plain): What is Orleans?", await Ask(brain, bobsApp, installed, "What is Orleans?", ct));
 
-            // Customizing a declared setting redeploys the same revision; nothing is forked.
+            // Customizing a declared setting reruns the same revision in a fresh file; nothing is forked.
             var configured = await bobsApp.Configure(new(Guid.NewGuid(), new Dictionary<string, string> { ["style"] = "bullets" }));
-            await Running(brain, configured, ct);
-            Assert.Equal("Research (bullets): What is Orleans?", await Ask(bobsApp, "What is Orleans?", ct));
+            Assert.Equal(CSharpFileStatus.Stopped, (await brain.Get<ICSharpFile>(installed.CSharpFile!).Read(ct)).Status);
+            Assert.Equal("Research (bullets): What is Orleans?", await Ask(brain, bobsApp, configured, "What is Orleans?", ct));
 
-            // Changing the code needs a fork, and the fork's own tests gate the change.
+            // Changing the code needs a fork.
             Caller.As("bob");
             var fork = brain.Get<IPackage>(Fork.ToString());
             await fork.Fork(new(Guid.NewGuid(), new(listing.Package, listing.Revision)));
-            var failing = await Check(brain, ResearcherPackage.Content("Summary") with { Tests = ResearcherPackage.Tests("Research") }, ct);
-            Assert.Equal(CodeCheckStatus.Failed, failing.Status);
-            Assert.Null(failing.Artifact);
-            var summaries = await CommitChecked(brain, fork, original.Id, ResearcherPackage.Content("Summary"), "Summarize instead", ct);
-            var bobsFork = brain.Get<IApp>("workspace-bob/apps/bob/researcher");
+            var summaries = await fork.Commit(new(Guid.NewGuid(), original.Id, ResearcherPackage.Content("Summary"), "Summarize instead"));
+            bobsFork = brain.Get<IApp>("workspace-bob/apps/bob/researcher");
             var forkInstalled = await bobsFork.Install(new(Guid.NewGuid(), new(Fork, summaries.Id), new Dictionary<string, string>()));
-            await Running(brain, forkInstalled, ct);
-            Assert.Equal("Summary (plain): What is Orleans?", await Ask(bobsFork, "What is Orleans?", ct));
+            Assert.Equal("Summary (plain): What is Orleans?", await Ask(brain, bobsFork, forkInstalled, "What is Orleans?", ct));
 
             // Bob proposes the change back; Alice accepts and publishes it.
             var proposal = await upstream.Propose(new(Guid.NewGuid(), new(Fork, summaries.Id), "Summaries"));
@@ -74,68 +66,43 @@ public sealed class PackageSharingFacts
 
             // Bob's original install upgrades to the contributed revision and keeps his setting.
             var upgraded = await bobsApp.Upgrade(new(Guid.NewGuid(), new(Upstream, summaries.Id)));
-            await Running(brain, upgraded, ct);
-            Assert.Equal("Summary (bullets): What is Orleans?", await Ask(bobsApp, "What is Orleans?", ct));
-
-            await bobsApp.Uninstall(new(Guid.NewGuid()));
-            await bobsFork.Uninstall(new(Guid.NewGuid()));
+            Assert.Equal("Summary (bullets): What is Orleans?", await Ask(brain, bobsApp, upgraded, "What is Orleans?", ct));
         }
         finally
         {
             Caller.Clear();
+            if (bobsApp is not null) { await Uninstall(bobsApp); }
+            if (bobsFork is not null) { await Uninstall(bobsFork); }
             if (Directory.Exists(root)) { Directory.Delete(root, true); }
         }
     }
 
-    private static async Task<PackageRevision> CommitChecked(E2EBrain brain, IPackage package, string? head, PackageContent content, string message, CancellationToken ct)
+    // The first answer waits for the container to build the script, so a failure reports its logs.
+    private static async Task<string?> Ask(E2EBrain brain, IApp app, AppSnapshot installed, string question, CancellationToken ct)
     {
-        var check = await Check(brain, content, ct);
-        Assert.True(check.Artifact is not null, string.Join("\n", check.Diagnostics.Select(diagnostic => diagnostic.Message)));
-        return await package.Commit(new(Guid.NewGuid(), head, content, check.Artifact, message));
-    }
-
-    private static async Task<CodeCheckSnapshot> Check(E2EBrain brain, PackageContent content, CancellationToken ct)
-    {
-        var draft = brain.Get<ICodeDraft>("package-draft-" + Guid.NewGuid().ToString("N"));
-        await draft.Save(new(0, Guid.NewGuid(), content.Source, content.Tests, content.ModuleIds), ct);
-        var check = await draft.Check(new(1, Guid.NewGuid()), ct);
-        while (check.Status is CodeCheckStatus.Queued or CodeCheckStatus.Building or CodeCheckStatus.Testing)
-        {
-            await Task.Delay(100, ct);
-            check = await draft.ReadCheck(check.OperationId, ct);
-        }
-        return check;
-    }
-
-    private static async Task Running(E2EBrain brain, AppSnapshot app, CancellationToken ct)
-    {
-        var program = brain.Get<IBehaviorProgram>(app.BehaviorProgram!);
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(TimeSpan.FromSeconds(90));
-        while (true)
-        {
-            var state = await program.Read(timeout.Token);
-            if (state.Ready && state.ActiveDeploymentRevision == state.DesiredDeploymentRevision) { return; }
-            if (state.State == BehaviorExecutionState.Failed)
-            {
-                var logs = await program.ReadLogs(0, 200, timeout.Token);
-                Assert.Fail(state.Error + "\n" + string.Join("\n", logs.Entries.Select(entry => entry.Message)));
-            }
-            await Task.Delay(100, timeout.Token);
-        }
-    }
-
-    private static async Task<string?> Ask(IApp app, string question, CancellationToken ct)
-    {
+        var file = brain.Get<ICSharpFile>(installed.CSharpFile!);
         var invocation = await app.Invoke(new(Guid.NewGuid(), "research", question));
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(TimeSpan.FromSeconds(30));
-        while (invocation.Status == InvocationStatus.Pending)
+        timeout.CancelAfter(BuildAndAnswer);
+        try
         {
-            await Task.Delay(100, timeout.Token);
-            invocation = await app.ReadInvocation(invocation.Id);
+            while (invocation.Status == InvocationStatus.Pending)
+            {
+                if ((await file.Read(timeout.Token)).Status == CSharpFileStatus.Exited)
+                { Assert.Fail("The script exited:\n" + await file.ReadLogs(200, timeout.Token)); }
+                await Task.Delay(500, timeout.Token);
+                invocation = await app.ReadInvocation(invocation.Id);
+            }
         }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        { Assert.Fail("No answer within " + BuildAndAnswer + ":\n" + await file.ReadLogs(200, ct)); }
         Assert.Equal(InvocationStatus.Completed, invocation.Status);
         return invocation.Output;
+    }
+
+    private static async Task Uninstall(IApp app)
+    {
+        try { await app.Uninstall(new(Guid.NewGuid())); }
+        catch (InvalidOperationException) { }
     }
 }

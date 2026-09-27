@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><IsPackable>true</IsPackable><Description>DigitalBrain Orleans client, signal subscriptions and script connections.</Description></PropertyGroup>
-  <ItemGroup><FrameworkReference Include="Microsoft.AspNetCore.App" /></ItemGroup>
+  <ItemGroup><FrameworkReference Include="Microsoft.AspNetCore.App" /><InternalsVisibleTo Include="DigitalBrain.Runtime.Tests.Unit" /></ItemGroup>
   <ItemGroup><PackageReference Include="Microsoft.Orleans.Client" /></ItemGroup>
   <ItemGroup><ProjectReference Include="../Contracts/DigitalBrain.Contracts.csproj" /></ItemGroup>
 </Project>

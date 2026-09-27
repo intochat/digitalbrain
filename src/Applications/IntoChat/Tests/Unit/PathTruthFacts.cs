@@ -48,14 +48,6 @@ public sealed class PathTruthFacts
     }
 
     [Fact]
-    public void FlutterContractsAreReferencedAtTheirMovedGooglePath()
-    {
-        var coding = Read("src/Modules/Coding/Tests/Unit/DigitalBrain.Modules.Coding.Tests.Unit.csproj");
-        Assert.Contains("Google/Flutter/Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj", coding);
-        Assert.DoesNotContain("Modules/Flutter/Contracts", coding);
-    }
-
-    [Fact]
     public void CiAndDeployUseTheMovedFlutterWorkspace()
     {
         foreach (var workflow in new[] { ".github/workflows/ci.yml", ".github/workflows/deploy.yml" })
@@ -105,7 +97,7 @@ public sealed class PathTruthFacts
             "DigitalBrain.Microsoft.Roslyn.RoslynModule",
             "DigitalBrain.Microsoft.DotNet.DotNetModule",
             "DigitalBrain.Coding.CodingModule",
-            "DigitalBrain.Behavior.BehaviorModule",
+            "DigitalBrain.Microsoft.CSharp.CSharpModule",
         ];
         foreach (var file in new[]
         {

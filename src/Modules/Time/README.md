@@ -1,6 +1,6 @@
 # Time
 
-Time exposes two neurons with one schedule per grain identity. File-based behaviors subscribe to their typed live signals and decide what work a tick means.
+Time exposes two neurons with one schedule per grain identity. C# file apps subscribe to their typed live signals and decide what work a tick means.
 
 ```csharp
 var timer = brain.Get<DigitalBrain.Time.Timers.ITimer>("tea");
@@ -46,7 +46,7 @@ Use the shared `DigitalBrainSimulation` with the real `TimeModule`, and the `Obs
 
 Separate integration scenarios exercise native timers, native reminders, idle collection, explicit deactivation, silo restart, persistent reminders in a fresh host, and the production file app. The restart test waits for an incoming reminder-call recorder before making any grain call, so it verifies autonomous reactivation.
 
-Signals remain live-only and can be lost while a behavior is disconnected. Persistent reminder registration does not make external behavior execution durable. Time contains no countdown snapshots, notes, public generations, durable one-shot alarms, or recovery classifications.
+Signals remain live-only and can be lost while a script is disconnected. Persistent reminder registration does not make external script execution durable. Time contains no countdown snapshots, notes, public generations, durable one-shot alarms, or recovery classifications.
 
 Run `dotnet test --project src/Modules/Time/Tests/DigitalBrain.Modules.Time.Tests.csproj -p:CodeGraphRefresh=false`.
 

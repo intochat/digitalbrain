@@ -8,8 +8,7 @@ using DigitalBrain.Apps;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.ClickHouse;
 using DigitalBrain.Coding;
-using DigitalBrain.Behavior;
-using DigitalBrain.Behavior.Aspire.Hosting;
+using DigitalBrain.Microsoft.CSharp;
 using DigitalBrain.Core;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
@@ -76,19 +75,19 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
 
 if (developerProfile)
 {
-    // Developer-only surfaces: the Windows executor, C# compilation, the behavior runtime and the
+    var repositoryRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "..", ".."));
+    // Developer-only surfaces: the Windows executor, C# change sets, C# files run in Docker and the
     // self-referential Aspire project path. The product profile composes only modules with a user path.
     digitalBrain
         .WithModule<AspireModule>(aspire => aspire
             .WithAspire(Path.Combine(builder.AppHostDirectory, "IntoChat.AppHost.csproj")))
         .WithModule<RoslynModule>()
         .WithModule<DotNetModule>()
-        .WithModule<CodingModule>(coding => coding.WithSolution(Path.GetFullPath(
-            Path.Combine(builder.AppHostDirectory, "..", "..", "..", "..", "DigitalBrain.slnx"))))
-        .WithModule<BehaviorModule>(behavior =>
+        .WithModule<CodingModule>(coding => coding.WithSolution(Path.Combine(repositoryRoot, "DigitalBrain.slnx")))
+        .WithModule<CSharpModule>(csharp =>
         {
-            if (builder.Configuration["IntoChat:BehaviorAuthoring:Root"] is { Length: > 0 } root)
-            { behavior.WithLocalExecution(root); }
+            if (builder.Configuration["IntoChat:CSharp:Root"] is { Length: > 0 } root)
+            { csharp.WithDocker(root, repositoryRoot); }
         });
 }
 
@@ -129,10 +128,10 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
         if (assets is not null) { context.EnvironmentVariables["IntoChat__LocalFiles__AssetDirectory"] = assets; }
         if (builder.Configuration["IntoChat:Assistant:Model"] is { Length: > 0 } assistantModel)
         { context.EnvironmentVariables["IntoChat__Assistant__Model"] = assistantModel; }
-        foreach (var setting in new[] { "AllowActivation", "ModelProfile" })
+        foreach (var setting in new[] { "AllowActivation" })
         {
-            if (builder.Configuration["IntoChat:BehaviorAuthoring:" + setting] is { } value)
-            { context.EnvironmentVariables["IntoChat__BehaviorAuthoring__" + setting] = value; }
+            if (builder.Configuration["IntoChat:CSharp:" + setting] is { } value)
+            { context.EnvironmentVariables["IntoChat__CSharp__" + setting] = value; }
         }
         if (clusterId is not null)
         {

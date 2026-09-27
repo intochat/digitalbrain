@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Coding module: drafts, change sets, validation and git.</Description>
+    <Description>Coding module: change sets and git.</Description>
     <RootNamespace>DigitalBrain.Coding</RootNamespace>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
     <!-- Roslyn's MSBuild loader flows Microsoft.Build.Framework into this project. -->

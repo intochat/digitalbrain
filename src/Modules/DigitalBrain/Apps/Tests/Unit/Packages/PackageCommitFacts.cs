@@ -9,7 +9,7 @@ public sealed class PackageCommitFacts
     {
         await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
         var content = PackageSamples.Researcher("Research");
-        var commit = new CommitPackage(Guid.NewGuid(), null, content, brain.Artifacts.Seal(content), "First version");
+        var commit = new CommitPackage(Guid.NewGuid(), null, content, "First version");
         Caller.As("alice");
         var package = brain.Get<IPackage>("alice/researcher");
 
@@ -38,20 +38,6 @@ public sealed class PackageCommitFacts
         Assert.Equal([first.Id], second.Parents);
         Assert.NotEqual(first.Id, second.Id);
         Assert.Equal([first.Id, second.Id], (await package.Read()).History.Select(item => item.Id));
-    }
-
-    [Fact]
-    public async Task AnArtifactBuiltFromOtherSourceCannotVouchForARevision()
-    {
-        await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
-        Caller.As("alice");
-        var foreign = brain.Artifacts.Seal(PackageSamples.Researcher("Something else"));
-        var commit = new CommitPackage(Guid.NewGuid(), null, PackageSamples.Researcher("Research"), foreign, "Unverified");
-
-        var error = await Assert.ThrowsAsync<ArgumentException>(() => brain.Get<IPackage>("alice/researcher").Commit(commit));
-
-        Assert.Contains("artifact", error.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Null((await brain.Get<IPackage>("alice/researcher").Read()).Head);
     }
 
     [Fact]
@@ -88,7 +74,7 @@ public sealed class PackageCommitFacts
         await package.Commit(commit);
 
         var changed = PackageSamples.Researcher("Investigate");
-        await Assert.ThrowsAsync<InvalidOperationException>(() => package.Commit(commit with { Content = changed, Artifact = brain.Artifacts.Seal(changed) }));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => package.Commit(commit with { Content = changed }));
     }
 
     [Fact]
@@ -106,7 +92,8 @@ public sealed class PackageCommitFacts
             valid with { Manifest = valid.Manifest with { Settings = [.. valid.Manifest.Settings, valid.Manifest.Settings[0]] } },
             valid with { Manifest = valid.Manifest with { Operations = [new PackageOperation("not valid", "Spaces are not allowed.")] } },
             valid with { Manifest = valid.Manifest with { Settings = [new PackageSetting("apiToken", "Credentials never ship in a package.", "")] } },
-            valid with { Manifest = valid.Manifest with { Settings = [new PackageSetting("app", "Collides with Behavior__App.", "")] } },
+            valid with { Manifest = valid.Manifest with { Settings = [new PackageSetting("app", "Collides with the app address.", "")] } },
+            valid with { Manifest = valid.Manifest with { Settings = [new PackageSetting("Account", "Collides with the account prefix.", "")] } },
             valid with { Manifest = valid.Manifest with { Accounts = [new PackageAccount("twitter", "twitter", "Watch"), new PackageAccount("twitter", "gmail", "Duplicate")] } },
             valid with { Manifest = valid.Manifest with { Accounts = [new PackageAccount("style", "twitter", "Collides with a setting")] } },
             valid with { Manifest = valid.Manifest with { Accounts = [new PackageAccount("twitter", "invalid source", "Bad source")] } },

@@ -94,7 +94,7 @@ internal static class AccountSession
 
         // Read-only server capabilities the shell gates developer-only surfaces on. Developer mode
         // is the same server setting the agent tool policy reads, so a client cannot grant itself
-        // the Behaviors console by editing local preferences.
+        // the C# console by editing local preferences.
         app.MapGet(CapabilitiesPath, static (IConfiguration configuration) => Results.Ok(
             new SessionCapabilities(AgentToolPolicy.DeveloperModeEnabled(configuration["IntoChat:DeveloperMode"]))));
 

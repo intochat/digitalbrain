@@ -35,8 +35,8 @@ public sealed class TimerProcessFacts
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
-        foreach (var argument in new[] { "run", "--file", "src/Modules/DigitalBrain/Behaviors/Samples/timer-report.cs", "-p:CodeGraphRefresh=false", "--",
-            "--Smoke", "true", "--TimerId", "process", "--ClusterId", cluster.Options.ClusterId,
+        foreach (var argument in new[] { "run", "--file", "src/Modules/Microsoft/CSharp/Samples/timer-report.cs", "-p:CodeGraphRefresh=false", "--",
+            "--CSharpFile:Settings:Smoke", "true", "--CSharpFile:Settings:TimerId", "process", "--ClusterId", cluster.Options.ClusterId,
             "--ServiceId", cluster.Options.ServiceId, "--Gateways", gateway.ToString() })
         { start.ArgumentList.Add(argument); }
         using var process = new Process { StartInfo = start };

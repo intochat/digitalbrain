@@ -94,7 +94,7 @@ public sealed class GoldenJourneyFacts
             .Where(name => name is not null)
             .ToArray();
         Assert.Contains(toolNames, name => FormTools.Contains(name, StringComparer.Ordinal));
-        Assert.DoesNotContain(toolNames, name => name!.StartsWith("code_", StringComparison.Ordinal) || name.StartsWith("synapse_", StringComparison.Ordinal));
+        Assert.DoesNotContain(toolNames, name => name!.StartsWith("code_", StringComparison.Ordinal) || name.StartsWith("csharp_", StringComparison.Ordinal));
     }
 
     private static async Task<E2EBrain> StartLiveAsync(CancellationToken ct)

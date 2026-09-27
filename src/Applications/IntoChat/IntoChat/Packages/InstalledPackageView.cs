@@ -1,6 +1,6 @@
 using DigitalBrain.Apps;
-using DigitalBrain.Behavior;
+using DigitalBrain.Microsoft.CSharp;
 
 namespace IntoChat.Packages;
 
-internal sealed record InstalledPackageView(AppSnapshot App, BehaviorSnapshot? Behavior);
+internal sealed record InstalledPackageView(AppSnapshot App, CSharpFileSnapshot? File);

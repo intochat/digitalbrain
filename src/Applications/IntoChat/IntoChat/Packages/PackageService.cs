@@ -1,10 +1,7 @@
-using System.Security.Cryptography;
-using System.Text.Json;
 using DigitalBrain.Apps;
-using DigitalBrain.Behavior;
-using DigitalBrain.Coding;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Microsoft.CSharp;
 using DigitalBrain.Sdk.Connectors;
 using IntoChat.Workspace;
 using Microsoft.Extensions.Options;
@@ -16,26 +13,20 @@ namespace IntoChat.Packages;
 internal sealed class PackageService(
     IDigitalBrain brain,
     IOptions<BasicAuthOptions> auth,
-    IOptions<BehaviorAuthoringOptions> authoring,
-    IOptions<CodeExecutionOptions> coding,
-    IOptions<BehaviorOptions> runtime)
+    CSharpToolService files)
 {
-    private static readonly TimeSpan CheckPollInterval = TimeSpan.FromMilliseconds(250);
-
     public Task<IReadOnlyList<PackageListing>> List() => brain.Get<IPackageDirectory>(PackageDirectory.Key).List();
 
     public Task<PackageSnapshot> Read(PackageId id) => Package(id).Read();
 
     public Task<PackageRevision> ReadRevision(PackageId id, string revision) => Package(id).ReadRevision(revision);
 
-    public async Task<PackageRevision> Commit(PackageId id, CommitPackageRequest request, CancellationToken cancellationToken)
+    public async Task<PackageRevision> Commit(PackageId id, CommitPackageRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        RequireCoding();
         var mergeFrom = request.MergeFrom is { } merge ? await Resolve(merge, preferPublished: false) : null;
-        var check = await Check(request.Content ?? throw new ArgumentException("Package content is required."), cancellationToken);
-        if (check.Artifact is null) { throw new PackageCheckFailedException(check); }
-        return await Package(id).Commit(new(request.OperationId ?? Guid.NewGuid(), request.ExpectedHead, request.Content, check.Artifact, request.Message, mergeFrom));
+        var content = request.Content ?? throw new ArgumentException("Package content is required.");
+        return await Package(id).Commit(new(request.OperationId ?? Guid.NewGuid(), request.ExpectedHead, content, request.Message, mergeFrom));
     }
 
     public async Task<PackageSnapshot> Fork(PackageId source, ForkPackageRequest request)
@@ -77,18 +68,18 @@ internal sealed class PackageService(
 
     public async Task<InstalledPackageView> ReadApp(string workspaceId, PackageId id) => await View(await App(workspaceId, id).Read());
 
-    public async Task<SynapseAccountOptions> AccountOptions(string workspaceId, PackageId id, string? revisionId)
+    public async Task<PackageAccountOptions> AccountOptions(string workspaceId, PackageId id, string? revisionId)
     {
         var revision = await Resolve(new(id.Owner, id.Name, revisionId), preferPublished: true);
         var declared = (await Package(id).ReadRevision(revision.Revision)).Content.Manifest.Accounts ?? [];
         var scope = WorkspaceScope.Current(auth.Value, workspaceId).Id;
         var owner = CallerContextStamper.Require().PrincipalId;
         var available = await brain.Get<IConnectors>(owner).List();
-        return new(revision.Revision, declared.Select(slot => new SynapseAccountSlot(slot.Name, slot.Source, slot.Description,
+        return new(revision.Revision, declared.Select(slot => new PackageAccountSlot(slot.Name, slot.Source, slot.Description,
             available.Where(account => account.Source == slot.Source && account.Status == ConnectorStatus.Connected
                 && (account.WorkspaceId == scope || account.WorkspaceId == owner))
                 .OrderBy(account => account.Id, StringComparer.Ordinal)
-                .Select(account => new SynapseAccountChoice(account.Id, account.Credential.Label)).ToArray())).ToArray());
+                .Select(account => new PackageAccountChoice(account.Id, account.Credential.Label)).ToArray())).ToArray());
     }
 
     public async Task<InstalledPackageView> Install(string workspaceId, PackageId id, InstallPackageRequest request)
@@ -143,28 +134,8 @@ internal sealed class PackageService(
 
     public Task<AppInvocation> ReadInvocation(string workspaceId, PackageId id, Guid invocationId) => App(workspaceId, id).ReadInvocation(invocationId);
 
-    // Identical content shares one draft, so a retried commit reuses its passing check instead of rebuilding.
-    private async Task<CodeCheckSnapshot> Check(PackageContent content, CancellationToken cancellationToken)
-    {
-        var draftKey = "package-check-" + Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(content)));
-        var draft = brain.Get<ICodeDraft>(draftKey);
-        var saved = await draft.Read(cancellationToken);
-        if (saved.Revision == 0)
-        { saved = await draft.Save(new(0, Guid.NewGuid(), content.Source, content.Tests, content.ModuleIds ?? []), cancellationToken); }
-        var check = saved.LatestCheckId is { } latest ? await draft.ReadCheck(latest, cancellationToken) : null;
-        // Only a passing or running check is reused; a failure may have been a timeout, so asking again rebuilds.
-        if (check?.Status is not (CodeCheckStatus.Passed or CodeCheckStatus.Queued or CodeCheckStatus.Building or CodeCheckStatus.Testing))
-        { check = await draft.Check(new(saved.Revision, Guid.NewGuid()), cancellationToken); }
-        while (check.Status is CodeCheckStatus.Queued or CodeCheckStatus.Building or CodeCheckStatus.Testing)
-        {
-            await Task.Delay(CheckPollInterval, cancellationToken);
-            check = await draft.ReadCheck(check.OperationId, cancellationToken);
-        }
-        return check;
-    }
-
     private async Task<InstalledPackageView> View(AppSnapshot snapshot)
-        => new(snapshot, snapshot.BehaviorProgram is { } program && HasRuntime ? await brain.Get<IBehaviorProgram>(program).Read() : null);
+        => new(snapshot, snapshot.CSharpFile is { } file && files.CanRun ? await brain.Get<ICSharpFile>(file).Read() : null);
 
     private async Task<PackageRevisionRef> Resolve(PackageReference reference, bool preferPublished)
     {
@@ -203,18 +174,9 @@ internal sealed class PackageService(
         { throw new ArgumentException("The installation contains an undeclared account slot."); }
     }
 
-    private bool HasCoding => !string.IsNullOrWhiteSpace(coding.Value.Root);
-
-    private bool HasRuntime => !string.IsNullOrWhiteSpace(runtime.Value.Root);
-
-    private void RequireCoding()
-    {
-        if (!HasCoding) { throw new InvalidOperationException("This host does not check packages; use the developer profile with a behavior authoring root."); }
-    }
-
     private void RequireActivation()
     {
-        if (!HasCoding || !HasRuntime || !authoring.Value.AllowActivation)
-        { throw new InvalidOperationException("This host does not run shared packages. Enable IntoChat:BehaviorAuthoring:AllowActivation in the developer profile."); }
+        if (!files.AllowActivation)
+        { throw new InvalidOperationException("This host does not run shared packages. Compose CSharpModule and enable IntoChat:CSharp:AllowActivation in the developer profile."); }
     }
 }

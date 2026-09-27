@@ -656,20 +656,25 @@ final class DigitalBrainUiClient {
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
-  Future<Map<String, dynamic>> behaviorRequest(
+  /// Calls the developer-mode C# file API; [path] is relative to `/csharp` (empty for the list).
+  Future<Map<String, dynamic>> csharpRequest(
     String workspace,
+    String method,
     String path, {
     Map<String, Object?>? body,
   }) async {
-    final response = await _request(
-      body == null ? 'GET' : 'POST',
-      '/workspaces/${Uri.encodeComponent(workspace)}/behaviors/$path',
-      body: body,
-      timeout: const Duration(seconds: 30),
-    );
-    return response.body.isEmpty
-        ? <String, dynamic>{}
-        : Map<String, dynamic>.from(jsonDecode(response.body) as Map);
+    try {
+      final result = await _tableRequest(
+        method,
+        '/workspaces/${Uri.encodeComponent(workspace)}/csharp${path.isEmpty ? '' : '/$path'}',
+        body: body,
+        // Starting builds the app inside a .NET SDK container, which can take minutes.
+        timeout: const Duration(minutes: 3),
+      );
+      return result is Map ? Map<String, dynamic>.from(result) : {};
+    } on TableRequestException catch (error) {
+      throw CSharpFileRequestException(error.statusCode, error.message);
+    }
   }
 
   Future<Map<String, dynamic>> storeSecret(
@@ -822,4 +827,12 @@ final class DigitalBrainUiClient {
     );
     return response.body.isEmpty ? null : jsonDecode(response.body);
   }
+}
+
+final class CSharpFileRequestException implements Exception {
+  const CSharpFileRequestException(this.statusCode, this.message);
+  final int statusCode;
+  final String message;
+  @override
+  String toString() => 'C# file request failed ($statusCode): $message';
 }

@@ -1,11 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using DigitalBrain.Apps.Signals;
-using DigitalBrain.Behavior;
-using DigitalBrain.Coding;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
+using DigitalBrain.Microsoft.CSharp;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Apps;
@@ -32,12 +30,11 @@ internal sealed class App(
         var settings = Resolve(revision.Content.Manifest.Settings, new Dictionary<string, string>(), request.Settings);
         var accounts = ResolveAccounts(revision.Content.Manifest.Accounts ?? [], request.Accounts ?? new Dictionary<string, string>());
         var generation = Snapshot.ProgramGeneration + 1;
-        await Deploy(generation, request.OperationId, revision.Artifact, settings, accounts);
+        await Deploy(generation, revision.Content.Source, settings, accounts);
         await Persist(Snapshot with
         {
             Status = AppStatus.Installed,
             Revision = request.Revision,
-            Artifact = revision.Artifact,
             Declared = [.. revision.Content.Manifest.Settings],
             Settings = settings,
             Accounts = accounts,
@@ -58,8 +55,8 @@ internal sealed class App(
         var selected = new Dictionary<string, string>(Snapshot.Accounts);
         foreach (var (slot, account) in request.Accounts ?? new Dictionary<string, string>()) { selected[slot] = account; }
         var accounts = ResolveAccounts(revision.Content.Manifest.Accounts ?? [], selected);
-        await Retire(Snapshot.ProgramGeneration, request.OperationId);
-        await Deploy(Snapshot.ProgramGeneration + 1, request.OperationId, Snapshot.Artifact!, settings, accounts);
+        await Retire(Snapshot.ProgramGeneration);
+        await Deploy(Snapshot.ProgramGeneration + 1, revision.Content.Source, settings, accounts);
         await Persist(Snapshot with { Settings = settings, Accounts = accounts, ProgramGeneration = Snapshot.ProgramGeneration + 1, Receipts = Receipted(request.OperationId, request) });
         return Describe(Snapshot);
     }
@@ -78,13 +75,12 @@ internal sealed class App(
         var kept = Snapshot.Settings.Where(pair => declared.Any(setting => setting.Name == pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value);
         var settings = Resolve(declared, kept, new Dictionary<string, string>());
         var accounts = ResolveAccounts(revision.Content.Manifest.Accounts ?? [], request.Accounts ?? Snapshot.Accounts);
-        await Retire(Snapshot.ProgramGeneration, request.OperationId);
-        await Deploy(Snapshot.ProgramGeneration + 1, request.OperationId, revision.Artifact, settings, accounts);
+        await Retire(Snapshot.ProgramGeneration);
+        await Deploy(Snapshot.ProgramGeneration + 1, revision.Content.Source, settings, accounts);
         await Persist(Snapshot with
         {
             Revision = request.Revision,
             ProgramGeneration = Snapshot.ProgramGeneration + 1,
-            Artifact = revision.Artifact,
             Declared = [.. declared],
             Settings = settings,
             Accounts = accounts,
@@ -99,7 +95,7 @@ internal sealed class App(
         ArgumentNullException.ThrowIfNull(request);
         if (Replay(request.OperationId, request)) { return Describe(Snapshot); }
         RequireInstalled();
-        await Retire(Snapshot.ProgramGeneration, request.OperationId);
+        await Retire(Snapshot.ProgramGeneration);
         var now = clock.GetUtcNow();
         var invocations = Snapshot.Invocations
             .Select(item => item.Status == InvocationStatus.Pending ? item with { Status = InvocationStatus.Failed, Error = "The app was uninstalled.", CompletedAt = now } : item)
@@ -124,7 +120,7 @@ internal sealed class App(
         while (invocations.Count > MaxInvocations)
         {
             var oldest = invocations.FindIndex(item => item.Status != InvocationStatus.Pending);
-            if (oldest < 0) { throw new InvalidOperationException($"{MaxInvocations} invocations are still waiting for the app's behavior."); }
+            if (oldest < 0) { throw new InvalidOperationException($"{MaxInvocations} invocations are still waiting for the app's script."); }
             invocations.RemoveAt(oldest);
         }
         await Save(Snapshot with { Invocations = invocations }, new AppInvoked(invocation.Id, invocation.Operation, invocation.Input));
@@ -160,28 +156,27 @@ internal sealed class App(
     public Task<IReadOnlyList<AppInvocation>> Pending()
         => Task.FromResult<IReadOnlyList<AppInvocation>>(Snapshot.Invocations.Where(item => item.Status == InvocationStatus.Pending).ToArray());
 
-    // Every deployment gets a fresh program: its request never depends on program state, so a command
-    // retried after a lost save replays the same deployment, and no program outgrows its deployment history.
-    private Task Deploy(int generation, Guid operationId, CodeArtifactRef artifact, IReadOnlyDictionary<string, string> settings, IReadOnlyDictionary<string, string> accounts)
-        => GrainFactory.GetGrain<IBehaviorProgram>(ProgramKey(generation)).Deploy(new DeployBehavior(0, operationId, artifact, Configuration(settings, accounts)));
-
-    // Deleting an already deleted program is harmless, so a retry deletes again under a revision-specific operation id.
-    private async Task Retire(int generation, Guid operationId)
+    // Every deployment gets a fresh file, so a command retried after a lost save rewrites and restarts
+    // the same file instead of depending on what the previous generation left behind.
+    private async Task Deploy(int generation, string source, IReadOnlyDictionary<string, string> settings, IReadOnlyDictionary<string, string> accounts)
     {
-        var program = GrainFactory.GetGrain<IBehaviorProgram>(ProgramKey(generation));
-        var revision = (await program.Read()).Revision;
-        var retirement = new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(operationId + "\0" + revision)).AsSpan(0, 16));
-        await program.Delete(new DeleteBehavior(revision, retirement));
+        var file = GrainFactory.GetGrain<ICSharpFile>(FileKey(generation));
+        await file.Write(source);
+        await file.Configure(Configuration(settings, accounts));
+        await file.Start();
     }
 
-    // The behavior reads Behavior:App to find this neuron and Behavior:{name} for each setting,
-    // the same keys an automation reads in the behavior console.
-    private string Configuration(IReadOnlyDictionary<string, string> settings, IReadOnlyDictionary<string, string> accounts)
+    // Deleting an already deleted file is harmless, so retries need no bookkeeping.
+    private Task Retire(int generation) => GrainFactory.GetGrain<ICSharpFile>(FileKey(generation)).Delete();
+
+    // The script reads brain.Setting("App") to find this neuron, brain.Setting(name) for each setting
+    // and brain.Setting("Account__" + slot) for each connected account.
+    private Dictionary<string, string> Configuration(IReadOnlyDictionary<string, string> settings, IReadOnlyDictionary<string, string> accounts)
     {
-        var values = new SortedDictionary<string, string>(StringComparer.Ordinal) { ["Behavior__App"] = this.GetPrimaryKeyString() };
-        foreach (var (name, value) in settings) { values["Behavior__" + name] = value; }
-        foreach (var (name, id) in accounts) { values["Behavior__Account__" + name] = id; }
-        return JsonSerializer.Serialize(values);
+        var values = new Dictionary<string, string>(StringComparer.Ordinal) { ["App"] = this.GetPrimaryKeyString() };
+        foreach (var (name, value) in settings) { values[name] = value; }
+        foreach (var (name, id) in accounts) { values["Account__" + name] = id; }
+        return values;
     }
 
     private static Dictionary<string, string> ResolveAccounts(IReadOnlyList<PackageAccount> declared, IReadOnlyDictionary<string, string> selected)
@@ -198,8 +193,8 @@ internal sealed class App(
         return result;
     }
 
-    private string ProgramKey(int generation)
-        => "app-behavior-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(this.GetPrimaryKeyString() + "\0" + generation)));
+    private string FileKey(int generation)
+        => "app-csharp-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(this.GetPrimaryKeyString() + "\0" + generation)));
 
     private static Dictionary<string, string> Resolve(IReadOnlyList<PackageSetting> declared, IReadOnlyDictionary<string, string> current, IReadOnlyDictionary<string, string> supplied)
     {
@@ -254,6 +249,6 @@ internal sealed class App(
         state.Revision,
         new Dictionary<string, string>(state.Settings),
         state.Operations.ToArray(),
-        state.ProgramGeneration == 0 ? null : ProgramKey(state.ProgramGeneration),
+        state.ProgramGeneration == 0 ? null : FileKey(state.ProgramGeneration),
         new Dictionary<string, string>(state.Accounts));
 }

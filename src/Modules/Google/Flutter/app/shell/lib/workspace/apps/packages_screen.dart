@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../csharp/csharp_manager.dart';
+
 typedef PackagesRequest = Future<dynamic> Function(
   String method,
   String path, [
@@ -13,7 +15,7 @@ const _installed = 1;
 const _pending = 0;
 const _completed = 1;
 
-// Shared behaviors: install one into this workspace in one step, run it, keep it current, or fork it.
+// Shared C# apps: install one into this workspace in one step, run it, keep it current, or fork it.
 class PackagesScreen extends StatefulWidget {
   const PackagesScreen({
     super.key,
@@ -35,6 +37,7 @@ class PackagesScreen extends StatefulWidget {
 class _PackagesScreenState extends State<PackagesScreen> {
   List<Map<String, dynamic>> _listings = [];
   final Map<String, Map<String, dynamic>> _apps = {};
+  final Map<String, Map<String, dynamic>> _files = {};
   final Map<String, TextEditingController> _inputs = {};
   final Map<String, String> _outputs = {};
   bool _busy = false;
@@ -109,6 +112,12 @@ class _PackagesScreenState extends State<PackagesScreen> {
           for (var index = 0; index < ids.length; index++)
             MapEntry(ids[index], _map(_map(reads[index])['app'])),
         ]);
+      _files
+        ..clear()
+        ..addEntries([
+          for (var index = 0; index < ids.length; index++)
+            MapEntry(ids[index], _map(_map(reads[index])['file'])),
+        ]);
       if (failures > 0) {
         _error = 'Could not read $failures installed package(s).';
       }
@@ -150,7 +159,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
       () => _outputs[id] = invocation['status'] == _completed
           ? '${invocation['output'] ?? ''}'
           : invocation['status'] == _pending
-          ? 'Still running; the behavior has not answered yet.'
+          ? 'Still running; the app has not answered yet.'
           : 'Failed: ${invocation['error'] ?? 'no reason given'}',
     );
   });
@@ -190,7 +199,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
           Expanded(
             child: _listings.isEmpty && !_busy
                 ? const Center(
-                    child: Text('No one has published a behavior yet.'),
+                    child: Text('No one has published a C# app yet.'),
                   )
                 : ListView(
                     padding: const EdgeInsets.all(12),
@@ -212,6 +221,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
     final operations = app['operations'] is List
         ? (app['operations'] as List).map(_map).toList()
         : <Map<String, dynamic>>[];
+    final file = _files[id] ?? const <String, dynamic>{};
     final input = _inputs.putIfAbsent(id, TextEditingController.new);
     return Card(
       key: ValueKey('package-$id'),
@@ -231,6 +241,11 @@ class _PackagesScreenState extends State<PackagesScreen> {
               Text('Forked from ${origin['owner']}/${origin['name']}'),
             if ('${listing['description'] ?? ''}'.isNotEmpty)
               Text('${listing['description']}'),
+            if (installed && file.isNotEmpty)
+              Text(
+                'C# app: ${csharpStatusLabel(file)}',
+                key: ValueKey('file-status-$id'),
+              ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,

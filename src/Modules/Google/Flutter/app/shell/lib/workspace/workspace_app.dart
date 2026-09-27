@@ -16,7 +16,7 @@ import 'workspace_chat.dart';
 import 'app_surface_host.dart';
 import 'compute_limits_panel.dart';
 import 'workspace_islands.dart';
-import 'behaviors/behavior_manager.dart';
+import 'csharp/csharp_manager.dart';
 import 'apps/consent_sheet_view.dart';
 import 'apps/built_in_app_view.dart';
 import 'apps/packages_screen.dart';
@@ -438,7 +438,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   Future<void> _open(WorkspaceArtifact a) async {
     final destination = store.currentProject;
     if (a.kind == 'app') {
-      if (a.data['app'] == 'behaviors' && !store.developerMode) return;
+      if (a.data['app'] == 'csharp' && !store.developerMode) return;
       store.launchLocalApp(a.data['app'] as String);
       return;
     }
@@ -567,27 +567,25 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
           child: Text('Connect to IntoChat to open local apps.'),
         );
       }
-      if (a.data['app'] == 'behaviors') {
+      if (a.data['app'] == 'csharp') {
         if (!store.developerMode) {
           return const Center(
-            child: Text('Behaviors are available in developer mode only.'),
+            child: Text('C# files are available in developer mode only.'),
           );
         }
         final project = store.currentProject;
-        return BehaviorManager(
+        return CSharpManager(
           key: ValueKey('${project.id}-${a.id}'),
           initialId: a.data['selected'] as String?,
           active: !project.presentation.minimizedArtifactIds.contains(a.id),
-          request: (path, {body}) =>
-              client.behaviorRequest(project.id, path, body: body),
+          request: (method, path, {body}) =>
+              client.csharpRequest(project.id, method, path, body: body),
           onSelected: (id) {
             a.data['selected'] = id;
             store.save();
           },
           onAsk: (id, prompt) {
-            final conversation = store.createConversation(
-              title: 'Behavior: $id',
-            );
+            final conversation = store.createConversation(title: 'C# app: $id');
             conversation.draft = prompt;
             project.presentation.chatCollapsed = false;
             setState(() => _mobileWork = false);
@@ -906,19 +904,19 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                             conversation.id == store.currentConversation.id,
                         store: store,
                         onRun: widget.onRun,
-                        selectedBehaviorId:
+                        selectedCSharpFileId:
                             project.presentation.activeArtifactId ==
-                                'app-behaviors'
+                                'app-csharp'
                             ? project.artifacts
-                                      .where((a) => a.id == 'app-behaviors')
+                                      .where((a) => a.id == 'app-csharp')
                                       .firstOrNull
                                       ?.data['selected']
                                   as String?
                             : null,
-                        onOpenBehavior: (id) {
+                        onOpenCSharpFile: (id) {
                           if (!store.developerMode) return;
                           store.selectProject(project.id);
-                          final app = store.launchLocalApp('behaviors');
+                          final app = store.launchLocalApp('csharp');
                           app.data['selected'] = id;
                           store.save();
                         },
@@ -1195,8 +1193,8 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   }
 
   Future<void> _launchApp(String launchKey) async {
-    if (launchKey == 'behaviors' && !store.developerMode) return;
-    if (const {'files', 'images', 'behaviors'}.contains(launchKey)) {
+    if (launchKey == 'csharp' && !store.developerMode) return;
+    if (const {'files', 'images', 'csharp'}.contains(launchKey)) {
       store.launchLocalApp(launchKey);
       return;
     }

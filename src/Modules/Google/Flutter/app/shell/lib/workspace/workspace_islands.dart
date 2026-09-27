@@ -54,7 +54,7 @@ class WorkspaceIslands extends StatelessWidget {
   IconData appIcon(String kind) => switch (kind) {
     'files' => Icons.folder_outlined,
     'images' => Icons.tune,
-    'behaviors' => Icons.account_tree_outlined,
+    'csharp' => Icons.code,
     'table' => Icons.table_chart_outlined,
     _ => Icons.web_asset_outlined,
   };
@@ -223,11 +223,11 @@ class WorkspaceIslands extends StatelessWidget {
                 if (store.developerMode) ...[
                   const PopupMenuDivider(),
                   PopupMenuItem(
-                    value: behaviorsLauncherEntry.launchKey,
+                    value: csharpLauncherEntry.launchKey,
                     child: ListTile(
-                      leading: Icon(behaviorsLauncherEntry.icon),
-                      title: Text(behaviorsLauncherEntry.title),
-                      subtitle: Text(behaviorsLauncherEntry.subtitle),
+                      leading: Icon(csharpLauncherEntry.icon),
+                      title: Text(csharpLauncherEntry.title),
+                      subtitle: Text(csharpLauncherEntry.subtitle),
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),

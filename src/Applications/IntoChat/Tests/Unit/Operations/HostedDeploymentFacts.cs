@@ -23,7 +23,7 @@ public sealed class HostedDeploymentFacts
         "DigitalBrain.Microsoft.Roslyn.RoslynModule",
         "DigitalBrain.Microsoft.DotNet.DotNetModule",
         "DigitalBrain.Coding.CodingModule",
-        "DigitalBrain.Behavior.BehaviorModule",
+        "DigitalBrain.Microsoft.CSharp.CSharpModule",
     ];
 
     private static readonly string[] PackagingFiles =

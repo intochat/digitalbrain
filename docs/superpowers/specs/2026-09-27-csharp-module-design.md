@@ -97,3 +97,13 @@ Reflects loaded `*.Contracts` assemblies in the silo; per module returns neuron 
 * No compile check at `Write` or at package commit; errors surface as `Exited` + logs. Option B fixes this.
 * Orphaned containers when the silo host dies stay running; they are labelled by ServiceId for cleanup.
 * Requires Docker on the silo host (developer profile only, as behaviors were).
+
+## Implementation notes (as built)
+
+* No Aspire.Hosting project: the AppHost configures the module with `ModuleConfiguration<CSharpModule>.WithDocker(root, sourceRoot)`.
+* `CSharpFileStatus` is `Stopped | Running | Restarting | Exited`; a build in progress reads as `Running`.
+* Orleans addresses a silo by its advertised IP. For a loopback-advertised silo the container gets `Gateways=gwy.tcp://127.0.0.1:<port>/0` plus `GatewayRelayHost=host.docker.internal`, and `DigitalBrainClient` relays that loopback endpoint to the Docker host. Dialling `host.docker.internal` directly fails: the silo forwards messages addressed to an address that is not its own.
+* Containers are stopped with `docker stop --time 10` before `docker rm --force`. A SIGKILLed script never unwatches, and `INeuronObserver.OnSignalAsync` then blocks the watched neuron's publishes until the call times out.
+* `--restart on-failure:5`, not unbounded: an uncompilable script would otherwise rebuild forever and never reach `Exited`.
+* Script settings with `__` (for example `Account__twitter`) arrive as configuration sections; `Setting` maps `__` to `:`.
+* Package revision ids no longer hash tests or module ids, so revisions persisted before this change fail lineage verification.
