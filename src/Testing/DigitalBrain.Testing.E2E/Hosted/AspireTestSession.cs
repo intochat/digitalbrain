@@ -1,3 +1,4 @@
+using DigitalBrain.Client;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;

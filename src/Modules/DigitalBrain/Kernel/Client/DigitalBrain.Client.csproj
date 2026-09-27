@@ -1,6 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><IsPackable>true</IsPackable><Description>DigitalBrain Orleans client, signal subscriptions and script connections.</Description></PropertyGroup>
-  <ItemGroup><FrameworkReference Include="Microsoft.AspNetCore.App" /><InternalsVisibleTo Include="DigitalBrain.Runtime.Tests.Unit" /></ItemGroup>
-  <ItemGroup><PackageReference Include="Microsoft.Orleans.Client" /></ItemGroup>
+  <PropertyGroup><IsPackable>true</IsPackable><Description>Connects single-file C# apps to a DigitalBrain cluster: neuron calls and live signal subscriptions.</Description></PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain" />
+    <InternalsVisibleTo Include="DigitalBrain.Testing" />
+    <InternalsVisibleTo Include="DigitalBrain.Testing.Unit" />
+    <InternalsVisibleTo Include="DigitalBrain.Testing.E2E" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Orleans.Client" />
+  </ItemGroup>
   <ItemGroup><ProjectReference Include="../Contracts/DigitalBrain.Contracts.csproj" /></ItemGroup>
 </Project>

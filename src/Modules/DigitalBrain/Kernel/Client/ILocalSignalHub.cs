@@ -1,9 +1,9 @@
 using DigitalBrain.Contracts;
 using Orleans.Runtime;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Client;
 
-public interface ILocalSignalHub
+internal interface ILocalSignalHub
 {
     void Subscribe(GrainId source, INeuronObserver observer);
     void Unsubscribe(GrainId source, INeuronObserver observer);

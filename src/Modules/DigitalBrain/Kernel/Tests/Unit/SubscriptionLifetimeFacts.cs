@@ -7,15 +7,7 @@ namespace DigitalBrain.Tests;
 
 public sealed class SubscriptionLifetimeFacts
 {
-    internal static UnitTestBuilder Options(int capacity = 256) => UnitTest.Create()
-        .ConfigureSilo(silo => silo.Services.Configure<BrainOptions>(Configure))
-        .ConfigureClient(client => client.Services.Configure<BrainOptions>(options => { Configure(options); options.BufferCapacity = capacity; }));
-    private static void Configure(BrainOptions options)
-    {
-        options.ObserverLease = TimeSpan.FromSeconds(2);
-        options.RenewEvery = TimeSpan.FromMilliseconds(200);
-        options.OperationTimeout = TimeSpan.FromMilliseconds(500);
-    }
+    internal static UnitTestBuilder Options(int capacity = 256) => UnitTest.Create().WithFastSubscriptions(capacity);
 
     [Fact]
     public async Task OverflowIsVisibleEvenWithoutDrainingTheBuffer()

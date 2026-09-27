@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Client;
 
 // Orleans addresses a silo by the IP it advertises. A container cannot use a loopback-advertised
 // silo address directly, so it listens on that same loopback endpoint and pipes to the Docker host.

@@ -1,6 +1,6 @@
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Client;
 
-public sealed class BrainOptions
+internal sealed class BrainOptions
 {
     public int BufferCapacity { get; set; } = 256;
     public TimeSpan ObserverLease { get; set; } = TimeSpan.FromMinutes(5);

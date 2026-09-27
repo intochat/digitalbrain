@@ -12,7 +12,6 @@ using IntoChat.Agent;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 
 namespace IntoChat.Apps.BuiltIn;
 
@@ -137,7 +136,7 @@ public sealed class AssistantApp(
         var observer = this.AsReference<INeuronObserver>();
         await button.Watch(observer);
         if (_renewal is not null) { return; }
-        var interval = ServiceProvider.GetRequiredService<IOptions<BrainOptions>>().Value.RenewEvery;
+        var interval = ObserverRenewal;
         _renewal = this.RegisterGrainTimer((_, _) => button.Watch(observer), 0,
             new GrainTimerCreationOptions { DueTime = interval, Period = interval, Interleave = true, KeepAlive = true });
     }

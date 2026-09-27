@@ -1,4 +1,6 @@
+using DigitalBrain.Client;
 using DigitalBrain.Core;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Hosting;
 
@@ -42,6 +44,18 @@ public sealed class UnitTestBuilder
         EnsureMutable();
         _options = _options with { ConfigureClient = _options.ConfigureClient + configure };
         return this;
+    }
+    // Short leases and renewals so subscription expiry and reactivation show up within a test's timeout.
+    public UnitTestBuilder WithFastSubscriptions(int bufferCapacity = 256)
+    {
+        static void Shorten(BrainOptions options)
+        {
+            options.ObserverLease = TimeSpan.FromSeconds(2);
+            options.RenewEvery = TimeSpan.FromMilliseconds(200);
+            options.OperationTimeout = TimeSpan.FromMilliseconds(500);
+        }
+        return ConfigureSilo(silo => silo.Services.Configure<BrainOptions>(Shorten))
+            .ConfigureClient(client => client.Services.Configure<BrainOptions>(options => { Shorten(options); options.BufferCapacity = bufferCapacity; }));
     }
     public UnitTestBuilder WithReminders()
     {

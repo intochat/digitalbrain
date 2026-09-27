@@ -3,7 +3,7 @@
 #:project ../../../Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj
 #:property PublishAot=false
 
-using DigitalBrain.Core;
+using DigitalBrain.Client;
 using DigitalBrain.Time.Timers.Signals;
 using ITimer = DigitalBrain.Time.Timers.ITimer;
 

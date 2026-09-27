@@ -2,7 +2,7 @@ using DigitalBrain.Contracts;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Client;
 
 internal sealed class BrainClient(IClusterClient cluster, IOptions<BrainOptions> options, ILogger<BrainClient> logger, ILocalSignalHub? hub = null)
     : IDigitalBrain

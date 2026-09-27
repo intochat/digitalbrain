@@ -1,3 +1,4 @@
+using DigitalBrain.Client;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Registry;

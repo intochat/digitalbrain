@@ -1,3 +1,4 @@
+using DigitalBrain.Client;
 using System.Diagnostics;
 using Aspire.Hosting;
 using DigitalBrain.Contracts;

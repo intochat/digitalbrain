@@ -6,7 +6,7 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Serialization;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Client;
 
 public static class DigitalBrainClient
 {

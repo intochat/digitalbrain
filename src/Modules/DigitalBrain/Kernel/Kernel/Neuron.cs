@@ -1,3 +1,4 @@
+using DigitalBrain.Client;
 using DigitalBrain.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -14,6 +15,8 @@ public abstract class Neuron : Grain, INeuron
     private ObserverManager<INeuronObserver> Observers => _observers ??= new(
         ServiceProvider.GetRequiredService<IOptions<BrainOptions>>().Value.ObserverLease,
         ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Neuron.Observers"));
+
+    protected TimeSpan ObserverRenewal => ServiceProvider.GetRequiredService<IOptions<BrainOptions>>().Value.RenewEvery;
 
     public virtual Task<Guid> Watch(INeuronObserver observer)
     {

@@ -1,12 +1,10 @@
 using DigitalBrain.Contracts;
-using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Core.Enforcement;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Client;
 
-public static class BrainClientHosting
+internal static class BrainClientHosting
 {
     public static IClientBuilder AddDigitalBrain(this IClientBuilder client)
     {
@@ -21,7 +19,6 @@ public static class BrainClientHosting
                 && o.ObserverLease > o.RenewEvery + o.OperationTimeout, "Invalid brain buffer or subscription timing settings.")
             .ValidateOnStart();
         services.TryAddSingleton<IDigitalBrain, BrainClient>();
-        services.TryAddSingleton<ICallFilter, CallFilter>();
         return services;
     }
 }

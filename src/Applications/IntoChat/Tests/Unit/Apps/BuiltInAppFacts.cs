@@ -21,12 +21,7 @@ public sealed class BuiltInAppFacts
     public async Task SettingsOwnsEditableNeuronsAndPreservesPreferencesAcrossActivation()
     {
         await using var brain = await UnitTest.Create().WithModule<FlutterModule>()
-            .ConfigureSilo(silo => silo.Services.Configure<BrainOptions>(options =>
-            {
-                options.ObserverLease = TimeSpan.FromSeconds(2);
-                options.RenewEvery = TimeSpan.FromMilliseconds(200);
-                options.OperationTimeout = TimeSpan.FromMilliseconds(500);
-            })).StartAsync(TestContext.Current.CancellationToken);
+            .WithFastSubscriptions().StartAsync(TestContext.Current.CancellationToken);
         var first = brain.Get<ISettingsApp>("workspace-a");
         var second = brain.Get<ISettingsApp>("workspace-b");
         var opened = await first.Activate();

@@ -1,3 +1,4 @@
+using DigitalBrain.Client;
 using System.Collections.Concurrent;
 using DigitalBrain.Contracts;
 using Orleans.Runtime;

@@ -3,7 +3,7 @@ using System.Threading.Channels;
 using DigitalBrain.Contracts;
 using Microsoft.Extensions.Logging;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Client;
 
 internal sealed class SignalSubscription<T>(IClusterClient cluster, INeuron source, BrainOptions options,
     ILogger logger, Action<IAsyncDisposable> closed, ILocalSignalHub? hub, CancellationToken cancellationToken)

@@ -35,7 +35,7 @@ internal sealed class DockerCSharpRunner(IProcessRunner processes, IOptions<CSha
           <ItemGroup>
             <ProjectReference Include="{ClientProject}" />
             <Using Include="DigitalBrain.Contracts" />
-            <Using Include="DigitalBrain.Core" />
+            <Using Include="DigitalBrain.Client" />
           </ItemGroup>
         </Project>
         """;

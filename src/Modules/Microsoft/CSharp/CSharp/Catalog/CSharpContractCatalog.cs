@@ -18,7 +18,7 @@ public sealed class CSharpContractCatalog(IOptions<CSharpOptions> options)
     public const string Example = """
         #:project /brain/src/Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj
         // Add one #:project line per module whose contracts you use (copy them from Directive).
-        // DigitalBrain.Client is referenced for you; DigitalBrain.Contracts and DigitalBrain.Core are imported.
+        // DigitalBrain.Client is referenced for you; its namespace and DigitalBrain.Contracts are imported.
         using ITimer = DigitalBrain.Time.Timers.ITimer;
         using DigitalBrain.Time.Timers.Signals;
 
