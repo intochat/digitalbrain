@@ -32,6 +32,7 @@ public sealed class AspireNeuronFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().WithModule<AspireModule>().StartAsync(ct);
+        brain.SiloServices.GetRequiredService<AspireBridge>().ConnectTimeout = TimeSpan.FromMilliseconds(200);
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() => brain.Get<IAspire>(Application).StartResource("csharp-sandbox", ct));
 

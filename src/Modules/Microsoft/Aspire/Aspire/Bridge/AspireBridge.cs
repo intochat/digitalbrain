@@ -10,17 +10,19 @@ internal sealed class AspireBridge
 {
     // A first start builds the resource image, which can take minutes.
     internal static readonly TimeSpan CommandTimeout = TimeSpan.FromMinutes(4);
+    // The brain turns healthy moments before the AppHost dials in, so an early command waits for it.
+    internal TimeSpan ConnectTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
     private readonly Channel<AspireBridgeCommand> _commands = Channel.CreateUnbounded<AspireBridgeCommand>();
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource<AspireBridgeCommandResult>> _pending = new();
+    private readonly Lock _gate = new();
     private int _connectedAppHosts;
-
-    public bool IsConnected => Volatile.Read(ref _connectedAppHosts) > 0;
+    private TaskCompletionSource _connected = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public async Task ExecuteAsync(string resource, string command, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(resource);
-        if (!IsConnected) { throw new InvalidOperationException("No Aspire AppHost is connected to this brain."); }
+        await WaitForAppHostAsync(cancellationToken).ConfigureAwait(false);
         var request = new AspireBridgeCommand(Guid.NewGuid(), resource, command);
         var completion = new TaskCompletionSource<AspireBridgeCommandResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         _pending[request.Id] = completion;
@@ -35,7 +37,10 @@ internal sealed class AspireBridge
 
     public async IAsyncEnumerable<AspireBridgeCommand> ReadCommandsAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        Interlocked.Increment(ref _connectedAppHosts);
+        lock (_gate)
+        {
+            if (++_connectedAppHosts == 1) { _connected.TrySetResult(); }
+        }
         try
         {
             await foreach (var command in _commands.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
@@ -44,7 +49,21 @@ internal sealed class AspireBridge
                 if (_pending.ContainsKey(command.Id)) { yield return command; }
             }
         }
-        finally { Interlocked.Decrement(ref _connectedAppHosts); }
+        finally
+        {
+            lock (_gate)
+            {
+                if (--_connectedAppHosts == 0) { _connected = new(TaskCreationOptions.RunContinuationsAsynchronously); }
+            }
+        }
+    }
+
+    private async Task WaitForAppHostAsync(CancellationToken cancellationToken)
+    {
+        Task connected;
+        lock (_gate) { connected = _connected.Task; }
+        try { await connected.WaitAsync(ConnectTimeout, cancellationToken).ConfigureAwait(false); }
+        catch (TimeoutException error) { throw new InvalidOperationException("No Aspire AppHost is connected to this brain.", error); }
     }
 
     public void Complete(Guid id, AspireBridgeCommandResult result)

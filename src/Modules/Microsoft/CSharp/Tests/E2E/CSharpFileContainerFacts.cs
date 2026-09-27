@@ -25,10 +25,10 @@ public sealed class CSharpFileContainerFacts
         """;
 
     [Fact]
-    public async Task TheSandboxStartsOnDemandAndRunsScriptsSideBySide()
+    public async Task TheSandboxStartsOnDemandRunsScriptsSideBySideAndComesBackAfterItStops()
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        deadline.CancelAfter(TimeSpan.FromMinutes(12));
+        deadline.CancelAfter(TimeSpan.FromMinutes(15));
         var ct = deadline.Token;
         await using var brain = await E2ETest.Create()
             .WithModule<TimeModule>()
@@ -51,12 +51,20 @@ public sealed class CSharpFileContainerFacts
             await broken.Start(ct);
 
             await Logs(listener, "script ready", ct);
+            Assert.NotEqual(0, (await Until(broken, snapshot => snapshot.ExitCode is not null, ct)).ExitCode);
+            Assert.Contains("error CS0103", await broken.ReadLogs(500, ct), StringComparison.Ordinal);
+            await broken.Stop(ct);
+
+            // Losing the sandbox loses every run in it; the reconcile starts the sandbox and the listener again.
+            await aspire.StopResource(CSharpSandbox.ResourceName, ct);
+            await Until(listener, snapshot => snapshot.Status == CSharpFileStatus.Restarting, ct);
+            await Until(listener, snapshot => snapshot.Status == CSharpFileStatus.Running, ct);
+            await Logs(listener, "script ready", ct);
+
             await brain.Get<ITimer>(timerId).Start(TimeSpan.Zero);
             await Logs(listener, "script tick " + timerId, ct);
-            Assert.Equal(0, (await Until(listener, snapshot => snapshot.Status == CSharpFileStatus.Exited, ct)).ExitCode);
-
-            Assert.NotEqual(0, (await Until(broken, snapshot => snapshot.Status == CSharpFileStatus.Exited, ct)).ExitCode);
-            Assert.Contains("error CS0103", await broken.ReadLogs(500, ct), StringComparison.Ordinal);
+            var finished = await Until(listener, snapshot => snapshot.Status == CSharpFileStatus.Exited, ct);
+            Assert.Equal(0, finished.ExitCode);
         }
         finally
         {

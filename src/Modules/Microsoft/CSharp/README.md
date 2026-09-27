@@ -23,9 +23,9 @@ await foreach (var tick in brain.On<TimerTick>(timer, brain.Stopping))
 | --- | --- |
 | `Write(source)` | Stores the source (≤ 128 KiB). A running script keeps the previous source until `Start`. |
 | `Configure(settings)` | Stores settings; the script reads them with `brain.Setting(name)`. Names are letters, digits and underscores. |
-| `Start()` | Stops the previous run and starts the current source as a new run. |
-| `Stop()` / `Delete()` | Stop the run; `Delete` also clears the state. |
-| `Read()` / `ReadLogs(tail)` | Live run status (`Stopped`, `Running`, `Exited` + exit code) and console output. |
+| `Start()` | Stops the previous run, starts the current source as a new run and keeps the file running (see Reconcile). |
+| `Stop()` / `Delete()` | Stop the run and the reconcile; `Delete` also clears the state. |
+| `Read()` / `ReadLogs(tail)` | Live run status (`Stopped`, `Running`, `Restarting`, `Exited` + exit code, `ShouldRun`, `Failures`) and console output. |
 
 `CSharpFileChanged` is published on every write and lifecycle change.
 
@@ -45,8 +45,20 @@ Scripts run in the `csharp-sandbox` resource: a container built from [`Sandbox/`
 | `POST /runs/{id}/stop` | SIGTERM, 10 s grace, then kill. |
 
 * `Stop`, `Delete` and a repeated `Start` stop the run with SIGTERM first: `brain.Stopping` fires and the script's subscriptions unwatch; a killed script would leave every neuron it watched waiting on a dead observer. Loop over `brain.Stopping`, not `CancellationToken.None`.
-* A script that does not compile settles on `Exited` with a non-zero code and the compiler output in its logs. Runs are not restarted.
 * Orleans addresses a silo by the IP it advertises. For a loopback-advertised silo, the client opens a relay on that loopback endpoint inside the container and forwards it to `GatewayRelayHost`.
+
+## Reconcile
+
+`Start` records `ShouldRun` and the owner (the caller's principal: production keys one sandbox session per user by it) and registers a one-minute `reconcile` reminder:
+
+| Run as the sandbox reports it | Reconcile |
+| --- | --- |
+| `Running` | nothing |
+| `Exited(0)` | done: `ShouldRun = false` |
+| `Exited(n ≠ 0)` | retry as a new run; after 5 consecutive failures, give up (`Exited`, `ShouldRun = false`) |
+| gone (run or whole sandbox lost) | start a new run, bringing the sandbox back through `IAspire`; not counted as a failure |
+
+A file that should run but is between runs reads as `Restarting`. A script that does not compile is retried like any crash, so its compiler output stays in the logs. Signals published while a script is down are not replayed.
 
 Options (`DigitalBrain:CSharp`): `SourceRoot`, the repository the sandbox mounts at `/brain` (default: the repository containing the silo), and `AspireApplication`, the `IAspire` key (default `DigitalBrain`). IntoChat's AppHost composes the module and `AspireModule` in the developer profile.
 

@@ -15,7 +15,7 @@ public sealed class RecordingCSharpFile : Neuron, ICSharpFile
 
     private string Key => this.GetPrimaryKeyString();
 
-    private CSharpFileSnapshot Current => Files.GetOrAdd(Key, key => new(key, "", new Dictionary<string, string>(), CSharpFileStatus.Stopped, null, null));
+    private CSharpFileSnapshot Current => Files.GetOrAdd(Key, key => new(key, "", new Dictionary<string, string>(), CSharpFileStatus.Stopped, null, null, false, 0));
 
     public Task<CSharpFileSnapshot> Read(CancellationToken cancellationToken = default) => Task.FromResult(Current);
 
