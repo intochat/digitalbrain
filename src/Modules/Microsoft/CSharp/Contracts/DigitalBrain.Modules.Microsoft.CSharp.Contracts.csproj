@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Single-file C# app neuron contracts.</Description>
+    <RootNamespace>DigitalBrain.Microsoft.CSharp</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../DigitalBrain/Kernel/Contracts/DigitalBrain.Contracts.csproj" />
+  </ItemGroup>
+</Project>

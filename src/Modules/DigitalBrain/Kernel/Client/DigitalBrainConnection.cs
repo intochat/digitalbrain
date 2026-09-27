@@ -10,12 +10,14 @@ public sealed class DigitalBrainConnection : IDigitalBrain
     private readonly IHost _host;
     private readonly IDigitalBrain _brain;
     private readonly Activity? _activity;
+    private readonly GatewayRelay? _relay;
 
-    internal DigitalBrainConnection(IHost host, IDigitalBrain brain, IConfiguration configuration, Activity? activity)
+    internal DigitalBrainConnection(IHost host, IDigitalBrain brain, IConfiguration configuration, Activity? activity, GatewayRelay? relay)
     {
         _host = host;
         _brain = brain;
         _activity = activity;
+        _relay = relay;
         Configuration = configuration;
     }
 
@@ -37,6 +39,7 @@ public sealed class DigitalBrainConnection : IDigitalBrain
         using var shutdown = new CancellationTokenSource(TimeSpan.FromSeconds(15));
         await _host.StopAsync(shutdown.Token).ConfigureAwait(false);
         _host.Dispose();
+        if (_relay is not null) { await _relay.DisposeAsync().ConfigureAwait(false); }
         _activity?.Dispose();
     }
 }

@@ -21,6 +21,7 @@ public static class DigitalBrainClient
         var builder = Host.CreateApplicationBuilder(args);
         builder.Logging.SetMinimumLevel(LogLevel.Warning);
         var scriptAssembly = Assembly.GetEntryAssembly();
+        GatewayRelay? relay = null;
         builder.UseOrleansClient(client =>
         {
             client.AddActivityPropagation();
@@ -43,7 +44,9 @@ public static class DigitalBrainClient
                 client.UseLocalhostClustering();
                 return;
             }
-            client.UseStaticClustering(options => options.Gateways = [.. GatewayEndpoints(gateways)]);
+            var endpoints = GatewayEndpoints(gateways);
+            if (builder.Configuration["GatewayRelayHost"] is { Length: > 0 } relayHost) { relay = GatewayRelay.Start(endpoints, relayHost); }
+            client.UseStaticClustering(options => options.Gateways = [.. endpoints]);
             client.Configure<ClusterOptions>(options =>
             {
                 options.ClusterId = builder.Configuration["ClusterId"] ?? throw new InvalidOperationException("ClusterId is required.");
@@ -55,12 +58,13 @@ public static class DigitalBrainClient
         try
         {
             await host.StartAsync(cancellationToken).ConfigureAwait(false);
-            return new DigitalBrainConnection(host, host.Services.GetRequiredService<IDigitalBrain>(), builder.Configuration, activity);
+            return new DigitalBrainConnection(host, host.Services.GetRequiredService<IDigitalBrain>(), builder.Configuration, activity, relay);
         }
         catch
         {
             activity?.Dispose();
             host.Dispose();
+            if (relay is not null) { await relay.DisposeAsync().ConfigureAwait(false); }
             throw;
         }
     }
