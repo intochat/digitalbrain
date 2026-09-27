@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace DigitalBrain.Core;
 
-internal sealed class SignalSubscription<T>(IGrainFactory grains, INeuron source, BrainOptions options,
+internal sealed class SignalSubscription<T>(IClusterClient cluster, INeuron source, BrainOptions options,
     ILogger logger, Action<IAsyncDisposable> closed, ILocalSignalHub? hub, CancellationToken cancellationToken)
     : ISignalSubscription<T>, INeuronObserver where T : Signal
 {
@@ -31,7 +31,7 @@ internal sealed class SignalSubscription<T>(IGrainFactory grains, INeuron source
             if (hub is not null) { hub.Subscribe(source.GetGrainId(), this); }
             else
             {
-                _reference = grains.CreateObjectReference<INeuronObserver>(this);
+                _reference = cluster.CreateObjectReference<INeuronObserver>(this);
                 var activation = await WatchAsync(token).ConfigureAwait(false);
                 lock (_gate)
                 {
@@ -132,7 +132,7 @@ internal sealed class SignalSubscription<T>(IGrainFactory grains, INeuron source
             if (_watch is { IsCompleted: false }) { _ = CleanupLateWatchAsync(_watch); }
             else { _ = _watch?.Exception; }
             try { await UnwatchAsync().ConfigureAwait(false); }
-            finally { grains.DeleteObjectReference<INeuronObserver>(_reference); }
+            finally { cluster.DeleteObjectReference<INeuronObserver>(_reference); }
         }
         finally
         {

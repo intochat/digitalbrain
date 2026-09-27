@@ -4,14 +4,14 @@ using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Core;
 
-internal sealed class BrainClient(IGrainFactory grains, IOptions<BrainOptions> options, ILogger<BrainClient> logger, ILocalSignalHub? hub = null)
+internal sealed class BrainClient(IClusterClient cluster, IOptions<BrainOptions> options, ILogger<BrainClient> logger, ILocalSignalHub? hub = null)
     : IDigitalBrain
 {
     private readonly Lock _gate = new();
     private readonly HashSet<IAsyncDisposable> _subscriptions = [];
     private bool _disposed;
 
-    public T Get<T>(string id) where T : class, IGrainWithStringKey => grains.GetGrain<T>(id);
+    public T Get<T>(string id) where T : class, IGrainWithStringKey => cluster.GetGrain<T>(id);
 
     public async Task<ISignalSubscription<T>> SubscribeAsync<T>(INeuron source, CancellationToken cancellationToken = default) where T : Signal
     {
@@ -22,7 +22,7 @@ internal sealed class BrainClient(IGrainFactory grains, IOptions<BrainOptions> o
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            subscription = new(grains, source, options.Value, logger, Remove, hub, cancellationToken);
+            subscription = new(cluster, source, options.Value, logger, Remove, hub, cancellationToken);
             _subscriptions.Add(subscription); // Orleans holds observer targets weakly; this owns the strong reference.
             connecting = subscription.ConnectAsync();
         }
