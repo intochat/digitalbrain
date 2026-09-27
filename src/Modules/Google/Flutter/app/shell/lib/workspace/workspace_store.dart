@@ -334,17 +334,29 @@ class WorkspaceStore extends ChangeNotifier {
   void Function(String workspaceId, String windowId, bool open)?
   onRemoteWindowAction;
   final Map<String, int> remoteRevisions = {};
+  final Map<String, Set<String>> _startupWindows = {};
 
   void reconcileWorkspace(
     WorkspaceProject project,
-    WorkspaceSnapshot snapshot,
-  ) {
+    WorkspaceSnapshot snapshot, {
+    String? openedWindowId,
+  }) {
     if (snapshot.revision < (remoteRevisions[project.id] ?? -1)) return;
+    final startupSnapshot = loaded && !remoteRevisions.containsKey(project.id);
     remoteRevisions[project.id] = snapshot.revision;
     _firstRun[project.id] = snapshot.firstRun == null
         ? null
         : FirstRunState.fromMetadata(snapshot.firstRun);
     final layout = project.presentation;
+    if (startupSnapshot) {
+      _startupWindows[project.id] = snapshot.windows
+          .where((window) => window.isOpen)
+          .map((window) => window.id)
+          .toSet();
+    }
+    final suppressed = _startupWindows[project.id];
+    suppressed?.remove(openedWindowId);
+    suppressed?.retainAll(snapshot.windows.where((w) => w.isOpen).map((w) => w.id));
     for (final window in snapshot.windows) {
       var artifact = project.artifacts
           .where((a) => a.id == window.id)
@@ -379,7 +391,7 @@ class WorkspaceStore extends ChangeNotifier {
         }
       }
       artifact.title = window.title;
-      if (window.isOpen) {
+      if (window.isOpen && !(suppressed?.contains(window.id) ?? false)) {
         if (!layout.openArtifactIds.contains(window.id)) {
           layout.openArtifactIds.add(window.id);
           layout.windowModes.putIfAbsent(window.id, () => 'floating');
@@ -462,6 +474,11 @@ class WorkspaceStore extends ChangeNotifier {
           project.presentation.minimizedArtifactIds.retainAll(
             project.presentation.openArtifactIds,
           );
+          // Reopen saved work explicitly; do not restore stale windows into the dock.
+          project.presentation.openArtifactIds.clear();
+          project.presentation.minimizedArtifactIds.clear();
+          project.presentation.activeArtifactId = null;
+          project.presentation.chatCollapsed = false;
         }
         projects
           ..clear()
@@ -639,6 +656,7 @@ class WorkspaceStore extends ChangeNotifier {
 
   void openArtifact(String id, {String? placement}) {
     if (currentProject.artifacts.any((a) => a.id == id && a.remoteManaged)) {
+      _startupWindows[currentProject.id]?.remove(id);
       onRemoteWindowAction?.call(currentProject.id, id, true);
       return;
     }

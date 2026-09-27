@@ -143,7 +143,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
           : await client.closeWorkspaceWindow(workspace, window, revision);
       if (!mounted) return;
       final project = store.projects.firstWhere((p) => p.id == workspace);
-      store.reconcileWorkspace(project, state);
+      store.reconcileWorkspace(project, state, openedWindowId: open ? window : null);
       if (open && workspace == store.selectedProjectId) {
         store.focusWindow(window);
       }
@@ -904,6 +904,10 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                             conversation.id == store.currentConversation.id,
                         store: store,
                         onRun: widget.onRun,
+                        onTranscribe: widget.programmingClient == null
+                            ? null
+                            : (audio, fileName) => widget.programmingClient!
+                                .transcribeWorkspaceAudio(project.id, audio),
                         selectedCSharpFileId:
                             project.presentation.activeArtifactId ==
                                 'app-csharp'

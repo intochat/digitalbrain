@@ -219,7 +219,7 @@ internal static class AgentEndpoints
         return queryError;
     }
 
-    private static bool ValidId(string? value) => !string.IsNullOrWhiteSpace(value) && value.Length <= 200 && !value.Any(char.IsControl) && !value.Contains('/') && !value.Contains('\\');
+    internal static bool ValidId(string? value) => !string.IsNullOrWhiteSpace(value) && value.Length <= 200 && !value.Any(char.IsControl) && !value.Contains('/') && !value.Contains('\\');
 
     private static IReadOnlyList<string> History(AgentConversationState state)
     {

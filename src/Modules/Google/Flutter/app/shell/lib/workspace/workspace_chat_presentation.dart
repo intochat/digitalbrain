@@ -696,6 +696,20 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
                           ],
                         ),
                       ),
+                      WorkspaceVoiceButton(
+                        onTranscribe: widget.onTranscribe,
+                        enabled: !_running && widget.active,
+                        onDraft: (draft) {
+                          final existing = _composer.text;
+                          _composer.text = existing.isEmpty
+                              ? draft
+                              : '$existing${existing.endsWith(' ') || existing.endsWith('\n') ? '' : ' '}$draft';
+                          _composer.selection = TextSelection.collapsed(
+                            offset: _composer.text.length,
+                          );
+                          _composerFocus.requestFocus();
+                        },
+                      ),
                       ValueListenableBuilder<TextEditingValue>(
                         valueListenable: _composer,
                         builder: (context, value, _) => IconButton.filled(

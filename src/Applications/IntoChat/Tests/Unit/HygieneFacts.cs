@@ -142,9 +142,6 @@ public sealed class HygieneFacts
             "src/Modules/Google/Flutter/app/shell/lib/workspace/brain_graph_store.dart",
             "src/Modules/Google/Flutter/app/shell/lib/workspace/workspace_brain_observation.dart",
             "src/Modules/Google/Flutter/app/shell/lib/workspace/graph_artifact.dart",
-            "src/Modules/Google/Flutter/app/shell/lib/workspace/workspace_voice.dart",
-            "src/Modules/Google/Flutter/app/shell/lib/workspace/voice_file_io.dart",
-            "src/Modules/Google/Flutter/app/shell/lib/workspace/voice_file_web.dart",
             "src/Modules/Google/Flutter/app/shell/lib/inbox_banner.dart",
             "src/Modules/Google/Flutter/app/shell/test/inbox_banner_test.dart",
         ];

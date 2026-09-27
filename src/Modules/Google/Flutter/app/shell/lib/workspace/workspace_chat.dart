@@ -12,6 +12,7 @@ import 'package:uuid/uuid.dart';
 import '../integrations/integrations_menu.dart';
 import 'receipt_card.dart';
 import 'workspace_store.dart';
+import 'workspace_voice.dart';
 
 part 'workspace_chat_presentation.dart';
 
@@ -21,6 +22,7 @@ class WorkspaceChat extends StatefulWidget {
     required this.conversation,
     required this.store,
     this.onRun,
+    this.onTranscribe,
     this.onReadConversation,
     this.onOpenUrl,
     this.onSalesforceConnected,
@@ -39,6 +41,7 @@ class WorkspaceChat extends StatefulWidget {
   final String? selectedCSharpFileId;
   final ValueChanged<String>? onOpenCSharpFile;
   final AgentRunner? onRun;
+  final Future<String> Function(Uint8List audio, String fileName)? onTranscribe;
   final Future<Map<String, dynamic>> Function(
     String workspaceId,
     String threadId,

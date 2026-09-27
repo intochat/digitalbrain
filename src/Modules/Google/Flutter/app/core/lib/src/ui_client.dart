@@ -428,7 +428,18 @@ final class DigitalBrainUiClient {
     return response.body.isEmpty ? null : jsonDecode(response.body);
   }
 
-  /// Sends only the new user message; the server owns conversation history.
+  /// Transcribes a recording into editable draft text without sending a chat turn.
+  Future<String> transcribeWorkspaceAudio(String workspaceId, Uint8List audio) async {
+    final result = await _tableRequest(
+      'POST',
+      '/workspaces/${Uri.encodeComponent(workspaceId)}/voice',
+      body: {'audio': base64Encode(audio)},
+      timeout: const Duration(minutes: 3),
+    );
+    return (result as Map)['text'] as String;
+  }
+
+  /// Reads the server-owned conversation history.
   Future<Map<String, dynamic>> readWorkspaceConversation(
     String workspaceId,
     String threadId,
