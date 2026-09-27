@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using DigitalBrain.Contracts.Enforcement;
+using DigitalBrain.Core.Enforcement;
 
 namespace DigitalBrain.Sdk.Connectors;
 
@@ -9,11 +10,20 @@ internal static class ConnectorEndpoints
 {
     internal static void MapConnectors(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/connections/{owner}", async (string owner, IGrainFactory grains, CancellationToken cancellationToken) =>
+        var group = endpoints.MapGroup("/connections/{owner}");
+        group.AddEndpointFilter(async (context, next) =>
+        {
+            var owner = context.HttpContext.Request.RouteValues["owner"]?.ToString();
+            if (CallerContextStamper.TryGet(out var caller) && owner != caller.AccountId)
+            { return Results.StatusCode(StatusCodes.Status403Forbidden); }
+            return await next(context);
+        });
+        group.MapGet("", async (string owner, IGrainFactory grains, CancellationToken cancellationToken) =>
             Results.Ok(await grains.GetGrain<IConnectors>(owner).List(cancellationToken)));
 
-        endpoints.MapPost("/connections/{owner}/connect", async (string owner, ConnectRequestInput body, IGrainFactory grains, CancellationToken cancellationToken) =>
+        group.MapPost("/connect", async (string owner, ConnectRequestInput body, IGrainFactory grains, CancellationToken cancellationToken) =>
         {
+            if (body.SecretReference is not null) { return Results.BadRequest(new { error = "Supply a connection value." }); }
             try
             {
                 var record = await grains.GetGrain<IConnectors>(owner).Connect(new ConnectRequest
@@ -32,7 +42,7 @@ internal static class ConnectorEndpoints
             }
         });
 
-        endpoints.MapPost("/connections/{owner}/probe", async (string owner, ConnectionIdInput body, IGrainFactory grains, CancellationToken cancellationToken) =>
+        group.MapPost("/probe", async (string owner, ConnectionIdInput body, IGrainFactory grains, CancellationToken cancellationToken) =>
         {
             try
             {
@@ -44,14 +54,14 @@ internal static class ConnectorEndpoints
             }
         });
 
-        endpoints.MapPost("/connections/{owner}/disconnect", async (string owner, ConnectionIdInput body, IGrainFactory grains, CancellationToken cancellationToken) =>
+        group.MapPost("/disconnect", async (string owner, ConnectionIdInput body, IGrainFactory grains, CancellationToken cancellationToken) =>
         {
             await grains.GetGrain<IConnectors>(owner).Disconnect(body.ConnectionId ?? "", HttpCaller(owner), cancellationToken);
             return Results.Ok();
         });
     }
 
-    private static CallerContext HttpCaller(string owner) => new()
+    private static CallerContext HttpCaller(string owner) => CallerContextStamper.TryGet(out var caller) ? caller : new()
     {
         PrincipalId = owner,
         AccountId = owner,

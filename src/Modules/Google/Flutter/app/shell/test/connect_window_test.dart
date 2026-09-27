@@ -34,7 +34,8 @@ void main() {
           .text,
       isEmpty,
     );
-    expect(find.textContaining('Connected'), findsWidgets);
+    expect(find.textContaining('Configured'), findsWidgets);
+    expect(find.text('Connected'), findsNothing);
   });
 
   testWidgets('lists status and probes and disconnects', (tester) async {

@@ -12,7 +12,9 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
     if (entry['role'] == 'tool') return _toolMessage(entry);
     if (entry['role'] == 'ui') {
       final card = entry['card'];
-      return card is Map ? _uiCard(Map<String, dynamic>.from(card)) : const SizedBox.shrink();
+      return card is Map
+          ? _uiCard(Map<String, dynamic>.from(card))
+          : const SizedBox.shrink();
     }
     final user = entry['role'] == 'user';
     final text = entry['text'] as String? ?? '';
@@ -332,10 +334,7 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
       ),
       const SizedBox(height: 12),
       if (card['approved'] == true)
-        Text(
-          'Approved',
-          style: TextStyle(fontSize: 12, color: colors.primary),
-        )
+        Text('Approved', style: TextStyle(fontSize: 12, color: colors.primary))
       else
         Wrap(
           spacing: 8,
@@ -640,6 +639,13 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
                               onPressed: widget.onAttach,
                               icon: const Icon(Icons.add, size: 21),
                             ),
+                            if (widget.loadModels != null)
+                              ConversationModelPicker(
+                                load: widget.loadModels!,
+                                selectedId: widget.conversation.modelProfile,
+                                enabled: !_running && widget.active,
+                                onSelected: _selectModel,
+                              ),
                             PopupMenuButton<String>(
                               tooltip: 'Choose specialist',
                               onSelected: widget.store.setAgent,

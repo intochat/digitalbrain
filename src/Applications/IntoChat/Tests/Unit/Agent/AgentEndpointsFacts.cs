@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text;
+using DigitalBrain.AI;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.AI.Metering;
 using DigitalBrain.Compute;
@@ -12,6 +13,21 @@ namespace IntoChat.Tests;
 
 public sealed class AgentEndpointsFacts
 {
+    [Fact]
+    public async Task RunModelForwardsTheSelectedProfileInsteadOfTheServerDefault()
+    {
+        var runner = new RecordingRunner();
+        var selected = new AgentModelSelection(Profile: "work");
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        { ["IntoChat:Assistant:Model"] = "IGpt56Luna" }).Build();
+
+        await AgentEndpoints.RunModel("scope", "run", "hello", false, EmptyState, "reply",
+            configuration, runner, new ToolSelection([], false), _ => Task.CompletedTask,
+            new StringBuilder(), [], new IntentActivity(), TestContext.Current.CancellationToken, selected);
+
+        Assert.Equal(selected, runner.Request!.Model);
+    }
+
     // The /agent model input must carry the conversation summary once old turns are evicted.
     [Fact]
     public async Task RunModelFeedsTheConversationSummaryIntoTheSystemInstructions()

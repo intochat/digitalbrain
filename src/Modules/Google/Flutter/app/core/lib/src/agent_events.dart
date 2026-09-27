@@ -15,6 +15,7 @@ typedef AgentRunner = Stream<AgentEvent> Function({
   required String threadId,
   required String runId,
   String? parentRunId,
+  String? modelProfile,
   required String text,
 });
 

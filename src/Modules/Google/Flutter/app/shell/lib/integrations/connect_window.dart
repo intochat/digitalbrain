@@ -2,6 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+/// A stored credential is configured, never proof of working provider access.
+String connectionStatus(Object? status) => switch (status) {
+  'Connected' || 'Configured' || 0 => 'Configured',
+  'Verified' => 'Verified',
+  'Expired' || 1 => 'Expired',
+  'Disconnected' || 3 => 'Disconnected',
+  _ => 'Unavailable',
+};
+
 typedef ConnectionsRequest = Future<Object?> Function(
   String path, {
   Map<String, Object?>? body,
@@ -17,7 +26,12 @@ const connectionSources = <(String, String)>[
 /// Connect window: pick a source, paste a connection string (masked) or start OAuth, probe the
 /// credential through the backend, and show connected/expired/failing. The secret is never shown.
 class ConnectWindow extends StatefulWidget {
-  const ConnectWindow({super.key, required this.request, this.oauthUrl, this.onOpen});
+  const ConnectWindow({
+    super.key,
+    required this.request,
+    this.oauthUrl,
+    this.onOpen,
+  });
 
   final ConnectionsRequest request;
   final Uri? oauthUrl;
@@ -101,7 +115,8 @@ class _ConnectWindowState extends State<ConnectWindow> {
       final record = Map<String, dynamic>.from(result as Map);
       setState(() {
         _connectionId.clear();
-        notice = 'Connected ${record['source']} (${record['status']}).';
+        notice =
+            'Configured ${record['source']} (${connectionStatus(record['status'])}).';
       });
       await load();
     } catch (failure) {
@@ -114,7 +129,8 @@ class _ConnectWindowState extends State<ConnectWindow> {
   }
 
   Future<void> probe(String id) => act('probe', id, 'Probed $id.');
-  Future<void> disconnect(String id) => act('disconnect', id, 'Disconnected $id.');
+  Future<void> disconnect(String id) =>
+      act('disconnect', id, 'Disconnected $id.');
 
   Future<void> act(String action, String id, String message) async {
     final ticket = ++generation;
@@ -256,12 +272,14 @@ class _ConnectWindowState extends State<ConnectWindow> {
                   for (final connection in connections)
                     ListTile(
                       leading: Icon(
-                        connection['status'] == 'Connected'
-                            ? Icons.check_circle_outline
+                        connectionStatus(connection['status']) == 'Configured'
+                            ? Icons.key_outlined
                             : Icons.error_outline,
                       ),
-                      title: Text('${connection['source']} · ${connection['id']}'),
-                      subtitle: Text('${connection['status']}'),
+                      title: Text(
+                        '${connection['source']} · ${connection['id']}',
+                      ),
+                      subtitle: Text(connectionStatus(connection['status'])),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [

@@ -58,7 +58,7 @@ final class _UiGalleryScreenState extends State<UiGalleryScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'UI Ui',
+                              'UI Kit',
                               style: TextStyle(
                                 fontSize: 26,
                                 fontWeight: FontWeight.w600,
@@ -67,7 +67,7 @@ final class _UiGalleryScreenState extends State<UiGalleryScreen> {
                               ),
                             ),
                             Text(
-                              'The building blocks of IntoCaht',
+                              'Explore neurons and compose your own apps',
                               style: TextStyle(
                                 color: LumenPalette.muted,
                                 fontSize: 13,
@@ -78,7 +78,7 @@ final class _UiGalleryScreenState extends State<UiGalleryScreen> {
                       ),
                       if (wide)
                         const Text(
-                          'LUMEN / COMPONENT LIBRARY',
+                          'FLUTTER / COMPONENT LIBRARY',
                           style: TextStyle(
                             fontSize: 10,
                             letterSpacing: 1.4,
@@ -285,6 +285,15 @@ final class _UiGalleryScreenState extends State<UiGalleryScreen> {
           color: LumenPalette.muted,
         ),
       ),
+      const SizedBox(height: 12),
+      Text(
+        _selected.id.startsWith('neuron:')
+            ? (_selected.category == 'Composable neurons'
+                  ? 'Composable neuron · dedicated renderer'
+                  : 'Neuron kind · fallback renderer')
+            : 'Presentation widget · not a neuron definition',
+        style: const TextStyle(color: LumenPalette.accent, fontSize: 12),
+      ),
       const SizedBox(height: 24),
       GalleryPreview(
         key: ValueKey(_selected.id),
@@ -311,9 +320,11 @@ final class _UiGalleryScreenState extends State<UiGalleryScreen> {
               style: const TextStyle(color: LumenPalette.muted, height: 1.5),
             ),
             const SizedBox(height: 18),
-            const Text(
-              'COMPONENT API',
-              style: TextStyle(
+            Text(
+              _selected.id.startsWith('neuron:')
+                  ? 'EXAMPLE NEURON DEFINITION'
+                  : 'WIDGET API',
+              style: const TextStyle(
                 fontSize: 10,
                 letterSpacing: 1,
                 color: LumenPalette.muted,

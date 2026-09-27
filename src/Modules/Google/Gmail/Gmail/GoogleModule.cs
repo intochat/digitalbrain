@@ -39,6 +39,7 @@ public sealed class GmailModule : IModule
         services.AddOptions<GmailOAuthOptions>().Bind(silo.Configuration.GetSection(GmailOAuthOptions.SectionName));
         services.TryAddSingleton(static services => new GmailOAuthConfiguration(services.GetRequiredService<IOptions<GmailOAuthOptions>>()));
         services.TryAddSingleton<GmailLogins>();
+        services.AddSingleton<BrowserLogins>(s => s.GetRequiredService<GmailLogins>());
         services.TryAddSingleton<IGmailTokenExchange, GmailTokenExchange>();
         services.AddSingleton<IHttpSurface>(static services => new BrowserLoginSurface(services.GetRequiredService<GmailLogins>()));
     }

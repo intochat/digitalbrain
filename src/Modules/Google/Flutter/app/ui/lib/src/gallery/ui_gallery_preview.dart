@@ -7,6 +7,8 @@ import 'package:flutter_chat_core/flutter_chat_core.dart';
 import 'package:forui/forui.dart';
 
 import '../chat/ui_chat.dart';
+import '../composition/renderer_registry.dart';
+import 'neuron_gallery.dart';
 import '../components/button/ui_button.dart';
 import '../components/card/ui_card.dart';
 import '../components/browser/ui_web_browser.dart';
@@ -100,8 +102,25 @@ final class GalleryEntry {
   final bool dark;
 }
 
-const galleryEntries = [
-  GalleryEntry(
+final galleryEntries = [
+  for (final kind in RendererRegistry.uiKinds)
+    GalleryEntry(
+      'neuron:$kind',
+      kind,
+      RendererRegistry.uiEntry(kind).isFallback
+          ? 'Neuron kinds · fallback'
+          : 'Composable neurons',
+      Icons.hub_outlined,
+      neuronDescriptions[kind] ??
+          'The $kind kind is addressable in the Flutter vocabulary. It currently displays a fallback in composed apps.',
+      neuronExampleJson(kind),
+      RendererRegistry.uiEntry(kind).isFallback
+          ? 'No dedicated neuron renderer yet. A presentation widget with a similar name may exist below; that does not make this kind renderable in a composed app.'
+          : 'Reference this neuron with its kind and name. Surface and layout children resolve those references into a composed app. The preview uses the real neuron renderer with local sample data.'
+                '${compositionGuidance(kind)}'
+                '${kind == 'form' ? '\nDedicated field inputs: ${RendererRegistry.dedicatedFieldKinds.join(', ')}. Plain-text fallback: ${RendererRegistry.fieldFallbackKinds.join(', ')}.' : ''}',
+    ),
+  const GalleryEntry(
     'lumen',
     'Lumen foundations',
     'Foundations',
@@ -111,7 +130,7 @@ const galleryEntries = [
     'The Lumen palette is the product foundation. Actions, icon buttons and fields use Forui for focus, keyboard and disabled behavior.',
     ['Normal', 'Disabled'],
   ),
-  GalleryEntry(
+  const GalleryEntry(
     'forui-buttons',
     'Forui buttons',
     'Foundations',
@@ -121,7 +140,7 @@ const galleryEntries = [
     'A null onPress disables the actual control; loading uses an explicit progress prefix.',
     ['Normal', 'Loading', 'Disabled'],
   ),
-  GalleryEntry(
+  const GalleryEntry(
     'forui-forms',
     'Forui form controls',
     'Foundations',
@@ -131,7 +150,7 @@ const galleryEntries = [
     'Error and disabled modes use the controls’ own properties. All entered values remain local.',
     ['Normal', 'Error', 'Disabled'],
   ),
-  GalleryEntry(
+  const GalleryEntry(
     'feedback',
     'Alerts & progress',
     'Foundations',
@@ -141,7 +160,7 @@ const galleryEntries = [
     'Loading is indeterminate, with no invented completion percentage. Error uses the destructive alert variant.',
     ['Normal', 'Loading', 'Error'],
   ),
-  GalleryEntry(
+  const GalleryEntry(
     'presence',
     'IntoCaht presence',
     'Foundations',
@@ -159,7 +178,7 @@ const galleryEntries = [
       'Disconnected',
     ],
   ),
-  GalleryEntry(
+  const GalleryEntry(
     'button',
     'Action button',
     'Inputs & actions',
@@ -169,7 +188,7 @@ const galleryEntries = [
     'The counter demonstrates a local action. A host can also observe the optional onButtonPressed callback.',
     ['Normal', 'Disabled'],
   ),
-  GalleryEntry(
+  const GalleryEntry(
     'chat',
     'Chat & rich text',
     'Content',
@@ -179,7 +198,7 @@ const galleryEntries = [
     'Send a sample message to append it locally. No model or transport is connected. Empty clears the sample history.',
     ['Normal', 'Empty'],
   ),
-  GalleryEntry(
+  const GalleryEntry(
     'card',
     'Content card',
     'Content',
@@ -190,7 +209,7 @@ const galleryEntries = [
     ['Normal', 'Compact'],
     true,
   ),
-  GalleryEntry(
+  const GalleryEntry(
     'image',
     'Image',
     'Content',
@@ -201,7 +220,7 @@ const galleryEntries = [
     ['Normal', 'Error'],
     true,
   ),
-  GalleryEntry(
+  const GalleryEntry(
     'chart',
     'Bar chart',
     'Data & time',
@@ -212,7 +231,7 @@ const galleryEntries = [
     ['Normal', 'Empty'],
     true,
   ),
-  GalleryEntry(
+  const GalleryEntry(
     'video',
     'Video player',
     'Media',
@@ -223,7 +242,7 @@ const galleryEntries = [
     ['Normal', 'Playing'],
     true,
   ),
-  GalleryEntry(
+  const GalleryEntry(
     'webbrowser',
     'Web browser',
     'Media',
@@ -234,7 +253,7 @@ const galleryEntries = [
     ['Normal'],
     true,
   ),
-  GalleryEntry(
+  const GalleryEntry(
     'sheet',
     'Spreadsheet',
     'Data & time',
@@ -245,7 +264,7 @@ const galleryEntries = [
     ['Normal', 'Empty', 'Wide'],
     true,
   ),
-  GalleryEntry(
+  const GalleryEntry(
     'data-table',
     'Data table',
     'Data & time',
@@ -255,7 +274,7 @@ const galleryEntries = [
     'This fixture is read-only; backend view updates are not connected. Loading and Error exercise the controller’s actual feedback. Disabled omits the reader as well.',
     ['Normal', 'Empty', 'Loading', 'Error', 'Disabled'],
   ),
-  GalleryEntry(
+  const GalleryEntry(
     'clock',
     'Clock & countdown',
     'Data & time',
@@ -266,7 +285,7 @@ const galleryEntries = [
     ['Wall clock', 'Countdown', 'Expired'],
     true,
   ),
-  GalleryEntry(
+  const GalleryEntry(
     'graph',
     'Projected graph',
     'Graphs',
@@ -277,7 +296,7 @@ const galleryEntries = [
     ['Normal', 'Empty'],
     true,
   ),
-  GalleryEntry(
+  const GalleryEntry(
     'brain-graph',
     'Lumen brain graph',
     'Graphs',
@@ -436,6 +455,9 @@ final class _GalleryPreviewState extends State<GalleryPreview> {
   void _action() => setState(() => _count++);
   bool get _disabled => _state == 'Disabled';
   Widget _example() {
+    if (widget.entry.id.startsWith('neuron:')) {
+      return NeuronGalleryPreview(kind: widget.entry.id.substring(7));
+    }
     switch (widget.entry.id) {
       case 'lumen':
         return _stack([

@@ -37,6 +37,7 @@ public sealed class SalesforceModule : IModule
         services.AddOptions<SalesforceOAuthOptions>().Bind(silo.Configuration.GetSection(SalesforceOAuthOptions.SectionName));
         services.TryAddSingleton(static services => new SalesforceOAuthConfiguration(services.GetRequiredService<IOptions<SalesforceOAuthOptions>>()));
         services.TryAddSingleton<SalesforceLogins>();
+        services.AddSingleton<BrowserLogins>(s => s.GetRequiredService<SalesforceLogins>());
         services.TryAddSingleton<ISalesforceTokenExchange, SalesforceTokenExchange>();
         services.TryAddSingleton<SalesforceTokenRefresh>();
         services.TryAddSingleton<SalesforceCredentialStore>();

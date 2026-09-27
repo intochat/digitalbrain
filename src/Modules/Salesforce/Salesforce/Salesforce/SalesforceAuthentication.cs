@@ -69,10 +69,11 @@ internal static class SalesforceAuthentication
                             var nonce = context.HttpContext.RequestServices.GetRequiredService<TokenHandoff>()
                                 .Deposit(new OAuthTokens(context.AccessToken!, context.RefreshToken));
                             var grains = context.HttpContext.RequestServices.GetRequiredService<IGrainFactory>();
-                            var owner = DigitalBrain.Core.Enforcement.CallerContextStamper.TryGet(out var caller)
+                            var workspace = BrowserLoginWorkspace.FromScope(BrowserLoginCorrelation.Scope(context.Properties));
+                            var owner = workspace?.Registry ?? (DigitalBrain.Core.Enforcement.CallerContextStamper.TryGet(out var caller)
                                 ? caller.PrincipalId
-                                : null;
-                            await grains.GetGrain<ISalesforce>("salesforce")
+                                : null);
+                            await grains.GetGrain<ISalesforce>(workspace?.Registry ?? "salesforce")
                                 .Connect(new ConnectSalesforceAccount(instanceUrl.AbsoluteUri,
                                     checked((int)(context.ExpiresIn?.TotalSeconds ?? 3600)), nonce, owner)).ConfigureAwait(false);
                         }

@@ -26,13 +26,16 @@ internal static class AgentEndpoints
 
     public static void MapWorkspaceAgent(this IEndpointRouteBuilder routes)
     {
+        // AccountSession gates this route exactly as it gates /agent, including local-owner mode.
+        routes.MapGet("/ai/models", (ModelProfiles profiles, IOptionsMonitor<AIOptions> options, IConfiguration configuration) =>
+            Results.Ok(new AgentModelCatalog(profiles, options, configuration).Read()));
         routes.MapGet("/workspaces/{workspaceId}/conversations/{threadId}", async (string workspaceId, string threadId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) =>
         {
             if (!ValidId(workspaceId) || !ValidId(threadId)) { return Results.BadRequest(); }
             var scope = WorkspaceScope.Current(auth.Value, workspaceId);
             return Results.Ok(await (await brain.Get<IAssistantApp>(scope.Id).Conversation(threadId)).ReadConversation(ct));
         });
-        routes.MapPost("/agent", async (AgentInput input, HttpContext http, IDigitalBrain brain, IPriceBook priceBook, IAgentTurnRunner runner, IIntentUsageSink usage, IOptions<BasicAuthOptions> auth, IConfiguration configuration, IHostEnvironment environment) =>
+        routes.MapPost("/agent", async (AgentInput input, HttpContext http, IDigitalBrain brain, IPriceBook priceBook, IAgentTurnRunner runner, IIntentUsageSink usage, IOptions<BasicAuthOptions> auth, IConfiguration configuration, IHostEnvironment environment, ModelProfiles profiles, IOptionsMonitor<AIOptions> aiOptions) =>
         {
             if (!ValidId(input.ThreadId) || !ValidId(input.RunId) || !ValidId(input.WorkspaceId)
                 || input.Messages is not { Count: 1 } || input.Messages[0].Role != "user"
@@ -42,6 +45,22 @@ internal static class AgentEndpoints
                 !await http.RequestServices.GetRequiredService<IWorkspaceAccess>().CanAccessAsync(CallerContextStamper.Require().PrincipalId, input.WorkspaceId, http.RequestAborted))
             { http.Response.StatusCode = StatusCodes.Status403Forbidden; return; }
             var scope = WorkspaceScope.Current(auth.Value, input.WorkspaceId);
+            var agent = await brain.Get<IAssistantApp>(scope.Id).Conversation(input.ThreadId);
+            var snapshot = await agent.ReadConversation(http.RequestAborted);
+            PreparedTurn prepared;
+            try { prepared = PrepareTurn(snapshot, input, new AgentModelCatalog(profiles, aiOptions, configuration)); }
+            catch (ArgumentException error)
+            {
+                http.Response.StatusCode = StatusCodes.Status400BadRequest;
+                await http.Response.WriteAsJsonAsync(new { code = "MODEL_UNAVAILABLE", message = error.Message }, http.RequestAborted);
+                return;
+            }
+            catch (InvalidOperationException error)
+            {
+                http.Response.StatusCode = StatusCodes.Status409Conflict;
+                await http.Response.WriteAsJsonAsync(new { code = "RUN_CONFLICT", message = error.Message }, http.RequestAborted);
+                return;
+            }
             http.Response.ContentType = "text/event-stream";
             http.Response.Headers.CacheControl = "no-cache";
             async Task Emit(object value)
@@ -54,7 +73,6 @@ internal static class AgentEndpoints
             using var capture = ContentCaptureScope.Begin(
                 ContentCapturePolicy.IsLocalOwner(auth.Value, configuration, environment),
                 ContentCapturePolicy.ClassOf(input.Messages));
-            var agent = await brain.Get<IAssistantApp>(scope.Id).Conversation(input.ThreadId);
             var userText = input.Messages[0].Content;
             // Only the request that actually opened the active run may complete or interrupt it.
             // A rejected concurrent submission must never mutate the owner's conversation turn.
@@ -73,7 +91,10 @@ internal static class AgentEndpoints
             {
                 try
                 {
-                    var state = await agent.BeginConversation(new(input.RunId, userText), http.RequestAborted);
+                    // A retained response needs no model and must survive provider removal.
+                    // Replay the snapshot directly so concurrent history trimming cannot turn it into a fresh run.
+                    var state = prepared.Replay is not null ? snapshot
+                        : await agent.BeginConversation(new(input.RunId, userText), http.RequestAborted);
                     var replay = state.Turns.SingleOrDefault(turn => turn.RunId == input.RunId);
                     ownsRun = replay is null;
                     recordUsage = ownsRun;
@@ -99,7 +120,7 @@ internal static class AgentEndpoints
                             var text = new StringBuilder();
                             var results = new List<string>();
                             var selection = await new AgentToolSelection(brain).ResolveAsync(scope.Id, userText, History(state), http.RequestAborted);
-                            var queryError = await RunModel(scope.Id, usageId, userText, developerMode, state, messageId, configuration, runner, selection, Emit, text, results, activity, http.RequestAborted);
+                            var queryError = await RunModel(scope.Id, usageId, userText, developerMode, state, messageId, configuration, runner, selection, Emit, text, results, activity, http.RequestAborted, prepared.Model);
                             if (queryError is not null) { throw new WorkspaceQueryException(queryError); }
                             await agent.CompleteConversation(new(input.RunId, userText, text.ToString(), results), http.RequestAborted);
                         }
@@ -193,13 +214,27 @@ internal static class AgentEndpoints
         });
     }
 
+    internal static PreparedTurn PrepareTurn(AgentConversationState snapshot, AgentInput input, AgentModelCatalog catalog)
+    {
+        var replay = snapshot.Turns.SingleOrDefault(turn => turn.RunId == input.RunId);
+        if (replay is not null)
+        {
+            if (replay.UserText != input.Messages[0].Content) { throw new InvalidOperationException("Run ID already belongs to another message."); }
+            return new(replay, null);
+        }
+        // Validation precedes BeginConversation: rejected choices never open or fail a turn.
+        return new(null, catalog.Select(input.ModelProfile));
+    }
+
+    internal sealed record PreparedTurn(AgentConversationTurn? Replay, AgentModelSelection? Model);
+
     internal static async Task<string?> RunModel(string scope, string run, string message, bool developerMode,
         AgentConversationState state, string messageId, IConfiguration configuration,
-        IAgentTurnRunner runner, ToolSelection selection, Func<object, Task> emit, StringBuilder text, List<string> results, IntentActivity activity, CancellationToken ct)
+        IAgentTurnRunner runner, ToolSelection selection, Func<object, Task> emit, StringBuilder text, List<string> results, IntentActivity activity, CancellationToken ct, AgentModelSelection? modelSelection = null)
     {
         var finished = false;
         string? queryError = null;
-        var model = configuration["IntoChat:Assistant:Model"] is { Length: > 0 } modelName ? new AgentModelSelection(Model: modelName) : null;
+        var model = modelSelection ?? (configuration["IntoChat:Assistant:Model"] is { Length: > 0 } modelName ? new AgentModelSelection(Model: modelName) : null);
         var instructions = developerMode ? DeveloperInstructions : ProductInstructions;
         // A trimmed conversation summarizes the evicted turns; the model must still receive it.
         if (!string.IsNullOrEmpty(state.Summary)) { instructions += "\nEarlier conversation summary: " + state.Summary; }
@@ -297,7 +332,7 @@ internal static class AgentEndpoints
         }
         activity.RecordTool(tool.Name, succeeded, title, rowsRead);
     }
-    internal sealed record AgentInput(string WorkspaceId, string ThreadId, string RunId, IReadOnlyList<AgentMessage> Messages);
+    internal sealed record AgentInput(string WorkspaceId, string ThreadId, string RunId, IReadOnlyList<AgentMessage> Messages, string? ModelProfile = null);
     internal sealed record AgentMessage(string Role, string Content, string? Class = null);
 }
 

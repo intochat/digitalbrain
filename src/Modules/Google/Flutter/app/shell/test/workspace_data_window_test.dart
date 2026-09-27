@@ -83,7 +83,7 @@ void main() {
     tester,
   ) async {
     final store = WorkspaceStore(persistence: MemoryPersistence());
-      final events = StreamController<AgentEvent>.broadcast();
+    final events = StreamController<AgentEvent>.broadcast();
     await tester.pumpWidget(
       WorkspaceApp(
         store: store,
@@ -93,6 +93,7 @@ void main() {
           required threadId,
           required runId,
           parentRunId,
+          modelProfile,
           required text,
         }) => events.stream,
       ),
@@ -161,6 +162,7 @@ void main() {
                 required threadId,
                 required runId,
                 parentRunId,
+                modelProfile,
                 required text,
               }) {
                 requests++;

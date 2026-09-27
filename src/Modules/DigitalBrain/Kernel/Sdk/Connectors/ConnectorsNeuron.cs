@@ -111,7 +111,7 @@ internal sealed class ConnectorsNeuron : Neuron<ConnectorsState>, IConnectors
         }
 
         var vault = _grains.GetGrain<ISecrets>(caller.PrincipalId);
-        var fieldPath = FieldPath(source, request.ConnectionId);
+        var fieldPath = FieldPath(this.GetPrimaryKeyString(), source, request.ConnectionId);
         return await vault.Set(caller, fieldPath, request.Label ?? source, request.Value, cancellationToken);
     }
 
@@ -152,6 +152,8 @@ internal sealed class ConnectorsNeuron : Neuron<ConnectorsState>, IConnectors
         _ => ConnectorStatus.Failing,
     };
 
-    private static string FieldPath(string source, string connectionId) => $"connections.{source}.{connectionId}";
+    private static string FieldPath(string registry, string source, string connectionId) => "connections." +
+        Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(
+            System.Text.Json.JsonSerializer.Serialize(new[] { registry, source, connectionId }))));
 }
 

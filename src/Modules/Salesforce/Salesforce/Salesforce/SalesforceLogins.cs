@@ -14,5 +14,5 @@ internal sealed class SalesforceLogins(SalesforceOAuthConfiguration configuratio
         "/integrations/salesforce/callback",
         "Log in to Salesforce to continue this request. Your credentials stay outside the conversation.");
 
-    protected override Uri? PublicOrigin => configuration.PublicOrigin;
+    protected override Uri? PublicOrigin => configuration.IsConfigured ? configuration.PublicOrigin : null;
 }

@@ -9,12 +9,14 @@ import 'agent_events.dart';
 import 'basic_credentials.dart';
 import 'cookie_http_client.dart';
 import 'session_http_client_io.dart'
-    if (dart.library.html) 'session_http_client_web.dart' as transport;
+    if (dart.library.html) 'session_http_client_web.dart'
+    as transport;
 import 'host_environment.dart';
 import 'models/app_manifest.dart';
 import 'models/brain_models.dart';
 import 'models/consent_sheet.dart';
 import 'models/compute_usage.dart';
+import 'models/model_catalog.dart';
 import 'models/grant_summary.dart';
 import 'models/session_capabilities.dart';
 import 'models/table_models.dart';
@@ -116,9 +118,14 @@ final class DigitalBrainUiClient {
 
   /// Creates an owned workspace; clients never choose or claim an existing id.
   Future<String> createWorkspace() async {
-    final response = await _request('POST', '/identity/workspaces',
-      body: const {}, timeout: const Duration(seconds: 15));
-    return (jsonDecode(response.body) as Map<String, dynamic>)['workspaceId'] as String;
+    final response = await _request(
+      'POST',
+      '/identity/workspaces',
+      body: const {},
+      timeout: const Duration(seconds: 15),
+    );
+    return (jsonDecode(response.body) as Map<String, dynamic>)['workspaceId']
+        as String;
   }
 
   Future<void> signOut() async {
@@ -430,7 +437,10 @@ final class DigitalBrainUiClient {
   }
 
   /// Transcribes a recording into editable draft text without sending a chat turn.
-  Future<String> transcribeWorkspaceAudio(String workspaceId, Uint8List audio) async {
+  Future<String> transcribeWorkspaceAudio(
+    String workspaceId,
+    Uint8List audio,
+  ) async {
     final result = await _tableRequest(
       'POST',
       '/workspaces/${Uri.encodeComponent(workspaceId)}/voice',
@@ -457,6 +467,7 @@ final class DigitalBrainUiClient {
     required String threadId,
     required String runId,
     String? parentRunId,
+    String? modelProfile,
     required String text,
   }) {
     final abort = Completer<void>();
@@ -480,6 +491,7 @@ final class DigitalBrainUiClient {
                   'workspaceId': workspaceId,
                   'runId': runId,
                   'parentRunId': ?parentRunId,
+                  'modelProfile': ?modelProfile,
                   'messages': [
                     {'id': _uuid.v4(), 'role': 'user', 'content': text},
                   ],
@@ -494,7 +506,15 @@ final class DigitalBrainUiClient {
             return;
           }
           if (response.statusCode != 200) {
-            await response.stream.listen(null).cancel();
+            final failure = await http.Response.fromStream(response);
+            try {
+              final payload = jsonDecode(failure.body);
+              if (payload is Map && payload['code'] == 'MODEL_UNAVAILABLE') {
+                throw const ModelUnavailableException();
+              }
+            } on FormatException {
+              // Non-JSON infrastructure failures retain the status-only message.
+            }
             throw StateError('Agent request failed (${response.statusCode}).');
           }
           incoming = decodeAgentEvents(response.stream).listen(
@@ -575,18 +595,33 @@ final class DigitalBrainUiClient {
     return controller.stream;
   }
 
-  Future<ComputeUsagePage> readComputeUsage(String workspaceId, {String? cursor, int limit = 20}) async {
-    final query = Uri(queryParameters: {
-      'limit': '$limit', if (cursor != null) 'cursor': cursor,
-    }).query;
-    return ComputeUsagePage.fromJson(Map<String, dynamic>.from(await _tableRequest(
-      'GET', '/workspaces/${Uri.encodeComponent(workspaceId)}/compute/usage?$query',
-    ) as Map));
+  Future<ComputeUsagePage> readComputeUsage(
+    String workspaceId, {
+    String? cursor,
+    int limit = 20,
+  }) async {
+    final query = Uri(
+      queryParameters: {
+        'limit': '$limit',
+        if (cursor != null) 'cursor': cursor,
+      },
+    ).query;
+    return ComputeUsagePage.fromJson(
+      Map<String, dynamic>.from(
+        await _tableRequest(
+          'GET',
+          '/workspaces/${Uri.encodeComponent(workspaceId)}/compute/usage?$query',
+        ) as Map,
+      ),
+    );
   }
 
   Future<ComputeAccountSummary> readComputeSummary() async =>
-      ComputeAccountSummary.fromJson(Map<String, dynamic>.from(
-        await _tableRequest('GET', '/compute/summary') as Map));
+      ComputeAccountSummary.fromJson(
+        Map<String, dynamic>.from(
+          await _tableRequest('GET', '/compute/summary') as Map,
+        ),
+      );
 
   Future<Map<String, dynamic>> readComputeLimits() async {
     final response = await _request(
@@ -596,6 +631,7 @@ final class DigitalBrainUiClient {
     );
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
+
   Future<Map<String, dynamic>> readUi(
     String workspace,
     String collection,
@@ -721,6 +757,33 @@ final class DigitalBrainUiClient {
         ? <String, dynamic>{}
         : Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
+
+  Future<ChatModelCatalog> readModelCatalog() async =>
+      ChatModelCatalog.fromJson(
+        Map<String, dynamic>.from(
+          await jsonRequest('GET', '/ai/models') as Map,
+        ),
+      );
+
+  Future<Object?> serviceConnectionsRequest(
+    String workspaceId,
+    String path, {
+    Map<String, Object?>? body,
+  }) => jsonRequest(
+    body == null ? 'GET' : 'POST',
+    '/workspaces/${Uri.encodeComponent(workspaceId)}/connections/services${path.isEmpty ? '' : '/$path'}',
+    body,
+  );
+
+  Future<Object?> workspaceConnectionsRequest(
+    String workspaceId,
+    String path, {
+    Map<String, Object?>? body,
+  }) => jsonRequest(
+    body == null ? 'GET' : 'POST',
+    '/workspaces/${Uri.encodeComponent(workspaceId)}/connections${path.isEmpty ? '' : '/$path'}',
+    body,
+  );
 
   Future<Object?> connectionsRequest(
     String owner,
@@ -852,6 +915,13 @@ final class DigitalBrainUiClient {
     );
     return response.body.isEmpty ? null : jsonDecode(response.body);
   }
+}
+
+final class ModelUnavailableException implements Exception {
+  const ModelUnavailableException();
+  @override
+  String toString() =>
+      'This model is no longer available. Choose another model beside the composer.';
 }
 
 final class CSharpFileRequestException implements Exception {

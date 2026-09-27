@@ -122,6 +122,7 @@ class WorkspaceConversation {
     required this.id,
     required this.title,
     this.selectedAgentId = 'intocaht',
+    this.modelProfile,
     this.draft = '',
     Set<String>? attachedArtifactIds,
     List<Map<String, dynamic>>? messages,
@@ -132,6 +133,7 @@ class WorkspaceConversation {
   final String id;
   String title;
   String selectedAgentId;
+  String? modelProfile;
   String draft;
   String? threadId;
   String? parentRunId;
@@ -141,6 +143,7 @@ class WorkspaceConversation {
     'id': id,
     'title': title,
     'selectedAgentId': selectedAgentId,
+    'modelProfile': modelProfile,
     'draft': draft,
     'attachedArtifactIds': attachedArtifactIds.toList(),
     'messages': messages,
@@ -152,6 +155,7 @@ class WorkspaceConversation {
         id: json['id'] as String,
         title: _text(json['title'], 'New conversation'),
         selectedAgentId: _text(json['selectedAgentId'], 'intocaht'),
+        modelProfile: json['modelProfile'] as String?,
         draft: _text(json['draft'], ''),
         attachedArtifactIds: _strings(json['attachedArtifactIds']).toSet(),
         messages: (json['messages'] as List? ?? []).map(_map).toList(),
@@ -275,6 +279,7 @@ class WorkspaceProject {
 }
 
 class WorkspacePreferences {
+  String? defaultModelProfile;
   String displayName = '';
   String role = '';
   String theme = 'dark';
@@ -283,6 +288,7 @@ class WorkspacePreferences {
   bool reducedMotion = false;
   bool compactDensity = false;
   Map<String, dynamic> toJson() => {
+    'defaultModelProfile': defaultModelProfile,
     'displayName': displayName,
     'role': role,
     'theme': theme,
@@ -294,6 +300,7 @@ class WorkspacePreferences {
   WorkspacePreferences();
   factory WorkspacePreferences.fromJson(Map<String, dynamic> json) =>
       WorkspacePreferences()
+        ..defaultModelProfile = json['defaultModelProfile'] as String?
         ..displayName = _text(json['displayName'], '')
         ..role = _text(json['role'], '')
         ..theme = _text(json['theme'], 'dark')
@@ -356,7 +363,9 @@ class WorkspaceStore extends ChangeNotifier {
     }
     final suppressed = _startupWindows[project.id];
     suppressed?.remove(openedWindowId);
-    suppressed?.retainAll(snapshot.windows.where((w) => w.isOpen).map((w) => w.id));
+    suppressed?.retainAll(
+      snapshot.windows.where((w) => w.isOpen).map((w) => w.id),
+    );
     for (final window in snapshot.windows) {
       var artifact = project.artifacts
           .where((a) => a.id == window.id)
@@ -535,6 +544,7 @@ class WorkspaceStore extends ChangeNotifier {
           ? agentId
           : 'intocaht',
       draft: draft,
+      modelProfile: settings.defaultModelProfile,
     );
     final p = WorkspaceProject(
       id: id ?? _id(),
@@ -558,6 +568,7 @@ class WorkspaceStore extends ChangeNotifier {
   WorkspaceConversation createConversation({String? title}) {
     final c = WorkspaceConversation(
       id: _id(),
+      modelProfile: settings.defaultModelProfile,
       title: title?.trim().isNotEmpty == true
           ? title!.trim()
           : 'New conversation',

@@ -14,6 +14,7 @@ import 'receipt_card.dart';
 import 'workspace_store.dart';
 import 'workspace_voice.dart';
 import 'compute_usage_history.dart';
+import 'model_settings.dart';
 
 part 'workspace_chat_presentation.dart';
 
@@ -23,6 +24,7 @@ class WorkspaceChat extends StatefulWidget {
     required this.conversation,
     required this.store,
     this.onRun,
+    this.loadModels,
     this.onTranscribe,
     this.onUsageChanged,
     this.onReadConversation,
@@ -43,6 +45,7 @@ class WorkspaceChat extends StatefulWidget {
   final String? selectedCSharpFileId;
   final ValueChanged<String>? onOpenCSharpFile;
   final AgentRunner? onRun;
+  final ModelCatalogLoader? loadModels;
   final Future<String> Function(Uint8List audio, String fileName)? onTranscribe;
   final VoidCallback? onUsageChanged;
   final Future<Map<String, dynamic>> Function(
@@ -52,7 +55,11 @@ class WorkspaceChat extends StatefulWidget {
   onReadConversation;
   final OpenUrl? onOpenUrl;
   final Future<bool> Function()? onSalesforceConnected;
-  final Future<void> Function(String workspaceId, String intentId, String message)?
+  final Future<void> Function(
+    String workspaceId,
+    String intentId,
+    String message,
+  )?
   onReportProblem;
   final void Function(Map<String, dynamic>) onArtifact;
   final VoidCallback onAttach;
@@ -247,6 +254,11 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
     }
   }
 
+  void _selectModel(String? id) {
+    setState(() => widget.conversation.modelProfile = id);
+    widget.store.save();
+  }
+
   void _send({String? resumeText}) {
     final text = (resumeText ?? _composer.text).trim();
     final run = widget.onRun;
@@ -338,6 +350,7 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
             threadId: c.threadId!,
             runId: runId,
             parentRunId: c.parentRunId,
+            modelProfile: c.modelProfile,
             text: prompt,
           ).listen(
             _event,
@@ -502,7 +515,12 @@ class _WorkspaceChatState extends State<WorkspaceChat> {
     if (report == null || runId == null) return;
     try {
       await report(_project.id, runId, _notice ?? 'The request failed.');
-      if (mounted) setState(() { _reported = true; _notice = 'Thanks — your report was sent.'; });
+      if (mounted) {
+        setState(() {
+          _reported = true;
+          _notice = 'Thanks — your report was sent.';
+        });
+      }
     } catch (_) {
       if (mounted) setState(() => _notice = 'The report could not be sent.');
     }

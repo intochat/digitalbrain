@@ -18,6 +18,7 @@ internal static class GitHubAuthentication
         services.AddOptions<GitHubAppOptions>().Bind(configuration.GetSection(GitHubAppOptions.SectionName));
         services.AddSingleton(services => new GitHubOAuthConfiguration(services.GetRequiredService<IOptions<GitHubAppOptions>>()));
         services.AddSingleton<GitHubLogins>();
+        services.AddSingleton<BrowserLogins>(s => s.GetRequiredService<GitHubLogins>());
         services.AddSingleton<IHttpSurface>(s => new BrowserLoginSurface(s.GetRequiredService<GitHubLogins>()));
         services.AddLogging(logging =>
         {

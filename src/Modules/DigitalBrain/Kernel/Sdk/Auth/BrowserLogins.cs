@@ -13,6 +13,8 @@ public abstract class BrowserLogins(BrowserLoginDefinition definition)
 
     internal Uri? ConfiguredOrigin => PublicOrigin;
 
+    public bool IsConfigured => PublicOrigin is not null;
+
     public Uri Require(string? scope = null)
     {
         var origin = PublicOrigin

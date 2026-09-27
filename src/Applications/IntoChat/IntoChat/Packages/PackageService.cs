@@ -72,12 +72,12 @@ internal sealed class PackageService(
     {
         var revision = await Resolve(new(id.Owner, id.Name, revisionId), preferPublished: true);
         var declared = (await Package(id).ReadRevision(revision.Revision)).Content.Manifest.Accounts ?? [];
-        var scope = WorkspaceScope.Current(auth.Value, workspaceId).Id;
+        var scope = WorkspaceScope.Current(auth.Value, workspaceId);
         var owner = CallerContextStamper.Require().PrincipalId;
-        var available = await brain.Get<IConnectors>(owner).List();
+        var available = WorkspaceConnectionRecords.Combine(scope, owner,
+            await brain.Get<IConnectors>(scope.Id).List(), await brain.Get<IConnectors>(owner).List());
         return new(revision.Revision, declared.Select(slot => new PackageAccountSlot(slot.Name, slot.Source, slot.Description,
-            available.Where(account => account.Source == slot.Source && account.Status == ConnectorStatus.Connected
-                && (account.WorkspaceId == scope || account.WorkspaceId == owner))
+            available.Where(account => account.Source == slot.Source && account.Status == ConnectorStatus.Connected)
                 .OrderBy(account => account.Id, StringComparer.Ordinal)
                 .Select(account => new PackageAccountChoice(account.Id, account.Credential.Label)).ToArray())).ToArray());
     }
@@ -160,15 +160,15 @@ internal sealed class PackageService(
     {
         var declared = (await Package(revision.Package).ReadRevision(revision.Revision)).Content.Manifest.Accounts ?? [];
         if (declared.Count == 0 && selected.Count == 0) { return; }
-        var scope = WorkspaceScope.Current(auth.Value, workspaceId).Id;
+        var scope = WorkspaceScope.Current(auth.Value, workspaceId);
         var owner = CallerContextStamper.Require().PrincipalId;
-        var available = await brain.Get<IConnectors>(owner).List();
+        var available = WorkspaceConnectionRecords.Combine(scope, owner,
+            await brain.Get<IConnectors>(scope.Id).List(), await brain.Get<IConnectors>(owner).List());
         foreach (var slot in declared)
         {
             if (!selected.TryGetValue(slot.Name, out var id) || string.IsNullOrWhiteSpace(id))
             { throw new ArgumentException($"Choose an account for {slot.Name} ({slot.Source})."); }
-            var account = available.FirstOrDefault(item => item.Id == id && item.WorkspaceId is not null
-                && (item.WorkspaceId == scope || item.WorkspaceId == owner) && item.Source == slot.Source);
+            var account = available.FirstOrDefault(item => item.Id == id && item.Source == slot.Source);
             if (account is null || account.Status != ConnectorStatus.Connected)
             { throw new ArgumentException($"Account {id} is not a connected {slot.Source} account in this workspace."); }
         }

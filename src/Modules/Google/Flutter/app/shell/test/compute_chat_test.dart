@@ -25,7 +25,11 @@ void main() {
       {
         'id': 'run/receipt',
         'role': 'receipt',
-        'receipt': <String, dynamic>{'id': 'usage', 'compute': .4, 'shadow': true},
+        'receipt': <String, dynamic>{
+          'id': 'usage',
+          'compute': .4,
+          'shadow': true,
+        },
       },
     ]);
     final item = savedComputeHistory(store.currentProject).single;
@@ -110,6 +114,7 @@ void main() {
                 required threadId,
                 required runId,
                 parentRunId,
+                modelProfile,
                 required text,
               }) => events.stream,
             ),

@@ -19,7 +19,6 @@ import 'compute_usage_history.dart';
 import 'workspace_islands.dart';
 import 'csharp/csharp_manager.dart';
 import 'apps/consent_sheet_view.dart';
-import 'apps/built_in_app_view.dart';
 import 'apps/packages_screen.dart';
 
 class WorkspaceApp extends StatefulWidget {
@@ -145,7 +144,11 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
           : await client.closeWorkspaceWindow(workspace, window, revision);
       if (!mounted) return;
       final project = store.projects.firstWhere((p) => p.id == workspace);
-      store.reconcileWorkspace(project, state, openedWindowId: open ? window : null);
+      store.reconcileWorkspace(
+        project,
+        state,
+        openedWindowId: open ? window : null,
+      );
       if (open && workspace == store.selectedProjectId) {
         store.focusWindow(window);
       }
@@ -239,37 +242,20 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     if (segments.firstOrNull == 'settings') {
       void showSettings() {
         if (!mounted) return;
-        final section = segments.length > 1 ? segments[1] : 'profile';
+        final section = segments.length > 2 && segments[2] == 'gallery'
+            ? 'ui-kit'
+            : segments.length > 1
+            ? segments[1]
+            : 'general';
         _navigator.currentState?.push(
           MaterialPageRoute<void>(
             settings: RouteSettings(name: '/settings/$section'),
-            builder: (_) =>
-                widget.programmingClient != null &&
-                    (section == 'profile' || section == 'appearance')
-                ? _settingsApp(() => _navigator.currentState?.pop())
-                : WorkspaceSettings(
-                    store: store,
-                    initialSection: section,
-                    kernelBaseUri: widget.kernelBaseUri,
-                    onOpen: widget.onOpenUrl,
-                    connectionsRequest: _connectionsRequest,
-                    onClose: () => _navigator.currentState?.pop(),
-                  ),
+            builder: (_) => _settingsApp(
+              () => _navigator.currentState?.pop(),
+              section: section,
+            ),
           ),
         );
-        if (segments.length > 2 && segments[2] == 'gallery') {
-          _navigator.currentState?.push(
-            MaterialPageRoute<void>(
-              settings: const RouteSettings(
-                name: '/settings/developer/gallery',
-              ),
-              builder: (_) => Scaffold(
-                appBar: AppBar(title: const Text('UI components gallery')),
-                body: const UiGalleryScreen(),
-              ),
-            ),
-          );
-        }
       }
 
       if (_navigator.currentState != null) {
@@ -907,11 +893,12 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                             conversation.id == store.currentConversation.id,
                         store: store,
                         onRun: widget.onRun,
+                        loadModels: widget.programmingClient?.readModelCatalog,
                         onUsageChanged: () => _computeRefresh.value++,
                         onTranscribe: widget.programmingClient == null
                             ? null
                             : (audio, fileName) => widget.programmingClient!
-                                .transcribeWorkspaceAudio(project.id, audio),
+                                  .transcribeWorkspaceAudio(project.id, audio),
                         selectedCSharpFileId:
                             project.presentation.activeArtifactId ==
                                 'app-csharp'
@@ -1137,16 +1124,8 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         : () => _openCompute(context),
     onSettings: () => Navigator.of(context).push(
       MaterialPageRoute<void>(
-        settings: const RouteSettings(name: '/settings/profile'),
-        builder: (_) => widget.programmingClient != null
-            ? _settingsApp(() => Navigator.of(context).pop())
-            : WorkspaceSettings(
-                store: store,
-                kernelBaseUri: widget.kernelBaseUri,
-                onOpen: widget.onOpenUrl,
-                connectionsRequest: _connectionsRequest,
-                onClose: () => Navigator.of(context).pop(),
-              ),
+        settings: const RouteSettings(name: '/settings/general'),
+        builder: (_) => _settingsApp(() => Navigator.of(context).pop()),
       ),
     ),
   );
@@ -1156,7 +1135,9 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     if (client == null) return;
     final project = store.currentProject;
     Widget panel(BuildContext dialogContext) => ComputeUsagePanel(
-      client: client, workspaceId: project.id, workspaceName: project.title,
+      client: client,
+      workspaceId: project.id,
+      workspaceName: project.title,
       refreshSignal: _computeRefresh,
       savedHistory: () => savedComputeHistory(project),
       onClose: () => Navigator.of(dialogContext).pop(),
@@ -1164,7 +1145,9 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     final size = MediaQuery.sizeOf(context);
     if (size.width < 600) {
       showModalBottomSheet<void>(
-        context: context, useSafeArea: true, isScrollControlled: true,
+        context: context,
+        useSafeArea: true,
+        isScrollControlled: true,
         showDragHandle: true,
         builder: (sheetContext) => SizedBox(
           height: MediaQuery.sizeOf(sheetContext).height * .85,
@@ -1176,49 +1159,54 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     showDialog<void>(
       context: context,
       builder: (dialogContext) => Dialog(
-        alignment: store.settings.dockTop ? Alignment.topRight : Alignment.bottomRight,
-        insetPadding: EdgeInsets.only(left: 12, right: 12,
+        alignment: store.settings.dockTop
+            ? Alignment.topRight
+            : Alignment.bottomRight,
+        insetPadding: EdgeInsets.only(
+          left: 12,
+          right: 12,
           top: store.settings.dockTop ? 76 : 12,
-          bottom: store.settings.dockTop ? 12 : 76),
+          bottom: store.settings.dockTop ? 12 : 76,
+        ),
         clipBehavior: Clip.antiAlias,
-        child: SizedBox(width: 480, height: (size.height - 110).clamp(280.0, 680.0),
-          child: panel(dialogContext)),
+        child: SizedBox(
+          width: 480,
+          height: (size.height - 110).clamp(280.0, 680.0),
+          child: panel(dialogContext),
+        ),
       ),
     );
   }
 
-  Widget _settingsApp(VoidCallback onClose) => BuiltInAppView(
-    key: ValueKey(
-      '${widget.programmingClient!.workspaceIdentity}/${store.currentProject.id}/settings',
-    ),
-    client: widget.programmingClient!,
-    workspaceId: store.currentProject.id,
-    appId: 'settings',
-    onClose: onClose,
-    onMoreSettings: () => Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => WorkspaceSettings(
-          store: store,
-          kernelBaseUri: widget.kernelBaseUri,
-          onOpen: widget.onOpenUrl,
-          connectionsRequest: _connectionsRequest,
-          onClose: () => Navigator.of(context).pop(),
-        ),
-      ),
-    ),
-    onPreferences: (preferences) {
-      if (!mounted) return;
-      store.settings.displayName = preferences['displayName'] as String? ?? '';
-      store.settings.theme = preferences['theme'] as String? ?? 'system';
-      unawaited(store.save());
-    },
-  );
+  Widget _settingsApp(VoidCallback onClose, {String section = 'general'}) =>
+      WorkspaceSettings(
+        store: store,
+        initialSection: section,
+        onClose: onClose,
+        kernelBaseUri: widget.kernelBaseUri,
+        onOpen: widget.onOpenUrl,
+        connectionsRequest: _connectionsRequest,
+        serviceRequest: _serviceConnectionsRequest,
+        loadModels: widget.programmingClient?.readModelCatalog,
+      );
+
+  ConnectionsRequest? get _serviceConnectionsRequest {
+    final client = widget.programmingClient;
+    if (client == null) return null;
+    final workspaceId = store.currentProject.id;
+    return (path, {body}) =>
+        client.serviceConnectionsRequest(workspaceId, path, body: body);
+  }
 
   ConnectionsRequest? get _connectionsRequest {
     final client = widget.programmingClient;
     if (client == null) return null;
-    return (path, {body}) =>
-        client.connectionsRequest(store.currentProject.id, path, body: body);
+    final workspaceId = store.currentProject.id;
+    return (path, {body}) => client.workspaceConnectionsRequest(
+      workspaceId,
+      path,
+      body: body,
+    );
   }
 
   void _startFromPrompt(StarterPrompt prompt) {
