@@ -20,8 +20,7 @@ public static class BrainClientHosting
             .Validate(o => o.BufferCapacity > 0 && o.RenewEvery > TimeSpan.Zero && o.OperationTimeout > TimeSpan.Zero
                 && o.ObserverLease > o.RenewEvery + o.OperationTimeout, "Invalid brain buffer or subscription timing settings.")
             .ValidateOnStart();
-        services.TryAddSingleton<BrainClient>();
-        services.TryAddSingleton<IDigitalBrain>(sp => sp.GetRequiredService<BrainClient>());
+        services.TryAddSingleton<IDigitalBrain, BrainClient>();
         services.TryAddSingleton<ICallFilter, CallFilter>();
         return services;
     }

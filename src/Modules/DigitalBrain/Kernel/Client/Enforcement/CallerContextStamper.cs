@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Contracts.Enforcement;
 using Orleans.Runtime;
 
@@ -24,14 +25,14 @@ public static class CallerContextStamper
         return context;
     }
 
-    public static bool TryGet(out CallerContext? context)
+    public static bool TryGet([NotNullWhen(true)] out CallerContext? context)
     {
         context = RequestContext.Get(RequestContextKey) as CallerContext;
         return context is not null;
     }
 
     public static CallerContext Require()
-        => TryGet(out var context) && context is not null
+        => TryGet(out var context)
             ? context
             : throw new UntrustedCallerException("No caller context was stamped at a trusted edge.");
 

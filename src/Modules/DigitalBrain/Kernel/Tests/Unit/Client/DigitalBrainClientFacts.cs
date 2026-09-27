@@ -1,3 +1,4 @@
+using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
 using Xunit;
@@ -6,13 +7,13 @@ namespace DigitalBrain.Tests;
 
 public sealed class DigitalBrainClientFacts
 {
+    // Scripts are compiled outside this solution; this call fails to build if a second On<T> overload appears.
     [Fact]
-    public void KeepsIpGatewaysAndResolvesHostNames()
+    public void ScriptsListenThroughASingleOnExtension()
     {
-        var gateways = DigitalBrainClient.GatewayEndpoints("gwy.tcp://10.0.0.5:30000/0; gwy.tcp://localhost:30001/0");
+        static IAsyncEnumerable<Signal> Listen(IDigitalBrain brain, INeuron source) => brain.On<Signal>(source);
 
-        Assert.Equal("gwy.tcp://10.0.0.5:30000/0", gateways[0].ToString());
-        Assert.Equal("gwy.tcp://127.0.0.1:30001/0", gateways[1].ToString());
+        Assert.NotNull(Listen(null!, null!));
     }
 
     [Fact]

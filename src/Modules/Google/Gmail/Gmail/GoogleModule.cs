@@ -61,7 +61,7 @@ public sealed class GmailModule : IModule
                 return Results.BadRequest();
             }
 
-            var owner = DigitalBrain.Core.Enforcement.CallerContextStamper.TryGet(out var caller) && caller is not null
+            var owner = DigitalBrain.Core.Enforcement.CallerContextStamper.TryGet(out var caller)
                 ? caller.PrincipalId
                 : null;
             await grains.GetGrain<IGmail>("gmail").AcceptAuthorizationCode(code, owner);

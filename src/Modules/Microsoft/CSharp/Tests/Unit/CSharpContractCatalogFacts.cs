@@ -10,7 +10,7 @@ public sealed class CSharpContractCatalogFacts
     [Fact]
     public void ListsInstalledContractsWithTheirProjectDirective()
     {
-        var catalog = new CSharpContractCatalog(Create(new CSharpOptions { SourceRoot = RepositoryRoot.Find() }));
+        var catalog = new CSharpContractCatalog(Create(new CSharpOptions { SourceRoot = CSharpModule.FindRepositoryRoot() }));
 
         var snapshot = catalog.Read(["time"]);
 

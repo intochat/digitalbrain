@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using DigitalBrain.Microsoft.CSharp;
+using DigitalBrain.Microsoft.DotNet;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -9,13 +9,11 @@ namespace DigitalBrain.Tests;
 public sealed class CSharpFileNeuronFacts
 {
     [Fact]
-    public async Task WritesConfiguresStartsAndDeletesThroughTheRunner()
+    public async Task WritesConfiguresStartsAndDeletesThroughDocker()
     {
         var ct = TestContext.Current.CancellationToken;
-        var runner = new FakeRunner();
-        await using var brain = await UnitTest.Create().WithModule<CSharpModule>()
-            .ConfigureSilo(silo => silo.Services.AddSingleton<ICSharpRunner>(runner))
-            .StartAsync(ct);
+        var docker = new FakeDocker();
+        await using var brain = await Brain(docker, ct);
         var file = brain.Get<ICSharpFile>("workspace/report");
         await using var changes = await brain.Observe<CSharpFileChanged>(file, ct);
 
@@ -25,9 +23,9 @@ public sealed class CSharpFileNeuronFacts
 
         Assert.Equal(CSharpFileStatus.Running, running.Status);
         Assert.Equal("Console.WriteLine(\"hi\");", running.Source);
-        var started = Assert.Single(runner.Started);
-        Assert.Equal("workspace/report", started.FileId);
-        Assert.Equal("tea", started.Settings["TimerId"]);
+        var run = Assert.Single(docker.Calls, call => call[0] == "run");
+        Assert.Contains("CSharpFile__Id=workspace/report", run);
+        Assert.Contains("CSharpFile__Settings__TimerId=tea", run);
         Assert.Equal(CSharpFileStatus.Running, (await changes.NextAsync(change => change.Status == CSharpFileStatus.Running, ct)).Status);
 
         await file.Delete(ct);
@@ -42,9 +40,7 @@ public sealed class CSharpFileNeuronFacts
     public async Task RejectsStartWithoutSourceAndInvalidInput()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<CSharpModule>()
-            .ConfigureSilo(silo => silo.Services.AddSingleton<ICSharpRunner>(new FakeRunner()))
-            .StartAsync(ct);
+        await using var brain = await Brain(new FakeDocker(), ct);
         var file = brain.Get<ICSharpFile>("empty");
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => file.Start(ct));
@@ -53,40 +49,19 @@ public sealed class CSharpFileNeuronFacts
     }
 
     [Fact]
-    public async Task UnsetComposedSettingsFallBackToTheRepositoryAndTheSiloGateway()
+    public async Task UnsetComposedSettingsFallBackToTheRepositoryAndATemporaryRoot()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().WithModule<CSharpModule>().StartAsync(ct);
 
         var options = brain.SiloServices.GetRequiredService<IOptions<CSharpOptions>>().Value;
 
-        Assert.Equal(RepositoryRoot.Find(), options.SourceRoot);
+        Assert.Equal(CSharpModule.FindRepositoryRoot(), options.SourceRoot);
         Assert.False(string.IsNullOrWhiteSpace(options.Root));
-        Assert.StartsWith("gwy.tcp://", options.Gateways, StringComparison.Ordinal);
-        Assert.False(string.IsNullOrWhiteSpace(options.ClusterId));
     }
 
-    private sealed class FakeRunner : ICSharpRunner
-    {
-        private readonly ConcurrentDictionary<string, CSharpContainerState> _containers = new();
-        public ConcurrentQueue<(string FileId, IReadOnlyDictionary<string, string> Settings)> Started { get; } = new();
-
-        public Task StartAsync(string fileId, string source, IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken)
-        {
-            Started.Enqueue((fileId, settings));
-            _containers[fileId] = new(CSharpFileStatus.Running, null, DateTimeOffset.UtcNow);
-            return Task.CompletedTask;
-        }
-
-        public Task StopAsync(string fileId, CancellationToken cancellationToken)
-        {
-            _containers.TryRemove(fileId, out _);
-            return Task.CompletedTask;
-        }
-
-        public Task<CSharpContainerState> InspectAsync(string fileId, CancellationToken cancellationToken)
-            => Task.FromResult(_containers.GetValueOrDefault(fileId, CSharpContainerState.Missing));
-
-        public Task<string> LogsAsync(string fileId, int tail, CancellationToken cancellationToken) => Task.FromResult("");
-    }
+    private static Task<UnitBrain> Brain(FakeDocker docker, CancellationToken ct)
+        => UnitTest.Create().WithModule<CSharpModule>()
+            .ConfigureSilo(silo => silo.Services.AddSingleton<IProcessRunner>(docker))
+            .StartAsync(ct);
 }

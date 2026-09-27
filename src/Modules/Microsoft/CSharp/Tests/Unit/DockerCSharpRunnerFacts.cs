@@ -1,5 +1,7 @@
+using System.Net;
 using DigitalBrain.Microsoft.CSharp;
 using DigitalBrain.Microsoft.DotNet;
+using Orleans.Configuration;
 using Xunit;
 using static Microsoft.Extensions.Options.Options;
 
@@ -9,21 +11,20 @@ public sealed class DockerCSharpRunnerFacts : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "csharp-runner-facts", Guid.NewGuid().ToString("N"));
 
-    private CSharpOptions Settings => new()
-    {
-        Root = _root, SourceRoot = @"E:\repo", Gateways = "gwy.tcp://127.0.0.1:30000/0", GatewayRelayHost = "host.docker.internal", ClusterId = "cluster", ServiceId = "service",
-    };
+    private DockerCSharpRunner Runner(FakeDocker docker, string advertised = "127.0.0.1")
+        => new(docker, Create(new CSharpOptions { Root = _root, SourceRoot = @"E:\repo" }),
+            Create(new EndpointOptions { AdvertisedIPAddress = IPAddress.Parse(advertised), GatewayPort = 30000 }),
+            Create(new ClusterOptions { ClusterId = "cluster", ServiceId = "service" }));
 
     [Fact]
-    public async Task StartReplacesTheContainerAndRunsTheFileWithSettings()
+    public async Task StartStopsTheOldContainerAndRunsTheFileWithSettings()
     {
         var ct = TestContext.Current.CancellationToken;
-        var processes = new RecordingProcessRunner();
-        var runner = new DockerCSharpRunner(processes, Create(Settings));
+        var docker = new FakeDocker();
 
-        await runner.StartAsync("workspace/timer", "Console.WriteLine(1);", new Dictionary<string, string> { ["Greeting"] = "a = b c" }, ct);
+        await Runner(docker).StartAsync("workspace/timer", "Console.WriteLine(1);", new Dictionary<string, string> { ["Greeting"] = "a = b c" }, ct);
 
-        var calls = processes.Calls.ToArray();
+        var calls = docker.Calls.ToArray();
         var container = DockerCSharpRunner.ContainerName("workspace/timer");
         Assert.Equal(["stop", "--time", "10", container], calls[0]);
         Assert.Equal(["rm", "--force", container], calls[1]);
@@ -33,20 +34,32 @@ public sealed class DockerCSharpRunnerFacts : IDisposable
         Assert.Contains(@"E:\repo:/brain:ro", run);
         Assert.Contains("CSharpFile__Settings__Greeting=a = b c", run);
         Assert.Contains("CSharpFile__Id=workspace/timer", run);
-        Assert.Contains("Gateways=gwy.tcp://127.0.0.1:30000/0", run);
-        Assert.Contains("GatewayRelayHost=host.docker.internal", run);
-        Assert.Equal(["mcr.microsoft.com/dotnet/sdk:11.0.100-rc.1", "dotnet", "run", "app.cs", "-p:ArtifactsPath=/work/artifacts"], run.TakeLast(5));
+        Assert.Contains("ClusterId=cluster", run);
+        Assert.Equal([DockerCSharpRunner.Image, "dotnet", "run", "app.cs", "-p:ArtifactsPath=/work/artifacts"], run.TakeLast(5));
         var work = Path.Combine(_root, container);
         Assert.Equal("Console.WriteLine(1);", await File.ReadAllTextAsync(Path.Combine(work, "app.cs"), ct));
         Assert.Contains(DockerCSharpRunner.ClientProject, await File.ReadAllTextAsync(Path.Combine(work, "Directory.Build.props"), ct), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("127.0.0.1", "gwy.tcp://127.0.0.1:30000/0", true)]
+    [InlineData("10.1.2.3", "gwy.tcp://10.1.2.3:30000/0", false)]
+    public async Task ContainersDialTheAdvertisedSiloAndRelayOnlyToALoopbackOne(string advertised, string gateway, bool relayed)
+    {
+        var docker = new FakeDocker();
+
+        await Runner(docker, advertised).StartAsync("relay", "x", new Dictionary<string, string>(), TestContext.Current.CancellationToken);
+
+        var run = docker.Calls.Single(call => call[0] == "run");
+        Assert.Contains("Gateways=" + gateway, run);
+        Assert.Equal(relayed, run.Contains("GatewayRelayHost=host.docker.internal"));
     }
 
     [Fact]
     public async Task StoppingAMissingContainerIsNotAnError()
     {
         var ct = TestContext.Current.CancellationToken;
-        var processes = new RecordingProcessRunner(_ => new ProcessResult(1, "", "Error response from daemon: No such container: csharp-x", TimeSpan.Zero, false));
-        var runner = new DockerCSharpRunner(processes, Create(Settings));
+        var runner = Runner(new FakeDocker());
 
         await runner.StopAsync("never-started", ct);
 
@@ -56,13 +69,10 @@ public sealed class DockerCSharpRunnerFacts : IDisposable
     [Fact]
     public async Task FailedDockerRunSurfacesTheDaemonError()
     {
-        var processes = new RecordingProcessRunner(arguments => arguments[0] == "run"
-            ? new ProcessResult(125, "", "Cannot connect to the Docker daemon", TimeSpan.Zero, false)
-            : new ProcessResult(0, "", "", TimeSpan.Zero, false));
-        var runner = new DockerCSharpRunner(processes, Create(Settings));
+        var docker = new FakeDocker(arguments => arguments[0] == "run" ? new ProcessResult(125, "", "Cannot connect to the Docker daemon", TimeSpan.Zero, false) : null);
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => runner.StartAsync("a", "x", new Dictionary<string, string>(), TestContext.Current.CancellationToken));
+            () => Runner(docker).StartAsync("a", "x", new Dictionary<string, string>(), TestContext.Current.CancellationToken));
 
         Assert.Contains("Cannot connect to the Docker daemon", error.Message, StringComparison.Ordinal);
     }

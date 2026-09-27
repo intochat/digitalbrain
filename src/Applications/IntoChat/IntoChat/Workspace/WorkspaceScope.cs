@@ -7,7 +7,7 @@ namespace IntoChat.Workspace;
 internal sealed record WorkspaceScope(string Id, string Owner, string WorkspaceId)
 {
     public static WorkspaceScope Current(BasicAuthOptions auth, string workspaceId)
-        => Create(CallerContextStamper.TryGet(out var caller) && caller is not null ? caller.AccountId
+        => Create(CallerContextStamper.TryGet(out var caller) ? caller.AccountId
             : auth.Username is { Length: > 0 } owner ? owner : AccountSession.DefaultLogin, workspaceId);
 
     public static WorkspaceScope Create(string owner, string workspaceId)

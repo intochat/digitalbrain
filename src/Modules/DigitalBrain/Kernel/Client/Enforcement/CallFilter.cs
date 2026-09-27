@@ -24,7 +24,7 @@ public sealed class CallFilter(IEnumerable<ICallFilterStage> stages) : ICallFilt
             return CallDecision.Deny(CallDenial.UntrustedCaller, "The principal was not stamped at a trusted edge.");
         }
 
-        if (CallerContextStamper.TryGet(out var ambient) && ambient is not null && ambient != caller)
+        if (CallerContextStamper.TryGet(out var ambient) && ambient != caller)
         {
             return CallDecision.Deny(CallDenial.UntrustedCaller, "The principal does not match the trusted edge stamp.");
         }

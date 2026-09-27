@@ -9,7 +9,7 @@ namespace DigitalBrain.Microsoft.CSharp;
 [GrainType("microsoft.csharp.file")]
 internal sealed partial class CSharpFileNeuron(
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<CSharpFileState> store,
-    ICSharpRunner runner)
+    DockerCSharpRunner runner)
     : Neuron<CSharpFileState>(store), ICSharpFile
 {
     internal const int MaximumSourceBytes = 128 * 1024;
@@ -23,10 +23,7 @@ internal sealed partial class CSharpFileNeuron(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(source);
         if (Encoding.UTF8.GetByteCount(source) > MaximumSourceBytes) { throw new ArgumentException($"Source exceeds {MaximumSourceBytes} bytes.", nameof(source)); }
-        var container = await runner.InspectAsync(FileId, cancellationToken);
-        await Save(new CSharpFileState { Source = source, Settings = new(Snapshot.Settings, StringComparer.Ordinal) },
-            new CSharpFileChanged(FileId, container.Status));
-        return Describe(container);
+        return await SaveAsync(new CSharpFileState { Source = source, Settings = new(Snapshot.Settings, StringComparer.Ordinal) }, cancellationToken);
     }
 
     public async Task<CSharpFileSnapshot> Configure(IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken = default)
@@ -35,10 +32,7 @@ internal sealed partial class CSharpFileNeuron(
         if (settings.Count > MaximumSettings) { throw new ArgumentException($"At most {MaximumSettings} settings are allowed.", nameof(settings)); }
         if (settings.Keys.FirstOrDefault(name => !SettingName().IsMatch(name)) is { } invalid)
         { throw new ArgumentException($"Setting '{invalid}' must contain only letters, digits and underscores.", nameof(settings)); }
-        var container = await runner.InspectAsync(FileId, cancellationToken);
-        await Save(new CSharpFileState { Source = Snapshot.Source, Settings = new(settings, StringComparer.Ordinal) },
-            new CSharpFileChanged(FileId, container.Status));
-        return Describe(container);
+        return await SaveAsync(new CSharpFileState { Source = Snapshot.Source, Settings = new(settings, StringComparer.Ordinal) }, cancellationToken);
     }
 
     public async Task<CSharpFileSnapshot> Start(CancellationToken cancellationToken = default)
@@ -62,6 +56,13 @@ internal sealed partial class CSharpFileNeuron(
         await runner.StopAsync(FileId, cancellationToken);
         await Save(new CSharpFileState(), new CSharpFileChanged(FileId, CSharpFileStatus.Stopped));
         DeactivateOnIdle();
+    }
+
+    private async Task<CSharpFileSnapshot> SaveAsync(CSharpFileState next, CancellationToken cancellationToken)
+    {
+        var container = await runner.InspectAsync(FileId, cancellationToken);
+        await Save(next, new CSharpFileChanged(FileId, container.Status));
+        return Describe(container);
     }
 
     private async Task<CSharpFileSnapshot> Changed(CancellationToken cancellationToken)

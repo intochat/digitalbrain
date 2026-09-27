@@ -251,7 +251,7 @@ internal sealed class PackageNeuron(
     }
 
     private static string RequireCaller()
-        => CallerContextStamper.TryGet(out var caller) && caller is not null && CallerContextStamper.IsTrusted(caller)
+        => CallerContextStamper.TryGet(out var caller) && CallerContextStamper.IsTrusted(caller)
             && caller.Kind is CallerKind.User or CallerKind.Assistant
             ? caller.PrincipalId
             : throw new UnauthorizedAccessException("Sign in to change packages.");

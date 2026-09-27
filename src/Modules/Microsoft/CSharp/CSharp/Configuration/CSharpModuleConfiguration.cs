@@ -3,7 +3,7 @@ using DigitalBrain.Core;
 namespace DigitalBrain.Microsoft.CSharp;
 
 public sealed class CSharpConfigurationContract() : ModuleConfigurationContract<CSharpModule, CSharpOptions>(
-    "Root", "SourceRoot", "Image", "DockerPath", "Gateways", "GatewayRelayHost", "ClusterId", "ServiceId", "DockerTimeout")
+    "Root", "SourceRoot")
 {
     protected override ModuleDefinition Compile(CSharpOptions options) => CSharpModule.Define(options);
 }

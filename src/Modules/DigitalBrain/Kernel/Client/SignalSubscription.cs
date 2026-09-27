@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace DigitalBrain.Core;
 
-public sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObserver where T : Signal
+internal sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObserver where T : Signal
 {
     private readonly IGrainFactory _grains;
     private readonly INeuron _source;
@@ -45,18 +45,16 @@ public sealed class SignalSubscription<T> : ISignalSubscription<T>, INeuronObser
         try
         {
             var token = _lifetime.Token;
-            if (_hub is not null)
+            if (_hub is not null) { _hub.Subscribe(_source.GetGrainId(), this); }
+            else
             {
-                _hub.Subscribe(_source.GetGrainId(), this);
-                _logger.LogInformation("SubscriptionReady {Source} {SignalType}", _source.GetGrainId(), typeof(T).Name);
-                return;
-            }
-            _reference = _grains.CreateObjectReference<INeuronObserver>(this);
-            var activation = await WatchAsync(token).ConfigureAwait(false);
-            lock (_gate)
-            {
-                token.ThrowIfCancellationRequested();
-                _renewal = RenewAsync(activation, token);
+                _reference = _grains.CreateObjectReference<INeuronObserver>(this);
+                var activation = await WatchAsync(token).ConfigureAwait(false);
+                lock (_gate)
+                {
+                    token.ThrowIfCancellationRequested();
+                    _renewal = RenewAsync(activation, token);
+                }
             }
             _logger.LogInformation("SubscriptionReady {Source} {SignalType}", _source.GetGrainId(), typeof(T).Name);
         }

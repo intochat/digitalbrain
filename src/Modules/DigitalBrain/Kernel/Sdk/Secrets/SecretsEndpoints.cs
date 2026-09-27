@@ -12,7 +12,7 @@ internal static class SecretsEndpoints
     {
         endpoints.MapPost("/secrets/{owner}", async (string owner, SecretInput body, IGrainFactory grains) =>
         {
-            if (!CallerContextStamper.TryGet(out var caller) || caller is null)
+            if (!CallerContextStamper.TryGet(out var caller))
             {
                 return Results.Unauthorized();
             }

@@ -45,7 +45,7 @@ docker run --detach --restart on-failure:5 --add-host host.docker.internal:host-
 * A script that exits non-zero is restarted up to 5 times (`--restart on-failure:5`): enough to ride out a silo restart. A script that does not compile shows its compiler output in the logs while `Restarting`, then settles on `Exited(1)`. A script that finishes stays `Exited(0)`.
 * Orleans addresses a silo by the IP it advertises. For a loopback-advertised silo, the client opens a relay on that loopback endpoint inside the container and forwards it to `GatewayRelayHost`.
 
-Options (`DigitalBrain:CSharp`): `Root` (default: temp), `SourceRoot` (default: the repository containing the silo), `Image`, `DockerPath`, `Gateways` / `ClusterId` / `ServiceId` / `GatewayRelayHost` (default: derived from the silo), `DockerTimeout`. IntoChat's AppHost composes the module only in the developer profile, with `IntoChat:CSharp:Root`.
+Options (`DigitalBrain:CSharp`): `Root` (default: temp) and `SourceRoot` (default: the repository containing the silo). The gateway, relay host and cluster ids come from the silo's own endpoint and cluster options. IntoChat's AppHost composes the module only in the developer profile, with `IntoChat:CSharp:Root`.
 
 ## Trust
 

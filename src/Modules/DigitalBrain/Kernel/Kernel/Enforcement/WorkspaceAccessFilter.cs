@@ -20,7 +20,7 @@ public static class WorkspaceAccessFilter
             return await next(context);
         }
 
-        if (!CallerContextStamper.TryGet(out var caller) || caller is null) { return Results.Unauthorized(); }
+        if (!CallerContextStamper.TryGet(out var caller)) { return Results.Unauthorized(); }
 
         var access = http.RequestServices.GetRequiredService<IWorkspaceAccess>();
         return await access.CanAccessAsync(caller.PrincipalId, workspace, http.RequestAborted)

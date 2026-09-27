@@ -5,8 +5,7 @@ using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Microsoft.CSharp;
 
-[GenerateSerializer, Alias("microsoft.csharp.contract-module")]
-public sealed record CSharpContractModule([property: Id(0)] string Id, [property: Id(1)] string? Directive);
+public sealed record CSharpContractModule(string Id, string? Directive);
 
 public sealed record CSharpContractCatalogSnapshot(IReadOnlyList<CSharpContractModule> Modules, IReadOnlyList<string> Contracts, string Example, bool Truncated = false);
 
@@ -58,14 +57,14 @@ public sealed class CSharpContractCatalog(IOptions<CSharpOptions> options)
         return snapshot;
     }
 
-    internal static string ModuleId(Assembly assembly)
+    private static string ModuleId(Assembly assembly)
     {
         var name = assembly.GetName().Name!;
         if (name == typeof(INeuron).Assembly.GetName().Name) { return "kernel"; }
         return name[ModulePrefix.Length..^ContractsSuffix.Length].ToLowerInvariant();
     }
 
-    internal string? Directive(Assembly assembly)
+    private string? Directive(Assembly assembly)
     {
         if (options.Value.SourceRoot is not { } sourceRoot) { return null; }
         var project = Directory.EnumerateFiles(Path.Combine(sourceRoot, "src"), assembly.GetName().Name + ".csproj", SearchOption.AllDirectories).FirstOrDefault();
