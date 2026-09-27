@@ -29,6 +29,8 @@ public sealed class CSharpContractCatalog(IOptions<CSharpOptions> options)
             Console.WriteLine($"TimerTick {tick.TimerId} {tick.ObservedAt:O}");
         }
         // Top-level statements run once; loop over brain.On<T>() to keep reacting to signals.
+        // Or arm the file on a trigger instead: each signal then starts one run that reads it with
+        // var tick = brain.Trigger<TimerTick>(); and exits, so nothing runs between signals.
         // Console output is the log. Settings arrive through brain.Setting(name).
         """;
 
@@ -85,7 +87,9 @@ public sealed class CSharpContractCatalog(IOptions<CSharpOptions> options)
                 + (method.IsGenericMethod ? "<" + string.Join(",", method.GetGenericArguments().Select(TypeName)) + ">" : "")
                 + "(" + string.Join(", ", method.GetParameters().Select(parameter => TypeName(parameter.ParameterType) + " " + parameter.Name + (parameter.HasDefaultValue ? " = default" : ""))) + ")")
             : type.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly).Select(property => TypeName(property.PropertyType) + " " + property.Name);
-        return type.FullName + " { " + string.Join("; ", members) + " }";
+        // Arming a file needs the neuron id, "<grain type>/<key>", so neuron contracts name their grain type.
+        var grainType = type.GetCustomAttributesData().FirstOrDefault(attribute => attribute.AttributeType.Name == "DefaultGrainTypeAttribute")?.ConstructorArguments[0].Value;
+        return type.FullName + (grainType is null ? "" : $" [neuron id: {grainType}/<key>]") + " { " + string.Join("; ", members) + " }";
     }
 
     private static string TypeName(Type type) => type.IsGenericType

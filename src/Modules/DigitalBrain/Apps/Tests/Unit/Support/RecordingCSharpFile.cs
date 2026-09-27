@@ -15,7 +15,7 @@ public sealed class RecordingCSharpFile : Neuron, ICSharpFile
 
     private string Key => this.GetPrimaryKeyString();
 
-    private CSharpFileSnapshot Current => Files.GetOrAdd(Key, key => new(key, "", new Dictionary<string, string>(), CSharpFileStatus.Stopped, null, null, false, 0));
+    private CSharpFileSnapshot Current => Files.GetOrAdd(Key, key => new(key, "", new Dictionary<string, string>(), CSharpFileStatus.Stopped, null, null, false, 0, null));
 
     public Task<CSharpFileSnapshot> Read(CancellationToken cancellationToken = default) => Task.FromResult(Current);
 
@@ -27,6 +27,9 @@ public sealed class RecordingCSharpFile : Neuron, ICSharpFile
 
     public Task<CSharpFileSnapshot> Start(CancellationToken cancellationToken = default)
         => Task.FromResult(Files[Key] = Current with { Status = CSharpFileStatus.Running, StartedAt = DateTimeOffset.UtcNow });
+
+    public Task<CSharpFileSnapshot> Arm(CSharpTrigger trigger, CancellationToken cancellationToken = default)
+        => Task.FromResult(Files[Key] = Current with { Trigger = trigger });
 
     public Task<CSharpFileSnapshot> Stop(CancellationToken cancellationToken = default)
         => Task.FromResult(Files[Key] = Current with { Status = CSharpFileStatus.Stopped });

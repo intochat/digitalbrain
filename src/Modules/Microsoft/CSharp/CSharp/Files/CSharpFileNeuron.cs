@@ -8,14 +8,14 @@ using Orleans.Timers;
 
 namespace DigitalBrain.Microsoft.CSharp;
 
-// Start records the intent to run; a reminder reconciles it with the sandbox, so a run lost with its
-// container comes back and a crashing script is retried a bounded number of times.
+// Start records the intent to keep a run up; Arm records the intent to run once per trigger signal.
+// A reminder reconciles either intent with the sandbox, so a file survives lost runs and silo restarts.
 [GrainType("microsoft.csharp.file")]
 internal sealed partial class CSharpFileNeuron(
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<CSharpFileState> store,
     SandboxCSharpRunner runner,
     IReminderRegistry reminders)
-    : Neuron<CSharpFileState>(store), ICSharpFile, IRemindable
+    : Neuron<CSharpFileState>(store), ICSharpFile, ICSharpFileTrigger, IRemindable, INeuronObserver
 {
     internal const int MaximumSourceBytes = 128 * 1024;
     internal const int MaximumFailures = 5;
@@ -23,7 +23,18 @@ internal sealed partial class CSharpFileNeuron(
     // Orleans reminders fire at most once a minute.
     internal static readonly TimeSpan ReconcilePeriod = TimeSpan.FromMinutes(1);
     private const int MaximumSettings = 64;
+    private INeuron? _triggerSource;
+    private IGrainTimer? _triggerRenewal;
     private string FileId => this.GetPrimaryKeyString();
+    private bool IsArmed => Snapshot is { ShouldRun: true, Trigger: not null };
+
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        await base.OnActivateAsync(cancellationToken);
+        // The source's own signal may be what activated this file, so watching it now would deadlock;
+        // the renewal timer's first tick watches it right after activation instead.
+        if (IsArmed) { RenewTriggerWatch(dueTime: TimeSpan.Zero); }
+    }
 
     public async Task<CSharpFileSnapshot> Read(CancellationToken cancellationToken = default)
         => Describe(await runner.InspectAsync(Snapshot.RunId, cancellationToken));
@@ -46,17 +57,32 @@ internal sealed partial class CSharpFileNeuron(
 
     public async Task<CSharpFileSnapshot> Start(CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(Snapshot.Source)) { throw new InvalidOperationException("Write the C# source before starting it."); }
+        RequireSource();
+        await UnwatchTriggerAsync();
         if (Snapshot.RunId.Length > 0) { await runner.StopAsync(Snapshot.RunId, cancellationToken); }
-        var owner = CallerContextStamper.TryGet(out var caller) ? caller.PrincipalId : "system";
         await reminders.RegisterOrUpdateReminder(this.GetGrainId(), ReconcileReminder, ReconcilePeriod, ReconcilePeriod);
-        var runId = await StartRunAsync(Snapshot with { ShouldRun = true, Failures = 0, Owner = owner }, cancellationToken);
+        var runId = await StartRunAsync(Snapshot with { ShouldRun = true, Failures = 0, Owner = Caller(), Trigger = null }, trigger: null, cancellationToken);
         return Describe(await runner.InspectAsync(runId, cancellationToken));
+    }
+
+    public async Task<CSharpFileSnapshot> Arm(CSharpTrigger trigger, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(trigger);
+        RequireSource();
+        if (!GrainId.TryParse(trigger.Neuron, out _)) { throw new ArgumentException($"'{trigger.Neuron}' is not a neuron id such as time.timer/tea.", nameof(trigger)); }
+        ArgumentException.ThrowIfNullOrWhiteSpace(trigger.Signal);
+        await UnwatchTriggerAsync();
+        if (Snapshot.RunId.Length > 0) { await runner.StopAsync(Snapshot.RunId, cancellationToken); }
+        await Save(Snapshot with { ShouldRun = true, Failures = 0, Owner = Caller(), Trigger = trigger }, new CSharpFileChanged(FileId));
+        await WatchTriggerAsync();
+        await reminders.RegisterOrUpdateReminder(this.GetGrainId(), ReconcileReminder, ReconcilePeriod, ReconcilePeriod);
+        return Describe(await runner.InspectAsync(Snapshot.RunId, cancellationToken));
     }
 
     public async Task<CSharpFileSnapshot> Stop(CancellationToken cancellationToken = default)
     {
         await StopReconcilingAsync();
+        await UnwatchTriggerAsync();
         await runner.StopAsync(Snapshot.RunId, cancellationToken);
         var run = await runner.InspectAsync(Snapshot.RunId, cancellationToken);
         await Save(Snapshot with { ShouldRun = false }, new CSharpFileChanged(FileId));
@@ -69,9 +95,37 @@ internal sealed partial class CSharpFileNeuron(
     public async Task Delete(CancellationToken cancellationToken = default)
     {
         await StopReconcilingAsync();
+        await UnwatchTriggerAsync();
         if (Snapshot.RunId.Length > 0) { await runner.StopAsync(Snapshot.RunId, cancellationToken); }
         await Save(new CSharpFileState(), new CSharpFileChanged(FileId));
         DeactivateOnIdle();
+    }
+
+    Task INeuronObserver.OnSignalAsync(Signal signal)
+        => IsArmed && signal.GetType().Name == Snapshot.Trigger!.Signal
+            ? this.AsReference<ICSharpFileTrigger>().Fire(signal)
+            : Task.CompletedTask;
+
+    // Triggered runs are not retried: the next signal is the next attempt. A file whose runs keep
+    // failing disarms instead of burning a run on every signal.
+    public async Task Fire(Signal signal)
+    {
+        if (!IsArmed) { return; }
+        var previous = await runner.InspectAsync(Snapshot.RunId, CancellationToken.None);
+        var failures = previous switch
+        {
+            { Status: CSharpFileStatus.Exited, ExitCode: not 0 } => Snapshot.Failures + 1,
+            { Status: CSharpFileStatus.Exited } => 0,
+            _ => Snapshot.Failures,
+        };
+        if (failures >= MaximumFailures)
+        {
+            await StopReconcilingAsync();
+            await UnwatchTriggerAsync();
+            await Save(Snapshot with { ShouldRun = false, Failures = failures }, new CSharpFileChanged(FileId));
+            return;
+        }
+        await StartRunAsync(Snapshot with { Failures = failures }, signal, CancellationToken.None);
     }
 
     public async Task ReceiveReminder(string reminderName, TickStatus status)
@@ -80,6 +134,11 @@ internal sealed partial class CSharpFileNeuron(
         if (!Snapshot.ShouldRun)
         {
             await StopReconcilingAsync();
+            return;
+        }
+        if (Snapshot.Trigger is not null)
+        {
+            if (_triggerSource is null) { await WatchTriggerAsync(); }
             return;
         }
         var run = await runner.InspectAsync(Snapshot.RunId, CancellationToken.None);
@@ -96,21 +155,48 @@ internal sealed partial class CSharpFileNeuron(
                 await Save(Snapshot with { ShouldRun = false, Failures = Snapshot.Failures + 1 }, new CSharpFileChanged(FileId));
                 return;
             case CSharpFileStatus.Exited:
-                await StartRunAsync(Snapshot with { Failures = Snapshot.Failures + 1 }, CancellationToken.None);
+                await StartRunAsync(Snapshot with { Failures = Snapshot.Failures + 1 }, trigger: null, CancellationToken.None);
                 return;
             default:
                 // The run or its whole sandbox is gone; that is not the script's failure.
-                await StartRunAsync(Snapshot, CancellationToken.None);
+                await StartRunAsync(Snapshot, trigger: null, CancellationToken.None);
                 return;
         }
     }
 
-    private async Task<string> StartRunAsync(CSharpFileState next, CancellationToken cancellationToken)
+    private async Task<string> StartRunAsync(CSharpFileState next, Signal? trigger, CancellationToken cancellationToken)
     {
         var runId = Guid.NewGuid().ToString("N");
-        await runner.StartAsync(runId, next.Source, next.Settings, cancellationToken);
+        await runner.StartAsync(runId, next.Source, next.Settings, trigger, cancellationToken);
         await Save(next with { RunId = runId }, new CSharpFileChanged(FileId));
         return runId;
+    }
+
+    private async Task WatchTriggerAsync()
+    {
+        var source = RenewTriggerWatch(dueTime: ObserverRenewal);
+        await source.Watch(this.AsReference<INeuronObserver>());
+    }
+
+    // The source keeps observers for a lease; renewing on a timer also keeps this activation alive.
+    private INeuron RenewTriggerWatch(TimeSpan dueTime)
+    {
+        var source = GrainFactory.GetGrain<INeuron>(GrainId.Parse(Snapshot.Trigger!.Neuron));
+        var observer = this.AsReference<INeuronObserver>();
+        _triggerSource = source;
+        _triggerRenewal?.Dispose();
+        _triggerRenewal = this.RegisterGrainTimer(_ => source.Watch(observer),
+            new GrainTimerCreationOptions { DueTime = dueTime, Period = ObserverRenewal, Interleave = true, KeepAlive = true });
+        return source;
+    }
+
+    private async Task UnwatchTriggerAsync()
+    {
+        _triggerRenewal?.Dispose();
+        _triggerRenewal = null;
+        if (_triggerSource is not { } source) { return; }
+        _triggerSource = null;
+        await source.Unwatch(this.AsReference<INeuronObserver>());
     }
 
     private async Task StopReconcilingAsync()
@@ -121,12 +207,19 @@ internal sealed partial class CSharpFileNeuron(
         }
     }
 
-    // A file that should run but crashed or lost its run is between runs: the reconcile restarts it.
+    private void RequireSource()
+    {
+        if (string.IsNullOrWhiteSpace(Snapshot.Source)) { throw new InvalidOperationException("Write the C# source before starting it."); }
+    }
+
+    private static string Caller() => CallerContextStamper.TryGet(out var caller) ? caller.PrincipalId : "system";
+
+    // An always-on file that crashed or lost its run is between runs: the reconcile restarts it.
     private CSharpFileSnapshot Describe(CSharpRunState run)
         => new(FileId, Snapshot.Source, Snapshot.Settings,
-            Snapshot.ShouldRun && run is not { Status: CSharpFileStatus.Running } and not { Status: CSharpFileStatus.Exited, ExitCode: 0 }
+            Snapshot is { ShouldRun: true, Trigger: null } && run is not { Status: CSharpFileStatus.Running } and not { Status: CSharpFileStatus.Exited, ExitCode: 0 }
                 ? CSharpFileStatus.Restarting : run.Status,
-            run.ExitCode, run.StartedAt, Snapshot.ShouldRun, Snapshot.Failures);
+            run.ExitCode, run.StartedAt, Snapshot.ShouldRun, Snapshot.Failures, Snapshot.Trigger);
 
     [GeneratedRegex("^[A-Za-z0-9_]{1,128}$")]
     private static partial Regex SettingName();

@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using DigitalBrain.Contracts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +24,12 @@ public sealed class DigitalBrainConnection : IDigitalBrain
 
     // Environment variables spell configuration sections with "__", so "Account__twitter" arrives as "Account:twitter".
     public string? Setting(string name) => _host.Services.GetRequiredService<IConfiguration>()[SettingKey(name)];
+
+    // A run started by an armed file's trigger carries that signal; other runs have none.
+    public T Trigger<T>() where T : Signal
+        => _host.Services.GetRequiredService<IConfiguration>()["CSharpFile:Trigger"] is { Length: > 0 } json
+            ? JsonSerializer.Deserialize<T>(json, JsonSerializerOptions.Web) ?? throw new InvalidOperationException("The trigger signal is empty.")
+            : throw new InvalidOperationException("This run was not started by a trigger.");
 
     private static string SettingKey(string name) => "CSharpFile:Settings:" + name.Replace("__", ":", StringComparison.Ordinal);
 

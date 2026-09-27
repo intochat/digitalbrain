@@ -61,6 +61,14 @@ internal sealed class ScopedCSharpTools(IDigitalBrain brain, CSharpCatalogStore 
         _ => throw new ArgumentException("Use action status, start, stop, logs or delete.", nameof(action)),
     };
 
+    [McpServerTool(Name = "csharp_arm"), Description("Run a saved C# app on a trigger instead of keeping it up: every signal of the given type from the given neuron starts one run, and the app reads that signal with brain.Trigger<TSignal>() and exits. neuron is the neuron id \"<grain type>/<key>\" from csharp_contracts, for example timer/tea; signal is the signal type name, for example TimerTick. Nothing runs between signals. stop disarms it; after 5 failing runs in a row it disarms itself.")]
+    public async Task<CSharpFileView> Arm(string id, string neuron, string signal, CancellationToken ct)
+    {
+        if (!allowActivation) { throw new InvalidOperationException("Running C# files is disabled by host policy. Enable IntoChat:CSharp:AllowActivation."); }
+        var description = await catalog.Read(scope, id, ct);
+        return new(description, await File(id).Arm(new(neuron, signal), ct));
+    }
+
     public async Task<IReadOnlyList<CSharpFileView>> List(CancellationToken ct)
     {
         var views = new List<CSharpFileView>();

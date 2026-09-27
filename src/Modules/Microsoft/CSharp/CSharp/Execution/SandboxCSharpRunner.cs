@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using DigitalBrain.Contracts;
 using DigitalBrain.Microsoft.Aspire;
 using Microsoft.Extensions.Options;
@@ -25,11 +26,11 @@ internal sealed class SandboxCSharpRunner(
 
     private IAspire Aspire => grains.GetGrain<IAspire>(options.Value.AspireApplication);
 
-    public async Task StartAsync(string runId, string source, IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken)
+    public async Task StartAsync(string runId, string source, IReadOnlyDictionary<string, string> settings, Signal? trigger, CancellationToken cancellationToken)
     {
         var sandbox = await EnsureSandboxAsync(cancellationToken).ConfigureAwait(false);
         using var response = await http.PostAsJsonAsync(new Uri(sandbox, "runs?identifier=" + Uri.EscapeDataString(runId)),
-            new SandboxRunRequest(source, ScriptEnvironment(settings)), cancellationToken).ConfigureAwait(false);
+            new SandboxRunRequest(source, ScriptEnvironment(settings, trigger)), cancellationToken).ConfigureAwait(false);
         await EnsureSuccessAsync(response, "start", cancellationToken).ConfigureAwait(false);
     }
 
@@ -98,7 +99,7 @@ internal sealed class SandboxCSharpRunner(
 
     private static bool IsReady(string state, string? health) => state == "Running" && health is null or "Healthy";
 
-    private Dictionary<string, string> ScriptEnvironment(IReadOnlyDictionary<string, string> settings)
+    private Dictionary<string, string> ScriptEnvironment(IReadOnlyDictionary<string, string> settings, Signal? trigger)
     {
         var advertised = endpoint.Value.AdvertisedIPAddress ?? IPAddress.Loopback;
         var environment = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -109,6 +110,7 @@ internal sealed class SandboxCSharpRunner(
         };
         if (IPAddress.IsLoopback(advertised)) { environment["GatewayRelayHost"] = DockerHost; }
         foreach (var (name, value) in settings) { environment["CSharpFile__Settings__" + name] = value; }
+        if (trigger is not null) { environment["CSharpFile__Trigger"] = JsonSerializer.Serialize(trigger, trigger.GetType(), JsonSerializerOptions.Web); }
         return environment;
     }
 

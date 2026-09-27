@@ -24,7 +24,8 @@ await foreach (var tick in brain.On<TimerTick>(timer, brain.Stopping))
 | `Write(source)` | Stores the source (≤ 128 KiB). A running script keeps the previous source until `Start`. |
 | `Configure(settings)` | Stores settings; the script reads them with `brain.Setting(name)`. Names are letters, digits and underscores. |
 | `Start()` | Stops the previous run, starts the current source as a new run and keeps the file running (see Reconcile). |
-| `Stop()` / `Delete()` | Stop the run and the reconcile; `Delete` also clears the state. |
+| `Arm(trigger)` | Runs on signals instead: every `trigger.Signal` from neuron `trigger.Neuron` (`"<grain type>/<key>"`) starts one run that reads it with `brain.Trigger<T>()`. |
+| `Stop()` / `Delete()` | Stop the run, the reconcile and any trigger; `Delete` also clears the state. |
 | `Read()` / `ReadLogs(tail)` | Live run status (`Stopped`, `Running`, `Restarting`, `Exited` + exit code, `ShouldRun`, `Failures`) and console output. |
 
 `CSharpFileChanged` is published on every write and lifecycle change.
@@ -57,6 +58,8 @@ Scripts run in the `csharp-sandbox` resource: a container built from [`Sandbox/`
 | `Exited(0)` | done: `ShouldRun = false` |
 | `Exited(n ≠ 0)` | retry as a new run; after 5 consecutive failures, give up (`Exited`, `ShouldRun = false`) |
 | gone (run or whole sandbox lost) | start a new run, bringing the sandbox back through `IAspire`; not counted as a failure |
+
+An armed file keeps watching its trigger instead: the reconcile re-watches it after a silo restart, and a signal that arrives after the file was collected reactivates it. Triggered runs are not retried (the next signal is the next attempt); 5 failing runs in a row disarm the file.
 
 A file that should run but is between runs reads as `Restarting`. A script that does not compile is retried like any crash, so its compiler output stays in the logs. Signals published while a script is down are not replayed.
 

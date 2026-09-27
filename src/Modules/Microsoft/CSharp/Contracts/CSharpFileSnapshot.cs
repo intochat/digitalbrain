@@ -12,5 +12,6 @@ public sealed record CSharpFileSnapshot(
     [property: Id(4)] int? ExitCode,
     [property: Id(5)] DateTimeOffset? StartedAt,
     [property: Id(6)] bool ShouldRun,
-    [property: Id(7)] int Failures);
+    [property: Id(7)] int Failures,
+    [property: Id(8)] CSharpTrigger? Trigger);
 
