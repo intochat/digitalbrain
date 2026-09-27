@@ -1,0 +1,3 @@
+name: intochat
+runtime: dotnet
+description: IntoChat on Azure, deployed from its AppHost manifest with DeploymentKit.

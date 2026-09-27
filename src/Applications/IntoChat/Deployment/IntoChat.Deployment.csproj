@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <Description>Pulumi program deploying IntoChat to Azure from its AppHost manifest.</Description>
+    <RootNamespace>IntoChat.Deployment</RootNamespace>
+    <!-- DeploymentKit (EF Core design) and IntoChat (Roslyn) both flow Microsoft.Build.Framework in. -->
+    <DisableMSBuildAssemblyCopyCheck>true</DisableMSBuildAssemblyCopyCheck>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The manifest names every composed module; their assemblies must load to find their deployments. -->
+    <ProjectReference Include="../IntoChat/IntoChat.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/Deployment/DigitalBrain.Deployment.csproj" />
+    <ProjectReference Include="../../../Modules/AI/Deployment/DigitalBrain.Modules.AI.Deployment.csproj" />
+    <ProjectReference Include="../../../Modules/Memory/Deployment/DigitalBrain.Modules.Memory.Deployment.csproj" />
+    <ProjectReference Include="../../../Modules/ClickHouse/Deployment/DigitalBrain.Modules.ClickHouse.Deployment.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Compute/Deployment/DigitalBrain.Modules.Compute.Deployment.csproj" />
+    <ProjectReference Include="../../../Modules/Microsoft/CSharp/Deployment/DigitalBrain.Modules.Microsoft.CSharp.Deployment.csproj" />
+  </ItemGroup>
+</Project>

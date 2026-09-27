@@ -1,6 +1,8 @@
 <Solution>
   <Folder Name="/IntoChat/">
     <Project Path="src/Applications/IntoChat/AppHost/IntoChat.AppHost.csproj" />
+    <Project Path="src/Applications/IntoChat/Deployment/IntoChat.Deployment.csproj" />
+    <Project Path="src/Applications/IntoChat/Tests/Deployment/IntoChat.Deployment.Tests.csproj" />
     <Project Path="src/Applications/IntoChat/IntoChat/IntoChat.csproj" />
     <Project Path="src/Applications/IntoChat/ServiceDefaults/IntoChat.ServiceDefaults.csproj" />
     <Project Path="src/Applications/IntoChat/Tests/Unit/IntoChat.Tests.Unit.csproj" />
@@ -11,6 +13,7 @@
     <Project Path="src/Modules/AI/Tests/Unit/DigitalBrain.Modules.AI.Tests.Unit.csproj" />
     <Project Path="src/Modules/AI/Tests/E2E/DigitalBrain.Modules.AI.Tests.E2E.csproj" />
     <Project Path="src/Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
+    <Project Path="src/Modules/AI/Deployment/DigitalBrain.Modules.AI.Deployment.csproj" />
     <Project Path="src/Modules/AI/Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" />
     <Project Path="src/Modules/AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
   </Folder>
@@ -23,12 +26,15 @@
     <Project Path="src/Modules/DigitalBrain/Kernel/Client/DigitalBrain.Client.csproj" />
     <Project Path="src/Modules/DigitalBrain/Kernel/Contracts/DigitalBrain.Contracts.csproj" />
     <Project Path="src/Modules/DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Kernel/Tests/Deployment/DigitalBrain.Deployment.Tests.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Kernel/Deployment/DigitalBrain.Deployment.csproj" />
     <Project Path="src/Modules/DigitalBrain/Kernel/Sdk/DigitalBrain.Sdk.csproj" />
   </Folder>
   <Folder Name="/Modules/ClickHouse/">
     <Project Path="src/Modules/ClickHouse/Tests/Unit/DigitalBrain.Modules.ClickHouse.Tests.Unit.csproj" />
     <Project Path="src/Modules/ClickHouse/Aspire.Hosting/DigitalBrain.Modules.ClickHouse.Aspire.Hosting.csproj" />
     <Project Path="src/Modules/ClickHouse/ClickHouse/DigitalBrain.Modules.ClickHouse.csproj" />
+    <Project Path="src/Modules/ClickHouse/Deployment/DigitalBrain.Modules.ClickHouse.Deployment.csproj" />
     <Project Path="src/Modules/ClickHouse/Contracts/DigitalBrain.Modules.ClickHouse.Contracts.csproj" />
   </Folder>
   <Folder Name="/Modules/Coding/">
@@ -58,6 +64,7 @@
     <Project Path="src/Modules/Memory/Aspire.Hosting/DigitalBrain.Modules.Memory.Aspire.Hosting.csproj" />
     <Project Path="src/Modules/Memory/Contracts/DigitalBrain.Modules.Memory.Contracts.csproj" />
     <Project Path="src/Modules/Memory/Memory/DigitalBrain.Modules.Memory.csproj" />
+    <Project Path="src/Modules/Memory/Deployment/DigitalBrain.Modules.Memory.Deployment.csproj" />
   </Folder>
   <Folder Name="/Modules/Microsoft/" />
   <Folder Name="/Modules/Microsoft/Aspire/">
@@ -70,6 +77,7 @@
     <Project Path="src/Modules/Microsoft/CSharp/Tests/E2E/DigitalBrain.Modules.Microsoft.CSharp.Tests.E2E.csproj" />
     <Project Path="src/Modules/Microsoft/CSharp/Tests/Unit/DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit.csproj" />
     <Project Path="src/Modules/Microsoft/CSharp/CSharp/DigitalBrain.Modules.Microsoft.CSharp.csproj" />
+    <Project Path="src/Modules/Microsoft/CSharp/Deployment/DigitalBrain.Modules.Microsoft.CSharp.Deployment.csproj" />
     <Project Path="src/Modules/Microsoft/CSharp/Aspire.Hosting/DigitalBrain.Modules.Microsoft.CSharp.Aspire.Hosting.csproj" />
     <Project Path="src/Modules/Microsoft/CSharp/Sandbox/DigitalBrain.Modules.Microsoft.CSharp.Sandbox.csproj" />
     <Project Path="src/Modules/Microsoft/CSharp/Contracts/DigitalBrain.Modules.Microsoft.CSharp.Contracts.csproj" />
@@ -111,6 +119,7 @@
     <Project Path="src/Modules/DigitalBrain/Compute/Tests/Unit/DigitalBrain.Modules.Compute.Tests.Unit.csproj" />
     <Project Path="src/Modules/DigitalBrain/Compute/Contracts/DigitalBrain.Modules.Compute.Contracts.csproj" />
     <Project Path="src/Modules/DigitalBrain/Compute/Compute/DigitalBrain.Modules.Compute.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Compute/Deployment/DigitalBrain.Modules.Compute.Deployment.csproj" />
   </Folder>
   <Folder Name="/Modules/DigitalBrain/Apps/">
     <Project Path="src/Modules/DigitalBrain/Apps/Tests/E2E/DigitalBrain.Modules.Apps.Tests.E2E.csproj" />

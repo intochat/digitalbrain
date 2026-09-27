@@ -9,6 +9,7 @@ using Qdrant.Client;
 
 namespace DigitalBrain.Memory;
 
+[ModuleDeployment("DigitalBrain.Memory.MemoryDeployment, DigitalBrain.Modules.Memory.Deployment")]
 [ModuleConfiguration(typeof(MemoryConfigurationContract))]
 [ModuleHosting("DigitalBrain.Memory.Aspire.Hosting.MemoryModuleHosting, DigitalBrain.Modules.Memory.Aspire.Hosting")]
 public sealed class MemoryModule : IModule

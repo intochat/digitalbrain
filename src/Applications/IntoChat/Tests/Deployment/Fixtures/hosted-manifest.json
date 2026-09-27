@@ -1,0 +1,417 @@
+{
+  "resources": {
+    "storage": {
+      "type": "azure.bicep.v0",
+      "path": "storage.module.bicep"
+    },
+    "clustering": {
+      "type": "value.v0",
+      "connectionString": "{storage.outputs.tableEndpoint}"
+    },
+    "reminders": {
+      "type": "value.v0",
+      "connectionString": "{storage.outputs.tableEndpoint}"
+    },
+    "grainstate": {
+      "type": "value.v0",
+      "connectionString": "{storage.outputs.blobEndpoint}"
+    },
+    "compute-postgres": {
+      "type": "container.v0",
+      "connectionString": "Host={compute-postgres.bindings.tcp.host};Port={compute-postgres.bindings.tcp.port};Username=postgres;Password={compute-postgres-password.value}",
+      "image": "docker.io/library/postgres:18.3",
+      "volumes": [
+        {
+          "name": "intochat.apphost-d570d561ba-compute-postgres-data",
+          "target": "/var/lib/postgresql",
+          "readOnly": false
+        }
+      ],
+      "env": {
+        "POSTGRES_HOST_AUTH_METHOD": "scram-sha-256",
+        "POSTGRES_INITDB_ARGS": "--auth-host=scram-sha-256 --auth-local=scram-sha-256",
+        "POSTGRES_USER": "postgres",
+        "POSTGRES_PASSWORD": "{compute-postgres-password.value}"
+      },
+      "bindings": {
+        "tcp": {
+          "scheme": "tcp",
+          "protocol": "tcp",
+          "transport": "tcp",
+          "targetPort": 5432
+        }
+      }
+    },
+    "compute-database": {
+      "type": "value.v0",
+      "connectionString": "{compute-postgres.connectionString};Database=compute"
+    },
+    "IntoChat": {
+      "type": "project.v0",
+      "path": "../../../IntoChat/IntoChat.csproj",
+      "env": {
+        "OTEL_DOTNET_EXPERIMENTAL_OTLP_RETRY": "in_memory",
+        "ASPNETCORE_FORWARDEDHEADERS_ENABLED": "true",
+        "HTTP_PORTS": "{IntoChat.bindings.http.targetPort}",
+        "ConnectionStrings__compute": "{compute-database.connectionString}",
+        "COMPUTE_HOST": "{compute-postgres.bindings.tcp.host}",
+        "COMPUTE_PORT": "{compute-postgres.bindings.tcp.port}",
+        "COMPUTE_USERNAME": "postgres",
+        "COMPUTE_PASSWORD": "{compute-postgres-password.value}",
+        "COMPUTE_URI": "postgresql://postgres:{compute-postgres-password-uri-encoded.value}@{compute-postgres.bindings.tcp.host}:{compute-postgres.bindings.tcp.port}/compute",
+        "COMPUTE_JDBCCONNECTIONSTRING": "jdbc:postgresql://{compute-postgres.bindings.tcp.host}:{compute-postgres.bindings.tcp.port}/compute",
+        "COMPUTE_DATABASENAME": "compute",
+        "Orleans__Clustering__ProviderType": "AzureTableStorage",
+        "Orleans__Clustering__ServiceKey": "clustering",
+        "ConnectionStrings__clustering": "{clustering.connectionString}",
+        "CLUSTERING_URI": "{storage.outputs.tableEndpoint}",
+        "Orleans__ClusterId": "digitalbrain-8dd5653331814da09f6d388ce4bdb857",
+        "Orleans__ServiceId": "digitalbrain-8dd5653331814da09f6d388ce4bdb857",
+        "Orleans__EnableDistributedTracing": "true",
+        "Orleans__Reminders__ProviderType": "AzureTableStorage",
+        "Orleans__Reminders__ServiceKey": "reminders",
+        "ConnectionStrings__reminders": "{reminders.connectionString}",
+        "REMINDERS_URI": "{storage.outputs.tableEndpoint}",
+        "Orleans__GrainStorage__Default__ProviderType": "AzureBlobStorage",
+        "Orleans__GrainStorage__Default__ServiceKey": "grainstate",
+        "ConnectionStrings__grainstate": "{grainstate.connectionString}",
+        "GRAINSTATE_URI": "{storage.outputs.blobEndpoint}",
+        "Orleans__Endpoints__SiloPort": "{IntoChat.bindings.orleans-silo.targetPort}",
+        "Orleans__Endpoints__GatewayPort": "{IntoChat.bindings.orleans-gateway.targetPort}",
+        "DigitalBrain__Modules__0": "DigitalBrain.AI.AIModule, DigitalBrain.Modules.AI",
+        "DigitalBrain__Modules__1": "DigitalBrain.Memory.MemoryModule, DigitalBrain.Modules.Memory",
+        "DigitalBrain__Modules__2": "DigitalBrain.ClickHouse.ClickHouseModule, DigitalBrain.Modules.ClickHouse",
+        "DigitalBrain__Modules__3": "DigitalBrain.Supabase.SupabaseModule, DigitalBrain.Modules.Supabase",
+        "DigitalBrain__Modules__4": "DigitalBrain.Time.TimeModule, DigitalBrain.Modules.Time",
+        "DigitalBrain__Modules__5": "DigitalBrain.Sdk.Secrets.SecretsModule, DigitalBrain.Sdk",
+        "DigitalBrain__Modules__6": "DigitalBrain.Sdk.Connectors.ConnectorModule, DigitalBrain.Sdk",
+        "DigitalBrain__Modules__7": "IntoChat.Apps.LeadGeneratorModule, IntoChat",
+        "DigitalBrain__Modules__8": "IntoChat.Identity.IdentityModule, IntoChat",
+        "DigitalBrain__Modules__9": "DigitalBrain.Google.Gmail.GmailModule, DigitalBrain.Modules.Google.Gmail",
+        "DigitalBrain__Modules__10": "DigitalBrain.Salesforce.SalesforceModule, DigitalBrain.Modules.Salesforce",
+        "DigitalBrain__Modules__11": "DigitalBrain.Microsoft.GitHub.GitHubModule, DigitalBrain.Modules.Microsoft.GitHub",
+        "DigitalBrain__Modules__12": "DigitalBrain.Flutter.FlutterModule, DigitalBrain.Modules.Flutter",
+        "DigitalBrain__Modules__13": "DigitalBrain.Compute.ComputeModule, DigitalBrain.Modules.Compute",
+        "DigitalBrain__Modules__14": "DigitalBrain.Discovery.DiscoveryModule, DigitalBrain.Modules.Discovery",
+        "DigitalBrain__Modules__15": "DigitalBrain.Apps.AppsModule, DigitalBrain.Modules.Apps",
+        "DigitalBrain__AI__Default__Model": "IGemma4",
+        "DigitalBrain__AI__Default__Embedding": "ITextEmbedding3Small",
+        "DigitalBrain__AI__Default__Transcription": "IWhisperLargeV3Turbo",
+        "DigitalBrain__AI__Telemetry__EnableSensitiveData": "false",
+        "DigitalBrain__AI__Tavily__Enabled": "true",
+        "DigitalBrain__AI__Hosting__Llms__0": "IGpt56Luna",
+        "DigitalBrain__AI__Hosting__Llms__1": "IGemma4",
+        "DigitalBrain__AI__Hosting__Embeddings__0": "ITextEmbedding3Small",
+        "DigitalBrain__Memory__Provider": "Qdrant",
+        "DigitalBrain__Memory__HostQdrant": "True",
+        "DigitalBrain__Memory__Qdrant__ConnectionName": "memory-qdrant",
+        "DigitalBrain__Memory__Qdrant__CollectionName": "",
+        "DigitalBrain__ClickHouse__Provider": "ClickHouse",
+        "DigitalBrain__ClickHouse__ConnectionName": "clickhouse",
+        "DigitalBrain__ClickHouse__Hosting__Enabled": "True",
+        "DigitalBrain__ClickHouse__Hosting__PersistentStorage": "True",
+        "DigitalBrain__ClickHouse__Hosting__AlwaysRunInitScripts": "False",
+        "DigitalBrain__ClickHouse__Hosting__Seeds__0": "leads",
+        "DigitalBrain__Supabase__Provider": "Npgsql",
+        "DigitalBrain__Supabase__ConnectionName": "supabase",
+        "DigitalBrain__Supabase__Hosting__Kind": "External",
+        "DigitalBrain__Google__Gmail__OAuth__PublicOrigin": "{IntoChat.bindings.http.url}",
+        "DigitalBrain__Google__Gmail__OAuth__TokenEndpoint": "https://oauth2.googleapis.com/token",
+        "DigitalBrain__Google__Gmail__OAuth__HostGmail": "True",
+        "DigitalBrain__Salesforce__Mcp__Endpoint": "https://api.salesforce.com/platform/mcp/v1/platform/sobject-all",
+        "DigitalBrain__Salesforce__Hosting__HostMcp": "True",
+        "DigitalBrain__Salesforce__Mcp__AllowLoopback": "False",
+        "DigitalBrain__Salesforce__Hosting__PublicOrigin": "",
+        "DigitalBrain__Flutter__Hosting__Kind": "Window",
+        "DigitalBrain__Flutter__Hosting__ResourceName": "FlutterShell",
+        "DigitalBrain__Flutter__Hosting__DeviceTarget": "windows",
+        "DigitalBrain__Flutter__Hosting__ShellName": "desk",
+        "DigitalBrain__Flutter__Hosting__ChatName": "main",
+        "DigitalBrain__Flutter__Hosting__FlutterCommand": "",
+        "DigitalBrain__Flutter__Hosting__WorkingDirectory": "",
+        "DigitalBrain__Flutter__Hosting__ReleaseBuild": "False",
+        "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT": "false",
+        "DigitalBrain__AI__Tavily__ApiKey": "{tavily-api-key.value}",
+        "DigitalBrain__AI__Ollama__Endpoint": "{ollama.bindings.http.scheme}://{ollama.bindings.http.host}:{ollama.bindings.http.port}",
+        "DigitalBrain__AI__Ollama__IGemma4__Model": "gemma4:e2b",
+        "DigitalBrain__AI__OpenAI__ApiKey": "{openai-api-key.value}",
+        "ConnectionStrings__memory-qdrant": "Endpoint={qdrant.bindings.grpc.url};Key={qdrant-Key.value}",
+        "MEMORY_QDRANT_GRPCHOST": "{qdrant.bindings.grpc.host}",
+        "MEMORY_QDRANT_GRPCPORT": "{qdrant.bindings.grpc.port}",
+        "MEMORY_QDRANT_HTTPHOST": "{qdrant.bindings.http.host}",
+        "MEMORY_QDRANT_HTTPPORT": "{qdrant.bindings.http.port}",
+        "MEMORY_QDRANT_APIKEY": "{qdrant-Key.value}",
+        "MEMORY_QDRANT_URI": "{qdrant.bindings.grpc.url}",
+        "MEMORY_QDRANT_HTTPURI": "{qdrant.bindings.http.url}",
+        "ConnectionStrings__memory-qdrant_http": "Endpoint={qdrant.bindings.http.url};Key={qdrant-Key.value}",
+        "ConnectionStrings__clickhouse": "{clickhouse-db.connectionString}",
+        "CLICKHOUSE_HOST": "{ClickHouse.bindings.http.host}",
+        "CLICKHOUSE_PORT": "{ClickHouse.bindings.http.port}",
+        "CLICKHOUSE_USERNAME": "default",
+        "CLICKHOUSE_PASSWORD": "{ClickHouse-password.value}",
+        "CLICKHOUSE_DATABASENAME": "digitalbrain",
+        "ConnectionStrings__supabase": "{supabase-connection.value}",
+        "DigitalBrain__Google__Gmail__OAuth__ClientId": "{gmail-client-id.value}",
+        "DigitalBrain__Google__Gmail__OAuth__ClientSecret": "{gmail-client-secret.value}",
+        "DigitalBrain__Salesforce__OAuth__ConsumerKey": "{salesforce-consumer-key.value}",
+        "DigitalBrain__Salesforce__OAuth__ConsumerSecret": "{salesforce-consumer-secret.value}",
+        "DigitalBrain__Salesforce__OAuth__PublicOrigin": "{IntoChat.bindings.http.url}",
+        "OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION": "false",
+        "OTEL_DOTNET_EXPERIMENTAL_HTTPCLIENT_DISABLE_URL_QUERY_REDACTION": "false",
+        "IntoChat__Assistant__Model": "IGpt56Luna",
+        "IntoChat__Hosted__Enabled": "true"
+      },
+      "bindings": {
+        "http": {
+          "scheme": "http",
+          "protocol": "tcp",
+          "transport": "http",
+          "port": 5080
+        },
+        "https": {
+          "scheme": "https",
+          "protocol": "tcp",
+          "transport": "http"
+        },
+        "orleans-silo": {
+          "scheme": "tcp",
+          "protocol": "tcp",
+          "transport": "tcp",
+          "targetPort": 8000
+        },
+        "orleans-gateway": {
+          "scheme": "tcp",
+          "protocol": "tcp",
+          "transport": "tcp",
+          "targetPort": 8001
+        }
+      }
+    },
+    "openai-api-key": {
+      "type": "parameter.v0",
+      "value": "{openai-api-key.inputs.value}",
+      "inputs": {
+        "value": {
+          "type": "string",
+          "secret": true
+        }
+      }
+    },
+    "ollama": {
+      "type": "container.v0",
+      "connectionString": "Endpoint={ollama.bindings.http.scheme}://{ollama.bindings.http.host}:{ollama.bindings.http.port}",
+      "image": "docker.io/ollama/ollama:latest",
+      "volumes": [
+        {
+          "name": "intochat.apphost-d570d561ba-ollama-ollama",
+          "target": "/root/.ollama",
+          "readOnly": false
+        }
+      ],
+      "bindings": {
+        "http": {
+          "scheme": "http",
+          "protocol": "tcp",
+          "transport": "http",
+          "targetPort": 11434
+        }
+      }
+    },
+    "gemma4-e2b": {
+      "type": "value.v0",
+      "connectionString": "{ollama.connectionString};Model=gemma4:e2b"
+    },
+    "tavily-api-key": {
+      "type": "parameter.v0",
+      "value": "{tavily-api-key.inputs.value}",
+      "inputs": {
+        "value": {
+          "type": "string",
+          "secret": true
+        }
+      }
+    },
+    "qdrant": {
+      "type": "container.v0",
+      "connectionString": "Endpoint={qdrant.bindings.grpc.url};Key={qdrant-Key.value}",
+      "image": "docker.io/qdrant/qdrant:v1.18.0",
+      "volumes": [
+        {
+          "name": "intochat.apphost-d570d561ba-qdrant-data",
+          "target": "/qdrant/storage",
+          "readOnly": false
+        }
+      ],
+      "env": {
+        "QDRANT__SERVICE__API_KEY": "{qdrant-Key.value}",
+        "QDRANT__SERVICE__ENABLE_STATIC_CONTENT": "0"
+      },
+      "bindings": {
+        "grpc": {
+          "scheme": "http",
+          "protocol": "tcp",
+          "transport": "http2",
+          "targetPort": 6334
+        },
+        "http": {
+          "scheme": "http",
+          "protocol": "tcp",
+          "transport": "http",
+          "targetPort": 6333
+        }
+      }
+    },
+    "ClickHouse": {
+      "type": "container.v0",
+      "connectionString": "Host={ClickHouse.bindings.http.host};Port={ClickHouse.bindings.http.port};Username=default;Password={ClickHouse-password.value}",
+      "image": "docker.io/clickhouse/clickhouse-server:latest",
+      "volumes": [
+        {
+          "name": "intochat.apphost-d570d561ba-ClickHouse-data",
+          "target": "/var/lib/clickhouse",
+          "readOnly": false
+        }
+      ],
+      "env": {
+        "CLICKHOUSE_USER": "default",
+        "CLICKHOUSE_PASSWORD": "{ClickHouse-password.value}"
+      },
+      "bindings": {
+        "http": {
+          "scheme": "http",
+          "protocol": "tcp",
+          "transport": "http",
+          "targetPort": 8123
+        }
+      }
+    },
+    "clickhouse-db": {
+      "type": "value.v0",
+      "connectionString": "Host={ClickHouse.bindings.http.host};Port={ClickHouse.bindings.http.port};Username=default;Password={ClickHouse-password.value};Database=digitalbrain"
+    },
+    "supabase-connection": {
+      "type": "parameter.v0",
+      "value": "{supabase-connection.inputs.value}",
+      "inputs": {
+        "value": {
+          "type": "string",
+          "secret": true
+        }
+      }
+    },
+    "FlutterShell": {
+      "type": "executable.v0",
+      "workingDirectory": "../../../../../Modules/Google/Flutter/app/shell",
+      "command": "E:\\tools\\flutter\\bin\\flutter",
+      "args": [
+        "run",
+        "-d",
+        "windows"
+      ],
+      "env": {
+        "DIGITALBRAIN_SHELL": "desk",
+        "DIGITALBRAIN_CHAT": "main",
+        "DIGITALBRAIN_UI_BASE": "{IntoChat.bindings.http.url}"
+      }
+    },
+    "gmail-client-id": {
+      "type": "parameter.v0",
+      "value": "{gmail-client-id.inputs.value}",
+      "inputs": {
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "gmail-client-secret": {
+      "type": "parameter.v0",
+      "value": "{gmail-client-secret.inputs.value}",
+      "inputs": {
+        "value": {
+          "type": "string",
+          "secret": true
+        }
+      }
+    },
+    "salesforce-consumer-key": {
+      "type": "parameter.v0",
+      "value": "{salesforce-consumer-key.inputs.value}",
+      "inputs": {
+        "value": {
+          "type": "string",
+          "secret": true
+        }
+      }
+    },
+    "salesforce-consumer-secret": {
+      "type": "parameter.v0",
+      "value": "{salesforce-consumer-secret.inputs.value}",
+      "inputs": {
+        "value": {
+          "type": "string",
+          "secret": true
+        }
+      }
+    },
+    "storage-roles": {
+      "type": "azure.bicep.v0",
+      "path": "storage-roles.module.bicep",
+      "params": {
+        "storage_outputs_name": "{storage.outputs.name}",
+        "principalType": "",
+        "principalId": ""
+      }
+    },
+    "compute-postgres-password": {
+      "type": "parameter.v0",
+      "value": "{compute-postgres-password.inputs.value}",
+      "inputs": {
+        "value": {
+          "type": "string",
+          "secret": true,
+          "default": {
+            "generate": {
+              "minLength": 22
+            }
+          }
+        }
+      }
+    },
+    "compute-postgres-password-uri-encoded": {
+      "type": "annotated.string",
+      "value": "{compute-postgres-password.value}",
+      "filter": "uri"
+    },
+    "qdrant-Key": {
+      "type": "parameter.v0",
+      "value": "{qdrant-Key.inputs.value}",
+      "inputs": {
+        "value": {
+          "type": "string",
+          "secret": true,
+          "default": {
+            "generate": {
+              "minLength": 22,
+              "special": false
+            }
+          }
+        }
+      }
+    },
+    "ClickHouse-password": {
+      "type": "parameter.v0",
+      "value": "{ClickHouse-password.inputs.value}",
+      "inputs": {
+        "value": {
+          "type": "string",
+          "secret": true,
+          "default": {
+            "generate": {
+              "minLength": 22
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -8,6 +8,7 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Microsoft.CSharp;
 
+[ModuleDeployment("DigitalBrain.Microsoft.CSharp.CSharpDeployment, DigitalBrain.Modules.Microsoft.CSharp.Deployment")]
 [ModuleConfiguration(typeof(CSharpConfigurationContract))]
 [ModuleHosting("DigitalBrain.Microsoft.CSharp.CSharpModuleHosting, DigitalBrain.Modules.Microsoft.CSharp.Aspire.Hosting")]
 public sealed class CSharpModule : IModule

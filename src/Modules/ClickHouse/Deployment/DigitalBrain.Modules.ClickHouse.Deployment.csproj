@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Azure deployment for the ClickHouse module: the ClickHouse server.</Description>
+    <RootNamespace>DigitalBrain.ClickHouse</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../DigitalBrain/Kernel/Deployment/DigitalBrain.Deployment.csproj" />
+    <ProjectReference Include="../ClickHouse/DigitalBrain.Modules.ClickHouse.csproj" />
+  </ItemGroup>
+</Project>

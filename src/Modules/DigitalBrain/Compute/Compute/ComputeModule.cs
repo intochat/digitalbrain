@@ -12,6 +12,7 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Compute;
 
+[ModuleDeployment("DigitalBrain.Compute.ComputeDeployment, DigitalBrain.Modules.Compute.Deployment")]
 [ModuleConfiguration(typeof(ComputeConfigurationContract))]
 public sealed class ComputeModule : IModule
 {

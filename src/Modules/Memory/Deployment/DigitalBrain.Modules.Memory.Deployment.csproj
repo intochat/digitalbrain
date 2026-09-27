@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Azure deployment for the memory module: the Qdrant vector store.</Description>
+    <RootNamespace>DigitalBrain.Memory</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../DigitalBrain/Kernel/Deployment/DigitalBrain.Deployment.csproj" />
+    <ProjectReference Include="../Memory/DigitalBrain.Modules.Memory.csproj" />
+  </ItemGroup>
+</Project>

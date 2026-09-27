@@ -1,0 +1,6 @@
+# Non-secret settings. Module secrets are set with `pulumi config set --secret digitalbrain:<parameter>`,
+# one per secret parameter in the manifest (see README.md).
+config:
+  digitalbrain:manifest: aspire-manifest.json
+  digitalbrain:location: westeurope
+  digitalbrain:namingPrefix: intochat

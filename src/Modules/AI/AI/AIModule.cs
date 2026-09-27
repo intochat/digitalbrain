@@ -11,6 +11,7 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.AI;
 
+[ModuleDeployment("DigitalBrain.AI.AIDeployment, DigitalBrain.Modules.AI.Deployment")]
 [ModuleConfiguration(typeof(AIConfigurationContract))]
 [ModuleHosting("DigitalBrain.AI.Aspire.Hosting.AIModuleHosting, DigitalBrain.Modules.AI.Aspire.Hosting")]
 public sealed class AIModule : IModule

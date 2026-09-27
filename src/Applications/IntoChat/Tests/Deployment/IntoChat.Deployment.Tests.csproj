@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../../../Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="../../Deployment/IntoChat.Deployment.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../../../Modules/DigitalBrain/Kernel/Tests/Deployment/AzureMocks.cs" Link="AzureMocks.cs" />
+    <None Include="Fixtures/**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
