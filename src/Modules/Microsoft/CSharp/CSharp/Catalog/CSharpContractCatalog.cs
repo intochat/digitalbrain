@@ -69,7 +69,7 @@ public sealed class CSharpContractCatalog(IOptions<CSharpOptions> options)
         if (options.Value.SourceRoot is not { } sourceRoot) { return null; }
         var project = Directory.EnumerateFiles(Path.Combine(sourceRoot, "src"), assembly.GetName().Name + ".csproj", SearchOption.AllDirectories).FirstOrDefault();
         return project is null ? null
-            : "#:project " + DockerCSharpRunner.SourceMount + "/" + Path.GetRelativePath(sourceRoot, project).Replace('\\', '/');
+            : "#:project " + CSharpSandbox.SourceMount + "/" + Path.GetRelativePath(sourceRoot, project).Replace('\\', '/');
     }
 
     private static IEnumerable<Assembly> ContractAssemblies()

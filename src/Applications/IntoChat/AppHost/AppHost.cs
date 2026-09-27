@@ -76,19 +76,14 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
 if (developerProfile)
 {
     var repositoryRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "..", ".."));
-    // Developer-only surfaces: the Windows executor, C# change sets, C# files run in Docker and the
-    // self-referential Aspire project path. The product profile composes only modules with a user path.
+    // Developer-only surfaces: the Windows executor, C# change sets, C# files run in the on-demand
+    // sandbox container and the AppHost bridge. The product profile composes only modules with a user path.
     digitalBrain
-        .WithModule<AspireModule>(aspire => aspire
-            .WithAspire(Path.Combine(builder.AppHostDirectory, "IntoChat.AppHost.csproj")))
+        .WithModule<AspireModule>()
         .WithModule<RoslynModule>()
         .WithModule<DotNetModule>()
         .WithModule<CodingModule>(coding => coding.WithSolution(Path.Combine(repositoryRoot, "DigitalBrain.slnx")))
-        .WithModule<CSharpModule>(csharp =>
-        {
-            if (builder.Configuration["IntoChat:CSharp:Root"] is { Length: > 0 } root)
-            { csharp.WithDocker(root, repositoryRoot); }
-        });
+        .WithModule<CSharpModule>(csharp => csharp.WithSandbox(repositoryRoot));
 }
 
 var clusterId = builder.Configuration["Orleans:ClusterId"]

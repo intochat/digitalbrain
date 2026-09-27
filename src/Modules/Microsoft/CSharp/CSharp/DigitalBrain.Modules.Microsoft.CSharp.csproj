@@ -1,13 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Single-file C# apps that operate neurons, run with dotnet in a container.</Description>
+    <Description>Single-file C# apps that operate neurons, compiled and run in the C# sandbox.</Description>
     <RootNamespace>DigitalBrain.Microsoft.CSharp</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit" />
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Microsoft.CSharp.Contracts.csproj" />
-    <ProjectReference Include="../../DotNet/DotNet/DigitalBrain.Modules.Microsoft.DotNet.csproj" />
+    <ProjectReference Include="../../Aspire/Contracts/DigitalBrain.Modules.Microsoft.Aspire.Contracts.csproj" />
     <ProjectReference Include="../../../DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
   </ItemGroup>
 </Project>

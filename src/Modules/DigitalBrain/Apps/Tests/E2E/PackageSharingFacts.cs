@@ -1,10 +1,11 @@
 using DigitalBrain.Apps;
+using DigitalBrain.Microsoft.Aspire;
 using DigitalBrain.Microsoft.CSharp;
 
 namespace DigitalBrain.Modules.Apps.Tests.E2E;
 
 // Alice shares a C# app, Bob installs and customizes it, forks and changes its code, and his change
-// flows back upstream. Every installed app runs as a real script in a .NET SDK container.
+// flows back upstream. Every installed app runs as a real script in the C# sandbox container.
 public sealed class PackageSharingFacts
 {
     private static readonly PackageId Upstream = PackageId.Parse("alice/researcher");
@@ -17,17 +18,12 @@ public sealed class PackageSharingFacts
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         deadline.CancelAfter(TimeSpan.FromMinutes(15));
         var ct = deadline.Token;
-        var root = Path.Combine(Path.GetTempPath(), "brain-packages-e2e", Guid.NewGuid().ToString("N"));
         IApp? bobsApp = null;
         IApp? bobsFork = null;
         try
         {
             await using var brain = await E2ETest.Create()
-                .WithModule<CSharpModule>().WithModule<AppsModule>()
-                .WithExecution(new TestExecutionOptions
-                {
-                    PrivateConfiguration = new Dictionary<string, string?> { [CSharpOptions.SectionName + ":Root"] = root },
-                })
+                .WithModule<AspireModule>().WithModule<CSharpModule>(csharp => csharp.WithSandbox(RepositoryRoot())).WithModule<AppsModule>()
                 .StartAsync(ct);
 
             Caller.As("alice");
@@ -73,8 +69,16 @@ public sealed class PackageSharingFacts
             Caller.Clear();
             if (bobsApp is not null) { await Uninstall(bobsApp); }
             if (bobsFork is not null) { await Uninstall(bobsFork); }
-            if (Directory.Exists(root)) { Directory.Delete(root, true); }
         }
+    }
+
+    private static string RepositoryRoot()
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "DigitalBrain.slnx"))) { return directory.FullName; }
+        }
+        throw new InvalidOperationException("The sandbox mounts the repository; run the test from inside it.");
     }
 
     // The first answer waits for the container to build the script, so a failure reports its logs.

@@ -2,6 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="../../../../../Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
     <ProjectReference Include="../../Apps/DigitalBrain.Modules.Apps.csproj" />
-    <ProjectReference Include="../../../../Microsoft/CSharp/CSharp/DigitalBrain.Modules.Microsoft.CSharp.csproj" />
+    <ProjectReference Include="../../../../Microsoft/CSharp/Aspire.Hosting/DigitalBrain.Modules.Microsoft.CSharp.Aspire.Hosting.csproj" />
+    <ProjectReference Include="../../../../Microsoft/Aspire/Aspire.Hosting/DigitalBrain.Modules.Microsoft.Aspire.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>

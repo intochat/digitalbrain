@@ -28,6 +28,6 @@
     <ProjectReference Include="../../../Modules/Coding/Coding/DigitalBrain.Modules.Coding.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Microsoft/Roslyn/Roslyn/DigitalBrain.Modules.Microsoft.Roslyn.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Microsoft/DotNet/DotNet/DigitalBrain.Modules.Microsoft.DotNet.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../../../Modules/Microsoft/CSharp/CSharp/DigitalBrain.Modules.Microsoft.CSharp.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Microsoft/CSharp/Aspire.Hosting/DigitalBrain.Modules.Microsoft.CSharp.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
   </ItemGroup>
 </Project>

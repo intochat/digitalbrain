@@ -1,14 +1,12 @@
-using DigitalBrain.Core;
+using DigitalBrain.Microsoft.Aspire;
 using DigitalBrain.Microsoft.CSharp;
 using DigitalBrain.Time;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
-using Orleans.TestingHost;
 using ITimer = DigitalBrain.Time.Timers.ITimer;
 
 namespace DigitalBrain.Tests;
 
-// Needs a Docker daemon with Linux containers: the script really runs in the .NET SDK image against this silo.
+// Needs a Docker daemon with Linux containers: Aspire builds and starts the sandbox on the first run,
+// and the script compiles and runs inside it against this brain.
 public sealed class CSharpFileContainerFacts
 {
     private const string Source = """
@@ -27,65 +25,45 @@ public sealed class CSharpFileContainerFacts
         """;
 
     [Fact]
-    public async Task ScriptOperatesNeuronsFromAContainerAndExitsCleanly()
+    public async Task TheSandboxStartsOnDemandAndRunsScriptsSideBySide()
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        deadline.CancelAfter(TimeSpan.FromMinutes(6));
+        deadline.CancelAfter(TimeSpan.FromMinutes(12));
         var ct = deadline.Token;
-        var builder = new TestClusterBuilder(1);
-        builder.Options.ConnectionTransport = ConnectionTransportType.TcpSocket;
-        builder.AddSiloBuilderConfigurator<ContainerSilo>();
-        await using var cluster = builder.Build();
-        await cluster.DeployAsync(ct);
+        await using var brain = await E2ETest.Create()
+            .WithModule<TimeModule>()
+            .WithModule<AspireModule>()
+            .WithModule<CSharpModule>(csharp => csharp.WithSandbox(RepositoryRoot()))
+            .StartAsync(ct);
+        var aspire = brain.Get<IAspire>(new AspireOptions().ApplicationName);
+        await using var sandboxStates = await brain.Observe<ResourceStateChanged>(aspire, ct);
         var timerId = "csharp-e2e-" + Guid.NewGuid().ToString("N")[..8];
-        var file = cluster.Client.GetGrain<ICSharpFile>("e2e/" + timerId);
+        var listener = brain.Get<ICSharpFile>("e2e/" + timerId);
+        var broken = brain.Get<ICSharpFile>("e2e/broken-" + timerId);
         try
         {
-            await file.Write(Source, ct);
-            await file.Configure(new Dictionary<string, string> { ["TimerId"] = timerId }, ct);
-            var started = await file.Start(ct);
-            Assert.Equal(CSharpFileStatus.Running, started.Status);
+            await listener.Write(Source, ct);
+            await listener.Configure(new Dictionary<string, string> { ["TimerId"] = timerId }, ct);
+            Assert.Equal(CSharpFileStatus.Running, (await listener.Start(ct)).Status);
+            await sandboxStates.NextAsync(change => change.Resource == CSharpSandbox.ResourceName && change.State == "Running", ct: ct);
 
-            await Logs(file, "script ready", ct);
-            await cluster.Client.GetGrain<ITimer>(timerId).Start(TimeSpan.Zero);
-            await Logs(file, "script tick " + timerId, ct);
+            await broken.Write("Console.WriteLine(undefinedName);", ct);
+            await broken.Start(ct);
 
-            var exited = await Until(file, snapshot => snapshot.Status == CSharpFileStatus.Exited, ct);
-            Assert.Equal(0, exited.ExitCode);
+            await Logs(listener, "script ready", ct);
+            await brain.Get<ITimer>(timerId).Start(TimeSpan.Zero);
+            await Logs(listener, "script tick " + timerId, ct);
+            Assert.Equal(0, (await Until(listener, snapshot => snapshot.Status == CSharpFileStatus.Exited, ct)).ExitCode);
+
+            Assert.NotEqual(0, (await Until(broken, snapshot => snapshot.Status == CSharpFileStatus.Exited, ct)).ExitCode);
+            Assert.Contains("error CS0103", await broken.ReadLogs(500, ct), StringComparison.Ordinal);
         }
         finally
         {
-            await file.Delete(CancellationToken.None);
+            await listener.Delete(CancellationToken.None);
+            await broken.Delete(CancellationToken.None);
         }
-        Assert.Equal(CSharpFileStatus.Stopped, (await file.Read(ct)).Status);
-    }
-
-    [Fact]
-    public async Task ASourceThatDoesNotCompileSettlesAsExitedWithTheCompilerOutput()
-    {
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        deadline.CancelAfter(TimeSpan.FromMinutes(8));
-        var ct = deadline.Token;
-        var builder = new TestClusterBuilder(1);
-        builder.Options.ConnectionTransport = ConnectionTransportType.TcpSocket;
-        builder.AddSiloBuilderConfigurator<ContainerSilo>();
-        await using var cluster = builder.Build();
-        await cluster.DeployAsync(ct);
-        var file = cluster.Client.GetGrain<ICSharpFile>("e2e/broken-" + Guid.NewGuid().ToString("N")[..8]);
-        try
-        {
-            await file.Write("Console.WriteLine(undefinedName);", ct);
-            await file.Start(ct);
-
-            var exited = await Until(file, snapshot => snapshot.Status == CSharpFileStatus.Exited, ct);
-
-            Assert.NotEqual(0, exited.ExitCode);
-            Assert.Contains("error CS0103", await file.ReadLogs(500, ct), StringComparison.Ordinal);
-        }
-        finally
-        {
-            await file.Delete(CancellationToken.None);
-        }
+        Assert.Equal(CSharpFileStatus.Stopped, (await listener.Read(ct)).Status);
     }
 
     private static async Task Logs(ICSharpFile file, string expected, CancellationToken ct)
@@ -110,14 +88,12 @@ public sealed class CSharpFileContainerFacts
         }
     }
 
-    public sealed class ContainerSilo : ISiloConfigurator
+    private static string RepositoryRoot()
     {
-        public void Configure(ISiloBuilder silo)
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
         {
-            silo.AddDigitalBrain().AddTime();
-            silo.AddMemoryGrainStorage("Default");
-            silo.UseInMemoryReminderService();
-            new CSharpModule().Configure(silo);
+            if (File.Exists(Path.Combine(directory.FullName, "DigitalBrain.slnx"))) { return directory.FullName; }
         }
+        throw new InvalidOperationException("The sandbox mounts the repository; run the test from inside it.");
     }
 }

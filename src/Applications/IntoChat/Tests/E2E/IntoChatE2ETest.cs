@@ -22,7 +22,6 @@ internal static class IntoChatE2ETest
 
     public static E2ETestBuilder<Projects.IntoChat_AppHost> Create(string modelApiKey = "fixture-key", Dictionary<string, string?>? privateConfiguration = null)
         => E2ETest.For<Projects.IntoChat_AppHost>()
-            .WithExecutionRoot("IntoChat:CSharp:Root")
             .ConfigureModule<AIModule>(ai => ai.WithoutLocalModels().WithoutVoiceToText().WithoutWebSearch()
                 .WithDefaultLlm<IGpt56Luna>().WithModelEndpoint(AiProvider.OpenAI, new(UnconfiguredProvider, "v1/")))
             .ConfigureModule<MemoryModule>(memory => memory.WithQdrant())
@@ -34,7 +33,6 @@ internal static class IntoChatE2ETest
             .ConfigureModule<SupabaseModule>(database => database.WithPostgres())
             .ConfigureModule<GmailModule>(gmail => gmail.WithTokenEndpoint(new(UnconfiguredProvider, "token")))
             .ConfigureModule<SalesforceModule>(salesforce => salesforce.WithLocalMcp(new(UnconfiguredProvider, "mcp")))
-            .ConfigureModule<AspireModule>(aspire => aspire.WithoutAspire())
             .ConfigureModule<GitHubModule>(github => github.WithGitHubRepositories(new Dictionary<string, GitHubRepositoryDeclaration>()))
             .ConfigureModule<CodingModule>(coding => coding.ConfigureOptions<CodingModuleOptions>(
                 options => options.SolutionPath = null, "SolutionPath"))

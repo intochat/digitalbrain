@@ -1,21 +1,22 @@
 using DigitalBrain.Core;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
 
 namespace DigitalBrain.Microsoft.Aspire;
 
 [ModuleConfiguration(typeof(AspireConfigurationContract))]
+[ModuleHosting("DigitalBrain.Microsoft.Aspire.AspireModuleHosting, DigitalBrain.Modules.Microsoft.Aspire.Aspire.Hosting")]
 public sealed class AspireModule : IModule
 {
     public const string ConfigurationRoot = "DigitalBrain:Microsoft:Aspire";
 
-    public static ModuleDefinition Define(AspireModuleOptions options)
+    public static ModuleDefinition Define(AspireOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
         return new(typeof(AspireModule), new Dictionary<string, string?>
         {
-            [ConfigurationRoot + ":ProjectPath"] = options.ProjectPath,
             [ConfigurationRoot + ":ApplicationName"] = options.ApplicationName,
         });
     }
@@ -23,13 +24,13 @@ public sealed class AspireModule : IModule
     public void Configure(ISiloBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        builder.Services.AddOptions<AspireOptions>().Bind(builder.Configuration.GetSection(AspireOptions.SectionName))
-            .Validate(options =>
-            {
-                _ = options.CreateSettings();
-                return true;
-            })
-            .ValidateOnStart();
-        builder.Services.AddSingleton(services => new AspireConnection(services.GetRequiredService<IOptions<AspireOptions>>().Value.CreateSettings()));
+        builder.Services.AddOptions<AspireOptions>().BindConfiguration(AspireOptions.SectionName);
+        builder.Services.TryAddSingleton<AspireBridge>();
+    }
+
+    public void Configure(IEndpointRouteBuilder endpoints)
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+        endpoints.MapAspireBridge();
     }
 }

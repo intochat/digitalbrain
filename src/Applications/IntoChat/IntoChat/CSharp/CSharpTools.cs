@@ -51,7 +51,7 @@ internal sealed class ScopedCSharpTools(IDigitalBrain brain, CSharpCatalogStore 
         return new(description, await file.Read(ct));
     }
 
-    [McpServerTool(Name = "csharp_run"), Description("Act on a saved C# app: status reads its container state and recent output; start builds and runs the current source in a .NET SDK container (restarting it if running); stop stops it; logs reads recent console output; delete stops it and removes the file. Compile errors appear in logs while the status is Restarting, and the status settles on Exited after a few retries. Never claim the app works until its logs show the expected output.")]
+    [McpServerTool(Name = "csharp_run"), Description("Act on a saved C# app: status reads its run state and recent output; start compiles and runs the current source in the C# sandbox (restarting it if running); stop stops it; logs reads recent console output; delete stops it and removes the file. Compile errors appear in logs and the status is Exited with a non-zero exit code. Never claim the app works until its logs show the expected output.")]
     public async Task<CSharpFileView> Run(string id, string action, CancellationToken ct) => (action ?? "").Trim().ToLowerInvariant() switch
     {
         "status" or "logs" => await Read(id, ct),

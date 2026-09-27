@@ -64,14 +64,6 @@ public sealed class HygieneFacts
     }
 
     [Fact]
-    public void EmptyAspireContractsProjectIsDeleted()
-    {
-        Assert.False(Directory.Exists(PathInRepo("src/Modules/Microsoft/Aspire/Contracts")), "The empty Aspire Contracts project must be gone.");
-        Assert.DoesNotContain("Microsoft.Aspire.Contracts", Read("DigitalBrain.slnx"));
-        Assert.DoesNotContain("Contracts/DigitalBrain.Modules.Microsoft.Aspire.Contracts.csproj", Read("src/Modules/Microsoft/Aspire/Aspire/DigitalBrain.Modules.Microsoft.Aspire.csproj"));
-    }
-
-    [Fact]
     public void StaleReqnrollGitignoreRuleIsGone()
     {
         var gitignore = Read(".gitignore");
