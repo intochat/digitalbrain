@@ -125,6 +125,21 @@ internal sealed class WorkspaceNeuron(
 
     public Task<WorkspaceState> Read() => Task.FromResult(Snapshot());
 
+    // Before windows had a typed WindowReference (b0a4c72c1) they held a table view whose first field was
+    // the table id, so stored windows from then load with that id as Kind and no NeuronId. Clients cannot
+    // read such a workspace at all, so it is repaired once, on activation.
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        await base.OnActivateAsync(cancellationToken);
+        var legacy = store.State.Windows.Values.Where(window => window.Reference is { NeuronId: null }).ToArray();
+        if (legacy.Length == 0) { return; }
+        foreach (var window in legacy)
+        { store.State.Windows[window.Id] = window with { Reference = WindowReference.Table(window.Reference.Kind) }; }
+        foreach (var (operationId, request) in store.State.OperationLog.Where(entry => entry.Value.Reference is { NeuronId: null }).ToArray())
+        { store.State.OperationLog[operationId] = request with { Reference = WindowReference.Table(request.Reference.Kind) }; }
+        await store.WriteStateAsync(cancellationToken);
+    }
+
     private WorkspaceState Snapshot() => new(store.State.Revision, store.State.Windows.Values.ToArray(), FirstRun());
 
     private FirstRunState? FirstRun() =>
