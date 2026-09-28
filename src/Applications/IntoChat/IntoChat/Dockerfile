@@ -61,7 +61,8 @@ ENV ASPNETCORE_ENVIRONMENT=Production \
     DigitalBrain__Modules__12="DigitalBrain.Compute.ComputeModule, DigitalBrain.Modules.Compute" \
     DigitalBrain__Modules__13="DigitalBrain.Discovery.DiscoveryModule, DigitalBrain.Modules.Discovery" \
     DigitalBrain__Modules__14="DigitalBrain.Apps.AppsModule, DigitalBrain.Modules.Apps" \
-    DigitalBrain__Modules__15="DigitalBrain.Qdrant.QdrantModule, DigitalBrain.Modules.Qdrant"
+    DigitalBrain__Modules__15="DigitalBrain.Qdrant.QdrantModule, DigitalBrain.Modules.Qdrant" \
+    DigitalBrain__Modules__16="DigitalBrain.Files.FilesModule, DigitalBrain.Modules.Files"
 
 EXPOSE 8080
 
