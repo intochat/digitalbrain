@@ -17,6 +17,16 @@ public sealed class BrainCompositionBuilder
         return this;
     }
 
+    // Adds the modules an application requires that are not declared yet; declared ones keep their configuration.
+    public BrainCompositionBuilder WithApp(AppDefinition app)
+    {
+        EnsureMutable();
+        ArgumentNullException.ThrowIfNull(app);
+        foreach (var module in app.RequiredModules.Where(module => !_modules.ContainsKey(module)))
+        { _modules.Add(module, new ModuleDraft(module)); }
+        return this;
+    }
+
     public BrainCompositionBuilder ConfigureModule<TModule>(Action<ModuleConfiguration<TModule>> configure)
         where TModule : class, IModule, new()
     {

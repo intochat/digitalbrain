@@ -1,4 +1,8 @@
 <Solution>
+  <Folder Name="/Apps/Assistant/">
+    <Project Path="src/Apps/Assistant/DigitalBrain.Apps.Assistant.csproj" />
+    <Project Path="src/Apps/Assistant/Tests/Unit/DigitalBrain.Apps.Assistant.Tests.Unit.csproj" />
+  </Folder>
   <Folder Name="/IntoChat/">
     <Project Path="src/Applications/IntoChat/AppHost/IntoChat.AppHost.csproj" />
     <Project Path="src/Applications/IntoChat/Deployment/IntoChat.Deployment.csproj" />
