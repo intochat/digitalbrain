@@ -3,6 +3,7 @@ using IntoChat.Agent;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using DigitalBrain.Identity;
 
 namespace IntoChat.Tests;
 

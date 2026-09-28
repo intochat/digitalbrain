@@ -8,12 +8,12 @@ using DigitalBrain.Sdk;
 using IntoChat;
 using IntoChat.Agent;
 using IntoChat.Apps;
-using IntoChat.LocalFiles;
-using IntoChat.Operations;
+using IntoChat.Applications;
 using IntoChat.ServiceDefaults;
 using IntoChat.Workspace;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Orleans.Dashboard;
+using DigitalBrain.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -35,23 +35,10 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Events.OnRedirectToAccessDenied = context => { context.Response.StatusCode = StatusCodes.Status403Forbidden; return Task.CompletedTask; };
     });
 builder.AddDurableProtection();
-builder.Services.Configure<BackgroundRemovalOptions>(builder.Configuration.GetSection(BackgroundRemovalOptions.SectionName));
-builder.Services.AddSingleton<IBackgroundRemover, DeterministicBackgroundRemover>();
-builder.Services.AddSingleton<IAssetBlobStore, AzureAssetBlobStore>();
-builder.Services.AddSingleton<LocalFileStore>();
-builder.Services.AddSingleton<AppSurfaceComposer>();
-builder.Services.AddSingleton<ImageSaveCoordinator>();
-builder.Services.AddSingleton<LiveTableWindows>();
-builder.Services.AddSingleton<IAgentToolFactory, WorkspaceTableTools>();
+builder.Services.AddApplications();
 builder.Services.AddSingleton<IAgentToolFactory, WorkspaceFormTools>();
 builder.Services.AddSingleton<IAgentToolFactory, DiscoveryTools>();
 builder.Services.AddSingleton<IAgentContextProvider, CapabilityContextProvider>();
-builder.Services.AddSingleton<IAgentToolFactory, LeadGeneratorTools>();
-builder.Services.AddSingleton<IAgentToolFactory, ImageEditorTools>();
-builder.Services.AddSingleton<IProblemReportStore, ProblemReportStore>();
-builder.Services.AddSingleton<IWorkspaceVectorPurge, MemoryWorkspaceVectorPurge>();
-builder.Services.AddSingleton<IWorkspaceBackupPurge, HostedWorkspaceBackupPurge>();
-builder.Services.AddSingleton<WorkspaceDeletion>();
 
 var app = builder.Build();
 
@@ -60,6 +47,9 @@ app.UseModuleHttpSurfaces();
 app.UseAuthentication();
 app.UseAccountSession();
 app.MapDefaultEndpoints();
+// Developer mode is a server setting, so a client cannot grant itself the C# console.
+app.MapGet("/session/capabilities", static (IConfiguration configuration) =>
+    Results.Ok(new { developerMode = AgentToolPolicy.DeveloperModeEnabled(configuration["IntoChat:DeveloperMode"]) }));
 app.MapOrleansDashboard("/orleans");
 app.MapCSharp();
 app.MapPackages();
@@ -67,12 +57,12 @@ app.MapDigitalBrainModules();
 app.MapGet("/compute/limits", static async (IDigitalBrain brain, CancellationToken ct) =>
     Results.Ok(await brain.Get<IAllowanceLedger>(CallerContextStamper.Require().AccountId).ReadLimitsAsync(ct)));
 app.MapWorkspaceDataEndpoints();
-app.MapShellPersistence();
 app.MapWorkspaceAgent();
 app.MapWorkspaceConnections();
 app.MapComputeUsage();
 app.MapWorkspaceVoice();
 app.MapLocalApps();
 app.MapBuiltInApps();
+app.MapApplications();
 
 app.Run();

@@ -18,7 +18,7 @@ public sealed class ShareCSharpFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await IntoChatE2ETest.Create()
-            .WithResourceEnvironment(new Dictionary<string, string> { ["IntoChat__CSharp__AllowActivation"] = "true" })
+            .WithResourceEnvironment(new Dictionary<string, string> { ["DigitalBrain__CSharp__AllowActivation"] = "true" })
             .StartAsync(ct);
         using var alice = await People.SignedIn(brain.HttpClient, "alice", ct);
         using var bob = await People.SignedIn(brain.HttpClient, "bob", ct);

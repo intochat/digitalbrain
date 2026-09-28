@@ -13,6 +13,8 @@ using IntoChat.Workspace;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using DigitalBrain.Identity;
+using DigitalBrain.Supabase.Windows;
 
 namespace IntoChat.Agent;
 
@@ -28,19 +30,17 @@ internal static class AgentEndpoints
             Results.Ok(new AgentModelCatalog(profiles, options, configuration).Read()));
         routes.MapGet("/workspaces/{workspaceId}/conversations/{threadId}", async (string workspaceId, string threadId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) =>
         {
-            if (!ValidId(workspaceId) || !ValidId(threadId)) { return Results.BadRequest(); }
+            if (!WorkspaceScope.IsValidId(workspaceId) || !WorkspaceScope.IsValidId(threadId)) { return Results.BadRequest(); }
             var scope = WorkspaceScope.Current(auth.Value, workspaceId);
             return Results.Ok(await (await brain.Get<IAssistantApp>(scope.Id).Conversation(threadId)).ReadConversation(ct));
-        });
+        }).AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
         routes.MapPost("/agent", async (AgentInput input, HttpContext http, IDigitalBrain brain, IPriceBook priceBook, IAgentTurnRunner runner, IIntentUsageSink usage, IOptions<BasicAuthOptions> auth, IConfiguration configuration, IHostEnvironment environment, ModelProfiles profiles, IOptionsMonitor<AIOptions> aiOptions) =>
         {
-            if (!ValidId(input.ThreadId) || !ValidId(input.RunId) || !ValidId(input.WorkspaceId)
+            if (!WorkspaceScope.IsValidId(input.ThreadId) || !WorkspaceScope.IsValidId(input.RunId) || !WorkspaceScope.IsValidId(input.WorkspaceId)
                 || input.Messages is not { Count: 1 } || input.Messages[0].Role != "user"
                 || string.IsNullOrWhiteSpace(input.Messages[0].Content) || input.Messages[0].Content.Length > 32000)
             { http.Response.StatusCode = 400; return; }
-            if (http.User.Identity?.IsAuthenticated == true &&
-                !await http.RequestServices.GetRequiredService<IWorkspaceAccess>().CanAccessAsync(CallerContextStamper.Require().PrincipalId, input.WorkspaceId, http.RequestAborted))
-            { http.Response.StatusCode = StatusCodes.Status403Forbidden; return; }
+            if (await WorkspaceAccessFilter.Decide(http, input.WorkspaceId) is { } denied) { await denied.ExecuteAsync(http); return; }
             var scope = WorkspaceScope.Current(auth.Value, input.WorkspaceId);
             var agent = await brain.Get<IAssistantApp>(scope.Id).Conversation(input.ThreadId);
             var snapshot = await agent.ReadConversation(http.RequestAborted);
@@ -283,7 +283,6 @@ internal static class AgentEndpoints
         return queryError;
     }
 
-    internal static bool ValidId(string? value) => !string.IsNullOrWhiteSpace(value) && value.Length <= 200 && !value.Any(char.IsControl) && !value.Contains('/') && !value.Contains('\\');
     private static bool IsLiveTableTool(string name) => name is "show_supabase_query_table" or "table_read" or "table_refine";
 
     private static async Task EmitUiCard(string result, Func<object, Task> emit)

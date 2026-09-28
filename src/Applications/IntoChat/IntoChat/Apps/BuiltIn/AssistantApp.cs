@@ -1,3 +1,4 @@
+using DigitalBrain.Identity;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
@@ -88,7 +89,7 @@ public sealed class AssistantApp(
 
     public async Task<IAgent> Conversation(string threadId)
     {
-        if (string.IsNullOrWhiteSpace(threadId) || threadId.Length > 200 || threadId.Any(char.IsControl) || threadId.Contains('/') || threadId.Contains('\\'))
+        if (!WorkspaceScope.IsValidId(threadId))
         { throw new ArgumentException("A bounded thread identifier is required.", nameof(threadId)); }
         await Activate();
         // Keep existing conversations addressable when the host delegates ownership to this app.

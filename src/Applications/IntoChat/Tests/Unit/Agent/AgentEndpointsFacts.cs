@@ -95,7 +95,7 @@ public sealed class AgentEndpointsFacts
         intent.AddUsage(new TokenUsageEntry(MeterKind.Chat, "OpenAI", "gpt-5.6-luna",
             1_000_000, 0, null, 1_000_000, 2_000_000, true, DateTimeOffset.UtcNow));
 
-        var (modelCalls, compute) = AgentReceipts.ShadowPrice(intent, new PriceBook());
+        var (modelCalls, compute) = AgentReceipts.ShadowPrice(intent.Usage.OfType<TokenUsageEntry>(), new PriceBook());
 
         Assert.Equal(1, modelCalls);
         Assert.Equal(250m + 1000m, compute);

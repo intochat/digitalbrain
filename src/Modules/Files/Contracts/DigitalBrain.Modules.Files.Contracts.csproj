@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Workspace files and image documents: explorer, edits and saved copies.</Description>
+    <RootNamespace>DigitalBrain.Files</RootNamespace>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Google/Flutter/Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
+  </ItemGroup>
+</Project>

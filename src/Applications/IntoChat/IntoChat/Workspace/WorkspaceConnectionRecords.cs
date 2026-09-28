@@ -1,4 +1,5 @@
 using DigitalBrain.Sdk.Connectors;
+using DigitalBrain.Identity;
 
 namespace IntoChat.Workspace;
 

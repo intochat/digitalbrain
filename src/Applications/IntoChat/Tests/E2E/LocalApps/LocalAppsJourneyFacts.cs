@@ -84,7 +84,7 @@ public sealed class LocalAppsJourneyFacts
             // Flutter mirrors the SnackBar text into an aria-live announcement; assert the visible node.
             await Assertions.Expect(page.Locator("flt-semantics").GetByText("Saved " + outputName, new() { Exact = true })).ToBeVisibleAsync();
             var assetChecksum = receipt.RootElement.GetProperty("file").GetProperty("checksum").GetString()!;
-            var assetId = IntoChat.LocalFiles.LocalFileStore.AssetId(IntoChat.Workspace.WorkspaceScope.Create("owner", workspaceId).Id, assetChecksum);
+            var assetId = DigitalBrain.Files.WorkspaceFileStore.AssetId(DigitalBrain.Identity.WorkspaceScope.Create("owner", workspaceId).Id, assetChecksum);
             var outputResponse = await brain.HttpClient.GetAsync($"/workspaces/{Uri.EscapeDataString(workspaceId)}/apps/assets/{assetId}", ct);
             outputResponse.EnsureSuccessStatusCode();
             var output = await outputResponse.Content.ReadAsByteArrayAsync(ct);

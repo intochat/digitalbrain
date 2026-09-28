@@ -1,3 +1,4 @@
+using DigitalBrain.Microsoft.CSharp;
 using DigitalBrain.AI.Agents;
 
 namespace IntoChat.Agent;

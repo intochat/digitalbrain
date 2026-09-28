@@ -1,3 +1,4 @@
+using DigitalBrain.Microsoft.CSharp;
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.AI;

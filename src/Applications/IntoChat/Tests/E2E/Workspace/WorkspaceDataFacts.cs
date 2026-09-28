@@ -6,6 +6,7 @@ using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Supabase.Tables;
 using IntoChat.Workspace;
 using Npgsql;
+using DigitalBrain.Identity;
 
 namespace IntoChat.Tests.E2E.Workspace;
 

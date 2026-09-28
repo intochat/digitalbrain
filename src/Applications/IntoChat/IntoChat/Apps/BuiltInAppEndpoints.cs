@@ -3,6 +3,7 @@ using DigitalBrain.Core.Enforcement;
 using IntoChat.Apps.BuiltIn;
 using IntoChat.Workspace;
 using Microsoft.Extensions.Options;
+using DigitalBrain.Identity;
 
 namespace IntoChat.Apps;
 

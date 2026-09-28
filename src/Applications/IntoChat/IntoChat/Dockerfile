@@ -53,7 +53,7 @@ ENV ASPNETCORE_ENVIRONMENT=Production \
     DigitalBrain__Modules__4="DigitalBrain.Time.TimeModule, DigitalBrain.Modules.Time" \
     DigitalBrain__Modules__5="DigitalBrain.Sdk.Secrets.SecretsModule, DigitalBrain.Sdk" \
     DigitalBrain__Modules__6="DigitalBrain.Sdk.Connectors.ConnectorModule, DigitalBrain.Sdk" \
-    DigitalBrain__Modules__7="IntoChat.Identity.IdentityModule, IntoChat" \
+    DigitalBrain__Modules__7="DigitalBrain.Identity.IdentityModule, DigitalBrain.Modules.Identity" \
     DigitalBrain__Modules__8="DigitalBrain.Google.Gmail.GmailModule, DigitalBrain.Modules.Google.Gmail" \
     DigitalBrain__Modules__9="DigitalBrain.Salesforce.SalesforceModule, DigitalBrain.Modules.Salesforce" \
     DigitalBrain__Modules__10="DigitalBrain.Microsoft.GitHub.GitHubModule, DigitalBrain.Modules.Microsoft.GitHub" \
@@ -61,7 +61,7 @@ ENV ASPNETCORE_ENVIRONMENT=Production \
     DigitalBrain__Modules__12="DigitalBrain.Compute.ComputeModule, DigitalBrain.Modules.Compute" \
     DigitalBrain__Modules__13="DigitalBrain.Discovery.DiscoveryModule, DigitalBrain.Modules.Discovery" \
     DigitalBrain__Modules__14="DigitalBrain.Apps.AppsModule, DigitalBrain.Modules.Apps" \
-    DigitalBrain__Modules__15="IntoChat.Apps.LeadGeneratorModule, IntoChat" \n    DigitalBrain__Modules__16="DigitalBrain.Qdrant.QdrantModule, DigitalBrain.Modules.Qdrant"
+    DigitalBrain__Modules__15="DigitalBrain.Qdrant.QdrantModule, DigitalBrain.Modules.Qdrant"
 
 EXPOSE 8080
 

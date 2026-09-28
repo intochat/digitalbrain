@@ -49,11 +49,7 @@ internal static class AgentReceipts
         return new AgentReceipt(outcome, Summarize(activity), activity.Calls, activity.Touched, modelCalls, compute);
     }
 
-    // Model calls and shadow Compute come from the intent's durable usage batch, priced by the
-    // one price book. Unknown meters and local models price at zero, so shadow never overcharges.
-    internal static (int ModelCalls, decimal Compute) ShadowPrice(IntentContext intent, IPriceBook priceBook)
-        => ShadowPrice(intent.Usage.OfType<TokenUsageEntry>(), priceBook);
-
+    // Unknown meters and local models price at zero, so shadow never overcharges.
     internal static (int ModelCalls, decimal Compute) ShadowPrice(IEnumerable<TokenUsageEntry> entries, IPriceBook priceBook)
     {
         var modelCalls = 0;

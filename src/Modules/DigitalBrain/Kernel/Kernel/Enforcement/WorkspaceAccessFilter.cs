@@ -16,16 +16,21 @@ public static class WorkspaceAccessFilter
         var http = context.HttpContext;
         var workspace = http.Request.RouteValues["workspace"] as string
             ?? http.Request.RouteValues["workspaceId"] as string;
-        if (string.IsNullOrWhiteSpace(workspace) || !RequiresMembership(http))
-        {
-            return await next(context);
-        }
+        if (string.IsNullOrWhiteSpace(workspace)) { return await next(context); }
 
+        return await Decide(http, workspace) is { } denied ? denied : await next(context);
+    }
+
+    // For a route that carries the workspace in its body rather than its path.
+    public static async ValueTask<IResult?> Decide(HttpContext http, string workspace)
+    {
+        ArgumentNullException.ThrowIfNull(http);
+        if (!RequiresMembership(http)) { return null; }
         if (!CallerContextStamper.TryGet(out var caller)) { return Results.Unauthorized(); }
 
         var access = http.RequestServices.GetRequiredService<IWorkspaceAccess>();
         return await access.CanAccessAsync(caller.PrincipalId, workspace, http.RequestAborted)
-            ? await next(context)
+            ? null
             : Results.StatusCode(StatusCodes.Status403Forbidden);
     }
 

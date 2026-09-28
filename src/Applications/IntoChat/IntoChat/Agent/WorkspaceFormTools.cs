@@ -8,14 +8,15 @@ using DigitalBrain.Contracts.Types;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Form;
 using DigitalBrain.Flutter.Workspace;
-using IntoChat.Apps;
+using DigitalBrain.Flutter.Layout;
+using DigitalBrain.Flutter.Surface;
 using Microsoft.Extensions.AI;
 
 namespace IntoChat.Agent;
 
 // One declarative form window per assistant call. The model asks for typed fields by name and
 // receives the handle plus the field types; submitted values never travel back to the model.
-internal sealed class WorkspaceFormTools(IDigitalBrain brain, AppSurfaceComposer surfaces) : IAgentToolFactory
+internal sealed class WorkspaceFormTools(IDigitalBrain brain) : IAgentToolFactory
 {
     private static readonly Dictionary<string, FieldKind> Kinds = BuildKinds();
 
@@ -62,7 +63,7 @@ internal sealed class WorkspaceFormTools(IDigitalBrain brain, AppSurfaceComposer
         }
         var formId = trusted.ScopeId + "/apps/forms/" + Hash(JsonSerializer.Serialize(new[] { trusted.ScopeId, trusted.RunId, trusted.CallId }));
         var state = await brain.Get<IForm>(formId).Define(new(title, declared)).WaitAsync(ct);
-        await EnsureWindowAsync(trusted.ScopeId, formId, title, await surfaces.Form(formId, title, formId), ct);
+        await ShowWindowAsync(trusted.ScopeId, formId, title, ct);
         return Handle(state, formId);
     }
 
@@ -72,23 +73,18 @@ internal sealed class WorkspaceFormTools(IDigitalBrain brain, AppSurfaceComposer
         { throw new ArgumentException("The form handle belongs to another workspace.", nameof(formId)); }
         var state = await brain.Get<IForm>(formId).Read().WaitAsync(ct);
         if (state.Fields.Count == 0) { throw new KeyNotFoundException("No such form; call show_form first."); }
-        await EnsureWindowAsync(trusted.ScopeId, formId, state.Title, await surfaces.Form(formId, state.Title, formId), ct);
+        await ShowWindowAsync(trusted.ScopeId, formId, state.Title, ct);
         return Handle(state, formId);
     }
 
-    private async Task EnsureWindowAsync(string scope, string windowId, string title, UiChildRef surface, CancellationToken ct)
+    // The whole form is one neuron rendered from one read; the window only lays it out.
+    private async Task ShowWindowAsync(string scope, string formId, string title, CancellationToken ct)
     {
-        var workspace = brain.Get<IWorkspace>(scope);
-        var reference = WindowReference.For(surface);
-        for (var attempt = 0; attempt < 4; attempt++)
-        {
-            ct.ThrowIfCancellationRequested();
-            var state = await workspace.Read().WaitAsync(ct);
-            if (state.Windows.Any(window => window.Id == windowId && window.IsOpen && window.Reference == reference)) { return; }
-            try { await workspace.OpenSurface(new(Guid.NewGuid().ToString(), windowId, title, reference, state.Revision)).WaitAsync(ct); return; }
-            catch (WorkspaceRevisionConflictException) when (attempt < 3) { }
-        }
-        throw new InvalidOperationException("The workspace changed too often; retry this operation.");
+        var layout = brain.Get<ILayout>(formId + "/layout");
+        await layout.Set(new("column", [new("form", formId)], 4), (await layout.Read().WaitAsync(ct)).Revision).WaitAsync(ct);
+        var surface = brain.Get<ISurface>(formId + "/surface");
+        await surface.Set(new(title, [new("layout", formId + "/layout")]), (await surface.Read().WaitAsync(ct)).Revision).WaitAsync(ct);
+        await brain.Get<IWorkspace>(scope).EnsureOpenAsync(formId, title, WindowReference.For(new UiChildRef("surface", formId + "/surface")), ct);
     }
 
     private static FieldKind ParseKind(string kind)

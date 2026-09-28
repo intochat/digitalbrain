@@ -14,7 +14,7 @@ using DigitalBrain.Core;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Google.Gmail;
-using IntoChat.Identity;
+using DigitalBrain.Identity;
 using DigitalBrain.Memory;
 using DigitalBrain.Qdrant;
 using DigitalBrain.Microsoft.Aspire;
@@ -29,7 +29,7 @@ using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
 using DigitalBrain.Time;
 using IntoChat.AppHost;
-using IntoChat.Apps;
+using DigitalBrain.Files;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 
@@ -66,8 +66,8 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<TimeModule>()
     .WithModule<SecretsModule>()
     .WithModule<ConnectorModule>()
-    .WithModule<LeadGeneratorModule>()
     .WithModule<IdentityModule>()
+    .WithModule<FilesModule>()
     .WithModule<GmailModule>(gmail => gmail.WithGmail())
     .WithModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
     .WithModule<GitHubModule>(github => github.WithGitHubRepositories(repositories))
@@ -119,8 +119,8 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
     {
         if (builder.Configuration["IntoChat:Assistant:Model"] is { Length: > 0 } assistantModel)
         { context.EnvironmentVariables["IntoChat__Assistant__Model"] = assistantModel; }
-        if (builder.Configuration["IntoChat:CSharp:AllowActivation"] is { } allowActivation)
-        { context.EnvironmentVariables["IntoChat__CSharp__AllowActivation"] = allowActivation; }
+        if (builder.Configuration["DigitalBrain:CSharp:AllowActivation"] is { } allowActivation)
+        { context.EnvironmentVariables["DigitalBrain__CSharp__AllowActivation"] = allowActivation; }
         if (clusterId is not null)
         {
             context.EnvironmentVariables["Orleans__ClusterId"] = clusterId;

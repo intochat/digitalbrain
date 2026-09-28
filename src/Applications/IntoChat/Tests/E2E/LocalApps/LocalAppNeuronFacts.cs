@@ -1,6 +1,7 @@
 using DigitalBrain.Flutter.Collection;
-using IntoChat.Apps;
+using DigitalBrain.Files;
 using IntoChat.Workspace;
+using DigitalBrain.Identity;
 namespace IntoChat.Tests.E2E.LocalApps;
 
 public sealed class LocalAppNeuronFacts

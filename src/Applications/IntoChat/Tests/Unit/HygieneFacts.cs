@@ -94,7 +94,9 @@ public sealed class HygieneFacts
     [Fact]
     public void HostFilesystemIsNotExposed()
     {
-        Assert.DoesNotContain("IntoChat:LocalFiles", Read("src/Applications/IntoChat/AppHost/AppHost.cs"));
+        var appHost = Read("src/Applications/IntoChat/AppHost/AppHost.cs");
+        Assert.DoesNotContain("IntoChat:LocalFiles", appHost);
+        Assert.DoesNotContain("DigitalBrain:Files", appHost);
     }
 
     [Fact]

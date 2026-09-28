@@ -5,6 +5,7 @@ using DigitalBrain.Microsoft.CSharp;
 using DigitalBrain.Sdk.Connectors;
 using IntoChat.Workspace;
 using Microsoft.Extensions.Options;
+using DigitalBrain.Identity;
 
 namespace IntoChat.Packages;
 
@@ -182,6 +183,6 @@ internal sealed class PackageService(
         var runtime = (await Package(revision.Package).ReadRevision(revision.Revision)).Content.Manifest.RuntimeName;
         if (runtime != PackageManifest.CSharpRuntime) { return; }
         if (!files.AllowActivation)
-        { throw new InvalidOperationException("This host does not run shared packages. Compose CSharpModule and enable IntoChat:CSharp:AllowActivation in the developer profile."); }
+        { throw new InvalidOperationException("This host does not run shared packages. Compose CSharpModule and enable DigitalBrain:CSharp:AllowActivation in the developer profile."); }
     }
 }

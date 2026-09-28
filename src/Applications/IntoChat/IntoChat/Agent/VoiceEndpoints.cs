@@ -1,3 +1,4 @@
+using DigitalBrain.Identity;
 using DigitalBrain.AI;
 using DigitalBrain.Core.Enforcement;
 using IntoChat.Workspace;
@@ -15,13 +16,9 @@ internal static class VoiceEndpoints
             string workspaceId, VoiceInput input, HttpContext http,
             CancellationToken ct) =>
         {
-            if (!AgentEndpoints.ValidId(workspaceId)) { return Results.BadRequest(); }
-            if (http.User.Identity?.IsAuthenticated == true &&
-                !await http.RequestServices.GetRequiredService<IWorkspaceAccess>()
-                    .CanAccessAsync(CallerContextStamper.Require().PrincipalId, workspaceId, ct))
-            { return Results.StatusCode(StatusCodes.Status403Forbidden); }
+            if (!WorkspaceScope.IsValidId(workspaceId)) { return Results.BadRequest(); }
             return await Transcribe(input, http.RequestServices.GetService<IAudioTranscriptionService>(), ct);
-        }).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(6 * 1024 * 1024));
+        }).AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(6 * 1024 * 1024));
     }
 
     internal static async Task<IResult> Transcribe(VoiceInput input, IAudioTranscriptionService? transcription, CancellationToken ct)

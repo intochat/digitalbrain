@@ -30,6 +30,9 @@ public static class UIVocabulary
     public const string TabsType = "tabs";
     public const string TreeType = "tree";
     public const string SheetType = "sheet";
+    // "chat" is already the AI module's conversation neuron.
+    public const string ChatType = "uichat";
+    public const string VoiceInputType = "voiceinput";
     public const string FormType = "form";
 
     public const int ChartMaxPoints = 256;

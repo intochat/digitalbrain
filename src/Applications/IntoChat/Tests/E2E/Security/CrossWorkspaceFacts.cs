@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Slider;
+using DigitalBrain.Identity;
 
 namespace IntoChat.Tests.E2E.Security;
 
@@ -46,8 +47,8 @@ public sealed class CrossWorkspaceFacts
             new { principalId = "bob", displayName = "Bob", password = "bob-password-123" }, ct);
         Assert.Equal(HttpStatusCode.OK, bobLogin.StatusCode);
 
-        var aliceMember = await aliceLogin.Content.ReadFromJsonAsync<IntoChat.Identity.Member>(Json, ct);
-        var bobMember = await bobLogin.Content.ReadFromJsonAsync<IntoChat.Identity.Member>(Json, ct);
+        var aliceMember = await aliceLogin.Content.ReadFromJsonAsync<DigitalBrain.Identity.Member>(Json, ct);
+        var bobMember = await bobLogin.Content.ReadFromJsonAsync<DigitalBrain.Identity.Member>(Json, ct);
         var aliceWorkspace = aliceMember!.WorkspaceId;
         var bobWorkspace = bobMember!.WorkspaceId;
 
