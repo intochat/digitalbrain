@@ -186,16 +186,32 @@ public sealed class AgentToolFacts
         Assert.Equal("Available: invoices", messages[0].Text);
     }
 
-    private sealed class FixedContext(string name, string context) : IAgentContextProvider
+    [Fact]
+    public async Task ContextToolsJoinTheTurnOnlyWhenTheHostRegistersThem()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var services = new ServiceCollection().AddSingleton<IChatClient>(new ScriptedClient())
+            .AddSingleton<IAgentToolFactory, Tools>()
+            .AddSingleton<IAgentContextProvider>(new FixedContext("capabilities", "Available: lookup", ["lookup", "not_registered"]))
+            .BuildServiceProvider();
+        var events = new List<AgentTurnEvent>();
+
+        await foreach (var item in new AgentTurnRunner(services).RunAsync(
+            new("agent", "run", "scope", [], "ask", null, ContextProviders: ["capabilities"]), ct)) { events.Add(item); }
+
+        Assert.Equal("lookup", Assert.Single(events.OfType<AgentTurnEvent.ToolCompleted>()).Name);
+    }
+
+    private sealed class FixedContext(string name, string text, IReadOnlyList<string>? tools = null) : IAgentContextProvider
     {
         public string Name => name;
-        public Task<string?> Provide(AgentContextRequest request, CancellationToken ct) => Task.FromResult<string?>(context);
+        public Task<AgentContext> Provide(AgentContextRequest request, CancellationToken ct) => Task.FromResult(new AgentContext(text, tools ?? []));
     }
 
     private sealed class FailingContext : IAgentContextProvider
     {
         public string Name => "failing";
-        public Task<string?> Provide(AgentContextRequest request, CancellationToken ct) => throw new InvalidOperationException("down");
+        public Task<AgentContext> Provide(AgentContextRequest request, CancellationToken ct) => throw new InvalidOperationException("down");
     }
 
     private sealed class RecordingClient : IChatClient

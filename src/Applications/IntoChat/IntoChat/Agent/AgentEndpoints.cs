@@ -116,7 +116,7 @@ internal static class AgentEndpoints
                         {
                             var text = new StringBuilder();
                             var results = new List<string>();
-                            var appTools = await new AgentToolSelection(brain).ResolveAsync(scope.Id, userText, History(state), http.RequestAborted);
+                            var appTools = await new AgentToolSelection(brain).ResolveAsync(scope.Id, http.RequestAborted);
                             var queryError = await RunModel(scope.Id, usageId, userText, developerMode, state, messageId, configuration, runner, appTools, Emit, text, results, activity, http.RequestAborted, prepared.Model);
                             if (queryError is not null) { throw new WorkspaceQueryException(queryError); }
                             await agent.CompleteConversation(new(input.RunId, userText, text.ToString(), results), http.RequestAborted);
@@ -284,12 +284,6 @@ internal static class AgentEndpoints
     }
 
     internal static bool ValidId(string? value) => !string.IsNullOrWhiteSpace(value) && value.Length <= 200 && !value.Any(char.IsControl) && !value.Contains('/') && !value.Contains('\\');
-
-    private static IReadOnlyList<string> History(AgentConversationState state)
-    {
-        var turns = state.Turns.Count <= 6 ? state.Turns : state.Turns.Skip(state.Turns.Count - 6).ToList();
-        return [.. turns.SelectMany(turn => new[] { turn.UserText, turn.AssistantText })];
-    }
     private static bool IsLiveTableTool(string name) => name is "show_supabase_query_table" or "table_read" or "table_refine";
 
     private static async Task EmitUiCard(string result, Func<object, Task> emit)

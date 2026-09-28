@@ -17,12 +17,16 @@ public interface IAgentToolFactory
 {
     IReadOnlyList<AIFunction> Create(Func<AgentToolContext> context);
 }
-public sealed record AgentContextRequest(string ScopeId, string Message);
-// Adds what the model should know before it answers this message; a null answer adds nothing.
+public sealed record AgentContextRequest(string ScopeId, string Message, string? PreviousMessage = null);
+// Text is what the model should know before it answers; Tools are registered tools it may need for it.
+public sealed record AgentContext(string? Text, IReadOnlyList<string> Tools)
+{
+    public static AgentContext None { get; } = new(null, []);
+}
 public interface IAgentContextProvider
 {
     string Name { get; }
-    Task<string?> Provide(AgentContextRequest request, CancellationToken ct);
+    Task<AgentContext> Provide(AgentContextRequest request, CancellationToken ct);
 }
 public sealed record AgentTurnRequest(string AgentId, string RunId, string ScopeId,
     IReadOnlyList<AgentConversationTurn> History, string Message, AgentModelSelection? Model,
@@ -65,17 +69,19 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
     }
 
     // A provider that fails leaves the turn without its context rather than failing the turn.
-    private async Task<IReadOnlyList<string>> ProvideContext(AgentTurnRequest request, CancellationToken ct)
+    private async Task<IReadOnlyList<AgentContext>> ProvideContext(AgentTurnRequest request, CancellationToken ct)
     {
         var selected = request.ContextProviders ?? [];
         if (selected.Count == 0) { return []; }
         var message = request.Input?.Content.OfType<AiText>().Select(static part => part.Text).FirstOrDefault() ?? request.Message;
-        var contexts = new List<string>();
+        var previous = request.History.Count > 0 ? request.History[^1].UserText
+            : request.Messages?.LastOrDefault(static item => item.Role == "user")?.Content.OfType<AiText>().Select(static part => part.Text).FirstOrDefault();
+        var contexts = new List<AgentContext>();
         foreach (var provider in services.GetServices<IAgentContextProvider>().Where(provider => selected.Contains(provider.Name)))
         {
             try
             {
-                if (await provider.Provide(new(request.ScopeId, message), ct).ConfigureAwait(false) is { Length: > 0 } context) { contexts.Add(context); }
+                contexts.Add(await provider.Provide(new(request.ScopeId, message, previous), ct).ConfigureAwait(false));
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -95,9 +101,15 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
             await events.WriteAsync(new AgentTurnEvent.Started(request.RunId), ct).ConfigureAwait(false);
             string? currentCall = null;
             AgentToolContext Context() => new(request.ScopeId, request.RunId, currentCall ?? throw new InvalidOperationException("No active tool call."));
-            var selected = request.ToolNames ?? [];
-            if (selected.Distinct(StringComparer.Ordinal).Count() != selected.Count) { throw new ArgumentException("Tool names must be unique."); }
-            var available = selected.Count == 0 ? [] : services.GetServices<IAgentToolFactory>().SelectMany(f => f.Create(Context)).ToList();
+            var requestedTools = request.ToolNames ?? [];
+            if (requestedTools.Distinct(StringComparer.Ordinal).Count() != requestedTools.Count) { throw new ArgumentException("Tool names must be unique."); }
+            var provided = await ProvideContext(request, ct).ConfigureAwait(false);
+            var factoryTools = services.GetServices<IAgentToolFactory>().SelectMany(f => f.Create(Context)).ToList();
+            // Context may name tools this host does not register; only registered ones join the turn.
+            IReadOnlyList<string> selected = [.. requestedTools, .. provided.SelectMany(static context => context.Tools)
+                .Where(name => !requestedTools.Contains(name) && factoryTools.Any(tool => tool.Name == name))
+                .Distinct(StringComparer.Ordinal)];
+            var available = selected.Count == 0 ? [] : factoryTools;
             if (selected.Count > 0 && services.GetService<NativeTools>() is { } native)
             { available.AddRange(native.Resolve(selected).OfType<AIFunction>()); }
             if (selected.Count > 0)
@@ -164,7 +176,7 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
                     messages.Add(new(ChatRole.Assistant, turn.AssistantText + (turn.ResultIds.Count == 0 ? "" : "\nResult windows: " + string.Join(", ", turn.ResultIds))));
                 }
             }
-            foreach (var context in await ProvideContext(request, ct).ConfigureAwait(false)) { messages.Add(new(ChatRole.System, context)); }
+            foreach (var context in provided.Where(static context => !string.IsNullOrEmpty(context.Text))) { messages.Add(new(ChatRole.System, context.Text)); }
             messages.Add(request.Input is null ? new(ChatRole.User, request.Message) : InferenceMapping.ToChatMessage(request.Input));
             var generated = new List<ChatMessage>();
             UsageDetails? usage = null;
