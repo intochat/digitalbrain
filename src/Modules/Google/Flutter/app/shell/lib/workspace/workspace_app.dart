@@ -67,13 +67,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         seedProject: false,
         persistence: widget.programmingClient == null
             ? MemoryWorkspacePersistence()
-            : NeuronWorkspacePersistence(
-                client: widget.programmingClient!,
-                legacy: PreferencesWorkspacePersistence(
-                  key: widget.persistenceKey,
-                ),
-                legacyKey: widget.persistenceKey,
-              ),
+            : NeuronWorkspacePersistence(client: widget.programmingClient!),
       );
   final _tables = <String, UiTableController>{};
   final _remote = <String, WorkspaceRemoteController>{};

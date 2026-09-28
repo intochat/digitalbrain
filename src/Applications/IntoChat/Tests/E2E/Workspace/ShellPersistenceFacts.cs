@@ -9,6 +9,40 @@ namespace IntoChat.Tests.E2E.Workspace;
 
 public sealed class ShellPersistenceFacts
 {
+    [Fact(Timeout = 240_000)]
+    public async Task EstablishedWorkspaceImportsWithinClientDeadline()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await IntoChatE2ETest.StartAsync(ct);
+        var snapshot = new JsonObject
+        {
+            ["version"] = 1,
+            ["projects"] = new JsonArray(Enumerable.Range(0, 6).Select(project => (JsonNode?)new JsonObject
+            {
+                ["id"] = $"project-{project}",
+                ["conversations"] = new JsonArray(new JsonObject
+                {
+                    ["id"] = "chat",
+                    ["messages"] = new JsonArray(Enumerable.Range(0, 180).Select(message => (JsonNode?)new JsonObject
+                    {
+                        ["role"] = "user", ["content"] = $"{project}:{message}:" + new string('x', 900),
+                        ["metadata"] = new JsonObject { ["usage"] = new JsonObject { ["tokens"] = message } }
+                    }).ToArray())
+                })
+            }).ToArray())
+        };
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(TimeSpan.FromSeconds(30));
+        var operationId = Guid.NewGuid().ToString();
+        using var imported = await brain.HttpClient.PostAsJsonAsync("/shell/import", new { expectedRevision = 0, operationId, snapshot }, deadline.Token);
+        imported.EnsureSuccessStatusCode();
+        var restored = await brain.HttpClient.GetFromJsonAsync<JsonObject>("/shell/state", deadline.Token);
+        Assert.True(JsonNode.DeepEquals(snapshot, restored!["snapshot"]));
+        using var replay = await brain.HttpClient.PostAsJsonAsync("/shell/import", new { expectedRevision = 0, operationId, snapshot }, deadline.Token);
+        replay.EnsureSuccessStatusCode();
+        Assert.Equal(1, (await replay.Content.ReadFromJsonAsync<JsonObject>(deadline.Token))!["revision"]!.GetValue<int>());
+    }
+
     [Fact(Timeout = 300_000)]
     public async Task FreshBrowserRestoresWorkspaceWithoutDeviceStorage()
     {

@@ -10,8 +10,30 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'workspace_remote_controller_test.dart' show MemoryPersistence;
+import 'first_run_test.dart' show FirstRunClient;
 
 void main() {
+  testWidgets(
+    'empty server starts one default workspace without device preferences',
+    (tester) async {
+      final api = _StartupClient();
+      final client = DigitalBrainUiClient(
+        baseUri: Uri.parse('http://kernel'),
+        httpClient: api,
+      )..defaultWorkspaceId = 'default';
+      // No preferences plugin is registered: production startup must never read it.
+      await tester.pumpWidget(WorkspaceApp(programmingClient: client));
+      await tester.pumpAndSettle();
+      expect(find.text('Retry loading'), findsNothing);
+      expect(api.snapshot?['projects'], hasLength(1));
+      expect(api.snapshot!['projects'][0]['id'], 'default');
+      expect(api.snapshot!['projects'][0]['title'], 'Personal');
+      expect(api.imports, 0);
+      await tester.pumpWidget(const SizedBox());
+      await api.events.close();
+      client.close();
+    },
+  );
   test(
     'explicit server recovery bypasses malformed legacy without changing it',
     () async {
@@ -239,6 +261,28 @@ class _Legacy extends MemoryPersistence {
   Future<void> write(String value) async {
     writes++;
     throw StateError('Read only');
+  }
+}
+
+class _StartupClient extends FirstRunClient {
+  Map<String, dynamic>? snapshot;
+  int revision = 0, imports = 0;
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    if (!request.url.path.startsWith('/shell/')) return super.send(request);
+    if (request.url.path == '/shell/import') imports++;
+    if (request.method != 'GET') {
+      final command =
+          jsonDecode(await request.finalize().bytesToString()) as Map;
+      snapshot = Map<String, dynamic>.from(command['snapshot']);
+      revision++;
+    }
+    return http.StreamedResponse(
+      Stream.value(
+        utf8.encode(jsonEncode({'revision': revision, 'snapshot': snapshot})),
+      ),
+      200,
+    );
   }
 }
 

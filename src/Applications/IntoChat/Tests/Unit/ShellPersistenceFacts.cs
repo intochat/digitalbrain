@@ -9,6 +9,45 @@ public sealed class ShellPersistenceFacts
     private const string EmptySnapshot = """{"version":1,"settings":{},"projects":[]}""";
 
     [Fact]
+    public async Task EstablishedWorkspaceUsesBoundedPagesInsteadOfThousandsOfSerialCalls()
+    {
+        var snapshot = JsonNode.Parse(EmptySnapshot)!;
+        snapshot["messages"] = new JsonArray(Enumerable.Range(0, 1000).Select(i => (JsonNode?)new JsonObject
+        {
+            ["id"] = i, ["text"] = new string('x', 900),
+            ["metadata"] = new JsonObject { ["model"] = "assistant", ["usage"] = new JsonObject { ["tokens"] = i } }
+        }).ToArray());
+        var parts = new System.Collections.Concurrent.ConcurrentDictionary<string, string>();
+        var active = 0;
+        var peak = 0;
+        var root = await ShellSnapshotParts.Write(snapshot, async (key, value) =>
+        {
+            var count = Interlocked.Increment(ref active);
+            UpdateMaximum(ref peak, count);
+            await Task.Yield();
+            parts[key] = value;
+            Interlocked.Decrement(ref active);
+        });
+        Assert.True(parts.Count < 128, $"A 1 MB workspace required {parts.Count} storage writes.");
+        Assert.InRange(peak, 2, 16);
+        var reads = new System.Collections.Concurrent.ConcurrentDictionary<string, int>();
+        var restored = await ShellSnapshotParts.Read(root, key =>
+        {
+            reads.AddOrUpdate(key, 1, (_, count) => count + 1);
+            return Task.FromResult(parts[key]);
+        });
+        Assert.True(JsonNode.DeepEquals(snapshot, restored));
+        Assert.All(reads.Values, count => Assert.Equal(1, count));
+    }
+
+    private static void UpdateMaximum(ref int target, int value)
+    {
+        int previous;
+        do { previous = Volatile.Read(ref target); if (previous >= value) { return; } }
+        while (Interlocked.CompareExchange(ref target, value, previous) != previous);
+    }
+
+    [Fact]
     public async Task RevisionConflictsAndImportRetriesDoNotReplaceNewerState()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -49,9 +88,37 @@ public sealed class ShellPersistenceFacts
         var parts = new Dictionary<string, string>();
         var root = await ShellSnapshotParts.Write(snapshot, (key, value) => { parts[key] = value; return Task.CompletedTask; });
         Assert.DoesNotContain("hello", parts[root]);
-        Assert.True(parts.Count >= 5);
+        Assert.InRange(parts.Count, 2, 4);
         var restored = await ShellSnapshotParts.Read(root, key => Task.FromResult(parts[key]));
         Assert.True(JsonNode.DeepEquals(snapshot, restored));
+    }
+
+    [Fact]
+    public async Task PreviousSnapshotFormatReadsSharedPartsOnlyOnce()
+    {
+        var parts = new Dictionary<string, string>();
+        string Add(string json)
+        {
+            var id = ShellSnapshotParts.Digest(json);
+            parts[id] = json;
+            return id;
+        }
+        var emptyObject = Add("""{"objectPages":[]}""");
+        var record = Add(new JsonObject { ["object"] = new JsonObject { ["metadata"] = emptyObject } }.ToJsonString());
+        var fragment = Add(new JsonObject { ["objectPages"] = new JsonArray(record) }.ToJsonString());
+        var page = Add(new JsonObject { ["page"] = new JsonArray(Enumerable.Repeat(fragment, 64).Select(id => (JsonNode?)JsonValue.Create(id)).ToArray()) }.ToJsonString());
+        var root = Add(new JsonObject { ["array"] = new JsonArray(page, page) }.ToJsonString());
+        var calls = new System.Collections.Concurrent.ConcurrentDictionary<string, int>();
+        var restored = await ShellSnapshotParts.Read(root, async key =>
+        {
+            calls.AddOrUpdate(key, 1, (_, count) => count + 1);
+            await Task.Yield();
+            return parts[key];
+        });
+        Assert.Equal(128, restored.AsArray().Count);
+        Assert.All(restored.AsArray(), item => Assert.Empty(item!["metadata"]!.AsObject()));
+        Assert.Equal(parts.Count, calls.Count);
+        Assert.All(calls.Values, count => Assert.Equal(1, count));
     }
 
     [Fact]
