@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../ServiceDefaults/IntoChat.ServiceDefaults.csproj" />
+    <ProjectReference Include="../../../Apps/Assistant/DigitalBrain.Apps.Assistant.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/Aspire/DigitalBrain.Aspire.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/Sdk/DigitalBrain.Sdk.csproj" />
