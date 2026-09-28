@@ -99,11 +99,12 @@ internal static class AppEndpoints
             var name = Scope(auth.Value, workspaceId) + "/apps/image-editor";
             return Results.Ok(new { surface = new UiChildRef("surface", name + "/surface"), tabs = await brain.Get<ITabs>(name + "/tabs").Read().WaitAsync(ct) });
         }));
-        apps.MapGet("/images/{documentId}", (string workspaceId, string documentId, IDigitalBrain brain, AppSurfaceComposer surfaces, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        apps.MapGet("/images/{documentId}", (string workspaceId, string documentId, IDigitalBrain brain, AppSurfaceComposer surfaces, LocalFileStore files, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);
             var document = await Document(brain, scope, documentId).Read().WaitAsync(ct);
             if (document.Asset is null) { throw new KeyNotFoundException(); }
+            await files.PreserveAssetAsync(scope, document.Asset, ct);
             await surfaces.RegisterDocument(scope, document);
             return Results.Ok(document);
         }));
@@ -137,8 +138,8 @@ internal static class AppEndpoints
         }));
         apps.MapPost("/background-removal/run", (string workspaceId, BackgroundRemovalRunInput input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
             Results.Ok(await Removal(brain, Scope(auth.Value, workspaceId)).Run(input.PlanId, input.IntentId).WaitAsync(ct))));
-        apps.MapGet("/assets/{assetId}", (string workspaceId, string assetId, LocalFileStore files, IOptions<BasicAuthOptions> auth) => Respond(() =>
-            Task.FromResult<IResult>(Results.File(files.OpenAsset(Scope(auth.Value, workspaceId), assetId), "application/octet-stream", enableRangeProcessing: true))));
+        apps.MapGet("/assets/{assetId}", (string workspaceId, string assetId, LocalFileStore files, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+            Results.File(await files.OpenAssetAsync(Scope(auth.Value, workspaceId), assetId, ct), "application/octet-stream", enableRangeProcessing: true)));
         apps.MapGet("/node", (string workspaceId, string kind, string name, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);

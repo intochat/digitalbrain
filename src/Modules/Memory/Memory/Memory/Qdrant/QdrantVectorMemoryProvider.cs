@@ -38,6 +38,32 @@ internal sealed class QdrantVectorMemoryProvider : IAsyncDisposable
         return ValueTask.CompletedTask;
     }
 
+    internal async Task<LegacyMemoryPage> ReadPage(string name, string @namespace, string? cursor, int limit, CancellationToken ct)
+    {
+        if (limit is < 1 or > 128) { throw new ArgumentOutOfRangeException(nameof(limit)); }
+        if (!await CollectionExistsAsync(ct).ConfigureAwait(false)) { return new([], null); }
+        PointId? offset = null;
+        if (cursor is not null)
+        {
+            if (!Guid.TryParse(cursor, out var id)) { throw new ArgumentException("Invalid legacy memory cursor.", nameof(cursor)); }
+            offset = new() { Uuid = id.ToString("D") };
+        }
+        var page = await _client.ScrollAsync(_collectionName,
+            filter: new Filter { Must = { MatchKeyword(NameField, name), MatchKeyword(NamespaceField, @namespace) } },
+            limit: (uint)limit, offset: offset, payloadSelector: true, vectorsSelector: true, cancellationToken: ct).ConfigureAwait(false);
+        var entries = new List<VectorMemoryEntry>();
+        foreach (var point in page.Result)
+        {
+            if (!PayloadEquals(point.Payload, NameField, name) || !PayloadEquals(point.Payload, NamespaceField, @namespace))
+            { throw new InvalidOperationException("Legacy memory returned an out-of-scope entry."); }
+            var note = ToRecalledMemory(new ScoredPoint { Payload = { point.Payload } });
+            var vector = point.Vectors?.Vector?.GetDenseVector()?.Data.ToArray()
+                ?? throw new InvalidOperationException("Legacy memory is missing its dense vector.");
+            entries.Add(new(name, @namespace, note.Key, note.Text, note.Tags, note.Payload, vector));
+        }
+        return new(entries, page.NextPageOffset?.Uuid);
+    }
+
     public async Task UpsertAsync(
         string name,
         string @namespace,

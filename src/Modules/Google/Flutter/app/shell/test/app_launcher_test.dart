@@ -7,7 +7,7 @@ void main() {
     final entries = launcherEntries(const []);
     expect(entries.map((e) => e.launchKey), ['files', 'images']);
     expect(entries.first.title, 'Files');
-    expect(entries.first.subtitle, 'On this computer');
+    expect(entries.first.subtitle, 'Workspace assets');
   });
 
   test('first-party manifests drive the launcher keys and labels', () {
@@ -29,7 +29,7 @@ void main() {
     expect(entries.map((e) => e.launchKey), ['files', 'images']);
     expect(
       entries.singleWhere((e) => e.launchKey == 'files').subtitle,
-      'On this computer',
+      'Workspace assets',
     );
   });
 

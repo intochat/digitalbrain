@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../integrations/connect_window.dart';
 import '../integrations/integrations_menu.dart';
 import 'workspace_store.dart';
+import 'neuron_workspace_persistence.dart';
 import 'workspace_remote_controller.dart';
 import 'workspace_desktop.dart';
 import 'workspace_settings.dart';
@@ -64,9 +65,15 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       widget.store ??
       WorkspaceStore(
         seedProject: false,
-        persistence: PreferencesWorkspacePersistence(
-          key: widget.persistenceKey,
-        ),
+        persistence: widget.programmingClient == null
+            ? MemoryWorkspacePersistence()
+            : NeuronWorkspacePersistence(
+                client: widget.programmingClient!,
+                legacy: PreferencesWorkspacePersistence(
+                  key: widget.persistenceKey,
+                ),
+                legacyKey: widget.persistenceKey,
+              ),
       );
   final _tables = <String, UiTableController>{};
   final _remote = <String, WorkspaceRemoteController>{};
@@ -193,6 +200,10 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   Future<void> _load() async {
     await store.load();
     if (!mounted) return;
+    if (store.loadFailed) {
+      setState(() {});
+      return;
+    }
     if (store.projects.isEmpty) {
       final owned = widget.programmingClient?.defaultWorkspaceId;
       if (owned == null) {
@@ -220,6 +231,49 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     _loadApps(store.currentProject.id);
     _loadCapabilities();
     _navigateRoute(_initialLocation);
+  }
+
+  int _reloadGeneration = 0;
+  Future<void> _reloadSavedState(BuildContext context) async {
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reload saved state?'),
+        content: const Text(
+          'Unsaved changes in this session will be discarded. Copy any work you want to keep before reloading. The original device copy will be retained; its import will be skipped for this session.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep my changes'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Discard and reload'),
+          ),
+        ],
+      ),
+    );
+    if (discard != true || !mounted) return;
+    for (final controller in _remote.values) {
+      controller.dispose();
+    }
+    _remote.clear();
+    _sourcesSynced.clear();
+    for (final cancellation in _tableCancelled.values) {
+      if (!cancellation.isCompleted) cancellation.complete();
+    }
+    _tableCancelled.clear();
+    for (final table in _tables.values) {
+      table.dispose();
+    }
+    _tables.clear();
+    setState(() {
+      _ready = false;
+      _reloadGeneration++;
+    });
+    await store.reload(useServerVersion: true);
+    if (mounted) await _load();
   }
 
   void _loadCapabilities() {
@@ -1038,7 +1092,28 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     home: Builder(
       builder: (context) => Scaffold(
         body: !_ready
-            ? const Center(child: CircularProgressIndicator())
+            ? Center(
+                child: store.loadFailed
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(store.persistenceError!),
+                          TextButton(
+                            onPressed: () async {
+                              await store.reload();
+                              if (mounted) await _load();
+                            },
+                            child: const Text('Retry loading'),
+                          ),
+                          if (store.canUseServerVersion)
+                            TextButton(
+                              onPressed: () => _reloadSavedState(context),
+                              child: const Text('Use server version'),
+                            ),
+                        ],
+                      )
+                    : const CircularProgressIndicator(),
+              )
             : Column(
                 children: [
                   if (widget.statusMessage != null)
@@ -1047,17 +1122,31 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                       actions: const [SizedBox.shrink()],
                     ),
                   if (store.persistenceError != null)
-                    Text(
-                      store.persistenceError!,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
+                    MaterialBanner(
+                      content: Text(store.persistenceError!),
+                      actions: [
+                        TextButton(
+                          onPressed: store.save,
+                          child: const Text('Retry saving'),
+                        ),
+                        TextButton(
+                          onPressed: () => _reloadSavedState(context),
+                          child: const Text('Reload saved state'),
+                        ),
+                      ],
+                    ),
+                  if (widget.programmingClient == null && widget.store == null)
+                    const Text(
+                      'Offline session: changes are temporary and will be lost when this session closes.',
                     ),
                   if (store.settings.dockTop) _islands(context),
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-                      child: _workspace(context),
+                      child: KeyedSubtree(
+                        key: ValueKey(_reloadGeneration),
+                        child: _workspace(context),
+                      ),
                     ),
                   ),
                   if (!store.settings.dockTop) _islands(context),
@@ -1202,11 +1291,8 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     final client = widget.programmingClient;
     if (client == null) return null;
     final workspaceId = store.currentProject.id;
-    return (path, {body}) => client.workspaceConnectionsRequest(
-      workspaceId,
-      path,
-      body: body,
-    );
+    return (path, {body}) =>
+        client.workspaceConnectionsRequest(workspaceId, path, body: body);
   }
 
   void _startFromPrompt(StarterPrompt prompt) {

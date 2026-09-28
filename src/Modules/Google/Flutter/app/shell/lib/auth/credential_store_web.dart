@@ -1,29 +1,32 @@
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:web/web.dart' as web;
 
-// sessionStorage, not localStorage: the credential dies with the tab, so a
-// shared machine does not hand the next visitor a signed-in shell.
+// Basic credentials are transient. Reload authentication uses the session cookie.
 const _usernameKey = 'digitalbrain.auth.username';
 const _passwordKey = 'digitalbrain.auth.password';
+BasicCredentials? _credentials;
 
 BasicCredentials? readStoredCredentials() {
-  final username = web.window.sessionStorage.getItem(_usernameKey);
-  final password = web.window.sessionStorage.getItem(_passwordKey);
-  if (username == null ||
-      password == null ||
-      username.isEmpty ||
-      password.isEmpty) {
-    return null;
-  }
-  return BasicCredentials(username: username, password: password);
+  // Remove secrets left by older clients without ever reading them.
+  _clearLegacy();
+  return _credentials;
 }
 
 void writeStoredCredentials(BasicCredentials credentials) {
-  web.window.sessionStorage.setItem(_usernameKey, credentials.username);
-  web.window.sessionStorage.setItem(_passwordKey, credentials.password);
+  _clearLegacy();
+  _credentials = credentials;
 }
 
 void clearStoredCredentials() {
-  web.window.sessionStorage.removeItem(_usernameKey);
-  web.window.sessionStorage.removeItem(_passwordKey);
+  _credentials = null;
+  _clearLegacy();
+}
+
+void _clearLegacy() {
+  try {
+    web.window.sessionStorage.removeItem(_usernameKey);
+    web.window.sessionStorage.removeItem(_passwordKey);
+  } catch (_) {
+    // Browsers may disable storage. Authentication must still work via cookies.
+  }
 }

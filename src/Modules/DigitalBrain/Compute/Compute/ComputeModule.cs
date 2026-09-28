@@ -3,6 +3,7 @@ using DigitalBrain.Compute.Billing;
 using DigitalBrain.Compute.Ledger;
 using DigitalBrain.Compute.Metering;
 using DigitalBrain.Compute.Usage;
+using DigitalBrain.Compute.Storage;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Enforcement;
 using Microsoft.Extensions.Configuration;
@@ -29,24 +30,29 @@ public sealed class ComputeModule : IModule
         var services = silo.Services;
         var connectionString = silo.Configuration[ConnectionStringKey]
             ?? silo.Configuration.GetConnectionString(LedgerConnectionName);
-        if (!string.IsNullOrWhiteSpace(connectionString))
+        var importLegacy = silo.Configuration.GetValue<bool>("DigitalBrain:Compute:ImportLegacy");
+        if (importLegacy && !string.IsNullOrWhiteSpace(connectionString))
         {
             services.TryAddSingleton(_ => new ComputeDatabase(NpgsqlDataSource.Create(connectionString)));
-            services.TryAddSingleton<IMeterStore, PostgresMeterStore>();
-            services.TryAddSingleton<ILedgerStore, PostgresLedgerStore>();
-            services.TryAddSingleton<IUsageStore, PostgresUsageStore>();
+            services.TryAddSingleton(provider =>
+            {
+                var database = provider.GetRequiredService<ComputeDatabase>();
+                return new LegacyComputeSources(new PostgresLedgerStore(database, readOnly: true),
+                    new PostgresMeterStore(database, readOnly: true), new PostgresUsageStore(database, readOnly: true));
+            });
         }
-        else
+        else if (importLegacy)
         {
-            services.TryAddSingleton<IMeterStore, InMemoryMeterStore>();
-            services.TryAddSingleton<ILedgerStore, InMemoryLedgerStore>();
-            services.TryAddSingleton<IUsageStore>(provider => new FileUsageStore(silo.Configuration["DigitalBrain:Compute:UsageDirectory"]
+            services.TryAddSingleton(provider => new LegacyComputeSources(Usage: new FileUsageStore(silo.Configuration["DigitalBrain:Compute:UsageDirectory"]
                 ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DigitalBrain", "compute-usage",
-                    UsagePaging.Hash(provider.GetService<IHostEnvironment>()?.ContentRootPath ?? AppContext.BaseDirectory))));
+                    UsagePaging.Hash(provider.GetService<IHostEnvironment>()?.ContentRootPath ?? AppContext.BaseDirectory)), readOnly: true)));
         }
+        else { services.TryAddSingleton(new LegacyComputeSources()); }
+        services.TryAddSingleton<IMeterStore, NeuronMeterStore>();
+        services.TryAddSingleton<ILedgerStore, NeuronLedgerStore>();
+        services.TryAddSingleton<IUsageStore, NeuronUsageStore>();
         services.TryAddSingleton<IMeterSink, DurableMeterSink>();
         services.TryAddSingleton<IBatchMeterSink>(provider => (IBatchMeterSink)provider.GetRequiredService<IMeterSink>());
-        services.AddHostedService<ComputeSchemaWarmer>();
         services.TryAddSingleton<IPriceBook, PriceBook>();
         services.TryAddSingleton<IInvoicingProvider, FakeInvoicingProvider>();
         services.TryAddSingleton<IAllowancePolicySource, GrainAllowancePolicySource>();

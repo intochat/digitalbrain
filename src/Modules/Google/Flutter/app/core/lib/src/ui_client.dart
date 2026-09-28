@@ -696,8 +696,11 @@ final class DigitalBrainUiClient {
             },
           );
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw StateError(
-        '$method $path failed: ${response.statusCode} ${response.body}',
+      throw UiRequestException(
+        method,
+        path,
+        response.statusCode,
+        response.body,
       );
     }
     return response;
@@ -915,6 +918,13 @@ final class DigitalBrainUiClient {
     );
     return response.body.isEmpty ? null : jsonDecode(response.body);
   }
+}
+
+/// Includes status without requiring callers to parse server error text.
+final class UiRequestException extends StateError {
+  UiRequestException(String method, String path, this.statusCode, String body)
+    : super('$method $path failed: $statusCode $body');
+  final int statusCode;
 }
 
 final class ModelUnavailableException implements Exception {

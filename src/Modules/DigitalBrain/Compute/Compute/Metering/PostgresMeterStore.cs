@@ -6,7 +6,7 @@ namespace DigitalBrain.Compute.Metering;
 // Append-only PostgreSQL meter table. The primary key is the idempotency key, so a
 // duplicate insert is a no-op instead of a second event (T3, no Orleans transactions).
 // One intent's events are written in a single multi-row INSERT so a turn pays one round-trip.
-internal sealed class PostgresMeterStore(ComputeDatabase database) : IMeterStore
+internal sealed class PostgresMeterStore(ComputeDatabase database, bool readOnly = false) : IMeterStore
 {
     private const string Columns =
         "(intent_id, meter_id, step, workspace_id, quantity, unit, source, app_id, cost_basis, occurred_at)";
@@ -34,6 +34,7 @@ internal sealed class PostgresMeterStore(ComputeDatabase database) : IMeterStore
 
     public async ValueTask<int> AppendBatchAsync(IReadOnlyList<MeterEvent> meterEvents, CancellationToken cancellationToken = default)
     {
+        if (readOnly) { throw new InvalidOperationException("Legacy compute storage is read-only."); }
         ArgumentNullException.ThrowIfNull(meterEvents);
         if (meterEvents.Count == 0) { return 0; }
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
@@ -108,6 +109,7 @@ internal sealed class PostgresMeterStore(ComputeDatabase database) : IMeterStore
     private async Task<NpgsqlConnection> OpenAsync(CancellationToken cancellationToken)
     {
         var connection = await database.Source.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        if (readOnly) { return connection; }
         if (initialized) { return connection; }
         await using (var command = connection.CreateCommand())
         {

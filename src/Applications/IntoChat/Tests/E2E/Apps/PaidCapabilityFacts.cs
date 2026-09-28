@@ -36,9 +36,10 @@ public sealed class PaidCapabilityFacts
 
             var scope = WorkspaceScope.Create("owner", "paid-capability").Id;
             var files = brain.Get<IFileExplorer>(scope);
+            await LocalApps.HostAssetFixture.Import(brain, scope);
             await files.Navigate(null);
-            var entries = (await brain.Get<ICollectionView>(scope + "/apps/files/items").Read()).Definition.Items;
-            Assert.Equal(3, entries.Count);
+            var entries = (await brain.Get<ICollectionView>(scope + "/apps/files/items").Read()).Definition.Items.Where(item => item.Kind == "image").ToArray();
+            Assert.Equal(3, entries.Length);
 
             var documentIds = new List<string>();
             var nameById = new Dictionary<string, string>(StringComparer.Ordinal);

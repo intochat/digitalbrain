@@ -66,6 +66,7 @@ public sealed class AgentAppJourneyFacts
             var page = brain.Page;
             await page.SetViewportSizeAsync(1600, 1000);
             var projectId = await WorkspaceBrowser.CreateProjectAsync(page, "Paid workspace");
+            await LocalApps.HostAssetFixture.Import(brain, WorkspaceScope.Create("owner", projectId).Id);
 
             await SendAsync(page, "Remove the background from these 3 product photos");
 

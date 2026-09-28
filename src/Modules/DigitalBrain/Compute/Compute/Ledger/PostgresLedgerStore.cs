@@ -4,7 +4,7 @@ namespace DigitalBrain.Compute.Ledger;
 
 // Append-only PostgreSQL ledger. The UNIQUE constraint on (account_id, idempotency_key)
 // is the single defence against a double charge; the writer never reads before writing.
-internal sealed class PostgresLedgerStore(ComputeDatabase database) : ILedgerStore
+internal sealed class PostgresLedgerStore(ComputeDatabase database, bool readOnly = false) : ILedgerStore
 {
     private const string CreateTable = """
         CREATE TABLE IF NOT EXISTS compute_ledger_entry (
@@ -35,6 +35,7 @@ internal sealed class PostgresLedgerStore(ComputeDatabase database) : ILedgerSto
 
     public async ValueTask<LedgerAppend> AppendAsync(LedgerEntry entry, CancellationToken cancellationToken = default)
     {
+        if (readOnly) { throw new InvalidOperationException("Legacy compute storage is read-only."); }
         ArgumentNullException.ThrowIfNull(entry);
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
@@ -88,7 +89,7 @@ internal sealed class PostgresLedgerStore(ComputeDatabase database) : ILedgerSto
     private async Task<NpgsqlConnection> OpenAsync(CancellationToken cancellationToken)
     {
         var connection = await database.Source.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        if (initialized) { return connection; }
+        if (initialized || readOnly) { return connection; }
         await using (var command = connection.CreateCommand())
         {
             command.CommandText = CreateTable;

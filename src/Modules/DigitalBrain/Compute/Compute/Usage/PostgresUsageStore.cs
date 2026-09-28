@@ -2,7 +2,7 @@ using Npgsql;
 
 namespace DigitalBrain.Compute.Usage;
 
-internal sealed class PostgresUsageStore(ComputeDatabase database) : IUsageStore
+internal sealed class PostgresUsageStore(ComputeDatabase database, bool readOnly = false) : IUsageStore
 {
     private bool initialized;
     private readonly SemaphoreSlim schemaGate = new(1);
@@ -14,6 +14,7 @@ internal sealed class PostgresUsageStore(ComputeDatabase database) : IUsageStore
     private async Task<NpgsqlConnection> Open(CancellationToken ct)
     {
         var connection = await database.Source.OpenConnectionAsync(ct).ConfigureAwait(false);
+        if (readOnly) { return connection; }
         try
         {
             await schemaGate.WaitAsync(ct).ConfigureAwait(false);
@@ -48,6 +49,7 @@ internal sealed class PostgresUsageStore(ComputeDatabase database) : IUsageStore
     }
     public async ValueTask AppendAsync(string account, string workspace, string id, string payload, CancellationToken ct = default, DateTimeOffset? revision = null)
     {
+        if (readOnly) { throw new InvalidOperationException("Legacy compute storage is read-only."); }
         await using var connection = await Open(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = """
@@ -64,7 +66,7 @@ internal sealed class PostgresUsageStore(ComputeDatabase database) : IUsageStore
         var before = UsagePaging.Decode(account, workspace, limit, cursor);
         await using var connection = await Open(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT id,payload,sort_key FROM compute_usage WHERE account_id=$1 AND workspace_id=$2 AND ($3::text IS NULL OR sort_key < $3) ORDER BY sort_key DESC LIMIT $4";
+        command.CommandText = "SELECT id,payload,sort_key,revision FROM compute_usage WHERE account_id=$1 AND workspace_id=$2 AND ($3::text IS NULL OR sort_key < $3) ORDER BY sort_key DESC LIMIT $4";
         command.Parameters.Add(new NpgsqlParameter { Value = account });
         command.Parameters.Add(new NpgsqlParameter { Value = workspace });
         command.Parameters.Add(new NpgsqlParameter { NpgsqlDbType = NpgsqlTypes.NpgsqlDbType.Text, Value = (object?)before ?? DBNull.Value });
@@ -75,7 +77,7 @@ internal sealed class PostgresUsageStore(ComputeDatabase database) : IUsageStore
         while (await reader.ReadAsync(ct).ConfigureAwait(false))
         {
             if (rows.Count == limit) { return new(rows, UsagePaging.Encode(account, workspace, last!)); }
-            rows.Add(new(reader.GetString(0), reader.GetString(1), UsagePaging.OccurredAt(reader.GetString(2))));
+            rows.Add(new(reader.GetString(0), reader.GetString(1), UsagePaging.OccurredAt(reader.GetString(2)), reader.GetInt64(3)));
             last = reader.GetString(2);
         }
         return new(rows, null);

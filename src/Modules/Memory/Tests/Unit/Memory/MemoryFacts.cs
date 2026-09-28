@@ -9,6 +9,81 @@ namespace DigitalBrain.Tests;
 public sealed class MemoryFacts
 {
     [Fact]
+    public async Task HashCollisionsUseOverflowPagesAndPurgeRetriesIndexFailure()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var index = new InMemoryVectorMemoryStore();
+        await using var brain = await Start(index, ct);
+        var memory = brain.Get<IMemory>("owner");
+        var keys = Enumerable.Range(0, 100000).Select(value => "collision-" + value)
+            .Where(key => System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key))[0] == 0)
+            .Take(65).ToArray();
+        Assert.Equal(65, keys.Length);
+        foreach (var key in keys) { await memory.Remember(new("notes", key, key, [], null)); }
+        Assert.Equal(65, (await memory.RebuildIndex("notes")).Indexed);
+        index.FailWrites = true;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => memory.PurgeNamespace(new("notes")));
+        Assert.Empty((await memory.Recall(new("notes", "test", 5, []))).Matches);
+        index.FailWrites = false;
+        Assert.Equal(0, (await memory.RebuildIndex("notes")).Pending);
+        Assert.Empty(await index.SearchAsync("owner", "notes", [1, 1], 5, null, ct));
+    }
+    [Fact]
+    public async Task CanonicalMemorySurvivesMissingIndexAndReactivationAndRebuildRetries()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var index = new InMemoryVectorMemoryStore { FailWrites = true };
+        await using var brain = await Start(index, ct);
+        var memory = brain.Get<IMemory>("owner");
+        await memory.Remember(new("notes", "stable", "durable text", [new("tag", "kept")], null));
+        var failed = await memory.RebuildIndex("notes");
+        Assert.Equal(1, failed.Pending);
+        var shard = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("stable"))[0];
+        await brain.DeactivateAsync(brain.Get<IMemoryPage>(MemoryNeuron.PageId("owner", "notes", 0, shard)), ct);
+        await brain.DeactivateAsync(memory, ct);
+        Assert.Equal("durable text", Assert.Single((await memory.Recall(new("notes", "durable", 5, []))).Matches).Text);
+        index.FailWrites = false;
+        Assert.Equal(0, (await memory.RebuildIndex("notes")).Pending);
+        Assert.Single(await index.SearchAsync("owner", "notes", [1, 1], 5, null, ct));
+        Assert.Empty((await brain.Get<IMemory>("other").Recall(new("notes", "durable", 5, []))).Matches);
+    }
+
+    [Fact]
+    public async Task LegacyImportIsPagedScopedIdempotentAndDoesNotRestoreDeletedOrOverwriteNewerNotes()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var source = new InMemoryVectorMemoryStore();
+        await source.UpsertAsync(new("owner", "notes", "a", "legacy a", [new("tag", "kept")], new(Guid.NewGuid().ToString(), null), [1, 1]), ct);
+        await source.UpsertAsync(new("owner", "notes", "b", "legacy b", [], null, [1, 1]), ct);
+        await source.UpsertAsync(new("someone-else", "notes", "secret", "private", [], null, [1, 1]), ct);
+        await using var brain = await Start(source, ct);
+        var memory = brain.Get<IMemory>("owner");
+        var first = await memory.ImportLegacy("notes", limit: 1);
+        Assert.Equal(1, first.Imported);
+        Assert.NotNull(first.NextCursor);
+        Assert.Equal(0, (await memory.ImportLegacy("notes", limit: 1)).Imported);
+        await memory.Remember(new("notes", "b", "newer b", [], null));
+        Assert.Equal(0, (await memory.ImportLegacy("notes", first.NextCursor, 1)).Imported);
+        await memory.Forget(new("notes", "a"));
+        Assert.Equal(0, (await memory.ImportLegacy("notes", limit: 1)).Imported);
+        Assert.Equal("newer b", Assert.Single((await memory.Recall(new("notes", "text", 5, []))).Matches).Text);
+        Assert.Equal(2, (await source.SearchAsync("owner", "notes", [1, 1], 5, null, ct)).Count);
+        await memory.PurgeNamespace(new("notes"));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => memory.ImportLegacy("notes"));
+    }
+
+    [Fact]
+    public async Task MemoryWorksWithoutAnyQdrantRegistration()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<MemoryModule>()
+            .ConfigureSilo(silo => silo.Services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new FakeEmbeddings())).StartAsync(ct);
+        var memory = brain.Get<IMemory>("owner");
+        await memory.Remember(new("notes", "key", "stored", [], null));
+        Assert.Single((await memory.Recall(new("notes", "stored", 5, []))).Matches);
+        Assert.False((await memory.RebuildIndex("notes")).Available);
+    }
+    [Fact]
     public async Task RememberStoresRecallableNoteAndPublishes()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -101,6 +176,7 @@ public sealed class MemoryFacts
             .ConfigureSilo(silo =>
             {
                 silo.Services.AddSingleton<IVectorMemoryStore>(store);
+                silo.Services.AddSingleton<ILegacyVectorMemoryStore>(store);
                 silo.Services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new FakeEmbeddings());
             })
             .StartAsync(ct);
@@ -124,12 +200,14 @@ internal sealed class FakeEmbeddings : IEmbeddingGenerator<string, Embedding<flo
     public void Dispose() { }
 }
 
-internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore
+internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore, ILegacyVectorMemoryStore
 {
     private readonly Dictionary<(string Owner, string Namespace, string Key), VectorMemoryEntry> _entries = [];
+    internal bool FailWrites { get; set; }
 
     public Task UpsertAsync(VectorMemoryEntry entry, CancellationToken cancellationToken)
     {
+        if (FailWrites) { throw new IOException("Index unavailable"); }
         _entries[(entry.Name, entry.Namespace, entry.Key)] = entry;
         return Task.CompletedTask;
     }
@@ -157,8 +235,16 @@ internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore
 
     public Task<long> RemoveNamespaceAsync(string name, string @namespace, CancellationToken cancellationToken)
     {
+        if (FailWrites) { throw new IOException("Index unavailable"); }
         var keys = _entries.Keys.Where(entry => entry.Owner == name && entry.Namespace == @namespace).ToArray();
         foreach (var key in keys) { _entries.Remove(key); }
         return Task.FromResult((long)keys.Length);
+    }
+
+    public Task<LegacyMemoryPage> ReadPage(string name, string @namespace, string? cursor, int limit, CancellationToken ct)
+    {
+        var offset = cursor is null ? 0 : int.Parse(cursor, System.Globalization.CultureInfo.InvariantCulture);
+        var entries = _entries.Values.Where(entry => entry.Name == name && entry.Namespace == @namespace).OrderBy(entry => entry.Key, StringComparer.Ordinal).ToArray();
+        return Task.FromResult(new LegacyMemoryPage(entries.Skip(offset).Take(limit).ToArray(), offset + limit < entries.Length ? (offset + limit).ToString(System.Globalization.CultureInfo.InvariantCulture) : null));
     }
 }

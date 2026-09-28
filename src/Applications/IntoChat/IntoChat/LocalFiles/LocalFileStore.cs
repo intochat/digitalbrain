@@ -7,12 +7,35 @@ using Microsoft.Extensions.Options;
 
 namespace IntoChat.LocalFiles;
 
-internal sealed class LocalFileStore(IOptions<LocalFilesOptions> options, IDataProtectionProvider protection)
+internal sealed class LocalFileStore(IOptions<LocalFilesOptions> options, IDataProtectionProvider protection, IAssetBlobStore blobs, IGrainFactory grains)
 {
     private readonly IDataProtector _protector = protection.CreateProtector("IntoChat.LocalFiles.v1");
     private readonly LocalFilesOptions _options = options.Value;
 
-    public Task<DirectoryPage> ListAsync(string scope, string? folderId, int offset, string sort, string filter, CancellationToken ct)
+    internal const string WorkspaceRoot = "workspace-assets";
+    private const string AssetEntry = "asset:";
+
+    public async Task<DirectoryPage> ListAsync(string scope, string? folderId, int offset, string sort, string filter, CancellationToken ct)
+    {
+        if (folderId is not null && folderId != WorkspaceRoot) { return await ListHostAsync(scope, folderId, offset, sort, filter, ct); }
+        if (offset < 0 || offset > 100000 || filter.Length > 200) { throw new ArgumentException("Invalid file listing request."); }
+        var assets = (await grains.GetGrain<IWorkspaceAssets>(scope).List().WaitAsync(ct))
+            .Where(asset => asset.Image.Name.Contains(filter, StringComparison.OrdinalIgnoreCase));
+        var ordered = sort switch
+        {
+            "date" => assets.OrderByDescending(asset => asset.CreatedAt).ThenBy(asset => asset.Image.DocumentId, StringComparer.Ordinal),
+            "size" => assets.OrderByDescending(asset => asset.Bytes).ThenBy(asset => asset.Image.DocumentId, StringComparer.Ordinal),
+            _ => assets.OrderBy(asset => asset.Image.Name, StringComparer.OrdinalIgnoreCase).ThenBy(asset => asset.Image.DocumentId, StringComparer.Ordinal),
+        };
+        var rows = ordered.Select(asset => new CollectionItem(AssetEntry + asset.Image.DocumentId, asset.Image.Name,
+            "image", null, asset.Bytes, asset.CreatedAt, true)).ToList();
+        if (_options.Roots.ContainsKey("downloads") && "Import from host Downloads".Contains(filter, StringComparison.OrdinalIgnoreCase))
+        { rows.Insert(0, new(Encode(new(scope, "downloads", "")), "Import from host Downloads", "folder", null, null, null, true)); }
+        var page = rows.Skip(offset).Take(101).ToArray();
+        return new(WorkspaceRoot, "Workspace Files", null, page.Take(100).ToArray(), page.Length > 100 ? offset + 100 : null, [new(WorkspaceRoot, "Workspace Files")]);
+    }
+
+    internal Task<DirectoryPage> ListHostAsync(string scope, string? folderId, int offset, string sort, string filter, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         if (offset < 0 || offset > 100000 || filter.Length > 200) { throw new ArgumentException("Invalid file listing request."); }
@@ -33,20 +56,22 @@ internal sealed class LocalFileStore(IOptions<LocalFilesOptions> options, IDataP
             Encode(handle with { RelativePath = Path.Combine(handle.RelativePath, x.Name), Length = x is FileInfo version ? version.Length : null, ModifiedTicks = x is FileInfo ? x.LastWriteTimeUtc.Ticks : null, CreatedTicks = x is FileInfo ? x.CreationTimeUtc.Ticks : null }), x.Name,
             x is DirectoryInfo ? "folder" : IsImage(x.Name) ? "image" : "file", null,
             x is FileInfo file ? file.Length : null, new DateTimeOffset(x.LastWriteTimeUtc), x is DirectoryInfo || IsImage(x.Name))).ToArray();
-        var crumbs = new List<DirectoryCrumb> { new(Encode(new(scope, handle.Root, "")), "Downloads") };
+        var crumbs = new List<DirectoryCrumb> { new(WorkspaceRoot, "Workspace Files"), new(Encode(new(scope, handle.Root, "")), "Import from host Downloads") };
         var relativeCrumb = "";
         foreach (var part in handle.RelativePath.Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries))
         {
             relativeCrumb = Path.Combine(relativeCrumb, part);
             crumbs.Add(new(Encode(new(scope, handle.Root, relativeCrumb)), part));
         }
-        return Task.FromResult(new DirectoryPage(Encode(handle), handle.RelativePath.Length == 0 ? "Downloads" : Path.GetFileName(folder),
-            handle.RelativePath.Length == 0 ? null : Encode(handle with { RelativePath = Path.GetDirectoryName(handle.RelativePath) ?? "" }),
+        return Task.FromResult(new DirectoryPage(Encode(handle), handle.RelativePath.Length == 0 ? "Import from host Downloads" : Path.GetFileName(folder),
+            handle.RelativePath.Length == 0 ? WorkspaceRoot : Encode(handle with { RelativePath = Path.GetDirectoryName(handle.RelativePath) ?? "" }),
             rows.Take(100).ToArray(), rows.Length > 100 ? offset + 100 : null, crumbs));
     }
 
     public async Task<ImageAsset> SnapshotImageAsync(string scope, string entryId, CancellationToken ct)
     {
+        if (entryId.StartsWith(AssetEntry, StringComparison.Ordinal))
+        { return await grains.GetGrain<IWorkspaceAssets>(scope).Read(entryId[AssetEntry.Length..]).WaitAsync(ct); }
         var handle = Decode(scope, entryId);
         var path = Resolve(handle);
         if (!IsImage(path)) { throw new ArgumentException("Only PNG and JPEG images can be opened."); }
@@ -70,47 +95,59 @@ internal sealed class LocalFileStore(IOptions<LocalFilesOptions> options, IDataP
         var (width, height) = ImageHeader.Read(bytes);
         var digest = Convert.ToHexStringLower(SHA256.HashData(bytes));
         var id = ScopeKey(scope) + "-" + digest;
-        var destination = AssetPath(scope, id);
-        Directory.CreateDirectory(_options.AssetDirectory);
-        var pending = destination + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try
-        {
-            await File.WriteAllBytesAsync(pending, bytes, ct);
-            try { File.Move(pending, destination, false); }
-            catch (IOException) when (File.Exists(destination))
-            {
-                var existing = await File.ReadAllBytesAsync(destination, ct);
-                if (!CryptographicOperations.FixedTimeEquals(SHA256.HashData(existing), SHA256.HashData(bytes))) { throw new IOException("The image snapshot is incomplete. Retry opening the image."); }
-            }
-        }
-        finally { if (File.Exists(pending)) { File.Delete(pending); } }
         var identity = scope + "\0" + handle.Root + "\0" + (OperatingSystem.IsWindows() ? handle.RelativePath.ToUpperInvariant() : handle.RelativePath) + "\0" + digest;
         var documentId = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(identity)));
-        return new(id, Path.GetFileName(path), width, height, digest, entryId, documentId);
+        return await StoreImageAsync(scope, new(id, Path.GetFileName(path), width, height, digest, AssetEntry + documentId, documentId), bytes, ct);
     }
 
-    public Stream OpenAsset(string scope, string assetId) => new FileStream(AssetPath(scope, assetId), FileMode.Open, FileAccess.Read, FileShare.Read);
-    public string DestinationFolder(string scope, string entryId)
+    public async Task<Stream> OpenAssetAsync(string scope, string assetId, CancellationToken ct)
     {
-        var handle = Decode(scope, entryId);
-        return Resolve(handle with { RelativePath = Path.GetDirectoryName(handle.RelativePath) ?? "" });
+        ValidateAssetId(scope, assetId);
+        var bytes = await blobs.Read(assetId, ct);
+        if (bytes is null)
+        {
+            var path = AssetPath(scope, assetId);
+            if (!File.Exists(path)) { throw new FileNotFoundException("The workspace image was not found."); }
+            if (new FileInfo(path).Length > LocalFilesOptions.MaxExportBytes) { throw new IOException("The legacy asset is too large."); }
+            bytes = await File.ReadAllBytesAsync(path, ct);
+            VerifyBytes(assetId, bytes);
+            // Migration only publishes a verified immutable upload. Preserve the old file.
+            await blobs.Put(assetId, bytes, ct);
+        }
+        VerifyBytes(assetId, bytes);
+        return new MemoryStream(bytes, writable: false);
     }
-    public string EntryForSavedFile(string scope, string sourceEntryId, string filename)
+
+    public async Task<ImageAsset> PreserveAssetAsync(string scope, ImageAsset asset, CancellationToken ct)
     {
-        var handle = Decode(scope, sourceEntryId);
-        return Encode(handle with { RelativePath = Path.Combine(Path.GetDirectoryName(handle.RelativePath) ?? "", filename), Length = null, ModifiedTicks = null, CreatedTicks = null });
+        await using var stream = await OpenAssetAsync(scope, asset.Id, ct);
+        return await grains.GetGrain<IWorkspaceAssets>(scope).Register(new(asset with { SourceEntryId = AssetEntry + asset.DocumentId }, stream.Length, DateTimeOffset.UtcNow)).WaitAsync(ct);
     }
-    public string JournalDirectory(string scope)
+
+    public async Task<ImageAsset> StoreImageAsync(string scope, ImageAsset asset, byte[] bytes, CancellationToken ct)
     {
-        var path = Path.Combine(_options.AssetDirectory, "saves", ScopeKey(scope));
-        Directory.CreateDirectory(path);
-        return path;
+        ValidateAssetId(scope, asset.Id);
+        VerifyBytes(asset.Id, bytes);
+        await blobs.Put(asset.Id, bytes, ct);
+        return await grains.GetGrain<IWorkspaceAssets>(scope).Register(new(asset, bytes.Length, DateTimeOffset.UtcNow)).WaitAsync(ct);
     }
+
+    internal static string AssetId(string scope, string checksum) => ScopeKey(scope) + "-" + checksum;
+    internal string LegacyJournalPath(string scope, string key) => Path.Combine(_options.AssetDirectory, "saves", ScopeKey(scope), key + ".json");
     private string AssetPath(string scope, string id)
+    {
+        ValidateAssetId(scope, id);
+        return Path.Combine(_options.AssetDirectory, id + ".image");
+    }
+    internal static void ValidateAssetId(string scope, string id)
     {
         if (id.Length != 129 || !id.StartsWith(ScopeKey(scope) + "-", StringComparison.Ordinal) || id.Where((_, i) => i != 64).Any(c => !char.IsAsciiHexDigit(c)))
         { throw new UnauthorizedAccessException("The image does not belong to this workspace."); }
-        return Path.Combine(_options.AssetDirectory, id + ".image");
+    }
+    private static void VerifyBytes(string id, byte[] bytes)
+    {
+        if (bytes.Length > LocalFilesOptions.MaxExportBytes || Convert.ToHexStringLower(SHA256.HashData(bytes)) != id[65..])
+        { throw new IOException("The image asset failed its integrity check."); }
     }
     private static string ScopeKey(string scope) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(scope)));
     private string Encode(FileHandle value) => _protector.Protect(JsonSerializer.Serialize(value));

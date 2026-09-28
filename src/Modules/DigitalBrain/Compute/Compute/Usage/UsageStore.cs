@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace DigitalBrain.Compute.Usage;
 
-public sealed record UsageRow(string Id, string Payload, DateTimeOffset OccurredAt);
+public sealed record UsageRow(string Id, string Payload, DateTimeOffset OccurredAt, long? Revision = null);
 public sealed record UsagePage(IReadOnlyList<UsageRow> Items, string? NextCursor);
 
 public interface IUsageStore
@@ -40,9 +40,9 @@ internal static class UsagePaging
     }
 }
 
-// Local single-host fallback. Atomically replaced receipt files and a stable filename index survive restarts;
-// only the bounded page of payloads is read. Hosted deployments use the SQL index instead.
-internal sealed class FileUsageStore(string root) : IUsageStore
+// Legacy receipt format, retained for explicit read-only migration and format tests.
+// Production application writes use neuron-backed storage.
+internal sealed class FileUsageStore(string root, bool readOnly = false) : IUsageStore
 {
     private readonly SemaphoreSlim gate = new(1);
     private sealed record Stored(string Key, string Id, string Payload, long Revision = 0);
@@ -56,6 +56,7 @@ internal sealed class FileUsageStore(string root) : IUsageStore
 
     public async ValueTask AppendAsync(string account, string workspace, string id, string payload, CancellationToken ct = default, DateTimeOffset? revision = null)
     {
+        if (readOnly) { throw new InvalidOperationException("Legacy compute storage is read-only."); }
         await gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
@@ -98,7 +99,7 @@ internal sealed class FileUsageStore(string root) : IUsageStore
         foreach (var key in keys.Take(limit))
         {
             var stored = await ReadStored(Path.Combine(directory, key![20..] + ".json"), ct).ConfigureAwait(false);
-            rows.Add(new(stored.Id, stored.Payload, UsagePaging.OccurredAt(stored.Key)));
+            rows.Add(new(stored.Id, stored.Payload, UsagePaging.OccurredAt(stored.Key), stored.Revision));
         }
         return new(rows, keys.Length > limit ? UsagePaging.Encode(account, workspace, keys[limit - 1]!) : null);
     }

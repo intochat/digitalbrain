@@ -2,7 +2,7 @@ using DigitalBrain.Memory.Qdrant;
 
 namespace DigitalBrain.Memory;
 
-internal sealed class QdrantVectorMemoryStore(QdrantVectorMemoryProvider provider) : IVectorMemoryStore
+internal sealed class QdrantVectorMemoryStore(QdrantVectorMemoryProvider provider) : IVectorMemoryStore, ILegacyVectorMemoryStore
 {
     private readonly QdrantVectorMemoryProvider _provider = provider
         ?? throw new ArgumentNullException(nameof(provider));
@@ -35,4 +35,7 @@ internal sealed class QdrantVectorMemoryStore(QdrantVectorMemoryProvider provide
 
     public Task<long> RemoveNamespaceAsync(string name, string @namespace, CancellationToken cancellationToken)
         => _provider.RemoveNamespaceAsync(name, @namespace, cancellationToken);
+
+    public Task<LegacyMemoryPage> ReadPage(string name, string @namespace, string? cursor, int limit, CancellationToken ct)
+        => _provider.ReadPage(name, @namespace, cursor, limit, ct);
 }

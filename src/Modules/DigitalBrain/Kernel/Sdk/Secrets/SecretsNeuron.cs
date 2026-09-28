@@ -7,18 +7,41 @@ using Orleans.Runtime;
 namespace DigitalBrain.Sdk.Secrets;
 
 [GrainType("vault")]
-internal sealed class SecretsNeuron : Neuron<SecretsState>, ISecrets
+internal sealed class SecretsNeuron : Neuron<SecretsState>, ISecrets, ISecretKeyMigration
 {
     private readonly IPersistentState<SecretsState> _state;
     private readonly SecretsStore _secrets;
+    private readonly IKeyWrapper _keys;
 
     public SecretsNeuron(
         [PersistentState("vault", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SecretsState> state,
         IKeyWrapper keys) : base(state)
     {
         _state = state;
+        _keys = keys;
         _secrets = new SecretsStore(keys);
     }
+
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        await base.OnActivateAsync(cancellationToken);
+        if (_keys is DataProtectionKeyWrapper && !string.IsNullOrEmpty(Snapshot.WrappedOwnerKey)
+            && DataProtectionKeyWrapper.NeedsMigration(Snapshot.WrappedOwnerKey))
+        {
+            var previous = Snapshot.WrappedOwnerKey;
+            var key = _keys.Unwrap(previous);
+            try
+            {
+                Snapshot.WrappedOwnerKey = _keys.Wrap(key);
+                await _state.WriteStateAsync();
+            }
+            catch { Snapshot.WrappedOwnerKey = previous; throw; }
+            finally { System.Security.Cryptography.CryptographicOperations.ZeroMemory(key); }
+        }
+    }
+
+    public Task<bool> EnsurePortable() => Task.FromResult(string.IsNullOrEmpty(Snapshot.WrappedOwnerKey)
+        || !DataProtectionKeyWrapper.NeedsMigration(Snapshot.WrappedOwnerKey));
 
     public async Task<SecretRef> Set(CallerContext caller, string name, string label, string value, CancellationToken cancellationToken = default)
     {

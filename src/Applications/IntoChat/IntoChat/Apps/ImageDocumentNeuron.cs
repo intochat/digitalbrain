@@ -57,7 +57,10 @@ internal sealed class ImageDocumentNeuron(AppSurfaceComposer surfaces,
     public async Task<ImageDocumentState> CompleteSave(string operationId, SavedFile result)
     {
         var ticket = store.State.Saves.GetValueOrDefault(operationId) ?? throw new KeyNotFoundException("Save operation not found.");
-        if (ticket.Result is not null && ticket.Result != result) { throw new InvalidOperationException("Save operation has a different result."); }
+        if (ticket.Result is { } previous && previous != result
+            && (previous.EntryId.StartsWith("asset:", StringComparison.Ordinal) || !result.EntryId.StartsWith("asset:", StringComparison.Ordinal)
+                || previous.Checksum != result.Checksum || previous.Bytes != result.Bytes))
+        { throw new InvalidOperationException("Save operation has a different result."); }
         await Save(store.State with { LastSavedRevision = Math.Max(store.State.LastSavedRevision, ticket.Revision), Saves = new(store.State.Saves) { [operationId] = ticket with { Result = result } } });
         return store.State;
     }

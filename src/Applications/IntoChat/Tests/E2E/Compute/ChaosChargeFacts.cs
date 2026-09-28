@@ -114,6 +114,7 @@ public sealed class ChaosChargeFacts
                 .StartAsync(ct);
 
             const string workspace = "chaos-paid";
+            await LocalApps.HostAssetFixture.Import(brain, IntoChat.Workspace.WorkspaceScope.Create("owner", workspace).Id);
             async Task<string> Ask(string run, string message)
             {
                 using var response = await brain.HttpClient.PostAsJsonAsync("/agent",

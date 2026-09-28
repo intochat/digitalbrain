@@ -34,10 +34,11 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Events.OnRedirectToLogin = context => { context.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; };
         options.Events.OnRedirectToAccessDenied = context => { context.Response.StatusCode = StatusCodes.Status403Forbidden; return Task.CompletedTask; };
     });
-builder.Services.AddDataProtection();
+builder.AddDurableProtection();
 builder.Services.Configure<LocalFilesOptions>(builder.Configuration.GetSection("IntoChat:LocalFiles"));
 builder.Services.Configure<BackgroundRemovalOptions>(builder.Configuration.GetSection(BackgroundRemovalOptions.SectionName));
 builder.Services.AddSingleton<IBackgroundRemover, DeterministicBackgroundRemover>();
+builder.Services.AddSingleton<IAssetBlobStore, AzureAssetBlobStore>();
 builder.Services.AddSingleton<LocalFileStore>();
 builder.Services.AddSingleton<AppSurfaceComposer>();
 builder.Services.AddSingleton<ImageSaveCoordinator>();
@@ -66,6 +67,7 @@ app.MapDigitalBrainModules();
 app.MapGet("/compute/limits", static async (IDigitalBrain brain, CancellationToken ct) =>
     Results.Ok(await brain.Get<IAllowanceLedger>(CallerContextStamper.Require().AccountId).ReadLimitsAsync(ct)));
 app.MapWorkspaceDataEndpoints();
+app.MapShellPersistence();
 app.MapWorkspaceAgent();
 app.MapWorkspaceConnections();
 app.MapComputeUsage();

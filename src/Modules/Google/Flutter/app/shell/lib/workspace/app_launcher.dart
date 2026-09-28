@@ -58,7 +58,7 @@ AppLauncherEntry entryFor(AppManifestSummary app) => switch (app.id) {
   'intochat.files' => const AppLauncherEntry(
     launchKey: 'files',
     title: 'Files',
-    subtitle: 'On this computer',
+    subtitle: 'Workspace assets',
     icon: Icons.folder_outlined,
   ),
   'intochat.image-editor' => const AppLauncherEntry(
@@ -91,7 +91,7 @@ const defaultLauncherEntries = <AppLauncherEntry>[
   AppLauncherEntry(
     launchKey: 'files',
     title: 'Files',
-    subtitle: 'On this computer',
+    subtitle: 'Workspace assets',
     icon: Icons.folder_outlined,
   ),
   AppLauncherEntry(

@@ -24,7 +24,7 @@ internal static class IntoChatE2ETest
         => E2ETest.For<Projects.IntoChat_AppHost>()
             .ConfigureModule<AIModule>(ai => ai.WithoutLocalModels().WithoutVoiceToText().WithoutWebSearch()
                 .WithDefaultLlm<IGpt56Luna>().WithModelEndpoint(AiProvider.OpenAI, new(UnconfiguredProvider, "v1/")))
-            .ConfigureModule<MemoryModule>(memory => memory.WithQdrant())
+            .ConfigureModule<MemoryModule>(memory => memory.ConfigureOptions<MemoryModuleOptions>(options => options.HostQdrant = false, "HostQdrant"))
             .ConfigureModule<ClickHouseModule>(database => database.WithClickHouse(options =>
             {
                 options.PersistentStorage = false;

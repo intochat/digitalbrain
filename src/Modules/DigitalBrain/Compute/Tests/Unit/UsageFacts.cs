@@ -6,6 +6,14 @@ namespace DigitalBrain.Tests;
 public sealed class UsageFacts
 {
     [Fact]
+    public async Task LegacyReaderCannotCreateOrReplaceReceiptFiles()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "compute-read-only-" + Guid.NewGuid());
+        var store = new FileUsageStore(root, readOnly: true);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => store.AppendAsync("a", "w", "id", "{}", TestContext.Current.CancellationToken).AsTask());
+        Assert.False(Directory.Exists(root));
+    }
+    [Fact]
     public async Task HistorySurvivesReloadAndPagesWithoutDuplicatesOrScopeLeaks()
     {
         var root = Path.Combine(Path.GetTempPath(), "compute-usage-" + Guid.NewGuid());

@@ -31,8 +31,6 @@ public sealed class LocalAppsJourneyFacts
                 await File.WriteAllBytesAsync(Path.Combine(downloads, "Second.png"), source, ct);
                 await File.WriteAllTextAsync(Path.Combine(downloads, "readme.txt"), "Local file fixture", ct);
             }
-            var outputName = Path.GetFileNameWithoutExtension(original) + "-edited.png";
-            for (var suffix = 1; File.Exists(Path.Combine(downloads, outputName)); suffix++) { outputName = Path.GetFileNameWithoutExtension(original) + "-edited (" + suffix + ").png"; }
             var settings = new Dictionary<string, string?> { ["IntoChat:LocalFiles:Roots:downloads"] = downloads, ["IntoChat:LocalFiles:AssetDirectory"] = Path.Combine(root, "assets") };
             await using var brain = await IntoChatE2ETest.Create(privateConfiguration: settings)
                 .ConfigureModule<FlutterModule>(flutter => flutter.RunWebApp()).StartAsync(ct);
@@ -42,7 +40,8 @@ public sealed class LocalAppsJourneyFacts
             page.Request += (_, request) => { if (request.Method == "POST" && request.Url.Contains("/save/", StringComparison.Ordinal)) { saveRequest = request; } };
             await page.SetViewportSizeAsync(1600, 1000);
             await page.GetByRole(AriaRole.Button, new() { Name = "Applications", Exact = true }).ClickAsync();
-            await page.GetByRole(AriaRole.Menuitem, new() { Name = "Files On this computer", Exact = true }).ClickAsync();
+            await page.GetByRole(AriaRole.Menuitem, new() { Name = "Files Workspace assets", Exact = true }).ClickAsync();
+            await page.GetByRole(AriaRole.Button, new() { Name = "Open Import from host Downloads", Exact = true }).ClickAsync();
             if (!string.IsNullOrWhiteSpace(acceptanceImage))
             {
                 var filter = page.GetByRole(AriaRole.Textbox, new() { Name = "Filter files", Exact = true });
@@ -77,10 +76,20 @@ public sealed class LocalAppsJourneyFacts
             foreach (var (label, value) in new[] { ("X", "10"), ("Y", "10"), ("Width", "60"), ("Height", "40") })
             { await WorkspaceBrowser.EnterTextAsync(page.GetByRole(AriaRole.Textbox, new() { Name = label, Exact = true }), value); }
             await page.GetByRole(AriaRole.Button, new() { Name = "Apply crop", Exact = true }).ClickAsync();
-            await editor.GetByRole(AriaRole.Button, new() { Name = "Save copy", Exact = true }).ClickAsync();
+            var response = await page.RunAndWaitForResponseAsync(
+                () => editor.GetByRole(AriaRole.Button, new() { Name = "Save copy", Exact = true }).ClickAsync(),
+                response => response.Request.Method == "POST" && response.Url.Contains("/save/", StringComparison.Ordinal));
+            using var receipt = System.Text.Json.JsonDocument.Parse(await response.TextAsync());
+            var outputName = receipt.RootElement.GetProperty("file").GetProperty("name").GetString()!;
             // Flutter mirrors the SnackBar text into an aria-live announcement; assert the visible node.
             await Assertions.Expect(page.Locator("flt-semantics").GetByText("Saved " + outputName, new() { Exact = true })).ToBeVisibleAsync();
-            var output = await File.ReadAllBytesAsync(Path.Combine(downloads, outputName), ct);
+            var assetChecksum = receipt.RootElement.GetProperty("file").GetProperty("checksum").GetString()!;
+            var workspaceId = Uri.UnescapeDataString(new Uri(response.Url).AbsolutePath.Split('/')[2]);
+            var assetId = IntoChat.LocalFiles.LocalFileStore.AssetId(IntoChat.Workspace.WorkspaceScope.Create("owner", workspaceId).Id, assetChecksum);
+            var outputResponse = await brain.HttpClient.GetAsync($"/workspaces/{Uri.EscapeDataString(workspaceId)}/apps/assets/{assetId}", ct);
+            outputResponse.EnsureSuccessStatusCode();
+            var output = await outputResponse.Content.ReadAsByteArrayAsync(ct);
+            Assert.False(File.Exists(Path.Combine(downloads, outputName)));
             Assert.Equal(60, BinaryPrimitives.ReadInt32BigEndian(output.AsSpan(16, 4)));
             Assert.Equal(40, BinaryPrimitives.ReadInt32BigEndian(output.AsSpan(20, 4)));
             Assert.Equal(SHA256.HashData(source), SHA256.HashData(await File.ReadAllBytesAsync(original, ct)));
@@ -103,6 +112,9 @@ public sealed class LocalAppsJourneyFacts
             Assert.Equal(originalReceipt.RootElement.GetProperty("file").GetProperty("entryId").GetString(), replayReceipt.RootElement.GetProperty("file").GetProperty("entryId").GetString());
             Assert.Equal(copiesBefore, Directory.GetFiles(downloads, Path.GetFileNameWithoutExtension(original) + "-edited*.png").Length);
             await page.ReloadAsync();
+            await page.GetByRole(AriaRole.Button, new() { Name = "Applications", Exact = true }).ClickAsync();
+            await page.GetByRole(AriaRole.Menuitem, new() { Name = "Files Workspace assets", Exact = true }).ClickAsync();
+            await page.GetByRole(AriaRole.Button, new() { Name = "Open " + Path.GetFileName(original), Exact = true }).ClickAsync();
             await Assertions.Expect(editor.GetByText("Copy saved", new() { Exact = true })).ToBeVisibleAsync();
             await editor.GetByRole(AriaRole.Button, new() { Name = "Fit", Exact = true }).ClickAsync();
             var screenshot = Environment.GetEnvironmentVariable("INTOCHAT_LOCAL_ACCEPTANCE_SCREENSHOT");
@@ -116,6 +128,7 @@ public sealed class LocalAppsJourneyFacts
             {
                 // Both documents are at revision zero; changing tabs must still reload the composition.
                 await page.GetByRole(AriaRole.Button, new() { Name = "Files", Exact = true }).ClickAsync();
+                await page.GetByRole(AriaRole.Button, new() { Name = "Open Import from host Downloads", Exact = true }).ClickAsync();
                 await page.GetByRole(AriaRole.Button, new() { Name = "Open Second.png", Exact = true }).ClickAsync();
                 await Assertions.Expect(editor.GetByText("120 × 80", new() { Exact = true })).ToBeVisibleAsync();
                 await Assertions.Expect(editor).ToHaveCountAsync(1);

@@ -36,15 +36,15 @@ public sealed class MemoryModule : IModule
         services.TryAddSingleton(TimeProvider.System);
         services.AddOptions<MemoryModuleOptions>()
             .Bind(silo.Configuration.GetSection(MemoryModuleOptions.SectionName))
-            .PostConfigure<IConfiguration>(static (options, configuration) => options.ResolveConnection(configuration))
-            .Validate(static options => string.Equals(options.Provider, QdrantProviderName, StringComparison.OrdinalIgnoreCase),
-                "Memory requires DigitalBrain:Memory:Provider=Qdrant.")
-            .Validate(static options => !string.IsNullOrWhiteSpace(options.Qdrant.ConnectionString)
-                && QdrantVectorMemoryRegistration.TryParseConnectionString(options.Qdrant.ConnectionString, out _, out _),
-                "Qdrant vector memory requires a valid connection string with Endpoint and optional Key.");
+            .PostConfigure<IConfiguration>(static (options, configuration) => options.ResolveConnection(configuration));
+        var configured = silo.Configuration.GetSection(MemoryModuleOptions.SectionName).Get<MemoryModuleOptions>() ?? new();
+        configured.ResolveConnection(silo.Configuration);
+        if (string.IsNullOrWhiteSpace(configured.Qdrant.ConnectionString)) { return; }
         services.TryAddSingleton(CreateQdrantClient);
         services.TryAddSingleton(CreateQdrantProvider);
-        services.TryAddSingleton<IVectorMemoryStore, QdrantVectorMemoryStore>();
+        services.TryAddSingleton<QdrantVectorMemoryStore>();
+        services.TryAddSingleton<IVectorMemoryStore>(services => services.GetRequiredService<QdrantVectorMemoryStore>());
+        services.TryAddSingleton<ILegacyVectorMemoryStore>(services => services.GetRequiredService<QdrantVectorMemoryStore>());
     }
 
     private static QdrantClient CreateQdrantClient(IServiceProvider services)

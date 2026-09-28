@@ -90,15 +90,12 @@ if (developerProfile)
 
 var clusterId = builder.Configuration["Orleans:ClusterId"]
     ?? (builder.Environment.IsDevelopment() ? $"digitalbrain-{Guid.NewGuid():N}" : null);
-
-// The Compute ledger and meters live in their own database, never in the customer's Supabase data.
-var computeServer = builder.AddPostgres("compute-postgres");
-if (!testing) { computeServer.WithDataVolume(); }
-var computeLedger = computeServer.AddDatabase("compute-database", ComputeModule.LedgerConnectionName);
+// Deployment membership can change; the logical service must survive restarts.
+// Preserve an explicitly configured historical cluster/service identity.
+var serviceId = builder.Configuration["Orleans:ServiceId"]
+    ?? builder.Configuration["Orleans:ClusterId"] ?? "intochat";
 
 var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.IntoChat)
-    .WithReference(computeLedger, ComputeModule.LedgerConnectionName)
-    .WaitFor(computeLedger)
     .WithReference(digitalBrain)
     .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION", "false")
     .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_HTTPCLIENT_DISABLE_URL_QUERY_REDACTION", "false")
@@ -130,7 +127,17 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
         if (clusterId is not null)
         {
             context.EnvironmentVariables["Orleans__ClusterId"] = clusterId;
-            context.EnvironmentVariables["Orleans__ServiceId"] = clusterId;
+        }
+        context.EnvironmentVariables["Orleans__ServiceId"] = serviceId;
+        foreach (var key in new[] { "IntoChat:DataProtection:Certificate", "IntoChat:DataProtection:CertificatePassword" })
+        {
+            if (builder.Configuration[key] is { Length: > 0 } value)
+            { context.EnvironmentVariables[key.Replace(":", "__", StringComparison.Ordinal)] = value; }
+        }
+        foreach (var setting in builder.Configuration.GetSection("IntoChat:DataProtection:PreviousCertificates").AsEnumerable())
+        {
+            if (setting.Value is not null)
+            { context.EnvironmentVariables[setting.Key.Replace(":", "__", StringComparison.Ordinal)] = setting.Value; }
         }
 
         // Browser shell (aspire run and Playwright e2e) is a different origin than the kernel.
@@ -144,6 +151,25 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
         }
 
     });
+
+// Existing volumes remain untouched. SQL is an explicit, read-only migration source.
+if (builder.Configuration.GetValue<bool>("DigitalBrain:Compute:ImportLegacy"))
+{
+    runtime.WithEnvironment("DigitalBrain__Compute__ImportLegacy", "true");
+    var legacyConnection = builder.Configuration[ComputeModule.ConnectionStringKey]
+        ?? builder.Configuration.GetConnectionString(ComputeModule.LedgerConnectionName);
+    if (!string.IsNullOrWhiteSpace(legacyConnection))
+    { runtime.WithEnvironment("DigitalBrain__Compute__ConnectionString", legacyConnection); }
+    else if (builder.Configuration["DigitalBrain:Compute:UsageDirectory"] is { Length: > 0 } usageDirectory)
+    { runtime.WithEnvironment("DigitalBrain__Compute__UsageDirectory", usageDirectory); }
+    else
+    {
+        var computeServer = builder.AddPostgres("compute-postgres");
+        if (!testing) { computeServer.WithDataVolume(); }
+        var computeLedger = computeServer.AddDatabase("compute-database", ComputeModule.LedgerConnectionName);
+        runtime.WithReference(computeLedger, ComputeModule.LedgerConnectionName).WaitFor(computeLedger);
+    }
+}
 
 if (testing)
 {
