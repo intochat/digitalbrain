@@ -1,6 +1,6 @@
 using DigitalBrain.Apps;
 using DigitalBrain.Discovery;
-using DigitalBrain.Discovery.Search;
+using DigitalBrain.Qdrant;
 using DigitalBrain.Core.Registry;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
@@ -18,18 +18,18 @@ public sealed class CatalogFacts
     public async Task SearchIncludesPublicNeuronContractsFromSelectedModules()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<DiscoveryModule>()
+        await using var brain = await UnitTest.Create().WithModule<QdrantModule>().WithModule<DiscoveryModule>()
             .WithModule<FixtureNeuronModule>()
-            .ConfigureSilo(silo => silo.Services.AddSingleton<IManifestSource>(
+            .ConfigureSilo(silo => silo.Services.AddSingleton<ICapabilitySource>(
                 new FixtureManifestSource([ScopedAppManifest.Global(InvoiceManifest())])))
             .StartAsync(ct);
 
         var catalog = brain.Get<ICapabilityCatalog>("catalog");
         var neuron = await catalog.Search("emit a registry signal", "workspace-a", 5);
         Assert.Contains(neuron.Hits, hit => hit.Id == "test.registry-emitter" && hit.Kind == CapabilityKind.Neuron);
-        var details = await catalog.ReadNeuron("test.registry-emitter");
-        Assert.Equal(typeof(IRegistryEmitter).FullName, details?.ContractType);
-        Assert.NotNull(await catalog.ReadNeuron("test.registry-monitor"));
+        var emitter = Assert.Single(neuron.Hits, hit => hit.Id == "test.registry-emitter");
+        Assert.Equal("RegistryEmitter", emitter.Name);
+        Assert.Contains("Emit Registry Signal", emitter.Description, StringComparison.Ordinal);
 
         var monitor = await catalog.Search("registry monitor", "workspace-a", 5);
         Assert.Contains(monitor.Hits, hit => hit.Id == "test.registry-monitor");
@@ -42,9 +42,9 @@ public sealed class CatalogFacts
     public async Task DiscoveryReadsLocalRegistry()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<DiscoveryModule>()
+        await using var brain = await UnitTest.Create().WithModule<QdrantModule>().WithModule<DiscoveryModule>()
             .WithModule<FixtureNeuronModule>()
-            .ConfigureSilo(silo => silo.Services.AddSingleton<IManifestSource>(new FixtureManifestSource([])))
+            .ConfigureSilo(silo => silo.Services.AddSingleton<ICapabilitySource>(new FixtureManifestSource([])))
             .StartAsync(ct);
         var registry = brain.SiloServices.GetRequiredService<NeuronRegistry>();
         Assert.Equal(typeof(IRegistryEmitter), registry.Find("test.registry-emitter")?.Interface);
@@ -52,17 +52,15 @@ public sealed class CatalogFacts
         var catalog = brain.Get<ICapabilityCatalog>("catalog");
         var result = await catalog.Search("emit a registry signal", "workspace-a", 5);
         Assert.Contains(result.Hits, hit => hit.Id == "test.registry-emitter");
-        Assert.Equal(typeof(FixtureNeuronModule).FullName,
-            (await catalog.ReadNeuron("test.registry-emitter"))?.ModuleId);
     }
 
     [Fact]
     public async Task ManifestSourceFailureKeepsRegistrySearchAvailable()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<DiscoveryModule>()
+        await using var brain = await UnitTest.Create().WithModule<QdrantModule>().WithModule<DiscoveryModule>()
             .WithModule<FixtureNeuronModule>()
-            .ConfigureSilo(silo => silo.Services.AddSingleton<IManifestSource>(new ThrowingManifestSource()))
+            .ConfigureSilo(silo => silo.Services.AddSingleton<ICapabilitySource>(new ThrowingManifestSource()))
             .StartAsync(ct);
 
         var result = await brain.Get<ICapabilityCatalog>("catalog")
@@ -77,9 +75,9 @@ public sealed class CatalogFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var source = new SwitchableManifestSource([ScopedAppManifest.Global(InvoiceManifest())]);
-        await using var brain = await UnitTest.Create().WithModule<DiscoveryModule>()
+        await using var brain = await UnitTest.Create().WithModule<QdrantModule>().WithModule<DiscoveryModule>()
             .WithModule<FixtureNeuronModule>()
-            .ConfigureSilo(silo => silo.Services.AddSingleton<IManifestSource>(source))
+            .ConfigureSilo(silo => silo.Services.AddSingleton<ICapabilitySource>(source))
             .StartAsync(ct);
         var catalog = brain.Get<ICapabilityCatalog>("catalog");
         Assert.Contains((await catalog.Search("summarize invoices", "workspace-a", 5)).Hits,
@@ -102,9 +100,9 @@ public sealed class CatalogFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var source = new SwitchableManifestSource([ScopedAppManifest.Global(InvoiceManifest())]) { Fail = true };
-        await using var brain = await UnitTest.Create().WithModule<DiscoveryModule>()
+        await using var brain = await UnitTest.Create().WithModule<QdrantModule>().WithModule<DiscoveryModule>()
             .WithModule<FixtureNeuronModule>()
-            .ConfigureSilo(silo => silo.Services.AddSingleton<IManifestSource>(source))
+            .ConfigureSilo(silo => silo.Services.AddSingleton<ICapabilitySource>(source))
             .StartAsync(ct);
         var catalog = brain.Get<ICapabilityCatalog>("catalog");
         Assert.Contains((await catalog.Search("emit a registry signal", "workspace-a", 5)).Hits,
@@ -120,9 +118,9 @@ public sealed class CatalogFacts
     public async Task AppOnlySearchDoesNotLoseAppsToNeuronResultLimit()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<DiscoveryModule>()
+        await using var brain = await UnitTest.Create().WithModule<QdrantModule>().WithModule<DiscoveryModule>()
             .WithModule<CrowdingNeuronModule>()
-            .ConfigureSilo(silo => silo.Services.AddSingleton<IManifestSource>(
+            .ConfigureSilo(silo => silo.Services.AddSingleton<ICapabilitySource>(
                 new FixtureManifestSource([ScopedAppManifest.Global(InvoiceManifest())])))
             .StartAsync(ct);
 
@@ -225,26 +223,21 @@ public sealed class CatalogFacts
     }
 
     [Fact]
-    public async Task VectorSearchRunsOnlyWhenCandidatesExceedEight()
+    public async Task VectorsFindACapabilityThatSharesNoWordWithTheQuery()
     {
         var ct = TestContext.Current.CancellationToken;
-        var embedder = new CountingEmbedder();
-        await using var brain = await Start(new FixtureManifestSource(Globals(BroadManifests())), ct, embedder);
+        await using var brain = await Start(new FixtureManifestSource([ScopedAppManifest.Global(InvoiceManifest())]), ct, new SynonymEmbedder());
         var catalog = brain.Get<ICapabilityCatalog>("catalog");
 
-        await catalog.Search("report", "workspace-a", 5);
-        var callsAfterBroadSearch = embedder.Calls;
+        var result = await catalog.Search("what do my clients still owe", "workspace-a", 5);
 
-        await catalog.Search("nightingale", "workspace-a", 5);
-
-        Assert.Equal(callsAfterBroadSearch, embedder.Calls);
-        await catalog.Search("report", "workspace-a", 5);
-        Assert.Equal(callsAfterBroadSearch + 1, embedder.Calls);
+        Assert.Contains(result.Hits, hit => hit.Id == "intochat.invoices/summarize_invoices");
+        Assert.False(result.Degraded);
     }
 
-    private static Task<UnitBrain> Start(IManifestSource source, CancellationToken ct, ICapabilityEmbedder? embedder = null)
+    private static Task<UnitBrain> Start(ICapabilitySource source, CancellationToken ct, IEmbeddingGenerator<string, Embedding<float>>? embedder = null)
     {
-        var builder = UnitTest.Create().WithModule<DiscoveryModule>()
+        var builder = UnitTest.Create().WithModule<QdrantModule>().WithModule<DiscoveryModule>()
             .ConfigureSilo(silo =>
             {
                 silo.Services.AddSingleton(source);
@@ -295,41 +288,6 @@ public sealed class CatalogFacts
             },
         ],
     };
-
-    private static IReadOnlyList<ScopedAppManifest> Globals(IReadOnlyList<AppManifest> manifests)
-        => [.. manifests.Select(ScopedAppManifest.Global)];
-
-    private static IReadOnlyList<AppManifest> BroadManifests()
-    {
-        var operations = Enumerable.Range(0, 12)
-            .Select(index => new AppOperation
-            {
-                Name = $"report_{index}",
-                DescriptionForModel = $"Build report number {index} for the team.",
-                ReadOnly = true,
-            })
-            .Append(new AppOperation
-            {
-                Name = "nightingale",
-                DescriptionForModel = "Sing the nightingale song.",
-                ReadOnly = true,
-            })
-            .ToArray();
-        return
-        [
-            new AppManifest
-            {
-                Id = "intochat.reports",
-                Version = "1.0.0",
-                Publisher = "intochat",
-                Kind = AppKind.Declarative,
-                Name = "Report Studio",
-                DescriptionForPeople = "Reports.",
-                DescriptionForModel = "Build reports.",
-                Operations = operations,
-            },
-        ];
-    }
 }
 
 [Alias("test.registry-emitter")]
@@ -347,57 +305,71 @@ public sealed class CrowdingNeuronModule : IModule
     public void Configure(ISiloBuilder silo) { }
 }
 
-internal sealed class ThrowingManifestSource : IManifestSource
+internal sealed class ThrowingManifestSource : ICapabilitySource
 {
-    public Task<IReadOnlyList<ScopedAppManifest>> ReadAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<CapabilityDocument>> Read(CancellationToken cancellationToken)
         => throw new InvalidOperationException("manifest source unavailable");
 }
 
-internal sealed class SwitchableManifestSource(IReadOnlyList<ScopedAppManifest> manifests) : IManifestSource
+internal sealed class SwitchableManifestSource(IReadOnlyList<ScopedAppManifest> manifests) : ICapabilitySource
 {
     public bool Fail { get; set; }
-    public Task<IReadOnlyList<ScopedAppManifest>> ReadAsync(CancellationToken cancellationToken = default)
-        => Fail ? throw new InvalidOperationException("manifest source unavailable") : Task.FromResult(manifests);
+    public Task<IReadOnlyList<CapabilityDocument>> Read(CancellationToken cancellationToken)
+        => Fail ? throw new InvalidOperationException("manifest source unavailable") : Task.FromResult(AppDocuments.Describe(manifests));
 }
 
-internal sealed class FixtureManifestSource(IReadOnlyList<ScopedAppManifest> manifests) : IManifestSource
+internal sealed class FixtureManifestSource(IReadOnlyList<ScopedAppManifest> manifests) : ICapabilitySource
 {
-    public Task<IReadOnlyList<ScopedAppManifest>> ReadAsync(CancellationToken cancellationToken = default)
-        => Task.FromResult(manifests);
+    public Task<IReadOnlyList<CapabilityDocument>> Read(CancellationToken cancellationToken)
+        => Task.FromResult(AppDocuments.Describe(manifests));
 }
 
-internal sealed class CountingManifestSource(IReadOnlyList<ScopedAppManifest> manifests) : IManifestSource
+internal sealed class CountingManifestSource(IReadOnlyList<ScopedAppManifest> manifests) : ICapabilitySource
 {
     private int reads;
 
     public int Reads => reads;
 
-    public Task<IReadOnlyList<ScopedAppManifest>> ReadAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<CapabilityDocument>> Read(CancellationToken cancellationToken)
     {
         Interlocked.Increment(ref reads);
-        return Task.FromResult(manifests);
+        return Task.FromResult(AppDocuments.Describe(manifests));
     }
 }
 
-internal sealed class FailingEmbedder : ICapabilityEmbedder
+// Mirrors the Apps module's source: an app document plus one document per operation.
+internal static class AppDocuments
 {
-    public string ModelId => "failing";
+    public static IReadOnlyList<CapabilityDocument> Describe(IEnumerable<ScopedAppManifest> manifests)
+        => [.. manifests.SelectMany(static scoped => scoped.Manifest.Operations
+            .Select(operation => new CapabilityDocument(scoped.Manifest.Id + "/" + operation.Name, CapabilityKind.Operation,
+                operation.Name, operation.DescriptionForModel, scoped.OwningWorkspaceId))
+            .Prepend(new CapabilityDocument(scoped.Manifest.Id, CapabilityKind.App, scoped.Manifest.Name,
+                scoped.Manifest.DescriptionForPeople + " " + scoped.Manifest.DescriptionForModel, scoped.OwningWorkspaceId)))];
+}
 
-    public ValueTask<float[]> EmbedAsync(string text, CancellationToken cancellationToken = default)
+internal sealed class FailingEmbedder : IEmbeddingGenerator<string, Embedding<float>>
+{
+    public Task<GeneratedEmbeddings<Embedding<float>>> GenerateAsync(IEnumerable<string> values,
+        EmbeddingGenerationOptions? options = null, CancellationToken cancellationToken = default)
         => throw new InvalidOperationException("embeddings are down");
+
+    public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+    public void Dispose() { }
 }
 
-internal sealed class CountingEmbedder : ICapabilityEmbedder
+// Texts about money owed land on one axis, everything else on another.
+internal sealed class SynonymEmbedder : IEmbeddingGenerator<string, Embedding<float>>
 {
-    private readonly HashingCapabilityEmbedder _inner = new();
+    private static readonly string[] MoneyOwed = ["invoice", "owe", "payment"];
 
-    public int Calls { get; private set; }
+    public Task<GeneratedEmbeddings<Embedding<float>>> GenerateAsync(IEnumerable<string> values,
+        EmbeddingGenerationOptions? options = null, CancellationToken cancellationToken = default)
+        => Task.FromResult(new GeneratedEmbeddings<Embedding<float>>(values.Select(static text =>
+            new Embedding<float>(MoneyOwed.Any(word => text.Contains(word, StringComparison.OrdinalIgnoreCase)) ? new float[] { 1, 0 } : [0, 1]))));
 
-    public string ModelId => _inner.ModelId;
+    public object? GetService(Type serviceType, object? serviceKey = null) => null;
 
-    public ValueTask<float[]> EmbedAsync(string text, CancellationToken cancellationToken = default)
-    {
-        Calls++;
-        return _inner.EmbedAsync(text, cancellationToken);
-    }
+    public void Dispose() { }
 }

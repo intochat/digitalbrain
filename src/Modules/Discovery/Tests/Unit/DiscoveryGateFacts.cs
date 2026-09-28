@@ -1,32 +1,36 @@
 using System.Diagnostics;
 using DigitalBrain.Apps;
 using DigitalBrain.Discovery;
-using DigitalBrain.Discovery.Search;
+using DigitalBrain.Qdrant;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace DigitalBrain.Tests;
 
 // Gate: >= 60 golden prompts vs >= 50 operations (>= 20 distractors); top-5 recall >= 0.9,
-// negative precision >= 0.9, p95 < 300 ms, and it still works when embeddings are down.
+// negative precision >= 0.9, p95 < 300 ms, with no embedding model and with a failing one.
 public sealed class DiscoveryGateFacts
 {
     [Fact]
-    public async Task KeywordGateMeetsRecallPrecisionAndLatencyWithEmbeddingsDown()
+    public async Task KeywordGateMeetsRecallPrecisionAndLatencyWithoutEmbeddings()
     {
-        await RunGateAsync(embed: null, degraded: true);
+        await RunGateAsync(embeddings: null, degraded: false);
     }
 
     [Fact]
-    public async Task VectorGateMeetsRecallPrecisionAndLatencyWithEmbeddingsUp()
+    public async Task KeywordGateHoldsWhenEmbeddingsFail()
     {
-        await RunGateAsync(embed: HashingEmbed(), degraded: false);
+        await RunGateAsync(new FailingEmbedder(), degraded: true);
     }
 
-    private static async Task RunGateAsync(Func<string, CancellationToken, ValueTask<float[]?>>? embed, bool degraded)
+    private static async Task RunGateAsync(IEmbeddingGenerator<string, Embedding<float>>? embeddings, bool degraded)
     {
         var ct = TestContext.Current.CancellationToken;
         var manifests = BuildManifests();
-        var index = await CapabilityIndex.BuildAsync([.. manifests.Select(ScopedAppManifest.Global)], embed, ct);
+        var catalog = new CapabilityCatalog([new FixtureManifestSource([.. manifests.Select(ScopedAppManifest.Global)])],
+            new InMemoryQdrant(), embeddings, NullLogger<CapabilityCatalog>.Instance);
+        await catalog.RebuildAsync(ct);
 
         Assert.True(Targets.Length * 2 + Negatives.Length >= 60, "the golden set must contain at least 60 prompts");
         Assert.True(manifests.Sum(manifest => manifest.Operations.Count) >= 50, "at least 50 operations are required");
@@ -40,7 +44,7 @@ public sealed class DiscoveryGateFacts
             foreach (var prompt in new[] { target.Direct, target.Indirect })
             {
                 var watch = Stopwatch.StartNew();
-                var hits = await index.SearchAsync(prompt, null, 5, degraded, ct);
+                var hits = await catalog.SearchAsync(prompt, null, 5, ct);
                 latencies.Add(watch.Elapsed.TotalMilliseconds);
                 if (hits.Hits.Any(hit => hit.Id == expected))
                 {
@@ -52,7 +56,7 @@ public sealed class DiscoveryGateFacts
         var negativeClean = 0;
         foreach (var prompt in Negatives)
         {
-            var hits = await index.SearchAsync(prompt, null, 5, degraded, ct);
+            var hits = await catalog.SearchAsync(prompt, null, 5, ct);
             if (hits.Hits.Count == 0)
             {
                 negativeClean++;
@@ -65,15 +69,10 @@ public sealed class DiscoveryGateFacts
         latencies.Sort();
         var p95 = latencies[(int)Math.Ceiling(latencies.Count * 0.95) - 1];
 
+        Assert.Equal(degraded, (await catalog.SearchAsync("anything", null, 5, ct)).Degraded);
         Assert.True(recall >= 0.9, $"top-5 recall was {recall:F3}");
         Assert.True(precision >= 0.9, $"negative precision was {precision:F3}");
         Assert.True(p95 < 300, $"p95 latency was {p95:F1} ms");
-    }
-
-    private static Func<string, CancellationToken, ValueTask<float[]?>> HashingEmbed()
-    {
-        var embedder = new HashingCapabilityEmbedder();
-        return async (text, ct) => await embedder.EmbedAsync(text, ct);
     }
 
     private static IReadOnlyList<AppManifest> BuildManifests()

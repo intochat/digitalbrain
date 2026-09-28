@@ -23,22 +23,21 @@ internal sealed class DiscoveryTools(IDigitalBrain brain) : IAgentToolFactory
             {
                 var catalog = brain.Get<ICapabilityCatalog>(CatalogKey);
                 var result = await catalog.Search(query, trusted.ScopeId, 5).WaitAsync(ct);
-                var capabilities = await Task.WhenAll(result.Hits.Select(async hit => new
+                var capabilities = result.Hits.Select(static hit => new
                 {
                     id = hit.Id,
                     kind = hit.Kind.ToString(),
+                    name = hit.Name,
+                    description = hit.Description,
                     score = hit.Score,
-                    neuron = hit.Kind == CapabilityKind.Neuron
-                        ? await catalog.ReadNeuron(hit.Id).WaitAsync(ct)
-                        : null,
-                }));
+                });
                 return new
                 {
                     degraded = result.Degraded,
                     capabilities,
                     guidance = result.Hits.Count == 0
                         ? "No capability matched. Do not invent one; name what is missing and continue with the capabilities you have."
-                        : "App ids must be read through their manifests. Neuron entries include registry metadata; they do not grant a callable tool.",
+                        : "App ids must be read through their manifests. Neuron entries describe a contract; they do not grant a callable tool.",
                 };
             }
             catch (Exception error) when (error is ArgumentException or InvalidOperationException)

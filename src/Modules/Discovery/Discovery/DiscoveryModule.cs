@@ -1,13 +1,16 @@
 using DigitalBrain.Core;
-using DigitalBrain.Discovery.Search;
+using DigitalBrain.Discovery.Sources;
+using DigitalBrain.Qdrant;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
 
 namespace DigitalBrain.Discovery;
 
+// Requires the Qdrant module. Other modules publish what they offer as ICapabilitySource.
 [ModuleConfiguration(typeof(DiscoveryConfigurationContract))]
 public sealed class DiscoveryModule : IModule
 {
@@ -18,9 +21,12 @@ public sealed class DiscoveryModule : IModule
         ArgumentNullException.ThrowIfNull(silo);
         var services = silo.Services;
         services.TryAddSingleton(TimeProvider.System);
-        services.TryAddEnumerable(ServiceDescriptor.Singleton<IManifestSource, AppsManifestSource>());
-        services.TryAddSingleton<ICapabilityEmbedder>(CreateEmbedder);
-        services.TryAddSingleton<CapabilityCatalog>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<ICapabilitySource, NeuronCapabilitySource>());
+        services.TryAddSingleton(provider => new CapabilityCatalog(
+            provider.GetServices<ICapabilitySource>(),
+            provider.GetRequiredService<IQdrant>(),
+            Embeddings(provider),
+            provider.GetRequiredService<ILogger<CapabilityCatalog>>()));
         services.AddHostedService<CapabilityCatalogRebuilder>();
     }
 
@@ -30,18 +36,16 @@ public sealed class DiscoveryModule : IModule
         endpoints.MapDiscoveryBoard();
     }
 
-    private static ICapabilityEmbedder CreateEmbedder(IServiceProvider services)
+    private static IEmbeddingGenerator<string, Embedding<float>>? Embeddings(IServiceProvider services)
     {
         try
         {
-            var generator = services.GetService<IEmbeddingGenerator<string, Embedding<float>>>();
-            return generator is null ? new HashingCapabilityEmbedder() : new AiCapabilityEmbedder(generator);
+            return services.GetService<IEmbeddingGenerator<string, Embedding<float>>>();
         }
         catch (InvalidOperationException)
         {
-            // The AI module registers a factory that throws when no embedding model is configured;
-            // discovery must still start and serve keyword search.
-            return new HashingCapabilityEmbedder();
+            // The AI module registers a factory that throws when no embedding model is configured.
+            return null;
         }
     }
 }

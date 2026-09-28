@@ -16,9 +16,7 @@ public sealed class AppsModule : IModule
     public void Configure(ISiloBuilder silo)
     {
         ArgumentNullException.ThrowIfNull(silo);
-        // Discovery indexes the committed first-party manifests; apps are composed after discovery
-        // in the product profile, so this replaces the empty default source.
-        silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IManifestSource, FirstPartyManifestSource>());
+        silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<ICapabilitySource, AppCapabilitySource>());
         silo.Services.TryAddSingleton(TimeProvider.System);
         silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<StepLibrary, AppSteps>());
     }
