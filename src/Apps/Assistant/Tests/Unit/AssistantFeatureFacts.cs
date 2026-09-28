@@ -1,5 +1,6 @@
 using System.Text;
 using DigitalBrain.AI;
+using DigitalBrain.AI.Agents;
 using DigitalBrain.Specs;
 using DigitalBrain.Supabase;
 using DigitalBrain.Testing.Unit;
@@ -12,6 +13,20 @@ namespace DigitalBrain.Apps.Assistant.Tests.Unit;
 public sealed class AssistantFeatureFacts
 {
     [Fact]
+    public void ApplicationCompositionBelongsToAppsNotKernel()
+    {
+        Assert.Equal("DigitalBrain.Apps", typeof(AssistantApp).GetInterfaces().Single().Namespace);
+        Assert.Null(typeof(DigitalBrain.Core.BrainCompositionBuilder).Assembly.GetType("DigitalBrain.Core.IApplication"));
+    }
+
+    [Fact]
+    public void TheApplicationNeuronOwnsTheTurnStream()
+    {
+        Assert.Contains(typeof(IAssistant).GetMethods(), method =>
+            method.Name == "Run" && method.ReturnType == typeof(IAsyncEnumerable<string>));
+    }
+
+    [Fact]
     public async Task TheAssistantFeatureIsGreen()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -21,6 +36,9 @@ public sealed class AssistantFeatureFacts
             .WithModule<SupabaseModule>()
             .ConfigureSilo(silo => silo.Services
                 .AddSingleton<StepLibrary, AssistantSteps>()
+                .Configure<AIOptions>(options => { options.OpenAI.ApiKey = "fixture"; options.Default.Provider = "OpenAI"; options.Default.Model = "fixture"; options.Default.Capabilities = LlmCapabilities.Tools; })
+                .AddSingleton<InjectedModelTurnRunner>()
+                .AddSingleton<IAgentTurnRunner>(services => services.GetRequiredService<InjectedModelTurnRunner>())
                 .AddSingleton<IChatClient>(new ScriptedAssistantModel())
                 .AddSingleton<CustomersDatabase>()
                 .AddSingleton<ISupabaseProvider>(services => services.GetRequiredService<CustomersDatabase>())
@@ -54,6 +72,7 @@ public sealed class AssistantFeatureFacts
         public Task<string> TranscribeAsync(string audioFilePath, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public async Task<string> TranscribeAsync(Stream audioStream, string fileName, CancellationToken cancellationToken = default)
         {
+            audioStream.Position = 44; // The fixture stores its transcript after a WAV header.
             using var reader = new StreamReader(audioStream, Encoding.UTF8);
             return await reader.ReadToEndAsync(cancellationToken);
         }

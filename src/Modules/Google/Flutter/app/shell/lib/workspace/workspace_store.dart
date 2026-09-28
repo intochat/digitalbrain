@@ -501,6 +501,16 @@ class WorkspaceStore extends ChangeNotifier {
               WorkspaceConversation(id: _id(), title: 'New conversation'),
             );
           }
+          // The assistant is now the main application surface, not a saved artifact.
+          project.artifacts.removeWhere(
+            (artifact) =>
+                artifact.kind == 'app' && artifact.data['app'] == 'assistant',
+          );
+          if (!project.conversations.any(
+            (c) => c.id == project.selectedConversationId,
+          )) {
+            project.selectedConversationId = project.conversations.first.id;
+          }
           final ids = project.artifacts.map((a) => a.id).toSet();
           for (final c in project.conversations) {
             c.attachedArtifactIds.retainAll(ids);
@@ -679,7 +689,7 @@ class WorkspaceStore extends ChangeNotifier {
   }
 
   WorkspaceArtifact launchLocalApp(String app) {
-    if (!['files', 'images', 'csharp', 'assistant'].contains(app)) {
+    if (!['files', 'images', 'csharp'].contains(app)) {
       throw ArgumentError('Application not implemented.');
     }
     if (app == 'csharp' && !_developerMode) {
@@ -693,7 +703,6 @@ class WorkspaceStore extends ChangeNotifier {
           title: switch (app) {
             'files' => 'Files',
             'csharp' => 'C# files',
-            'assistant' => 'Assistant',
             _ => 'Image Editor',
           },
           kind: 'app',

@@ -1,5 +1,9 @@
+using DigitalBrain.Apps;
 using DigitalBrain.Core;
-using DigitalBrain.Flutter.Chat;
+using DigitalBrain.Flutter.Button;
+using DigitalBrain.Flutter.Select;
+using DigitalBrain.Flutter.TextField;
+using DigitalBrain.Flutter.FileInput;
 using DigitalBrain.Flutter.Layout;
 using DigitalBrain.Flutter.Surface;
 using DigitalBrain.Flutter.Text;
@@ -8,7 +12,17 @@ using DigitalBrain.Flutter.VoiceInput;
 namespace DigitalBrain.Flutter;
 
 // A node names a part of the app; started for a key, it becomes the neuron "{key}/{part}".
-public sealed record UiNode(string Kind, string Part, Func<IGrainFactory, string, Task> Apply, IReadOnlyList<UiNode> Children);
+public sealed record UiNode(string Kind, string Part, Func<IGrainFactory, string, Task> Apply, IReadOnlyList<UiNode> Children)
+{
+    public UiNode OnEvent<T>() where T : IUiEventHandler => this with
+    {
+        Apply = async (grains, key) =>
+        {
+            await Apply(grains, key);
+            await grains.GetGrain<IUiBinding>(UiComposer.NameOf(key, Part)).Bind(grains.GetGrain<T>(key));
+        },
+    };
+}
 
 public sealed class UiComposer
 {
@@ -24,17 +38,39 @@ public sealed class UiComposer
 
     public UiNode Column(params UiNode[] children) => Layout("layout", "column", children);
 
+    public UiNode List(string part, bool followEnd, params UiNode[] children) => new(UIVocabulary.LayoutType, part, async (grains, key) =>
+    {
+        var layout = grains.GetGrain<ILayout>(NameOf(key, part));
+        await layout.Set(new("list", References(key, children), FollowEnd: followEnd), (await layout.Read()).Revision);
+    }, children);
+
     public UiNode Layout(string part, string mode, params UiNode[] children) => new(UIVocabulary.LayoutType, part, async (grains, key) =>
     {
         var layout = grains.GetGrain<ILayout>(NameOf(key, part));
         await layout.Set(new(mode, References(key, children)), (await layout.Read()).Revision);
     }, children);
 
+    public UiNode Layout(string part, string mode, double[] extents, params UiNode[] children) => new(UIVocabulary.LayoutType, part, async (grains, key) =>
+    {
+        var layout = grains.GetGrain<ILayout>(NameOf(key, part));
+        await layout.Set(new(mode, References(key, children), Extents: extents), (await layout.Read()).Revision);
+    }, children);
+
+    public UiNode Button(string part, string label, string action) =>
+        new(UIVocabulary.ButtonType, part, (grains, key) => grains.GetGrain<IButton>(NameOf(key, part)).Set(label, action), []);
+
+    public UiNode TextField(string part, string label, string kind = "text", string? submitButton = null) =>
+        new(UIVocabulary.TextFieldType, part, (grains, key) => grains.GetGrain<ITextField>(NameOf(key, part))
+            .Configure(label, kind, submitButton is null ? null : NameOf(key, submitButton)), []);
+
+    public UiNode Select(string part, string label) =>
+        new(UIVocabulary.SelectType, part, (grains, key) => grains.GetGrain<ISelect>(NameOf(key, part)).Set(label, Array.Empty<SelectOption>(), null), []);
+
+    public UiNode FileInput(string part, string label) =>
+        new(UIVocabulary.FileInputType, part, (grains, key) => grains.GetGrain<IFileInput>(NameOf(key, part)).Configure(label), []);
+
     public UiNode Text(string part, string markdown) =>
         new(UIVocabulary.TextType, part, (grains, key) => grains.GetGrain<IText>(NameOf(key, part)).Set(markdown), []);
-
-    public UiNode Chat(string part, string label) =>
-        new(UIVocabulary.ChatType, part, (grains, key) => grains.GetGrain<IChat>(NameOf(key, part)).Configure(label), []);
 
     public UiNode VoiceInput(string part, string label) =>
         new(UIVocabulary.VoiceInputType, part, (grains, key) => grains.GetGrain<IVoiceInput>(NameOf(key, part)).Configure(label), []);
@@ -47,7 +83,7 @@ public sealed class UiComposer
     }
 
     private static IReadOnlyList<UiChildRef> References(string key, UiNode[] children) =>
-        [.. children.Select(child => new UiChildRef(child.Kind, NameOf(key, child.Part)))];
+        children.Select(child => new UiChildRef(child.Kind, NameOf(key, child.Part))).ToArray();
 }
 
 public static class UiAppBuilderExtensions

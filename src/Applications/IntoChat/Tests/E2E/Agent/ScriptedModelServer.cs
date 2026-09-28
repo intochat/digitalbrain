@@ -56,12 +56,32 @@ public sealed partial class ScriptedModelServer : IAsyncDisposable
     {
         using var document = await JsonDocument.ParseAsync(http.Request.Body, cancellationToken: http.RequestAborted);
         var request = document.RootElement.Clone();
-        _requests.Enqueue(request);
+
         var messages = request.GetProperty("messages").EnumerateArray().ToArray();
         var results = messages.Where(m => m.GetProperty("role").GetString() == "tool").ToArray();
         var lastUser = messages.LastOrDefault(m => m.GetProperty("role").GetString() == "user") is { } user
             ? user.GetProperty("content").GetString() ?? ""
             : "";
+        // Startup verifies the shipped prompt/group-chat packages through this same provider.
+        // Recognize those exact scenarios separately; a main assistant request missing tools
+        // still reaches the strict protocol assertions below.
+        var instructions = string.Join("\n", messages.Where(m => m.GetProperty("role").GetString() is "system" or "developer")
+            .Select(m => m.GetProperty("content").GetString()));
+        string? backgroundReply = null;
+        if (lastUser == "What is the capital of France?" && instructions.StartsWith("You are a helpful assistant. Answer the user's question directly in at most three clear sentences.", StringComparison.Ordinal))
+        { backgroundReply = "Paris is the capital of France."; }
+        else if (lastUser.StartsWith("Question: Name one product idea for dog owners", StringComparison.Ordinal)
+            && instructions.Contains("You are brainstorming with another model to give the user one good answer.", StringComparison.Ordinal))
+        { backgroundReply = "AGREE: A smart dog bowl that logs every meal."; }
+        else if (instructions == "You judge whether an answer meets a criterion. Reply with YES or NO on the first line, then one short reason."
+            && lastUser == "Criterion: It proposes one concrete product for dog owners\n\nAnswer:\nAGREE: A smart dog bowl that logs every meal.")
+        { backgroundReply = "YES\nThe dog bowl is a concrete product for dog owners."; }
+        if (backgroundReply is not null)
+        {
+            Assert.False(request.TryGetProperty("tools", out var tools) && tools.GetArrayLength() > 0);
+            return Completion(new { role = "assistant", content = backgroundReply }, "stop");
+        }
+        _requests.Enqueue(request);
         // The client appends an artifact-context paragraph to the owner's words; intent comes from the owner's own text.
         var ownerText = lastUser.Split("\n\n[Conversation agent:", 2, StringSplitOptions.None)[0];
         var wantsCount = ownerText.Contains("how many", StringComparison.OrdinalIgnoreCase);
@@ -155,6 +175,11 @@ public sealed partial class ScriptedModelServer : IAsyncDisposable
                 reason = "stop";
             }
         }
+        return Completion(message, reason);
+    }
+
+    private static IResult Completion(object message, string reason)
+    {
         return Results.Json(new { id = "fixture-response", @object = "chat.completion", created = 1, model = "gpt-5.6-luna", choices = new[] { new { index = 0, message, finish_reason = reason } }, usage = new { prompt_tokens = 1, completion_tokens = 1, total_tokens = 2 } });
     }
 
@@ -182,7 +207,7 @@ public sealed partial class ScriptedModelServer : IAsyncDisposable
     };
     public void AssertCompleted()
     {
-        Assert.Empty(Errors);
+        Assert.True(Errors.IsEmpty, string.Join("\n", Errors));
         Assert.True(_completed > 0, "The model never received a real query-window tool result.");
         Assert.Equal(_completed * 3 + RepairCount, Requests.Count);
     }

@@ -195,6 +195,14 @@ public static class ShellHostingExtensions
 
         private static string[] ResolveWatchRoots(string workingDirectory)
         {
+            // A Dart workspace can include application packages outside the shell's
+            // module. Watch its sources too, including on the first pub resolution.
+            for (var directory = new DirectoryInfo(workingDirectory); directory is not null; directory = directory.Parent)
+            {
+                var manifest = Path.Combine(directory.FullName, "pubspec.yaml");
+                if (File.Exists(manifest) && File.ReadLines(manifest).Any(line => line.TrimEnd() == "workspace:"))
+                { return [directory.FullName]; }
+            }
             var family = Path.GetFullPath(Path.Combine(workingDirectory, ".."));
             return
             [

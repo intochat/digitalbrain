@@ -1,6 +1,8 @@
 import 'package:digitalbrain_flutter_shell/workspace/workspace_store.dart';
-import 'package:digitalbrain_flutter_shell/workspace/workspace_chat.dart';
-import 'package:digitalbrain_flutter_shell/workspace/workspace_voice.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
+
+import 'dart:typed_data';
+
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -48,30 +50,33 @@ void main() {
     restored.dispose();
   });
 
-  testWidgets('assistant composer exposes voice recording', (tester) async {
-    final store = WorkspaceStore(persistence: MemoryPersistence());
-    store.currentConversation.draft = 'Existing draft';
+  testWidgets('declared voice input sends audio to its neuron', (tester) async {
+    final events = <Map<String, dynamic>>[];
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: WorkspaceChat(
-            conversation: store.currentConversation,
-            store: store,
-            onArtifact: (_) {},
-            onAttach: () {},
+          body: NeuronView(
+            kind: 'voiceinput',
+            name: 'voice',
+            load: (_, _) async => {'label': 'Dictate'},
+            onAction: (event) async => events.add(event),
           ),
         ),
       ),
     );
-    expect(find.byTooltip('Record a voice draft'), findsOneWidget);
-    tester
-        .widget<WorkspaceVoiceButton>(find.byType(WorkspaceVoiceButton))
-        .onDraft!('spoken words');
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Dictate'), findsOneWidget);
+    await tester
+        .widget<UiVoiceInput>(find.byType(UiVoiceInput))
+        .onAudio!(Uint8List.fromList([1, 2, 3]), 'audio/wav');
     await tester.pump();
-    expect(store.currentConversation.draft, 'Existing draft spoken words');
-    expect(store.currentConversation.messages, isEmpty);
+    expect(events.single, {
+      'kind': 'voiceinput',
+      'name': 'voice',
+      'value': 'AQID',
+      'mimeType': 'audio/wav',
+    });
     await tester.pumpWidget(const SizedBox());
-    store.dispose();
   });
 
   test(

@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Configuration;
+
 namespace DigitalBrain.Flutter.Aspire.Hosting;
 
 internal static class FlutterHostLaunch
@@ -15,7 +17,7 @@ internal static class FlutterHostLaunch
         FlutterHostKind kind,
         string packageRoot,
         FlutterHostOptions options,
-        Microsoft.Extensions.Configuration.IConfiguration? configuration = null)
+        IConfiguration? configuration = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(packageRoot);
         ArgumentNullException.ThrowIfNull(options);
@@ -53,7 +55,7 @@ internal static class FlutterHostLaunch
     private static Result ResolveWindow(
         string packageRoot,
         FlutterHostOptions options,
-        Microsoft.Extensions.Configuration.IConfiguration? configuration)
+        IConfiguration? configuration)
     {
         var deviceTarget = string.IsNullOrWhiteSpace(options.DeviceTarget)
             ? ShellNames.DefaultDeviceTarget
@@ -102,7 +104,7 @@ internal static class FlutterHostLaunch
     private static Result ResolveWeb(
         string packageRoot,
         FlutterHostOptions options,
-        Microsoft.Extensions.Configuration.IConfiguration? configuration)
+        IConfiguration? configuration)
     {
         var deviceTarget = string.IsNullOrWhiteSpace(options.DeviceTarget)
             || string.Equals(
@@ -167,7 +169,7 @@ internal static class FlutterHostLaunch
 
     internal static string ResolveFlutterCommand(
         FlutterHostOptions options,
-        Microsoft.Extensions.Configuration.IConfiguration? configuration = null)
+        IConfiguration? configuration = null)
     {
         ArgumentNullException.ThrowIfNull(options);
 

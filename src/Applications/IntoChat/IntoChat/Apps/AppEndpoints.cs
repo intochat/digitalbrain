@@ -7,7 +7,6 @@ using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Button;
 using DigitalBrain.Flutter.Card;
-using DigitalBrain.Flutter.Chat;
 using DigitalBrain.Flutter.Collection;
 using DigitalBrain.Flutter.Form;
 using DigitalBrain.Flutter.ImageCanvas;
@@ -17,6 +16,8 @@ using DigitalBrain.Flutter.Tabs;
 using DigitalBrain.Flutter.Text;
 using DigitalBrain.Flutter.TextField;
 using DigitalBrain.Flutter.VoiceInput;
+using DigitalBrain.Flutter.Select;
+using DigitalBrain.Flutter.FileInput;
 using DigitalBrain.Flutter.Workspace;
 using IntoChat.Workspace;
 using Microsoft.Extensions.Options;
@@ -83,6 +84,8 @@ internal static class AppEndpoints
                 "text" => Results.Ok(await brain.Get<IText>(name).Read().WaitAsync(ct)),
                 "button" => Results.Ok(await brain.Get<IButton>(name).Read().WaitAsync(ct)),
                 "textfield" => Results.Ok(await brain.Get<ITextField>(name).Read().WaitAsync(ct)),
+                "select" => Results.Ok(await brain.Get<ISelect>(name).Read().WaitAsync(ct)),
+                "fileinput" => Results.Ok(await brain.Get<IFileInput>(name).Read().WaitAsync(ct)),
                 "card" => Results.Ok(await brain.Get<ICard>(name).Read().WaitAsync(ct)),
                 "tabs" => Results.Ok(await brain.Get<ITabs>(name).Read().WaitAsync(ct)),
                 "surface" => Results.Ok(await brain.Get<ISurface>(name).Read().WaitAsync(ct)),
@@ -90,7 +93,6 @@ internal static class AppEndpoints
                 "collection" => Results.Ok(await brain.Get<ICollectionView>(name).Read().WaitAsync(ct)),
                 "imagecanvas" => Results.Ok(await brain.Get<IImageCanvas>(name).Read().WaitAsync(ct)),
                 "form" => Results.Ok(await brain.Get<IForm>(name).Read().WaitAsync(ct)),
-                UIVocabulary.ChatType => Results.Ok(await brain.Get<IChat>(name).Read().WaitAsync(ct)),
                 UIVocabulary.VoiceInputType => Results.Ok(await brain.Get<IVoiceInput>(name).Read().WaitAsync(ct)),
                 _ => throw new ArgumentException("Unknown app UI kind.")
             };
@@ -102,7 +104,9 @@ internal static class AppEndpoints
             switch (input.Kind)
             {
                 case "button": await brain.Get<IButton>(input.Name).Click().WaitAsync(ct); break;
-                case "textfield": await brain.Get<ITextField>(input.Name).SetValue(input.Value ?? "").WaitAsync(ct); break;
+                case "textfield": await brain.Get<ITextField>(input.Name).Input(input.Value ?? "").WaitAsync(ct); break;
+                case "select": await brain.Get<ISelect>(input.Name).Choose(input.Value ?? "").WaitAsync(ct); break;
+                case "fileinput": await brain.Get<IFileInput>(input.Name).Capture(input.Field ?? "", input.Value ?? "").WaitAsync(ct); break;
                 case "tabs": await brain.Get<ITabs>(input.Name).Select(input.Value ?? "").WaitAsync(ct); break;
                 case "collection":
                     var collection = brain.Get<ICollectionView>(input.Name);
@@ -127,11 +131,6 @@ internal static class AppEndpoints
                         await form.SetSecret(input.Field ?? "", SecretRef.FromReference(input.Value!, input.Field ?? "")).WaitAsync(ct);
                     }
                     else { await form.SetDraft(input.Field ?? "", input.Value ?? "").WaitAsync(ct); }
-                    break;
-                case UIVocabulary.ChatType:
-                    var chat = brain.Get<IChat>(input.Name);
-                    await chat.SetDraft(input.Value ?? "").WaitAsync(ct);
-                    await chat.Submit().WaitAsync(ct);
                     break;
                 case UIVocabulary.VoiceInputType:
                     await brain.Get<IVoiceInput>(input.Name).Capture(DecodeAudio(input.Value), input.MimeType ?? "").WaitAsync(ct);

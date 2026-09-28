@@ -13,10 +13,10 @@ public sealed class NeuronTools(NeuronRegistry registry, NeuronInvoker invoker) 
 {
     public const string NewNeuron = "new";
 
-    private IReadOnlyList<Described>? _described;
+    private readonly Lazy<IReadOnlyList<Described>> _described = new(() => [.. registry.Methods.Select(Describe)]);
 
     public IReadOnlyList<AIFunction> Create(Func<AgentToolContext> context)
-        => [.. (_described ??= [.. registry.Methods.Select(Describe)]).Select(described => new NeuronFunction(described, invoker, context))];
+        => [.. _described.Value.Select(described => new NeuronFunction(described, invoker, context))];
 
     public static JsonElement Schema(NeuronMethod method)
     {
@@ -33,7 +33,7 @@ public sealed class NeuronTools(NeuronRegistry registry, NeuronInvoker invoker) 
         {
             properties[parameter.Name!] = JsonNode.Parse(AIJsonUtilities.CreateJsonSchema(parameter.ParameterType,
                 hasDefaultValue: parameter.HasDefaultValue, defaultValue: parameter.HasDefaultValue ? parameter.DefaultValue : null,
-                serializerOptions: NeuronInvoker.Json).GetRawText());
+                serializerOptions: new JsonSerializerOptions(NeuronInvoker.Json)).GetRawText());
             if (!parameter.HasDefaultValue) { required.Add(parameter.Name); }
         }
         return JsonSerializer.SerializeToElement(new JsonObject { ["type"] = "object", ["properties"] = properties, ["required"] = required });

@@ -2,7 +2,6 @@ library;
 
 export 'src/chat/ui_chat.dart';
 export 'src/chat/ui_copyable_message.dart';
-export 'src/chat/ui_neuron_chat.dart';
 export 'src/components/browser/ui_web_browser.dart';
 export 'src/components/button/ui_button.dart';
 export 'src/components/card/ui_card.dart';
@@ -33,3 +32,7 @@ export 'src/components/image_canvas/ui_image_canvas.dart';
 export 'src/composition/neuron_view.dart';
 export 'src/composition/renderer_registry.dart';
 export 'src/composition/ui_collection_view.dart';
+
+export 'src/composition/application_surface.dart';
+
+export 'src/voice_input/ui_voice_input.dart';

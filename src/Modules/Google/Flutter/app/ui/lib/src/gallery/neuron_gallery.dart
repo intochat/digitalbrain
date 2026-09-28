@@ -15,12 +15,12 @@ const neuronDescriptions = <String, String>{
       'Edit an image through the host-provided image canvas and asset loader.',
   'button': 'A labeled action connected to its named neuron.',
   'text': 'Display the text stored in a neuron’s markdown field.',
-  'textfield': 'Collect a value and send it when the user submits the field.',
+  'textfield': 'Edit a value stored by its named neuron.',
   'card': 'Group a title, body, and optional child neurons.',
   'tabs': 'Switch between named child views within an app.',
   'form': 'Collect typed fields and submit their values together.',
-  'uichat':
-      'A conversation: shows its messages and submits what the user sends.',
+  'fileinput': 'Choose a file and send its content to its neuron.',
+  'select': 'Choose from options declared by its neuron.',
   'voiceinput': 'Record the user speaking and hand the audio to its neuron.',
   'toggle': 'An on/off value for a setting or option.',
   'slider': 'A numeric value selected along a range.',
@@ -133,15 +133,16 @@ Map<String, dynamic> neuronExample(String kind) => switch (kind) {
       },
     ],
   },
-  'uichat' => {
-    'revision': 1,
-    'label': 'Message the assistant',
-    'messages': [
-      {'id': 'question', 'role': 'User', 'text': 'What should I read next?'},
-      {'id': 'answer', 'role': 'Assistant', 'text': 'Try The Creative Act.'},
+  'voiceinput' => {'label': 'Hold to talk'},
+  'fileinput' => {'label': 'Attach file'},
+  'select' => {
+    'label': 'Category',
+    'selected': 'books',
+    'options': [
+      {'id': 'books', 'label': 'Books', 'enabled': true},
+      {'id': 'notes', 'label': 'Notes', 'enabled': true},
     ],
   },
-  'voiceinput' => {'label': 'Hold to talk'},
   'imagecanvas' => {
     'assetId': 'local-image',
     'width': 640,

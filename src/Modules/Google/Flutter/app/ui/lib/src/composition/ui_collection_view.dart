@@ -26,56 +26,63 @@ class UiCollectionView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) => Column(
-      children: [
-        if (error != null)
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              children: [
-                Semantics(liveRegion: true, child: Text(error!)),
-                if (onRetry != null)
-                  TextButton(onPressed: onRetry, child: const Text('Retry')),
-              ],
+    builder: (context, constraints) {
+      final content = items.isEmpty
+          ? Center(
+              child: Text(
+                emptyLabel ??
+                    (fileMode ? 'This folder is empty.' : 'No activity yet.'),
+              ),
+            )
+          : ListView.separated(
+              shrinkWrap: !constraints.hasBoundedHeight,
+              physics: constraints.hasBoundedHeight
+                  ? null
+                  : const NeverScrollableScrollPhysics(),
+              itemCount: items.length,
+              separatorBuilder: (_, _) => const Divider(height: 1),
+              itemBuilder: (context, index) =>
+                  _item(context, items[index], constraints.maxWidth),
+            );
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (error != null)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  Semantics(liveRegion: true, child: Text(error!)),
+                  if (onRetry != null)
+                    TextButton(onPressed: onRetry, child: const Text('Retry')),
+                ],
+              ),
             ),
-          ),
-        Expanded(
-          child: items.isEmpty
-              ? Center(
-                  child: Text(
-                    emptyLabel ??
-                        (fileMode
-                            ? 'This folder is empty.'
-                            : 'No activity yet.'),
-                  ),
-                )
-              : ListView.separated(
-                  itemCount: items.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
-                  itemBuilder: (context, index) =>
-                      _item(context, items[index], constraints.maxWidth),
-                ),
-        ),
-        if (onLoadMore != null || loadingMore)
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: loadingMore
-                ? Semantics(
-                    label: 'Loading more',
-                    liveRegion: true,
-                    child: const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+          if (constraints.hasBoundedHeight)
+            Expanded(child: content)
+          else
+            content,
+          if (onLoadMore != null || loadingMore)
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: loadingMore
+                  ? Semantics(
+                      label: 'Loading more',
+                      liveRegion: true,
+                      child: const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : TextButton(
+                      onPressed: onLoadMore,
+                      child: const Text('Load more'),
                     ),
-                  )
-                : TextButton(
-                    onPressed: onLoadMore,
-                    child: const Text('Load more'),
-                  ),
-          ),
-      ],
-    ),
+            ),
+        ],
+      );
+    },
   );
 
   Widget _item(BuildContext context, Map<String, dynamic> item, double width) {

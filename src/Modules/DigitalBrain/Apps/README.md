@@ -2,6 +2,26 @@
 
 Shared C# apps (packages), their marketplace directory, and packages installed into workspaces as apps. The module also keeps first-party app manifests, the per-workspace catalog and consent for the existing app surfaces.
 
+## Compiled applications
+
+`DigitalBrain.Apps.IApplication` declares module requirements and startup steps through `IAppBuilder`.
+`AppDefinition` captures that declaration; `ApplicationCatalog` starts it for a workspace-scoped key.
+These types and their hosting extensions live in this module. Kernel only composes modules and has
+no dependency on applications. `WithApp` adds missing requirements while preserving modules already
+configured by the host. `DigitalBrain.Modules.Apps.Testing` provides the unit-test `WithApp`
+extension, which also registers the application catalog without adding Apps dependencies to the
+base test harness.
+
+The Assistant in `src/Apps/Assistant` declares the main conversation surface with the application
+builder. Assistant neurons own drafts, conversation/model selection and the presentation state;
+Flutter renders the declared tree with generic neuron components. No app-specific Dart renderer
+or client turn controller is required. IntoChat registers the app and exposes authenticated
+transport. `IAssistant.Run` owns turn execution, replay, cancellation, conversation history,
+tool selection, model calls, metering and receipts. `IAssistant.Transcribe` owns voice validation
+and transcription. `OpenWindow` starts a distinct app instance and opens its surface in the
+workspace. Application services are registered through `IAppBuilder.ConfigureServices`. Package apps below retain their
+existing installation, publishing, consent, and verification lifecycle.
+
 ## Packages
 
 A package is a shareable single-file C# app addressed as `owner/name`, where the owner is the publishing account's username. `IPackage` holds content-addressed revisions: a revision id hashes its parents and content, so forks share ancestry.

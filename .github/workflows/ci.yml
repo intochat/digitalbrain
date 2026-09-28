@@ -108,7 +108,7 @@ jobs:
         working-directory: src/Modules/Google/Flutter/app
         run: dart format --output=none --set-exit-if-changed core ui shell
 
-      - name: Analyze core, ui and shell
+      - name: Analyze Flutter packages
         working-directory: src/Modules/Google/Flutter/app
         run: |
           (cd core && dart analyze --fatal-infos)

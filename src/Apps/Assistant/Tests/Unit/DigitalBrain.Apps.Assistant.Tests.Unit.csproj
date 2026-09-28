@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="../../../../Modules/DigitalBrain/Apps/Testing/DigitalBrain.Modules.Apps.Testing.csproj" />
     <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
     <ProjectReference Include="../../../../Modules/DigitalBrain/Specs/Specs/DigitalBrain.Modules.Specs.csproj" />
     <ProjectReference Include="../../DigitalBrain.Apps.Assistant.csproj" />
@@ -7,5 +8,6 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="assistant.feature" LogicalName="assistant.feature" />
+    <EmbeddedResource Include="assistant-stream.feature" LogicalName="assistant-stream.feature" />
   </ItemGroup>
 </Project>

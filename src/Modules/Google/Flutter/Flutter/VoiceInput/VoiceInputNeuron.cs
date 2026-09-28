@@ -18,7 +18,7 @@ internal sealed class VoiceInputNeuron([PersistentState("state", DigitalBrainNam
         return Save(next, new VoiceInputChanged(next.Name, next.Revision));
     }
 
-    public Task Capture(byte[] audio, string mimeType)
+    public async Task Capture(byte[] audio, string mimeType)
     {
         ArgumentNullException.ThrowIfNull(audio);
         ArgumentException.ThrowIfNullOrWhiteSpace(mimeType);
@@ -26,7 +26,9 @@ internal sealed class VoiceInputNeuron([PersistentState("state", DigitalBrainNam
         if (!mimeType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase)) { throw new ArgumentException("Only audio can be captured.", nameof(mimeType)); }
         var next = Next();
         next.Captures++;
-        return Save(next, new VoiceInputChanged(next.Name, next.Revision), new VoiceCaptured(next.Name, audio, mimeType.Trim().ToLowerInvariant()));
+        var captured = new VoiceCaptured(next.Name, audio, mimeType.Trim().ToLowerInvariant());
+        await Save(next, new VoiceInputChanged(next.Name, next.Revision), captured);
+        await GrainFactory.GetGrain<IUiBinding>(next.Name).Dispatch(captured);
     }
 
     [ReadOnly] public Task<VoiceInputState> Read() { Snapshot.Name = this.GetPrimaryKeyString(); return Task.FromResult(Snapshot); }

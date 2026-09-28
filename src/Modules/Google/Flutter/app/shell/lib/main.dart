@@ -70,7 +70,6 @@ Widget buildShell({
     initialLocation: initialLocation,
     kernelBaseUri: edge?.baseUri,
     programmingClient: edge,
-    onRun: edge?.runAgent,
     onSalesforceConnected: edge?.salesforceConnected,
     onReadTable: edge?.readTable,
     onUpdateTableView: edge?.updateTableView,

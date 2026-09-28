@@ -19,12 +19,11 @@ public sealed class UnitTestBuilder
         _composition.WithModule(configure);
         return this;
     }
-    public UnitTestBuilder WithApp<TApp>() where TApp : IApplication, new()
+    public UnitTestBuilder RequireModules(IEnumerable<Type> modules)
     {
         EnsureMutable();
-        var app = AppDefinition.Of<TApp>();
-        _composition.WithApp(app);
-        return ConfigureSilo(silo => silo.AddApplication(app));
+        _composition.RequireModules(modules);
+        return this;
     }
     public UnitTestBuilder ConfigureModule<TModule>(Action<ModuleConfiguration<TModule>> configure)
         where TModule : class, IModule, new()

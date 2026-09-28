@@ -36,7 +36,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Switch account'), findsNothing);
       expect(find.byTooltip('Packages'), findsNothing);
-      expect(find.byTooltip('New conversation'), findsOneWidget);
+      expect(find.text('Send'), findsOneWidget);
 
       await tester.tap(find.byTooltip('Profile'));
       await tester.pumpAndSettle();

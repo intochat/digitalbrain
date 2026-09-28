@@ -12,7 +12,7 @@ internal sealed class LayoutNeuron(
     public async Task Set(LayoutDefinition definition, long expectedRevision)
     {
         ArgumentNullException.ThrowIfNull(definition);
-        if (definition.Mode is not ("row" or "column" or "split" or "stack")) { throw new ArgumentException("Unknown layout mode."); }
+        if (definition.Mode is not ("row" or "column" or "split" or "stack" or "list")) { throw new ArgumentException("Unknown layout mode."); }
         if (!double.IsFinite(definition.Gap) || definition.Gap < 0 || definition.Gap > 128) { throw new ArgumentException("Gap must be between 0 and 128."); }
         if (definition.Extents is { } extents && (extents.Count != definition.Children.Count || extents.Any(x => !double.IsFinite(x) || x < 0 || x > 4096))) { throw new ArgumentException("Extents must match children and be between 0 and 4096."); }
         CompositionValidation.Children(definition.Children);

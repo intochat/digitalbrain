@@ -144,6 +144,7 @@
     <Project Path="src/Modules/DigitalBrain/Apps/Tests/Unit/DigitalBrain.Modules.Apps.Tests.Unit.csproj" />
     <Project Path="src/Modules/DigitalBrain/Apps/Contracts/DigitalBrain.Modules.Apps.Contracts.csproj" />
     <Project Path="src/Modules/DigitalBrain/Apps/Apps/DigitalBrain.Modules.Apps.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Apps/Testing/DigitalBrain.Modules.Apps.Testing.csproj" />
   </Folder>
   <Folder Name="/Modules/DigitalBrain/Specs/">
     <Project Path="src/Modules/DigitalBrain/Specs/Tests/Unit/DigitalBrain.Modules.Specs.Tests.Unit.csproj" />

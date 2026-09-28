@@ -1,3 +1,4 @@
+using DigitalBrain.Apps.Assistant;
 using DigitalBrain.AI.Metering;
 using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
@@ -17,7 +18,7 @@ public sealed class ComputeUsageFacts
         using var intent = IntentContext.Begin("mixed", "workspace");
         var receipt = AgentReceipts.Create(priceBook, intent, new IntentActivity(), AgentRunOutcome.Succeeded, [priced, unpriced]);
         Assert.True(receipt.Compute > 0);
-        var row = ComputeUsageEndpoints.Create("mixed", receipt, priceBook, [priced, unpriced]);
+        var row = AssistantUsage.Create("mixed", receipt, priceBook, [priced, unpriced]);
         Assert.Null(row.PreviewCompute);
     }
 
@@ -39,7 +40,7 @@ public sealed class ComputeUsageFacts
     public void ProjectionPreservesMissingTokensAndSeparatesPreviewFromActual()
     {
         var receipt = new AgentReceipt(AgentRunOutcome.Succeeded, "2 tool calls", [], [], 1, 12m);
-        var row = ComputeUsageEndpoints.Create("run", receipt, new PriceBook(), [new(MeterKind.Chat, "provider", "model", null, null, null, null, null, false, DateTimeOffset.UtcNow)]);
+        var row = AssistantUsage.Create("run", receipt, new PriceBook(), [new(MeterKind.Chat, "provider", "model", null, null, null, null, null, false, DateTimeOffset.UtcNow)]);
         Assert.Null(row.PreviewCompute);
         Assert.Null(row.ChargedCompute);
         Assert.Null(row.ReservedCompute);

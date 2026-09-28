@@ -1,10 +1,10 @@
 using System.Globalization;
 using System.Text;
 using DigitalBrain.AI.Agents;
-using DigitalBrain.Core;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Chat;
-using DigitalBrain.Flutter.Layout;
+using DigitalBrain.Flutter.TextField;
+using DigitalBrain.Flutter.Button;
 using DigitalBrain.Flutter.Surface;
 using DigitalBrain.Flutter.VoiceInput;
 using DigitalBrain.Flutter.Workspace;
@@ -30,22 +30,69 @@ internal sealed class AssistantSteps : StepLibrary
             var title = (await Surface(context).Read()).Definition.Title;
             if (title != args.Text(0)) { throw new StepFailedException($"The surface is titled \"{title}\"."); }
         });
-        Step("its surface shows a chat and voice input", "The surface lays out a chat and a voice input.", async context =>
+        Step("its surface declares explicit assistant controls", "The app declares the full control tree using generic primitives.", context =>
+            Ui(context).AssertExplicitControls());
+        Step("I draft {string}", "Edits the bound multiline field.", (context, args) => Ui(context).Input(args.Text(0)));
+        Step("the chat draft is {string}", "Reopening has not erased the draft.", async (context, args) =>
         {
-            var layout = Assert((await Surface(context).Read()).Definition.Children, UIVocabulary.LayoutType);
-            var children = (await context.Grains.GetGrain<ILayout>(layout.Name).Read()).Definition.Children;
-            Assert(children, UIVocabulary.ChatType);
-            Assert(children, UIVocabulary.VoiceInputType);
+            await Ui(context).WaitForDraft(args.Text(0));
         });
-        Step("I type {string}", "Types a message into the chat and submits it.", async (context, args) =>
+        Step("conversation {string} has a completed answer {string}", "Keeps a completed turn in the app-owned conversation.", async (context, args) =>
         {
-            var chat = Chat(context);
-            await chat.SetDraft(args.Text(0));
-            await chat.Submit();
+            var conversation = await Assistant(context).Conversation(args.Text(0));
+            await conversation.BeginConversation(new("run-1", "question"), context.CancellationToken);
+            await conversation.CompleteConversation(new("run-1", "question", args.Text(1), []), context.CancellationToken);
         });
+        Step("conversation {string} contains the answer {string}", "Reads a saved turn after reopening.", async (context, args) =>
+        {
+            var conversation = await Assistant(context).Conversation(args.Text(0));
+            var turns = (await conversation.ReadConversation(context.CancellationToken)).Turns;
+            if (turns.Count != 1 || turns[0].AssistantText != args.Text(1)) { throw new StepFailedException("The saved turn is missing or duplicated."); }
+            var legacy = context.Grains.GetGrain<IAgent>(AssistantConversations.Key(context.Subject.Split("/applications/")[0], args.Text(0)));
+            if ((await legacy.ReadConversation(context.CancellationToken)).Turns.Count != 1)
+            { throw new StepFailedException("Existing conversation identity was not preserved."); }
+        });
+        Step("conversation {string} is empty", "New threads do not inherit another thread's history.", async (context, args) =>
+        {
+            var conversation = await Assistant(context).Conversation(args.Text(0));
+            if ((await conversation.ReadConversation(context.CancellationToken)).Turns.Count != 0)
+            { throw new StepFailedException("History leaked across threads."); }
+        });
+        Step("another workspace has no turns in conversation {string}", "Workspace conversations remain isolated.", async (context, args) =>
+        {
+            var other = context.Grains.GetGrain<IAssistant>(AssistantApp.Key(context.Subject.Split("/applications/")[0] + "-other"));
+            var conversation = await other.Conversation(args.Text(0));
+            if ((await conversation.ReadConversation(context.CancellationToken)).Turns.Count != 0)
+            { throw new StepFailedException("History leaked across workspaces."); }
+        });
+        Step("I configure the assistant instructions as {string}", "Configures the app-owned agent.", (context, args) =>
+            Assistant(context).Configure(new AgentDefinition { DisplayName = "Custom assistant", Instructions = args.Text(0) }));
+        Step("the assistant turn uses instructions {string}", "The application preserves its configured agent.", async (context, args) =>
+        {
+            if ((await Assistant(context).DefineTurn(false, null)).Instructions != args.Text(0))
+            { throw new StepFailedException("The application lost its agent configuration."); }
+        });
+        Step("the assistant includes the summary {string} in its turn instructions", "The neuron composes retained context.", async (context, args) =>
+        {
+            var definition = await Assistant(context).DefineTurn(false, args.Text(0));
+            if (!definition.Instructions.Contains("Earlier conversation summary: " + args.Text(0), StringComparison.Ordinal))
+            { throw new StepFailedException("The retained context is missing."); }
+        });
+        Step("invalid conversation identifiers are rejected", "Rejects keys that could escape the thread scope.", async context =>
+        {
+            foreach (var invalid in new[] { "", "foreign/thread", "foreign\\thread", new string('x', 201) })
+            {
+                try { await Assistant(context).Conversation(invalid); }
+                catch (ArgumentException) { continue; }
+                throw new StepFailedException("An invalid conversation identifier was accepted.");
+            }
+        });
+        Step("I type {string}", "Types into the field and clicks the bound send button.", (context, args) =>
+            Ui(context).Submit(args.Text(0)));
+        Step("I send the draft", "Clicks the bound send button.", context => Ui(context).Submit());
         Step("I say {string} by voice", "Records audio that the transcriber hears as this text.", (context, args) =>
             context.Grains.GetGrain<IVoiceInput>(UiComposer.NameOf(context.Subject, AssistantApp.VoicePart))
-                .Capture(Encoding.UTF8.GetBytes(args.Text(0)), "audio/webm"));
+                .Capture(RecordedText(args.Text(0)), "audio/wav"));
         Step("the chat shows my message {string}", "The chat shows this message from the user.", (context, args) =>
             Shows(context, ChatRole.User, args.Text(0)));
         Step("the chat shows the assistant reply {string}", "The chat shows this reply from the assistant.", (context, args) =>
@@ -57,15 +104,15 @@ internal sealed class AssistantSteps : StepLibrary
             database.Rows = [.. Enumerable.Range(1, args.Int(1)).Select(id => new SupabaseTableRow("row-" + id, [id.ToString(CultureInfo.InvariantCulture), $"\"Customer {id}\""]))];
             return Task.CompletedTask;
         });
-        Step("the assistant used {string} and {string}", "The assistant's agent completed calls to both neuron methods.", async (context, args) =>
+        Step("the assistant used {string} and {string}", "The assistant's agent completed calls to both neuron methods.", (context, args) =>
         {
-            var completed = (await context.Grains.GetGrain<IAgent>(UiComposer.NameOf(context.Subject, "agent")).GetEventLog())
-                .Where(entry => entry.Kind == "tool-completed").Select(entry => entry.Tool ?? "").ToArray();
+            var completed = context.Services.GetRequiredService<InjectedModelTurnRunner>().CompletedTools.ToArray();
             foreach (var method in new[] { args.Text(0), args.Text(1) })
             {
                 if (!completed.Any(tool => tool.EndsWith("_" + method, StringComparison.Ordinal)))
                 { throw new StepFailedException($"No completed call to {method} among [{string.Join(", ", completed)}]."); }
             }
+            return Task.CompletedTask;
         });
         Step("a table window is open in the workspace", "The workspace shows an open table window.", FindTableWindow);
         Step("the table has {int} rows", "The table in the workspace window serves this many rows.", async (context, args) =>
@@ -85,23 +132,34 @@ internal sealed class AssistantSteps : StepLibrary
 
     private void Step(string pattern, string description, Func<StepContext, Task> run) => Step(pattern, description, (context, _) => run(context));
 
+    private static IAssistant Assistant(StepContext context) => context.Grains.GetGrain<IAssistant>(context.Subject);
+
     private static ISurface Surface(StepContext context) => context.Grains.GetGrain<ISurface>(UiComposer.NameOf(context.Subject, "surface"));
 
-    private static IChat Chat(StepContext context) => context.Grains.GetGrain<IChat>(UiComposer.NameOf(context.Subject, AssistantApp.ChatPart));
+    private static AssistantUiProbe Ui(StepContext context) => new(context.Grains, context.Subject);
 
-    private static UiChildRef Assert(IReadOnlyList<UiChildRef> children, string kind) =>
-        children.FirstOrDefault(child => child.Kind == kind)
-        ?? throw new StepFailedException($"No {kind} among [{string.Join(", ", children.Select(child => child.Kind))}].");
+    private static byte[] RecordedText(string text)
+    {
+        var payload = Encoding.UTF8.GetBytes(text);
+        var wav = new byte[44 + payload.Length];
+        "RIFF"u8.CopyTo(wav);
+        "WAVE"u8.CopyTo(wav.AsSpan(8));
+        payload.CopyTo(wav, 44);
+        return wav;
+    }
 
     // The assistant answers one-way, so the chat is read until the message arrives.
     private static async Task Shows(StepContext context, ChatRole role, string text)
     {
         var deadline = DateTimeOffset.UtcNow + ChatTimeout;
-        IReadOnlyList<ChatEntry> messages;
-        while (!(messages = (await Chat(context).Read()).Messages).Any(message => message.Role == role && message.Text == text))
+        var ui = Ui(context);
+        while (true)
         {
-            if (DateTimeOffset.UtcNow > deadline)
-            { throw new StepFailedException($"The chat shows [{string.Join(" | ", messages.Select(message => $"{message.Role}: {message.Text}"))}]."); }
+            var thread = await ui.Read();
+            if (thread.Messages.Any(message => message.Role == role && message.Text == text)
+                && (await ui.VisibleText()).Contains(text, StringComparison.Ordinal)) { return; }
+            if (thread.Error is not null || DateTimeOffset.UtcNow > deadline)
+            { throw new StepFailedException($"State: {System.Text.Json.JsonSerializer.Serialize(thread)}. Runner: {string.Join("; ", context.Services.GetRequiredService<InjectedModelTurnRunner>().Failures)}."); }
             await Task.Delay(TimeSpan.FromMilliseconds(50), context.CancellationToken);
         }
     }

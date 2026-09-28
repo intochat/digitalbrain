@@ -7,7 +7,6 @@ import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:uuid/uuid.dart';
 
 import 'workspace_store.dart';
-import 'workspace_voice.dart';
 
 class AppSurfaceHost extends StatefulWidget {
   const AppSurfaceHost({
@@ -30,7 +29,7 @@ class AppSurfaceHost extends StatefulWidget {
 }
 
 class _AppSurfaceHostState extends State<AppSurfaceHost> {
-  Map<String, dynamic>? listing, document, editorUi, assistantSurface;
+  Map<String, dynamic>? listing, document, editorUi;
   Uint8List? bytes;
   String? error, folder;
   bool editing = false;
@@ -71,20 +70,7 @@ class _AppSurfaceHostState extends State<AppSurfaceHost> {
       error = null;
     });
     try {
-      if (app == 'assistant') {
-        final started = await widget.client.jsonRequest(
-          'POST',
-          '/workspaces/${Uri.encodeComponent(widget.workspace)}/applications/assistant/start',
-          <String, dynamic>{},
-        );
-        if (mounted && request == generation) {
-          setState(
-            () => assistantSurface = Map<String, dynamic>.from(
-              (started as Map)['surface'] as Map,
-            ),
-          );
-        }
-      } else if (app == 'files') {
+      if (app == 'files') {
         final query = Uri(
           queryParameters: {
             'offset': '$offset',
@@ -331,53 +317,8 @@ class _AppSurfaceHostState extends State<AppSurfaceHost> {
   Future<void> relay(Map<String, dynamic> event) =>
       widget.client.appRequest(widget.workspace, 'event', body: event);
 
-  Widget assistant() {
-    final surface = assistantSurface;
-    if (surface == null) {
-      return Center(
-        child: error == null
-            ? const CircularProgressIndicator()
-            : TextButton(onPressed: load, child: const Text('Retry')),
-      );
-    }
-    return NeuronView(
-      kind: surface['kind'] as String,
-      name: surface['name'] as String,
-      load: node,
-      onAction: relay,
-      voiceBuilder: (name, _) => Padding(
-        padding: const EdgeInsets.all(8),
-        child: Center(
-          child: WorkspaceVoiceButton(
-            onAudio: (audio, mimeType) => relay({
-              'kind': 'voiceinput',
-              'name': name,
-              'value': base64Encode(audio),
-              'mimeType': mimeType,
-            }),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    if (app == 'assistant') {
-      return Column(
-        children: [
-          if (error != null)
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(
-                error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-            ),
-          Expanded(child: assistant()),
-        ],
-      );
-    }
     final renderedDocument = document;
     final renderedBytes = bytes;
     final surface = app == 'files'

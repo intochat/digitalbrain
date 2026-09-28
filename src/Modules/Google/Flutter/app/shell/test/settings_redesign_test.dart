@@ -1,10 +1,9 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_flutter_shell/workspace/model_settings.dart';
 import 'package:digitalbrain_flutter_shell/workspace/workspace_app.dart';
-import 'package:digitalbrain_flutter_shell/workspace/workspace_chat.dart';
+import 'package:digitalbrain_ui/digitalbrain_ui.dart';
 import 'package:digitalbrain_flutter_shell/workspace/workspace_settings.dart';
 import 'package:digitalbrain_flutter_shell/workspace/workspace_store.dart';
 import 'package:flutter/material.dart';
@@ -30,10 +29,24 @@ const catalog = ChatModelCatalog(
 
 void main() {
   test('unavailable model response tells user how to recover', () async {
-    final client = DigitalBrainUiClient(baseUri: Uri.parse('http://test'),
-      httpClient: MockClient((_) async => http.Response('{"code":"MODEL_UNAVAILABLE"}', 400)));
-    await expectLater(client.runAgent(workspaceId: 'w', threadId: 't', runId: 'r', text: 'Hi').toList(),
-      throwsA(predicate((error) => error.toString().contains('Choose another model beside the composer'))));
+    final client = DigitalBrainUiClient(
+      baseUri: Uri.parse('http://test'),
+      httpClient: MockClient(
+        (_) async => http.Response('{"code":"MODEL_UNAVAILABLE"}', 400),
+      ),
+    );
+    await expectLater(
+      client
+          .runAgent(workspaceId: 'w', threadId: 't', runId: 'r', text: 'Hi')
+          .toList(),
+      throwsA(
+        predicate(
+          (error) => error.toString().contains(
+            'Choose another model beside the composer',
+          ),
+        ),
+      ),
+    );
   });
 
   test(
@@ -183,58 +196,38 @@ void main() {
     expect(selected, isNull);
   });
 
-  testWidgets(
-    'composer model selection reaches next run and locks during run',
-    (tester) async {
-      final store = WorkspaceStore(persistence: MemoryPersistence());
-      final stream = StreamController<AgentEvent>();
-      String? used;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: WorkspaceChat(
-              store: store,
-              conversation: store.currentConversation,
-              onArtifact: (_) {},
-              onAttach: () {},
-              loadModels: () async => catalog,
-              onRun:
-                  ({
-                    required workspaceId,
-                    required threadId,
-                    required runId,
-                    parentRunId,
-                    modelProfile,
-                    required text,
-                  }) {
-                    used = modelProfile;
-                    return stream.stream;
-                  },
-            ),
+  testWidgets('declared select options send selection to their neuron', (
+    tester,
+  ) async {
+    final events = <Map<String, dynamic>>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: NeuronView(
+            kind: 'select',
+            name: 'model',
+            load: (_, _) async => {
+              'label': 'Model',
+              'selected': null,
+              'options': [
+                {'id': 'profile:fast', 'label': 'Fast', 'enabled': true},
+              ],
+            },
+            onAction: (event) async => events.add(event),
           ),
         ),
-      );
-      await tester.tap(find.byKey(const Key('conversation-model-picker')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Fast'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'Hello');
-      await tester.pump();
-      await tester.tap(find.byTooltip('Send'));
-      await tester.pump();
-      expect(used, 'profile:fast');
-      expect(
-        tester
-            .widget<TextButton>(
-              find.byKey(const Key('conversation-model-picker')),
-            )
-            .onPressed,
-        isNull,
-      );
-      await stream.close();
-      await tester.pumpAndSettle(const Duration(milliseconds: 350));
-      await tester.pumpWidget(const SizedBox());
-      store.dispose();
-    },
-  );
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Model'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(CheckedPopupMenuItem<String>));
+    await tester.pumpAndSettle();
+    expect(events.single, {
+      'kind': 'select',
+      'name': 'model',
+      'value': 'profile:fast',
+    });
+    await tester.pumpWidget(const SizedBox());
+  });
 }

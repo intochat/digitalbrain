@@ -11,6 +11,19 @@ namespace DigitalBrain.Tests;
 public sealed class NeuronToolsFacts
 {
     [Fact]
+    public void SchemasCanBeCreatedConcurrentlyAfterInvocationOptionsAreUsed()
+    {
+        var method = new NeuronMethod(new NeuronContract("test.shelf", typeof(IShelf), "module"), typeof(IShelf).GetMethod(nameof(IShelf.Put))!);
+        System.Text.Json.JsonSerializer.Serialize(new ShelfItem("book", 1), NeuronInvoker.Json);
+
+        Parallel.For(0, 64, iteration =>
+        {
+            var schema = NeuronTools.Schema(method);
+            Assert.True(schema.GetProperty("properties").GetProperty("item").GetProperty("properties").TryGetProperty("title", out _));
+        });
+    }
+
+    [Fact]
     public void SchemaRequiresTheNeuronIdAndEveryArgumentWithoutADefault()
     {
         var method = new NeuronMethod(new NeuronContract("test.shelf", typeof(IShelf), "module"), typeof(IShelf).GetMethod(nameof(IShelf.Put))!);

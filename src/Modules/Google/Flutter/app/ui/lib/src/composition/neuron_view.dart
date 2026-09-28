@@ -1,6 +1,13 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:convert';
 
-import '../chat/ui_neuron_chat.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:gpt_markdown/gpt_markdown.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../voice_input/ui_voice_input.dart';
 import '../models/ui_part.dart';
 import 'renderer_registry.dart';
 import 'ui_collection_view.dart';
@@ -9,10 +16,36 @@ typedef NeuronLoader = Future<Map<String, dynamic>> Function(
   String kind,
   String name,
 );
-
-/// Posts a raw secret once to the owner's vault and returns the vault reference; the reference,
-/// never the raw value, is what the form event carries.
 typedef SecretSaver = Future<String?> Function(String fieldName, String value);
+
+/// One ordered event channel for a composed tree. A button is processed only
+/// after preceding field edits, regardless of network latency or input focus.
+class NeuronEventQueue extends ChangeNotifier {
+  Future<void> _tail = Future.value();
+  int version = 0, pending = 0;
+  bool _disposed = false;
+  Future<void> flush() => _tail;
+  Future<void> dispatch(
+    Future<void> Function(Map<String, dynamic>) send,
+    Map<String, dynamic> event,
+  ) {
+    version++;
+    pending++;
+    final operation = _tail.then((_) => send(event));
+    _tail = operation.catchError((Object _) {});
+    return operation.whenComplete(() {
+      pending--;
+      version++;
+      if (!_disposed && pending == 0) notifyListeners();
+    });
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+}
 
 class NeuronView extends StatefulWidget {
   const NeuronView({
@@ -28,6 +61,8 @@ class NeuronView extends StatefulWidget {
     this.ancestors = const {},
     this.revision = 0,
     this.enabled = true,
+    this.events,
+    this.refreshEvery = const Duration(seconds: 2),
   });
   final String kind, name;
   final NeuronLoader load;
@@ -39,313 +74,602 @@ class NeuronView extends StatefulWidget {
   final Set<String> ancestors;
   final int revision;
   final bool enabled;
+  final NeuronEventQueue? events;
+  final Duration refreshEvery;
   @override
   State<NeuronView> createState() => _NeuronViewState();
 }
 
 class _NeuronViewState extends State<NeuronView> {
-  late Future<Map<String, dynamic>> state;
+  Map<String, dynamic>? _data;
+  Object? _error;
   String? selection;
+  Timer? _timer;
+  bool _loading = false, _reloadAgain = false;
+  int _generation = 0;
+  late final NeuronEventQueue _events = widget.events ?? NeuronEventQueue();
   @override
   void initState() {
     super.initState();
-    state = widget.load(widget.kind, widget.name);
+    _events.addListener(_changed);
+    _reload();
+    _timer = Timer.periodic(widget.refreshEvery, (_) => _reload());
+  }
+
+  void _changed() {
+    _reload();
   }
 
   @override
   void didUpdateWidget(NeuronView old) {
     super.didUpdateWidget(old);
+    if (old.name != widget.name || old.kind != widget.kind) {
+      _generation++;
+      _data = null;
+      _error = null;
+    }
     if (old.name != widget.name ||
         old.kind != widget.kind ||
         old.revision != widget.revision) {
-      state = widget.load(widget.kind, widget.name);
+      _reload();
     }
   }
 
-  Future<void> selectItem(
-    Map<String, dynamic> item,
-    Map<String, dynamic> data,
-  ) async {
-    setState(() => selection = item['id'] as String);
-    await widget.onAction?.call({
-      'kind': 'collection',
-      'name': widget.name,
-      'action': 'select',
-      'value': item['id'],
-      'revision': data['revision'],
-    });
-    if (mounted) setState(() => state = widget.load(widget.kind, widget.name));
+  Future<void> _reload() async {
+    if (_events.pending > 0) return;
+    if (_loading) {
+      _reloadAgain = true;
+      return;
+    }
+    _loading = true;
+    final generation = _generation;
+    final version = _events.version;
+    try {
+      final data = await widget.load(widget.kind, widget.name);
+      if (mounted && generation == _generation && version == _events.version) {
+        setState(() {
+          _data = data;
+          _error = null;
+        });
+      }
+    } catch (error) {
+      if (mounted && _data == null) setState(() => _error = error);
+    } finally {
+      _loading = false;
+      if (mounted && _reloadAgain) {
+        _reloadAgain = false;
+        unawaited(_reload());
+      }
+    }
   }
 
+  Future<void> _dispatch(Map<String, dynamic> event) async {
+    final send = widget.onAction;
+    if (!widget.enabled || send == null) return;
+    try {
+      await _events.dispatch(send, event);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text('Could not save change: $error')),
+        );
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _button(Map<String, dynamic> definition) async {
+    FocusScope.of(context).unfocus();
+    try {
+      if (definition['activation'] case final String json) {
+        await _events.flush();
+        if (!mounted) return;
+        final activation = Map<String, dynamic>.from(jsonDecode(json) as Map);
+        final uri = Uri.tryParse('${activation['url'] ?? ''}');
+        if (uri != null && const {'http', 'https'}.contains(uri.scheme)) {
+          await launchUrl(uri);
+        } else {
+          widget.onActivate?.call(activation);
+        }
+      } else {
+        await _dispatch({
+          'kind': 'button',
+          'name': widget.name,
+          'action': definition['action'],
+        });
+      }
+    } catch (_) {
+      /* Dispatch presents the failure and keeps the projection. */
+    }
+  }
+
+  Future<void> _file() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(withData: true);
+      if (!mounted || result == null || result.files.isEmpty) return;
+      final file = result.files.first;
+      if (file.bytes == null) return;
+      await _dispatch({
+        'kind': 'fileinput',
+        'name': widget.name,
+        'value': utf8.decode(file.bytes!, allowMalformed: true),
+        'field': file.name,
+      });
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text('Could not attach file: $error')),
+        );
+      }
+    }
+  }
+
+  Widget _child(Map child) => NeuronView(
+    key: ValueKey('${child['kind']}:${child['name']}'),
+    kind: child['kind'] as String,
+    name: child['name'] as String,
+    load: widget.load,
+    onActivate: widget.onActivate,
+    onAction: widget.onAction,
+    imageBuilder: widget.imageBuilder,
+    voiceBuilder: widget.voiceBuilder,
+    secretSaver: widget.secretSaver,
+    events: _events,
+    refreshEvery: widget.refreshEvery,
+    ancestors: {...widget.ancestors, '${widget.kind}:${widget.name}'},
+    revision: widget.revision,
+    enabled: widget.enabled,
+  );
+  Widget _markdown(String text) => SelectionArea(
+    child: GptMarkdown(
+      text,
+      onLinkTap: (url, _) async {
+        final uri = Uri.tryParse(url);
+        if (uri != null && const {'https', 'http'}.contains(uri.scheme)) {
+          await launchUrl(uri);
+        }
+      },
+    ),
+  );
   @override
   Widget build(BuildContext context) {
     final identity = '${widget.kind}:${widget.name}';
     if (widget.ancestors.contains(identity) || widget.ancestors.length >= 16) {
       return const Center(child: Text('This component cannot be displayed.'));
     }
-    return FutureBuilder<Map<String, dynamic>>(
-      future: state,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return WindowStateView(
-            state: const WindowState(WindowStatus.failed),
-            onRetry: () =>
-                setState(() => state = widget.load(widget.kind, widget.name)),
-          );
-        }
-        if (!snapshot.hasData) {
-          return const WindowStateView(
-            state: WindowState(WindowStatus.loading),
-          );
-        }
-        final data = snapshot.data!;
-        final declared = WindowState.fromMetadata(data);
-        if (declared != null) {
-          return WindowStateView(
-            state: declared,
-            onRetry: () =>
-                setState(() => state = widget.load(widget.kind, widget.name)),
-          );
-        }
-        final definition = Map<String, dynamic>.from(
-          data['definition'] as Map? ?? data,
+    if (_data == null) {
+      return WindowStateView(
+        state: WindowState(
+          _error == null ? WindowStatus.loading : WindowStatus.failed,
+        ),
+        onRetry: _error == null ? null : _reload,
+      );
+    }
+    final data = _data!;
+    final declared = WindowState.fromMetadata(data);
+    if (declared != null) {
+      return WindowStateView(state: declared, onRetry: _reload);
+    }
+    final definition = Map<String, dynamic>.from(
+      data['definition'] as Map? ?? data,
+    );
+    final rawChildren = (definition['children'] as List? ?? [])
+        .take(128)
+        .toList();
+    final children = [
+      for (final child in rawChildren)
+        if (child is Map && child['kind'] is String && child['name'] is String)
+          _child(child)
+        else
+          const Text('This component cannot be displayed.'),
+    ];
+    final enabled = widget.enabled && definition['enabled'] != false;
+    switch (widget.kind) {
+      case 'surface':
+      case 'layout':
+        if (children.isEmpty) return const SizedBox.shrink();
+        final gap = (definition['gap'] as num? ?? 0).toDouble().clamp(
+          0.0,
+          128.0,
         );
-        final children = (definition['children'] as List? ?? [])
-            .take(128)
-            .map(
-              (child) =>
-                  child is! Map ||
-                      child['kind'] is! String ||
-                      child['name'] is! String
-                  ? const Center(
-                      child: Text('This component cannot be displayed.'),
+        if (definition['mode'] == 'stack') {
+          return Stack(fit: StackFit.expand, children: children);
+        }
+        if (definition['mode'] == 'list') {
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final column = Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                spacing: gap,
+                children: children,
+              );
+              return constraints.hasBoundedHeight
+                  ? _NeuronList(
+                      followEnd: definition['followEnd'] == true,
+                      child: column,
                     )
-                  : NeuronView(
-                      key: ValueKey('${child['kind']}:${child['name']}'),
-                      kind: child['kind'] as String,
-                      name: child['name'] as String,
-                      load: widget.load,
-                      onActivate: widget.onActivate,
-                      onAction: widget.onAction,
-                      imageBuilder: widget.imageBuilder,
-                      voiceBuilder: widget.voiceBuilder,
-                      secretSaver: widget.secretSaver,
-                      ancestors: {...widget.ancestors, identity},
-                      revision: widget.revision,
-                      enabled: widget.enabled,
-                    ),
-            )
-            .toList();
-        switch (widget.kind) {
-          case 'surface':
-          case 'layout':
-            if (children.isEmpty) return const SizedBox.shrink();
-            final gap = (definition['gap'] as num? ?? 0).toDouble().clamp(
-              0.0,
-              128.0,
-            );
-            if (definition['mode'] == 'stack') {
-              return Stack(fit: StackFit.expand, children: children);
-            }
-            return Flex(
-              direction:
-                  definition['mode'] == 'row' || definition['mode'] == 'split'
-                  ? Axis.horizontal
-                  : Axis.vertical,
-              spacing: gap,
-              children: [
-                for (var i = 0; i < children.length; i++)
-                  if ((definition['extents'] as List?)?.elementAtOrNull(i)
-                      case final num extent when extent > 0)
-                    SizedBox(
-                      width:
-                          definition['mode'] == 'row' ||
-                              definition['mode'] == 'split'
-                          ? extent.toDouble()
-                          : null,
-                      height:
-                          definition['mode'] == 'row' ||
-                              definition['mode'] == 'split'
-                          ? null
-                          : extent.toDouble(),
-                      child: children[i],
-                    )
-                  else if (_sizesItself(definition, i))
-                    children[i]
-                  else
-                    Expanded(child: children[i]),
-              ],
-            );
-          case 'text':
-            return Text(definition['markdown'] as String? ?? '');
-          case 'button':
-            return TextButton(
-              onPressed: definition['enabled'] == false
-                  ? null
-                  : () => widget.onAction?.call({
-                      'kind': 'button',
-                      'name': widget.name,
-                      'action': definition['action'],
-                    }),
-              child: Text(
-                definition['label'] as String? ?? '',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            );
-          case 'textfield':
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-              child: TextFormField(
-                key: ValueKey('${widget.name}:${widget.revision}'),
-                initialValue: definition['value'] as String? ?? '',
-                obscureText:
-                    definition['kind'] == 'secret' ||
-                    definition['kind'] == 'password',
-                decoration: InputDecoration(
-                  labelText: definition['label'] as String? ?? '',
-                  isDense: true,
-                ),
-                onFieldSubmitted: (value) => widget.onAction?.call({
-                  'kind': 'textfield',
-                  'name': widget.name,
-                  'value': value,
-                }),
-              ),
-            );
-          case 'tabs':
-            final tabs = (definition['tabs'] as List? ?? [])
-                .whereType<Map>()
-                .toList();
-            final selected = definition['selectedId'];
-            final active = tabs
-                .where((tab) => tab['id'] == selected)
-                .firstOrNull;
-            return Column(
-              children: [
+                  : column;
+            },
+          );
+        }
+        final horizontal =
+            definition['mode'] == 'row' || definition['mode'] == 'split';
+        return Flex(
+          direction: horizontal ? Axis.horizontal : Axis.vertical,
+          spacing: gap,
+          children: [
+            for (var i = 0; i < children.length; i++)
+              if ((definition['extents'] as List?)?.elementAtOrNull(i)
+                  case final num extent when extent > 0)
                 SizedBox(
-                  height: 42,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      for (final tab in tabs)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: ChoiceChip(
-                            label: Text(tab['title'] as String? ?? ''),
-                            selected: tab['id'] == selected,
-                            onSelected: !widget.enabled
-                                ? null
-                                : (_) => widget.onAction?.call({
-                                    'kind': 'tabs',
-                                    'name': widget.name,
-                                    'value': tab['id'],
-                                  }),
-                          ),
-                        ),
-                    ],
-                  ),
+                  width: horizontal ? extent.toDouble() : null,
+                  height: horizontal ? null : extent.toDouble(),
+                  child: children[i],
+                )
+              else if (!horizontal &&
+                  rawChildren[i] is Map &&
+                  const {
+                    'voiceinput',
+                    'fileinput',
+                  }.contains((rawChildren[i] as Map)['kind']))
+                children[i]
+              else
+                Expanded(child: children[i]),
+          ],
+        );
+      case 'text':
+        return _markdown(definition['markdown'] as String? ?? '');
+      case 'button':
+        return TextButton(
+          onPressed: enabled ? () => _button(definition) : null,
+          child: Text(
+            definition['label'] as String? ?? '',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        );
+      case 'textfield':
+        return _NeuronTextField(
+          key: ValueKey(widget.name),
+          name: widget.name,
+          definition: definition,
+          enabled: enabled && widget.onAction != null,
+          dispatch: _dispatch,
+        );
+      case 'select':
+        final options = (definition['options'] as List? ?? [])
+            .whereType<Map>()
+            .toList();
+        return PopupMenuButton<String>(
+          tooltip: definition['label'] as String? ?? '',
+          enabled: enabled && widget.onAction != null,
+          onSelected: (value) => unawaited(
+            _dispatch({'kind': 'select', 'name': widget.name, 'value': value})
+                .catchError((Object _) {}),
+          ),
+          itemBuilder: (_) => [
+            for (final option in options)
+              CheckedPopupMenuItem(
+                value: '${option['id']}',
+                checked: option['id'] == definition['selected'],
+                enabled: option['enabled'] != false,
+                child: Text('${option['label']}'),
+              ),
+          ],
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Text(
+              '${options.where((option) => option['id'] == definition['selected']).firstOrNull?['label'] ?? definition['label'] ?? ''}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        );
+      case 'fileinput':
+        final label = definition['label'] as String? ?? '';
+        final capture = enabled && widget.onAction != null ? _file : null;
+        return LayoutBuilder(
+          builder: (context, constraints) => constraints.maxWidth < 120
+              ? IconButton(
+                  tooltip: label,
+                  onPressed: capture,
+                  icon: const Icon(Icons.attach_file),
+                )
+              : TextButton.icon(
+                  onPressed: capture,
+                  icon: const Icon(Icons.attach_file),
+                  label: Text(label),
                 ),
-                if (active?['child'] is Map)
-                  Expanded(
-                    child: NeuronView(
-                      kind: active!['child']['kind'] as String,
-                      name: active['child']['name'] as String,
-                      load: widget.load,
-                      onActivate: widget.onActivate,
-                      onAction: widget.onAction,
-                      imageBuilder: widget.imageBuilder,
-                      voiceBuilder: widget.voiceBuilder,
-                      secretSaver: widget.secretSaver,
-                      ancestors: {...widget.ancestors, identity},
-                      revision: widget.revision,
-                      enabled: widget.enabled,
-                    ),
-                  ),
-              ],
+        );
+      case 'voiceinput':
+        return widget.voiceBuilder?.call(widget.name, definition) ??
+            UiVoiceInput(
+              label: definition['label'] as String? ?? '',
+              enabled: enabled && widget.onAction != null,
+              onAudio: (audio, mimeType) => _dispatch({
+                'kind': 'voiceinput',
+                'name': widget.name,
+                'value': base64Encode(audio),
+                'mimeType': mimeType,
+              }),
             );
-          case 'card':
-            return SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      case 'tabs':
+        final tabs = (definition['tabs'] as List? ?? [])
+            .whereType<Map>()
+            .toList();
+        final selected = definition['selectedId'];
+        final active = tabs.where((tab) => tab['id'] == selected).firstOrNull;
+        return Column(
+          children: [
+            SizedBox(
+              height: 42,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
                 children: [
-                  Text(definition['title'] as String? ?? ''),
-                  Text(definition['body'] as String? ?? ''),
-                  ...children.map(
-                    (child) => SizedBox(height: 240, child: child),
-                  ),
+                  for (final tab in tabs)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: ChoiceChip(
+                        label: Text(tab['title'] as String? ?? ''),
+                        selected: tab['id'] == selected,
+                        onSelected: !enabled
+                            ? null
+                            : (_) => unawaited(
+                                _dispatch({
+                                  'kind': 'tabs',
+                                  'name': widget.name,
+                                  'value': tab['id'],
+                                }).catchError((Object _) {}),
+                              ),
+                      ),
+                    ),
                 ],
               ),
-            );
-          case 'collection':
-            final items = (definition['items'] as List? ?? [])
-                .whereType<Map>()
-                .map((item) => Map<String, dynamic>.from(item))
-                .toList();
-            return UiCollectionView(
-              items: items,
-              fileMode: definition['fileMode'] != false,
-              selectionEnabled: definition['selectionEnabled'] != false,
-              selectedId: selection ?? definition['selection'] as String?,
-              emptyLabel: definition['emptyLabel'] as String?,
-              error: definition['error'] as String?,
-              onRetry: () =>
-                  setState(() => state = widget.load(widget.kind, widget.name)),
-              onSelect: !widget.enabled
-                  ? null
-                  : (id) => selectItem(
-                      items.firstWhere((item) => item['id'] == id),
-                      data,
-                    ),
-              onActivate: !widget.enabled
-                  ? null
-                  : (item) => widget.onActivate?.call({
-                      ...item,
-                      'collection': widget.name,
+            ),
+            if (active?['child'] is Map)
+              Expanded(child: _child(active!['child'] as Map)),
+          ],
+        );
+      case 'card':
+        return Padding(
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if ((definition['title'] as String? ?? '').isNotEmpty)
+                Text(
+                  definition['title'] as String,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              if ((definition['body'] as String? ?? '').isNotEmpty)
+                _markdown(definition['body'] as String),
+              ...children,
+            ],
+          ),
+        );
+      case 'collection':
+        final items = (definition['items'] as List? ?? [])
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+        return UiCollectionView(
+          items: items,
+          fileMode: definition['fileMode'] != false,
+          selectionEnabled: definition['selectionEnabled'] != false,
+          selectedId: selection ?? definition['selection'] as String?,
+          emptyLabel: definition['emptyLabel'] as String?,
+          error: definition['error'] as String?,
+          onRetry: _reload,
+          onSelect: !enabled
+              ? null
+              : (id) async {
+                  setState(() => selection = id);
+                  try {
+                    await _dispatch({
+                      'kind': 'collection',
+                      'name': widget.name,
+                      'action': 'select',
+                      'value': id,
                       'revision': data['revision'],
-                    }),
-            );
-          case 'uichat':
-            return UiNeuronChat(
-              name: widget.name,
-              state: definition,
-              reload: () async {
-                final latest = await widget.load(widget.kind, widget.name);
-                return Map<String, dynamic>.from(
-                  latest['definition'] as Map? ?? latest,
-                );
-              },
-              onAction: widget.onAction,
-              enabled: widget.enabled,
-            );
-          case 'voiceinput':
-            return widget.voiceBuilder?.call(widget.name, definition) ??
-                _FallbackRenderer(kind: widget.kind);
-          case 'imagecanvas':
-            return widget.imageBuilder?.call(definition) ??
-                const Center(child: Text('Image canvas unavailable.'));
-          case 'form':
-            return _FormRenderer(
-              part: UiFormPart.fromMetadata(definition),
-              name: widget.name,
-              revision: widget.revision,
-              enabled: widget.enabled,
-              onAction: widget.onAction,
-              secretSaver: widget.secretSaver,
-            );
-          default:
-            return _FallbackRenderer(kind: widget.kind);
-        }
-      },
-    );
+                    });
+                  } catch (_) {}
+                },
+          onActivate: !enabled
+              ? null
+              : (item) => widget.onActivate?.call({
+                  ...item,
+                  'collection': widget.name,
+                  'revision': data['revision'],
+                }),
+        );
+      case 'imagecanvas':
+        return widget.imageBuilder?.call(definition) ??
+            const Center(child: Text('Image canvas unavailable.'));
+      case 'form':
+        return _FormRenderer(
+          part: UiFormPart.fromMetadata(definition),
+          name: widget.name,
+          revision: widget.revision,
+          enabled: enabled,
+          onAction: _dispatch,
+          secretSaver: widget.secretSaver,
+        );
+      default:
+        return _FallbackRenderer(kind: widget.kind);
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _events.removeListener(_changed);
+    if (widget.events == null) _events.dispose();
+    super.dispose();
   }
 }
 
-bool _sizesItself(Map<String, dynamic> definition, int index) =>
-    switch ((definition['children'] as List?)?.elementAtOrNull(index)) {
-      {'kind': 'voiceinput'} => true,
-      _ => false,
-    };
+/// Scroll behavior is declared by the layout, independent of its contents.
+class _NeuronList extends StatefulWidget {
+  const _NeuronList({required this.followEnd, required this.child});
+  final bool followEnd;
+  final Widget child;
+  @override
+  State<_NeuronList> createState() => _NeuronListState();
+}
+
+class _NeuronListState extends State<_NeuronList> {
+  final _scroll = ScrollController();
+  bool _following = true, _scheduled = false;
+  void _follow() {
+    if (_scheduled || !widget.followEnd || !_following) return;
+    _scheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scheduled = false;
+      if (!mounted || !_scroll.hasClients || !_following || !widget.followEnd) {
+        return;
+      }
+      final end = _scroll.position.maxScrollExtent;
+      if ((end - _scroll.offset).abs() > 1) _scroll.jumpTo(end);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      NotificationListener<ScrollMetricsNotification>(
+        onNotification: (notification) {
+          if (notification.depth == 0) _follow();
+          return false;
+        },
+        child: NotificationListener<ScrollNotification>(
+          onNotification: (notification) {
+            if (notification.depth == 0 &&
+                (notification is UserScrollNotification ||
+                    notification is ScrollUpdateNotification &&
+                        notification.dragDetails != null)) {
+              _following = notification.metrics.extentAfter < 48;
+            }
+            return false;
+          },
+          child: SingleChildScrollView(
+            controller: _scroll,
+            child: widget.child,
+          ),
+        ),
+      );
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+}
+
+class _NeuronTextField extends StatefulWidget {
+  const _NeuronTextField({
+    super.key,
+    required this.name,
+    required this.definition,
+    required this.enabled,
+    required this.dispatch,
+  });
+  final String name;
+  final Map<String, dynamic> definition;
+  final bool enabled;
+  final Future<void> Function(Map<String, dynamic>) dispatch;
+  @override
+  State<_NeuronTextField> createState() => _NeuronTextFieldState();
+}
+
+class _NeuronTextFieldState extends State<_NeuronTextField> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.definition['value'] as String? ?? '',
+  );
+  final _focus = FocusNode();
+  int _edit = 0, _pending = 0;
+  bool _failedEdit = false;
+  @override
+  void didUpdateWidget(_NeuronTextField old) {
+    super.didUpdateWidget(old);
+    final value = widget.definition['value'] as String? ?? '';
+    if (_pending == 0 && !_failedEdit && _controller.text != value) {
+      _controller.value = TextEditingValue(
+        text: value,
+        selection: TextSelection.collapsed(offset: value.length),
+      );
+    }
+  }
+
+  Future<void> _change(String value) async {
+    final edit = ++_edit;
+    _pending++;
+    try {
+      await widget.dispatch({
+        'kind': 'textfield',
+        'name': widget.name,
+        'value': value,
+      });
+      if (edit == _edit) _failedEdit = false;
+    } catch (_) {
+      if (edit == _edit) _failedEdit = true;
+    } finally {
+      _pending--;
+      if (mounted && edit == _edit) setState(() {});
+    }
+  }
+
+  void _submit(String target) {
+    _focus.unfocus();
+    unawaited(
+      widget
+          .dispatch({'kind': 'button', 'name': target})
+          .catchError((Object _) {}),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final kind = '${widget.definition['kind'] ?? ''}'.toLowerCase();
+    final multiline = kind == 'multiline';
+    final target = widget.definition['submitButton'] as String?;
+    final field = TextField(
+      key: ValueKey('textfield:${widget.name}'),
+      controller: _controller,
+      focusNode: _focus,
+      enabled: widget.enabled,
+      obscureText: kind == 'secret' || kind == 'password',
+      minLines: multiline ? 2 : 1,
+      maxLines: multiline ? 5 : 1,
+      textInputAction: target == null
+          ? (multiline ? TextInputAction.newline : TextInputAction.done)
+          : TextInputAction.send,
+      decoration: InputDecoration(
+        labelText: widget.definition['label'] as String? ?? '',
+        isDense: true,
+      ),
+      onChanged: _change,
+      onSubmitted: target == null ? null : (_) => _submit(target),
+    );
+    return Padding(
+      padding: const EdgeInsets.all(4),
+      child: target == null
+          ? field
+          : CallbackShortcuts(
+              bindings: {
+                const SingleActivator(LogicalKeyboardKey.enter): () =>
+                    _submit(target),
+              },
+              child: field,
+            ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+}
 
 /// Renders the declared fallback for a UI kind that has no dedicated renderer: the kind is named
 /// and explained, never blank.
