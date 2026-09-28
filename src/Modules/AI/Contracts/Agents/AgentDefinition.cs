@@ -15,8 +15,6 @@ public sealed record AgentDefinition
     [Id(9)] public int MaxHistoryMessages { get; init; } = 256;
     [Id(10)] public InferenceOptions? Options { get; init; }
     [Id(11)] public IReadOnlyList<string> ContextProviders { get; init; } = [];
-    // Listed in the agent directory, so other agents can find it and delegate to it.
-    [Id(12)] public bool Discoverable { get; init; }
 }
 
 [GenerateSerializer, Alias("ai.agent-metadata")]
