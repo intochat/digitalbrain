@@ -876,29 +876,6 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                       ),
                     ),
                   ),
-                  if (widget.onSwitchAccount != null)
-                    TextButton.icon(
-                      onPressed: widget.onSwitchAccount,
-                      icon: const Icon(Icons.switch_account, size: 18),
-                      label: const Text('Switch account'),
-                    ),
-                  if (widget.programmingClient != null)
-                    IconButton(
-                      tooltip: 'Packages',
-                      icon: const Icon(Icons.extension),
-                      onPressed: () => _navigator.currentState?.push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => PackagesScreen(
-                            key: ValueKey(
-                              '${widget.programmingClient!.workspaceIdentity}/${store.currentProject.id}',
-                            ),
-                            workspaceId: store.currentProject.id,
-                            request: widget.programmingClient!.jsonRequest,
-                            onClose: () => _navigator.currentState?.pop(),
-                          ),
-                        ),
-                      ),
-                    ),
                   IconButton(
                     tooltip: 'New conversation',
                     onPressed: () => store.createConversation(),
@@ -1200,6 +1177,8 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
         }
       }
     },
+    onSwitchAccount: widget.onSwitchAccount,
+    onPackages: widget.programmingClient == null ? null : _openPackages,
     onSavedWork: () => _projectFiles(context),
     onSearch: () => _search(context),
     onCompute: widget.programmingClient == null
@@ -1212,6 +1191,22 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       ),
     ),
   );
+
+  void _openPackages() {
+    final client = widget.programmingClient;
+    if (client == null) return;
+    final workspaceId = store.currentProject.id;
+    _navigator.currentState?.push(
+      MaterialPageRoute<void>(
+        builder: (_) => PackagesScreen(
+          key: ValueKey('${client.workspaceIdentity}/$workspaceId'),
+          workspaceId: workspaceId,
+          request: client.jsonRequest,
+          onClose: () => _navigator.currentState?.pop(),
+        ),
+      ),
+    );
+  }
 
   void _openCompute(BuildContext context) {
     final client = widget.programmingClient;

@@ -18,12 +18,15 @@ class WorkspaceIslands extends StatelessWidget {
     required this.onSearch,
     required this.onSettings,
     this.onCompute,
+    this.onSwitchAccount,
+    this.onPackages,
   });
   final WorkspaceStore store;
   final List<AppManifestSummary> apps;
   final ValueChanged<String> onLaunch, onRestore;
   final VoidCallback onNewWorkspace, onSavedWork, onSearch, onSettings;
   final VoidCallback? onCompute;
+  final VoidCallback? onSwitchAccount, onPackages;
   Widget island(BuildContext context, Widget child) => ClipRRect(
     borderRadius: BorderRadius.circular(19),
     child: BackdropFilter(
@@ -208,7 +211,13 @@ class WorkspaceIslands extends StatelessWidget {
               tooltip: 'Applications',
               position: PopupMenuPosition.over,
               icon: const Icon(Icons.apps_rounded, size: 23),
-              onSelected: onLaunch,
+              onSelected: (value) {
+                if (value == 'manage-packages') {
+                  onPackages?.call();
+                } else {
+                  onLaunch(value);
+                }
+              },
               itemBuilder: (_) => [
                 for (final entry in launcherEntries(apps))
                   PopupMenuItem(
@@ -228,6 +237,18 @@ class WorkspaceIslands extends StatelessWidget {
                       leading: Icon(csharpLauncherEntry.icon),
                       title: Text(csharpLauncherEntry.title),
                       subtitle: Text(csharpLauncherEntry.subtitle),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
+                if (onPackages != null) ...[
+                  const PopupMenuDivider(),
+                  const PopupMenuItem(
+                    value: 'manage-packages',
+                    child: ListTile(
+                      leading: Icon(Icons.extension_outlined),
+                      title: Text('Packages'),
+                      subtitle: Text('Browse and manage packages'),
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),
@@ -273,6 +294,10 @@ class WorkspaceIslands extends StatelessWidget {
                 ),
               ),
               onSelected: (value) {
+                if (value == 'switch-account') {
+                  onSwitchAccount?.call();
+                  return;
+                }
                 if (value == 'settings') {
                   onSettings();
                   return;
@@ -296,6 +321,15 @@ class WorkspaceIslands extends StatelessWidget {
                   ),
                 ),
                 const PopupMenuDivider(),
+                if (onSwitchAccount != null)
+                  const PopupMenuItem(
+                    value: 'switch-account',
+                    child: ListTile(
+                      leading: Icon(Icons.switch_account_outlined),
+                      title: Text('Switch account'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
                 PopupMenuItem(
                   value: 'dock',
                   child: Text(
