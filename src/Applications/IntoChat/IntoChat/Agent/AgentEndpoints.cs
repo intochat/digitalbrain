@@ -18,9 +18,6 @@ namespace IntoChat.Agent;
 
 internal static class AgentEndpoints
 {
-    private const string ProductInstructions = "You are the IntoChat workspace assistant. Choose tools that match the user's request. Only for database requests, use supabase_schema then show_supabase_query_table with read-only SQL; refine the same window with table_refine and answer counts or aggregates with table_read instead of opening a new window. To collect typed input (a card with fields, a sign-up, a password), call show_form with fields whose kind comes from the type catalog; then answer with the handle, never re-ask for values the form collects. Use show_view to reopen a form window. Never fabricate data or result identifiers. Tool results with isError=true are failures: repair the arguments or explain the configuration problem; never claim success.";
-    private const string DeveloperInstructions = "You are the IntoChat workspace assistant. Choose tools that match the user's request. Only for database requests, use supabase_schema then show_supabase_query_table with read-only SQL; refine the same window with table_refine and answer counts or aggregates with table_read instead of opening a new window. Never fabricate data or result identifiers. To automate with C#, use csharp_contracts to discover installed module IDs, concrete neuron contracts and their #:project lines, then csharp_write to save one single-file C# app with a readable name and purpose; it connects with DigitalBrainClient.ConnectAsync(args) and operates neurons. Use csharp_run start only when the user asked to run it, then csharp_run status to read its output; compile errors appear there with a non-zero exit code while the status is Restarting (retried up to 5 times, then Exited), so repair the source, write it again and restart. Resolve neurons by concrete contracts such as ITimer, never the INeuron base interface. Never claim the app works until its output shows it. Tool results with isError=true are failures: repair the arguments or explain the configuration problem; never claim success.";
-
     public static string ConversationKey(string scope, string thread) =>
         "agent-conversation-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new[] { scope, thread })))).ToLowerInvariant();
 
@@ -119,8 +116,8 @@ internal static class AgentEndpoints
                         {
                             var text = new StringBuilder();
                             var results = new List<string>();
-                            var selection = await new AgentToolSelection(brain).ResolveAsync(scope.Id, userText, History(state), http.RequestAborted);
-                            var queryError = await RunModel(scope.Id, usageId, userText, developerMode, state, messageId, configuration, runner, selection, Emit, text, results, activity, http.RequestAborted, prepared.Model);
+                            var appTools = await new AgentToolSelection(brain).ResolveAsync(scope.Id, userText, History(state), http.RequestAborted);
+                            var queryError = await RunModel(scope.Id, usageId, userText, developerMode, state, messageId, configuration, runner, appTools, Emit, text, results, activity, http.RequestAborted, prepared.Model);
                             if (queryError is not null) { throw new WorkspaceQueryException(queryError); }
                             await agent.CompleteConversation(new(input.RunId, userText, text.ToString(), results), http.RequestAborted);
                         }
@@ -230,18 +227,17 @@ internal static class AgentEndpoints
 
     internal static async Task<string?> RunModel(string scope, string run, string message, bool developerMode,
         AgentConversationState state, string messageId, IConfiguration configuration,
-        IAgentTurnRunner runner, ToolSelection selection, Func<object, Task> emit, StringBuilder text, List<string> results, IntentActivity activity, CancellationToken ct, AgentModelSelection? modelSelection = null)
+        IAgentTurnRunner runner, IReadOnlyList<string> appTools, Func<object, Task> emit, StringBuilder text, List<string> results, IntentActivity activity, CancellationToken ct, AgentModelSelection? modelSelection = null)
     {
         var finished = false;
         string? queryError = null;
         var model = modelSelection ?? (configuration["IntoChat:Assistant:Model"] is { Length: > 0 } modelName ? new AgentModelSelection(Model: modelName) : null);
-        var instructions = developerMode ? DeveloperInstructions : ProductInstructions;
+        var definition = AssistantDefinition.For(developerMode, appTools);
+        var instructions = definition.Instructions;
         // A trimmed conversation summarizes the evicted turns; the model must still receive it.
         if (!string.IsNullOrEmpty(state.Summary)) { instructions += "\nEarlier conversation summary: " + state.Summary; }
         await foreach (var item in runner.RunAsync(new("workspace-assistant", run, scope, state.Turns, message, model,
-            instructions,
-            AgentToolPolicy.SelectTools(developerMode, CSharpAgentTools.Names, selection.AppTools, selection.TableIntent),
-            ContextProviders: [CapabilityContextProvider.ProviderName]), ct))
+            instructions, definition.Tools, ContextProviders: definition.ContextProviders), ct))
         {
             switch (item)
             {

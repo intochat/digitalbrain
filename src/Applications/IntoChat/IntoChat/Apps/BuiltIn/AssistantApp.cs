@@ -20,7 +20,7 @@ public sealed record AssistantAppState
 {
     [Id(0)] public long Revision { get; init; }
     [Id(1)] public bool Active { get; init; }
-    [Id(2)] public AgentDefinition Agent { get; init; } = new() { ContextProviders = [CapabilityContextProvider.ProviderName] };
+    [Id(2)] public AgentDefinition Agent { get; init; } = AssistantDefinition.Product;
     [Id(3)] public UiChildRef Surface { get; init; } = new("surface", "");
     [Id(4)] public UiChildRef Input { get; init; } = new("textfield", "");
     [Id(5)] public UiChildRef Response { get; init; } = new("text", "");

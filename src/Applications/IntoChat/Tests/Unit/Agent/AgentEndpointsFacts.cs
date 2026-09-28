@@ -22,7 +22,7 @@ public sealed class AgentEndpointsFacts
         { ["IntoChat:Assistant:Model"] = "IGpt56Luna" }).Build();
 
         await AgentEndpoints.RunModel("scope", "run", "hello", false, EmptyState, "reply",
-            configuration, runner, new ToolSelection([], false), _ => Task.CompletedTask,
+            configuration, runner, [], _ => Task.CompletedTask,
             new StringBuilder(), [], new IntentActivity(), TestContext.Current.CancellationToken, selected);
 
         Assert.Equal(selected, runner.Request!.Model);
@@ -34,7 +34,7 @@ public sealed class AgentEndpointsFacts
         var runner = new RecordingRunner();
 
         await AgentEndpoints.RunModel("scope", "run", "hello", false, EmptyState, "reply",
-            new ConfigurationBuilder().Build(), runner, new ToolSelection([], false), _ => Task.CompletedTask,
+            new ConfigurationBuilder().Build(), runner, [], _ => Task.CompletedTask,
             new StringBuilder(), [], new IntentActivity(), TestContext.Current.CancellationToken);
 
         Assert.Equal([CapabilityContextProvider.ProviderName], runner.Request!.ContextProviders);
@@ -50,7 +50,7 @@ public sealed class AgentEndpointsFacts
         var results = new List<string>();
 
         await AgentEndpoints.RunModel("scope", "run", "hello", developerMode: false, state, "run-reply",
-            new ConfigurationBuilder().Build(), runner, new ToolSelection([], false), _ => Task.CompletedTask, text, results, new IntentActivity(), TestContext.Current.CancellationToken);
+            new ConfigurationBuilder().Build(), runner, [], _ => Task.CompletedTask, text, results, new IntentActivity(), TestContext.Current.CancellationToken);
 
         Assert.NotNull(runner.Request);
         Assert.Contains("Earlier conversation summary: the user asked about invoices", runner.Request!.Instructions!, StringComparison.Ordinal);
@@ -66,7 +66,7 @@ public sealed class AgentEndpointsFacts
         var results = new List<string>();
 
         var queryError = await AgentEndpoints.RunModel("scope", "run", "how many?", developerMode: false,
-            EmptyState, "run-reply", new ConfigurationBuilder().Build(), runner, new ToolSelection([], false), _ => Task.CompletedTask, new StringBuilder(), results, new IntentActivity(), TestContext.Current.CancellationToken);
+            EmptyState, "run-reply", new ConfigurationBuilder().Build(), runner, [], _ => Task.CompletedTask, new StringBuilder(), results, new IntentActivity(), TestContext.Current.CancellationToken);
 
         Assert.Null(queryError);
         Assert.Empty(results);
@@ -80,7 +80,7 @@ public sealed class AgentEndpointsFacts
         var results = new List<string>();
 
         var queryError = await AgentEndpoints.RunModel("scope", "run", "read it", developerMode: false,
-            EmptyState, "run-reply", new ConfigurationBuilder().Build(), runner, new ToolSelection([], false), _ => Task.CompletedTask, new StringBuilder(), results, new IntentActivity(), TestContext.Current.CancellationToken);
+            EmptyState, "run-reply", new ConfigurationBuilder().Build(), runner, [], _ => Task.CompletedTask, new StringBuilder(), results, new IntentActivity(), TestContext.Current.CancellationToken);
 
         Assert.Equal("No readable Public columns were requested.", queryError);
     }

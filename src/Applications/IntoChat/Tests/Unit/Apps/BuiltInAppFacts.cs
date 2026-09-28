@@ -61,7 +61,10 @@ public sealed class BuiltInAppFacts
         Assert.Equal("A real agent response", (await brain.Get<IText>(opened.Response.Name).Read()).Markdown);
         Assert.Equal("Research assistant", (await first.Activate()).Agent.DisplayName);
         Assert.Equal(configured.Revision, (await first.Read()).Revision);
-        Assert.Equal("Assistant", (await second.Activate()).Agent.DisplayName);
+        var defaultAgent = (await second.Activate()).Agent;
+        Assert.Equal(AssistantDefinition.Product.Instructions, defaultAgent.Instructions);
+        Assert.Equal(AssistantDefinition.Product.Tools, defaultAgent.Tools);
+        Assert.Equal([CapabilityContextProvider.ProviderName], defaultAgent.ContextProviders);
         var conversation = await first.Conversation("thread-1");
         await conversation.BeginConversation(new("run-1", "hello"), TestContext.Current.CancellationToken);
         await conversation.CompleteConversation(new("run-1", "hello", "answer", []), TestContext.Current.CancellationToken);

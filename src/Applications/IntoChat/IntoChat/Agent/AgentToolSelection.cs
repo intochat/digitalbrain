@@ -5,13 +5,9 @@ using DigitalBrain.Flutter.Workspace;
 
 namespace IntoChat.Agent;
 
-// The tools a turn gets beyond the always-on core: the apps discovery matches, the apps installed in
-// the workspace, and the app a window belongs to. A data-shaped request also keeps the generic
-// live-table pair so a plain "show me the customers" request never loses the table path.
-//
-// Discovery, the installed-app list and the workspace snapshot are only read when the owner's own
-// words and the open windows have not already determined the tools, so a plain table turn makes no
-// selection round-trips at all.
+// The app tools a turn gets beyond the definition's core: apps installed in the workspace, apps whose
+// windows are open, and apps discovery matches to the owner's words (this message and the previous
+// one, so a follow-up such as "Allow once" keeps the tools of the app it answers).
 internal sealed class AgentToolSelection(IDigitalBrain brain)
 {
     private static readonly Dictionary<string, string[]> AppTools = new(StringComparer.Ordinal)
@@ -20,67 +16,17 @@ internal sealed class AgentToolSelection(IDigitalBrain brain)
         ["intochat.image-editor"] = ["plan_background_removal", "run_background_removal"],
     };
 
-    private static readonly string[] TableKeywords =
-        ["table", "supabase", "database", "query", "rows", "how many", "leads", "customer", "count", "sql", "select"];
-
-    // A turn only needs the workspace snapshot when it may touch an app window.
-    private static readonly string[] WindowKeywords =
-        ["app", "open", "window", "form", "view", "tab", "install"];
-
-    private static readonly Dictionary<string, string[]> KeywordApps = new(StringComparer.Ordinal)
+    public async Task<IReadOnlyList<string>> ResolveAsync(string scope, string message, IReadOnlyList<string> history, CancellationToken ct)
     {
-        ["intochat.leadgenerator"] = ["dental", "clinic", "find new", "lead", "approve"],
-        ["intochat.image-editor"] = ["background", "photo", "image", "allow", "approval"],
-    };
-
-    public async Task<ToolSelection> ResolveAsync(string scope, string message, IReadOnlyList<string> history, CancellationToken ct)
-    {
-        var own = Own(message);
-        // The owner's own words make an app relevant: a follow-up "Allow once" keeps the tools of the
-        // app proposed in the previous turn. The client's hidden artifact suffix is not intent.
-        var context = history.Count == 0 ? own : own + "\n" + string.Join("\n", history.Select(Own));
-        var tableIntent = TableIntent(context);
-
-        var ids = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var (appId, keywords) in KeywordApps)
-        {
-            if (keywords.Any(keyword => context.Contains(keyword, StringComparison.OrdinalIgnoreCase)))
-            { ids.Add(appId); }
-        }
-
-        // A plain data request is served by the generic live-table pair, so the installed apps and
-        // discovery cannot add anything: skip both. Any other request reads them, which is where an
-        // app the owner did not name can surface.
-        if (ids.Count == 0 && !tableIntent)
-        {
-            foreach (var id in await InstalledAsync(scope, ct)) { ids.Add(id); }
-            foreach (var id in await DiscoveredAsync(scope, own, ct)) { ids.Add(id); }
-        }
-
-        // The workspace snapshot is only needed when the owner's words point at an app window; the
-        // apps its open windows belong to are the only thing it adds. A turn
-        // about a table or a plain question skips the read.
-        var windows = NeedsWindows(context) ? await WindowsAsync(scope, ct) : [];
-        foreach (var id in windows) { ids.Add(id); }
-
-        var tools = new List<string>();
-        foreach (var id in ids)
-        {
-            foreach (var appId in AppTools.Keys)
-            {
-                if (string.Equals(appId, id, StringComparison.Ordinal) || appId.EndsWith("." + id, StringComparison.Ordinal))
-                { tools.AddRange(AppTools[appId]); }
-            }
-        }
-        return new ToolSelection([.. tools.Distinct(StringComparer.Ordinal)], tableIntent);
+        // History alternates user and assistant text, so the previous user message is second from the end.
+        var query = history.Count >= 2 ? Own(message) + "\n" + Own(history[^2]) : Own(message);
+        var reads = await Task.WhenAll(InstalledAsync(scope, ct), WindowsAsync(scope, ct), DiscoveredAsync(scope, query, ct));
+        var appIds = reads.SelectMany(static ids => ids).Select(static id => id.Split('/', 2)[0]).ToHashSet(StringComparer.Ordinal);
+        return [.. AppTools
+            .Where(app => appIds.Any(id => id == app.Key || app.Key.EndsWith("." + id, StringComparison.Ordinal)))
+            .SelectMany(static app => app.Value)
+            .Distinct(StringComparer.Ordinal)];
     }
-
-    public static bool TableIntent(string message) =>
-        !string.IsNullOrWhiteSpace(message)
-        && TableKeywords.Any(keyword => message.Contains(keyword, StringComparison.OrdinalIgnoreCase));
-
-    internal static bool NeedsWindows(string context) =>
-        WindowKeywords.Any(keyword => context.Contains(keyword, StringComparison.OrdinalIgnoreCase));
 
     // The chat client appends a hidden artifact-context paragraph to every message; intent comes from
     // the owner's own words before it.
@@ -139,5 +85,3 @@ internal sealed class AgentToolSelection(IDigitalBrain brain)
         return end < 0 ? rest : rest[..end];
     }
 }
-
-internal sealed record ToolSelection(IReadOnlyList<string> AppTools, bool TableIntent);
