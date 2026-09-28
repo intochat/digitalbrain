@@ -2,11 +2,11 @@ using System.Reflection;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using DigitalBrain.Microsoft.CSharp;
-using IntoChat;
+
 using Microsoft.Extensions.Options;
 using Xunit;
 
-namespace IntoChat.Tests;
+namespace DigitalBrain.Microsoft.CSharp.Tests;
 
 public sealed class CSharpCatalogFacts
 {

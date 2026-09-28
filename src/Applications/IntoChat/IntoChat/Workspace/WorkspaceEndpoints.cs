@@ -4,6 +4,7 @@ using DigitalBrain.Contracts;
 using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Flutter.Workspace.Signals;
 using DigitalBrain.Supabase.Tables;
+using DigitalBrain.Supabase.Windows;
 using IntoChat.Operations;
 using Microsoft.Extensions.Options;
 using DigitalBrain.Identity;
@@ -42,16 +43,16 @@ internal static class WorkspaceEndpoints
             {
                 var table = await ResolveTable(brain, auth.Value, workspaceId, tableId, ct);
                 var snapshot = await table.Read(new(offset ?? 0, limit ?? 25)).WaitAsync(ct) ?? throw new KeyNotFoundException("Table not found.");
-                return Results.Ok(WorkspaceTableAdapter.ToJson(snapshot));
+                return Results.Ok(LiveTableJson.ToJson(snapshot));
             }));
         routes.MapPost("/workspaces/{workspaceId}/tables/{tableId}/view",
-            (string workspaceId, string tableId, WorkspaceTableView input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct)
+            (string workspaceId, string tableId, LiveTableView input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct)
             => Respond(async () =>
             {
                 var table = await ResolveTable(brain, auth.Value, workspaceId, tableId, ct);
                 await table.UpdateView(input.ToRequest()).WaitAsync(ct);
                 var snapshot = await table.Read(new(0, 25)).WaitAsync(ct) ?? throw new KeyNotFoundException("Table not found.");
-                return Results.Ok(WorkspaceTableAdapter.ToJson(snapshot));
+                return Results.Ok(LiveTableJson.ToJson(snapshot));
             }));
         routes.MapGet("/workspaces/{workspaceId}/events", Events);
         OperationsEndpoints.MapOperationsEndpoints(routes);

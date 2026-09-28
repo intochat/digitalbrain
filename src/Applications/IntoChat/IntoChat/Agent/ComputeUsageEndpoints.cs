@@ -48,7 +48,7 @@ internal static class ComputeUsageEndpoints
         routes.MapGet("/workspaces/{workspaceId}/compute/usage", async (string workspaceId, int? limit, string? cursor,
             HttpContext http, IDigitalBrain brain, IUsageStore store, IOptions<BasicAuthOptions> auth, CancellationToken ct) =>
         {
-            if (!AgentEndpoints.ValidId(workspaceId)) { return Results.BadRequest(); }
+            if (!WorkspaceScope.IsValidId(workspaceId)) { return Results.BadRequest(); }
             var caller = CallerContextStamper.Require();
             var scope = WorkspaceScope.Current(auth.Value, workspaceId);
             UsagePage page;

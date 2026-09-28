@@ -12,11 +12,6 @@ public interface IAgentTurnRunner
 {
     IAsyncEnumerable<AgentTurnEvent> RunAsync(AgentTurnRequest request, CancellationToken ct);
 }
-public sealed record AgentToolContext(string ScopeId, string RunId, string CallId);
-public interface IAgentToolFactory
-{
-    IReadOnlyList<AIFunction> Create(Func<AgentToolContext> context);
-}
 public sealed record AgentContextRequest(string ScopeId, string Message, string? PreviousMessage = null);
 // Text is what the model should know before it answers; Tools are registered tools it may need for it.
 public sealed record AgentContext(string? Text, IReadOnlyList<string> Tools)

@@ -1,5 +1,6 @@
 using DigitalBrain.Core.Enforcement;
 using DigitalBrain.AI.Agents;
+using DigitalBrain.Microsoft.CSharp;
 using IntoChat.Workspace;
 using Microsoft.Extensions.Options;
 using ModelContextProtocol.Server;
@@ -11,10 +12,7 @@ internal static class CSharpEndpoints
 {
     public static void AddCSharp(this IHostApplicationBuilder builder)
     {
-        builder.Services.AddOptions<CSharpAuthoringOptions>().BindConfiguration("IntoChat:CSharp");
-        builder.Services.AddSingleton<CSharpCatalogStore>();
-        builder.Services.AddSingleton<CSharpToolService>();
-        builder.Services.AddSingleton<IAgentToolFactory, CSharpAgentTools>();
+        builder.Services.AddCSharpAuthoring();
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddScoped(sp =>
         {

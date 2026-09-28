@@ -1,9 +1,9 @@
 using DigitalBrain.AI.Agents;
 using Microsoft.Extensions.AI;
 
-namespace IntoChat;
+namespace DigitalBrain.Microsoft.CSharp;
 
-internal sealed class CSharpAgentTools(CSharpToolService service) : IAgentToolFactory
+public sealed class CSharpAgentTools(CSharpToolService service) : IAgentToolFactory
 {
     public static readonly string[] Names = [.. CSharpToolService.Tools.Select(tool => tool.Name)];
 

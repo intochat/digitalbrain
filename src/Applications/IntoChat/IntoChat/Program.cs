@@ -35,9 +35,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Events.OnRedirectToAccessDenied = context => { context.Response.StatusCode = StatusCodes.Status403Forbidden; return Task.CompletedTask; };
     });
 builder.AddDurableProtection();
-builder.Services.AddSingleton<LiveTableWindows>();
 builder.Services.AddApplications();
-builder.Services.AddSingleton<IAgentToolFactory, WorkspaceTableTools>();
 builder.Services.AddSingleton<IAgentToolFactory, WorkspaceFormTools>();
 builder.Services.AddSingleton<IAgentToolFactory, DiscoveryTools>();
 builder.Services.AddSingleton<IAgentContextProvider, CapabilityContextProvider>();
@@ -59,7 +57,6 @@ app.MapDigitalBrainModules();
 app.MapGet("/compute/limits", static async (IDigitalBrain brain, CancellationToken ct) =>
     Results.Ok(await brain.Get<IAllowanceLedger>(CallerContextStamper.Require().AccountId).ReadLimitsAsync(ct)));
 app.MapWorkspaceDataEndpoints();
-app.MapShellPersistence();
 app.MapWorkspaceAgent();
 app.MapWorkspaceConnections();
 app.MapComputeUsage();

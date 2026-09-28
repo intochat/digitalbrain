@@ -7,15 +7,14 @@ using DigitalBrain.Supabase;
 using DigitalBrain.Supabase.Tables;
 using Orleans;
 
-namespace IntoChat.Workspace;
+namespace DigitalBrain.Supabase.Windows;
 
 // The live-table window the assistant works in: open creates the table and its workspace window
 // once per tool call, and refine mutates that same window. Replay safety lives on
 // CreateFromQueryOnce's operation id and the workspace Open receipt; the deleted query-window
 // journal added nothing to that.
-internal sealed class LiveTableWindows(IDigitalBrain brain)
+public sealed class LiveTableWindows(IDigitalBrain brain)
 {
-    private const int MaxOpenRetries = 8;
     private const int MaxRefineRetries = 8;
 
     public async Task<QueryWindowResult> OpenAsync(string scopeId, string runId, string callId, string title, string sql, CancellationToken ct)
@@ -30,23 +29,9 @@ internal sealed class LiveTableWindows(IDigitalBrain brain)
         var tableId = "table-" + identityHash;
         ct.ThrowIfCancellationRequested();
         await brain.Get<ISupabaseTable>(tableId).CreateFromQueryOnce(operationId, new(title, sql), ct).WaitAsync(ct);
-        var workspace = brain.Get<IWorkspace>(scopeId);
-        var expectedRevision = 0L;
-        for (var attempt = 0; attempt < MaxOpenRetries; attempt++)
-        {
-            ct.ThrowIfCancellationRequested();
-            try
-            {
-                var receipt = await workspace.Open(new(operationId, tableId, title, WindowReference.Table(tableId), expectedRevision)).WaitAsync(ct);
-                return new QueryWindowResult(tableId, tableId, title, receipt.AppliedRevision);
-            }
-            catch (WorkspaceRevisionConflictException conflict) when (attempt < MaxOpenRetries - 1)
-            {
-                // The conflict carries the current revision, so the retry needs no extra read.
-                expectedRevision = conflict.CurrentRevision;
-            }
-        }
-        throw new InvalidOperationException("Workspace changed too often; retry this operation.");
+        var receipt = await WorkspaceWindows.RetryOnConflictAsync(0, revision =>
+            brain.Get<IWorkspace>(scopeId).Open(new(operationId, tableId, title, WindowReference.Table(tableId), revision)), ct);
+        return new QueryWindowResult(tableId, tableId, title, receipt.AppliedRevision);
     }
 
     public async Task<SupabaseTableSnapshot> RefineAsync(string scopeId, string tableId, IReadOnlyList<SupabaseTableFilter> filters,

@@ -25,7 +25,7 @@ internal static class WorkspaceConnectionsEndpoints
         {
             var http = context.HttpContext;
             var id = http.Request.RouteValues["workspaceId"]?.ToString();
-            if (string.IsNullOrWhiteSpace(id) || id.Length > 200 || id.Any(c => char.IsControl(c) || c is '/' or '\\'))
+            if (!WorkspaceScope.IsValidId(id))
                 { return Results.BadRequest(); }
             return await next(context);
         });

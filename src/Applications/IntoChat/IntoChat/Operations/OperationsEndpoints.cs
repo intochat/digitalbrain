@@ -12,7 +12,7 @@ internal static class OperationsEndpoints
         routes.MapPost("/workspaces/{workspaceId}/reports",
             async (string workspaceId, ProblemReportInput input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) =>
             {
-                if (!ValidIntentId(input.IntentId) || string.IsNullOrWhiteSpace(input.Message))
+                if (!WorkspaceScope.IsValidId(input.IntentId) || string.IsNullOrWhiteSpace(input.Message))
                 {
                     return Results.BadRequest(new { error = "A report needs the intent id it came from and a message." });
                 }
@@ -27,9 +27,6 @@ internal static class OperationsEndpoints
                 catch (ArgumentException error) { return Results.BadRequest(new { error = error.Message }); }
             });
     }
-
-    private static bool ValidIntentId(string? value)
-        => !string.IsNullOrWhiteSpace(value) && value.Length <= 200 && !value.Any(char.IsControl);
 
     internal sealed record ProblemReportInput(string? IntentId, string? Message);
 }

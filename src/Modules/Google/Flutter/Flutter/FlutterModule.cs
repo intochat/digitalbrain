@@ -1,3 +1,4 @@
+using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Core;
 using Microsoft.AspNetCore.Routing;
 
@@ -35,5 +36,6 @@ public sealed class FlutterModule : IModule
     {
         ArgumentNullException.ThrowIfNull(endpoints);
         endpoints.MapUiKit();
+        endpoints.MapShellPersistence();
     }
 }

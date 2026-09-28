@@ -7,8 +7,10 @@
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit" />
     <PackageReference Include="Azure.Identity" />
+    <PackageReference Include="ModelContextProtocol.Core" />
     <PackageReference Include="Microsoft.Orleans.Reminders" />
     <ProjectReference Include="../Contracts/DigitalBrain.Modules.Microsoft.CSharp.Contracts.csproj" />
+    <ProjectReference Include="../../../AI/Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="../../Aspire/Contracts/DigitalBrain.Modules.Microsoft.Aspire.Contracts.csproj" />
     <ProjectReference Include="../../../DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
     <ProjectReference Include="../../../DigitalBrain/Kernel/Client/DigitalBrain.Client.csproj" />

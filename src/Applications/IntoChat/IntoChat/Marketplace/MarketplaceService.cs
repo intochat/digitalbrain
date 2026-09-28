@@ -1,3 +1,4 @@
+using DigitalBrain.Microsoft.CSharp;
 using DigitalBrain.AI.GroupChat;
 using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
@@ -16,7 +17,7 @@ internal sealed record AppSpecView(
 
 internal sealed class MarketplaceService(IDigitalBrain brain, CSharpToolService csharp)
 {
-    public const string ActivationDisabled = "Running C# apps is disabled by host policy, and verifying one runs it. Enable IntoChat:CSharp:AllowActivation.";
+    public const string ActivationDisabled = "Running C# apps is disabled by host policy, and verifying one runs it. Enable DigitalBrain:CSharp:AllowActivation.";
 
     // Verifying a csharp revision runs its script, so it is allowed exactly when installing one is.
     public async Task RequireRunnable(PackageRevisionRef revision)

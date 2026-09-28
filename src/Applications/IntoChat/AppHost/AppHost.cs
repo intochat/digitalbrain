@@ -124,8 +124,8 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
         if (assets is not null) { context.EnvironmentVariables["DigitalBrain__Files__AssetDirectory"] = assets; }
         if (builder.Configuration["IntoChat:Assistant:Model"] is { Length: > 0 } assistantModel)
         { context.EnvironmentVariables["IntoChat__Assistant__Model"] = assistantModel; }
-        if (builder.Configuration["IntoChat:CSharp:AllowActivation"] is { } allowActivation)
-        { context.EnvironmentVariables["IntoChat__CSharp__AllowActivation"] = allowActivation; }
+        if (builder.Configuration["DigitalBrain:CSharp:AllowActivation"] is { } allowActivation)
+        { context.EnvironmentVariables["DigitalBrain__CSharp__AllowActivation"] = allowActivation; }
         if (clusterId is not null)
         {
             context.EnvironmentVariables["Orleans__ClusterId"] = clusterId;

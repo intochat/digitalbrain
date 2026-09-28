@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
-using IntoChat.Workspace;
+using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Testing.Unit;
 
-namespace IntoChat.Tests.Unit;
+namespace DigitalBrain.Flutter.Tests;
 
 public sealed class ShellPersistenceFacts
 {

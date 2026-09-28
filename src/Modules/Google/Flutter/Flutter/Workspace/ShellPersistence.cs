@@ -4,9 +4,12 @@ using System.Text.Json.Nodes;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core.Enforcement;
 using Orleans;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Orleans.Runtime;
 
-namespace IntoChat.Workspace;
+namespace DigitalBrain.Flutter.Workspace;
 
 // Immutable, content-addressed records are written before publishing the root pointer.
 // A failed child write leaves the previous revision readable. Retries reuse the same parts.

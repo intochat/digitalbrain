@@ -3,12 +3,12 @@ using System.Text.Json;
 using DigitalBrain.Core;
 using Orleans;
 
-namespace IntoChat;
+namespace DigitalBrain.Microsoft.CSharp;
 
-internal sealed record CSharpDescription(string Id, string Name, string Purpose, DateTimeOffset CreatedAt);
+public sealed record CSharpDescription(string Id, string Name, string Purpose, DateTimeOffset CreatedAt);
 
 // The workspace owns the human-facing names of its files; the ICSharpFile neuron owns source and execution.
-internal sealed class CSharpCatalogStore
+public sealed class CSharpCatalogStore
 {
     private const int MaxFilesPerWorkspace = 500;
     private readonly IDocumentStore<CSharpCatalog> _workspaces;
@@ -62,7 +62,7 @@ internal sealed class CSharpCatalogStore
     public Task Remove(string scope, string id, CancellationToken ct) => _workspaces.UpdateAsync(scope, catalog => catalog.Files.Remove(id), ct);
 }
 
-internal sealed class CSharpCatalog
+public sealed class CSharpCatalog
 {
     public Dictionary<string, CSharpDescription> Files { get; set; } = new(StringComparer.Ordinal);
 }

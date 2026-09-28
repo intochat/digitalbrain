@@ -3,15 +3,14 @@ using System.Text.Json;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Supabase;
 using DigitalBrain.Supabase.Tables;
-using IntoChat.Workspace;
 using Microsoft.Extensions.AI;
 
-namespace IntoChat.Agent;
+namespace DigitalBrain.Supabase.Windows;
 
 // The one live-table tool surface: discover schema, open a read-only window, then read and refine
 // that same window. Reads obey D6: schema, counts and aggregates always, row values only for
 // Public columns (no per-connection grant store exists yet).
-internal sealed class WorkspaceTableTools(ISupabaseProvider provider, LiveTableWindows windows) : IAgentToolFactory
+internal sealed class LiveTableTools(ISupabaseProvider provider, LiveTableWindows windows) : IAgentToolFactory
 {
     public IReadOnlyList<AIFunction> Create(Func<AgentToolContext> context)
     {
@@ -56,7 +55,7 @@ internal sealed class WorkspaceTableTools(ISupabaseProvider provider, LiveTableW
             var trusted = context();
             try
             {
-                var mapped = (filters ?? []).Select(ToFilter).ToArray();
+                var mapped = (filters ?? []).Select(filter => LiveTableJson.Filter(filter.ColumnId, filter.Operator, filter.Value)).ToArray();
                 var sort = string.IsNullOrWhiteSpace(sortColumn) ? null : new SupabaseTableSort(sortColumn, sortDescending);
                 return await windows.RefineAsync(trusted.ScopeId, tableId, mapped, sort, visibleColumns, ct);
             }
@@ -72,14 +71,6 @@ internal sealed class WorkspaceTableTools(ISupabaseProvider provider, LiveTableW
             AIFunctionFactory.Create(Read, "table_read", "Read schema, row counts and an optional aggregate from a table window, plus row values for readable Public columns. Rows are never returned for count/sum/avg/min/max. If isError=true, repair the arguments and retry."),
             AIFunctionFactory.Create(Refine, "table_refine", "Refine the existing table window (same window, not a new one) with filters, sort or visible columns. If isError=true, repair the arguments and retry."),
         ];
-    }
-
-    private static SupabaseTableFilter ToFilter(TableFilterArgument filter)
-    {
-        var value = filter.Value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null
-            ? "null"
-            : filter.Value.GetRawText();
-        return new(filter.ColumnId, filter.Operator, value);
     }
 
     private static object Failure(Exception error) => new { isError = true, message = error.Message };

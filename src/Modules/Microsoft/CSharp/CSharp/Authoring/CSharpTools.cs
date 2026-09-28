@@ -5,18 +5,18 @@ using DigitalBrain.Microsoft.CSharp;
 using Microsoft.Extensions.Options;
 using ModelContextProtocol.Server;
 
-namespace IntoChat;
+namespace DigitalBrain.Microsoft.CSharp;
 
-internal sealed class CSharpAuthoringOptions
+public sealed class CSharpAuthoringOptions
 {
     public bool AllowActivation { get; set; }
 }
 
-internal sealed record CSharpFileView(CSharpDescription Description, CSharpFileSnapshot File, string? Logs = null);
-internal sealed record WriteCSharpFileRequest(string Source, string? Name = null, string? Purpose = null);
+public sealed record CSharpFileView(CSharpDescription Description, CSharpFileSnapshot File, string? Logs = null);
+public sealed record WriteCSharpFileRequest(string Source, string? Name = null, string? Purpose = null);
 
 // The contract catalog is registered by CSharpModule, so its absence means this host cannot run C# files.
-internal sealed class CSharpToolService(IDigitalBrain brain, CSharpCatalogStore catalog, IOptions<CSharpAuthoringOptions> options,
+public sealed class CSharpToolService(IDigitalBrain brain, CSharpCatalogStore catalog, IOptions<CSharpAuthoringOptions> options,
     CSharpContractCatalog? contracts = null)
 {
     public static readonly (MethodInfo Method, string Name)[] Tools = [.. typeof(ScopedCSharpTools).GetMethods()
@@ -32,7 +32,7 @@ internal sealed class CSharpToolService(IDigitalBrain brain, CSharpCatalogStore 
 }
 
 [McpServerToolType]
-internal sealed class ScopedCSharpTools(IDigitalBrain brain, CSharpCatalogStore catalog, CSharpContractCatalog? contracts, string scope, bool allowActivation)
+public sealed class ScopedCSharpTools(IDigitalBrain brain, CSharpCatalogStore catalog, CSharpContractCatalog? contracts, string scope, bool allowActivation)
 {
     private const int LogTail = 150;
 
@@ -64,7 +64,7 @@ internal sealed class ScopedCSharpTools(IDigitalBrain brain, CSharpCatalogStore 
     [McpServerTool(Name = "csharp_arm"), Description("Run a saved C# app on a trigger instead of keeping it up: every signal of the given type from the given neuron starts one run, and the app reads that signal with brain.Trigger<TSignal>() and exits. neuron is the neuron id \"<grain type>/<key>\" from csharp_contracts, for example timer/tea; signal is the signal type name, for example TimerTick. Nothing runs between signals. stop disarms it; after 5 failing runs in a row it disarms itself.")]
     public async Task<CSharpFileView> Arm(string id, string neuron, string signal, CancellationToken ct)
     {
-        if (!allowActivation) { throw new InvalidOperationException("Running C# files is disabled by host policy. Enable IntoChat:CSharp:AllowActivation."); }
+        if (!allowActivation) { throw new InvalidOperationException("Running C# files is disabled by host policy. Enable DigitalBrain:CSharp:AllowActivation."); }
         var description = await catalog.Read(scope, id, ct);
         return new(description, await File(id).Arm(new(neuron, signal), ct));
     }
@@ -86,7 +86,7 @@ internal sealed class ScopedCSharpTools(IDigitalBrain brain, CSharpCatalogStore 
 
     public async Task<CSharpFileView> Start(string id, CancellationToken ct)
     {
-        if (!allowActivation) { throw new InvalidOperationException("Running C# files is disabled by host policy. Enable IntoChat:CSharp:AllowActivation."); }
+        if (!allowActivation) { throw new InvalidOperationException("Running C# files is disabled by host policy. Enable DigitalBrain:CSharp:AllowActivation."); }
         var description = await catalog.Read(scope, id, ct);
         return new(description, await File(id).Start(ct));
     }
