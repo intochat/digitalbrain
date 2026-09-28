@@ -36,8 +36,6 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     });
 builder.AddDurableProtection();
 builder.Services.Configure<LocalFilesOptions>(builder.Configuration.GetSection("IntoChat:LocalFiles"));
-builder.Services.Configure<BackgroundRemovalOptions>(builder.Configuration.GetSection(BackgroundRemovalOptions.SectionName));
-builder.Services.AddSingleton<IBackgroundRemover, DeterministicBackgroundRemover>();
 builder.Services.AddSingleton<IAssetBlobStore, AzureAssetBlobStore>();
 builder.Services.AddSingleton<LocalFileStore>();
 builder.Services.AddSingleton<AppSurfaceComposer>();
@@ -48,8 +46,6 @@ builder.Services.AddSingleton<IAgentToolFactory, WorkspaceTableTools>();
 builder.Services.AddSingleton<IAgentToolFactory, WorkspaceFormTools>();
 builder.Services.AddSingleton<IAgentToolFactory, DiscoveryTools>();
 builder.Services.AddSingleton<IAgentContextProvider, CapabilityContextProvider>();
-builder.Services.AddSingleton<IAgentToolFactory, LeadGeneratorTools>();
-builder.Services.AddSingleton<IAgentToolFactory, ImageEditorTools>();
 
 var app = builder.Build();
 

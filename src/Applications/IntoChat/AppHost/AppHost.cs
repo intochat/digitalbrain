@@ -66,7 +66,6 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<TimeModule>()
     .WithModule<SecretsModule>()
     .WithModule<ConnectorModule>()
-    .WithModule<LeadGeneratorModule>()
     .WithModule<IdentityModule>()
     .WithModule<GmailModule>(gmail => gmail.WithGmail())
     .WithModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())

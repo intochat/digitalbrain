@@ -37,8 +37,7 @@ public sealed class ManifestFacts
     [Fact]
     public void FirstPartyAppsDeclareTheAgentToolsTheHostRegisters()
     {
-        Assert.Equal(["propose_app", "run_leadgenerator"], FirstPartyApps.Get("intochat.leadgenerator").AgentTools);
-        Assert.Equal(["plan_background_removal", "run_background_removal"], FirstPartyApps.Get("intochat.image-editor").AgentTools);
+        Assert.Empty(FirstPartyApps.Get("intochat.image-editor").AgentTools);
         Assert.Empty(FirstPartyApps.Get("intochat.forms").AgentTools);
     }
 
@@ -104,9 +103,9 @@ public sealed class ManifestFacts
     public void EveryFirstPartyAppCarriesAValidGeneratedManifest()
     {
         var manifests = FirstPartyApps.All();
-        Assert.Equal(5, manifests.Count);
+        Assert.Equal(4, manifests.Count);
         Assert.All(manifests, ManifestValidator.Validate);
-        foreach (var id in new[] { "intochat.files", "intochat.forms", "intochat.image-editor", "intochat.customer-tables", "intochat.leadgenerator" })
+        foreach (var id in new[] { "intochat.files", "intochat.forms", "intochat.image-editor", "intochat.customer-tables" })
         {
             Assert.True(FirstPartyApps.Contains(id), $"Missing first-party manifest '{id}'.");
             Assert.NotEmpty(FirstPartyApps.Get(id).Operations);

@@ -285,9 +285,7 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
         ),
         child: switch (kind) {
           'consent-sheet' => _consentCard(card, colors),
-          'plan-card' => _planCard(card, colors),
           'charge-receipt' => _chargeCard(card, colors),
-          'leads' => _leadsCard(card, colors),
           _ => const Text('Updated'),
         },
       ),
@@ -353,47 +351,6 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
     ],
   );
 
-  Widget _planCard(Map<String, dynamic> card, ColorScheme colors) {
-    final images = card['images'] is List ? (card['images'] as List).length : 0;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Text(
-          'Remove background',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'The app sees only these $images images · estimate ${card['estimate']} Compute · maximum ${card['maximum']}',
-        ),
-        const SizedBox(height: 12),
-        if (card['requiresApproval'] == false)
-          Text(
-            'Already allowed',
-            style: TextStyle(fontSize: 12, color: colors.primary),
-          )
-        else
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              FilledButton(
-                onPressed: _running ? null : () => _decide('Allow once'),
-                child: const Text('Allow once'),
-              ),
-              TextButton(
-                onPressed: _running
-                    ? null
-                    : () => _decide('Always, up to 100 a month'),
-                child: const Text('Always, up to 100 a month'),
-              ),
-            ],
-          ),
-      ],
-    );
-  }
-
   Widget _chargeCard(Map<String, dynamic> card, ColorScheme colors) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     mainAxisSize: MainAxisSize.min,
@@ -412,11 +369,6 @@ extension _WorkspaceChatPresentation on _WorkspaceChatState {
         ),
       ],
     ],
-  );
-
-  Widget _leadsCard(Map<String, dynamic> card, ColorScheme colors) => Text(
-    'Leads window opened (${card['leads'] ?? 0} companies)',
-    style: const TextStyle(fontWeight: FontWeight.w600),
   );
 
   String _labels(List items, String key) => items
