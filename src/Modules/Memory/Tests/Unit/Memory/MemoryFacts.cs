@@ -26,7 +26,7 @@ public sealed class MemoryFacts
         Assert.Empty((await memory.Recall(new("notes", "test", 5, []))).Matches);
         index.FailWrites = false;
         Assert.Equal(0, (await memory.RebuildIndex("notes")).Pending);
-        Assert.Empty(await index.SearchAsync("owner", "notes", [1, 1], 5, null, ct));
+        Assert.Empty(index.Entries("owner", "notes"));
     }
     [Fact]
     public async Task CanonicalMemorySurvivesMissingIndexAndReactivationAndRebuildRetries()
@@ -44,7 +44,7 @@ public sealed class MemoryFacts
         Assert.Equal("durable text", Assert.Single((await memory.Recall(new("notes", "durable", 5, []))).Matches).Text);
         index.FailWrites = false;
         Assert.Equal(0, (await memory.RebuildIndex("notes")).Pending);
-        Assert.Single(await index.SearchAsync("owner", "notes", [1, 1], 5, null, ct));
+        Assert.Single(index.Entries("owner", "notes"));
         Assert.Empty((await brain.Get<IMemory>("other").Recall(new("notes", "durable", 5, []))).Matches);
     }
 
@@ -67,7 +67,7 @@ public sealed class MemoryFacts
         await memory.Forget(new("notes", "a"));
         Assert.Equal(0, (await memory.ImportLegacy("notes", limit: 1)).Imported);
         Assert.Equal("newer b", Assert.Single((await memory.Recall(new("notes", "text", 5, []))).Matches).Text);
-        Assert.Equal(2, (await source.SearchAsync("owner", "notes", [1, 1], 5, null, ct)).Count);
+        Assert.Equal(2, source.Entries("owner", "notes").Length);
         await memory.PurgeNamespace(new("notes"));
         await Assert.ThrowsAsync<InvalidOperationException>(() => memory.ImportLegacy("notes"));
     }
@@ -212,23 +212,8 @@ internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore, ILegacyVec
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyList<RecalledMemory>> SearchAsync(
-        string name,
-        string @namespace,
-        float[] queryEmbedding,
-        int limit,
-        IReadOnlyDictionary<string, string>? metadataFilter,
-        CancellationToken cancellationToken)
-    {
-        IReadOnlyList<RecalledMemory> matches = _entries.Values
-            .Where(entry => entry.Name == name && entry.Namespace == @namespace)
-            .Where(entry => metadataFilter is null || metadataFilter.Count == 0
-                || metadataFilter.All(filter => entry.Tags.Any(tag => tag.Name == filter.Key && tag.Value == filter.Value)))
-            .Take(limit)
-            .Select(static entry => new RecalledMemory(entry.Key, entry.Text, entry.Tags, entry.Payload))
-            .ToArray();
-        return Task.FromResult(matches);
-    }
+    internal VectorMemoryEntry[] Entries(string name, string @namespace)
+        => [.. _entries.Values.Where(entry => entry.Name == name && entry.Namespace == @namespace)];
 
     public Task<bool> RemoveAsync(string name, string @namespace, string key, CancellationToken cancellationToken)
         => Task.FromResult(_entries.Remove((name, @namespace, key)));

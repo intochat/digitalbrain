@@ -1,12 +1,10 @@
 using DigitalBrain.Core;
 using DigitalBrain.Discovery.Search;
-using DigitalBrain.Discovery.Vector;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
-using Qdrant.Client;
 
 namespace DigitalBrain.Discovery;
 
@@ -22,7 +20,6 @@ public sealed class DiscoveryModule : IModule
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IManifestSource, AppsManifestSource>());
         services.TryAddSingleton<ICapabilityEmbedder>(CreateEmbedder);
-        services.TryAddSingleton<ICapabilityVectorIndex>(CreateVectorIndex);
         services.TryAddSingleton<CapabilityCatalog>();
         services.AddHostedService<CapabilityCatalogRebuilder>();
     }
@@ -46,14 +43,5 @@ public sealed class DiscoveryModule : IModule
             // discovery must still start and serve keyword search.
             return new HashingCapabilityEmbedder();
         }
-    }
-
-    private static ICapabilityVectorIndex CreateVectorIndex(IServiceProvider services)
-    {
-        var model = services.GetRequiredService<ICapabilityEmbedder>().ModelId;
-        var client = services.GetService<QdrantClient>();
-        return client is null
-            ? new InMemoryCapabilityVectorIndex(model)
-            : new QdrantCapabilityVectorIndex(client, model);
     }
 }

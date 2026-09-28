@@ -18,7 +18,7 @@ AppHost ──(--publisher manifest)──► aspire-manifest.json ──► pul
 
 | Module | Deployment | Deploys |
 | --- | --- | --- |
-| Memory | `Memory/Deployment` | Qdrant (manifest image) as an internal app, data on Azure Files |
+| Qdrant | `Qdrant/Deployment` | Qdrant (manifest image) as an internal app, data on Azure Files |
 | ClickHouse | `ClickHouse/Deployment` | ClickHouse (manifest image) as an internal app, data on Azure Files |
 | Compute | `DigitalBrain/Compute/Deployment` | The ledger on DeploymentKit's PostgreSQL Flexible Server |
 | AI | `AI/Deployment` | Ollama, pulling every model the manifest names; provider keys are secrets |

@@ -12,7 +12,7 @@
     <ProjectReference Include="../IntoChat/IntoChat.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/Deployment/DigitalBrain.Deployment.csproj" />
     <ProjectReference Include="../../../Modules/AI/Deployment/DigitalBrain.Modules.AI.Deployment.csproj" />
-    <ProjectReference Include="../../../Modules/Memory/Deployment/DigitalBrain.Modules.Memory.Deployment.csproj" />
+    <ProjectReference Include="../../../Modules/Qdrant/Deployment/DigitalBrain.Modules.Qdrant.Deployment.csproj" />
     <ProjectReference Include="../../../Modules/ClickHouse/Deployment/DigitalBrain.Modules.ClickHouse.Deployment.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Compute/Deployment/DigitalBrain.Modules.Compute.Deployment.csproj" />
     <ProjectReference Include="../../../Modules/Microsoft/CSharp/Deployment/DigitalBrain.Modules.Microsoft.CSharp.Deployment.csproj" />

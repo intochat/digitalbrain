@@ -1,68 +1,34 @@
 using DigitalBrain.Core;
-using DigitalBrain.Memory.Qdrant;
+using DigitalBrain.Qdrant;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Options;
 using Orleans.Hosting;
-using Qdrant.Client;
 
 namespace DigitalBrain.Memory;
 
-[ModuleDeployment("DigitalBrain.Memory.MemoryDeployment, DigitalBrain.Modules.Memory.Deployment")]
 [ModuleConfiguration(typeof(MemoryConfigurationContract))]
-[ModuleHosting("DigitalBrain.Memory.Aspire.Hosting.MemoryModuleHosting, DigitalBrain.Modules.Memory.Aspire.Hosting")]
 public sealed class MemoryModule : IModule
 {
-    public const string ProviderConfigurationKey = "DigitalBrain:Memory:Provider";
-    public const string QdrantProviderName = "Qdrant";
-
     public static ModuleDefinition Define(MemoryModuleOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
         return new(typeof(MemoryModule), new Dictionary<string, string?>
         {
-            [MemoryModuleOptions.SectionName + ":Provider"] = options.Provider,
-            [MemoryModuleOptions.SectionName + ":HostQdrant"] = options.HostQdrant.ToString(),
-            [MemoryModuleOptions.SectionName + ":Qdrant:ConnectionName"] = options.Qdrant.ConnectionName,
-            [MemoryModuleOptions.SectionName + ":Qdrant:CollectionName"] = options.Qdrant.CollectionName,
+            [MemoryModuleOptions.SectionName + ":CollectionName"] = options.CollectionName,
         });
     }
 
+    // Canonical memory lives in neurons; the vector projection exists only over a real Qdrant connection.
     public void Configure(ISiloBuilder silo)
     {
         ArgumentNullException.ThrowIfNull(silo);
         var services = silo.Services;
         services.TryAddSingleton(TimeProvider.System);
-        services.AddOptions<MemoryModuleOptions>()
-            .Bind(silo.Configuration.GetSection(MemoryModuleOptions.SectionName))
-            .PostConfigure<IConfiguration>(static (options, configuration) => options.ResolveConnection(configuration));
-        var configured = silo.Configuration.GetSection(MemoryModuleOptions.SectionName).Get<MemoryModuleOptions>() ?? new();
-        configured.ResolveConnection(silo.Configuration);
-        if (string.IsNullOrWhiteSpace(configured.Qdrant.ConnectionString)) { return; }
-        services.TryAddSingleton(CreateQdrantClient);
-        services.TryAddSingleton(CreateQdrantProvider);
-        services.TryAddSingleton<QdrantVectorMemoryStore>();
-        services.TryAddSingleton<IVectorMemoryStore>(services => services.GetRequiredService<QdrantVectorMemoryStore>());
-        services.TryAddSingleton<ILegacyVectorMemoryStore>(services => services.GetRequiredService<QdrantVectorMemoryStore>());
-    }
-
-    private static QdrantClient CreateQdrantClient(IServiceProvider services)
-    {
-        var options = services.GetRequiredService<IOptions<MemoryModuleOptions>>().Value.Qdrant;
-        var connectionName = options.ConnectionName;
-        var connectionString = options.ConnectionString
-            ?? throw new InvalidOperationException(
-                $"Qdrant vector memory requires connection string '{connectionName}'.");
-
-        return QdrantVectorMemoryRegistration.CreateClient(connectionString);
-    }
-
-    private static QdrantVectorMemoryProvider CreateQdrantProvider(IServiceProvider services)
-    {
-        var options = services.GetRequiredService<IOptions<MemoryModuleOptions>>().Value;
-        var client = services.GetRequiredService<QdrantClient>();
-        var collectionName = options.Qdrant.CollectionName;
-        return new QdrantVectorMemoryProvider(client, collectionName);
+        if (!QdrantModule.IsConnected(silo.Configuration)) { return; }
+        var collectionName = silo.Configuration[MemoryModuleOptions.SectionName + ":CollectionName"];
+        services.TryAddSingleton(provider => new VectorMemoryStore(provider.GetRequiredService<IQdrant>(), collectionName));
+        services.TryAddSingleton<IVectorMemoryStore>(provider => provider.GetRequiredService<VectorMemoryStore>());
+        services.TryAddSingleton<ILegacyVectorMemoryStore>(provider => provider.GetRequiredService<VectorMemoryStore>());
     }
 }

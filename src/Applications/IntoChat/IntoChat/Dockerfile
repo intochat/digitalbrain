@@ -15,8 +15,7 @@
 #   ConnectionStrings__clustering   Orleans clustering (Azure Table/Blob)
 #   ConnectionStrings__reminders    Orleans reminders
 #   ConnectionStrings__grainstate   Orleans grain state (digitalbrain-v2-state)
-#   DigitalBrain__Memory__Provider=Qdrant
-#   ConnectionStrings__memory-qdrant  Endpoint=http://qdrant:6334;Key=...
+#   ConnectionStrings__qdrant  Endpoint=http://qdrant:6334;Key=...
 #
 # The product profile excludes the developer executors: Coding, CSharp, Roslyn, DotNet
 # and Aspire are not in the module list below.
@@ -62,7 +61,7 @@ ENV ASPNETCORE_ENVIRONMENT=Production \
     DigitalBrain__Modules__12="DigitalBrain.Compute.ComputeModule, DigitalBrain.Modules.Compute" \
     DigitalBrain__Modules__13="DigitalBrain.Discovery.DiscoveryModule, DigitalBrain.Modules.Discovery" \
     DigitalBrain__Modules__14="DigitalBrain.Apps.AppsModule, DigitalBrain.Modules.Apps" \
-    DigitalBrain__Modules__15="IntoChat.Apps.LeadGeneratorModule, IntoChat"
+    DigitalBrain__Modules__15="IntoChat.Apps.LeadGeneratorModule, IntoChat" \n    DigitalBrain__Modules__16="DigitalBrain.Qdrant.QdrantModule, DigitalBrain.Modules.Qdrant"
 
 EXPOSE 8080
 

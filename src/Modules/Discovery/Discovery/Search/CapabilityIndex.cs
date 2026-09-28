@@ -170,12 +170,6 @@ internal sealed class CapabilityIndex
         list.Add(entry);
     }
 
-    public IReadOnlyList<(string Id, string WorkspaceId, string Text, float[] Embedding)> EmbeddedEntries()
-        => _entries
-            .Where(static entry => entry.Embedding is not null)
-            .Select(static entry => (entry.Id, entry.WorkspaceId ?? string.Empty, entry.Name, entry.Embedding!))
-            .ToArray();
-
     private static async ValueTask<float[]?> EmbedAsync(
         Func<string, CancellationToken, ValueTask<float[]?>>? embed,
         string text,

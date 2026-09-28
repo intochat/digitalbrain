@@ -2,7 +2,6 @@ using System.Security.Cryptography;
 using System.Text;
 using DigitalBrain.Apps;
 using DigitalBrain.Discovery.Search;
-using DigitalBrain.Discovery.Vector;
 using DigitalBrain.Core.Registry;
 using Microsoft.Extensions.Logging;
 
@@ -13,7 +12,6 @@ internal sealed class CapabilityCatalog(
     IEnumerable<IManifestSource> sources,
     NeuronRegistry neurons,
     ICapabilityEmbedder embedder,
-    ICapabilityVectorIndex vectors,
     ILogger<CapabilityCatalog> logger)
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -85,7 +83,6 @@ internal sealed class CapabilityCatalog(
             }
 
             _index = await CapabilityIndex.BuildAsync(manifests, Embed, cancellationToken, contracts).ConfigureAwait(false);
-            await PersistAsync(_index, cancellationToken).ConfigureAwait(false);
             _signature = signature;
             _indexDegraded = degraded;
             Degraded = degraded || unreadable > 0 && read.Count == 0;
@@ -94,25 +91,6 @@ internal sealed class CapabilityCatalog(
         finally
         {
             _gate.Release();
-        }
-    }
-
-    private async Task PersistAsync(CapabilityIndex index, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var records = index.EmbeddedEntries()
-                .Select(static entry => new CapabilityVectorRecord(
-                    entry.WorkspaceId.Length == 0 ? entry.Id : entry.WorkspaceId + "/" + entry.Id,
-                    entry.WorkspaceId,
-                    entry.Text,
-                    entry.Embedding))
-                .ToArray();
-            await vectors.UpsertAsync(CapabilityCollection.SystemCapabilities, records, cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            logger.LogWarning(exception, "Persisting capability vectors failed; in-memory search is unaffected.");
         }
     }
 

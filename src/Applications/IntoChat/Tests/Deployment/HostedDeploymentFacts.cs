@@ -53,7 +53,7 @@ public sealed class HostedDeploymentFacts
         {
             "digitalbrain--ai--openai--apikey", "digitalbrain--ai--tavily--apikey", "connectionstrings--supabase",
             "digitalbrain--google--gmail--oauth--clientsecret", "digitalbrain--salesforce--oauth--consumersecret",
-            "connectionstrings--compute", "connectionstrings--memory-qdrant", "connectionstrings--clickhouse",
+            "connectionstrings--compute", "connectionstrings--qdrant", "connectionstrings--clickhouse",
         })
         {
             Assert.Contains("intochat-" + variable, vaulted);

@@ -2,10 +2,10 @@ using System.Globalization;
 using DigitalBrain.Deployment;
 using Pulumi;
 
-namespace DigitalBrain.Memory;
+namespace DigitalBrain.Qdrant;
 
 // Runs the manifest's Qdrant container as an internal service with its data on Azure Files.
-public sealed class MemoryDeployment : IDigitalBrainModuleDeployment
+public sealed class QdrantDeployment : IDigitalBrainModuleDeployment
 {
     private const int GrpcPort = 6334;
     private const int HttpPort = 6333;
@@ -13,7 +13,7 @@ public sealed class MemoryDeployment : IDigitalBrainModuleDeployment
     public void Deploy(ModuleDeploymentContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        var qdrant = context.Manifest.ServingContainer(context.Runtime, "memory-qdrant");
+        var qdrant = context.Manifest.ServingContainer(context.Runtime, QdrantModule.ConnectionName);
         var app = context.AddService(new ServiceDefinition("qdrant", context.Manifest.Image(qdrant), GrpcPort)
         {
             Transport = "http2",
