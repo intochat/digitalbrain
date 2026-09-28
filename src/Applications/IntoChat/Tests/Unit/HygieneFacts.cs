@@ -92,11 +92,9 @@ public sealed class HygieneFacts
     }
 
     [Fact]
-    public void HostDownloadsRootIsNotExposedByDefault()
+    public void HostFilesystemIsNotExposed()
     {
-        var appHost = Read("src/Applications/IntoChat/AppHost/AppHost.cs");
-        Assert.DoesNotContain("Downloads", appHost);
-        Assert.Contains("IntoChat:LocalFiles:Roots:downloads", appHost);
+        Assert.DoesNotContain("IntoChat:LocalFiles", Read("src/Applications/IntoChat/AppHost/AppHost.cs"));
     }
 
     [Fact]

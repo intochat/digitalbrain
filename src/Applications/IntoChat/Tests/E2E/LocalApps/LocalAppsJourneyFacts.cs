@@ -31,17 +31,17 @@ public sealed class LocalAppsJourneyFacts
                 await File.WriteAllBytesAsync(Path.Combine(downloads, "Second.png"), source, ct);
                 await File.WriteAllTextAsync(Path.Combine(downloads, "readme.txt"), "Local file fixture", ct);
             }
-            var settings = new Dictionary<string, string?> { ["IntoChat:LocalFiles:Roots:downloads"] = downloads, ["IntoChat:LocalFiles:AssetDirectory"] = Path.Combine(root, "assets") };
-            await using var brain = await IntoChatE2ETest.Create(privateConfiguration: settings)
+            await using var brain = await IntoChatE2ETest.Create()
                 .ConfigureModule<FlutterModule>(flutter => flutter.RunWebApp()).StartAsync(ct);
             var page = brain.Page;
             page.SetDefaultTimeout(15000);
             Microsoft.Playwright.IRequest? saveRequest = null;
             page.Request += (_, request) => { if (request.Method == "POST" && request.Url.Contains("/save/", StringComparison.Ordinal)) { saveRequest = request; } };
             await page.SetViewportSizeAsync(1600, 1000);
+            var workspaceId = await WorkspaceBrowser.CreateProjectAsync(page, "Local images");
+            await WorkspaceUploadFixture.Upload(brain.HttpClient, workspaceId, string.IsNullOrWhiteSpace(acceptanceImage) ? Directory.GetFiles(downloads, "*.png") : [original]);
             await page.GetByRole(AriaRole.Button, new() { Name = "Applications", Exact = true }).ClickAsync();
             await page.GetByRole(AriaRole.Menuitem, new() { Name = "Files Workspace assets", Exact = true }).ClickAsync();
-            await page.GetByRole(AriaRole.Button, new() { Name = "Open Import from host Downloads", Exact = true }).ClickAsync();
             if (!string.IsNullOrWhiteSpace(acceptanceImage))
             {
                 var filter = page.GetByRole(AriaRole.Textbox, new() { Name = "Filter files", Exact = true });
@@ -84,12 +84,10 @@ public sealed class LocalAppsJourneyFacts
             // Flutter mirrors the SnackBar text into an aria-live announcement; assert the visible node.
             await Assertions.Expect(page.Locator("flt-semantics").GetByText("Saved " + outputName, new() { Exact = true })).ToBeVisibleAsync();
             var assetChecksum = receipt.RootElement.GetProperty("file").GetProperty("checksum").GetString()!;
-            var workspaceId = Uri.UnescapeDataString(new Uri(response.Url).AbsolutePath.Split('/')[2]);
             var assetId = IntoChat.LocalFiles.LocalFileStore.AssetId(IntoChat.Workspace.WorkspaceScope.Create("owner", workspaceId).Id, assetChecksum);
             var outputResponse = await brain.HttpClient.GetAsync($"/workspaces/{Uri.EscapeDataString(workspaceId)}/apps/assets/{assetId}", ct);
             outputResponse.EnsureSuccessStatusCode();
             var output = await outputResponse.Content.ReadAsByteArrayAsync(ct);
-            Assert.False(File.Exists(Path.Combine(downloads, outputName)));
             Assert.Equal(60, BinaryPrimitives.ReadInt32BigEndian(output.AsSpan(16, 4)));
             Assert.Equal(40, BinaryPrimitives.ReadInt32BigEndian(output.AsSpan(20, 4)));
             Assert.Equal(SHA256.HashData(source), SHA256.HashData(await File.ReadAllBytesAsync(original, ct)));
@@ -105,12 +103,10 @@ public sealed class LocalAppsJourneyFacts
             Assert.NotNull(saveRequest);
             var originalResponse = await saveRequest.ResponseAsync() ?? throw new InvalidOperationException("Save had no response.");
             using var originalReceipt = System.Text.Json.JsonDocument.Parse(await originalResponse.TextAsync());
-            var copiesBefore = Directory.GetFiles(downloads, Path.GetFileNameWithoutExtension(original) + "-edited*.png").Length;
             var replay = await page.APIRequest.FetchAsync(saveRequest, new() { DataByte = output });
             Assert.Equal(200, replay.Status);
             using var replayReceipt = System.Text.Json.JsonDocument.Parse(await replay.TextAsync());
             Assert.Equal(originalReceipt.RootElement.GetProperty("file").GetProperty("entryId").GetString(), replayReceipt.RootElement.GetProperty("file").GetProperty("entryId").GetString());
-            Assert.Equal(copiesBefore, Directory.GetFiles(downloads, Path.GetFileNameWithoutExtension(original) + "-edited*.png").Length);
             await page.ReloadAsync();
             await page.GetByRole(AriaRole.Button, new() { Name = "Applications", Exact = true }).ClickAsync();
             await page.GetByRole(AriaRole.Menuitem, new() { Name = "Files Workspace assets", Exact = true }).ClickAsync();

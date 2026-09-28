@@ -105,16 +105,12 @@ public sealed class ChaosChargeFacts
             }
 
             await using var model = await ScriptedModelServer.StartAsync(ct);
-            await using var brain = await IntoChatE2ETest.Create(privateConfiguration: new()
-            {
-                ["IntoChat:LocalFiles:Roots:downloads"] = root,
-                ["IntoChat:LocalFiles:AssetDirectory"] = Path.Combine(root, "assets"),
-            })
+            await using var brain = await IntoChatE2ETest.Create()
                 .ConfigureModule<AIModule>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
                 .StartAsync(ct);
 
             const string workspace = "chaos-paid";
-            await LocalApps.HostAssetFixture.Import(brain, IntoChat.Workspace.WorkspaceScope.Create("owner", workspace).Id);
+            await LocalApps.WorkspaceUploadFixture.Upload(brain.HttpClient, workspace, Directory.GetFiles(root, "*.png"));
             async Task<string> Ask(string run, string message)
             {
                 using var response = await brain.HttpClient.PostAsJsonAsync("/agent",

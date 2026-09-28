@@ -13,11 +13,11 @@ public sealed class LocalAppNeuronFacts
         try
         {
             await File.WriteAllBytesAsync(Path.Combine(root, "image.png"), Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg=="), ct);
-            await using var brain = await IntoChatE2ETest.Create(privateConfiguration: new() { ["IntoChat:LocalFiles:Roots:downloads"] = root, ["IntoChat:LocalFiles:AssetDirectory"] = Path.Combine(root, "assets") }).StartAsync(ct);
+            await using var brain = await IntoChatE2ETest.Create().StartAsync(ct);
             var scope = WorkspaceScope.Create("owner", "local-neurons").Id;
-            await HostAssetFixture.Import(brain, scope);
+            await WorkspaceUploadFixture.Upload(brain.HttpClient, "local-neurons", Directory.GetFiles(root, "*.png"));
             var files = brain.Get<IFileExplorer>(scope);
-            var surface = await files.Navigate(null);
+            var surface = await files.Navigate();
             Assert.Equal("surface", surface.Surface!.Kind);
             var collection = await brain.Get<ICollectionView>(scope + "/apps/files/items").Read();
             var entry = Assert.Single(collection.Definition.Items, item => item.Kind == "image").Id;

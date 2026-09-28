@@ -8,4 +8,3 @@ public sealed record DirectoryCrumb(string Id, string Label);
 public sealed record ImageAsset([property: Id(0)] string Id, [property: Id(1)] string Name, [property: Id(2)] int Width, [property: Id(3)] int Height, [property: Id(4)] string Fingerprint, [property: Id(5)] string SourceEntryId, [property: Id(6)] string DocumentId);
 [GenerateSerializer, Alias("intochat.saved-file")]
 public sealed record SavedFile([property: Id(0)] string EntryId, [property: Id(1)] string Name, [property: Id(2)] string Checksum, [property: Id(3)] long Bytes);
-internal sealed record FileHandle(string Scope, string Root, string RelativePath, long? Length = null, long? ModifiedTicks = null, long? CreatedTicks = null);

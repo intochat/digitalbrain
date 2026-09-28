@@ -34,7 +34,7 @@ internal sealed class AzureAssetBlobStore([FromKeyedServices(DigitalBrainNames.G
         try
         {
             var blob = client.GetBlobContainerClient(ContainerName).GetBlobClient(id);
-            if ((await blob.GetPropertiesAsync(cancellationToken: ct)).Value.ContentLength > LocalFilesOptions.MaxExportBytes)
+            if ((await blob.GetPropertiesAsync(cancellationToken: ct)).Value.ContentLength > LocalFileStore.MaxExportBytes)
             { throw new IOException("The stored asset exceeds the supported size."); }
             return (await blob.DownloadContentAsync(ct)).Value.Content.ToArray();
         }

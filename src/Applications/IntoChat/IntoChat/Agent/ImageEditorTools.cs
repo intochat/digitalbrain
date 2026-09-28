@@ -49,7 +49,7 @@ internal sealed class ImageEditorTools(IDigitalBrain brain, LocalFileStore files
     private async Task<object> PlanAsync(string scope, string intentId, int imageCount, CancellationToken ct)
     {
         if (imageCount is < 1 or > 64) { throw new ArgumentException("Choose 1–64 images.", nameof(imageCount)); }
-        var page = await files.ListAsync(scope, null, 0, "name", "", ct);
+        var page = await files.ListAsync(scope, 0, "name", "", ct);
         var images = page.Items.Where(IsImage).Take(imageCount).ToArray();
         if (images.Length == 0) { throw new KeyNotFoundException("No images are in the workspace Files root."); }
         var explorer = brain.Get<IFileExplorer>(scope);

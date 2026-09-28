@@ -35,7 +35,6 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Events.OnRedirectToAccessDenied = context => { context.Response.StatusCode = StatusCodes.Status403Forbidden; return Task.CompletedTask; };
     });
 builder.AddDurableProtection();
-builder.Services.Configure<LocalFilesOptions>(builder.Configuration.GetSection("IntoChat:LocalFiles"));
 builder.Services.Configure<BackgroundRemovalOptions>(builder.Configuration.GetSection(BackgroundRemovalOptions.SectionName));
 builder.Services.AddSingleton<IBackgroundRemover, DeterministicBackgroundRemover>();
 builder.Services.AddSingleton<IAssetBlobStore, AzureAssetBlobStore>();

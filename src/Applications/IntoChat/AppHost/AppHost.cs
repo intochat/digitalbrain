@@ -117,11 +117,6 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
         })
     .WithEnvironment(context =>
     {
-        // No default host filesystem root: the Files app stays off unless a root is configured.
-        var downloads = builder.Configuration["IntoChat:LocalFiles:Roots:downloads"];
-        if (downloads is not null) { context.EnvironmentVariables["IntoChat__LocalFiles__Roots__downloads"] = downloads; }
-        var assets = builder.Configuration["IntoChat:LocalFiles:AssetDirectory"];
-        if (assets is not null) { context.EnvironmentVariables["IntoChat__LocalFiles__AssetDirectory"] = assets; }
         if (builder.Configuration["IntoChat:Assistant:Model"] is { Length: > 0 } assistantModel)
         { context.EnvironmentVariables["IntoChat__Assistant__Model"] = assistantModel; }
         if (builder.Configuration["IntoChat:CSharp:AllowActivation"] is { } allowActivation)

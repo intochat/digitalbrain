@@ -1,23 +1,18 @@
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using DigitalBrain.Flutter.Collection;
-using Microsoft.AspNetCore.DataProtection;
-using Microsoft.Extensions.Options;
 
 namespace IntoChat.LocalFiles;
 
-internal sealed class LocalFileStore(IOptions<LocalFilesOptions> options, IDataProtectionProvider protection, IAssetBlobStore blobs, IGrainFactory grains)
+internal sealed class LocalFileStore(IAssetBlobStore blobs, IGrainFactory grains)
 {
-    private readonly IDataProtector _protector = protection.CreateProtector("IntoChat.LocalFiles.v1");
-    private readonly LocalFilesOptions _options = options.Value;
-
     internal const string WorkspaceRoot = "workspace-assets";
+    internal const long MaxSourceBytes = 32 * 1024 * 1024;
+    internal const long MaxExportBytes = 128 * 1024 * 1024;
     private const string AssetEntry = "asset:";
 
-    public async Task<DirectoryPage> ListAsync(string scope, string? folderId, int offset, string sort, string filter, CancellationToken ct)
+    public async Task<DirectoryPage> ListAsync(string scope, int offset, string sort, string filter, CancellationToken ct)
     {
-        if (folderId is not null && folderId != WorkspaceRoot) { return await ListHostAsync(scope, folderId, offset, sort, filter, ct); }
         if (offset < 0 || offset > 100000 || filter.Length > 200) { throw new ArgumentException("Invalid file listing request."); }
         var assets = (await grains.GetGrain<IWorkspaceAssets>(scope).List().WaitAsync(ct))
             .Where(asset => asset.Image.Name.Contains(filter, StringComparison.OrdinalIgnoreCase));
@@ -27,93 +22,41 @@ internal sealed class LocalFileStore(IOptions<LocalFilesOptions> options, IDataP
             "size" => assets.OrderByDescending(asset => asset.Bytes).ThenBy(asset => asset.Image.DocumentId, StringComparer.Ordinal),
             _ => assets.OrderBy(asset => asset.Image.Name, StringComparer.OrdinalIgnoreCase).ThenBy(asset => asset.Image.DocumentId, StringComparer.Ordinal),
         };
-        var rows = ordered.Select(asset => new CollectionItem(AssetEntry + asset.Image.DocumentId, asset.Image.Name,
-            "image", null, asset.Bytes, asset.CreatedAt, true)).ToList();
-        if (_options.Roots.ContainsKey("downloads") && "Import from host Downloads".Contains(filter, StringComparison.OrdinalIgnoreCase))
-        { rows.Insert(0, new(Encode(new(scope, "downloads", "")), "Import from host Downloads", "folder", null, null, null, true)); }
-        var page = rows.Skip(offset).Take(101).ToArray();
+        var page = ordered.Skip(offset).Take(101).Select(asset => new CollectionItem(AssetEntry + asset.Image.DocumentId, asset.Image.Name,
+            "image", null, asset.Bytes, asset.CreatedAt, true)).ToArray();
         return new(WorkspaceRoot, "Workspace Files", null, page.Take(100).ToArray(), page.Length > 100 ? offset + 100 : null, [new(WorkspaceRoot, "Workspace Files")]);
     }
 
-    internal Task<DirectoryPage> ListHostAsync(string scope, string? folderId, int offset, string sort, string filter, CancellationToken ct)
+    public async Task<ImageAsset> ReadImageAsync(string scope, string entryId, CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        if (offset < 0 || offset > 100000 || filter.Length > 200) { throw new ArgumentException("Invalid file listing request."); }
-        var handle = folderId is null ? new FileHandle(scope, "downloads", "") : Decode(scope, folderId);
-        var folder = Resolve(handle);
-        using var lease = LocalPathLease.Acquire(folder);
-        var entries = new DirectoryInfo(folder).EnumerateFileSystemInfos().Where(x => !x.Attributes.HasFlag(FileAttributes.ReparsePoint) && !x.Name.StartsWith(".intochat-", StringComparison.Ordinal) && x.Name.Contains(filter, StringComparison.OrdinalIgnoreCase));
-        // Enumerate only this directory. Sorting is bounded to prevent unbounded metadata allocations.
-        var bounded = entries.Take(100001).ToArray();
-        if (bounded.Length > 100000) { throw new IOException("This folder contains too many entries. Open a smaller folder."); }
-        var ordered = sort switch
-        {
-            "date" => bounded.OrderByDescending(x => x.LastWriteTimeUtc).ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase),
-            "size" => bounded.OrderByDescending(x => x is FileInfo f ? f.Length : 0).ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase),
-            _ => bounded.OrderByDescending(x => x is DirectoryInfo).ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
-        };
-        var rows = ordered.Skip(offset).Take(101).Select(x => new CollectionItem(
-            Encode(handle with { RelativePath = Path.Combine(handle.RelativePath, x.Name), Length = x is FileInfo version ? version.Length : null, ModifiedTicks = x is FileInfo ? x.LastWriteTimeUtc.Ticks : null, CreatedTicks = x is FileInfo ? x.CreationTimeUtc.Ticks : null }), x.Name,
-            x is DirectoryInfo ? "folder" : IsImage(x.Name) ? "image" : "file", null,
-            x is FileInfo file ? file.Length : null, new DateTimeOffset(x.LastWriteTimeUtc), x is DirectoryInfo || IsImage(x.Name))).ToArray();
-        var crumbs = new List<DirectoryCrumb> { new(WorkspaceRoot, "Workspace Files"), new(Encode(new(scope, handle.Root, "")), "Import from host Downloads") };
-        var relativeCrumb = "";
-        foreach (var part in handle.RelativePath.Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries))
-        {
-            relativeCrumb = Path.Combine(relativeCrumb, part);
-            crumbs.Add(new(Encode(new(scope, handle.Root, relativeCrumb)), part));
-        }
-        return Task.FromResult(new DirectoryPage(Encode(handle), handle.RelativePath.Length == 0 ? "Import from host Downloads" : Path.GetFileName(folder),
-            handle.RelativePath.Length == 0 ? WorkspaceRoot : Encode(handle with { RelativePath = Path.GetDirectoryName(handle.RelativePath) ?? "" }),
-            rows.Take(100).ToArray(), rows.Length > 100 ? offset + 100 : null, crumbs));
+        if (!entryId.StartsWith(AssetEntry, StringComparison.Ordinal)) { throw new KeyNotFoundException("The workspace asset was not found."); }
+        return await grains.GetGrain<IWorkspaceAssets>(scope).Read(entryId[AssetEntry.Length..]).WaitAsync(ct);
     }
 
-    public async Task<ImageAsset> SnapshotImageAsync(string scope, string entryId, CancellationToken ct)
+    public async Task<ImageAsset> UploadImageAsync(string scope, string name, Stream content, CancellationToken ct)
     {
-        if (entryId.StartsWith(AssetEntry, StringComparison.Ordinal))
-        { return await grains.GetGrain<IWorkspaceAssets>(scope).Read(entryId[AssetEntry.Length..]).WaitAsync(ct); }
-        var handle = Decode(scope, entryId);
-        var path = Resolve(handle);
-        if (!IsImage(path)) { throw new ArgumentException("Only PNG and JPEG images can be opened."); }
-        using var lease = LocalPathLease.Acquire(Path.GetDirectoryName(path)!);
-        await using var source = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.Asynchronous);
-        LocalPathLease.Verify(source.SafeFileHandle, path);
-        var current = new FileInfo(path);
-        if (handle.Length is not null && (handle.Length != source.Length || handle.ModifiedTicks != current.LastWriteTimeUtc.Ticks || handle.CreatedTicks != current.CreationTimeUtc.Ticks))
-        { throw new IOException("This file changed since it was listed. Refresh Files and open it again."); }
-        if (source.Length > LocalFilesOptions.MaxSourceBytes) { throw new ArgumentException("Choose an image smaller than 32 MiB."); }
+        var fileName = Path.GetFileName(name);
+        if (fileName.Length is 0 or > 200 || Path.GetExtension(fileName).ToLowerInvariant() is not (".png" or ".jpg" or ".jpeg"))
+        { throw new ArgumentException("Only PNG and JPEG images can be uploaded."); }
         using var buffer = new MemoryStream();
         var chunk = new byte[81920];
         int read;
-        while ((read = await source.ReadAsync(chunk, ct)) != 0)
+        while ((read = await content.ReadAsync(chunk, ct)) != 0)
         {
-            if (buffer.Length + read > LocalFilesOptions.MaxSourceBytes) { throw new ArgumentException("Choose an image smaller than 32 MiB."); }
+            if (buffer.Length + read > MaxSourceBytes) { throw new ArgumentException("Choose an image smaller than 32 MiB."); }
             await buffer.WriteAsync(chunk.AsMemory(0, read), ct);
         }
-        if (buffer.Length > LocalFilesOptions.MaxSourceBytes) { throw new ArgumentException("Choose an image smaller than 32 MiB."); }
         var bytes = buffer.ToArray();
         var (width, height) = ImageHeader.Read(bytes);
-        var digest = Convert.ToHexStringLower(SHA256.HashData(bytes));
-        var id = ScopeKey(scope) + "-" + digest;
-        var identity = scope + "\0" + handle.Root + "\0" + (OperatingSystem.IsWindows() ? handle.RelativePath.ToUpperInvariant() : handle.RelativePath) + "\0" + digest;
-        var documentId = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(identity)));
-        return await StoreImageAsync(scope, new(id, Path.GetFileName(path), width, height, digest, AssetEntry + documentId, documentId), bytes, ct);
+        var checksum = Convert.ToHexStringLower(SHA256.HashData(bytes));
+        var documentId = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(scope + "\0" + fileName + "\0" + checksum)));
+        return await StoreImageAsync(scope, new(AssetId(scope, checksum), fileName, width, height, checksum, AssetEntry + documentId, documentId), bytes, ct);
     }
 
     public async Task<Stream> OpenAssetAsync(string scope, string assetId, CancellationToken ct)
     {
         ValidateAssetId(scope, assetId);
-        var bytes = await blobs.Read(assetId, ct);
-        if (bytes is null)
-        {
-            var path = AssetPath(scope, assetId);
-            if (!File.Exists(path)) { throw new FileNotFoundException("The workspace image was not found."); }
-            if (new FileInfo(path).Length > LocalFilesOptions.MaxExportBytes) { throw new IOException("The legacy asset is too large."); }
-            bytes = await File.ReadAllBytesAsync(path, ct);
-            VerifyBytes(assetId, bytes);
-            // Migration only publishes a verified immutable upload. Preserve the old file.
-            await blobs.Put(assetId, bytes, ct);
-        }
+        var bytes = await blobs.Read(assetId, ct) ?? throw new FileNotFoundException("The workspace image was not found.");
         VerifyBytes(assetId, bytes);
         return new MemoryStream(bytes, writable: false);
     }
@@ -133,12 +76,6 @@ internal sealed class LocalFileStore(IOptions<LocalFilesOptions> options, IDataP
     }
 
     internal static string AssetId(string scope, string checksum) => ScopeKey(scope) + "-" + checksum;
-    internal string LegacyJournalPath(string scope, string key) => Path.Combine(_options.AssetDirectory, "saves", ScopeKey(scope), key + ".json");
-    private string AssetPath(string scope, string id)
-    {
-        ValidateAssetId(scope, id);
-        return Path.Combine(_options.AssetDirectory, id + ".image");
-    }
     internal static void ValidateAssetId(string scope, string id)
     {
         if (id.Length != 129 || !id.StartsWith(ScopeKey(scope) + "-", StringComparison.Ordinal) || id.Where((_, i) => i != 64).Any(c => !char.IsAsciiHexDigit(c)))
@@ -146,39 +83,8 @@ internal sealed class LocalFileStore(IOptions<LocalFilesOptions> options, IDataP
     }
     private static void VerifyBytes(string id, byte[] bytes)
     {
-        if (bytes.Length > LocalFilesOptions.MaxExportBytes || Convert.ToHexStringLower(SHA256.HashData(bytes)) != id[65..])
+        if (bytes.Length > MaxExportBytes || Convert.ToHexStringLower(SHA256.HashData(bytes)) != id[65..])
         { throw new IOException("The image asset failed its integrity check."); }
     }
     private static string ScopeKey(string scope) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(scope)));
-    private string Encode(FileHandle value) => _protector.Protect(JsonSerializer.Serialize(value));
-    private FileHandle Decode(string scope, string id)
-    {
-        try
-        {
-            var value = JsonSerializer.Deserialize<FileHandle>(_protector.Unprotect(id));
-            if (value is null || value.Scope != scope) { throw new UnauthorizedAccessException("This file handle belongs to another workspace."); }
-            return value;
-        }
-        catch (CryptographicException) { throw new UnauthorizedAccessException("The file handle is invalid. Refresh Files."); }
-    }
-    private string Resolve(FileHandle handle)
-    {
-        if (!_options.Roots.TryGetValue(handle.Root, out var configured)) { throw new IOException("Downloads is not configured on this IntoChat host."); }
-        var relative = handle.RelativePath;
-        if (Path.IsPathRooted(relative) || relative.Contains(':') || relative.Split(['/', '\\']).Any(s => s is ".." or "."))
-        { throw new UnauthorizedAccessException("The path is outside the configured folder."); }
-        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(configured));
-        var path = Path.GetFullPath(Path.Combine(root, relative));
-        if (path != root && !path.StartsWith(root + Path.DirectorySeparatorChar, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
-        { throw new UnauthorizedAccessException("The path is outside the configured folder."); }
-        var current = root;
-        if (File.GetAttributes(current).HasFlag(FileAttributes.ReparsePoint)) { throw new UnauthorizedAccessException("Linked roots are not supported."); }
-        foreach (var part in relative.Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries))
-        {
-            current = Path.Combine(current, part);
-            if (File.GetAttributes(current).HasFlag(FileAttributes.ReparsePoint)) { throw new UnauthorizedAccessException("Linked files and folders are not supported."); }
-        }
-        return path;
-    }
-    private static bool IsImage(string path) => Path.GetExtension(path).ToLowerInvariant() is ".png" or ".jpg" or ".jpeg";
 }

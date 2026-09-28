@@ -56,8 +56,6 @@ public sealed class AgentAppJourneyFacts
             await using var model = await ScriptedModelServer.StartAsync(ct);
             await using var brain = await IntoChatE2ETest.Create(privateConfiguration: new()
             {
-                ["IntoChat:LocalFiles:Roots:downloads"] = root,
-                ["IntoChat:LocalFiles:AssetDirectory"] = Path.Combine(root, "assets"),
                 ["IntoChat:BackgroundRemoval:FailingImages:0"] = "photo-3.png",
             })
                 .ConfigureModule<AIModule>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
@@ -66,7 +64,7 @@ public sealed class AgentAppJourneyFacts
             var page = brain.Page;
             await page.SetViewportSizeAsync(1600, 1000);
             var projectId = await WorkspaceBrowser.CreateProjectAsync(page, "Paid workspace");
-            await LocalApps.HostAssetFixture.Import(brain, WorkspaceScope.Create("owner", projectId).Id);
+            await LocalApps.WorkspaceUploadFixture.Upload(brain.HttpClient, projectId, Directory.GetFiles(root, "*.png"));
 
             await SendAsync(page, "Remove the background from these 3 product photos");
 

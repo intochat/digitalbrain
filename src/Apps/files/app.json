@@ -5,13 +5,13 @@
   "kind": "declarative",
   "name": "Files",
   "descriptionForPeople": "Browse and open files in your workspace.",
-  "descriptionForModel": "Read folders and open local files; list, filter and sort entries.",
+  "descriptionForModel": "List, filter and sort workspace images and open them in the image editor.",
   "operations": [
     {
       "name": "Navigate",
-      "descriptionForModel": "List a folder's entries and breadcrumbs.",
+      "descriptionForModel": "List workspace images.",
       "readOnly": true,
-      "inputTypeIds": { "folderId": "plain-text", "offset": "number", "sort": "plain-text", "filter": "plain-text" },
+      "inputTypeIds": { "offset": "number", "sort": "plain-text", "filter": "plain-text" },
       "outputTypeId": "reference"
     },
     {
@@ -23,7 +23,7 @@
     },
     {
       "name": "Read",
-      "descriptionForModel": "Read the current folder state.",
+      "descriptionForModel": "Read the current listing state.",
       "readOnly": true,
       "outputTypeId": "reference"
     }

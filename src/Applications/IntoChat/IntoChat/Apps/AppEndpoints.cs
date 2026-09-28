@@ -78,15 +78,18 @@ internal static class AppEndpoints
             var result = await brain.Get<ILeadGeneratorLeads>(scope).Sweep(input.Query).WaitAsync(ct);
             return Results.Ok(result);
         }));
-        apps.MapGet("/files", (string workspaceId, string? folderId, int? offset, string? sort, string? filter, IDigitalBrain brain, LocalFileStore files, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        apps.MapGet("/files", (string workspaceId, int? offset, string? sort, string? filter, IDigitalBrain brain, LocalFileStore files, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);
             var neuron = brain.Get<IFileExplorer>(scope);
-            var state = await neuron.Navigate(folderId, offset ?? 0, sort ?? "name", filter ?? "").WaitAsync(ct);
-            var page = await files.ListAsync(scope, state.FolderId, offset ?? 0, sort ?? "name", filter ?? "", ct);
+            var state = await neuron.Navigate(offset ?? 0, sort ?? "name", filter ?? "").WaitAsync(ct);
+            var page = await files.ListAsync(scope, offset ?? 0, sort ?? "name", filter ?? "", ct);
             await EnsureWindow(brain, scope, "app-files", "Files", state.Surface!, ct);
             return Results.Ok(new { state, page });
         }));
+        apps.MapPost("/files/upload", (string workspaceId, string name, HttpRequest request, LocalFileStore files, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+            Results.Ok(await files.UploadImageAsync(Scope(auth.Value, workspaceId), name, request.Body, ct))))
+            .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(LocalFileStore.MaxSourceBytes));
         apps.MapPost("/files/open", (string workspaceId, OpenImage input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);
@@ -121,7 +124,7 @@ internal static class AppEndpoints
             var result = await saves.Save(scope, ticket, request.Body, ct);
             var updated = await document.CompleteSave(operationId, result).WaitAsync(ct);
             return Results.Ok(new { document = updated, file = result });
-        })).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(LocalFilesOptions.MaxExportBytes));
+        })).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(LocalFileStore.MaxExportBytes));
         apps.MapPost("/background-removal/plan", (string workspaceId, BackgroundRemovalPlanInput input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
             Results.Ok(await Removal(brain, Scope(auth.Value, workspaceId)).Plan(input.ImageIds, input.IntentId).WaitAsync(ct))));
         apps.MapPost("/background-removal/approve", (string workspaceId, BackgroundRemovalApproveInput input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
@@ -221,9 +224,8 @@ internal static class AppEndpoints
     private static async Task<IResult> Respond(Func<Task<IResult>> action)
     {
         try { return await action(); }
-        catch (UnauthorizedAccessException) { return Results.Json(new { error = "This file is outside the allowed workspace or is a linked file." }, statusCode: 403); }
+        catch (UnauthorizedAccessException) { return Results.Json(new { error = "This file belongs to another workspace." }, statusCode: 403); }
         catch (FileNotFoundException) { return Results.NotFound(new { error = "The file no longer exists. Refresh Files." }); }
-        catch (DirectoryNotFoundException) { return Results.NotFound(new { error = "The folder is unavailable. Check the local Downloads configuration." }); }
         catch (KeyNotFoundException) { return Results.NotFound(new { error = "The requested image or operation was not found." }); }
         catch (ArgumentException error) { return Results.BadRequest(new { error = error.Message }); }
         catch (InvalidOperationException error) { return Results.Conflict(new { error = error.Message }); }

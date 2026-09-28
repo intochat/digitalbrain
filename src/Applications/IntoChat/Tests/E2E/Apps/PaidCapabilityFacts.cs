@@ -28,16 +28,14 @@ public sealed class PaidCapabilityFacts
 
             await using var brain = await IntoChatE2ETest.Create(privateConfiguration: new()
             {
-                ["IntoChat:LocalFiles:Roots:downloads"] = root,
-                ["IntoChat:LocalFiles:AssetDirectory"] = Path.Combine(root, "assets"),
                 // The third product photo fails as a third-party fault and must not be charged.
                 ["IntoChat:BackgroundRemoval:FailingImages:0"] = "photo-3.png",
             }).StartAsync(ct);
 
             var scope = WorkspaceScope.Create("owner", "paid-capability").Id;
             var files = brain.Get<IFileExplorer>(scope);
-            await LocalApps.HostAssetFixture.Import(brain, scope);
-            await files.Navigate(null);
+            await LocalApps.WorkspaceUploadFixture.Upload(brain.HttpClient, "paid-capability", Directory.GetFiles(root, "*.png"));
+            await files.Navigate();
             var entries = (await brain.Get<ICollectionView>(scope + "/apps/files/items").Read()).Definition.Items.Where(item => item.Kind == "image").ToArray();
             Assert.Equal(3, entries.Length);
 

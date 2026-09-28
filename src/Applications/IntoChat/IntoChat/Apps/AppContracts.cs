@@ -9,7 +9,7 @@ namespace IntoChat.Apps;
 [Alias("intochat.file-explorer"), Orleans.Metadata.DefaultGrainType("intochat.file-explorer")]
 public interface IFileExplorer : INeuron
 {
-    Task<FileExplorerState> Navigate(string? folderId, int offset = 0, string sort = "name", string filter = "");
+    Task<FileExplorerState> Navigate(int offset = 0, string sort = "name", string filter = "");
     Task<ImageDocumentState> OpenImage(string entryId);
     [ReadOnly] Task<FileExplorerState> Read();
 }
