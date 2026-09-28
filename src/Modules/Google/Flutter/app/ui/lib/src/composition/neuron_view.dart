@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../chat/ui_neuron_chat.dart';
 import '../models/ui_part.dart';
 import 'renderer_registry.dart';
 import 'ui_collection_view.dart';
@@ -22,6 +23,7 @@ class NeuronView extends StatefulWidget {
     this.onActivate,
     this.onAction,
     this.imageBuilder,
+    this.voiceBuilder,
     this.secretSaver,
     this.ancestors = const {},
     this.revision = 0,
@@ -32,6 +34,7 @@ class NeuronView extends StatefulWidget {
   final ValueChanged<Map<String, dynamic>>? onActivate;
   final Future<void> Function(Map<String, dynamic>)? onAction;
   final Widget Function(Map<String, dynamic>)? imageBuilder;
+  final Widget Function(String name, Map<String, dynamic> state)? voiceBuilder;
   final SecretSaver? secretSaver;
   final Set<String> ancestors;
   final int revision;
@@ -125,6 +128,7 @@ class _NeuronViewState extends State<NeuronView> {
                       onActivate: widget.onActivate,
                       onAction: widget.onAction,
                       imageBuilder: widget.imageBuilder,
+                      voiceBuilder: widget.voiceBuilder,
                       secretSaver: widget.secretSaver,
                       ancestors: {...widget.ancestors, identity},
                       revision: widget.revision,
@@ -166,6 +170,8 @@ class _NeuronViewState extends State<NeuronView> {
                           : extent.toDouble(),
                       child: children[i],
                     )
+                  else if (_sizesItself(definition, i))
+                    children[i]
                   else
                     Expanded(child: children[i]),
               ],
@@ -249,6 +255,7 @@ class _NeuronViewState extends State<NeuronView> {
                       onActivate: widget.onActivate,
                       onAction: widget.onAction,
                       imageBuilder: widget.imageBuilder,
+                      voiceBuilder: widget.voiceBuilder,
                       secretSaver: widget.secretSaver,
                       ancestors: {...widget.ancestors, identity},
                       revision: widget.revision,
@@ -298,6 +305,22 @@ class _NeuronViewState extends State<NeuronView> {
                       'revision': data['revision'],
                     }),
             );
+          case 'uichat':
+            return UiNeuronChat(
+              name: widget.name,
+              state: definition,
+              reload: () async {
+                final latest = await widget.load(widget.kind, widget.name);
+                return Map<String, dynamic>.from(
+                  latest['definition'] as Map? ?? latest,
+                );
+              },
+              onAction: widget.onAction,
+              enabled: widget.enabled,
+            );
+          case 'voiceinput':
+            return widget.voiceBuilder?.call(widget.name, definition) ??
+                _FallbackRenderer(kind: widget.kind);
           case 'imagecanvas':
             return widget.imageBuilder?.call(definition) ??
                 const Center(child: Text('Image canvas unavailable.'));
@@ -317,6 +340,12 @@ class _NeuronViewState extends State<NeuronView> {
     );
   }
 }
+
+bool _sizesItself(Map<String, dynamic> definition, int index) =>
+    switch ((definition['children'] as List?)?.elementAtOrNull(index)) {
+      {'kind': 'voiceinput'} => true,
+      _ => false,
+    };
 
 /// Renders the declared fallback for a UI kind that has no dedicated renderer: the kind is named
 /// and explained, never blank.

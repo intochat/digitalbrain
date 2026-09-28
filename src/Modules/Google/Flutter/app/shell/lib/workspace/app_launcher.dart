@@ -47,12 +47,13 @@ const _firstPartyIds = {
 };
 
 /// A catalog app without a shell window: the manifest id is the launch key for its consent sheet.
-AppLauncherEntry catalogLauncherEntry(AppManifestSummary app) => AppLauncherEntry(
-  launchKey: app.id,
-  title: app.name,
-  subtitle: app.description,
-  icon: Icons.bolt_outlined,
-);
+AppLauncherEntry catalogLauncherEntry(AppManifestSummary app) =>
+    AppLauncherEntry(
+      launchKey: app.id,
+      title: app.name,
+      subtitle: app.description,
+      icon: Icons.bolt_outlined,
+    );
 
 AppLauncherEntry entryFor(AppManifestSummary app) => switch (app.id) {
   'intochat.files' => const AppLauncherEntry(
@@ -107,4 +108,11 @@ const csharpLauncherEntry = AppLauncherEntry(
   title: 'C# files',
   subtitle: 'Write and run single-file C# apps',
   icon: Icons.code,
+);
+
+const assistantLauncherEntry = AppLauncherEntry(
+  launchKey: 'assistant',
+  title: 'Assistant',
+  subtitle: 'Chat or talk with the assistant',
+  icon: Icons.assistant_outlined,
 );

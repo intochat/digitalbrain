@@ -7,6 +7,7 @@ using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Button;
 using DigitalBrain.Flutter.Card;
+using DigitalBrain.Flutter.Chat;
 using DigitalBrain.Flutter.Collection;
 using DigitalBrain.Flutter.Form;
 using DigitalBrain.Flutter.ImageCanvas;
@@ -15,6 +16,7 @@ using DigitalBrain.Flutter.Surface;
 using DigitalBrain.Flutter.Tabs;
 using DigitalBrain.Flutter.Text;
 using DigitalBrain.Flutter.TextField;
+using DigitalBrain.Flutter.VoiceInput;
 using DigitalBrain.Flutter.Workspace;
 using IntoChat.Workspace;
 using Microsoft.Extensions.Options;
@@ -75,7 +77,7 @@ internal static class AppEndpoints
         apps.MapGet("/node", (string workspaceId, string kind, string name, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);
-            if (!name.StartsWith(scope + "/apps/", StringComparison.Ordinal) && !name.StartsWith(scope + "/images/", StringComparison.Ordinal)) { throw new UnauthorizedAccessException("The UI belongs to another workspace."); }
+            if (!OwnsUi(scope, name)) { throw new UnauthorizedAccessException("The UI belongs to another workspace."); }
             return kind switch
             {
                 "text" => Results.Ok(await brain.Get<IText>(name).Read().WaitAsync(ct)),
@@ -88,13 +90,15 @@ internal static class AppEndpoints
                 "collection" => Results.Ok(await brain.Get<ICollectionView>(name).Read().WaitAsync(ct)),
                 "imagecanvas" => Results.Ok(await brain.Get<IImageCanvas>(name).Read().WaitAsync(ct)),
                 "form" => Results.Ok(await brain.Get<IForm>(name).Read().WaitAsync(ct)),
+                UIVocabulary.ChatType => Results.Ok(await brain.Get<IChat>(name).Read().WaitAsync(ct)),
+                UIVocabulary.VoiceInputType => Results.Ok(await brain.Get<IVoiceInput>(name).Read().WaitAsync(ct)),
                 _ => throw new ArgumentException("Unknown app UI kind.")
             };
         }));
         apps.MapPost("/event", (string workspaceId, UiEvent input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);
-            if (!input.Name.StartsWith(scope + "/apps/", StringComparison.Ordinal) && !input.Name.StartsWith(scope + "/images/", StringComparison.Ordinal)) { throw new UnauthorizedAccessException(); }
+            if (!OwnsUi(scope, input.Name)) { throw new UnauthorizedAccessException(); }
             switch (input.Kind)
             {
                 case "button": await brain.Get<IButton>(input.Name).Click().WaitAsync(ct); break;
@@ -124,12 +128,29 @@ internal static class AppEndpoints
                     }
                     else { await form.SetDraft(input.Field ?? "", input.Value ?? "").WaitAsync(ct); }
                     break;
+                case UIVocabulary.ChatType:
+                    var chat = brain.Get<IChat>(input.Name);
+                    await chat.SetDraft(input.Value ?? "").WaitAsync(ct);
+                    await chat.Submit().WaitAsync(ct);
+                    break;
+                case UIVocabulary.VoiceInputType:
+                    await brain.Get<IVoiceInput>(input.Name).Capture(DecodeAudio(input.Value), input.MimeType ?? "").WaitAsync(ct);
+                    break;
                 default: throw new ArgumentException("Unknown UI event.");
             }
             return Results.Ok(new { delivered = true });
         }));
 
     }
+    private static bool OwnsUi(string scope, string name) =>
+        new[] { "/apps/", "/images/", "/applications/" }.Any(area => name.StartsWith(scope + area, StringComparison.Ordinal));
+
+    private static byte[] DecodeAudio(string? base64)
+    {
+        try { return Convert.FromBase64String(base64 ?? ""); }
+        catch (FormatException) { throw new ArgumentException("Audio must be base64 encoded."); }
+    }
+
     private static string Scope(BasicAuthOptions auth, string workspace) => WorkspaceScope.Current(auth, workspace).Id;
     private static async Task<IResult> Respond(Func<Task<IResult>> action)
     {
@@ -141,5 +162,5 @@ internal static class AppEndpoints
         catch (InvalidOperationException error) { return Results.Conflict(new { error = error.Message }); }
         catch (IOException error) { return Results.Json(new { error = error.Message.Contains("changed since", StringComparison.Ordinal) ? error.Message : "The local file could not be accessed. Check its permissions and retry." }, statusCode: 503); }
     }
-    internal sealed record UiEvent(string Kind, string Name, string? Action = null, string? Value = null, long Revision = 0, string? Field = null);
+    internal sealed record UiEvent(string Kind, string Name, string? Action = null, string? Value = null, long Revision = 0, string? Field = null, string? MimeType = null);
 }

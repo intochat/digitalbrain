@@ -66,7 +66,7 @@ void main() {
     expect(find.byTooltip('Record a voice draft'), findsOneWidget);
     tester
         .widget<WorkspaceVoiceButton>(find.byType(WorkspaceVoiceButton))
-        .onDraft('spoken words');
+        .onDraft!('spoken words');
     await tester.pump();
     expect(store.currentConversation.draft, 'Existing draft spoken words');
     expect(store.currentConversation.messages, isEmpty);

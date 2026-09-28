@@ -2,6 +2,7 @@ library;
 
 export 'src/chat/ui_chat.dart';
 export 'src/chat/ui_copyable_message.dart';
+export 'src/chat/ui_neuron_chat.dart';
 export 'src/components/browser/ui_web_browser.dart';
 export 'src/components/button/ui_button.dart';
 export 'src/components/card/ui_card.dart';

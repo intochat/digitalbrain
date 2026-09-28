@@ -55,6 +55,8 @@ final class RendererRegistry {
     'tabs',
     'tree',
     'sheet',
+    'uichat',
+    'voiceinput',
     'form',
   ];
 
@@ -70,6 +72,8 @@ final class RendererRegistry {
     'card',
     'tabs',
     'form',
+    'uichat',
+    'voiceinput',
   };
 
   /// Mirrors `DigitalBrain.Contracts.Types.FieldKind`.

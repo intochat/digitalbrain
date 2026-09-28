@@ -58,6 +58,7 @@ class WorkspaceIslands extends StatelessWidget {
     'files' => Icons.folder_outlined,
     'images' => Icons.tune,
     'csharp' => Icons.code,
+    'assistant' => Icons.assistant_outlined,
     'table' => Icons.table_chart_outlined,
     _ => Icons.web_asset_outlined,
   };
@@ -219,7 +220,10 @@ class WorkspaceIslands extends StatelessWidget {
                 }
               },
               itemBuilder: (_) => [
-                for (final entry in launcherEntries(apps))
+                for (final entry in [
+                  ...launcherEntries(apps),
+                  assistantLauncherEntry,
+                ])
                   PopupMenuItem(
                     value: entry.launchKey,
                     child: ListTile(

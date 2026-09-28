@@ -1,9 +1,7 @@
 using DigitalBrain.Apps.Assistant;
-using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Flutter;
-using DigitalBrain.Flutter.Chat;
 using IntoChat.Workspace;
 using Microsoft.Extensions.Options;
 using DigitalBrain.Identity;
@@ -22,24 +20,9 @@ internal static class ApplicationEndpoints
             .AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
         assistant.MapPost("/start", async (string workspaceId, ApplicationCatalog catalog, IOptions<BasicAuthOptions> auth) =>
         {
-            await catalog.Start(AppDefinition.NameOf<AssistantApp>(), AppKey(auth.Value, workspaceId));
-            return Results.NoContent();
-        });
-        assistant.MapGet("/chat", async (string workspaceId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth) =>
-            Results.Ok(await Chat(brain, auth.Value, workspaceId).Read()));
-        assistant.MapPost("/chat", async (string workspaceId, ChatMessage input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth) =>
-        {
-            var chat = Chat(brain, auth.Value, workspaceId);
-            await chat.SetDraft(input.Text);
-            await chat.Submit();
-            return Results.Accepted();
+            var appKey = WorkspaceScope.Current(auth.Value, workspaceId).Id + "/applications/assistant";
+            await catalog.Start(AppDefinition.NameOf<AssistantApp>(), appKey);
+            return Results.Ok(new { surface = new { kind = UIVocabulary.SurfaceType, name = UiComposer.NameOf(appKey, "surface") } });
         });
     }
-
-    private static string AppKey(BasicAuthOptions auth, string workspaceId) => WorkspaceScope.Current(auth, workspaceId).Id + "/applications/assistant";
-
-    private static IChat Chat(IDigitalBrain brain, BasicAuthOptions auth, string workspaceId) =>
-        brain.Get<IChat>(UiComposer.NameOf(AppKey(auth, workspaceId), AssistantApp.ChatPart));
-
-    internal sealed record ChatMessage(string Text);
 }

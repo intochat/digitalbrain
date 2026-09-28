@@ -1292,7 +1292,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
 
   Future<void> _launchApp(String launchKey) async {
     if (launchKey == 'csharp' && !store.developerMode) return;
-    if (const {'files', 'images', 'csharp'}.contains(launchKey)) {
+    if (const {'files', 'images', 'csharp', 'assistant'}.contains(launchKey)) {
       store.launchLocalApp(launchKey);
       return;
     }

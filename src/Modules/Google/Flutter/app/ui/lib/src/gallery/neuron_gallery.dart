@@ -19,6 +19,9 @@ const neuronDescriptions = <String, String>{
   'card': 'Group a title, body, and optional child neurons.',
   'tabs': 'Switch between named child views within an app.',
   'form': 'Collect typed fields and submit their values together.',
+  'uichat':
+      'A conversation: shows its messages and submits what the user sends.',
+  'voiceinput': 'Record the user speaking and hand the audio to its neuron.',
   'toggle': 'An on/off value for a setting or option.',
   'slider': 'A numeric value selected along a range.',
   'progress': 'Progress or activity feedback for ongoing work.',
@@ -130,6 +133,15 @@ Map<String, dynamic> neuronExample(String kind) => switch (kind) {
       },
     ],
   },
+  'uichat' => {
+    'revision': 1,
+    'label': 'Message the assistant',
+    'messages': [
+      {'id': 'question', 'role': 'User', 'text': 'What should I read next?'},
+      {'id': 'answer', 'role': 'Assistant', 'text': 'Try The Creative Act.'},
+    ],
+  },
+  'voiceinput' => {'label': 'Hold to talk'},
   'imagecanvas' => {
     'assetId': 'local-image',
     'width': 640,
@@ -187,6 +199,11 @@ class _NeuronGalleryPreviewState extends State<NeuronGalleryPreview> {
           }),
           onActivate: (item) =>
               setState(() => lastAction = 'Opened locally: ${item['label']}'),
+          voiceBuilder: (_, state) => Center(
+            child: Text(
+              '${state['label']} · the host records from the microphone.',
+            ),
+          ),
           imageBuilder: (_) => const Center(
             child: Text(
               'Image canvas requires a host-loaded image.\nAsset: local-image · 640 × 480',

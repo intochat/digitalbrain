@@ -13,12 +13,15 @@ import 'voice_file_io.dart'
 class WorkspaceVoiceButton extends StatefulWidget {
   const WorkspaceVoiceButton({
     super.key,
-    required this.onTranscribe,
-    required this.onDraft,
+    this.onTranscribe,
+    this.onDraft,
+    this.onAudio,
     this.enabled = true,
   });
   final Future<String> Function(Uint8List audio, String fileName)? onTranscribe;
-  final ValueChanged<String> onDraft;
+  final ValueChanged<String>? onDraft;
+  // Receives the raw recording instead of a transcript, for hosts that transcribe elsewhere.
+  final Future<void> Function(Uint8List audio, String mimeType)? onAudio;
   final bool enabled;
   @override
   State<WorkspaceVoiceButton> createState() => _WorkspaceVoiceButtonState();
@@ -89,7 +92,8 @@ class _WorkspaceVoiceButtonState extends State<WorkspaceVoiceButton>
   Future<void> _toggle() async {
     final generation = ++_generation;
     final onDraft = widget.onDraft;
-    final transcribe = widget.onTranscribe!;
+    final transcribe = widget.onTranscribe;
+    final onAudio = widget.onAudio;
     setState(() => _busy = true);
     try {
       if (_recording) {
@@ -106,12 +110,16 @@ class _WorkspaceVoiceButtonState extends State<WorkspaceVoiceButton>
           );
           if (bytes.isEmpty) throw StateError('The recording was empty.');
           if (!mounted || generation != _generation) return;
-          final draft = await transcribe(bytes, 'voice.wav');
+          if (onAudio != null) {
+            await onAudio(bytes, 'audio/wav');
+            return;
+          }
+          final draft = await transcribe!(bytes, 'voice.wav');
           if (mounted && generation == _generation) {
             if (draft.trim().isEmpty) {
               throw StateError('No speech was detected. Try again.');
             }
-            onDraft(draft);
+            onDraft?.call(draft);
           }
         } finally {
           // A cancelled transcription can finish after a new recording starts.
@@ -195,9 +203,16 @@ class _WorkspaceVoiceButtonState extends State<WorkspaceVoiceButton>
         tooltip: _busy
             ? 'Transcribing…'
             : _recording
-            ? 'Stop recording and edit transcript'
+            ? widget.onAudio != null
+                  ? 'Stop recording and send'
+                  : 'Stop recording and edit transcript'
+            : widget.onAudio != null
+            ? 'Record a voice message'
             : 'Record a voice draft',
-        onPressed: widget.enabled && widget.onTranscribe != null && !_busy
+        onPressed:
+            widget.enabled &&
+                (widget.onTranscribe != null || widget.onAudio != null) &&
+                !_busy
             ? _toggle
             : null,
         color: _recording ? Colors.red : null,
