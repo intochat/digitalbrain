@@ -26,13 +26,14 @@ public sealed class CatalogFacts
 
         var catalog = brain.Get<ICapabilityCatalog>("catalog");
         var neuron = await catalog.Search("emit a registry signal", "workspace-a", 5);
-        Assert.Contains(neuron.Hits, hit => hit.Id == "test.registry-emitter" && hit.Kind == CapabilityKind.Neuron);
-        var emitter = Assert.Single(neuron.Hits, hit => hit.Id == "test.registry-emitter");
-        Assert.Equal("RegistryEmitter", emitter.Name);
+        Assert.Contains(neuron.Hits, hit => hit.Id == "test.registry-emitter/EmitRegistrySignal" && hit.Kind == CapabilityKind.Neuron);
+        var emitter = Assert.Single(neuron.Hits, hit => hit.Id == "test.registry-emitter/EmitRegistrySignal");
+        Assert.Equal("RegistryEmitter.EmitRegistrySignal", emitter.Name);
+        Assert.DoesNotContain(neuron.Hits, hit => hit.Id == "test.registry-emitter");
         Assert.Contains("Emit Registry Signal", emitter.Description, StringComparison.Ordinal);
 
         var monitor = await catalog.Search("registry monitor", "workspace-a", 5);
-        Assert.Contains(monitor.Hits, hit => hit.Id == "test.registry-monitor");
+        Assert.Contains(monitor.Hits, hit => hit.Id == "test.registry-monitor/MonitorRegistry");
 
         var app = await catalog.Search("summarize my outstanding invoices", "workspace-a", 5);
         Assert.Contains(app.Hits, hit => hit.Kind == CapabilityKind.Operation);
@@ -51,7 +52,7 @@ public sealed class CatalogFacts
 
         var catalog = brain.Get<ICapabilityCatalog>("catalog");
         var result = await catalog.Search("emit a registry signal", "workspace-a", 5);
-        Assert.Contains(result.Hits, hit => hit.Id == "test.registry-emitter");
+        Assert.Contains(result.Hits, hit => hit.Id == "test.registry-emitter/EmitRegistrySignal");
     }
 
     [Fact]
@@ -67,7 +68,7 @@ public sealed class CatalogFacts
             .Search("emit a registry signal", "workspace-a", 5);
 
         Assert.True(result.Degraded);
-        Assert.Contains(result.Hits, hit => hit.Id == "test.registry-emitter");
+        Assert.Contains(result.Hits, hit => hit.Id == "test.registry-emitter/EmitRegistrySignal");
     }
 
     [Fact]
@@ -106,7 +107,7 @@ public sealed class CatalogFacts
             .StartAsync(ct);
         var catalog = brain.Get<ICapabilityCatalog>("catalog");
         Assert.Contains((await catalog.Search("emit a registry signal", "workspace-a", 5)).Hits,
-            hit => hit.Id == "test.registry-emitter");
+            hit => hit.Id == "test.registry-emitter/EmitRegistrySignal");
 
         source.Fail = false;
         var recovered = await catalog.Search("summarize outstanding invoices", "workspace-a", 5);
@@ -318,7 +319,7 @@ public sealed class CatalogFacts
 [Alias("test.registry-emitter")]
 public interface IRegistryEmitter : INeuron { Task EmitRegistrySignal(); }
 [Alias("test.registry-monitor")]
-public interface IRegistryMonitor : INeuron;
+public interface IRegistryMonitor : INeuron { Task MonitorRegistry(); }
 
 public sealed class FixtureNeuronModule : IModule
 {

@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Text.RegularExpressions;
 using DigitalBrain.Contracts;
 
 namespace DigitalBrain.Core.Registry;
@@ -8,21 +7,22 @@ public sealed record NeuronContract(string Id, Type Interface, string ModuleId)
 {
     public string Name => Interface.Name is { Length: > 1 } name && name[0] == 'I' && char.IsUpper(name[1])
         ? name[1..] : Interface.Name;
-
-    public string SearchText => Regex.Replace(string.Join(' ', new[] { Id, Name }
-        .Concat(Interface.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-            .Select(method => method.Name))), "(?<=[a-z])(?=[A-Z])", " ");
 }
 
 public sealed class NeuronRegistry(IEnumerable<Type> moduleTypes)
 {
     private readonly Type[] _moduleTypes = [.. moduleTypes];
     private IReadOnlyList<NeuronContract>? _contracts;
+    private IReadOnlyList<NeuronMethod>? _methods;
 
     public IReadOnlyList<NeuronContract> All => _contracts
         ?? throw new InvalidOperationException("Neuron discovery has not completed.");
 
     public NeuronContract? Find(string id) => All.FirstOrDefault(contract => contract.Id == id);
+
+    public IReadOnlyList<NeuronMethod> Methods => _methods ??= [.. All.SelectMany(NeuronMethod.Of)];
+
+    public NeuronMethod? FindMethod(string id) => Methods.FirstOrDefault(method => method.Id == id);
 
     internal void Discover()
     {

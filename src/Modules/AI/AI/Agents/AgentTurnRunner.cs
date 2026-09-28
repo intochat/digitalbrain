@@ -12,17 +12,6 @@ public interface IAgentTurnRunner
 {
     IAsyncEnumerable<AgentTurnEvent> RunAsync(AgentTurnRequest request, CancellationToken ct);
 }
-public sealed record AgentContextRequest(string ScopeId, string Message, string? PreviousMessage = null);
-// Text is what the model should know before it answers; Tools are registered tools it may need for it.
-public sealed record AgentContext(string? Text, IReadOnlyList<string> Tools)
-{
-    public static AgentContext None { get; } = new(null, []);
-}
-public interface IAgentContextProvider
-{
-    string Name { get; }
-    Task<AgentContext> Provide(AgentContextRequest request, CancellationToken ct);
-}
 public sealed record AgentTurnRequest(string AgentId, string RunId, string ScopeId,
     IReadOnlyList<AgentConversationTurn> History, string Message, AgentModelSelection? Model,
     string? Instructions = null, IReadOnlyList<string>? ToolNames = null,
@@ -120,7 +109,7 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
             {
                 var matches = available.Where(f => f.Name == name).ToArray();
                 return matches.Length == 1 ? matches[0] : throw new InvalidOperationException($"Selected tool '{name}' must have exactly one registration.");
-            }).ToArray();
+            }).ToList();
 
             var configuration = services.GetService<IOptions<AIOptions>>()?.Value;
             var configured = configuration is not null && (configuration.Default.Profile is not null
@@ -143,7 +132,7 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
                         MaxOutputTokens = request.Options.MaxOutputTokens ?? selection?.MaxOutputTokens
                     };
                 }
-                var resolved = profiles.Resolve(selection, requiresTools: tools.Length > 0);
+                var resolved = profiles.Resolve(selection, requiresTools: tools.Count > 0);
                 descriptor = services.GetRequiredService<InferenceService>().DescribeResolved(resolved);
                 InferenceMapping.ValidateRequest(new InferenceRequest(
                     [.. request.Messages ?? [], request.Input ?? new AiMessage("user", [new AiText(request.Message)])],
@@ -222,6 +211,13 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
                     }
                     finally { currentCall = null; }
                     ct.ThrowIfCancellationRequested();
+                    if (result is AgentToolOffer offer)
+                    {
+                        tools.AddRange(available.Where(function => offer.Tools.Contains(function.Name) && tools.All(chosen => chosen.Name != function.Name))
+                            .DistinctBy(static function => function.Name));
+                        options.Tools = tools.Cast<AITool>().ToList();
+                        result = offer.Result;
+                    }
                     var resultMessage = new ChatMessage(ChatRole.Tool, [new FunctionResultContent(call.CallId, result)]);
                     messages.Add(resultMessage);
                     generated.Add(resultMessage);

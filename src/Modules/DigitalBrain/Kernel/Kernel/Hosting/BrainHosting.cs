@@ -20,6 +20,7 @@ public static class BrainHosting
     {
         ArgumentNullException.ThrowIfNull(moduleTypes);
         silo.Services.AddSingleton(new NeuronRegistry(moduleTypes));
+        silo.Services.TryAddSingleton<NeuronInvoker>();
         silo.AddStartupTask<NeuronDiscoveryStartupTask>();
         return silo;
     }

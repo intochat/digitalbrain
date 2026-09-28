@@ -81,6 +81,7 @@ public sealed class AIModule : IModule
 
         AIClients.Add(builder.Services);
         builder.Services.TryAddSingleton<Agents.IAgentTurnRunner, Agents.AgentTurnRunner>();
+        builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<Agents.IAgentToolFactory, Agents.NeuronTools>());
         builder.Services.TryAddSingleton<ModelProfiles>();
         builder.Services.TryAddSingleton<InferenceService>();
         builder.Services.AddMediaNeurons();
