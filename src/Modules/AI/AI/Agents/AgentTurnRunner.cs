@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Threading.Channels;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.AI.Agents;
@@ -16,11 +17,19 @@ public interface IAgentToolFactory
 {
     IReadOnlyList<AIFunction> Create(Func<AgentToolContext> context);
 }
+public sealed record AgentContextRequest(string ScopeId, string Message);
+// Adds what the model should know before it answers this message; a null answer adds nothing.
+public interface IAgentContextProvider
+{
+    string Name { get; }
+    Task<string?> Provide(AgentContextRequest request, CancellationToken ct);
+}
 public sealed record AgentTurnRequest(string AgentId, string RunId, string ScopeId,
     IReadOnlyList<AgentConversationTurn> History, string Message, AgentModelSelection? Model,
     string? Instructions = null, IReadOnlyList<string>? ToolNames = null,
     IReadOnlyList<AiMessage>? Messages = null, AiMessage? Input = null,
-    bool Streaming = false, int MaxModelCalls = 16, TimeSpan? Timeout = null, InferenceOptions? Options = null);
+    bool Streaming = false, int MaxModelCalls = 16, TimeSpan? Timeout = null, InferenceOptions? Options = null,
+    IReadOnlyList<string>? ContextProviders = null);
 public abstract record AgentTurnEvent
 {
     internal TaskCompletionSource? Observed { get; set; }
@@ -53,6 +62,28 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
             }
         }
         finally { await lifetime.CancelAsync().ConfigureAwait(false); await execution.ConfigureAwait(false); }
+    }
+
+    // A provider that fails leaves the turn without its context rather than failing the turn.
+    private async Task<IReadOnlyList<string>> ProvideContext(AgentTurnRequest request, CancellationToken ct)
+    {
+        var selected = request.ContextProviders ?? [];
+        if (selected.Count == 0) { return []; }
+        var message = request.Input?.Content.OfType<AiText>().Select(static part => part.Text).FirstOrDefault() ?? request.Message;
+        var contexts = new List<string>();
+        foreach (var provider in services.GetServices<IAgentContextProvider>().Where(provider => selected.Contains(provider.Name)))
+        {
+            try
+            {
+                if (await provider.Provide(new(request.ScopeId, message), ct).ConfigureAwait(false) is { Length: > 0 } context) { contexts.Add(context); }
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                services.GetService<ILoggerFactory>()?.CreateLogger<AgentTurnRunner>()
+                    .LogWarning(exception, "Context provider {Provider} failed; the turn continues without it.", provider.Name);
+            }
+        }
+        return contexts;
     }
 
     private async Task Execute(AgentTurnRequest request, ChannelWriter<AgentTurnEvent> events, CancellationToken ct)
@@ -133,6 +164,7 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
                     messages.Add(new(ChatRole.Assistant, turn.AssistantText + (turn.ResultIds.Count == 0 ? "" : "\nResult windows: " + string.Join(", ", turn.ResultIds))));
                 }
             }
+            foreach (var context in await ProvideContext(request, ct).ConfigureAwait(false)) { messages.Add(new(ChatRole.System, context)); }
             messages.Add(request.Input is null ? new(ChatRole.User, request.Message) : InferenceMapping.ToChatMessage(request.Input));
             var generated = new List<ChatMessage>();
             UsageDetails? usage = null;

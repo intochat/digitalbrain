@@ -28,6 +28,18 @@ public sealed class AgentEndpointsFacts
         Assert.Equal(selected, runner.Request!.Model);
     }
 
+    [Fact]
+    public async Task EveryAssistantTurnAsksForMatchingCapabilities()
+    {
+        var runner = new RecordingRunner();
+
+        await AgentEndpoints.RunModel("scope", "run", "hello", false, EmptyState, "reply",
+            new ConfigurationBuilder().Build(), runner, new ToolSelection([], false), _ => Task.CompletedTask,
+            new StringBuilder(), [], new IntentActivity(), TestContext.Current.CancellationToken);
+
+        Assert.Equal([CapabilityContextProvider.ProviderName], runner.Request!.ContextProviders);
+    }
+
     // The /agent model input must carry the conversation summary once old turns are evicted.
     [Fact]
     public async Task RunModelFeedsTheConversationSummaryIntoTheSystemInstructions()

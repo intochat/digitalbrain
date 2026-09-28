@@ -240,7 +240,8 @@ internal static class AgentEndpoints
         if (!string.IsNullOrEmpty(state.Summary)) { instructions += "\nEarlier conversation summary: " + state.Summary; }
         await foreach (var item in runner.RunAsync(new("workspace-assistant", run, scope, state.Turns, message, model,
             instructions,
-            AgentToolPolicy.SelectTools(developerMode, CSharpAgentTools.Names, selection.AppTools, selection.TableIntent)), ct))
+            AgentToolPolicy.SelectTools(developerMode, CSharpAgentTools.Names, selection.AppTools, selection.TableIntent),
+            ContextProviders: [CapabilityContextProvider.ProviderName]), ct))
         {
             switch (item)
             {

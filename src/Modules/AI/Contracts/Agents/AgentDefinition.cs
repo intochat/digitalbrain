@@ -14,6 +14,7 @@ public sealed record AgentDefinition
     [Id(8)] public TimeSpan Timeout { get; init; } = TimeSpan.FromMinutes(2);
     [Id(9)] public int MaxHistoryMessages { get; init; } = 256;
     [Id(10)] public InferenceOptions? Options { get; init; }
+    [Id(11)] public IReadOnlyList<string> ContextProviders { get; init; } = [];
 }
 
 [GenerateSerializer, Alias("ai.agent-metadata")]

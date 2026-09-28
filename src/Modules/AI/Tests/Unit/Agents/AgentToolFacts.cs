@@ -167,6 +167,60 @@ public sealed class AgentToolFacts
     [InlineData("", false)]
     public void DeveloperModeFailsClosedOnInvalidConfigurationButDefaultsOn(string? configured, bool expected)
         => Assert.Equal(expected, AgentToolPolicy.DeveloperModeEnabled(configured));
+    [Fact]
+    public async Task SelectedContextProvidersReachTheModelBeforeTheMessage()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var client = new RecordingClient();
+        using var services = new ServiceCollection().AddSingleton<IChatClient>(client)
+            .AddSingleton<IAgentContextProvider>(new FixedContext("capabilities", "Available: invoices"))
+            .AddSingleton<IAgentContextProvider>(new FixedContext("unselected", "must not appear"))
+            .AddSingleton<IAgentContextProvider>(new FailingContext())
+            .BuildServiceProvider();
+
+        await foreach (var _ in new AgentTurnRunner(services).RunAsync(
+            new("agent", "run", "scope", [], "ask", null, ContextProviders: ["capabilities", "failing"]), ct)) { }
+
+        var messages = Assert.Single(client.Requests);
+        Assert.Equal([ChatRole.System, ChatRole.User], messages.Select(message => message.Role));
+        Assert.Equal("Available: invoices", messages[0].Text);
+    }
+
+    private sealed class FixedContext(string name, string context) : IAgentContextProvider
+    {
+        public string Name => name;
+        public Task<string?> Provide(AgentContextRequest request, CancellationToken ct) => Task.FromResult<string?>(context);
+    }
+
+    private sealed class FailingContext : IAgentContextProvider
+    {
+        public string Name => "failing";
+        public Task<string?> Provide(AgentContextRequest request, CancellationToken ct) => throw new InvalidOperationException("down");
+    }
+
+    private sealed class RecordingClient : IChatClient
+    {
+        public List<ChatMessage[]> Requests { get; } = [];
+
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            Requests.Add([.. messages]);
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "done")));
+        }
+
+        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            Requests.Add([.. messages]);
+            await Task.Yield();
+            yield return new ChatResponseUpdate(ChatRole.Assistant, "done");
+        }
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose() { }
+    }
+
     private sealed class ScriptedClient(string toolName = "lookup") : IChatClient
     {
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)

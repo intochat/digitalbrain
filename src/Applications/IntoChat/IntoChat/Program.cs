@@ -46,6 +46,7 @@ builder.Services.AddSingleton<LiveTableWindows>();
 builder.Services.AddSingleton<IAgentToolFactory, WorkspaceTableTools>();
 builder.Services.AddSingleton<IAgentToolFactory, WorkspaceFormTools>();
 builder.Services.AddSingleton<IAgentToolFactory, DiscoveryTools>();
+builder.Services.AddSingleton<IAgentContextProvider, CapabilityContextProvider>();
 builder.Services.AddSingleton<IAgentToolFactory, LeadGeneratorTools>();
 builder.Services.AddSingleton<IAgentToolFactory, ImageEditorTools>();
 builder.Services.AddSingleton<IProblemReportStore, ProblemReportStore>();

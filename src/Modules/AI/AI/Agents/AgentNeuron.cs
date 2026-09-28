@@ -139,7 +139,8 @@ internal sealed class AgentNeuron(
             var bounded = BoundHistory(_state.History, Math.Max(1, definition.MaxHistoryMessages - 1), _state.HistorySummary);
             var request = new AgentTurnRequest(this.GetPrimaryKeyString(), run.RunId, this.GetPrimaryKeyString(), [], "",
                 model ?? definition.Model, AppendSummary(instructions ?? definition.Instructions, bounded.Summary), definition.Tools,
-                bounded.Messages, message, streaming, definition.MaxModelCalls, definition.Timeout, definition.Options);
+                bounded.Messages, message, streaming, definition.MaxModelCalls, definition.Timeout, definition.Options,
+                definition.ContextProviders);
             await using var iterator = runner.RunAsync(request, lifetime.Token).GetAsyncEnumerator(lifetime.Token);
             long sequence = 0;
             while (true)
