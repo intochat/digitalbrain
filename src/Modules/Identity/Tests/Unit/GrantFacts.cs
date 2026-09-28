@@ -1,10 +1,10 @@
 using DigitalBrain.Contracts.Enforcement;
-using IntoChat.Identity;
-using IntoChat.Identity.Grants;
+using DigitalBrain.Identity;
+using DigitalBrain.Identity.Grants;
 using DigitalBrain.Testing.Unit;
 using Xunit;
 
-namespace IntoChat.Tests.Unit.Identity;
+namespace DigitalBrain.Identity.Tests;
 
 public sealed class GrantFacts
 {

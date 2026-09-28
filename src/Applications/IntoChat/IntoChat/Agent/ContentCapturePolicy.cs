@@ -1,6 +1,7 @@
 using DigitalBrain.Contracts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using DigitalBrain.Identity;
 
 namespace IntoChat.Agent;
 

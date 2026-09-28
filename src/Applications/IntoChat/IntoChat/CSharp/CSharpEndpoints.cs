@@ -1,7 +1,9 @@
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.AI.Agents;
 using IntoChat.Workspace;
 using Microsoft.Extensions.Options;
 using ModelContextProtocol.Server;
+using DigitalBrain.Identity;
 
 namespace IntoChat;
 
@@ -31,9 +33,9 @@ internal static class CSharpEndpoints
 
     public static void MapCSharp(this IEndpointRouteBuilder routes)
     {
-        routes.MapMcp("/workspaces/{workspaceId}/csharp-mcp").AddEndpointFilter(async (context, next) =>
+        routes.MapMcp("/workspaces/{workspaceId}/csharp-mcp").AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync).AddEndpointFilter(async (context, next) =>
             DeveloperModeEnabled(context.HttpContext.RequestServices) ? await next(context) : Results.NotFound());
-        var files = routes.MapGroup("/workspaces/{workspaceId}/csharp");
+        var files = routes.MapGroup("/workspaces/{workspaceId}/csharp").AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
         files.AddEndpointFilter(async (context, next) =>
         {
             if (!DeveloperModeEnabled(context.HttpContext.RequestServices)) { return Results.NotFound(); }

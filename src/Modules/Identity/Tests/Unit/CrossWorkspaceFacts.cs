@@ -1,10 +1,10 @@
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
-using IntoChat.Identity;
-using IntoChat.Identity.Grants;
+using DigitalBrain.Identity;
+using DigitalBrain.Identity.Grants;
 using Xunit;
 
-namespace IntoChat.Tests.Unit.Identity;
+namespace DigitalBrain.Identity.Tests;
 
 // A caller that claims a workspace it is not a member of is denied by the single call filter.
 // This exercises the same pipeline the neurons run, with the grant stage in place.

@@ -6,6 +6,7 @@ using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Chat;
 using IntoChat.Workspace;
 using Microsoft.Extensions.Options;
+using DigitalBrain.Identity;
 
 namespace IntoChat.Applications;
 

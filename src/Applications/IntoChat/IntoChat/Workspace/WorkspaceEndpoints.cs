@@ -1,3 +1,4 @@
+using DigitalBrain.Core.Enforcement;
 using System.Text.Json;
 using DigitalBrain.Contracts;
 using DigitalBrain.Flutter.Workspace;
@@ -5,6 +6,7 @@ using DigitalBrain.Flutter.Workspace.Signals;
 using DigitalBrain.Supabase.Tables;
 using IntoChat.Operations;
 using Microsoft.Extensions.Options;
+using DigitalBrain.Identity;
 
 namespace IntoChat.Workspace;
 
@@ -12,8 +14,9 @@ internal static class WorkspaceEndpoints
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    public static void MapWorkspaceDataEndpoints(this IEndpointRouteBuilder routes)
+    public static void MapWorkspaceDataEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        var routes = endpoints.MapGroup("").AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
         routes.MapGet("/workspaces/{workspaceId}", (string workspaceId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct)
             => Respond(async () => Results.Ok(await GetWorkspace(brain, auth.Value, workspaceId).Read().WaitAsync(ct))));
         routes.MapPost("/workspaces/{workspaceId}/windows/{windowId}/close",

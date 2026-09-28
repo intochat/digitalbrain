@@ -1,7 +1,7 @@
 using DigitalBrain.Contracts.Enforcement;
 using Orleans;
 
-namespace IntoChat.Identity.Grants;
+namespace DigitalBrain.Identity.Grants;
 
 // The call filter only knows caller context; the grant stage reads membership and grants through
 // this seam so the rule stays a pure function and the source can be faked in tests.

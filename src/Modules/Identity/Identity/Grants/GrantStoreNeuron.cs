@@ -1,9 +1,9 @@
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
-using IntoChat.Identity;
+using DigitalBrain.Identity;
 using Orleans.Runtime;
 
-namespace IntoChat.Identity.Grants;
+namespace DigitalBrain.Identity.Grants;
 
 [GenerateSerializer, Alias("identity.grant-store-state")]
 internal sealed record GrantStoreState

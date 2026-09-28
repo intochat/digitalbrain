@@ -1,6 +1,6 @@
 using DigitalBrain.Core;
 
-namespace IntoChat.Identity;
+namespace DigitalBrain.Identity;
 
 // Identity exposes no public option members; the contract exists so the module participates in
 // manifest composition like every other product module.

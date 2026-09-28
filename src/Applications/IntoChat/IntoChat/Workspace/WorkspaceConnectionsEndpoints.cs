@@ -4,6 +4,7 @@ using DigitalBrain.Sdk;
 using DigitalBrain.Sdk.Connectors;
 using DigitalBrain.Salesforce;
 using Microsoft.Extensions.Options;
+using DigitalBrain.Identity;
 
 namespace IntoChat.Workspace;
 
@@ -26,12 +27,9 @@ internal static class WorkspaceConnectionsEndpoints
             var id = http.Request.RouteValues["workspaceId"]?.ToString();
             if (string.IsNullOrWhiteSpace(id) || id.Length > 200 || id.Any(c => char.IsControl(c) || c is '/' or '\\'))
                 { return Results.BadRequest(); }
-            var caller = CallerContextStamper.Require();
-            if (http.User.Identity?.IsAuthenticated == true && !await http.RequestServices.GetRequiredService<IWorkspaceAccess>()
-                .CanAccessAsync(caller.PrincipalId, id, http.RequestAborted))
-                { return Results.StatusCode(403); }
             return await next(context);
         });
+        group.AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
         group.MapGet("", async (string workspaceId, IGrainFactory grains, IOptions<BasicAuthOptions> auth, IEnumerable<BrowserLogins> logins, CancellationToken ct) =>
         {
             var scope = WorkspaceScope.Current(auth.Value, workspaceId);

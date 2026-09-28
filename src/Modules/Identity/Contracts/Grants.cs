@@ -1,6 +1,6 @@
 using Orleans;
 
-namespace IntoChat.Identity;
+namespace DigitalBrain.Identity;
 
 public enum MemberRole
 {

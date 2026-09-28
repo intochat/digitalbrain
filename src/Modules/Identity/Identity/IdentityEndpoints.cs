@@ -1,14 +1,14 @@
 using System.Security.Claims;
 using DigitalBrain.Contracts;
-using IntoChat.Identity.Directory;
-using IntoChat.Identity.Grants;
+using DigitalBrain.Identity.Directory;
+using DigitalBrain.Identity.Grants;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace IntoChat.Identity;
+namespace DigitalBrain.Identity;
 
 // Password-authenticated accounts own independent default workspaces. Invitation membership
 // and grants remain scoped to the owning account and workspace.

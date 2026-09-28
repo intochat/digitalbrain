@@ -1,7 +1,7 @@
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
 
-namespace IntoChat.Identity.Grants;
+namespace DigitalBrain.Identity.Grants;
 
 // P2's only stage: workspace membership plus grants. Allowances and limits arrive as further
 // stages in P3 without touching this one.

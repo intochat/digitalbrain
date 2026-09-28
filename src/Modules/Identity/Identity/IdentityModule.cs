@@ -1,13 +1,13 @@
 using DigitalBrain.Core;
 using DigitalBrain.Core.Enforcement;
-using IntoChat.Identity.Directory;
-using IntoChat.Identity.Grants;
+using DigitalBrain.Identity.Directory;
+using DigitalBrain.Identity.Grants;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
 
-namespace IntoChat.Identity;
+namespace DigitalBrain.Identity;
 
 [ModuleConfiguration(typeof(IdentityConfigurationContract))]
 public sealed class IdentityModule : IModule

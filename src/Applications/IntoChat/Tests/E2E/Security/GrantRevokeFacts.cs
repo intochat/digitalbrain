@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using DigitalBrain.Identity;
 
 namespace IntoChat.Tests.E2E.Security;
 
@@ -25,7 +26,7 @@ public sealed class GrantRevokeFacts
             new { principalId = "bob", displayName = "Bob", password = "bob-password-123" }, ct);
         Assert.Equal(HttpStatusCode.OK, bobLogin.StatusCode);
 
-        var member = await aliceLogin.Content.ReadFromJsonAsync<IntoChat.Identity.Member>(ct);
+        var member = await aliceLogin.Content.ReadFromJsonAsync<DigitalBrain.Identity.Member>(ct);
         var workspace = member!.WorkspaceId;
         using var create = await alice.PostAsJsonAsync(
             $"/workspaces/{workspace}/grants",

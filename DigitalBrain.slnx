@@ -112,6 +112,11 @@
     <Project Path="src/Modules/Salesforce/Contracts/DigitalBrain.Modules.Salesforce.Contracts.csproj" />
     <Project Path="src/Modules/Salesforce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
   </Folder>
+  <Folder Name="/Modules/Identity/">
+    <Project Path="src/Modules/Identity/Tests/Unit/DigitalBrain.Modules.Identity.Tests.Unit.csproj" />
+    <Project Path="src/Modules/Identity/Contracts/DigitalBrain.Modules.Identity.Contracts.csproj" />
+    <Project Path="src/Modules/Identity/Identity/DigitalBrain.Modules.Identity.csproj" />
+  </Folder>
   <Folder Name="/Modules/Supabase/">
     <Project Path="src/Modules/Supabase/Tests/Unit/DigitalBrain.Modules.Supabase.Tests.Unit.csproj" />
     <Project Path="src/Modules/Supabase/Aspire.Hosting/DigitalBrain.Modules.Supabase.Aspire.Hosting.csproj" />

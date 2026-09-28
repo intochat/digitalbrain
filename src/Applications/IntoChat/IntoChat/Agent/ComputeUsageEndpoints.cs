@@ -8,6 +8,7 @@ using DigitalBrain.Contracts;
 using DigitalBrain.Core.Enforcement;
 using IntoChat.Workspace;
 using Microsoft.Extensions.Options;
+using DigitalBrain.Identity;
 
 namespace IntoChat.Agent;
 
@@ -49,9 +50,6 @@ internal static class ComputeUsageEndpoints
         {
             if (!AgentEndpoints.ValidId(workspaceId)) { return Results.BadRequest(); }
             var caller = CallerContextStamper.Require();
-            if (http.User.Identity?.IsAuthenticated == true
-                && !await http.RequestServices.GetRequiredService<IWorkspaceAccess>().CanAccessAsync(caller.PrincipalId, workspaceId, ct))
-            { return Results.StatusCode(StatusCodes.Status403Forbidden); }
             var scope = WorkspaceScope.Current(auth.Value, workspaceId);
             UsagePage page;
             try { page = await store.ReadAsync(caller.AccountId, scope.Id, limit ?? 20, cursor, ct); }
@@ -70,6 +68,6 @@ internal static class ComputeUsageEndpoints
                 });
             }
             return Results.Ok(new { items, page.NextCursor });
-        });
+        }).AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
     }
 }

@@ -5,6 +5,7 @@ using DigitalBrain.Microsoft.CSharp;
 using DigitalBrain.Sdk.Connectors;
 using IntoChat.Workspace;
 using Microsoft.Extensions.Options;
+using DigitalBrain.Identity;
 
 namespace IntoChat.Packages;
 

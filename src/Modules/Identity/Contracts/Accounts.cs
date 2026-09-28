@@ -1,6 +1,6 @@
 using Orleans;
 
-namespace IntoChat.Identity;
+namespace DigitalBrain.Identity;
 
 [GenerateSerializer, Alias("identity.account")]
 public sealed record Account

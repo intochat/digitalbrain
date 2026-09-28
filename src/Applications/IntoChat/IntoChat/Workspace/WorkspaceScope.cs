@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Identity;
 
 namespace IntoChat.Workspace;
 

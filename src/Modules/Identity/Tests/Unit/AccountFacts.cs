@@ -1,8 +1,8 @@
-using IntoChat.Identity;
+using DigitalBrain.Identity;
 using DigitalBrain.Testing.Unit;
 using Xunit;
 
-namespace IntoChat.Tests.Unit.Identity;
+namespace DigitalBrain.Identity.Tests;
 
 public sealed class AccountFacts
 {

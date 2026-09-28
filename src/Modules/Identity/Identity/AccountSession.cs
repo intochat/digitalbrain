@@ -1,21 +1,24 @@
 using System.Security.Cryptography;
 using System.Text;
-using DigitalBrain.AI.Agents;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
-namespace IntoChat;
+namespace DigitalBrain.Identity;
 
-// The authenticated edge. A cookie session (issued by IntoChat identity) or, for the
+// The authenticated edge. A cookie session (issued by the identity endpoints) or, for the
 // single-owner bootstrap, the configured Basic credential decides the principal; when neither is
 // configured the kernel stays open, which is the local and test posture. Resolving a principal
 // stamps a CallerContext on the Orleans RequestContext so it travels with grain calls. Replaces
 // the former Basic-only gate.
-internal static class AccountSession
+public static class AccountSession
 {
     public const string DefaultLogin = "owner";
     public const string CheckPath = "/auth/check";
-    public const string CapabilitiesPath = "/session/capabilities";
 
     private const string BasicScheme = "Basic";
 
@@ -29,7 +32,7 @@ internal static class AccountSession
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        var credential = BasicCredential.FromOptions(IntoChatConfiguration.ResolveAuthOptions(app));
+        var credential = BasicCredential.FromOptions(ResolveAuthOptions(app));
 
         app.Use(async (context, next) =>
         {
@@ -73,32 +76,24 @@ internal static class AccountSession
             }
 
             CallerContextStamper.Stamp(principal);
-            var workspace = context.Request.RouteValues["workspaceId"] as string
-                ?? context.Request.RouteValues["workspace"] as string;
-            if (!string.IsNullOrWhiteSpace(workspace) &&
-                context.User.Identity?.IsAuthenticated == true)
-            {
-                var access = context.RequestServices.GetRequiredService<IWorkspaceAccess>();
-                if (!await access.CanAccessAsync(principal.PrincipalId, workspace, context.RequestAborted))
-                {
-                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                    return;
-                }
-            }
-
             await next(context).ConfigureAwait(false);
         });
 
         // Inside the gate, so reaching it at all proves the session is good.
         app.MapGet(CheckPath, static () => Results.NoContent());
 
-        // Read-only server capabilities the shell gates developer-only surfaces on. Developer mode
-        // is the same server setting the agent tool policy reads, so a client cannot grant itself
-        // the C# console by editing local preferences.
-        app.MapGet(CapabilitiesPath, static (IConfiguration configuration) => Results.Ok(
-            new SessionCapabilities(AgentToolPolicy.DeveloperModeEnabled(configuration["IntoChat:DeveloperMode"]))));
-
         return app;
+    }
+
+    // Small standalone hosts can use the middleware without registering the options; open-generic
+    // IOptions registration alone does not mean auth was configured.
+    private static BasicAuthOptions ResolveAuthOptions(WebApplication app)
+    {
+        var configured = app.Services.GetServices<IConfigureOptions<BasicAuthOptions>>().Any()
+            || app.Services.GetServices<IPostConfigureOptions<BasicAuthOptions>>().Any();
+        return configured
+            ? app.Services.GetRequiredService<IOptions<BasicAuthOptions>>().Value
+            : app.Configuration.GetSection(BasicAuthOptions.SectionName).Get<BasicAuthOptions>() ?? new();
     }
 
     // A cookie session wins; otherwise the configured single-owner Basic credential; otherwise,
@@ -225,4 +220,3 @@ internal static class AccountSession
     }
 }
 
-internal sealed record SessionCapabilities(bool DeveloperMode);

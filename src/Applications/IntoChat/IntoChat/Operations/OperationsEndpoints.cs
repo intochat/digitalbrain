@@ -1,6 +1,7 @@
 using DigitalBrain.Contracts;
 using IntoChat.Workspace;
 using Microsoft.Extensions.Options;
+using DigitalBrain.Identity;
 
 namespace IntoChat.Operations;
 

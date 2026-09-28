@@ -19,6 +19,7 @@ using DigitalBrain.Flutter.Workspace;
 using IntoChat.LocalFiles;
 using IntoChat.Workspace;
 using Microsoft.Extensions.Options;
+using DigitalBrain.Identity;
 namespace IntoChat.Apps;
 
 internal static class AppEndpoints

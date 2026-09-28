@@ -1,6 +1,6 @@
 using DigitalBrain.Contracts.Enforcement;
 
-namespace IntoChat.Identity.Grants;
+namespace DigitalBrain.Identity.Grants;
 
 // Pure grant rules for the call-filter stage. Kept free of Orleans so the enforcement decision
 // can be tested directly: a principal may only act inside the workspace it is a member of, and an

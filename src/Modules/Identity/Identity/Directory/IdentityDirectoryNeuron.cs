@@ -1,10 +1,10 @@
 using System.Security.Cryptography;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
-using IntoChat.Identity;
+using DigitalBrain.Identity;
 using Orleans.Runtime;
 
-namespace IntoChat.Identity.Directory;
+namespace DigitalBrain.Identity.Directory;
 
 [GenerateSerializer, Alias("identity.directory-state")]
 internal sealed record IdentityDirectoryState

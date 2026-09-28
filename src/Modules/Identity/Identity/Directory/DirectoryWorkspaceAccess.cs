@@ -1,7 +1,7 @@
 using DigitalBrain.Core.Enforcement;
 using Orleans;
 
-namespace IntoChat.Identity.Directory;
+namespace DigitalBrain.Identity.Directory;
 
 // The directory-backed answer to the workspace membership question asked by HTTP route filters.
 internal sealed class DirectoryWorkspaceAccess(IGrainFactory grains) : IWorkspaceAccess
