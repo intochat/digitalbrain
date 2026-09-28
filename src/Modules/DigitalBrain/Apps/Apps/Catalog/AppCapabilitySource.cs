@@ -16,8 +16,8 @@ internal sealed class AppCapabilitySource(IGrainFactory grains) : ICapabilitySou
             var workspaceId = scoped.OwningWorkspaceId;
             return manifest.Operations
                 .Select(operation => new CapabilityDocument(manifest.Id + "/" + operation.Name, CapabilityKind.Operation,
-                    operation.Name, operation.DescriptionForModel, workspaceId))
+                    operation.Name, operation.DescriptionForModel, workspaceId, manifest.AgentTools))
                 .Prepend(new CapabilityDocument(manifest.Id, CapabilityKind.App, manifest.Name,
-                    string.Join(' ', manifest.DescriptionForPeople, manifest.DescriptionForModel), workspaceId));
+                    string.Join(' ', manifest.DescriptionForPeople, manifest.DescriptionForModel), workspaceId, manifest.AgentTools));
         })];
 }

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "publisher": "intochat",
   "kind": "declarative",
+  "agentTools": ["propose_app", "run_leadgenerator"],
   "name": "LeadGenerator",
   "descriptionForPeople": "Find companies to contact, with company-level details only.",
   "descriptionForModel": "Find new companies such as new dental clinics in Berlin, look up each company, and keep them in a Leads table. Company-level fields only: name, address, website, phone and category. Never LinkedIn-derived, and no outreach is sent.",

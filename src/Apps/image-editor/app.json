@@ -3,6 +3,7 @@
   "version": "1.1.0",
   "publisher": "intochat",
   "kind": "declarative",
+  "agentTools": ["plan_background_removal", "run_background_removal"],
   "name": "Image Editor",
   "descriptionForPeople": "Draw, crop and save copies of images. Removing a background is a paid operation, priced in Compute.",
   "descriptionForModel": "Edit an image document; strokes and crops are saved as a new copy. Removing the background from one or more selected images is a paid operation that first shows a plan card with an estimate and a maximum, then runs under an allowance.",

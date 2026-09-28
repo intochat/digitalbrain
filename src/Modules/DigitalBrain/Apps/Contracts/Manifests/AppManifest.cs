@@ -17,4 +17,6 @@ public sealed record AppManifest
     [Id(10)] public IReadOnlyList<AppMeter> Meters { get; init; } = [];
     [Id(11)] public IReadOnlyList<string> ExamplePrompts { get; init; } = [];
     [Id(12)] public IReadOnlyList<AppScenario> Scenarios { get; init; } = [];
+    // Agent tool names the host registers for this app; a turn that finds the app gets them.
+    [Id(13)] public IReadOnlyList<string> AgentTools { get; init; } = [];
 }

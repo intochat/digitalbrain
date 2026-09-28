@@ -206,6 +206,17 @@ public sealed class CatalogFacts
     }
 
     [Fact]
+    public async Task HitsCarryTheToolsTheirSourceDeclared()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await Start(new ToolSource(), ct);
+
+        var result = await brain.Get<ICapabilityCatalog>("catalog").SearchApps("find new dental clinics", "workspace-a", 5);
+
+        Assert.Equal(["propose_app", "run_leadgenerator"], Assert.Single(result.Hits).Tools);
+    }
+
+    [Fact]
     public async Task UnmetIntentIsRecordedAndGrouped()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -346,6 +357,13 @@ internal static class AppDocuments
                 operation.Name, operation.DescriptionForModel, scoped.OwningWorkspaceId))
             .Prepend(new CapabilityDocument(scoped.Manifest.Id, CapabilityKind.App, scoped.Manifest.Name,
                 scoped.Manifest.DescriptionForPeople + " " + scoped.Manifest.DescriptionForModel, scoped.OwningWorkspaceId)))];
+}
+
+internal sealed class ToolSource : ICapabilitySource
+{
+    public Task<IReadOnlyList<CapabilityDocument>> Read(CancellationToken cancellationToken)
+        => Task.FromResult<IReadOnlyList<CapabilityDocument>>([new("intochat.leadgenerator", CapabilityKind.App, "LeadGenerator",
+            "Find new companies such as dental clinics.", Tools: ["propose_app", "run_leadgenerator"])]);
 }
 
 internal sealed class FailingEmbedder : IEmbeddingGenerator<string, Embedding<float>>

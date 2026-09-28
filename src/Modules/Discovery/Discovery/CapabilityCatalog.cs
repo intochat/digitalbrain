@@ -178,6 +178,7 @@ internal sealed class CapabilityCatalog(
         Score = Math.Round(score, 4),
         Name = document.Name,
         Description = document.Description,
+        Tools = document.Tools ?? [],
     };
 
     private static string Signature(IEnumerable<CapabilityDocument> documents)

@@ -20,6 +20,7 @@ public sealed record CapabilityHit
     [Id(2)] public required double Score { get; init; }
     [Id(3)] public string Name { get; init; } = "";
     [Id(4)] public string Description { get; init; } = "";
+    [Id(5)] public IReadOnlyList<string> Tools { get; init; } = [];
 }
 
 [GenerateSerializer, Alias("discovery.result")]

@@ -35,6 +35,14 @@ public sealed class ManifestFacts
     };
 
     [Fact]
+    public void FirstPartyAppsDeclareTheAgentToolsTheHostRegisters()
+    {
+        Assert.Equal(["propose_app", "run_leadgenerator"], FirstPartyApps.Get("intochat.leadgenerator").AgentTools);
+        Assert.Equal(["plan_background_removal", "run_background_removal"], FirstPartyApps.Get("intochat.image-editor").AgentTools);
+        Assert.Empty(FirstPartyApps.Get("intochat.forms").AgentTools);
+    }
+
+    [Fact]
     public void GeneratedManifestCannotDriftFromTheInterface()
     {
         var manifest = ManifestGenerator.FromInterface<IWidgetNeuron>(Seed());
