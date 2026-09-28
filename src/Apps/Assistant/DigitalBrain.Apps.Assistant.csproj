@@ -10,5 +10,9 @@
   <ItemGroup>
     <ProjectReference Include="../../Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
     <ProjectReference Include="../../Modules/Google/Flutter/Flutter/DigitalBrain.Modules.Flutter.csproj" />
+    <ProjectReference Include="../../Modules/Discovery/Discovery/DigitalBrain.Modules.Discovery.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="instructions.md" LogicalName="instructions.md" />
   </ItemGroup>
 </Project>

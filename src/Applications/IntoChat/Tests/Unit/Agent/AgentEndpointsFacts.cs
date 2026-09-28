@@ -37,7 +37,7 @@ public sealed class AgentEndpointsFacts
             new ConfigurationBuilder().Build(), runner, [], _ => Task.CompletedTask,
             new StringBuilder(), [], new IntentActivity(), TestContext.Current.CancellationToken);
 
-        Assert.Equal([CapabilityContextProvider.ProviderName], runner.Request!.ContextProviders);
+        Assert.Equal([DigitalBrain.Discovery.Agents.CapabilityTools.ProviderName], runner.Request!.ContextProviders);
     }
 
     // The /agent model input must carry the conversation summary once old turns are evicted.

@@ -18,6 +18,6 @@ internal static class AssistantDefinition
         DisplayName = "IntoChat assistant",
         Instructions = Shared + (developerMode ? DeveloperGuidance : ProductGuidance),
         Tools = AgentToolPolicy.SelectTools(developerMode, CSharpAgentTools.Names, appTools),
-        ContextProviders = [CapabilityContextProvider.ProviderName],
+        ContextProviders = [DigitalBrain.Discovery.Agents.CapabilityTools.ProviderName],
     };
 }

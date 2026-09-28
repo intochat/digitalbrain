@@ -64,7 +64,7 @@ public sealed class BuiltInAppFacts
         var defaultAgent = (await second.Activate()).Agent;
         Assert.Equal(AssistantDefinition.Product.Instructions, defaultAgent.Instructions);
         Assert.Equal(AssistantDefinition.Product.Tools, defaultAgent.Tools);
-        Assert.Equal([CapabilityContextProvider.ProviderName], defaultAgent.ContextProviders);
+        Assert.Equal([DigitalBrain.Discovery.Agents.CapabilityTools.ProviderName], defaultAgent.ContextProviders);
         var conversation = await first.Conversation("thread-1");
         await conversation.BeginConversation(new("run-1", "hello"), TestContext.Current.CancellationToken);
         await conversation.CompleteConversation(new("run-1", "hello", "answer", []), TestContext.Current.CancellationToken);

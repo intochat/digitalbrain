@@ -37,8 +37,6 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 builder.AddDurableProtection();
 builder.Services.AddApplications();
 builder.Services.AddSingleton<IAgentToolFactory, WorkspaceFormTools>();
-builder.Services.AddSingleton<IAgentToolFactory, DiscoveryTools>();
-builder.Services.AddSingleton<IAgentContextProvider, CapabilityContextProvider>();
 
 var app = builder.Build();
 

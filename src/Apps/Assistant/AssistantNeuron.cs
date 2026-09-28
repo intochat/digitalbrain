@@ -2,6 +2,7 @@ using DigitalBrain.AI.Agents;
 using DigitalBrain.AI.Media;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
+using DigitalBrain.Discovery.Agents;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Chat;
 using DigitalBrain.Flutter.Chat.Signals;
@@ -36,25 +37,27 @@ internal sealed class AssistantNeuron(
     [PersistentState("apps.assistant", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<AssistantState> store)
     : Neuron<AssistantState>(store), IAssistant, INeuronObserver
 {
-    private static readonly AgentDefinition Agent = new()
-    {
-        DisplayName = "Assistant",
-        Instructions = "You are a helpful assistant. Answer briefly.",
-    };
+    private static readonly string Instructions = ReadInstructions();
     private IGrainTimer? _renewal;
 
     private string Key => this.GetPrimaryKeyString();
     private IChat Chat => GrainFactory.GetGrain<IChat>(UiComposer.NameOf(Key, AssistantApp.ChatPart));
     private IVoiceInput Voice => GrainFactory.GetGrain<IVoiceInput>(UiComposer.NameOf(Key, AssistantApp.VoicePart));
+    // An assistant started for a workspace is keyed "{workspace}/applications/assistant".
+    private string Workspace => Key.Split("/applications/")[0];
+    private AgentDefinition Agent => new()
+    {
+        DisplayName = "Assistant",
+        Instructions = Instructions + $"\nThe user's workspace is the ui.workspace neuron \"{Workspace}\".",
+        Tools = [CapabilityTools.FindTool],
+        ContextProviders = [CapabilityTools.ProviderName],
+    };
     private IAgent Conversation => GrainFactory.GetGrain<IAgent>(UiComposer.NameOf(Key, "agent"));
 
     public async Task Activate()
     {
-        if (!Snapshot.Active)
-        {
-            await Conversation.Configure(Agent, (await Conversation.GetState()).Revision);
-            await Save(Snapshot with { Active = true }, new AssistantActivated(Key));
-        }
+        await Conversation.Configure(Agent, (await Conversation.GetState()).Revision);
+        if (!Snapshot.Active) { await Save(Snapshot with { Active = true }, new AssistantActivated(Key)); }
         await Subscribe();
     }
 
@@ -125,6 +128,13 @@ internal sealed class AssistantNeuron(
     }
 
     private Task WatchInputs(INeuronObserver observer) => Task.WhenAll(Chat.Watch(observer), Voice.Watch(observer));
+
+    private static string ReadInstructions()
+    {
+        using var stream = typeof(AssistantNeuron).Assembly.GetManifestResourceStream("instructions.md")!;
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
 
     private static string Extension(string mimeType) => mimeType.Split(';')[0].Trim() switch
     {

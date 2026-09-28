@@ -1,7 +1,7 @@
-using System.Runtime.CompilerServices;
 using System.Text;
 using DigitalBrain.AI;
 using DigitalBrain.Specs;
+using DigitalBrain.Supabase;
 using DigitalBrain.Testing.Unit;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,16 +18,19 @@ public sealed class AssistantFeatureFacts
         await using var brain = await UnitTest.Create()
             .WithApp<AssistantApp>()
             .WithModule<SpecsModule>()
+            .WithModule<SupabaseModule>()
             .ConfigureSilo(silo => silo.Services
                 .AddSingleton<StepLibrary, AssistantSteps>()
-                .AddSingleton<IChatClient>(new EchoChatClient())
+                .AddSingleton<IChatClient>(new ScriptedAssistantModel())
+                .AddSingleton<CustomersDatabase>()
+                .AddSingleton<ISupabaseProvider>(services => services.GetRequiredService<CustomersDatabase>())
                 .AddSingleton<IAudioTranscriptionService>(new TextTranscriber()))
             .StartAsync(ct);
         var feature = brain.Get<IFeature>("assistant");
         var snapshot = await feature.Set(ReadFeature());
         Assert.True(snapshot.FullyBound, snapshot.Problem?.Message ?? "Some steps are not bound.");
 
-        var run = await feature.Run("assistant-" + FeatureSnapshot.ScenarioPlaceholder);
+        var run = await feature.Run("workspace-" + FeatureSnapshot.ScenarioPlaceholder + "/applications/assistant");
 
         Assert.True(run.Green, string.Join("\n", run.Scenarios
             .SelectMany(scenario => scenario.Steps.Where(step => step.Verdict != Verdict.Passed)
@@ -39,20 +42,6 @@ public sealed class AssistantFeatureFacts
         using var stream = typeof(AssistantFeatureFacts).Assembly.GetManifestResourceStream("assistant.feature")!;
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
-    }
-
-    private sealed class EchoChatClient : IChatClient
-    {
-        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
-            => Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "You said: " + messages.Last(message => message.Role == ChatRole.User).Text)));
-        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
-            [EnumeratorCancellation] CancellationToken cancellationToken = default)
-        {
-            var response = await GetResponseAsync(messages, options, cancellationToken);
-            yield return new ChatResponseUpdate(ChatRole.Assistant, response.Text);
-        }
-        public object? GetService(Type serviceType, object? serviceKey = null) => null;
-        public void Dispose() { }
     }
 
     // Audio in these scenarios is the UTF-8 text the user "said".

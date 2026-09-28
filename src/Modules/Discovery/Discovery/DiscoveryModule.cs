@@ -1,4 +1,6 @@
+using DigitalBrain.AI.Agents;
 using DigitalBrain.Core;
+using DigitalBrain.Discovery.Agents;
 using DigitalBrain.Discovery.Sources;
 using DigitalBrain.Qdrant;
 using Microsoft.AspNetCore.Routing;
@@ -28,6 +30,9 @@ public sealed class DiscoveryModule : IModule
             Embeddings(provider),
             provider.GetRequiredService<ILogger<CapabilityCatalog>>()));
         services.AddHostedService<CapabilityCatalogRebuilder>();
+        services.TryAddSingleton<CapabilityTools>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAgentToolFactory, CapabilityTools>(provider => provider.GetRequiredService<CapabilityTools>()));
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAgentContextProvider, CapabilityTools>(provider => provider.GetRequiredService<CapabilityTools>()));
     }
 
     public void Configure(IEndpointRouteBuilder endpoints)
