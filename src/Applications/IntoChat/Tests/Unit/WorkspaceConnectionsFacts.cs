@@ -2,6 +2,7 @@ using DigitalBrain.Sdk;
 using DigitalBrain.Sdk.Connectors;
 using DigitalBrain.Contracts.Types;
 using IntoChat.Workspace;
+using DigitalBrain.Identity;
 
 namespace IntoChat.Tests;
 

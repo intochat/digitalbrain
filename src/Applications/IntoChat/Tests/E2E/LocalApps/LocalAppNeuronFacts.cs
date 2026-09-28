@@ -1,6 +1,7 @@
 using DigitalBrain.Flutter.Collection;
-using IntoChat.Apps;
+using DigitalBrain.Files;
 using IntoChat.Workspace;
+using DigitalBrain.Identity;
 namespace IntoChat.Tests.E2E.LocalApps;
 
 public sealed class LocalAppNeuronFacts
@@ -13,7 +14,7 @@ public sealed class LocalAppNeuronFacts
         try
         {
             await File.WriteAllBytesAsync(Path.Combine(root, "image.png"), Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg=="), ct);
-            await using var brain = await IntoChatE2ETest.Create(privateConfiguration: new() { ["IntoChat:LocalFiles:Roots:downloads"] = root, ["IntoChat:LocalFiles:AssetDirectory"] = Path.Combine(root, "assets") }).StartAsync(ct);
+            await using var brain = await IntoChatE2ETest.Create(privateConfiguration: new() { ["DigitalBrain:Files:Roots:downloads"] = root, ["DigitalBrain:Files:AssetDirectory"] = Path.Combine(root, "assets") }).StartAsync(ct);
             var scope = WorkspaceScope.Create("owner", "local-neurons").Id;
             await HostAssetFixture.Import(brain, scope);
             var files = brain.Get<IFileExplorer>(scope);

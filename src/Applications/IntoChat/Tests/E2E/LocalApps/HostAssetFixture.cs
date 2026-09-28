@@ -1,6 +1,6 @@
 using DigitalBrain.Contracts;
 using DigitalBrain.Flutter.Collection;
-using IntoChat.Apps;
+using DigitalBrain.Files;
 
 namespace IntoChat.Tests.E2E.LocalApps;
 

@@ -4,7 +4,7 @@ using Azure.Storage.Blobs;
 using DigitalBrain.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace IntoChat.LocalFiles;
+namespace DigitalBrain.Files;
 
 internal interface IAssetBlobStore
 {
@@ -34,7 +34,7 @@ internal sealed class AzureAssetBlobStore([FromKeyedServices(DigitalBrainNames.G
         try
         {
             var blob = client.GetBlobContainerClient(ContainerName).GetBlobClient(id);
-            if ((await blob.GetPropertiesAsync(cancellationToken: ct)).Value.ContentLength > LocalFilesOptions.MaxExportBytes)
+            if ((await blob.GetPropertiesAsync(cancellationToken: ct)).Value.ContentLength > FilesOptions.MaxExportBytes)
             { throw new IOException("The stored asset exceeds the supported size."); }
             return (await blob.DownloadContentAsync(ct)).Value.Content.ToArray();
         }

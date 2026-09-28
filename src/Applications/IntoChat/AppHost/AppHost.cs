@@ -29,7 +29,7 @@ using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
 using DigitalBrain.Time;
 using IntoChat.AppHost;
-using IntoChat.Apps;
+using DigitalBrain.Files;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 
@@ -67,6 +67,7 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<SecretsModule>()
     .WithModule<ConnectorModule>()
     .WithModule<IdentityModule>()
+    .WithModule<FilesModule>()
     .WithModule<GmailModule>(gmail => gmail.WithGmail())
     .WithModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
     .WithModule<GitHubModule>(github => github.WithGitHubRepositories(repositories))
@@ -117,10 +118,10 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
     .WithEnvironment(context =>
     {
         // No default host filesystem root: the Files app stays off unless a root is configured.
-        var downloads = builder.Configuration["IntoChat:LocalFiles:Roots:downloads"];
-        if (downloads is not null) { context.EnvironmentVariables["IntoChat__LocalFiles__Roots__downloads"] = downloads; }
-        var assets = builder.Configuration["IntoChat:LocalFiles:AssetDirectory"];
-        if (assets is not null) { context.EnvironmentVariables["IntoChat__LocalFiles__AssetDirectory"] = assets; }
+        var downloads = builder.Configuration["DigitalBrain:Files:Roots:downloads"];
+        if (downloads is not null) { context.EnvironmentVariables["DigitalBrain__Files__Roots__downloads"] = downloads; }
+        var assets = builder.Configuration["DigitalBrain:Files:AssetDirectory"];
+        if (assets is not null) { context.EnvironmentVariables["DigitalBrain__Files__AssetDirectory"] = assets; }
         if (builder.Configuration["IntoChat:Assistant:Model"] is { Length: > 0 } assistantModel)
         { context.EnvironmentVariables["IntoChat__Assistant__Model"] = assistantModel; }
         if (builder.Configuration["IntoChat:CSharp:AllowActivation"] is { } allowActivation)

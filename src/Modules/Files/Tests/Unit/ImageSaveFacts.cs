@@ -1,9 +1,7 @@
 using DigitalBrain.Testing.Unit;
-using IntoChat.Apps;
-using IntoChat.LocalFiles;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Options;
-namespace IntoChat.Tests.Unit.LocalApps;
+namespace DigitalBrain.Files.Tests;
 
 public sealed class ImageSaveFacts
 {
@@ -20,8 +18,8 @@ public sealed class ImageSaveFacts
             var source = Path.Combine(root, "Untitled.png");
             await File.WriteAllBytesAsync(source, Png, ct);
             var blobs = new MemoryAssetBlobStore();
-            var options = Options.Create(new LocalFilesOptions { Roots = new() { ["downloads"] = root }, AssetDirectory = Path.Combine(root, "legacy-assets") });
-            var files = new LocalFileStore(options, new EphemeralDataProtectionProvider(), blobs, brain.Grains);
+            var options = Options.Create(new FilesOptions { Roots = new() { ["downloads"] = root }, AssetDirectory = Path.Combine(root, "legacy-assets") });
+            var files = new WorkspaceFileStore(options, new EphemeralDataProtectionProvider(), blobs, brain.Grains);
             var listing = await files.ListHostAsync("scope", null, 0, "name", "Untitled.png", ct);
             var asset = await files.SnapshotImageAsync("scope", Assert.Single(listing.Items).Id, ct);
             File.Delete(source);
@@ -31,7 +29,7 @@ public sealed class ImageSaveFacts
             var first = await new ImageSaveCoordinator(files, brain.Grains).Save("scope", ticket, new MemoryStream(Png), ct);
             await brain.DeactivateAsync(brain.Get<IWorkspaceAssets>("scope"), ct);
             await brain.DeactivateAsync(brain.Get<IImageSaveOperation>(first.EntryId[6..]), ct);
-            var fresh = new LocalFileStore(Options.Create(new LocalFilesOptions { AssetDirectory = Path.Combine(root, "empty") }), new EphemeralDataProtectionProvider(), blobs, brain.Grains);
+            var fresh = new WorkspaceFileStore(Options.Create(new FilesOptions { AssetDirectory = Path.Combine(root, "empty") }), new EphemeralDataProtectionProvider(), blobs, brain.Grains);
             var second = await new ImageSaveCoordinator(fresh, brain.Grains).Save("scope", ticket, new MemoryStream(Png), ct);
             Assert.Equal(first, second);
             var durable = await fresh.ListAsync("scope", null, 0, "name", "", ct);
@@ -58,17 +56,17 @@ public sealed class ImageSaveFacts
         try
         {
             var checksum = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(Png));
-            var id = LocalFileStore.AssetId("scope", checksum);
+            var id = WorkspaceFileStore.AssetId("scope", checksum);
             var path = Path.Combine(root, id + ".image");
             await File.WriteAllBytesAsync(path, Png, ct);
             var blobs = new MemoryAssetBlobStore { FailNextUpload = true };
-            var files = new LocalFileStore(Options.Create(new LocalFilesOptions { AssetDirectory = root }), new EphemeralDataProtectionProvider(), blobs, brain.Grains);
+            var files = new WorkspaceFileStore(Options.Create(new FilesOptions { AssetDirectory = root }), new EphemeralDataProtectionProvider(), blobs, brain.Grains);
             await Assert.ThrowsAsync<IOException>(() => files.OpenAssetAsync("scope", id, ct));
             await using var restored = await files.OpenAssetAsync("scope", id, ct);
             Assert.Equal(Png, blobs.Values[id]);
             Assert.Equal(Png, await File.ReadAllBytesAsync(path, ct));
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() => files.OpenAssetAsync("other-scope", id, ct));
-            var missingHost = new LocalFileStore(Options.Create(new LocalFilesOptions { AssetDirectory = Path.Combine(root, "missing") }), new EphemeralDataProtectionProvider(), blobs, brain.Grains);
+            var missingHost = new WorkspaceFileStore(Options.Create(new FilesOptions { AssetDirectory = Path.Combine(root, "missing") }), new EphemeralDataProtectionProvider(), blobs, brain.Grains);
             await using var migrated = await missingHost.OpenAssetAsync("scope", id, ct);
             Assert.Equal(Png.Length, migrated.Length);
         }

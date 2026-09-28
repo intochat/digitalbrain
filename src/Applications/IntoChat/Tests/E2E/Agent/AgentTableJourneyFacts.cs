@@ -9,6 +9,7 @@ using IntoChat.Tests.E2E.Workspace;
 using IntoChat.Workspace;
 using Microsoft.Playwright;
 using Npgsql;
+using DigitalBrain.Identity;
 
 namespace IntoChat.Tests.E2E.Agent;
 

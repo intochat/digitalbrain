@@ -94,6 +94,7 @@
         "DigitalBrain__Modules__13": "DigitalBrain.Discovery.DiscoveryModule, DigitalBrain.Modules.Discovery",
         "DigitalBrain__Modules__14": "DigitalBrain.Apps.AppsModule, DigitalBrain.Modules.Apps",
         "DigitalBrain__Modules__15": "DigitalBrain.Qdrant.QdrantModule, DigitalBrain.Modules.Qdrant",
+        "DigitalBrain__Modules__16": "DigitalBrain.Files.FilesModule, DigitalBrain.Modules.Files",
         "DigitalBrain__Qdrant__Host": "True",
         "DigitalBrain__AI__Default__Model": "IGemma4",
         "DigitalBrain__AI__Default__Embedding": "ITextEmbedding3Small",

@@ -1,8 +1,7 @@
 using DigitalBrain.Flutter.ImageCanvas;
-using IntoChat.Apps;
 using Xunit;
 
-namespace IntoChat.Tests.Unit.LocalApps;
+namespace DigitalBrain.Files.Tests;
 
 public sealed class ImageEditFacts
 {

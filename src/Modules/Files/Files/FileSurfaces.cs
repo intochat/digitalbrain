@@ -7,10 +7,9 @@ using DigitalBrain.Flutter.Surface;
 using DigitalBrain.Flutter.Tabs;
 using DigitalBrain.Flutter.Text;
 using DigitalBrain.Flutter.TextField;
-using IntoChat.LocalFiles;
-namespace IntoChat.Apps;
+namespace DigitalBrain.Files;
 
-internal sealed class AppSurfaceComposer(IGrainFactory grains)
+internal sealed class FileSurfaces(IGrainFactory grains)
 {
     public async Task<UiChildRef> Files(string name, DirectoryPage page, int offset = 0, string sort = "name", string filter = "")
     {
@@ -34,7 +33,7 @@ internal sealed class AppSurfaceComposer(IGrainFactory grains)
         var bar = grains.GetGrain<ILayout>(name + "/toolbar");
         await bar.Set(new("row", toolbar, 4), (await bar.Read()).Revision);
         var status = grains.GetGrain<IText>(name + "/status");
-        await status.Set("Local filesystem · " + page.Items.Count + " items");
+        await status.Set("Workspace files · " + page.Items.Count + " items");
         var previous = grains.GetGrain<IButton>(name + "/previous"); await previous.Set("Previous", "previous", offset > 0);
         var next = grains.GetGrain<IButton>(name + "/next"); await next.Set("Next", "next", page.NextOffset is not null);
         var footer = grains.GetGrain<ILayout>(name + "/footer");
@@ -57,9 +56,6 @@ internal sealed class AppSurfaceComposer(IGrainFactory grains)
         await canvas.Set(new(asset.Id, asset.Width, asset.Height, recipe, revision), (await canvas.Read()).Revision);
         return await Compose(name, "Image Editor", [new("imagecanvas", name + "/canvas")]);
     }
-    // The whole form is one neuron rendered from one read; the window only lays it out.
-    public Task<UiChildRef> Form(string name, string title, string formId)
-        => Compose(name, title, [new("form", formId)]);
     private async Task<UiChildRef> Compose(string name, string title, UiChildRef[] children, IReadOnlyList<double>? extents = null)
     {
         var layout = grains.GetGrain<ILayout>(name + "/layout");

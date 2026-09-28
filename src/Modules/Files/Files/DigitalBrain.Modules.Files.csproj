@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Workspace files stored as immutable blobs, host folder import and the image editor.</Description>
+    <RootNamespace>DigitalBrain.Files</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Azure.Storage.Blobs" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Files.Tests.Unit" />
+    <InternalsVisibleTo Include="IntoChat.Tests.E2E" />
+    <ProjectReference Include="../Contracts/DigitalBrain.Modules.Files.Contracts.csproj" />
+    <ProjectReference Include="../../Identity/Identity/DigitalBrain.Modules.Identity.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
+  </ItemGroup>
+</Project>

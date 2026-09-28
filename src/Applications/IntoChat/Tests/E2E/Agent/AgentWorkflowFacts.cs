@@ -10,6 +10,7 @@ using IntoChat.Agent;
 using IntoChat.Tests.E2E.Workspace;
 using IntoChat.Workspace;
 using Npgsql;
+using DigitalBrain.Identity;
 
 namespace IntoChat.Tests.E2E.Agent;
 

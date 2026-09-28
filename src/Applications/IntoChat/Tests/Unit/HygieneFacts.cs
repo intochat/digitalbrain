@@ -96,7 +96,7 @@ public sealed class HygieneFacts
     {
         var appHost = Read("src/Applications/IntoChat/AppHost/AppHost.cs");
         Assert.DoesNotContain("Downloads", appHost);
-        Assert.Contains("IntoChat:LocalFiles:Roots:downloads", appHost);
+        Assert.Contains("DigitalBrain:Files:Roots:downloads", appHost);
     }
 
     [Fact]

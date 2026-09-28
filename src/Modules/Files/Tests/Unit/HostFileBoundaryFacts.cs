@@ -1,11 +1,10 @@
 using DigitalBrain.Testing.Unit;
-using IntoChat.LocalFiles;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Options;
 
-namespace IntoChat.Tests.Unit.LocalApps;
+namespace DigitalBrain.Files.Tests;
 
-public sealed class LocalFileBoundaryFacts
+public sealed class HostFileBoundaryFacts
 {
     [Fact]
     public async Task LargeFoldersArePagedAndOversizedSourcesAreRejectedBeforeReading()
@@ -17,8 +16,8 @@ public sealed class LocalFileBoundaryFacts
         try
         {
             for (var i = 0; i < 105; i++) { await File.WriteAllTextAsync(Path.Combine(root, $"file-{i:000}.txt"), "fixture", ct); }
-            using (var huge = File.Create(Path.Combine(root, "huge.png"))) { huge.SetLength(LocalFilesOptions.MaxSourceBytes + 1); }
-            var files = new LocalFileStore(Options.Create(new LocalFilesOptions { Roots = new() { ["downloads"] = root }, AssetDirectory = Path.Combine(root, "assets") }), new EphemeralDataProtectionProvider(), blobs, brain.Grains);
+            using (var huge = File.Create(Path.Combine(root, "huge.png"))) { huge.SetLength(FilesOptions.MaxSourceBytes + 1); }
+            var files = new WorkspaceFileStore(Options.Create(new FilesOptions { Roots = new() { ["downloads"] = root }, AssetDirectory = Path.Combine(root, "assets") }), new EphemeralDataProtectionProvider(), blobs, brain.Grains);
             var first = await files.ListHostAsync("scope", null, 0, "name", "file-", ct);
             Assert.Equal(100, first.Items.Count);
             Assert.Equal(100, first.NextOffset);
@@ -44,7 +43,7 @@ public sealed class LocalFileBoundaryFacts
             try { Directory.CreateSymbolicLink(Path.Combine(root, "linked"), outside); }
             catch (UnauthorizedAccessException) { Assert.Skip("The OS does not allow creating the symbolic-link fixture."); }
             catch (IOException) { Assert.Skip("The OS does not allow creating the symbolic-link fixture."); }
-            var files = new LocalFileStore(Options.Create(new LocalFilesOptions { Roots = new() { ["downloads"] = root } }), new EphemeralDataProtectionProvider(), blobs, brain.Grains);
+            var files = new WorkspaceFileStore(Options.Create(new FilesOptions { Roots = new() { ["downloads"] = root } }), new EphemeralDataProtectionProvider(), blobs, brain.Grains);
             Assert.Empty((await files.ListHostAsync("scope", null, 0, "name", "", ct)).Items);
         }
         finally
@@ -67,7 +66,7 @@ public sealed class LocalFileBoundaryFacts
             var source = Path.Combine(downloads, "Untitled.png");
             var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg==");
             await File.WriteAllBytesAsync(source, png, ct);
-            var files = new LocalFileStore(Options.Create(new LocalFilesOptions { Roots = new() { ["downloads"] = downloads }, AssetDirectory = Path.Combine(root, "assets") }), new EphemeralDataProtectionProvider(), blobs, brain.Grains);
+            var files = new WorkspaceFileStore(Options.Create(new FilesOptions { Roots = new() { ["downloads"] = downloads }, AssetDirectory = Path.Combine(root, "assets") }), new EphemeralDataProtectionProvider(), blobs, brain.Grains);
             var page = await files.ListHostAsync("workspace-a", null, 0, "name", "", ct);
             var item = Assert.Single(page.Items);
             Assert.Equal("Untitled.png", item.Label);

@@ -1,12 +1,11 @@
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
-using IntoChat.LocalFiles;
 using Orleans;
 using Orleans.Runtime;
-namespace IntoChat.Apps;
+namespace DigitalBrain.Files;
 
 [GrainType("intochat.file-explorer")]
-internal sealed class FileExplorerNeuron(LocalFileStore files, AppSurfaceComposer surfaces,
+internal sealed class FileExplorerNeuron(WorkspaceFileStore files, FileSurfaces surfaces,
     [PersistentState("files", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<FileExplorerState> store) : Neuron, IFileExplorer
 {
     private string Scope => this.GetPrimaryKeyString();

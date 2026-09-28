@@ -1,6 +1,6 @@
 using System.Buffers.Binary;
 using System.IO.Compression;
-namespace IntoChat.LocalFiles;
+namespace DigitalBrain.Files;
 
 internal static class ImageHeader
 {

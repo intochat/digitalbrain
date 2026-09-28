@@ -31,7 +31,7 @@ public sealed class LocalAppsJourneyFacts
                 await File.WriteAllBytesAsync(Path.Combine(downloads, "Second.png"), source, ct);
                 await File.WriteAllTextAsync(Path.Combine(downloads, "readme.txt"), "Local file fixture", ct);
             }
-            var settings = new Dictionary<string, string?> { ["IntoChat:LocalFiles:Roots:downloads"] = downloads, ["IntoChat:LocalFiles:AssetDirectory"] = Path.Combine(root, "assets") };
+            var settings = new Dictionary<string, string?> { ["DigitalBrain:Files:Roots:downloads"] = downloads, ["DigitalBrain:Files:AssetDirectory"] = Path.Combine(root, "assets") };
             await using var brain = await IntoChatE2ETest.Create(privateConfiguration: settings)
                 .ConfigureModule<FlutterModule>(flutter => flutter.RunWebApp()).StartAsync(ct);
             var page = brain.Page;
@@ -85,7 +85,7 @@ public sealed class LocalAppsJourneyFacts
             await Assertions.Expect(page.Locator("flt-semantics").GetByText("Saved " + outputName, new() { Exact = true })).ToBeVisibleAsync();
             var assetChecksum = receipt.RootElement.GetProperty("file").GetProperty("checksum").GetString()!;
             var workspaceId = Uri.UnescapeDataString(new Uri(response.Url).AbsolutePath.Split('/')[2]);
-            var assetId = IntoChat.LocalFiles.LocalFileStore.AssetId(IntoChat.Workspace.WorkspaceScope.Create("owner", workspaceId).Id, assetChecksum);
+            var assetId = DigitalBrain.Files.WorkspaceFileStore.AssetId(DigitalBrain.Identity.WorkspaceScope.Create("owner", workspaceId).Id, assetChecksum);
             var outputResponse = await brain.HttpClient.GetAsync($"/workspaces/{Uri.EscapeDataString(workspaceId)}/apps/assets/{assetId}", ct);
             outputResponse.EnsureSuccessStatusCode();
             var output = await outputResponse.Content.ReadAsByteArrayAsync(ct);

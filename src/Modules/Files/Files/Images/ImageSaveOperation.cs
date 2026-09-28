@@ -1,10 +1,9 @@
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
-using IntoChat.LocalFiles;
 using Orleans;
 using Orleans.Runtime;
 
-namespace IntoChat.Apps;
+namespace DigitalBrain.Files;
 
 [Alias("intochat.image-save-operation"), Orleans.Metadata.DefaultGrainType("intochat.image-save-operation")]
 internal interface IImageSaveOperation : INeuron

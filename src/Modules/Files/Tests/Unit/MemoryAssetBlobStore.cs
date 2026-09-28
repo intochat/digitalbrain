@@ -1,5 +1,4 @@
-using IntoChat.LocalFiles;
-namespace IntoChat.Tests.Unit.LocalApps;
+namespace DigitalBrain.Files.Tests;
 internal sealed class MemoryAssetBlobStore : IAssetBlobStore
 {
     internal Dictionary<string, byte[]> Values { get; } = [];

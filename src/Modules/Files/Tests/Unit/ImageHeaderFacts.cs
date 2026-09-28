@@ -1,5 +1,4 @@
-using IntoChat.LocalFiles;
-namespace IntoChat.Tests.Unit.LocalApps;
+namespace DigitalBrain.Files.Tests;
 
 public sealed class ImageHeaderFacts
 {

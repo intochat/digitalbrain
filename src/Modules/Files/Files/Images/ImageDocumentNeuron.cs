@@ -4,13 +4,12 @@ using System.Text.Json;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using DigitalBrain.Flutter.ImageCanvas;
-using IntoChat.LocalFiles;
 using Orleans;
 using Orleans.Runtime;
-namespace IntoChat.Apps;
+namespace DigitalBrain.Files;
 
 [GrainType("intochat.image-document")]
-internal sealed class ImageDocumentNeuron(AppSurfaceComposer surfaces,
+internal sealed class ImageDocumentNeuron(FileSurfaces surfaces,
     [PersistentState("image", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ImageDocumentState> store) : Neuron, IImageDocument
 {
     public async Task<ImageDocumentState> Open(ImageAsset asset)
@@ -65,14 +64,6 @@ internal sealed class ImageDocumentNeuron(AppSurfaceComposer surfaces,
         return store.State;
     }
     public Task<ImageDocumentState> Read() => Task.FromResult(store.State);
-    public async Task<ImageDocumentState> AddVersion(string kind, string assetId)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(kind);
-        ArgumentException.ThrowIfNullOrWhiteSpace(assetId);
-        var version = new ImageVersion(Guid.NewGuid().ToString("n"), assetId, store.State.Versions.Count, kind);
-        await Save(store.State with { Versions = [.. store.State.Versions, version] });
-        return store.State;
-    }
     private void RequireRevision(long revision)
     {
         if (revision != store.State.Revision) { throw new InvalidOperationException("The document changed. Reload it before retrying."); }

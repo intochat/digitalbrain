@@ -1,10 +1,9 @@
 using DigitalBrain.Contracts;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.ImageCanvas;
-using IntoChat.LocalFiles;
 using Orleans;
 using Orleans.Concurrency;
-namespace IntoChat.Apps;
+namespace DigitalBrain.Files;
 
 [Alias("intochat.file-explorer"), Orleans.Metadata.DefaultGrainType("intochat.file-explorer")]
 public interface IFileExplorer : INeuron
@@ -20,8 +19,6 @@ public interface IImageDocument : INeuron
     Task<ImageDocumentState> Apply(ImageEditCommand command, long expectedRevision, string operationId);
     Task<SaveTicket> PrepareSave(long expectedRevision, string operationId);
     Task<ImageDocumentState> CompleteSave(string operationId, SavedFile result);
-    // A background-removed copy is appended while the original stays at revision zero.
-    Task<ImageDocumentState> AddVersion(string kind, string assetId);
     [ReadOnly] Task<ImageDocumentState> Read();
 }
 [GenerateSerializer, Alias("intochat.image-edit-command")]
@@ -50,20 +47,3 @@ public sealed record ImageDocumentState
 public sealed record ImageVersion([property: Id(0)] string VersionId, [property: Id(1)] string AssetId, [property: Id(2)] long Revision, [property: Id(3)] string Kind);
 [GenerateSerializer, Alias("intochat.image-save-ticket")]
 public sealed record SaveTicket([property: Id(0)] string OperationId, [property: Id(1)] long Revision, [property: Id(2)] ImageRecipe Recipe, [property: Id(3)] ImageAsset Asset, [property: Id(4)] SavedFile? Result = null);
-
-internal static class ImageEdits
-{
-    public static ImageRecipe Apply(ImageRecipe current, ImageEditCommand command, int width, int height)
-    {
-        var next = command.Kind switch
-        {
-            "stroke" when command.Stroke is not null => current with { Strokes = [.. current.Strokes, command.Stroke] },
-            "crop" when command.Crop is not null => current with { Crop = command.Crop },
-            "reset" => new ImageRecipe(),
-            "replace" when command.Recipe is not null => command.Recipe,
-            _ => throw new ArgumentException("Unknown image edit command.")
-        };
-        next.Validate(width, height);
-        return next;
-    }
-}

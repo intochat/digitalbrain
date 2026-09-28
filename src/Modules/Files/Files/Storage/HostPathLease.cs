@@ -2,15 +2,15 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
-namespace IntoChat.LocalFiles;
+namespace DigitalBrain.Files;
 
 // Keep Windows directory ancestors immovable while a local file operation is in progress.
-internal sealed class LocalPathLease : IDisposable
+internal sealed class HostPathLease : IDisposable
 {
     private readonly List<SafeFileHandle> _handles = [];
-    public static LocalPathLease Acquire(string directory)
+    public static HostPathLease Acquire(string directory)
     {
-        var lease = new LocalPathLease();
+        var lease = new HostPathLease();
         if (!OperatingSystem.IsWindows()) { return lease; }
         try
         {

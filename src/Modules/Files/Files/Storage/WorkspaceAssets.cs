@@ -3,7 +3,7 @@ using DigitalBrain.Core;
 using Orleans;
 using Orleans.Runtime;
 
-namespace IntoChat.LocalFiles;
+namespace DigitalBrain.Files;
 
 [Alias("intochat.workspace-assets"), Orleans.Metadata.DefaultGrainType("intochat.workspace-assets")]
 internal interface IWorkspaceAssets : INeuron
@@ -41,7 +41,7 @@ internal sealed class WorkspaceAssetsNeuron([PersistentState("assets", DigitalBr
     }
     public async Task<ImageAsset> Register(WorkspaceAsset asset)
     {
-        LocalFileStore.ValidateAssetId(this.GetPrimaryKeyString(), asset.Image.Id);
+        WorkspaceFileStore.ValidateAssetId(this.GetPrimaryKeyString(), asset.Image.Id);
         if (store.State.Assets.TryGetValue(asset.Image.DocumentId, out var previous))
         {
             if (previous.Image.Id != asset.Image.Id) { throw new InvalidOperationException("The document already identifies different content."); }

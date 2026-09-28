@@ -6,6 +6,7 @@ using IntoChat.Agent;
 using IntoChat.Workspace;
 using IntoChat.Tests.E2E.Agent;
 using IntoChat.Tests.E2E.Workspace;
+using DigitalBrain.Identity;
 
 namespace IntoChat.Tests.E2E.Receipts;
 

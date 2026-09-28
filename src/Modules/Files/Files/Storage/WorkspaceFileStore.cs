@@ -5,12 +5,12 @@ using DigitalBrain.Flutter.Collection;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Options;
 
-namespace IntoChat.LocalFiles;
+namespace DigitalBrain.Files;
 
-internal sealed class LocalFileStore(IOptions<LocalFilesOptions> options, IDataProtectionProvider protection, IAssetBlobStore blobs, IGrainFactory grains)
+internal sealed class WorkspaceFileStore(IOptions<FilesOptions> options, IDataProtectionProvider protection, IAssetBlobStore blobs, IGrainFactory grains)
 {
     private readonly IDataProtector _protector = protection.CreateProtector("IntoChat.LocalFiles.v1");
-    private readonly LocalFilesOptions _options = options.Value;
+    private readonly FilesOptions _options = options.Value;
 
     internal const string WorkspaceRoot = "workspace-assets";
     private const string AssetEntry = "asset:";
@@ -41,7 +41,7 @@ internal sealed class LocalFileStore(IOptions<LocalFilesOptions> options, IDataP
         if (offset < 0 || offset > 100000 || filter.Length > 200) { throw new ArgumentException("Invalid file listing request."); }
         var handle = folderId is null ? new FileHandle(scope, "downloads", "") : Decode(scope, folderId);
         var folder = Resolve(handle);
-        using var lease = LocalPathLease.Acquire(folder);
+        using var lease = HostPathLease.Acquire(folder);
         var entries = new DirectoryInfo(folder).EnumerateFileSystemInfos().Where(x => !x.Attributes.HasFlag(FileAttributes.ReparsePoint) && !x.Name.StartsWith(".intochat-", StringComparison.Ordinal) && x.Name.Contains(filter, StringComparison.OrdinalIgnoreCase));
         // Enumerate only this directory. Sorting is bounded to prevent unbounded metadata allocations.
         var bounded = entries.Take(100001).ToArray();
@@ -75,22 +75,22 @@ internal sealed class LocalFileStore(IOptions<LocalFilesOptions> options, IDataP
         var handle = Decode(scope, entryId);
         var path = Resolve(handle);
         if (!IsImage(path)) { throw new ArgumentException("Only PNG and JPEG images can be opened."); }
-        using var lease = LocalPathLease.Acquire(Path.GetDirectoryName(path)!);
+        using var lease = HostPathLease.Acquire(Path.GetDirectoryName(path)!);
         await using var source = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.Asynchronous);
-        LocalPathLease.Verify(source.SafeFileHandle, path);
+        HostPathLease.Verify(source.SafeFileHandle, path);
         var current = new FileInfo(path);
         if (handle.Length is not null && (handle.Length != source.Length || handle.ModifiedTicks != current.LastWriteTimeUtc.Ticks || handle.CreatedTicks != current.CreationTimeUtc.Ticks))
         { throw new IOException("This file changed since it was listed. Refresh Files and open it again."); }
-        if (source.Length > LocalFilesOptions.MaxSourceBytes) { throw new ArgumentException("Choose an image smaller than 32 MiB."); }
+        if (source.Length > FilesOptions.MaxSourceBytes) { throw new ArgumentException("Choose an image smaller than 32 MiB."); }
         using var buffer = new MemoryStream();
         var chunk = new byte[81920];
         int read;
         while ((read = await source.ReadAsync(chunk, ct)) != 0)
         {
-            if (buffer.Length + read > LocalFilesOptions.MaxSourceBytes) { throw new ArgumentException("Choose an image smaller than 32 MiB."); }
+            if (buffer.Length + read > FilesOptions.MaxSourceBytes) { throw new ArgumentException("Choose an image smaller than 32 MiB."); }
             await buffer.WriteAsync(chunk.AsMemory(0, read), ct);
         }
-        if (buffer.Length > LocalFilesOptions.MaxSourceBytes) { throw new ArgumentException("Choose an image smaller than 32 MiB."); }
+        if (buffer.Length > FilesOptions.MaxSourceBytes) { throw new ArgumentException("Choose an image smaller than 32 MiB."); }
         var bytes = buffer.ToArray();
         var (width, height) = ImageHeader.Read(bytes);
         var digest = Convert.ToHexStringLower(SHA256.HashData(bytes));
@@ -108,7 +108,7 @@ internal sealed class LocalFileStore(IOptions<LocalFilesOptions> options, IDataP
         {
             var path = AssetPath(scope, assetId);
             if (!File.Exists(path)) { throw new FileNotFoundException("The workspace image was not found."); }
-            if (new FileInfo(path).Length > LocalFilesOptions.MaxExportBytes) { throw new IOException("The legacy asset is too large."); }
+            if (new FileInfo(path).Length > FilesOptions.MaxExportBytes) { throw new IOException("The legacy asset is too large."); }
             bytes = await File.ReadAllBytesAsync(path, ct);
             VerifyBytes(assetId, bytes);
             // Migration only publishes a verified immutable upload. Preserve the old file.
@@ -146,7 +146,7 @@ internal sealed class LocalFileStore(IOptions<LocalFilesOptions> options, IDataP
     }
     private static void VerifyBytes(string id, byte[] bytes)
     {
-        if (bytes.Length > LocalFilesOptions.MaxExportBytes || Convert.ToHexStringLower(SHA256.HashData(bytes)) != id[65..])
+        if (bytes.Length > FilesOptions.MaxExportBytes || Convert.ToHexStringLower(SHA256.HashData(bytes)) != id[65..])
         { throw new IOException("The image asset failed its integrity check."); }
     }
     private static string ScopeKey(string scope) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(scope)));
@@ -163,7 +163,7 @@ internal sealed class LocalFileStore(IOptions<LocalFilesOptions> options, IDataP
     }
     private string Resolve(FileHandle handle)
     {
-        if (!_options.Roots.TryGetValue(handle.Root, out var configured)) { throw new IOException("Downloads is not configured on this IntoChat host."); }
+        if (!_options.Roots.TryGetValue(handle.Root, out var configured)) { throw new IOException("Downloads is not configured on this host."); }
         var relative = handle.RelativePath;
         if (Path.IsPathRooted(relative) || relative.Contains(':') || relative.Split(['/', '\\']).Any(s => s is ".." or "."))
         { throw new UnauthorizedAccessException("The path is outside the configured folder."); }

@@ -1,11 +1,10 @@
 using System.Security.Cryptography;
 using System.Text;
 using DigitalBrain.Core.Enforcement;
-using DigitalBrain.Identity;
 
-namespace IntoChat.Workspace;
+namespace DigitalBrain.Identity;
 
-internal sealed record WorkspaceScope(string Id, string Owner, string WorkspaceId)
+public sealed record WorkspaceScope(string Id, string Owner, string WorkspaceId)
 {
     public static WorkspaceScope Current(BasicAuthOptions auth, string workspaceId)
         => Create(CallerContextStamper.TryGet(out var caller) ? caller.AccountId
