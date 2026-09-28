@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Password accounts, cookie sessions, workspace membership and app grants for the neuron kernel.</Description>
+    <RootNamespace>DigitalBrain.Identity</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Identity.Tests.Unit" />
+    <ProjectReference Include="../DigitalBrain.Modules.Identity.Contracts/DigitalBrain.Modules.Identity.Contracts.csproj" />
+    <ProjectReference Include="../../Kernel/DigitalBrain/DigitalBrain.csproj" />
+  </ItemGroup>
+</Project>

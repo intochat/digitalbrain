@@ -1,3 +1,4 @@
+using DigitalBrain.Identity.Configuration;
 using DigitalBrain.Core.Enforcement;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Microsoft.CSharp;

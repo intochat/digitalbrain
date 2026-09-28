@@ -10,7 +10,7 @@ Runtimes and what they need:
   and writes the final answer. A round ends the discussion when every speaker starts with AGREE.
 - "csharp": "source" is a C# file-based app that answers each invocation. Use exactly this shape and
   change only the Answer function (keep the #:project line):
-    #:project /brain/src/Modules/DigitalBrain/Apps/Contracts/DigitalBrain.Modules.Apps.Contracts.csproj
+    #:project /brain/src/Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps.Contracts/DigitalBrain.Modules.Apps.Contracts.csproj
     using DigitalBrain.Apps;
     using DigitalBrain.Apps.Signals;
 

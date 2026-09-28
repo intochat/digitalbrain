@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Azure deployment for the AI module: the Ollama model server and the models the brain uses.</Description>
+    <RootNamespace>DigitalBrain.AI</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Deployment/DigitalBrain.Deployment.csproj" />
+    <ProjectReference Include="../DigitalBrain.Modules.AI/DigitalBrain.Modules.AI.csproj" />
+  </ItemGroup>
+</Project>

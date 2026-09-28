@@ -1,6 +1,6 @@
 #!/usr/bin/env dotnet
-#:project ../../../DigitalBrain/Kernel/Client/DigitalBrain.Client.csproj
-#:project ../../../Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj
+#:project ../../../DigitalBrain/Kernel/DigitalBrain.Client/DigitalBrain.Client.csproj
+#:project ../../../Time/DigitalBrain.Modules.Time.Contracts/DigitalBrain.Modules.Time.Contracts.csproj
 #:property PublishAot=false
 
 using DigitalBrain.Client;

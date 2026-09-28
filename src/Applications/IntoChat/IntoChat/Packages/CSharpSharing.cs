@@ -1,3 +1,4 @@
+using DigitalBrain.Identity.Configuration;
 using DigitalBrain.Microsoft.CSharp;
 using DigitalBrain.Apps;
 using DigitalBrain.Contracts;

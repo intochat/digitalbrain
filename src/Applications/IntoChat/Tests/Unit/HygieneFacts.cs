@@ -41,7 +41,7 @@ public sealed class HygieneFacts
             "src/Applications/IntoChat/IntoChat/Http/WorkspaceArtifactStore.cs",
             "src/Applications/IntoChat/IntoChat/Http/WorkspaceEndpoints.cs",
             "src/Applications/IntoChat/IntoChat/IntoChatHost.cs",
-            "src/Modules/AI/AI/ConversationalAgent.cs",
+            "src/Modules/AI/DigitalBrain.Modules.AI/ConversationalAgent.cs",
         ];
         foreach (var relative in gone)
         {
@@ -74,10 +74,10 @@ public sealed class HygieneFacts
     [Fact]
     public void DuplicateProcessRunnerIsConsolidated()
     {
-        Assert.False(File.Exists(PathInRepo("src/Modules/Coding/Coding/ProcessRunner.cs")), "The duplicate Coding process runner must be deleted.");
-        Assert.False(File.Exists(PathInRepo("src/Modules/Coding/Coding/IProcessRunner.cs")), "The duplicate Coding process-runner interface must be deleted.");
-        Assert.False(File.Exists(PathInRepo("src/Modules/Coding/Coding/ProcessResult.cs")), "The duplicate Coding process-result type must be deleted.");
-        Assert.True(File.Exists(PathInRepo("src/Modules/Microsoft/DotNet/DotNet/Process/ProcessRunner.cs")), "The single shared process runner must remain under the DotNet module.");
+        Assert.False(File.Exists(PathInRepo("src/Modules/Coding/DigitalBrain.Modules.Coding/ProcessRunner.cs")), "The duplicate Coding process runner must be deleted.");
+        Assert.False(File.Exists(PathInRepo("src/Modules/Coding/DigitalBrain.Modules.Coding/IProcessRunner.cs")), "The duplicate Coding process-runner interface must be deleted.");
+        Assert.False(File.Exists(PathInRepo("src/Modules/Coding/DigitalBrain.Modules.Coding/ProcessResult.cs")), "The duplicate Coding process-result type must be deleted.");
+        Assert.True(File.Exists(PathInRepo("src/Modules/Microsoft/DotNet/DigitalBrain.Modules.Microsoft.DotNet/Process/ProcessRunner.cs")), "The single shared process runner must remain under the DotNet module.");
     }
 
     [Fact]
@@ -117,16 +117,16 @@ public sealed class HygieneFacts
     {
         string[] gone =
         [
-            "src/Modules/Google/Flutter/Contracts/Inbox/IInbox.cs",
-            "src/Modules/Google/Flutter/Contracts/Inbox/Signals/InboxAppeared.cs",
-            "src/Modules/Google/Flutter/Flutter/Inbox/InboxNeuron.cs",
-            "src/Modules/Google/Flutter/Flutter/Inbox/InboxEndpoints.cs",
+            "src/Modules/Google/Flutter/DigitalBrain.Modules.Flutter.Contracts/Inbox/IInbox.cs",
+            "src/Modules/Google/Flutter/DigitalBrain.Modules.Flutter.Contracts/Inbox/Signals/InboxAppeared.cs",
+            "src/Modules/Google/Flutter/DigitalBrain.Modules.Flutter/Inbox/InboxNeuron.cs",
+            "src/Modules/Google/Flutter/DigitalBrain.Modules.Flutter/Inbox/InboxEndpoints.cs",
         ];
         foreach (var relative in gone)
         {
             Assert.False(File.Exists(PathInRepo(relative)), $"{relative} is the volatile inbox and should be deleted.");
         }
-        var module = Read("src/Modules/Google/Flutter/Flutter/FlutterModule.cs");
+        var module = Read("src/Modules/Google/Flutter/DigitalBrain.Modules.Flutter/FlutterModule.cs");
         Assert.DoesNotContain("InboxPath", module);
         Assert.DoesNotContain("MapInbox", module);
     }

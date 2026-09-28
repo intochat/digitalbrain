@@ -149,14 +149,14 @@ contain application content — use controlled fixtures.
 ## Running
 
 ```powershell
-dotnet test --project src/Modules/Time/Tests/Unit/DigitalBrain.Modules.Time.Tests.Unit.csproj -p:CodeGraphRefresh=false
-dotnet test --project src/Modules/Google/Flutter/Tests/E2E/DigitalBrain.Modules.Flutter.Tests.E2E.csproj -p:CodeGraphRefresh=false
+dotnet test --project src/Modules/Time/DigitalBrain.Modules.Time.Tests.Unit/DigitalBrain.Modules.Time.Tests.Unit.csproj -p:CodeGraphRefresh=false
+dotnet test --project src/Modules/Google/Flutter/DigitalBrain.Modules.Flutter.Tests.E2E/DigitalBrain.Modules.Flutter.Tests.E2E.csproj -p:CodeGraphRefresh=false
 dotnet test --project src/Applications/IntoChat/Tests/E2E/IntoChat.Tests.E2E.csproj -p:CodeGraphRefresh=false
 dotnet test --solution DigitalBrain.slnx --max-parallel-test-modules 1 -p:CodeGraphRefresh=false
 ```
 
 Hosted tests need a container runtime. Browser scenarios need Chromium:
-`pwsh src/Modules/Google/Flutter/Tests/E2E/bin/Debug/net11.0/playwright.ps1 install chromium`.
+`pwsh src/Modules/Google/Flutter/DigitalBrain.Modules.Flutter.Tests.E2E/bin/Debug/net11.0/playwright.ps1 install chromium`.
 
 Run the solution with `--max-parallel-test-modules 1` so Flutter compilers do not compete over the
 shared checkout; browser assemblies also serialize their own browser tests.

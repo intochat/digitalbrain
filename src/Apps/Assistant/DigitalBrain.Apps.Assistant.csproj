@@ -8,12 +8,12 @@
     <PackageReference Include="Microsoft.Orleans.Sdk" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../Modules/DigitalBrain/Apps/Apps/DigitalBrain.Modules.Apps.csproj" />
-    <ProjectReference Include="../../Modules/Microsoft/CSharp/CSharp/DigitalBrain.Modules.Microsoft.CSharp.csproj" />
-    <ProjectReference Include="../../Modules/DigitalBrain/Compute/Compute/DigitalBrain.Modules.Compute.csproj" />
-    <ProjectReference Include="../../Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
-    <ProjectReference Include="../../Modules/Google/Flutter/Flutter/DigitalBrain.Modules.Flutter.csproj" />
-    <ProjectReference Include="../../Modules/Discovery/Discovery/DigitalBrain.Modules.Discovery.csproj" />
+    <ProjectReference Include="../../Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps/DigitalBrain.Modules.Apps.csproj" />
+    <ProjectReference Include="../../Modules/Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp/DigitalBrain.Modules.Microsoft.CSharp.csproj" />
+    <ProjectReference Include="../../Modules/DigitalBrain/Compute/DigitalBrain.Modules.Compute/DigitalBrain.Modules.Compute.csproj" />
+    <ProjectReference Include="../../Modules/AI/DigitalBrain.Modules.AI/DigitalBrain.Modules.AI.csproj" />
+    <ProjectReference Include="../../Modules/Google/Flutter/DigitalBrain.Modules.Flutter/DigitalBrain.Modules.Flutter.csproj" />
+    <ProjectReference Include="../../Modules/DigitalBrain/Discovery/DigitalBrain.Modules.Discovery/DigitalBrain.Modules.Discovery.csproj" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="instructions.md" LogicalName="instructions.md" />

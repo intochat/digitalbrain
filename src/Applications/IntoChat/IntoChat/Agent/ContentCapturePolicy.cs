@@ -1,3 +1,4 @@
+using DigitalBrain.Identity.Configuration;
 using DigitalBrain.Contracts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;

@@ -4,7 +4,7 @@
     <ProjectReference Include="../../Deployment/IntoChat.Deployment.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="../../../../Modules/DigitalBrain/Kernel/Tests/Deployment/AzureMocks.cs" Link="AzureMocks.cs" />
+    <Compile Include="../../../../Modules/DigitalBrain/Kernel/DigitalBrain.Deployment.Tests/AzureMocks.cs" Link="AzureMocks.cs" />
     <None Include="Fixtures/**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

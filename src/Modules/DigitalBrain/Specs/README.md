@@ -24,5 +24,5 @@ internal sealed class ArithmeticSteps : StepLibrary
 ```
 
 ```powershell
-dotnet test --project src/Modules/DigitalBrain/Specs/Tests/Unit/DigitalBrain.Modules.Specs.Tests.Unit.csproj -p:CodeGraphRefresh=false
+dotnet test --project src/Modules/DigitalBrain/Specs/DigitalBrain.Modules.Specs.Tests.Unit/DigitalBrain.Modules.Specs.Tests.Unit.csproj -p:CodeGraphRefresh=false
 ```

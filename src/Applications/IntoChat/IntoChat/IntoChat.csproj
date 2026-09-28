@@ -13,33 +13,33 @@
   <ItemGroup>
     <ProjectReference Include="../ServiceDefaults/IntoChat.ServiceDefaults.csproj" />
     <ProjectReference Include="../../../Apps/Assistant/DigitalBrain.Apps.Assistant.csproj" />
-    <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/Aspire/DigitalBrain.Aspire.csproj" />
-    <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/Kernel/DigitalBrain.csproj" />
-    <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/Sdk/DigitalBrain.Sdk.csproj" />
-    <ProjectReference Include="../../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" />
-    <ProjectReference Include="../../../Modules/Identity/Identity/DigitalBrain.Modules.Identity.csproj" />
-    <ProjectReference Include="../../../Modules/Files/Files/DigitalBrain.Modules.Files.csproj" />
-    <ProjectReference Include="../../../Modules/DigitalBrain/Compute/Contracts/DigitalBrain.Modules.Compute.Contracts.csproj" />
-    <ProjectReference Include="../../../Modules/DigitalBrain/Compute/Compute/DigitalBrain.Modules.Compute.csproj" />
-    <ProjectReference Include="../../../Modules/Google/Gmail/Gmail/DigitalBrain.Modules.Google.Gmail.csproj" />
-    <ProjectReference Include="../../../Modules/Google/Flutter/Flutter/DigitalBrain.Modules.Flutter.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
+    <ProjectReference Include="../../../Modules/Time/DigitalBrain.Modules.Time/DigitalBrain.Modules.Time.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Identity/DigitalBrain.Modules.Identity/DigitalBrain.Modules.Identity.csproj" />
+    <ProjectReference Include="../../../Modules/Files/DigitalBrain.Modules.Files/DigitalBrain.Modules.Files.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Compute/DigitalBrain.Modules.Compute.Contracts/DigitalBrain.Modules.Compute.Contracts.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Compute/DigitalBrain.Modules.Compute/DigitalBrain.Modules.Compute.csproj" />
+    <ProjectReference Include="../../../Modules/Google/Gmail/DigitalBrain.Modules.Google.Gmail/DigitalBrain.Modules.Google.Gmail.csproj" />
+    <ProjectReference Include="../../../Modules/Google/Flutter/DigitalBrain.Modules.Flutter/DigitalBrain.Modules.Flutter.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../../Modules/AI/AI/DigitalBrain.Modules.AI.csproj" />
-    <ProjectReference Include="../../../Modules/Memory/Memory/DigitalBrain.Modules.Memory.csproj" />
-    <ProjectReference Include="../../../Modules/Qdrant/Qdrant/DigitalBrain.Modules.Qdrant.csproj" />
-    <ProjectReference Include="../../../Modules/ClickHouse/ClickHouse/DigitalBrain.Modules.ClickHouse.csproj" />
-    <ProjectReference Include="../../../Modules/Supabase/Supabase/DigitalBrain.Modules.Supabase.csproj" />
-    <ProjectReference Include="../../../Modules/Salesforce/Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
-    <ProjectReference Include="../../../Modules/Microsoft/GitHub/GitHub/DigitalBrain.Modules.Microsoft.GitHub.csproj" />
-    <ProjectReference Include="../../../Modules/Microsoft/Aspire/Aspire/DigitalBrain.Modules.Microsoft.Aspire.csproj" />
-    <ProjectReference Include="../../../Modules/Coding/Coding/DigitalBrain.Modules.Coding.csproj" />
-    <ProjectReference Include="../../../Modules/Microsoft/Roslyn/Roslyn/DigitalBrain.Modules.Microsoft.Roslyn.csproj" />
-    <ProjectReference Include="../../../Modules/Microsoft/DotNet/DotNet/DigitalBrain.Modules.Microsoft.DotNet.csproj" />
-    <ProjectReference Include="../../../Modules/Microsoft/CSharp/CSharp/DigitalBrain.Modules.Microsoft.CSharp.csproj" />
-    <ProjectReference Include="../../../Modules/Discovery/Discovery/DigitalBrain.Modules.Discovery.csproj" />
-    <ProjectReference Include="../../../Modules/DigitalBrain/Apps/Apps/DigitalBrain.Modules.Apps.csproj" />
-    <ProjectReference Include="../../../Modules/DigitalBrain/Specs/Specs/DigitalBrain.Modules.Specs.csproj" />
+    <ProjectReference Include="../../../Modules/AI/DigitalBrain.Modules.AI/DigitalBrain.Modules.AI.csproj" />
+    <ProjectReference Include="../../../Modules/Memory/DigitalBrain.Modules.Memory/DigitalBrain.Modules.Memory.csproj" />
+    <ProjectReference Include="../../../Modules/Qdrant/DigitalBrain.Modules.Qdrant/DigitalBrain.Modules.Qdrant.csproj" />
+    <ProjectReference Include="../../../Modules/ClickHouse/DigitalBrain.Modules.ClickHouse/DigitalBrain.Modules.ClickHouse.csproj" />
+    <ProjectReference Include="../../../Modules/Supabase/DigitalBrain.Modules.Supabase/DigitalBrain.Modules.Supabase.csproj" />
+    <ProjectReference Include="../../../Modules/Salesforce/DigitalBrain.Modules.Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
+    <ProjectReference Include="../../../Modules/Microsoft/GitHub/DigitalBrain.Modules.Microsoft.GitHub/DigitalBrain.Modules.Microsoft.GitHub.csproj" />
+    <ProjectReference Include="../../../Modules/Microsoft/Aspire/DigitalBrain.Modules.Microsoft.Aspire/DigitalBrain.Modules.Microsoft.Aspire.csproj" />
+    <ProjectReference Include="../../../Modules/Coding/DigitalBrain.Modules.Coding/DigitalBrain.Modules.Coding.csproj" />
+    <ProjectReference Include="../../../Modules/Microsoft/Roslyn/DigitalBrain.Modules.Microsoft.Roslyn/DigitalBrain.Modules.Microsoft.Roslyn.csproj" />
+    <ProjectReference Include="../../../Modules/Microsoft/DotNet/DigitalBrain.Modules.Microsoft.DotNet/DigitalBrain.Modules.Microsoft.DotNet.csproj" />
+    <ProjectReference Include="../../../Modules/Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp/DigitalBrain.Modules.Microsoft.CSharp.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Discovery/DigitalBrain.Modules.Discovery/DigitalBrain.Modules.Discovery.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps/DigitalBrain.Modules.Apps.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Specs/DigitalBrain.Modules.Specs/DigitalBrain.Modules.Specs.csproj" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" />
   </ItemGroup>
   <ItemGroup>

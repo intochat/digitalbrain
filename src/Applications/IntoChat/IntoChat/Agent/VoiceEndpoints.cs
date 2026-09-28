@@ -1,3 +1,4 @@
+using DigitalBrain.Identity.Configuration;
 using DigitalBrain.Apps.Assistant;
 using DigitalBrain.Contracts;
 using DigitalBrain.Identity;

@@ -177,8 +177,8 @@ stage two. This change does not add those methods to `IAgent`.
 ## Verification
 
 ```powershell
-dotnet test --project src/Modules/AI/Tests/Unit/DigitalBrain.Modules.AI.Tests.Unit.csproj
-dotnet test --project src/Modules/AI/Tests/E2E/DigitalBrain.Modules.AI.Tests.E2E.csproj
+dotnet test --project src/Modules/AI/DigitalBrain.Modules.AI.Tests.Unit/DigitalBrain.Modules.AI.Tests.Unit.csproj
+dotnet test --project src/Modules/AI/DigitalBrain.Modules.AI.Tests.E2E/DigitalBrain.Modules.AI.Tests.E2E.csproj
 ```
 
 Unit tests use deterministic external providers and local HTTP fixtures, including

@@ -15,7 +15,7 @@ internal static class ResearcherPackage
         Source(verb));
 
     private static string Source(string verb) => $$"""
-        #:project /brain/src/Modules/DigitalBrain/Apps/Contracts/DigitalBrain.Modules.Apps.Contracts.csproj
+        #:project /brain/src/Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps.Contracts/DigitalBrain.Modules.Apps.Contracts.csproj
         using DigitalBrain.Apps;
         using DigitalBrain.Apps.Signals;
 

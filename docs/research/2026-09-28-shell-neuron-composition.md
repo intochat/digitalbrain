@@ -10,7 +10,7 @@ The inspected root is 1,372 lines. UI composition alone does not remove its requ
 
 All source paths below are repository-relative.
 
-- `src/Modules/Google/Flutter/Contracts/Surface/ISurface.cs`: a surface is a title and ordered named child references, with a revision.
+- `src/Modules/Google/Flutter/DigitalBrain.Modules.Flutter.Contracts/Surface/ISurface.cs`: a surface is a title and ordered named child references, with a revision.
 - `.../Contracts/Layout/ILayout.cs` and `.../Flutter/Layout/LayoutNeuron.cs`: rows, columns, splits and stacks; gap; fixed child extents or flexible remainder. No breakpoint model or resize interaction contract.
 - `.../Flutter/Workspace/WorkspaceNeuron.cs`: durable open/close window references, expected revisions, operation IDs and first-run suggestions. This is window ownership, not a complete shell renderer.
 - `src/Applications/IntoChat/IntoChat/Apps/AppSurfaceComposer.cs`: real C# compositions already build Files toolbar/list/footer, image tabs/canvas, Leads collections and a Form surface.

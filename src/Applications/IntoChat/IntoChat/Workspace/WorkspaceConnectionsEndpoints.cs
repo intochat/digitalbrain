@@ -1,3 +1,4 @@
+using DigitalBrain.Identity.Configuration;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Sdk;

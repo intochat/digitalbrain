@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Azure deployment for the compute module: its ledger database on DeploymentKit's PostgreSQL server.</Description>
+    <RootNamespace>DigitalBrain.Compute</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Kernel/DigitalBrain.Deployment/DigitalBrain.Deployment.csproj" />
+    <ProjectReference Include="../DigitalBrain.Modules.Compute/DigitalBrain.Modules.Compute.csproj" />
+  </ItemGroup>
+</Project>

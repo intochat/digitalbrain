@@ -3,7 +3,7 @@
 Single-file C# apps that operate neurons. An agent (or a person) writes one `app.cs`; the `ICSharpFile` neuron keeps it as a string in grain state and sends it to the C# sandbox, which compiles and runs it with `dotnet run app.cs`.
 
 ```csharp
-#:project /brain/src/Modules/Time/Contracts/DigitalBrain.Modules.Time.Contracts.csproj
+#:project /brain/src/Modules/Time/DigitalBrain.Modules.Time.Contracts/DigitalBrain.Modules.Time.Contracts.csproj
 using DigitalBrain.Time.Timers.Signals;
 using ITimer = DigitalBrain.Time.Timers.ITimer;
 
@@ -91,8 +91,8 @@ A script acts as its owner through the edge, limited to installed neuron contrac
 ## Tests
 
 ```powershell
-dotnet test --project src/Modules/Microsoft/CSharp/Tests/Unit/DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit.csproj
-dotnet test --project src/Modules/Microsoft/CSharp/Tests/E2E/DigitalBrain.Modules.Microsoft.CSharp.Tests.E2E.csproj
+dotnet test --project src/Modules/Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit/DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit.csproj
+dotnet test --project src/Modules/Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp.Tests.E2E/DigitalBrain.Modules.Microsoft.CSharp.Tests.E2E.csproj
 ```
 
 The E2E needs a Docker daemon with Linux containers: Aspire starts the sandbox on demand, a real script subscribes to a Time neuron and exits cleanly, and a script that does not compile exits with its compiler errors.

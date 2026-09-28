@@ -18,11 +18,11 @@ AppHost ──(--publisher manifest)──► aspire-manifest.json ──► pul
 
 | Module | Deployment | Deploys |
 | --- | --- | --- |
-| Qdrant | `Qdrant/Deployment` | Qdrant (manifest image) as an internal app, data on Azure Files |
-| ClickHouse | `ClickHouse/Deployment` | ClickHouse (manifest image) as an internal app, data on Azure Files |
-| Compute | `DigitalBrain/Compute/Deployment` | The ledger on DeploymentKit's PostgreSQL Flexible Server |
-| AI | `AI/Deployment` | Ollama, pulling every model the manifest names; provider keys are secrets |
-| CSharp | `Microsoft/CSharp/Deployment` | Session pool running the Sandbox image in its own environment and subnet |
+| Qdrant | `Qdrant/DigitalBrain.Modules.Qdrant.Deployment` | Qdrant (manifest image) as an internal app, data on Azure Files |
+| ClickHouse | `ClickHouse/DigitalBrain.Modules.ClickHouse.Deployment` | ClickHouse (manifest image) as an internal app, data on Azure Files |
+| Compute | `DigitalBrain/Compute/DigitalBrain.Modules.Compute.Deployment` | The ledger on DeploymentKit's PostgreSQL Flexible Server |
+| AI | `AI/DigitalBrain.Modules.AI.Deployment` | Ollama, pulling every model the manifest names; provider keys are secrets |
+| CSharp | `Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp.Deployment` | Session pool running the Sandbox image in its own environment and subnet |
 | Gmail, Salesforce, Supabase, GitHub | — | Secrets only |
 
 ## Deploy
@@ -59,7 +59,7 @@ The session pool needs its image in the registry before it can be created, and t
 ```powershell
 pulumi config set digitalbrain:sessionExecutorRoleId (az role definition list --name "Azure ContainerApps Session Executor" --query "[0].name" -o tsv)
 # After the first `pulumi up` created the registry (output registryLoginServer):
-docker build -f src/Modules/Microsoft/CSharp/Sandbox/Dockerfile.production -t <registry>/csharp-sandbox:<tag> .
+docker build -f src/Modules/Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp.Sandbox/Dockerfile.production -t <registry>/csharp-sandbox:<tag> .
 az acr login --name <registry> ; docker push <registry>/csharp-sandbox:<tag>
 pulumi config set digitalbrain:sandboxImage <registry>/csharp-sandbox:<tag>
 pulumi up

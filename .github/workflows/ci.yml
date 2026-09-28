@@ -76,7 +76,7 @@ jobs:
         run: dotnet pack DigitalBrain.slnx -c Release --no-build -o artifacts
 
       - name: Install browser and system dependencies
-        run: pwsh src/Modules/Google/Flutter/Tests/E2E/bin/Release/net11.0/playwright.ps1 install --with-deps chromium
+        run: pwsh src/Modules/Google/Flutter/DigitalBrain.Modules.Flutter.Tests.E2E/bin/Release/net11.0/playwright.ps1 install --with-deps chromium
 
       - name: Run tests
         run: dotnet test --solution DigitalBrain.slnx -c Release --no-build --max-parallel-test-modules 1 --ignore-exit-code 8

@@ -23,8 +23,8 @@ dotnet build DigitalBrain.slnx -p:CodeGraphRefresh=false
 Two kinds, described in [src/Testing/README.md](src/Testing/README.md):
 
 ```bash
-dotnet test --project src/Modules/Time/Tests/Unit/DigitalBrain.Modules.Time.Tests.Unit.csproj
-dotnet test --project src/Modules/Google/Flutter/Tests/E2E/DigitalBrain.Modules.Flutter.Tests.E2E.csproj
+dotnet test --project src/Modules/Time/DigitalBrain.Modules.Time.Tests.Unit/DigitalBrain.Modules.Time.Tests.Unit.csproj
+dotnet test --project src/Modules/Google/Flutter/DigitalBrain.Modules.Flutter.Tests.E2E/DigitalBrain.Modules.Flutter.Tests.E2E.csproj
 ```
 
 End-to-end tests need a container runtime for their disposable storage, and browser scenarios need

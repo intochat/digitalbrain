@@ -1,3 +1,4 @@
+using DigitalBrain.Identity.Configuration;
 using DigitalBrain.Apps.Assistant;
 using System.Security.Cryptography;
 using System.Text;

@@ -10,11 +10,11 @@
   <ItemGroup>
     <!-- The manifest names every composed module; their assemblies must load to find their deployments. -->
     <ProjectReference Include="../IntoChat/IntoChat.csproj" />
-    <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/Deployment/DigitalBrain.Deployment.csproj" />
-    <ProjectReference Include="../../../Modules/AI/Deployment/DigitalBrain.Modules.AI.Deployment.csproj" />
-    <ProjectReference Include="../../../Modules/Qdrant/Deployment/DigitalBrain.Modules.Qdrant.Deployment.csproj" />
-    <ProjectReference Include="../../../Modules/ClickHouse/Deployment/DigitalBrain.Modules.ClickHouse.Deployment.csproj" />
-    <ProjectReference Include="../../../Modules/DigitalBrain/Compute/Deployment/DigitalBrain.Modules.Compute.Deployment.csproj" />
-    <ProjectReference Include="../../../Modules/Microsoft/CSharp/Deployment/DigitalBrain.Modules.Microsoft.CSharp.Deployment.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/DigitalBrain.Deployment/DigitalBrain.Deployment.csproj" />
+    <ProjectReference Include="../../../Modules/AI/DigitalBrain.Modules.AI.Deployment/DigitalBrain.Modules.AI.Deployment.csproj" />
+    <ProjectReference Include="../../../Modules/Qdrant/DigitalBrain.Modules.Qdrant.Deployment/DigitalBrain.Modules.Qdrant.Deployment.csproj" />
+    <ProjectReference Include="../../../Modules/ClickHouse/DigitalBrain.Modules.ClickHouse.Deployment/DigitalBrain.Modules.ClickHouse.Deployment.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Compute/DigitalBrain.Modules.Compute.Deployment/DigitalBrain.Modules.Compute.Deployment.csproj" />
+    <ProjectReference Include="../../../Modules/Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp.Deployment/DigitalBrain.Modules.Microsoft.CSharp.Deployment.csproj" />
   </ItemGroup>
 </Project>

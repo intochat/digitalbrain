@@ -1,3 +1,4 @@
+using DigitalBrain.Identity.Configuration;
 using DigitalBrain.Identity;
 using Microsoft.Extensions.Options;
 

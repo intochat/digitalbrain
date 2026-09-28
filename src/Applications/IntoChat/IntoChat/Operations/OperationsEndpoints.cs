@@ -1,3 +1,4 @@
+using DigitalBrain.Identity.Configuration;
 using DigitalBrain.Contracts;
 using IntoChat.Workspace;
 using Microsoft.Extensions.Options;

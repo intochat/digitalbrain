@@ -49,7 +49,7 @@ Reads are public. Changes require the stamped caller to own the package. Proposa
 A package script:
 
 ```csharp
-#:project /brain/src/Modules/DigitalBrain/Apps/Contracts/DigitalBrain.Modules.Apps.Contracts.csproj
+#:project /brain/src/Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps.Contracts/DigitalBrain.Modules.Apps.Contracts.csproj
 using DigitalBrain.Apps;
 using DigitalBrain.Apps.Signals;
 
@@ -83,8 +83,8 @@ Installing a package runs its code in a container with full client access to the
 ## Tests
 
 ```powershell
-dotnet test --project src/Modules/DigitalBrain/Apps/Tests/Unit/DigitalBrain.Modules.Apps.Tests.Unit.csproj -p:CodeGraphRefresh=false
-dotnet test --project src/Modules/DigitalBrain/Apps/Tests/E2E/DigitalBrain.Modules.Apps.Tests.E2E.csproj -p:CodeGraphRefresh=false
+dotnet test --project src/Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps.Tests.Unit/DigitalBrain.Modules.Apps.Tests.Unit.csproj -p:CodeGraphRefresh=false
+dotnet test --project src/Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps.Tests.E2E/DigitalBrain.Modules.Apps.Tests.E2E.csproj -p:CodeGraphRefresh=false
 ```
 
 The E2E runs real package scripts in .NET SDK containers, so it needs a Docker daemon. IntoChat's `Packages/PackageSharingFacts` drives the same journey over HTTP with two registered accounts.
