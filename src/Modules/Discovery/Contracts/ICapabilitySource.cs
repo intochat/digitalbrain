@@ -9,4 +9,8 @@ public sealed record CapabilityDocument(string Id, CapabilityKind Kind, string N
 public interface ICapabilitySource
 {
     Task<IReadOnlyList<CapabilityDocument>> Read(CancellationToken cancellationToken);
+
+    // Calls changed whenever what Read returns may differ, until cancelled. A source whose
+    // capabilities are fixed for the host's lifetime keeps the default.
+    Task Watch(Action changed, CancellationToken cancellationToken) => Task.CompletedTask;
 }

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Manifest-driven capability catalog and workspace memory search.</Description>
+    <Description>Capability catalog: hybrid keyword and vector search over every capability source.</Description>
     <RootNamespace>DigitalBrain.Discovery</RootNamespace>
   </PropertyGroup>
   <ItemGroup>

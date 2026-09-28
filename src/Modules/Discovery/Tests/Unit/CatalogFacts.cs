@@ -217,6 +217,20 @@ public sealed class CatalogFacts
     }
 
     [Fact]
+    public async Task ASourceThatReportsAChangeIsReadAgain()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var source = new ChangingSource();
+        await using var brain = await Start(source, ct);
+        var catalog = brain.Get<ICapabilityCatalog>("catalog");
+        Assert.Empty((await catalog.Search("vendor onboarding", "workspace-a", 5)).Hits);
+
+        await source.Add(new("intochat.vendor-onboarding", CapabilityKind.App, "Vendor Onboarding", "Onboard a new vendor."));
+
+        Assert.Contains((await catalog.Search("vendor onboarding", "workspace-a", 5)).Hits, hit => hit.Id == "intochat.vendor-onboarding");
+    }
+
+    [Fact]
     public async Task UnmetIntentIsRecordedAndGrouped()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -357,6 +371,27 @@ internal static class AppDocuments
                 operation.Name, operation.DescriptionForModel, scoped.OwningWorkspaceId))
             .Prepend(new CapabilityDocument(scoped.Manifest.Id, CapabilityKind.App, scoped.Manifest.Name,
                 scoped.Manifest.DescriptionForPeople + " " + scoped.Manifest.DescriptionForModel, scoped.OwningWorkspaceId)))];
+}
+
+internal sealed class ChangingSource : ICapabilitySource
+{
+    private readonly List<CapabilityDocument> _documents = [];
+    private readonly TaskCompletionSource<Action> _watcher = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public async Task Add(CapabilityDocument document)
+    {
+        _documents.Add(document);
+        (await _watcher.Task)();
+    }
+
+    public Task<IReadOnlyList<CapabilityDocument>> Read(CancellationToken cancellationToken)
+        => Task.FromResult<IReadOnlyList<CapabilityDocument>>([.. _documents]);
+
+    public Task Watch(Action changed, CancellationToken cancellationToken)
+    {
+        _watcher.TrySetResult(changed);
+        return Task.Delay(Timeout.Infinite, cancellationToken);
+    }
 }
 
 internal sealed class ToolSource : ICapabilitySource
