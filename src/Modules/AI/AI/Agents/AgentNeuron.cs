@@ -80,6 +80,9 @@ internal sealed class AgentNeuron(
                 { Tools = definition.Tools.ToArray(), Capabilities = definition.Capabilities.ToArray(), RoutingExamples = definition.RoutingExamples.ToArray() }
             });
             await Notify(new AgentConfigured(this.GetPrimaryKeyString(), _state.Revision));
+            var directory = GrainFactory.GetGrain<IAgentDirectory>(AgentDirectoryGrains.Key);
+            if (definition.Discoverable) { await directory.Publish(await GetMetadata(ct)); }
+            else { await directory.Withdraw(this.GetPrimaryKeyString()); }
         }
         finally { _mutating = false; }
     }
