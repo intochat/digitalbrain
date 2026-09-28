@@ -2,13 +2,6 @@ using Microsoft.AspNetCore.DataProtection;
 
 namespace DigitalBrain.Sdk.Secrets;
 
-// Infrastructure-only interface, intentionally not an INeuron and not exported by the UI registry.
-[Orleans.Metadata.DefaultGrainType("vault")]
-public interface ISecretKeyMigration : IGrainWithStringKey
-{
-    Task<bool> EnsurePortable();
-}
-
 // The host must configure a shared key ring before selecting this wrapper.
 public sealed class DataProtectionKeyWrapper(IDataProtectionProvider provider) : IKeyWrapper
 {

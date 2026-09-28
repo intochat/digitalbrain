@@ -7,7 +7,7 @@ using Orleans.Runtime;
 namespace DigitalBrain.Sdk.Secrets;
 
 [GrainType("vault")]
-internal sealed class SecretsNeuron : Neuron<SecretsState>, ISecrets, ISecretKeyMigration
+internal sealed class SecretsNeuron : Neuron<SecretsState>, ISecrets
 {
     private readonly IPersistentState<SecretsState> _state;
     private readonly SecretsStore _secrets;
@@ -39,9 +39,6 @@ internal sealed class SecretsNeuron : Neuron<SecretsState>, ISecrets, ISecretKey
             finally { System.Security.Cryptography.CryptographicOperations.ZeroMemory(key); }
         }
     }
-
-    public Task<bool> EnsurePortable() => Task.FromResult(string.IsNullOrEmpty(Snapshot.WrappedOwnerKey)
-        || !DataProtectionKeyWrapper.NeedsMigration(Snapshot.WrappedOwnerKey));
 
     public async Task<SecretRef> Set(CallerContext caller, string name, string label, string value, CancellationToken cancellationToken = default)
     {

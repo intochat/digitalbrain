@@ -72,87 +72,6 @@ internal sealed class IdentityDirectoryNeuron : Neuron<IdentityDirectoryState>, 
         [PersistentState("directory", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<IdentityDirectoryState> store)
         : base(store)
         => _store = store;
-    public async Task<Account> CreateAccountAsync(string principalId, string name, string workspaceId, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        ArgumentException.ThrowIfNullOrWhiteSpace(principalId);
-        ArgumentException.ThrowIfNullOrWhiteSpace(workspaceId);
-        var next = Snapshot;
-        var account = new Account
-        {
-            AccountId = Guid.NewGuid().ToString("N"),
-            Name = name,
-            OwnerPrincipalId = principalId,
-            CreatedAt = DateTimeOffset.UtcNow,
-        };
-        next.Accounts.Add(account);
-        next.Members.Add(NewMember(account.AccountId, workspaceId, principalId, name, MemberRole.Owner));
-        await _store.WriteStateAsync();
-        return account;
-    }
-
-    public async Task<Member> EnsureOwnerAsync(string principalId, string workspaceId, string displayName, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        ArgumentException.ThrowIfNullOrWhiteSpace(principalId);
-        ArgumentException.ThrowIfNullOrWhiteSpace(workspaceId);
-        var existing = Snapshot.Members.FirstOrDefault(member => string.Equals(member.PrincipalId, principalId, StringComparison.Ordinal));
-        if (existing is not null)
-        {
-            return existing;
-        }
-
-        var next = Snapshot;
-        var account = new Account
-        {
-            AccountId = Guid.NewGuid().ToString("N"),
-            Name = displayName,
-            OwnerPrincipalId = principalId,
-            CreatedAt = DateTimeOffset.UtcNow,
-        };
-        next.Accounts.Add(account);
-
-        var owner = NewMember(account.AccountId, workspaceId, principalId, displayName, MemberRole.Owner);
-        next.Members.Add(owner);
-        await _store.WriteStateAsync();
-        return owner;
-    }
-
-    public async Task<Invitation> InviteAsync(string workspaceId, string? email, MemberRole role, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        ArgumentException.ThrowIfNullOrWhiteSpace(workspaceId);
-        var next = Snapshot;
-        var invitation = new Invitation
-        {
-            Code = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16)),
-            AccountId = next.Members.FirstOrDefault(m => m.WorkspaceId == workspaceId && m.Role == MemberRole.Owner)?.AccountId ?? throw new InvalidOperationException("Create an account before inviting members."),
-            WorkspaceId = workspaceId,
-            Role = role,
-            Email = email,
-            CreatedAt = DateTimeOffset.UtcNow,
-        };
-        next.Invitations.Add(invitation);
-        await _store.WriteStateAsync();
-        return invitation;
-    }
-
-    public async Task<Member> AcceptInvitationAsync(string code, string principalId, string displayName, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        ArgumentException.ThrowIfNullOrWhiteSpace(code);
-        ArgumentException.ThrowIfNullOrWhiteSpace(principalId);
-        var next = Snapshot;
-        var invitation = next.Invitations.FirstOrDefault(item => string.Equals(item.Code, code, StringComparison.Ordinal) && !item.Accepted)
-            ?? throw new KeyNotFoundException("The invitation is not valid or was already accepted.");
-        var replaced = next.Invitations.FindIndex(item => item.Code == invitation.Code);
-        next.Invitations[replaced] = invitation with { Accepted = true };
-        var member = NewMember(invitation.AccountId, invitation.WorkspaceId, principalId, displayName, invitation.Role);
-        next.Members.Add(member);
-        await _store.WriteStateAsync();
-        return member;
-    }
-
     public Task<Member?> FindMemberAsync(string principalId, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -170,13 +89,6 @@ internal sealed class IdentityDirectoryNeuron : Neuron<IdentityDirectoryState>, 
         return Task.FromResult(Snapshot.Members.Any(member =>
             string.Equals(member.PrincipalId, principalId, StringComparison.Ordinal)
             && string.Equals(member.WorkspaceId, workspaceId, StringComparison.Ordinal)));
-    }
-
-    public Task<IReadOnlyList<Member>> ListMembersAsync(string accountId, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult<IReadOnlyList<Member>>(
-            [.. Snapshot.Members.Where(member => string.Equals(member.AccountId, accountId, StringComparison.Ordinal))]);
     }
 
     public async Task<Member> ShareWorkspaceAsync(string accountId, string workspaceId, string principalId, string displayName, MemberRole role, CancellationToken cancellationToken = default)

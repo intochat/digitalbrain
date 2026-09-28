@@ -180,13 +180,6 @@ internal static class AccountSession
 
         public string Username { get; private init; } = "";
 
-        public static BasicCredential? FromConfiguration(IConfiguration configuration)
-        {
-            ArgumentNullException.ThrowIfNull(configuration);
-
-            return FromOptions(configuration.GetSection(BasicAuthOptions.SectionName).Get<BasicAuthOptions>() ?? new());
-        }
-
         public static BasicCredential? FromOptions(BasicAuthOptions options)
         {
             ArgumentNullException.ThrowIfNull(options);

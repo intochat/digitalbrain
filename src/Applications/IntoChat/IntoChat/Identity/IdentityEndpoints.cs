@@ -14,7 +14,6 @@ namespace IntoChat.Identity;
 // and grants remain scoped to the owning account and workspace.
 internal static class IdentityEndpoints
 {
-    internal const string DefaultWorkspace = "default";
     private const string PrincipalClaim = ClaimTypes.NameIdentifier;
     private const string AccountClaim = "intochat.account";
     private const string WorkspaceClaim = "intochat.workspace";
@@ -27,17 +26,6 @@ internal static class IdentityEndpoints
         routes.MapGet("/identity/session", Session);
         routes.MapPost("/identity/logout", (Delegate)LogoutAsync);
         routes.MapPost("/identity/workspaces", CreateWorkspaceAsync);
-        routes.MapGet("/identity/accounts/{accountId}/members", async (string accountId, HttpContext http, IDigitalBrain brain, CancellationToken ct) =>
-            http.User.FindFirstValue(AccountClaim) != accountId ? Results.Forbid() : Results.Ok(await Directory(brain).ListMembersAsync(accountId, ct)));
-        routes.MapPost("/identity/workspaces/{workspaceId}/invitations", async (string workspaceId, InviteRequest input, HttpContext http, IDigitalBrain brain, CancellationToken ct) =>
-        {
-            var principal = http.User.FindFirstValue(PrincipalClaim);
-            var member = principal is null ? null : await Directory(brain).FindMemberAsync(principal, ct);
-            return member?.WorkspaceId != workspaceId || member.Role != MemberRole.Owner
-                ? Results.Forbid() : Results.Ok(await Directory(brain).InviteAsync(workspaceId, input.Email, input.Role, ct));
-        });
-        routes.MapPost("/identity/invitations/{code}/accept", async (string code, AcceptRequest input, HttpContext http, IDigitalBrain brain, CancellationToken ct) =>
-            http.User.FindFirstValue(PrincipalClaim) != input.PrincipalId ? Results.Forbid() : Results.Ok(await Directory(brain).AcceptInvitationAsync(code, input.PrincipalId, input.DisplayName, ct)));
         var grants = routes.MapGroup("/workspaces/{workspaceId}/grants")
             .AddEndpointFilter(DigitalBrain.Core.Enforcement.WorkspaceAccessFilter.EnforceAsync);
         grants.MapGet("", async (string workspaceId, IDigitalBrain brain, CancellationToken ct) =>
@@ -47,11 +35,6 @@ internal static class IdentityEndpoints
         grants.MapPost("/revoke", async (string workspaceId, RevokeGrant input, IDigitalBrain brain, CancellationToken ct) =>
         {
             await Grants(brain, workspaceId).RevokeAsync(input.AppId, input.SemanticTypeId, input.Mode, ct);
-            return Results.NoContent();
-        });
-        grants.MapDelete("", async (string workspaceId, string appId, string semanticTypeId, GrantMode mode, IDigitalBrain brain, CancellationToken ct) =>
-        {
-            await Grants(brain, workspaceId).RevokeAsync(appId, semanticTypeId, mode, ct);
             return Results.NoContent();
         });
     }
@@ -125,8 +108,6 @@ internal static class IdentityEndpoints
 
     internal sealed record LoginRequest(string PrincipalId, string? Password = null);
     internal sealed record RegisterRequest(string PrincipalId, string? Password = null, string? DisplayName = null);
-    internal sealed record InviteRequest(string? Email = null, MemberRole Role = MemberRole.Member);
-    internal sealed record AcceptRequest(string PrincipalId, string DisplayName);
     internal sealed record RevokeGrant(string AppId, string SemanticTypeId, GrantMode Mode);
     internal sealed record SessionView(string PrincipalId, string AccountId, string WorkspaceId, string Role);
 }

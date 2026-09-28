@@ -11,21 +11,6 @@ public sealed class SecretsFacts
     private const string Canary = "canary-secret-7f3a91";
 
     [Fact]
-    public async Task StartupMigrationInterfaceTargetsTheExistingVaultGrain()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<SecretsModule>()
-            .ConfigureSilo(silo => silo.Services.AddSingleton<IKeyWrapper>(new DataProtectionKeyWrapper(
-                new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider()))).StartAsync(ct);
-        var vault = brain.Get<ISecrets>(Owner);
-        var secret = await vault.Set(UserCaller(), "api.key", "Key", Canary, ct);
-        Assert.True(await brain.Get<ISecretKeyMigration>(Owner).EnsurePortable());
-        await brain.DeactivateAsync(vault, ct);
-        Assert.True(await brain.Get<ISecretKeyMigration>(Owner).EnsurePortable());
-        Assert.Equal(Canary, await vault.Resolve(PlatformCaller(), secret, ct));
-    }
-
-    [Fact]
     public async Task ActivationRewrapsLegacyKeyAndFailedPersistenceRetainsOriginal()
     {
         var legacy = new KeyVaultKeyWrapper(new FakeKeyVault());
@@ -39,7 +24,6 @@ public sealed class SecretsFacts
         storage.FailWrite = false;
         var migrated = new SecretsNeuron(storage, portable);
         await migrated.OnActivateAsync(TestContext.Current.CancellationToken);
-        Assert.True(await migrated.EnsurePortable());
         Assert.StartsWith("dp2:", state.WrappedOwnerKey, StringComparison.Ordinal);
         Assert.Equal(Canary, new SecretsStore(portable).Resolve(state, reference));
         Assert.Equal(1, storage.Writes);

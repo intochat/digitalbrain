@@ -73,7 +73,6 @@ internal static class BlobProtectionRegistration
             throw new InvalidOperationException("Configure IntoChat:DataProtection:Certificate (base64 PFX) for a portable, encrypted key ring.");
         }
         builder.Services.AddSingleton<IKeyWrapper, DataProtectionKeyWrapper>();
-        builder.Services.AddHostedService<SecretKeyMigration>();
     }
     private sealed record ProtectionCertificate(string Pfx, string? Password);
 }

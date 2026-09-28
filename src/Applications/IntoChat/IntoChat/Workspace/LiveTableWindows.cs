@@ -13,7 +13,7 @@ namespace IntoChat.Workspace;
 // once per tool call, and refine mutates that same window. Replay safety lives on
 // CreateFromQueryOnce's operation id and the workspace Open receipt; the deleted query-window
 // journal added nothing to that.
-internal sealed class LiveTableWindows(IDigitalBrain brain, Func<Task>? afterTableCreated = null)
+internal sealed class LiveTableWindows(IDigitalBrain brain)
 {
     private const int MaxOpenRetries = 8;
     private const int MaxRefineRetries = 8;
@@ -30,7 +30,6 @@ internal sealed class LiveTableWindows(IDigitalBrain brain, Func<Task>? afterTab
         var tableId = "table-" + identityHash;
         ct.ThrowIfCancellationRequested();
         await brain.Get<ISupabaseTable>(tableId).CreateFromQueryOnce(operationId, new(title, sql), ct).WaitAsync(ct);
-        if (afterTableCreated is not null) { await afterTableCreated().WaitAsync(ct); }
         var workspace = brain.Get<IWorkspace>(scopeId);
         var expectedRevision = 0L;
         for (var attempt = 0; attempt < MaxOpenRetries; attempt++)
