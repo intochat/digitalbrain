@@ -10,7 +10,6 @@ using IntoChat.Agent;
 using IntoChat.Apps;
 using IntoChat.Applications;
 using IntoChat.LocalFiles;
-using IntoChat.Operations;
 using IntoChat.ServiceDefaults;
 using IntoChat.Workspace;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -51,10 +50,6 @@ builder.Services.AddSingleton<IAgentToolFactory, DiscoveryTools>();
 builder.Services.AddSingleton<IAgentContextProvider, CapabilityContextProvider>();
 builder.Services.AddSingleton<IAgentToolFactory, LeadGeneratorTools>();
 builder.Services.AddSingleton<IAgentToolFactory, ImageEditorTools>();
-builder.Services.AddSingleton<IProblemReportStore, ProblemReportStore>();
-builder.Services.AddSingleton<IWorkspaceVectorPurge, MemoryWorkspaceVectorPurge>();
-builder.Services.AddSingleton<IWorkspaceBackupPurge, HostedWorkspaceBackupPurge>();
-builder.Services.AddSingleton<WorkspaceDeletion>();
 
 var app = builder.Build();
 

@@ -63,7 +63,8 @@ internal sealed class IdentityDirectoryNeuron : Neuron<IdentityDirectoryState>, 
             Snapshot.PasswordHashes[principalId] = Passwords.HashPassword(principalId, password);
             await _store.WriteStateAsync();
         }
-        return Snapshot.Members.First(m => m.PrincipalId == principalId && m.Role == MemberRole.Owner);
+        // A principal may hold several memberships; sign in to the account it owns when there is one.
+        return Snapshot.Members.Where(m => m.PrincipalId == principalId).OrderBy(m => m.Role).FirstOrDefault();
     }
 
     private readonly IPersistentState<IdentityDirectoryState> _store;
