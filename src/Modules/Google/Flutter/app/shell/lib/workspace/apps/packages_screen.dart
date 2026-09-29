@@ -39,7 +39,7 @@ class PackagesScreen extends StatefulWidget {
 class _PackagesScreenState extends State<PackagesScreen> {
   List<Map<String, dynamic>> _listings = [];
   final Map<String, Map<String, dynamic>> _apps = {};
-  final Map<String, Map<String, dynamic>> _files = {};
+  final Map<String, List<Map<String, dynamic>>> _files = {};
   final Map<String, TextEditingController> _inputs = {};
   final Map<String, String> _outputs = {};
   final Map<String, List<Map<String, dynamic>>> _discussions = {};
@@ -119,7 +119,10 @@ class _PackagesScreenState extends State<PackagesScreen> {
         ..clear()
         ..addEntries([
           for (var index = 0; index < ids.length; index++)
-            MapEntry(ids[index], _map(_map(reads[index])['file'])),
+            MapEntry(ids[index], [
+              for (final file in (_map(reads[index])['files'] as List? ?? const []))
+                if (file is Map) Map<String, dynamic>.from(file),
+            ]),
         ]);
       if (failures > 0) {
         _error = 'Could not read $failures installed package(s).';
@@ -272,7 +275,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
     final operations = app['operations'] is List
         ? (app['operations'] as List).map(_map).toList()
         : <Map<String, dynamic>>[];
-    final file = _files[id] ?? const <String, dynamic>{};
+    final files = _files[id] ?? const <Map<String, dynamic>>[];
     final input = _inputs.putIfAbsent(id, TextEditingController.new);
     return Card(
       key: ValueKey('package-$id'),
@@ -292,9 +295,9 @@ class _PackagesScreenState extends State<PackagesScreen> {
               Text('Forked from ${origin['owner']}/${origin['name']}'),
             if ('${listing['description'] ?? ''}'.isNotEmpty)
               Text('${listing['description']}'),
-            if (installed && file.isNotEmpty)
+            if (installed && files.isNotEmpty)
               Text(
-                'C# app: ${csharpStatusLabel(file)}',
+                'C# app: ${files.map(csharpStatusLabel).join(', ')}',
                 key: ValueKey('file-status-$id'),
               ),
             const SizedBox(height: 8),

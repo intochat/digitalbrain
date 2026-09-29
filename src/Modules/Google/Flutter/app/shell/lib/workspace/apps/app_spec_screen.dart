@@ -58,7 +58,7 @@ class _AppSpecScreenState extends State<AppSpecScreen> {
   @override
   Widget build(BuildContext context) {
     final spec = _spec;
-    final feature = _map(spec?['feature']);
+    final specText = '${spec?['spec'] ?? ''}';
     final verification = _map(spec?['verification']);
     final run = verification.isEmpty ? null : _map(verification['run']);
     final green = verification['green'] == true;
@@ -99,10 +99,10 @@ class _AppSpecScreenState extends State<AppSpecScreen> {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const Divider(),
-            if (feature.isEmpty)
-              const Text('This app has no scenarios.')
+            if (specText.isEmpty)
+              const Text('This app has no spec.')
             else
-              AppSpecView(feature: feature, run: run),
+              AppSpecView(spec: specText, run: run),
           ],
         ],
       ),

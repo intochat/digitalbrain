@@ -161,18 +161,22 @@ class _FakePackagesServer {
           'operations': [
             {'name': 'research', 'description': 'Research a question.'},
           ],
-          'csharpFile': installedRevision == null ? null : 'researcher',
+          'csharpFiles': installedRevision == null
+              ? <String>[]
+              : ['researcher'],
         },
-        'file': installedRevision == null
-            ? null
-            : {
-                'id': 'researcher',
-                'source': 'Console.WriteLine("research");',
-                'settings': <String, String>{},
-                'status': 1,
-                'exitCode': null,
-                'startedAt': '2026-09-27T10:00:00Z',
-              },
+        'files': installedRevision == null
+            ? <Object>[]
+            : [
+                {
+                  'id': 'researcher',
+                  'source': 'Console.WriteLine("research");',
+                  'settings': <String, String>{},
+                  'status': 1,
+                  'exitCode': null,
+                  'startedAt': '2026-09-27T10:00:00Z',
+                },
+              ],
       };
     }
     if (path == '$app/invocations') {

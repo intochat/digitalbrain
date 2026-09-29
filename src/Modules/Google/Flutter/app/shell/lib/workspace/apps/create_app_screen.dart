@@ -11,8 +11,8 @@ const _building = 2;
 const _published = 3;
 const _failed = 4;
 
-// Create an app by describing it: the Author writes its scenarios, you read and adjust them, and the
-// Builder makes them pass. The app reaches the marketplace only when every scenario passes.
+// Create an app by describing it: the Author writes its spec, you read and adjust it, and the
+// Builder writes the tests and implementation. The app reaches the marketplace only when its tests pass.
 class CreateAppScreen extends StatefulWidget {
   const CreateAppScreen({super.key, required this.request, this.draftId});
 
@@ -85,7 +85,8 @@ class _CreateAppScreenState extends State<CreateAppScreen> {
   @override
   Widget build(BuildContext context) {
     final draft = _map(_view?['draft']);
-    final feature = _map(_view?['feature']);
+    final verification = _map(_view?['verification']);
+    final specText = '${draft['spec'] ?? ''}';
     final status = draft['status'] as int? ?? 0;
     final attempts = draft['attempts'] is List
         ? (draft['attempts'] as List).map(_map).toList()
@@ -136,7 +137,7 @@ class _CreateAppScreenState extends State<CreateAppScreen> {
               child: Text(draft.isEmpty ? 'Write scenarios' : 'Start over'),
             ),
           ),
-          if (feature.isNotEmpty) ...[
+          if (specText.isNotEmpty) ...[
             const Divider(height: 32),
             Text(
               '${draft['title']} · ${draft['runtime']} app',
@@ -155,7 +156,7 @@ class _CreateAppScreenState extends State<CreateAppScreen> {
                 decoration: const InputDecoration(border: OutlineInputBorder()),
               )
             else
-              AppSpecView(feature: feature),
+              AppSpecView(spec: specText, run: verification.isEmpty ? null : _map(verification['run'])),
             Wrap(
               spacing: 8,
               children: [
@@ -206,7 +207,7 @@ class _CreateAppScreenState extends State<CreateAppScreen> {
                   ),
                   FilledButton(
                     key: const ValueKey('build-app'),
-                    onPressed: _busy || feature['fullyBound'] != true
+                    onPressed: _busy
                         ? null
                         : () => _perform(
                             'The Builder is making every scenario pass. This can take a few minutes…',
@@ -216,10 +217,6 @@ class _CreateAppScreenState extends State<CreateAppScreen> {
                   ),
                 ],
               ),
-              if (feature['fullyBound'] != true)
-                const Text(
-                  'Grey steps are not ones the brain understands. Revise or edit them before building.',
-                ),
             ],
             if (status == _building) const Text('Building…'),
             for (final (index, attempt) in attempts.indexed)
