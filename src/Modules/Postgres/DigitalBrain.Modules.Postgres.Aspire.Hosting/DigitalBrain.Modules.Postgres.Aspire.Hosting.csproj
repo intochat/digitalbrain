@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Aspire AppHost integration for the DigitalBrain Postgres module.</Description>
+    <RootNamespace>DigitalBrain.Postgres.Aspire.Hosting</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+    <ProjectReference Include="../DigitalBrain.Modules.Postgres/DigitalBrain.Modules.Postgres.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
+  </ItemGroup>
+</Project>

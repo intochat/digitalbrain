@@ -122,6 +122,12 @@
     <Project Path="src/Modules/DigitalBrain/Identity/DigitalBrain.Modules.Identity.Contracts/DigitalBrain.Modules.Identity.Contracts.csproj" />
     <Project Path="src/Modules/DigitalBrain/Identity/DigitalBrain.Modules.Identity/DigitalBrain.Modules.Identity.csproj" />
   </Folder>
+  <Folder Name="/Modules/Postgres/">
+    <Project Path="src/Modules/Postgres/DigitalBrain.Modules.Postgres.Aspire.Hosting/DigitalBrain.Modules.Postgres.Aspire.Hosting.csproj" />
+    <Project Path="src/Modules/Postgres/DigitalBrain.Modules.Postgres.Contracts/DigitalBrain.Modules.Postgres.Contracts.csproj" />
+    <Project Path="src/Modules/Postgres/DigitalBrain.Modules.Postgres/DigitalBrain.Modules.Postgres.csproj" />
+    <Project Path="src/Modules/Postgres/DigitalBrain.Modules.Postgres.Tests.Unit/DigitalBrain.Modules.Postgres.Tests.Unit.csproj" />
+  </Folder>
   <Folder Name="/Modules/Supabase/">
     <Project Path="src/Modules/Supabase/DigitalBrain.Modules.Supabase.Tests.Unit/DigitalBrain.Modules.Supabase.Tests.Unit.csproj" />
     <Project Path="src/Modules/Supabase/DigitalBrain.Modules.Supabase.Aspire.Hosting/DigitalBrain.Modules.Supabase.Aspire.Hosting.csproj" />
