@@ -17,27 +17,27 @@ public sealed class LiveTableWindows(IDigitalBrain brain)
 {
     private const int MaxRefineRetries = 8;
 
-    public async Task<QueryWindowResult> OpenAsync(string scopeId, string runId, string callId, string title, string sql, CancellationToken ct)
+    public async Task<QueryWindowResult> OpenAsync(string scopeId, string runId, string callId, string title, string sql, CancellationToken ct, string source = "supabase")
     {
         foreach (var identity in new[] { scopeId, runId, callId })
         {
             if (string.IsNullOrWhiteSpace(identity) || identity.Length > 256)
             { throw new ArgumentException("A bounded scope, run and tool call identity is required."); }
         }
-        var identityHash = Hash(JsonSerializer.Serialize(new[] { scopeId, runId, callId }));
+        var identityHash = Hash(JsonSerializer.Serialize<string[]>(source == "supabase" ? [scopeId, runId, callId] : [scopeId, runId, callId, source]));
         var operationId = "query-" + identityHash;
         var tableId = "table-" + identityHash;
         ct.ThrowIfCancellationRequested();
-        await brain.Get<ISupabaseTable>(tableId).CreateFromQueryOnce(operationId, new(title, sql), ct).WaitAsync(ct);
+        await brain.Get<ISupabaseTable>(tableId).CreateFromQueryOnce(operationId, new(title, sql) { Source = source }, ct).WaitAsync(ct);
         var receipt = await WorkspaceWindows.RetryOnConflictAsync(0, revision =>
             brain.Get<IWorkspace>(scopeId).Open(new(operationId, tableId, title, WindowReference.Table(tableId), revision)), ct);
-        return new QueryWindowResult(tableId, tableId, title, receipt.AppliedRevision);
+        return new QueryWindowResult(tableId, tableId, title, receipt.AppliedRevision) { Source = source };
     }
 
     public async Task<SupabaseTableSnapshot> RefineAsync(string scopeId, string tableId, IReadOnlyList<SupabaseTableFilter> filters,
-        SupabaseTableSort? sort, IReadOnlyList<string>? visibleColumns, CancellationToken ct)
+        SupabaseTableSort? sort, IReadOnlyList<string>? visibleColumns, CancellationToken ct, string? expectedSource = null)
     {
-        var table = await ResolveAsync(scopeId, tableId, ct);
+        var table = await ResolveAsync(scopeId, tableId, ct, expectedSource);
         var snapshot = await table.Read(new(0, 1)).WaitAsync(ct) ?? throw new SupabaseTableNotFoundException(tableId);
         var visible = visibleColumns is { Count: > 0 } ? visibleColumns : snapshot.VisibleColumns;
         var revision = snapshot.Revision;
@@ -58,9 +58,9 @@ public sealed class LiveTableWindows(IDigitalBrain brain)
 
     // Reads schema, counts and (Public-only) row values from the saved view the workspace holds.
     public async Task<object> ReadAsync(string scopeId, string tableId, string? aggregate, string? aggregateColumn,
-        IReadOnlyList<string>? columns, int? limit, CancellationToken ct)
+        IReadOnlyList<string>? columns, int? limit, CancellationToken ct, string? expectedSource = null)
     {
-        var table = await ResolveAsync(scopeId, tableId, ct);
+        var table = await ResolveAsync(scopeId, tableId, ct, expectedSource);
         var pageLimit = aggregate is null ? Math.Clamp(limit ?? 25, 1, 200) : 1;
         var snapshot = await table.Read(new(0, pageLimit)).WaitAsync(ct) ?? throw new SupabaseTableNotFoundException(tableId);
         var readable = SupabaseTableReadPolicy.PublicColumns(snapshot);
@@ -84,6 +84,7 @@ public sealed class LiveTableWindows(IDigitalBrain brain)
             windowId = tableId,
             revision = snapshot.Revision,
             title = snapshot.Title,
+            source = snapshot.Source,
             schema = snapshot.Columns.Select(column => new
             {
                 id = column.Id,
@@ -100,12 +101,19 @@ public sealed class LiveTableWindows(IDigitalBrain brain)
         };
     }
 
-    private async Task<ISupabaseTable> ResolveAsync(string scopeId, string tableId, CancellationToken ct)
+    private async Task<ISupabaseTable> ResolveAsync(string scopeId, string tableId, CancellationToken ct, string? expectedSource)
     {
         var state = await brain.Get<IWorkspace>(scopeId).Read().WaitAsync(ct);
         if (!state.Windows.Any(window => window.Reference.Kind == WindowReference.TableKind && window.Reference.NeuronId == tableId))
         { throw new SupabaseTableNotFoundException(tableId); }
-        return brain.Get<ISupabaseTable>(tableId);
+        var table = brain.Get<ISupabaseTable>(tableId);
+        if (expectedSource is not null)
+        {
+            var summary = await table.ReadSummary().WaitAsync(ct) ?? throw new SupabaseTableNotFoundException(tableId);
+            if (summary.Source != expectedSource)
+            { throw new SupabaseTableValidationException($"This window uses {summary.Source}, but the request specifies {expectedSource}. Open a table from the requested database."); }
+        }
+        return table;
     }
 
     private static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
@@ -119,5 +127,6 @@ public sealed record QueryWindowResult(
     [property: Id(2)] string Title,
     [property: Id(3)] long WorkspaceRevision)
 {
+    [Id(4)] public string Source { get; init; } = "supabase";
     public bool RemoteManaged => true;
 }

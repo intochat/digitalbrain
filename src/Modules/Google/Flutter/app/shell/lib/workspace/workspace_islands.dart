@@ -223,6 +223,7 @@ class WorkspaceIslands extends StatelessWidget {
                 for (final entry in [
                   ...launcherEntries(apps),
                   assistantLauncherEntry,
+                  customerResearcherLauncherEntry,
                 ])
                   PopupMenuItem(
                     value: entry.launchKey,

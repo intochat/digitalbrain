@@ -13,15 +13,6 @@ public static partial class AIHostingExtensions
     private const string EnableSensitiveDataEnvironmentKey =
         "DigitalBrain__AI__Telemetry__EnableSensitiveData";
 
-    extension(DigitalBrainModuleBuilder<AIModule> module)
-    {
-        public bool EnableSensitiveData
-        {
-            get => State(module).EnableSensitiveData;
-            set => State(module).EnableSensitiveData = value;
-        }
-    }
-
     public static DigitalBrainModuleBuilder<AIModule> WithLlm<TModel>(this DigitalBrainModuleBuilder<AIModule> module)
         where TModel : ILLM
     {

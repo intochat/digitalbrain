@@ -51,14 +51,14 @@ public sealed class PostgresFacts
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        var configuration = new Microsoft.Extensions.Configuration.ConfigurationBuilder()
+        var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["DigitalBrain:Postgres:ConnectionName"] = "analytics",
                 ["ConnectionStrings:analytics"] = "Host=localhost;Database=analytics;Username=reader",
                 ["ConnectionStrings:supabase"] = "Host=localhost;Database=supabase;Username=reader",
             }).Build();
-        services.AddSingleton<Microsoft.Extensions.Configuration.IConfiguration>(configuration);
+        services.AddSingleton<IConfiguration>(configuration);
         var silo = new PostgresTestSiloBuilder(services, configuration);
         if (postgresFirst) { silo.AddPostgres(); }
         new DigitalBrain.Supabase.SupabaseModule().Configure(silo);
@@ -141,6 +141,8 @@ public sealed class PostgresFacts
         }).Build();
         services.AddSingleton<IConfiguration>(configuration);
         services.AddSingleton<IPostgresProvider, PostgresTestControls>();
+        await using var brain = await StartAsync();
+        services.AddSingleton<DigitalBrain.Contracts.IDigitalBrain>(brain);
         new PostgresTestSiloBuilder(services, configuration).AddPostgres();
         await using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
         var report = await provider.GetRequiredService<HealthCheckService>().CheckHealthAsync(TestContext.Current.CancellationToken);

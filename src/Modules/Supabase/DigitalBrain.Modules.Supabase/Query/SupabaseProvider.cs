@@ -146,7 +146,7 @@ internal sealed class SupabaseProvider(NpgsqlDataSource source) : ISupabaseProvi
         }
         catch (NpgsqlException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new SupabaseUnavailableException("Supabase is unreachable or the database connection failed. Check the configured connection string and network.");
+            throw new SupabaseUnavailableException("The database is unreachable or the connection failed. Check the configured connection string and network.");
         }
     }
 }

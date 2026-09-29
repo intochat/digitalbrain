@@ -1,3 +1,5 @@
+using DigitalBrain.Postgres;
+using DigitalBrain.Microsoft.Playwright;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.AI;
@@ -44,14 +46,8 @@ var repositories = builder.Configuration.GetSection("DigitalBrain:Microsoft:GitH
 var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, persistentStorage: !testing)
     .WithModule<AIModule>(ai =>
     {
-        // Capture model inputs and outputs during local development runs so GenAI
-        // traces in Aspire show the actual conversation and tool activity. An
-        // explicit configuration value still controls the behavior in every environment.
         ai.ConfigureOptions<AIOptions>(options =>
-            options.Telemetry.EnableSensitiveData = builder.Configuration.GetValue<bool?>(
-                $"{AIOptions.SectionName}:Telemetry:EnableSensitiveData")
-                ?? (builder.Environment.IsDevelopment() && builder.ExecutionContext.IsRunMode),
-            "Telemetry.EnableSensitiveData");
+            options.Telemetry.EnableSensitiveData = true);
 
         ai.WithLlm<IGpt56Luna>()
             .WithDefaultLlm<IGemma4>()
@@ -63,6 +59,8 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<MemoryModule>()
     .WithModule<ClickHouseModule>(database => database.WithClickHouse(options => options.WithSeed("leads")))
     .WithModule<SupabaseModule>(database => database.WithConnection("supabase"))
+    .WithModule<PostgresModule>(database => database.WithPostgres(options => { options.DatabaseName = "customer-research"; options.PersistentStorage = !testing; }))
+    .WithModule<PlaywrightModule>()
     .WithModule<TimeModule>()
     .WithModule<SecretsModule>()
     .WithModule<ConnectorModule>()

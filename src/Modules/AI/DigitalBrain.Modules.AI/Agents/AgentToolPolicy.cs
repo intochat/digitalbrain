@@ -14,24 +14,42 @@ public static class AgentToolPolicy
         ["table_read", "table_refine", "show_form", "show_view"];
 
     public static readonly IReadOnlyList<string> TableTools =
-        ["supabase_schema", "show_supabase_query_table"];
+        ["supabase_schema", "show_supabase_query_table", "postgres_schema", "show_postgres_query_table"];
 
     // The static product list is the core plus the generic live-table pair, used when no app is relevant.
     public static readonly IReadOnlyList<string> ProductTools = [.. CoreTools, .. TableTools];
 
     public static IReadOnlyList<string> SelectTools(bool developerMode, IReadOnlyList<string> developerTools,
-        IReadOnlyList<string>? appTools = null, bool tableIntent = false)
+        IReadOnlyList<string>? appTools = null, bool tableIntent = false, string? message = null)
     {
         ArgumentNullException.ThrowIfNull(developerTools);
         var selected = new List<string>(CoreTools);
         var relevant = appTools ?? [];
-        if (relevant.Count == 0 || tableIntent) { selected.AddRange(TableTools); }
+        if (relevant.Count == 0 || tableIntent || System.Text.RegularExpressions.Regex.IsMatch(message ?? "", @"\b(?:postgres(?:ql)?|supabase)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+        { selected.AddRange(ForDatabase(TableTools, message)); }
         selected.AddRange(relevant);
         var product = selected.Distinct(StringComparer.Ordinal).Take(MaxDefaultTools).ToList();
         if (developerMode) { product.AddRange(developerTools); }
         return product;
     }
 
+    // An explicit source constrains the allowlist, not merely the model's prompt. If both are
+    // named, leave both available so comparisons remain possible; ambiguous requests are clarified.
+    public static string? DatabaseSource(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message)) { return null; }
+        var postgres = System.Text.RegularExpressions.Regex.IsMatch(message, @"\bpostgres(?:ql)?\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var supabase = System.Text.RegularExpressions.Regex.IsMatch(message, @"\bsupabase\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return postgres == supabase ? null : postgres ? "postgres" : "supabase";
+    }
+
+    public static IReadOnlyList<string> ForDatabase(IReadOnlyList<string> tools, string? message)
+    {
+        var source = DatabaseSource(message);
+        if (source is null) { return tools; }
+        var other = source == "postgres" ? "supabase" : "postgres";
+        return tools.Where(tool => tool != other + "_schema" && tool != "show_" + other + "_query_table").ToArray();
+    }
     public static bool IsCSharpTool(string name)
     {
         ArgumentNullException.ThrowIfNull(name);

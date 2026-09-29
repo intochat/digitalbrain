@@ -8,6 +8,7 @@ import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../voice_input/ui_voice_input.dart';
+import '../components/browser/ui_web_browser.dart';
 import '../models/ui_part.dart';
 import 'renderer_registry.dart';
 import 'ui_collection_view.dart';
@@ -380,6 +381,31 @@ class _NeuronViewState extends State<NeuronView> {
                   icon: const Icon(Icons.attach_file),
                   label: Text(label),
                 ),
+        );
+      case 'webbrowser':
+        final send = widget.onAction;
+        return UiWebBrowser(
+          part: UiWebBrowserPart.fromMetadata({
+            ...definition,
+            'name': widget.name,
+          }),
+          height: null,
+          onConnect: send == null
+              ? null
+              : (port, sessionId) => send({
+                  'kind': 'webbrowser',
+                  'name': widget.name,
+                  'action': 'connect',
+                  'value': jsonEncode({'port': port, 'sessionId': sessionId}),
+                }),
+          onDisconnect: send == null
+              ? null
+              : (sessionId) => send({
+                  'kind': 'webbrowser',
+                  'name': widget.name,
+                  'action': 'disconnect',
+                  'value': jsonEncode({'sessionId': sessionId}),
+                }),
         );
       case 'voiceinput':
         return widget.voiceBuilder?.call(widget.name, definition) ??

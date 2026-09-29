@@ -15,9 +15,12 @@ internal sealed class SupabaseTableNeuron(
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SupabaseTableState> state)
     : Neuron, ISupabaseTable
 {
-    private ILiveTableSource? _source;
+    private ILiveTableSource ResolveSource(string source) => source == "supabase"
+        ? ServiceProvider.GetRequiredService<ILiveTableSource>()
+        : ServiceProvider.GetKeyedService<ILiveTableSource>(source)
+            ?? throw new SupabaseTableSourceException($"The {source} table source is not configured.");
 
-    private ILiveTableSource Source => _source ??= ServiceProvider.GetRequiredService<ILiveTableSource>();
+    private ILiveTableSource Source => ResolveSource(Current.CreationRequest?.Source ?? "supabase");
     private SupabaseTableState Current => state.State ?? SupabaseTableState.Empty;
 
     public Task<SupabaseTableSnapshot> CreateFromQuery(CreateQueryTable request)
@@ -60,7 +63,7 @@ internal sealed class SupabaseTableNeuron(
         try
         {
             // Describing runs the query with LIMIT 0, so a wrong column or table fails here, not on first read.
-            columns = await Source.DescribeAsync(sql, cancellationToken);
+            columns = await ResolveSource(request.Source).DescribeAsync(sql, cancellationToken);
         }
         catch (SupabaseQueryException error)
         {
@@ -68,10 +71,10 @@ internal sealed class SupabaseTableNeuron(
         }
         catch (SupabaseUnavailableException error)
         {
-            throw new SupabaseTableSourceException(error.Message + " Try again once Supabase is reachable.");
+            throw new SupabaseTableSourceException(error.Message + " Try again once the database is reachable.");
         }
 
-        var view = SupabaseTablePolicy.CreateView(this.GetPrimaryKeyString(), request.Title, columns);
+        var view = SupabaseTablePolicy.CreateView(this.GetPrimaryKeyString(), request.Title, columns) with { Source = request.Source };
         cancellationToken.ThrowIfCancellationRequested();
         state.State = current with { View = view, BaseSql = sql, SourceColumns = columns, CreationOperation = operationId, CreationRequest = request };
         try { await state.WriteStateAsync(); }
@@ -126,7 +129,7 @@ internal sealed class SupabaseTableNeuron(
         }
         catch (SupabaseQueryException error)
         {
-            throw new SupabaseTableSourceException($"Supabase refused the query behind table '{this.GetPrimaryKeyString()}': {error.Message}");
+            throw new SupabaseTableSourceException($"The database refused the query behind table '{this.GetPrimaryKeyString()}': {error.Message}");
         }
         catch (SupabaseUnavailableException error)
         {
@@ -159,7 +162,7 @@ internal sealed class SupabaseTableNeuron(
         }
         catch (SupabaseQueryException error)
         {
-            throw new SupabaseTableSourceException($"Supabase refused the aggregate behind table '{this.GetPrimaryKeyString()}': {error.Message}");
+            throw new SupabaseTableSourceException($"The database refused the aggregate behind table '{this.GetPrimaryKeyString()}': {error.Message}");
         }
         catch (SupabaseUnavailableException error)
         {
@@ -169,7 +172,7 @@ internal sealed class SupabaseTableNeuron(
 
     [ReadOnly]
     public Task<SupabaseTableSummary?> ReadSummary()
-        => Task.FromResult(Current.View is { } view ? new SupabaseTableSummary(view.Id, view.Title, view.Revision) : null);
+        => Task.FromResult(Current.View is { } view ? new SupabaseTableSummary(view.Id, view.Title, view.Revision) { Source = view.Source } : null);
 
     private static int Clamp(long count) => count > int.MaxValue ? int.MaxValue : (int)count;
 }

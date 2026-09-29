@@ -16,5 +16,6 @@ public sealed record SupabaseTableSnapshot(
     [property: Id(10)] int Offset,
     [property: Id(11)] int Limit)
 {
+    [Id(12)] public string Source { get; init; } = "supabase";
     public string Kind => "table";
 }

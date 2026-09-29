@@ -19,7 +19,6 @@ internal static class AIClients
     internal const string DefaultEmbeddingKey = $"{ConfigurationRoot}:Default:Embedding";
     internal const string DefaultTranscriptionKey = $"{ConfigurationRoot}:Default:Transcription";
     internal const string DefaultImageKey = $"{ConfigurationRoot}:Default:Image";
-    internal const string SensitiveTelemetryKey = $"{ConfigurationRoot}:Telemetry:EnableSensitiveData";
     private const string TelemetrySource = "DigitalBrain.AI";
 
     private static readonly IReadOnlyDictionary<AiProvider, ILlmProviderFactory> Factories =
@@ -86,11 +85,6 @@ internal static class AIClients
         bool rejectUnsupportedTools = false, bool useFunctionInvocation = true)
     {
         var configuration = provider.GetRequiredService<IOptions<AIOptions>>().Value;
-        // Capture is deployment-gated and request-gated: the host must allow it, and the calling
-        // request must be the local owner's ordinary dev run (D14). The per-turn agent client is
-        // rebuilt inside that request's ambient scope, so Personal/Credential runs stay uncaptured.
-        var captureContent = (configuration.Telemetry.EnableSensitiveData ?? false)
-            && ContentCaptureScope.Current is { AllowsCapture: true };
         var loggerFactory = provider.GetService<ILoggerFactory>();
         var pipeline = new ChatClientBuilder(innerClient);
         if (!supportsTools)
@@ -115,7 +109,7 @@ internal static class AIClients
         pipeline = pipeline.UseOpenTelemetry(
             loggerFactory: loggerFactory,
             sourceName: $"{TelemetrySource}.{telemetryName}",
-            configure: telemetry => telemetry.EnableSensitiveData = captureContent);
+            configure: telemetry => telemetry.EnableSensitiveData = configuration.Telemetry.EnableSensitiveData ?? false);
         // Innermost: one metered entry per raw provider call, before any function-invocation
         // aggregation, and never a second entry for the same call.
         if (meterProvider is not null && meterModel is not null && provider.GetService<IIntentUsageSink>() is { } sink)

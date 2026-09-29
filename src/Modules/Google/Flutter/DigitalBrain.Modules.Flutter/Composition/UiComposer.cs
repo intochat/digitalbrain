@@ -75,6 +75,9 @@ public sealed class UiComposer
     public UiNode VoiceInput(string part, string label) =>
         new(UIVocabulary.VoiceInputType, part, (grains, key) => grains.GetGrain<IVoiceInput>(NameOf(key, part)).Configure(label), []);
 
+    public UiNode WebBrowser(string part) =>
+        new(UIVocabulary.WebBrowserType, part, (_, _) => Task.CompletedTask, []);
+
     internal static async Task Compose(UiNode node, ApplicationStart start)
     {
         // Children first, so a container never refers to a node that is not configured yet.

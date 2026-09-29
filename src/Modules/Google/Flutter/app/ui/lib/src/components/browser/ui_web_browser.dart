@@ -2,12 +2,22 @@ import 'package:flutter/material.dart';
 
 import '../../models/ui_part.dart';
 import '../../theme/ui_theme.dart';
+import 'embedded_browser_stub.dart'
+    if (dart.library.io) 'embedded_browser_windows.dart';
 
 final class UiWebBrowser extends StatelessWidget {
-  const UiWebBrowser({super.key, required this.part, this.height = 160});
+  const UiWebBrowser({
+    super.key,
+    required this.part,
+    this.height = 160,
+    this.onConnect,
+    this.onDisconnect,
+  });
 
   final UiWebBrowserPart part;
-  final double height;
+  final double? height;
+  final Future<void> Function(int, String)? onConnect;
+  final Future<void> Function(String)? onDisconnect;
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +54,12 @@ final class UiWebBrowser extends StatelessWidget {
                   style: TextStyle(
                     fontFamily: UiType.bodyFamily,
                     color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                Expanded(
+                  child: EmbeddedBrowser(
+                    onConnect: onConnect,
+                    onDisconnect: onDisconnect,
                   ),
                 ),
               ],

@@ -92,6 +92,23 @@ public sealed class AgentToolFacts
     }
 
     [Fact]
+    public void ExplicitComparisonKeepsBothSourcesWithInstalledApps()
+    {
+        var tools = AgentToolPolicy.SelectTools(false, [], ["run_customer_researcher"], message: "Compare Postgres and Supabase");
+        Assert.Contains("postgres_schema", tools);
+        Assert.Contains("show_postgres_query_table", tools);
+        Assert.Contains("supabase_schema", tools);
+        Assert.Contains("show_supabase_query_table", tools);
+        Assert.True(tools.Count <= AgentToolPolicy.MaxDefaultTools);
+    }
+
+    [Fact]
+    public void UnavailablePostgresDoesNotSubstituteSupabase()
+    {
+        var tools = AgentToolPolicy.ForDatabase(["supabase_schema", "show_supabase_query_table"], "Show data from Postgres");
+        Assert.Empty(tools);
+    }
+    [Fact]
     public void DefaultAllowlistIsAtMostEightToolsAndExcludesCSharpTools()
     {
         var selected = AgentToolPolicy.SelectTools(developerMode: false,

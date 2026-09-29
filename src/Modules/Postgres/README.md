@@ -12,7 +12,7 @@ var connection = await postgres.ReadConnection();
 ```
 
 All neuron identities use the module's configured database. Results are read live;
-the neuron does not persist query results or maintain table windows.
+the neuron does not persist query results. The assistant integration can open live table windows backed by the same connection.
 
 ## Hosting
 
@@ -113,3 +113,18 @@ to create schemas, tables and functions. It creates and removes a uniquely named
 schema, and verifies database metadata, row limits, typed cells and server-enforced
 read-only transactions. Omit `Database` from that test connection to exercise the
 server's default database selection.
+
+## Assistant tables
+
+The module registers `postgres_schema` and `show_postgres_query_table`. The latter
+opens a window labelled **Postgres** and records its source as `postgres`.
+`table_read` and `table_refine` preserve that source for paging, filters, sort and
+aggregates. Explicit Postgres requests exclude Supabase schema/open tools and
+reject reads or refinements of an existing Supabase window; unavailable sources
+never fall back to another database.
+
+The implementation reuses the existing live-table engine in the Supabase assembly
+through `ILiveTableSource`. Its historical contract names remain compatible with
+saved windows, but the Postgres adapter is constructed exclusively from the
+Postgres module's keyed Npgsql pool. This does not configure a Supabase connection.
+Hosts opening windows also include the Flutter workspace module.

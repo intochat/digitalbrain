@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><DefaultItemExcludes>$(DefaultItemExcludes);Tests/**</DefaultItemExcludes></PropertyGroup>
+  <ItemGroup><PackageReference Include="Microsoft.Orleans.Sdk" /></ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps/DigitalBrain.Modules.Apps.csproj" />
+    <ProjectReference Include="../../Modules/AI/DigitalBrain.Modules.AI/DigitalBrain.Modules.AI.csproj" />
+    <ProjectReference Include="../../Modules/Google/Flutter/DigitalBrain.Modules.Flutter/DigitalBrain.Modules.Flutter.csproj" />
+    <ProjectReference Include="../../Modules/Microsoft/Playwright/DigitalBrain.Modules.Microsoft.Playwright/DigitalBrain.Modules.Microsoft.Playwright.csproj" />
+    <ProjectReference Include="../../Modules/Postgres/DigitalBrain.Modules.Postgres/DigitalBrain.Modules.Postgres.csproj" />
+  </ItemGroup>
+</Project>

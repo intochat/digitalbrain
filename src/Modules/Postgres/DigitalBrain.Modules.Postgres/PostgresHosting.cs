@@ -1,3 +1,6 @@
+using DigitalBrain.AI.Agents;
+using DigitalBrain.Supabase;
+using DigitalBrain.Supabase.Windows;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -10,7 +13,7 @@ namespace DigitalBrain.Postgres;
 
 public static class PostgresHosting
 {
-    internal const string DataSourceKey = "DigitalBrain.Postgres";
+    public const string DataSourceKey = "DigitalBrain.Postgres";
 
     public static ISiloBuilder AddPostgres(this ISiloBuilder silo)
     {
@@ -31,6 +34,10 @@ public static class PostgresHosting
             return NpgsqlDataSource.Create(PostgresConnectionSettings.Parse(connection).ConnectionString);
         });
         services.TryAddSingleton<IPostgresProvider, PostgresProvider>();
+        services.AddLiveTables();
+        services.TryAddKeyedSingleton<ILiveTableSource>("postgres", (provider, _) =>
+            LiveTableHosting.CreatePostgresSource(provider.GetRequiredKeyedService<NpgsqlDataSource>(DataSourceKey)));
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IAgentToolFactory, PostgresTools>());
         services.AddHealthChecks().AddCheck<PostgresHealthCheck>("postgres", tags: ["ready"]);
         return silo;
     }

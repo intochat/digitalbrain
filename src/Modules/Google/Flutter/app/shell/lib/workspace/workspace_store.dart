@@ -97,7 +97,7 @@ class WorkspaceArtifact {
   String title;
   String kind;
   String content;
-  final bool remoteManaged;
+  bool remoteManaged;
   Map<String, dynamic> data;
   Map<String, dynamic> editorState;
   Map<String, dynamic> get viewState => editorState;
@@ -391,6 +391,12 @@ class WorkspaceStore extends ChangeNotifier {
       snapshot.windows.where((w) => w.isOpen).map((w) => w.id),
     );
     for (final window in snapshot.windows) {
+      final builtIn = window.id == 'app-files' || window.id == 'app-images';
+      final kind = window.kind == 'table'
+          ? 'table'
+          : builtIn
+          ? 'app'
+          : 'surface';
       var artifact = project.artifacts
           .where((a) => a.id == window.id)
           .firstOrNull;
@@ -398,13 +404,25 @@ class WorkspaceStore extends ChangeNotifier {
         artifact = WorkspaceArtifact(
           id: window.id,
           title: window.title,
-          kind: window.kind == 'table' ? 'table' : 'app',
+          kind: kind,
           remoteManaged: true,
           data: window.kind == 'table'
               ? {'tableId': window.neuronId}
-              : {'app': window.id == 'app-files' ? 'files' : 'images'},
+              : builtIn
+              ? {'app': window.id == 'app-files' ? 'files' : 'images'}
+              : {
+                  'surface': {'kind': window.kind, 'name': window.neuronId},
+                },
         );
         project.artifacts.add(artifact);
+      }
+      artifact.remoteManaged = true;
+      artifact.kind = kind;
+      if (kind == 'surface') {
+        artifact.data = {
+          ...artifact.data,
+          'surface': {'kind': window.kind, 'name': window.neuronId},
+        };
       }
       if (window.kind != 'table' && window.id == 'app-images') {
         final name = window.neuronId;
@@ -746,8 +764,10 @@ class WorkspaceStore extends ChangeNotifier {
   void openArtifact(String id, {String? placement}) {
     if (currentProject.artifacts.any((a) => a.id == id && a.remoteManaged)) {
       _startupWindows[currentProject.id]?.remove(id);
-      onRemoteWindowAction?.call(currentProject.id, id, true);
-      return;
+      if (!currentProject.presentation.openArtifactIds.contains(id)) {
+        onRemoteWindowAction?.call(currentProject.id, id, true);
+        return;
+      }
     }
     if (!currentProject.artifacts.any((a) => a.id == id)) return;
     final p = currentProject.presentation;

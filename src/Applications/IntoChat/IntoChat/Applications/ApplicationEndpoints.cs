@@ -1,6 +1,7 @@
 using DigitalBrain.Identity.Configuration;
 using DigitalBrain.Apps;
 using DigitalBrain.Apps.Assistant;
+using DigitalBrain.Apps.CustomerResearcher;
 using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Flutter;
 using IntoChat.Workspace;
@@ -14,10 +15,17 @@ namespace IntoChat.Applications;
 internal static class ApplicationEndpoints
 {
     public static IServiceCollection AddApplications(this IServiceCollection services) => services
-        .AddApplication(AppDefinition.Of<AssistantApp>());
+        .AddApplication(AppDefinition.Of<AssistantApp>())
+        .AddApplication(AppDefinition.Of<CustomerResearcherApp>());
 
     public static void MapApplications(this IEndpointRouteBuilder routes)
     {
+        routes.MapPost("/workspaces/{workspaceId}/applications/customer-researcher/open", async (string workspaceId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth) =>
+        {
+            var key = CustomerResearcherApp.Key(WorkspaceScope.Current(auth.Value, workspaceId).Id);
+            var window = await brain.Get<ICustomerResearcher>(key).OpenWindow();
+            return Results.Ok(new { id = window.Id, title = window.Title, kind = "surface", surface = window.Surface });
+        }).AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
         var assistant = routes.MapGroup("/workspaces/{workspaceId}/applications/assistant")
             .AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
         assistant.MapPost("/start", async (string workspaceId, JsonElement input, ApplicationCatalog catalog, IDigitalBrain brain, IOptions<BasicAuthOptions> auth) =>

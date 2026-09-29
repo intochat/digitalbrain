@@ -9,6 +9,7 @@ public static class LiveTableJson
     {
         table.Id,
         table.Title,
+        table.Source,
         table.Kind,
         table.Revision,
         table.Columns,

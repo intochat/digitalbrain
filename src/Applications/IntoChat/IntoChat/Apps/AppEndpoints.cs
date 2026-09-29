@@ -20,6 +20,8 @@ using DigitalBrain.Flutter.VoiceInput;
 using DigitalBrain.Flutter.Select;
 using DigitalBrain.Flutter.FileInput;
 using DigitalBrain.Flutter.Workspace;
+using DigitalBrain.Flutter.WebBrowser;
+using System.Text.Json;
 using IntoChat.Workspace;
 using Microsoft.Extensions.Options;
 using DigitalBrain.Identity;
@@ -95,6 +97,7 @@ internal static class AppEndpoints
                 "imagecanvas" => Results.Ok(await brain.Get<IImageCanvas>(name).Read().WaitAsync(ct)),
                 "form" => Results.Ok(await brain.Get<IForm>(name).Read().WaitAsync(ct)),
                 UIVocabulary.VoiceInputType => Results.Ok(await brain.Get<IVoiceInput>(name).Read().WaitAsync(ct)),
+                UIVocabulary.WebBrowserType => Results.Ok(await brain.Get<IWebBrowser>(name).Read().WaitAsync(ct)),
                 _ => throw new ArgumentException("Unknown app UI kind.")
             };
         }));
@@ -104,6 +107,15 @@ internal static class AppEndpoints
             if (!OwnsUi(scope, input.Name)) { throw new UnauthorizedAccessException(); }
             switch (input.Kind)
             {
+                case UIVocabulary.WebBrowserType:
+                    BrowserConnection connection;
+                    try { connection = JsonSerializer.Deserialize<BrowserConnection>(input.Value ?? "", JsonSerializerOptions.Web) ?? throw new ArgumentException("Browser connection is required."); }
+                    catch (JsonException) { throw new ArgumentException("Invalid browser connection."); }
+                    var browser = brain.Get<IWebBrowser>(input.Name);
+                    if (input.Action == "connect") { await browser.Connect(connection.Port, connection.SessionId).WaitAsync(ct); }
+                    else if (input.Action == "disconnect") { await browser.Disconnect(connection.SessionId).WaitAsync(ct); }
+                    else { throw new ArgumentException("Unknown browser action."); }
+                    break;
                 case "button": await brain.Get<IButton>(input.Name).Click().WaitAsync(ct); break;
                 case "textfield": await brain.Get<ITextField>(input.Name).Input(input.Value ?? "").WaitAsync(ct); break;
                 case "select": await brain.Get<ISelect>(input.Name).Choose(input.Value ?? "").WaitAsync(ct); break;
@@ -163,4 +175,5 @@ internal static class AppEndpoints
         catch (IOException error) { return Results.Json(new { error = error.Message.Contains("changed since", StringComparison.Ordinal) ? error.Message : "The local file could not be accessed. Check its permissions and retry." }, statusCode: 503); }
     }
     internal sealed record UiEvent(string Kind, string Name, string? Action = null, string? Value = null, long Revision = 0, string? Field = null, string? MimeType = null);
+    private sealed record BrowserConnection(int Port, string SessionId);
 }

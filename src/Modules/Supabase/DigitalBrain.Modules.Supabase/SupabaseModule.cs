@@ -43,7 +43,7 @@ public sealed class SupabaseModule : IModule
                 "Supabase requires a valid PostgreSQL URI or Npgsql connection string for its configured connection name.");
         services.TryAddSingleton(CreateDataSource);
         services.TryAddSingleton<ISupabaseProvider, SupabaseProvider>();
-        services.TryAddSingleton<LiveTableWindows>();
+        services.AddLiveTables();
         services.AddSingleton<IAgentToolFactory, LiveTableTools>();
         services.TryAddSingleton<ILiveTableSource>(services => services.GetRequiredService<ISupabaseProvider>());
         services.AddHealthChecks().AddCheck<SupabaseHealthCheck>("supabase", tags: ["ready"]);

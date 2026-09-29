@@ -31,4 +31,8 @@
     <ProjectReference Include="../../../Modules/Microsoft/DotNet/DigitalBrain.Modules.Microsoft.DotNet/DigitalBrain.Modules.Microsoft.DotNet.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp.Aspire.Hosting/DigitalBrain.Modules.Microsoft.CSharp.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../Modules/Postgres/DigitalBrain.Modules.Postgres.Aspire.Hosting/DigitalBrain.Modules.Postgres.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Microsoft/Playwright/DigitalBrain.Modules.Microsoft.Playwright/DigitalBrain.Modules.Microsoft.Playwright.csproj" IsAspireProjectResource="false" />
+  </ItemGroup>
 </Project>

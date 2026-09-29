@@ -21,9 +21,7 @@ public sealed record AssistantRun(
     [property: Id(1)] string RunId,
     [property: Id(2)] string Message,
     [property: Id(3)] string Owner,
-    [property: Id(4)] string? ModelProfile = null,
-    [property: Id(5)] bool AllowContentCapture = false,
-    [property: Id(6)] ContentClass ContentClass = ContentClass.Unknown);
+    [property: Id(4)] string? ModelProfile = null);
 
 // Executed inside the Assistant neuron. Owns model calls, replay, cancellation,
 // retained history, tools, metering and receipts; no HTTP or Flutter dependencies.
@@ -75,8 +73,6 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
         var usage = services.GetRequiredService<IIntentUsageSink>();
         var usageId = AssistantUsage.IntentId(workspace, input.ThreadId, input.RunId);
         using var intent = IntentContext.Begin(usageId, workspace);
-        using var capture = ContentCaptureScope.Begin(
-            input.AllowContentCapture, input.ContentClass);
         var userText = input.Message;
         // Only the request that actually opened the active run may complete or interrupt it.
         // A rejected concurrent submission must never mutate the owner's conversation turn.
@@ -239,7 +235,7 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
         string? queryError = null;
         var model = modelSelection ?? (configuration["IntoChat:Assistant:Model"] is { Length: > 0 } modelName ? new AgentModelSelection(Model: modelName) : null);
         await foreach (var item in runner.RunAsync(new("workspace-assistant", run, scope, state.Turns, message, model,
-            definition.Instructions, definition.Tools, ContextProviders: definition.ContextProviders), ct))
+            definition.Instructions, AgentToolPolicy.ForDatabase(definition.Tools, message), ContextProviders: definition.ContextProviders), ct))
         {
             switch (item)
             {
@@ -264,8 +260,8 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
                         {
                             // A successful live-table call settles any earlier table failure. Only the
                             // open tool contributes a window id; read and refine stay on that window.
-                            queryError = null;
-                            if (tool.Name == "show_supabase_query_table")
+                            if (tool.Name is not ("postgres_schema" or "supabase_schema")) { queryError = null; }
+                            if (tool.Name is "show_supabase_query_table" or "show_postgres_query_table")
                             {
                                 var window = payload.RootElement.TryGetProperty("windowId", out var camel) ? camel : payload.RootElement.GetProperty("WindowId");
                                 results.Add(window.GetString()!);
@@ -285,7 +281,7 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
         return queryError;
     }
 
-    private static bool IsLiveTableTool(string name) => name is "show_supabase_query_table" or "table_read" or "table_refine";
+    private static bool IsLiveTableTool(string name) => name is "show_supabase_query_table" or "show_postgres_query_table" or "postgres_schema" or "supabase_schema" or "table_read" or "table_refine";
 
     private static async Task EmitUiCard(string result, Func<object, Task> emit)
     {

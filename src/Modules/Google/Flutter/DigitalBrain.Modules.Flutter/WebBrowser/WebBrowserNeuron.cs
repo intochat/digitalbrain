@@ -12,6 +12,27 @@ namespace DigitalBrain.Flutter.WebBrowser;
 internal sealed class WebBrowserNeuron([PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<WebBrowserState> store)
     : Neuron<WebBrowserState>(store), IWebBrowser
 {
+    public Task Connect(int port, string sessionId)
+    {
+        if (port is < 1024 or > 65535) { throw new ArgumentOutOfRangeException(nameof(port)); }
+        ValidateSession(sessionId);
+        return GrainFactory.GetGrain<IUiBinding>(this.GetPrimaryKeyString())
+            .Dispatch(new BrowserConnected(this.GetPrimaryKeyString(), port, sessionId));
+    }
+
+    public Task Disconnect(string sessionId)
+    {
+        ValidateSession(sessionId);
+        return GrainFactory.GetGrain<IUiBinding>(this.GetPrimaryKeyString())
+            .Dispatch(new BrowserDisconnected(this.GetPrimaryKeyString(), sessionId));
+    }
+
+    private static void ValidateSession(string sessionId)
+    {
+        if (sessionId is null || !Regex.IsMatch(sessionId, "^[a-f0-9]{32}$"))
+        { throw new ArgumentException("A browser session must be 32 lowercase hexadecimal characters.", nameof(sessionId)); }
+    }
+
     public Task Navigate(string uri, string? title = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(uri);

@@ -84,7 +84,7 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
             if (request.MaxModelCalls is < 1 or > 128) { throw new ArgumentOutOfRangeException(nameof(request), "MaxModelCalls must be between 1 and 128."); }
             await events.WriteAsync(new AgentTurnEvent.Started(request.RunId), ct).ConfigureAwait(false);
             string? currentCall = null;
-            AgentToolContext Context() => new(request.ScopeId, request.RunId, currentCall ?? throw new InvalidOperationException("No active tool call."));
+            AgentToolContext Context() => new(request.ScopeId, request.RunId, currentCall ?? throw new InvalidOperationException("No active tool call.")) { DatabaseSource = AgentToolPolicy.DatabaseSource(request.Message) };
             var requestedTools = request.ToolNames ?? [];
             if (requestedTools.Distinct(StringComparer.Ordinal).Count() != requestedTools.Count) { throw new ArgumentException("Tool names must be unique."); }
             var provided = await ProvideContext(request, ct).ConfigureAwait(false);
@@ -93,6 +93,7 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
             IReadOnlyList<string> selected = [.. requestedTools, .. provided.SelectMany(static context => context.Tools)
                 .Where(name => !requestedTools.Contains(name) && factoryTools.Any(tool => tool.Name == name))
                 .Distinct(StringComparer.Ordinal)];
+            selected = AgentToolPolicy.ForDatabase(selected, request.Message);
             var available = selected.Count == 0 ? [] : factoryTools;
             if (selected.Count > 0 && services.GetService<NativeTools>() is { } native)
             { available.AddRange(native.Resolve(selected).OfType<AIFunction>()); }
@@ -213,7 +214,8 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
                     ct.ThrowIfCancellationRequested();
                     if (result is AgentToolOffer offer)
                     {
-                        tools.AddRange(available.Where(function => offer.Tools.Contains(function.Name) && tools.All(chosen => chosen.Name != function.Name))
+                        var offered = AgentToolPolicy.ForDatabase(offer.Tools, request.Message);
+                        tools.AddRange(available.Where(function => offered.Contains(function.Name) && tools.All(chosen => chosen.Name != function.Name))
                             .DistinctBy(static function => function.Name));
                         options.Tools = tools.Cast<AITool>().ToList();
                         result = offer.Result;

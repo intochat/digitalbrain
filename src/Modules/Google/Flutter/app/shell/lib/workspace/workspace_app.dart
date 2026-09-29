@@ -441,6 +441,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     } else if ((existing.data['_revision'] as num? ?? 0) <=
         (artifact.data['_revision'] as num? ?? 0)) {
       existing.title = artifact.title;
+      existing.kind = artifact.kind;
       existing.content = artifact.content;
       existing.data = artifact.data;
       if (artifact.editorState.isNotEmpty) {
@@ -534,7 +535,8 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   }
 
   Widget _editor(WorkspaceArtifact a) {
-    if (a.kind == 'surface' && widget.programmingClient != null) {
+    if ((a.kind == 'surface' || a.data['surface'] is Map) &&
+        widget.programmingClient != null) {
       final client = widget.programmingClient!;
       final surface = Map<String, dynamic>.from(
         a.data['surface'] as Map? ?? a.data,
@@ -1140,8 +1142,14 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
 
   Future<void> _launchApp(String launchKey) async {
     if (launchKey == 'csharp' && !store.developerMode) return;
-    if (const {'files', 'images', 'csharp', 'assistant'}.contains(launchKey)) {
-      if (launchKey == 'assistant') {
+    if (const {
+      'files',
+      'images',
+      'csharp',
+      'assistant',
+      'customer-researcher',
+    }.contains(launchKey)) {
+      if (launchKey == 'assistant' || launchKey == 'customer-researcher') {
         await _openApplication(launchKey);
         return;
       }

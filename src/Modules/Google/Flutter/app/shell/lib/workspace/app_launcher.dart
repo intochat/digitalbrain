@@ -116,3 +116,10 @@ const assistantLauncherEntry = AppLauncherEntry(
   subtitle: 'Chat or talk with the assistant',
   icon: Icons.assistant_outlined,
 );
+
+const customerResearcherLauncherEntry = AppLauncherEntry(
+  launchKey: 'customer-researcher',
+  title: 'Customer Researcher',
+  subtitle: 'Research companies live and save to Postgres',
+  icon: Icons.travel_explore,
+);

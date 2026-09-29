@@ -7,6 +7,8 @@ namespace DigitalBrain.Flutter.WebBrowser;
 public interface IWebBrowser : INeuron
 {
     Task Navigate(string uri, string? title = null);
+    Task Connect(int port, string sessionId);
+    Task Disconnect(string sessionId);
     [ReadOnly, Alias("read")] Task<WebBrowserState> Read();
 }
 

@@ -87,6 +87,44 @@ public sealed class AgentTurnFacts
         Assert.Equal("No readable Public columns were requested.", queryError);
     }
 
+    [Theory]
+    [InlineData("Show data from postgres", "postgres_schema", "supabase_schema")]
+    [InlineData("Show data from PostgreSQL", "postgres_schema", "supabase_schema")]
+    [InlineData("Show data from Supabase", "supabase_schema", "postgres_schema")]
+    public async Task ExplicitDatabaseExcludesTheOtherDatabaseTools(string message, string expected, string forbidden)
+    {
+        var runner = new RecordingRunner();
+        var definition = new AgentDefinition { Instructions = "Use the requested source.", Tools =
+            ["postgres_schema", "show_postgres_query_table", "supabase_schema", "show_supabase_query_table", "table_read"] };
+        await AssistantTurnExecution.RunModel("scope", "run", message, definition, EmptyState, "reply",
+            new ConfigurationBuilder().Build(), runner, _ => Task.CompletedTask,
+            new StringBuilder(), [], new IntentActivity(), TestContext.Current.CancellationToken);
+        Assert.Contains(expected, runner.Request!.ToolNames!);
+        Assert.DoesNotContain(forbidden, runner.Request.ToolNames!);
+    }
+
+    [Fact]
+    public async Task PostgresWindowResultIsRecorded()
+    {
+        var results = new List<string>();
+        var runner = new ToolEventRunner(new AgentTurnEvent.ToolCompleted("open", "show_postgres_query_table", """{"windowId":"pg-table","source":"postgres"}"""));
+        var error = await AssistantTurnExecution.RunModel("scope", "run", "show postgres", AssistantDefinition.Product,
+            EmptyState, "reply", new ConfigurationBuilder().Build(), runner, _ => Task.CompletedTask,
+            new StringBuilder(), results, new IntentActivity(), TestContext.Current.CancellationToken);
+        Assert.Null(error);
+        Assert.Equal("pg-table", Assert.Single(results));
+    }
+    [Fact]
+    public async Task SchemaRetryDoesNotEraseFailedPostgresWindow()
+    {
+        var runner = new ToolEventRunner(
+            new AgentTurnEvent.ToolCompleted("open", "show_postgres_query_table", """{"isError":true,"message":"Query refused"}"""),
+            new AgentTurnEvent.ToolCompleted("schema", "postgres_schema", """{"database":"research","tables":[]}"""));
+        var error = await AssistantTurnExecution.RunModel("scope", "run", "show postgres", AssistantDefinition.Product,
+            EmptyState, "reply", new ConfigurationBuilder().Build(), runner, _ => Task.CompletedTask,
+            new StringBuilder(), [], new IntentActivity(), TestContext.Current.CancellationToken);
+        Assert.Equal("Query refused", error);
+    }
     private static AgentConversationState EmptyState => new(0, null, [], null);
 
     // The shadow Compute on a receipt is the intent's durable usage priced by the one price book.

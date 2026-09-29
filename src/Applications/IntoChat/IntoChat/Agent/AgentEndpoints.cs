@@ -23,14 +23,13 @@ internal static class AgentEndpoints
             var scope = WorkspaceScope.Current(auth.Value, workspaceId);
             return Results.Ok(await brain.Get<IAssistant>(AssistantApp.Key(scope.Id)).ReadConversation(threadId, ct));
         }).AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
-        routes.MapPost("/agent", async (AgentInput input, HttpContext http, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, IConfiguration configuration, IHostEnvironment environment) =>
+        routes.MapPost("/agent", async (AgentInput input, HttpContext http, IDigitalBrain brain, IOptions<BasicAuthOptions> auth) =>
         {
             if (!WorkspaceScope.IsValidId(input.WorkspaceId) || input.Messages is not { Count: 1 } || input.Messages[0].Role != "user")
             { http.Response.StatusCode = 400; return; }
             if (await WorkspaceAccessFilter.Decide(http, input.WorkspaceId) is { } denied) { await denied.ExecuteAsync(http); return; }
             var scope = WorkspaceScope.Current(auth.Value, input.WorkspaceId);
-            var request = new AssistantRun(input.ThreadId, input.RunId, input.Messages[0].Content, scope.Owner, input.ModelProfile,
-                ContentCapturePolicy.IsLocalOwner(auth.Value, configuration, environment), ContentCapturePolicy.ClassOf(input.Messages));
+            var request = new AssistantRun(input.ThreadId, input.RunId, input.Messages[0].Content, scope.Owner, input.ModelProfile);
             try
             {
                 await foreach (var item in brain.Get<IAssistant>(AssistantApp.Key(scope.Id)).Run(request, http.RequestAborted))
@@ -59,5 +58,5 @@ internal static class AgentEndpoints
     }
 
     internal sealed record AgentInput(string WorkspaceId, string ThreadId, string RunId, IReadOnlyList<AgentMessage> Messages, string? ModelProfile = null);
-    internal sealed record AgentMessage(string Role, string Content, string? Class = null);
+    internal sealed record AgentMessage(string Role, string Content);
 }
