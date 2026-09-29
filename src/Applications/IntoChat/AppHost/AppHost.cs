@@ -30,14 +30,11 @@ using DigitalBrain.Sdk.Secrets;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
 using DigitalBrain.Time;
-using IntoChat.AppHost;
 using DigitalBrain.Files;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
-var profile = builder.Configuration[ProductSurfaceResources.ProfileKey] ?? ProductSurfaceResources.DeveloperProfile;
-var hosted = HostedProfile.IsHosted(profile, builder.Configuration);
 var repositoryRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "..", ".."));
 var repositories = builder.Configuration.GetSection("DigitalBrain:Microsoft:GitHub:Repositories")
     .Get<Dictionary<string, GitHubRepositoryDeclaration>>() ?? [];
@@ -139,12 +136,6 @@ if (builder.Configuration.GetValue<bool>("DigitalBrain:Compute:ImportLegacy"))
         var computeLedger = computeServer.AddDatabase("compute-database", ComputeModule.LedgerConnectionName);
         runtime.WithReference(computeLedger, ComputeModule.LedgerConnectionName).WaitFor(computeLedger);
     }
-}
-
-if (hosted)
-{
-    // Product-only hosted deployment: managed identity and Key Vault are wired by configuration.
-    HostedProfile.Apply(runtime, builder.Configuration);
 }
 
 builder.Build().Run();

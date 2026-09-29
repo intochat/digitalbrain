@@ -67,16 +67,6 @@ public sealed class HostedDeploymentFacts
     }
 
     [Fact]
-    public void HostedProfileForwardsManagedIdentityAndKeyVaultWithoutCallingAzure()
-    {
-        var profile = Read("src/Applications/IntoChat/AppHost/Profiles/HostedProfile.cs");
-        Assert.Contains("AZURE_CLIENT_ID", profile);
-        Assert.Contains("DigitalBrain__KeyVault__Uri", profile);
-        Assert.DoesNotContain("AddAzureKeyVault", profile);
-        Assert.DoesNotContain("SecretClient", profile);
-    }
-
-    [Fact]
     public void TelemetryCollectorTailSamplesToAPersistentBackend()
     {
         var collector = Read("ops/otel/collector.yaml");

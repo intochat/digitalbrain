@@ -14,8 +14,6 @@
   </Folder>
   <Folder Name="/IntoChat/">
     <Project Path="src/Applications/IntoChat/AppHost/IntoChat.AppHost.csproj" />
-    <Project Path="src/Applications/IntoChat/Deployment/IntoChat.Deployment.csproj" />
-    <Project Path="src/Applications/IntoChat/Tests/Deployment/IntoChat.Deployment.Tests.csproj" />
     <Project Path="src/Applications/IntoChat/IntoChat/IntoChat.csproj" />
     <Project Path="src/Applications/IntoChat/ServiceDefaults/IntoChat.ServiceDefaults.csproj" />
     <Project Path="src/Applications/IntoChat/Tests/Unit/IntoChat.Tests.Unit.csproj" />
