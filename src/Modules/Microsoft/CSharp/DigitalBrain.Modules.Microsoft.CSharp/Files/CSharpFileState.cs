@@ -19,5 +19,5 @@ internal sealed record CSharpFileState
     // The caller who started or armed it; the script edge speaks for this caller as an app.
     [Id(7)] public CallerContext? OwnerContext { get; init; }
     // Durable subscriptions the current script registered by streaming; they outlive its runs.
-    [Id(8)] public IReadOnlyList<ScriptSubscription> Subscriptions { get; init; } = [];
+    [Id(8)] public ScriptSubscription[] Subscriptions { get; init; } = [];
 }

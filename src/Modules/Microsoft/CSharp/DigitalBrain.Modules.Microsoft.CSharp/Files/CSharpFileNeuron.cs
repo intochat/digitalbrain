@@ -38,7 +38,7 @@ internal sealed partial class CSharpFileNeuron(
         await base.OnActivateAsync(cancellationToken);
         // A source's own signal may be what activated this file, so watching it now would deadlock;
         // the renewal timer's first tick watches it right after activation instead.
-        if (IsArmed || Snapshot.Subscriptions.Count > 0) { RenewSourceWatches(dueTime: TimeSpan.Zero); }
+        if (IsArmed || Snapshot.Subscriptions.Length > 0) { RenewSourceWatches(dueTime: TimeSpan.Zero); }
     }
 
     public async Task<CSharpFileSnapshot> Read(CancellationToken cancellationToken = default)
@@ -128,11 +128,30 @@ internal sealed partial class CSharpFileNeuron(
         {
             if (s.Signal != name || s.Neuron != signal.Publisher) { return s; }
             changed = true;
-            var pending = s.Pending.Count >= MaximumPending ? s.Pending.Skip(1).Append(json) : s.Pending.Append(json);
-            return s with { Pending = [.. pending] };
+            var pending = s.Pending.Length >= MaximumPending ? s.Pending.Skip(1).Append(json) : s.Pending.Append(json);
+            return s with { Pending = pending.ToArray() };
         }).ToArray();
         if (!changed) { return; }
         await Save(Snapshot with { Subscriptions = next }, new CSharpPendingArrived(FileId));
+        await WakeAsync();
+    }
+
+    // Wake-runs are not retried: the next signal is the next attempt, so a file whose wake-runs
+    // keep failing disarms instead of burning a run on every signal.
+    private async Task WakeAsync()
+    {
+        if (!Snapshot.ShouldRun) { return; }
+        var current = await runner.InspectAsync(Snapshot.Owner, Snapshot.RunId, CancellationToken.None);
+        if (current.Status == CSharpFileStatus.Running) { return; }
+        var failures = current is { Status: CSharpFileStatus.Exited, ExitCode: not 0 } ? Snapshot.Failures + 1 : Snapshot.Failures;
+        if (failures >= MaximumFailures)
+        {
+            await StopReconcilingAsync();
+            await UnwatchSourcesAsync();
+            await Save(Snapshot with { ShouldRun = false, Failures = failures, Subscriptions = [] }, new CSharpFileChanged(FileId));
+            return;
+        }
+        await StartRunAsync(Snapshot with { Failures = failures }, trigger: null, CancellationToken.None);
     }
 
     public async Task Subscribed(string runId, string neuron, string signal)
@@ -151,11 +170,11 @@ internal sealed partial class CSharpFileNeuron(
     {
         await RequireSpeakingRun(runId);
         var subscription = Snapshot.Subscriptions.FirstOrDefault(s => s.Neuron == neuron && s.Signal == signal);
-        if (subscription is null or { Pending.Count: 0 }) { return []; }
+        if (subscription is null or { Pending.Length: 0 }) { return []; }
         var drained = subscription.Pending;
         await Save(Snapshot with
         {
-            Subscriptions = [.. Snapshot.Subscriptions.Select(s => s == subscription ? s with { Pending = [] } : s)],
+            Subscriptions = Snapshot.Subscriptions.Select(s => s == subscription ? s with { Pending = [] } : s).ToArray(),
         }, new CSharpFileChanged(FileId));
         return drained;
     }
@@ -199,6 +218,16 @@ internal sealed partial class CSharpFileNeuron(
         if (Snapshot.Trigger is not null)
         {
             if (_watched.Count == 0) { await WatchSourcesAsync(); }
+            return;
+        }
+        if (Snapshot.Subscriptions.Length > 0)
+        {
+            // A subscribed file waits between runs; the reminder keeps the watches alive and
+            // recovers pending signals a lost run never drained.
+            if (_watched.Count == 0) { await WatchSourcesAsync(); }
+            var waiting = await runner.InspectAsync(Snapshot.Owner, Snapshot.RunId, CancellationToken.None);
+            if (waiting.Status != CSharpFileStatus.Running && Snapshot.Subscriptions.Any(s => s.Pending.Length > 0))
+            { await WakeAsync(); }
             return;
         }
         var run = await runner.InspectAsync(Snapshot.Owner, Snapshot.RunId, CancellationToken.None);
@@ -272,7 +301,9 @@ internal sealed partial class CSharpFileNeuron(
     // earlier triggered runs. Stop and Delete revoke every token the file issued.
     public Task<RunAuthorization> Authorize(string runId)
         => Task.FromResult(new RunAuthorization(
-            runId.Length > 0 && Snapshot.ShouldRun && (runId == Snapshot.RunId || Snapshot.Trigger is not null), Snapshot.OwnerContext));
+            runId.Length > 0 && Snapshot.ShouldRun
+                && (runId == Snapshot.RunId || Snapshot.Trigger is not null || Snapshot.Subscriptions.Length > 0),
+            Snapshot.OwnerContext));
 
     private Task StopCurrentRunAsync(CancellationToken cancellationToken)
         => Snapshot.RunId.Length > 0 ? runner.StopAsync(Snapshot.Owner, Snapshot.RunId, cancellationToken) : Task.CompletedTask;
@@ -296,10 +327,10 @@ internal sealed partial class CSharpFileNeuron(
     // An always-on file that crashed or lost its run is between runs: the reconcile restarts it.
     private CSharpFileSnapshot Describe(CSharpRunState run)
         => new(FileId, Snapshot.Source, Snapshot.Settings,
-            Snapshot is { ShouldRun: true, Trigger: null } && run is not { Status: CSharpFileStatus.Running } and not { Status: CSharpFileStatus.Exited, ExitCode: 0 }
+            Snapshot is { ShouldRun: true, Trigger: null, Subscriptions.Length: 0 } && run is not { Status: CSharpFileStatus.Running } and not { Status: CSharpFileStatus.Exited, ExitCode: 0 }
                 ? CSharpFileStatus.Restarting : run.Status,
             run.ExitCode, run.StartedAt, Snapshot.ShouldRun, Snapshot.Failures, Snapshot.Trigger)
-        { Subscriptions = [.. Snapshot.Subscriptions.Select(s => new CSharpSubscriptionView(s.Neuron, s.Signal, s.Pending.Count))] };
+        { Subscriptions = Snapshot.Subscriptions.Select(s => new CSharpSubscriptionView(s.Neuron, s.Signal, s.Pending.Length)).ToArray() };
 
     [GeneratedRegex("^[A-Za-z0-9_]{1,128}$")]
     private static partial Regex SettingName();

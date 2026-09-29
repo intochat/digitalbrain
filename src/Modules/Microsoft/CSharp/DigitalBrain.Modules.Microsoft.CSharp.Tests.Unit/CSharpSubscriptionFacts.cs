@@ -95,6 +95,123 @@ public sealed class CSharpSubscriptionFacts
             () => file.AsReference<ICSharpFileEdge>().Subscribed("not-a-run", pinger.GetGrainId().ToString(), nameof(Pinged)));
     }
 
+    [Fact]
+    public async Task ASignalWithNoLiveRunWakesOne()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var sandbox = new FakeSandbox();
+        await using var brain = await SandboxBrain.StartAsync(sandbox, ct);
+        var pinger = brain.Get<IPinger>("pinger");
+        var file = await Subscribed(brain, sandbox, "workspace/waking", pinger, ct);
+
+        sandbox.ExitLatest(0);                        // the registering run ends cleanly
+        await Reconcile(file);                        // reconcile observes the exit
+        Assert.True((await file.Read(ct)).ShouldRun); // ...but a subscribed file is waiting, not finished
+
+        await pinger.Ping(1);
+        await Eventually(() => sandbox.Started == 2, ct);   // a wake-run started
+    }
+
+    [Fact]
+    public async Task ASecondSignalDuringAWakeRunQueuesInsteadOfStartingAnotherRun()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var sandbox = new FakeSandbox();
+        await using var brain = await SandboxBrain.StartAsync(sandbox, ct);
+        var pinger = brain.Get<IPinger>("pinger");
+        var file = await Subscribed(brain, sandbox, "workspace/queueing", pinger, ct);
+        sandbox.ExitLatest(0);
+        await Reconcile(file);
+
+        await pinger.Ping(1);
+        await Eventually(() => sandbox.Started == 2, ct);
+        await pinger.Ping(2);                         // wake-run still running
+        await Task.Delay(TimeSpan.FromMilliseconds(300), ct);
+
+        Assert.Equal(2, sandbox.Started);             // no third run
+        Assert.Equal(2, (await file.Read(ct)).Subscriptions.Single().Pending);
+    }
+
+    [Fact]
+    public async Task ASubscribedFileStillWakesAfterItsActivationIsCollected()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var sandbox = new FakeSandbox();
+        await using var brain = await SandboxBrain.StartAsync(sandbox, ct);
+        var pinger = brain.Get<IPinger>("pinger");
+        var file = await Subscribed(brain, sandbox, "workspace/collected-sub", pinger, ct);
+        sandbox.ExitLatest(0);
+        await Reconcile(file);
+
+        await brain.DeactivateAsync(file, ct);
+        await pinger.Ping(1);
+
+        await Eventually(() => sandbox.Started == 2, ct);
+    }
+
+    [Fact]
+    public async Task FailingWakeRunsClearTheSubscriptionsAndDisarm()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var sandbox = new FakeSandbox();
+        await using var brain = await SandboxBrain.StartAsync(sandbox, ct);
+        var pinger = brain.Get<IPinger>("pinger");
+        var file = await Subscribed(brain, sandbox, "workspace/failing-sub", pinger, ct);
+        sandbox.ExitLatest(0);
+        await Reconcile(file);
+
+        for (var attempt = 1; attempt <= CSharpFileNeuron.MaximumFailures; attempt++)
+        {
+            await pinger.Ping(attempt);
+            await Eventually(() => sandbox.Started == attempt + 1, ct);
+            sandbox.ExitLatest(1);
+        }
+        await pinger.Ping(0);
+        await Eventually(async () => !(await file.Read(ct)).ShouldRun, ct);
+
+        Assert.Empty((await file.Read(ct)).Subscriptions);
+        Assert.Equal(CSharpFileNeuron.MaximumFailures + 1, sandbox.Started);
+    }
+
+    [Fact]
+    public async Task StoppingClearsSubscriptionsAndNothingWakes()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var sandbox = new FakeSandbox();
+        await using var brain = await SandboxBrain.StartAsync(sandbox, ct);
+        var pinger = brain.Get<IPinger>("pinger");
+        var file = await Subscribed(brain, sandbox, "workspace/stopped-sub", pinger, ct);
+
+        await file.Stop(ct);
+        await pinger.Ping(1);
+        await Task.Delay(TimeSpan.FromMilliseconds(300), ct);
+
+        Assert.Empty((await file.Read(ct)).Subscriptions);
+        Assert.Equal(1, sandbox.Started);             // only the original registering run ever started
+    }
+
+    [Fact]
+    public async Task PendingLeftByALostRunIsRedeliveredByTheReconcile()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var sandbox = new FakeSandbox();
+        await using var brain = await SandboxBrain.StartAsync(sandbox, ct);
+        var pinger = brain.Get<IPinger>("pinger");
+        var file = await Subscribed(brain, sandbox, "workspace/lost-sub", pinger, ct);
+        sandbox.ExitLatest(0);
+        await Reconcile(file);
+
+        await pinger.Ping(1);                         // buffered, wakes run 2; nothing drained it
+        await Eventually(() => sandbox.Started == 2, ct);
+        sandbox.LoseEveryRun();                       // the wake-run vanished with its container
+        await Reconcile(file);
+
+        await Eventually(() => sandbox.Started == 3, ct);   // the pending signal is not stranded
+    }
+
+    private static Task Reconcile(ICSharpFile file)
+        => file.AsReference<IRemindable>().ReceiveReminder(CSharpFileNeuron.ReconcileReminder, default);
+
     // Starts the file (always-on) so a real run id exists, then registers the subscription as that run.
     internal static async Task<ICSharpFile> Subscribed(UnitBrain brain, FakeSandbox sandbox, string id, IPinger source, CancellationToken ct)
     {
