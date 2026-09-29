@@ -21,15 +21,14 @@ internal static class ModuleTestHost
         var launch = ResolveModuleHostLaunch(modules);
         return AspireTestSession.StartAsync(identity, execution, builder =>
         {
+            builder.Configuration["Orleans:ClusterId"] = identity;
             var brain = builder.AddDigitalBrain("modules", persistentStorage: false, dataVolume: durableStorageKey);
             brain.AddModules(modules);
             builder.AddExecutable("runtime", "dotnet", launch.WorkingDirectory, launch.Arguments)
                 .WithReference(brain)
                 .WithHttpEndpoint(name: "http", env: "ASPNETCORE_HTTP_PORTS")
                 .WithHttpHealthCheck(ModuleHostEndpoints.Health)
-                .AsPrimaryBrain()
-                .WithEnvironment("Orleans__ClusterId", identity)
-                .WithEnvironment("Orleans__ServiceId", identity);
+                .AsPrimaryBrain();
         }, cancellationToken);
     }
 

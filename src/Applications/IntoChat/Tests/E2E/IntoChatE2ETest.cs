@@ -6,6 +6,7 @@ using DigitalBrain.Flutter;
 using DigitalBrain.Google.Gmail;
 using DigitalBrain.Microsoft.Aspire;
 using DigitalBrain.Microsoft.GitHub;
+using DigitalBrain.Postgres;
 using DigitalBrain.Qdrant;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
@@ -25,6 +26,11 @@ internal static class IntoChatE2ETest
             .ConfigureModule<AIModule>(ai => ai.WithoutLocalModels().WithoutVoiceToText().WithoutWebSearch()
                 .WithDefaultLlm<IGpt56Luna>().WithModelEndpoint(AiProvider.OpenAI, new(UnconfiguredProvider, "v1/")))
             .ConfigureModule<QdrantModule>(qdrant => qdrant.ConfigureOptions<QdrantModuleOptions>(options => options.Host = false, "Host"))
+            .ConfigureModule<PostgresModule>(database => database.WithPostgres(options =>
+            {
+                options.DatabaseName = "customer-research";
+                options.PersistentStorage = false;
+            }))
             .ConfigureModule<ClickHouseModule>(database => database.WithClickHouse(options =>
             {
                 options.PersistentStorage = false;

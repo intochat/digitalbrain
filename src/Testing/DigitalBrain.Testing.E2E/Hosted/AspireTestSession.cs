@@ -92,6 +92,14 @@ public sealed class AspireTestSession : IAsyncDisposable
                 }));
             }
             var endpoint = resource.Annotations.OfType<BrainEndpointAnnotation>().Single();
+            // The AppHost publishes a fixed port. A testing builder also copies launchSettings ports,
+            // so clear both or every session binds the same endpoint.
+            foreach (var http in resource.Annotations.OfType<EndpointAnnotation>())
+            {
+                if (!string.Equals(http.Name, endpoint.Endpoint, StringComparison.Ordinal)) { continue; }
+                http.Port = null;
+                http.TargetPort = null;
+            }
             stage = "build";
             var app = await builder.BuildAsync(ct).ConfigureAwait(false);
             lifetime.Own("application", app);

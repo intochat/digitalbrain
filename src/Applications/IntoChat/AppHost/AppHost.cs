@@ -36,13 +36,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
-var testing = builder.Configuration.GetValue<bool>("DigitalBrain:Testing:Enabled");
 var profile = builder.Configuration[ProductSurfaceResources.ProfileKey] ?? ProductSurfaceResources.DeveloperProfile;
 var hosted = HostedProfile.IsHosted(profile, builder.Configuration);
 var repositoryRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "..", ".."));
 var repositories = builder.Configuration.GetSection("DigitalBrain:Microsoft:GitHub:Repositories")
     .Get<Dictionary<string, GitHubRepositoryDeclaration>>() ?? [];
-var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, persistentStorage: !testing)
+var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serviceId: "intochat")
     .WithModule<AIModule>(ai =>
     {
         ai.ConfigureOptions<AIOptions>(options =>
@@ -58,7 +57,7 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<MemoryModule>()
     .WithModule<ClickHouseModule>(database => database.WithClickHouse(options => options.WithSeed("leads")))
     .WithModule<SupabaseModule>(database => database.WithConnection("supabase"))
-    .WithModule<PostgresModule>(database => database.WithPostgres(options => { options.DatabaseName = "customer-research"; options.PersistentStorage = !testing; }))
+    .WithModule<PostgresModule>(database => database.WithPostgres(options => options.DatabaseName = "customer-research"))
     .WithModule<PlaywrightModule>()
     .WithModule<TimeModule>()
     .WithModule<SecretsModule>()
@@ -79,19 +78,10 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<CodingModule>(coding => coding.WithSolution(Path.Combine(repositoryRoot, "DigitalBrain.slnx")))
     .WithModule<CSharpModule>(csharp => csharp.WithSandbox(repositoryRoot));
 
-var clusterId = builder.Configuration["Orleans:ClusterId"]
-    ?? (builder.Environment.IsDevelopment() ? $"digitalbrain-{Guid.NewGuid():N}" : null);
-// Deployment membership can change; the logical service must survive restarts.
-// Preserve an explicitly configured historical cluster/service identity.
-var serviceId = builder.Configuration["Orleans:ServiceId"]
-    ?? builder.Configuration["Orleans:ClusterId"] ?? "intochat";
-
 var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.IntoChat)
     .WithReference(digitalBrain)
-    .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION", "false")
-    .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_HTTPCLIENT_DISABLE_URL_QUERY_REDACTION", "false")
     .WithHttpEndpoint(
-        port: testing ? null : ProductSurfaceResources.UiHttpPort,
+        port: ProductSurfaceResources.UiHttpPort,
         name: "http",
         isProxied: false)
     .WithHttpHealthCheck("/health", endpointName: "http")
@@ -110,11 +100,6 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
         { context.EnvironmentVariables["IntoChat__Assistant__Model"] = assistantModel; }
         if (builder.Configuration["DigitalBrain:CSharp:AllowActivation"] is { } allowActivation)
         { context.EnvironmentVariables["DigitalBrain__CSharp__AllowActivation"] = allowActivation; }
-        if (clusterId is not null)
-        {
-            context.EnvironmentVariables["Orleans__ClusterId"] = clusterId;
-        }
-        context.EnvironmentVariables["Orleans__ServiceId"] = serviceId;
         foreach (var key in new[] { "IntoChat:DataProtection:Certificate", "IntoChat:DataProtection:CertificatePassword" })
         {
             if (builder.Configuration[key] is { Length: > 0 } value)
@@ -150,18 +135,10 @@ if (builder.Configuration.GetValue<bool>("DigitalBrain:Compute:ImportLegacy"))
     { runtime.WithEnvironment("DigitalBrain__Compute__UsageDirectory", usageDirectory); }
     else
     {
-        var computeServer = builder.AddPostgres("compute-postgres");
-        if (!testing) { computeServer.WithDataVolume(); }
+        var computeServer = builder.AddPostgres("compute-postgres").WithDataVolume();
         var computeLedger = computeServer.AddDatabase("compute-database", ComputeModule.LedgerConnectionName);
         runtime.WithReference(computeLedger, ComputeModule.LedgerConnectionName).WaitFor(computeLedger);
     }
-}
-
-if (testing)
-{
-    // Null arguments to WithHttpEndpoint retain ports from launchSettings.json.
-    // Clear both inherited ports so each test deployment receives its own endpoint.
-    runtime.WithEndpoint("http", endpoint => { endpoint.Port = null; endpoint.TargetPort = null; });
 }
 
 if (hosted)

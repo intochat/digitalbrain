@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Core;
 
 namespace DigitalBrain.Testing.E2E;
@@ -21,7 +22,13 @@ public static class E2ETest
     }
 
     private static IReadOnlyList<string> ComposeHostArguments(string overrides, string identity)
-        => ["DigitalBrain:Testing:Enabled=true", $"Orleans:ClusterId={identity}", $"{CompositionOverrideTransport.ConfigurationKey}={overrides}"];
+        =>
+        [
+            "DigitalBrain:Testing:Enabled=true",
+            $"{DigitalBrainHostingNames.PersistentStorageKey}=false",
+            $"Orleans:ClusterId={identity}",
+            $"{CompositionOverrideTransport.ConfigurationKey}={overrides}",
+        ];
 
     internal static async Task<E2EBrain> StartModulesAsync(IReadOnlyList<ModuleDefinition> modules,
         TestExecutionOptions options, BrowserOptions browserOptions, string? durableStorageKey, CancellationToken cancellationToken)

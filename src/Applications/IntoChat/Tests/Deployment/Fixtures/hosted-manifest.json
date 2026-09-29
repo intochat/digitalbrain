@@ -154,8 +154,6 @@
         "DigitalBrain__Salesforce__OAuth__ConsumerKey": "{salesforce-consumer-key.value}",
         "DigitalBrain__Salesforce__OAuth__ConsumerSecret": "{salesforce-consumer-secret.value}",
         "DigitalBrain__Salesforce__OAuth__PublicOrigin": "{IntoChat.bindings.http.url}",
-        "OTEL_DOTNET_EXPERIMENTAL_ASPNETCORE_DISABLE_URL_QUERY_REDACTION": "false",
-        "OTEL_DOTNET_EXPERIMENTAL_HTTPCLIENT_DISABLE_URL_QUERY_REDACTION": "false",
         "IntoChat__Assistant__Model": "IGpt56Luna",
         "IntoChat__Hosted__Enabled": "true"
       },

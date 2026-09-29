@@ -4,6 +4,7 @@ using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace DigitalBrain.Aspire.Hosting;
 
@@ -29,10 +30,12 @@ public static class DigitalBrainHostingExtensions
         }
     }
 
-    public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name, bool persistentStorage = true, string? dataVolume = null)
+    public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name, bool persistentStorage = true, string? dataVolume = null, string? serviceId = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var persist = persistentStorage && builder.Configuration.GetValue(DigitalBrainHostingNames.PersistentStorageKey, true);
+        var stableServiceId = string.IsNullOrWhiteSpace(serviceId) ? name : serviceId;
 
         var resource = builder.AddResource(new DigitalBrainResource(name))
             .ExcludeFromManifest()
@@ -49,19 +52,29 @@ public static class DigitalBrainHostingExtensions
             .AddAzureStorage(DigitalBrainNames.Storage)
             .RunAsEmulator(emulator =>
             {
-                if (persistentStorage) { emulator.WithLifetime(ContainerLifetime.Persistent); }
+                if (persist) { emulator.WithLifetime(ContainerLifetime.Persistent); }
                 if (dataVolume is not null) { emulator.WithDataVolume(dataVolume); }
-                else if (persistentStorage) { emulator.WithDataVolume(); }
+                else if (persist) { emulator.WithDataVolume(); }
             })
             .WithParentRelationship(kernel);
         var clustering = storage.AddTables(DigitalBrainNames.Clustering);
         var reminders = storage.AddTables(DigitalBrainNames.Reminders);
         var grainState = storage.AddBlobs(DigitalBrainNames.GrainState);
+        // A configured cluster id is one session (tests pass one id and join neither each other nor a previous run).
+        // Development otherwise gets a new cluster so persistent membership does not resurrect dead silos.
+        // The service id stays stable unless that session id was supplied, so grain storage survives the new cluster.
+        var configuredClusterId = builder.Configuration["Orleans:ClusterId"];
+        var clusterId = configuredClusterId
+            ?? (builder.Environment.IsDevelopment() ? $"digitalbrain-{Guid.NewGuid():N}" : stableServiceId);
+        var resolvedServiceId = builder.Configuration["Orleans:ServiceId"]
+            ?? (configuredClusterId is not null ? clusterId : stableServiceId);
         var orleans = builder
             .AddOrleans(DigitalBrainHostingNames.Orleans)
             .WithClustering(clustering)
             .WithReminders(reminders)
-            .WithGrainStorage(DigitalBrainNames.DefaultGrainStorage, grainState);
+            .WithGrainStorage(DigitalBrainNames.DefaultGrainStorage, grainState)
+            .WithClusterId(clusterId)
+            .WithServiceId(resolvedServiceId);
         brain.AttachRuntime(orleans, grainState);
 
         brain.RequireHealthyBeforeStart(storage.Resource);
