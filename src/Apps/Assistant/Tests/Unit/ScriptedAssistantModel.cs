@@ -2,7 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using DigitalBrain.AI.Agents;
-using DigitalBrain.Discovery.Agents;
+using DigitalBrain.Registry.Agents;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.Apps.Assistant.Tests.Unit;

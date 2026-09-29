@@ -22,7 +22,7 @@ using DigitalBrain.Microsoft.GitHub;
 using DigitalBrain.Microsoft.DotNet;
 using DigitalBrain.Microsoft.Roslyn;
 using DigitalBrain.Compute;
-using DigitalBrain.Discovery;
+using DigitalBrain.Registry;
 using DigitalBrain.Sdk.Connectors;
 using DigitalBrain.Sdk.Secrets;
 using DigitalBrain.Salesforce;
@@ -73,7 +73,7 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<GitHubModule>(github => github.WithGitHubRepositories(repositories))
     .WithModule<FlutterModule>(flutter => flutter.RunDesktopApp())
     .WithModule<ComputeModule>()
-    .WithModule<DiscoveryModule>()
+    .WithModule<RegistryModule>()
     .WithModule<SpecsModule>()
     .WithModule<AppsModule>();
 

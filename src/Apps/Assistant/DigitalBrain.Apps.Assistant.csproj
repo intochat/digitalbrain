@@ -13,7 +13,7 @@
     <ProjectReference Include="../../Modules/DigitalBrain/Compute/DigitalBrain.Modules.Compute/DigitalBrain.Modules.Compute.csproj" />
     <ProjectReference Include="../../Modules/AI/DigitalBrain.Modules.AI/DigitalBrain.Modules.AI.csproj" />
     <ProjectReference Include="../../Modules/Google/Flutter/DigitalBrain.Modules.Flutter/DigitalBrain.Modules.Flutter.csproj" />
-    <ProjectReference Include="../../Modules/DigitalBrain/Discovery/DigitalBrain.Modules.Discovery/DigitalBrain.Modules.Discovery.csproj" />
+    <ProjectReference Include="../../Modules/DigitalBrain/Registry/DigitalBrain.Modules.Registry/DigitalBrain.Modules.Registry.csproj" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="instructions.md" LogicalName="instructions.md" />

@@ -151,10 +151,10 @@
     <Project Path="src/Modules/DigitalBrain/Specs/DigitalBrain.Modules.Specs.Contracts/DigitalBrain.Modules.Specs.Contracts.csproj" />
     <Project Path="src/Modules/DigitalBrain/Specs/DigitalBrain.Modules.Specs/DigitalBrain.Modules.Specs.csproj" />
   </Folder>
-  <Folder Name="/Modules/DigitalBrain/Discovery/">
-    <Project Path="src/Modules/DigitalBrain/Discovery/DigitalBrain.Modules.Discovery.Tests.Unit/DigitalBrain.Modules.Discovery.Tests.Unit.csproj" />
-    <Project Path="src/Modules/DigitalBrain/Discovery/DigitalBrain.Modules.Discovery.Contracts/DigitalBrain.Modules.Discovery.Contracts.csproj" />
-    <Project Path="src/Modules/DigitalBrain/Discovery/DigitalBrain.Modules.Discovery/DigitalBrain.Modules.Discovery.csproj" />
+  <Folder Name="/Modules/DigitalBrain/Registry/">
+    <Project Path="src/Modules/DigitalBrain/Registry/DigitalBrain.Modules.Registry.Tests.Unit/DigitalBrain.Modules.Registry.Tests.Unit.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Registry/DigitalBrain.Modules.Registry.Contracts/DigitalBrain.Modules.Registry.Contracts.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Registry/DigitalBrain.Modules.Registry/DigitalBrain.Modules.Registry.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />

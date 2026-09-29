@@ -1,7 +1,6 @@
 using Azure.Data.Tables;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
-using DigitalBrain.Core.Registry;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,7 +40,7 @@ public static class DigitalBrainRuntimeHostingExtensions
             // Orleans hosting already registers one activity-propagation filter pair. An explicit
             // `silo.AddActivityPropagation()` here registered a second pair and doubled every grain
             // call to 4 spans (measured); it was removed so exactly one registration remains.
-            silo.AddDigitalBrain().AddNeuronRegistry(modules.Select(module => module.GetType()));
+            silo.AddDigitalBrain(modules.Select(module => module.GetType()));
             foreach (var module in modules)
             {
                 module.Configure(silo);

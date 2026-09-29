@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using DigitalBrain.AI;
 using DigitalBrain.Compute;
-using DigitalBrain.Discovery;
+using DigitalBrain.Registry;
 using DigitalBrain.Flutter;
 using DigitalBrain.Qdrant;
 
@@ -33,7 +33,7 @@ public sealed class AssistantApp : IApplication
         .RequireModule<ComputeModule>()
         .RequireModule<FlutterModule>()
         .RequireModule<QdrantModule>()
-        .RequireModule<DiscoveryModule>()
+        .RequireModule<RegistryModule>()
         .Ui(ui => ui.Surface("Assistant",
             ui.Layout("main", "column", [64, 0, 40, 32, 100, 48],
                 ui.Layout("toolbar", "row", [0, 100, 0],

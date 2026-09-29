@@ -47,4 +47,4 @@ src/Applications/IntoChat/IntoChat/applications/
 .script-graph-tests/
 .graph-failure-tests/
 
-!src/Modules/DigitalBrain/Discovery/DigitalBrain.Modules.Discovery/Sources/
+!src/Modules/DigitalBrain/Registry/DigitalBrain.Modules.Registry/Sources/

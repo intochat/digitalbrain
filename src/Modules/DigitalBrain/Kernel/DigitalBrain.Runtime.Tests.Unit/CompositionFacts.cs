@@ -8,6 +8,16 @@ namespace DigitalBrain.Tests;
 public sealed class CompositionFacts
 {
     [Fact]
+    public async Task HostInventoryIncludesTransitiveSelectedModules()
+    {
+        await using var brain = await UnitTest.Create().WithModule<Dependent>()
+            .StartAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal([typeof(Dependency), typeof(Dependent)],
+            brain.SiloServices.GetRequiredService<ModuleInventory>().Types);
+    }
+
+    [Fact]
     public void DefinitionCopiesConfigurationAndDeduplicatesIdenticalModules()
     {
         var values = new Dictionary<string, string?> { ["Feature:Enabled"] = "false" };

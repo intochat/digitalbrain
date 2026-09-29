@@ -1,6 +1,6 @@
 using DigitalBrain.Apps.Signals;
 using DigitalBrain.Contracts;
-using DigitalBrain.Discovery;
+using DigitalBrain.Registry;
 
 namespace DigitalBrain.Apps;
 

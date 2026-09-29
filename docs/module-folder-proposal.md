@@ -10,17 +10,18 @@ Keep short module grouping folders, and name every project directory exactly aft
 src/Modules/DigitalBrain/
 ├── Apps/
 ├── Compute/
-├── Discovery/
-│   ├── DigitalBrain.Modules.Discovery/
-│   │   ├── DigitalBrain.Modules.Discovery.csproj
+├── Registry/
+│   ├── DigitalBrain.Modules.Registry/
+│   │   ├── DigitalBrain.Modules.Registry.csproj
 │   │   ├── Agents/
 │   │   ├── Configuration/
+│   │   ├── Neurons/
 │   │   ├── Search/
 │   │   └── Sources/
-│   ├── DigitalBrain.Modules.Discovery.Contracts/
-│   │   └── DigitalBrain.Modules.Discovery.Contracts.csproj
-│   ├── DigitalBrain.Modules.Discovery.Tests.Unit/
-│   │   └── DigitalBrain.Modules.Discovery.Tests.Unit.csproj
+│   ├── DigitalBrain.Modules.Registry.Contracts/
+│   │   └── DigitalBrain.Modules.Registry.Contracts.csproj
+│   ├── DigitalBrain.Modules.Registry.Tests.Unit/
+│   │   └── DigitalBrain.Modules.Registry.Tests.Unit.csproj
 │   └── README.md
 ├── Identity/
 │   ├── DigitalBrain.Modules.Identity/
@@ -36,7 +37,7 @@ src/Modules/DigitalBrain/
 └── Specs/
 ```
 
-The solution groups remain `/Modules/DigitalBrain/Identity/` and `/Modules/DigitalBrain/Discovery/`. Each project entry points to its matching physical directory. The same project-folder naming convention now applies to Apps, Compute, Kernel, and Specs, including their test projects.
+The solution groups remain `/Modules/DigitalBrain/Identity/` and `/Modules/DigitalBrain/Registry/`. Each project entry points to its matching physical directory. The same project-folder naming convention now applies to Apps, Compute, Kernel, and Specs, including their test projects.
 
 ## Namespace convention
 
@@ -47,15 +48,15 @@ Project directories match project names. C# namespaces use the configured projec
 | DigitalBrain.Modules.Identity | DigitalBrain.Identity |
 | DigitalBrain.Modules.Identity.Contracts | DigitalBrain.Identity |
 | DigitalBrain.Modules.Identity.Tests.Unit | DigitalBrain.Modules.Identity.Tests.Unit |
-| DigitalBrain.Modules.Discovery | DigitalBrain.Discovery |
-| DigitalBrain.Modules.Discovery.Contracts | DigitalBrain.Discovery |
-| DigitalBrain.Modules.Discovery.Tests.Unit | DigitalBrain.Modules.Discovery.Tests.Unit |
+| DigitalBrain.Modules.Registry | DigitalBrain.Registry |
+| DigitalBrain.Modules.Registry.Contracts | DigitalBrain.Registry |
+| DigitalBrain.Modules.Registry.Tests.Unit | DigitalBrain.Modules.Registry.Tests.Unit |
 
-For example, implementation files under `Configuration/` use `DigitalBrain.Identity.Configuration` or `DigitalBrain.Discovery.Configuration`. Existing `Directory`, `Grants`, `Agents`, `Search`, and `Sources` namespaces already follow this pattern. Update all affected imports and project root namespaces.
+For example, implementation files under `Configuration/` use `DigitalBrain.Identity.Configuration` or `DigitalBrain.Registry.Configuration`. Existing `Directory`, `Grants`, `Agents`, `Search`, and `Sources` namespaces already follow this pattern. Update all affected imports and project root namespaces.
 
 ## Implemented scope
 
-1. Move the complete Identity and Discovery module trees under `src/Modules/DigitalBrain/` and rename their project directories as shown.
+1. Move the complete Identity and Registry (formerly Discovery) module trees under `src/Modules/DigitalBrain/` and rename their project directories as shown.
 2. Update solution entries, all affected relative project references, imports, fully qualified names, and active documentation/build paths.
 3. Preserve explicit serialization aliases, grain identities, routes, and configuration keys.
 4. Check for stale paths/namespaces, build the solution, and run affected unit tests.
@@ -94,10 +95,10 @@ src/Modules/DigitalBrain/Compute/
     DigitalBrain.Modules.Compute.Contracts/
     DigitalBrain.Modules.Compute.Deployment/
     DigitalBrain.Modules.Compute.Tests.Unit/
-src/Modules/DigitalBrain/Discovery/
-    DigitalBrain.Modules.Discovery/
-    DigitalBrain.Modules.Discovery.Contracts/
-    DigitalBrain.Modules.Discovery.Tests.Unit/
+src/Modules/DigitalBrain/Registry/
+    DigitalBrain.Modules.Registry/
+    DigitalBrain.Modules.Registry.Contracts/
+    DigitalBrain.Modules.Registry.Tests.Unit/
 src/Modules/DigitalBrain/Identity/
     DigitalBrain.Modules.Identity/
     DigitalBrain.Modules.Identity.Contracts/

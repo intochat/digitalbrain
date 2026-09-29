@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>DigitalBrain.Modules.Registry.Tests.Unit</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
+    <ProjectReference Include="../DigitalBrain.Modules.Registry/DigitalBrain.Modules.Registry.csproj" />
+    <ProjectReference Include="../../Apps/DigitalBrain.Modules.Apps.Contracts/DigitalBrain.Modules.Apps.Contracts.csproj" />
+    <ProjectReference Include="../../../Qdrant/DigitalBrain.Modules.Qdrant/DigitalBrain.Modules.Qdrant.csproj" />
+    <ProjectReference Include="../../../Time/DigitalBrain.Modules.Time/DigitalBrain.Modules.Time.csproj" />
+  </ItemGroup>
+</Project>

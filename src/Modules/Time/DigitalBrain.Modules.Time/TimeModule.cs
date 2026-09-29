@@ -1,5 +1,4 @@
 using DigitalBrain.Core;
-using DigitalBrain.Core.Registry;
 using DigitalBrain.Time.Reminders;
 using DigitalBrain.Time.Timers;
 using Microsoft.Extensions.Configuration;

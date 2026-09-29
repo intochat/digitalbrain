@@ -37,7 +37,7 @@
     <ProjectReference Include="../../../Modules/Microsoft/Roslyn/DigitalBrain.Modules.Microsoft.Roslyn/DigitalBrain.Modules.Microsoft.Roslyn.csproj" />
     <ProjectReference Include="../../../Modules/Microsoft/DotNet/DigitalBrain.Modules.Microsoft.DotNet/DigitalBrain.Modules.Microsoft.DotNet.csproj" />
     <ProjectReference Include="../../../Modules/Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp/DigitalBrain.Modules.Microsoft.CSharp.csproj" />
-    <ProjectReference Include="../../../Modules/DigitalBrain/Discovery/DigitalBrain.Modules.Discovery/DigitalBrain.Modules.Discovery.csproj" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Registry/DigitalBrain.Modules.Registry/DigitalBrain.Modules.Registry.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps/DigitalBrain.Modules.Apps.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Specs/DigitalBrain.Modules.Specs/DigitalBrain.Modules.Specs.csproj" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" />

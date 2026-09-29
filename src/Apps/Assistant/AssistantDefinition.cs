@@ -19,7 +19,7 @@ public static class AssistantDefinition
         DisplayName = "IntoChat assistant",
         Instructions = NeuronInstructions + "\n" + Shared + (developerMode ? DeveloperGuidance : ProductGuidance),
         Tools = AgentToolPolicy.SelectTools(developerMode, CSharpAgentTools.Names, appTools),
-        ContextProviders = [DigitalBrain.Discovery.Agents.CapabilityTools.ProviderName],
+        ContextProviders = [DigitalBrain.Registry.Agents.CapabilityTools.ProviderName],
     };
 
     private static string ReadInstructions()

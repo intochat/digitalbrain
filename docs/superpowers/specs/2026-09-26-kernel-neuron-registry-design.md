@@ -1,5 +1,7 @@
 # Kernel neuron registry and capability discovery
 
+> Historical design. The implementation evolved to local reflection-based discovery; ownership is superseded by [Registry module consolidation](2026-09-29-registry-module-design.md).
+
 Date: 2026-09-26  
 Status: Implemented; startup registration revised at owner request.
 Baseline: PR #104, `delivery/integration` at `83308a429`.

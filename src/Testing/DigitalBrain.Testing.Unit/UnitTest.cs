@@ -1,7 +1,6 @@
 using DigitalBrain.Client;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
-using DigitalBrain.Core.Registry;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
@@ -34,7 +33,7 @@ public static class UnitTest
         });
         builder.ConfigureSilo((_, silo) =>
         {
-            silo.AddDigitalBrain().AddNeuronRegistry(modules.Select(module => module.ModuleType));
+            silo.AddDigitalBrain(modules.Select(module => module.ModuleType));
             foreach (var module in modules) { module.Configure(silo); }
             silo.AddMemoryGrainStorage("Default");
             if (options.UseReminders) { silo.UseInMemoryReminderService(); }

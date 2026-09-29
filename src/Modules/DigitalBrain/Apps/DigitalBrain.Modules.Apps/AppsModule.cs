@@ -1,6 +1,6 @@
 using DigitalBrain.Apps.Manifests;
 using DigitalBrain.Core;
-using DigitalBrain.Discovery;
+using DigitalBrain.Registry;
 using DigitalBrain.Specs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
