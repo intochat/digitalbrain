@@ -60,7 +60,7 @@ public sealed class HygieneFacts
     public void KernelMcpHostIsDeletedEverywhere()
     {
         Assert.False(Directory.Exists(PathInRepo("src/Modules/DigitalBrain/Kernel/Mcp")), "The Kernel MCP host must be gone from the tree.");
-        Assert.DoesNotContain("DigitalBrain.Mcp", Read("DigitalBrain.slnx"));
+        Assert.Contains("src/Modules/DigitalBrain/Mcp/DigitalBrain.Mcp.csproj", Read("DigitalBrain.slnx"));
     }
 
     [Fact]

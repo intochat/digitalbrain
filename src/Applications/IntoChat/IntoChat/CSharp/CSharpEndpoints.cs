@@ -4,7 +4,6 @@ using DigitalBrain.AI.Agents;
 using DigitalBrain.Microsoft.CSharp;
 using IntoChat.Workspace;
 using Microsoft.Extensions.Options;
-using ModelContextProtocol.Server;
 using DigitalBrain.Identity;
 
 namespace IntoChat;
@@ -21,19 +20,10 @@ internal static class CSharpEndpoints
             var workspace = http.Request.RouteValues["workspaceId"]?.ToString() ?? throw new ArgumentException("Workspace is required.");
             return sp.GetRequiredService<CSharpToolService>().ForScope(WorkspaceScope.Current(sp.GetRequiredService<IOptions<BasicAuthOptions>>().Value, workspace).Id);
         });
-        // WithTools<T> constructs T itself, bypassing the workspace-scoped factory; resolve it per invocation instead.
-        builder.Services.AddScoped<IntoChat.Marketplace.AppTools>();
-        builder.Services.AddMcpServer().WithHttpTransport()
-            .WithTools(CSharpToolService.Tools.Select(tool =>
-                McpServerTool.Create(tool.Method, request => request.Services!.GetRequiredService<ScopedCSharpTools>())))
-            .WithTools(IntoChat.Marketplace.AppTools.Methods.Select(method =>
-                McpServerTool.Create(method, request => request.Services!.GetRequiredService<IntoChat.Marketplace.AppTools>())));
     }
 
     public static void MapCSharp(this IEndpointRouteBuilder routes)
     {
-        routes.MapMcp("/workspaces/{workspaceId}/csharp-mcp").AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync).AddEndpointFilter(async (context, next) =>
-            DeveloperModeEnabled(context.HttpContext.RequestServices) ? await next(context) : Results.NotFound());
         var files = routes.MapGroup("/workspaces/{workspaceId}/csharp").AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
         files.AddEndpointFilter(async (context, next) =>
         {

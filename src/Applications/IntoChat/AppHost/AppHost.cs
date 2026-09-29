@@ -77,4 +77,10 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
         isProxied: false)
     .WithHttpHealthCheck("/health", endpointName: "http");
 
+builder.AddProject<Projects.DigitalBrain_Mcp>("digitalbrain-mcp")
+    .WithReference(digitalBrain.AsClient())
+    .WithHttpEndpoint(port: ProductSurfaceResources.McpHttpPort, name: "http", isProxied: false)
+    .WithHttpHealthCheck("/health", endpointName: "http")
+    .WaitFor(runtime);
+
 builder.Build().Run();
