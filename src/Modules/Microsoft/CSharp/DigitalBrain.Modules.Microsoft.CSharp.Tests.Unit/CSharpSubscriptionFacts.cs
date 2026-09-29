@@ -209,6 +209,66 @@ public sealed class CSharpSubscriptionFacts
         await Eventually(() => sandbox.Started == 3, ct);   // the pending signal is not stranded
     }
 
+    [Fact]
+    public async Task AnArmedFileIgnoresSameTypedSignalsFromOtherWatchedSources()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var sandbox = new FakeSandbox();
+        await using var brain = await SandboxBrain.StartAsync(sandbox, ct);
+        var tea = brain.Get<IPinger>("tea");
+        var other = brain.Get<IPinger>("other");
+        var file = brain.Get<ICSharpFile>("workspace/mixed");
+        await file.Write("Console.WriteLine(1);", ct);
+        await file.Arm(new(tea.GetGrainId().ToString(), nameof(Pinged)), ct);
+        await file.AsReference<ICSharpFileEdge>().Subscribed("triggered-run", other.GetGrainId().ToString(), nameof(Pinged));
+
+        await other.Ping(9);
+        await Eventually(() => sandbox.Started == 1, ct);
+        await tea.Ping(1);
+        await Eventually(() => sandbox.Started == 2, ct);
+
+        var starts = sandbox.Requests.Where(FakeSandbox.IsStart).ToArray();
+        Assert.Null(starts[0].Body!["environment"]!["CSharpFile__Trigger"]);   // other's ping woke, it did not fire the trigger
+        Assert.Contains("\"number\":1", starts[1].Body!["environment"]!["CSharpFile__Trigger"]!.GetValue<string>(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ACleanWakeRunResetsTheFailureCount()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var sandbox = new FakeSandbox();
+        await using var brain = await SandboxBrain.StartAsync(sandbox, ct);
+        var pinger = brain.Get<IPinger>("pinger");
+        var file = await Subscribed(brain, sandbox, "workspace/recovering", pinger, ct);
+        sandbox.ExitLatest(0);
+        await Reconcile(file);
+
+        await pinger.Ping(1);
+        await Eventually(() => sandbox.Started == 2, ct);
+        sandbox.ExitLatest(1);                        // one crash...
+        await pinger.Ping(2);
+        await Eventually(() => sandbox.Started == 3, ct);
+        sandbox.ExitLatest(0);                        // ...then a clean wake-run
+        await pinger.Ping(3);
+        await Eventually(() => sandbox.Started == 4, ct);
+
+        Assert.Equal(0, (await file.Read(ct)).Failures);
+    }
+
+    [Fact]
+    public async Task AScriptCannotSubscribeToItsOwnFile()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var sandbox = new FakeSandbox();
+        await using var brain = await SandboxBrain.StartAsync(sandbox, ct);
+        var file = brain.Get<ICSharpFile>("workspace/self");
+        await file.Write("Console.WriteLine(1);", ct);
+        await file.Start(ct);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => file.AsReference<ICSharpFileEdge>()
+            .Subscribed(sandbox.LatestRunId, file.GetGrainId().ToString(), nameof(CSharpFileChanged)));
+    }
+
     private static Task Reconcile(ICSharpFile file)
         => file.AsReference<IRemindable>().ReceiveReminder(CSharpFileNeuron.ReconcileReminder, default);
 

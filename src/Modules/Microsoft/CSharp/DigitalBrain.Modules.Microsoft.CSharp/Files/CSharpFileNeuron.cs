@@ -111,14 +111,14 @@ internal sealed partial class CSharpFileNeuron(
 
     Task INeuronObserver.OnSignalAsync(Signal signal)
     {
-        if (IsArmed && signal.GetType().Name == Snapshot.Trigger!.Signal)
+        if (IsArmed && signal.GetType().Name == Snapshot.Trigger!.Signal && signal.Publisher == Snapshot.Trigger.Neuron)
         { return this.AsReference<ICSharpFileTrigger>().Fire(signal); }
         return Snapshot.Subscriptions.Any(s => s.Signal == signal.GetType().Name && s.Neuron == signal.Publisher)
             ? this.AsReference<ICSharpFileTrigger>().Enqueue(signal)
             : Task.CompletedTask;
     }
 
-    // Buffers the signal on the subscription it matches; a later slice wakes a run from here.
+    // Buffers the signal on the subscription it matches, then wakes a run to drain it.
     public async Task Enqueue(Signal signal)
     {
         var json = JsonSerializer.Serialize(signal, signal.GetType(), ScriptEdgeProtocol.Json);
@@ -143,7 +143,12 @@ internal sealed partial class CSharpFileNeuron(
         if (!Snapshot.ShouldRun) { return; }
         var current = await runner.InspectAsync(Snapshot.Owner, Snapshot.RunId, CancellationToken.None);
         if (current.Status == CSharpFileStatus.Running) { return; }
-        var failures = current is { Status: CSharpFileStatus.Exited, ExitCode: not 0 } ? Snapshot.Failures + 1 : Snapshot.Failures;
+        var failures = current switch
+        {
+            { Status: CSharpFileStatus.Exited, ExitCode: not 0 } => Snapshot.Failures + 1,
+            { Status: CSharpFileStatus.Exited } => 0,
+            _ => Snapshot.Failures,
+        };
         if (failures >= MaximumFailures)
         {
             await StopReconcilingAsync();
@@ -158,6 +163,8 @@ internal sealed partial class CSharpFileNeuron(
     {
         await RequireSpeakingRun(runId);
         if (!GrainId.TryParse(neuron, out _)) { throw new ArgumentException($"'{neuron}' is not a neuron id such as time.timer/tea.", nameof(neuron)); }
+        // Watching itself would deadlock this non-reentrant grain and self-feed on every save.
+        if (neuron == this.GetGrainId().ToString()) { throw new ArgumentException("A script cannot subscribe to its own file.", nameof(neuron)); }
         ArgumentException.ThrowIfNullOrWhiteSpace(signal);
         if (!Snapshot.Subscriptions.Any(existing => existing.Neuron == neuron && existing.Signal == signal))
         {
@@ -297,8 +304,9 @@ internal sealed partial class CSharpFileNeuron(
         foreach (var source in sources) { await source.Unwatch(observer); }
     }
 
-    // A token speaks for the current run while the file should run; armed, also for overlapping
-    // earlier triggered runs. Stop and Delete revoke every token the file issued.
+    // A token speaks for the current run while the file should run; armed or subscribed, any of the
+    // file's signed tokens keeps speaking (a wake-run must authorize before its RunId is saved), so
+    // for those files only Stop and Delete revoke tokens, not a fresh Start.
     public Task<RunAuthorization> Authorize(string runId)
         => Task.FromResult(new RunAuthorization(
             runId.Length > 0 && Snapshot.ShouldRun
