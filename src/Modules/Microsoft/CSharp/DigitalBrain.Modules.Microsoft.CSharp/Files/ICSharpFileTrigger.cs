@@ -9,4 +9,5 @@ namespace DigitalBrain.Microsoft.CSharp;
 internal interface ICSharpFileTrigger : IGrainWithStringKey
 {
     [OneWay] Task Fire(Signal signal);
+    [OneWay] Task Enqueue(Signal signal);
 }

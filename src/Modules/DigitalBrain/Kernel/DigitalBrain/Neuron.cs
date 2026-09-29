@@ -64,8 +64,9 @@ public abstract class Neuron : Grain, INeuron, IGrainBase
 
     protected Task PublishAsync(Signal signal)
     {
-        ServiceProvider.GetService<LocalSignalHub>()?.Publish(this.GetGrainId(), signal);
-        return Observers.Notify(observer => observer.OnSignalAsync(signal));
+        var stamped = signal with { Publisher = this.GetGrainId().ToString() };
+        ServiceProvider.GetService<LocalSignalHub>()?.Publish(this.GetGrainId(), stamped);
+        return Observers.Notify(observer => observer.OnSignalAsync(stamped));
     }
 }
 

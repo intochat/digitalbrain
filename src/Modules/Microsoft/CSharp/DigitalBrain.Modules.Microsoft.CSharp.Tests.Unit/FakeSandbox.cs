@@ -41,6 +41,8 @@ internal sealed class FakeSandbox : HttpMessageHandler
 
     public int Started => Requests.Count(IsStart);
 
+    public string LatestRunId => _latest;
+
     public static bool IsStart((string Method, string Path, JsonNode? Body) request) => request.Method == "POST" && request.Path.Split('/') is ["runs", _];
 
     public void ExitLatest(int exitCode) => _runs[_latest] = ("Exited", exitCode);
