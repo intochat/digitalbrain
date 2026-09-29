@@ -35,7 +35,7 @@ internal static class CSharpEndpoints
             catch (TimeoutException error) { return Results.Problem(error.Message, statusCode: StatusCodes.Status504GatewayTimeout); }
         });
         // ScopedCSharpTools resolves the workspace from the {workspaceId} route value.
-        files.MapGet("/", async (ScopedCSharpTools tools, CancellationToken ct) => new { items = await tools.List(ct), allowActivation = tools.AllowActivation });
+        files.MapGet("/", async (ScopedCSharpTools tools, CancellationToken ct) => new { items = await tools.List(ct), canRun = tools.CanRun });
         files.MapGet("/{id}", (string id, ScopedCSharpTools tools, CancellationToken ct) => tools.Read(id, ct));
         files.MapPut("/{id}", (string id, WriteCSharpFileRequest request, ScopedCSharpTools tools, CancellationToken ct)
             => tools.Write(id, request.Source, request.Name, request.Purpose, ct));

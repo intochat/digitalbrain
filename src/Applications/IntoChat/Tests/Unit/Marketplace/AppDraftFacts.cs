@@ -94,7 +94,7 @@ public sealed class AppDraftFacts
         var built = await draft.Build();
 
         Assert.Equal(AppDraftStatus.Failed, built.Draft.Status);
-        Assert.Contains("disabled by host policy", built.Draft.Attempts[0].Failures, StringComparison.Ordinal);
+        Assert.Contains("has no C# sandbox", built.Draft.Attempts[0].Failures, StringComparison.Ordinal);
         var revised = await draft.Revise("Try a different angle.");
         Assert.Equal(AppDraftStatus.Drafted, revised.Draft.Status);
     }
@@ -102,7 +102,7 @@ public sealed class AppDraftFacts
     private sealed class RefusingTestRunner : DigitalBrain.Apps.ITestScriptRunner
     {
         public Task<DigitalBrain.Apps.AppTestRun> RunAsync(PackageRevisionRef revision, string tests, CancellationToken cancellationToken)
-            => throw new InvalidOperationException(MarketplaceService.ActivationDisabled);
+            => throw new InvalidOperationException(MarketplaceService.SandboxMissing);
     }
 
     [Fact]

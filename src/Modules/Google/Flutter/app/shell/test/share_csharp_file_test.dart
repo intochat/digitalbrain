@@ -35,7 +35,7 @@ void main() {
               if (path.isEmpty) {
                 return {
                   'items': [digest],
-                  'allowActivation': true,
+                  'canRun': true,
                 };
               }
               if (path == 'daily_digest/share') {

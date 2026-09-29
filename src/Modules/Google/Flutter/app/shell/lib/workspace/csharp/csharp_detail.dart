@@ -7,7 +7,7 @@ class CSharpDetailView extends StatefulWidget {
   const CSharpDetailView({
     super.key,
     required this.view,
-    required this.allowActivation,
+    required this.canRun,
     required this.enabled,
     required this.stale,
     required this.onSave,
@@ -19,7 +19,7 @@ class CSharpDetailView extends StatefulWidget {
     this.onShare,
   });
   final Map<String, dynamic> view;
-  final bool allowActivation, enabled, stale;
+  final bool canRun, enabled, stale;
   final Future<void> Function(Map<String, Object?> body) onSave;
   final Future<void> Function() onStart, onStop, onDelete, onRefresh;
   final ValueChanged<String> onAsk;
@@ -174,7 +174,7 @@ class _CSharpDetailViewState extends State<CSharpDetailView> {
                 child: const Text('Save'),
               ),
               OutlinedButton(
-                onPressed: widget.enabled && widget.allowActivation
+                onPressed: widget.enabled && widget.canRun
                     ? widget.onStart
                     : null,
                 child: Text(running ? 'Restart' : 'Start'),
@@ -204,11 +204,11 @@ class _CSharpDetailViewState extends State<CSharpDetailView> {
               ),
             ],
           ),
-          if (!widget.allowActivation)
+          if (!widget.canRun)
             const Padding(
               padding: EdgeInsets.only(top: 6),
               child: Text(
-                'Running C# apps is disabled by host settings. You can still edit and save them.',
+                'This host has no C# sandbox, so apps cannot run. You can still edit and save them.',
               ),
             ),
           if (edited)

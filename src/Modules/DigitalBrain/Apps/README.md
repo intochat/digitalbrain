@@ -81,7 +81,7 @@ IntoChat's `POST /workspaces/{workspaceId}/csharp/{id}/share` commits the file's
 
 ## Trust
 
-Installing a package runs its code in a container with full client access to the brain; the container is not a permission boundary. IntoChat composes the CSharp module only in the developer profile. Its package routes need `IntoChat:DeveloperMode`, and running packages also needs `IntoChat:CSharp:AllowActivation`. A public marketplace needs per-app identities first.
+Installing a package runs its code in a container with full client access to the brain; the container is not a permission boundary. IntoChat composes the CSharp module only in the developer profile. Its package routes need `IntoChat:DeveloperMode`, and running packages needs the host's C# sandbox (composing `CSharpModule` in a repository declares it). A public marketplace needs per-app identities first.
 
 ## Tests
 

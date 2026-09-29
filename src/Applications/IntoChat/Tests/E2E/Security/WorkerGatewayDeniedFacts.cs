@@ -3,7 +3,7 @@ using Aspire.Hosting.Testing;
 namespace IntoChat.Tests.E2E.Security;
 
 // CSharp is composed for every profile. A C# file is an arbitrary program that calls the brain
-// through the script edge; activation stays behind DigitalBrain:CSharp:AllowActivation.
+// through the script edge; running files needs the host's C# sandbox.
 public sealed class WorkerGatewayDeniedFacts
 {
     [Fact]

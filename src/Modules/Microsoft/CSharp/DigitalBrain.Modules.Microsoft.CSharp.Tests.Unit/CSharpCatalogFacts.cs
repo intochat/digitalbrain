@@ -56,10 +56,9 @@ public sealed class CSharpCatalogFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var store = new CSharpCatalogStore(new InMemoryDocumentStore<CSharpCatalog>());
-        var service = new CSharpToolService(null!, store, Options.Create(new CSharpAuthoringOptions { AllowActivation = true }));
+        var service = new CSharpToolService(null!, store);
 
         Assert.False(service.CanRun);
-        Assert.False(service.AllowActivation);
         var tools = service.ForScope("scope");
         await Assert.ThrowsAsync<InvalidOperationException>(() => tools.Write("timer", "Console.WriteLine(1);", null, null, ct));
         Assert.Throws<InvalidOperationException>(() => tools.Contracts([]));
@@ -71,7 +70,7 @@ public sealed class CSharpCatalogFacts
         var ct = TestContext.Current.CancellationToken;
         var brain = new RecordingBrain();
         var service = new CSharpToolService(brain, new CSharpCatalogStore(new InMemoryDocumentStore<CSharpCatalog>()),
-            Options.Create(new CSharpAuthoringOptions()), new CSharpContractCatalog(Options.Create(new CSharpOptions())));
+            new CSharpContractCatalog(Options.Create(new CSharpOptions())));
 
         await Assert.ThrowsAsync<ArgumentException>(() => service.ForScope("scope").Write("timer", "Console.WriteLine(1);", new string('n', 121), null, ct));
 

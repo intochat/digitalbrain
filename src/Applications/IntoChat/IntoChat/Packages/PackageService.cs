@@ -188,7 +188,7 @@ internal sealed class PackageService(
     {
         var runtime = (await Package(revision.Package).ReadRevision(revision.Revision)).Content.Manifest.RuntimeName;
         if (runtime != PackageManifest.CSharpRuntime) { return; }
-        if (!files.AllowActivation)
-        { throw new InvalidOperationException("This host does not run shared packages. Compose CSharpModule and set DigitalBrain:CSharp:AllowActivation."); }
+        if (!files.CanRun)
+        { throw new InvalidOperationException("This host does not run shared packages. Compose CSharpModule where the brain can run scripts."); }
     }
 }

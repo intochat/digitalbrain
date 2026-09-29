@@ -9,7 +9,6 @@ public static class CSharpAuthoringHosting
 {
     public static IServiceCollection AddCSharpAuthoring(this IServiceCollection services)
     {
-        services.AddOptions<CSharpAuthoringOptions>().BindConfiguration(CSharpOptions.SectionName);
         services.AddSingleton<CSharpCatalogStore>();
         services.AddSingleton<CSharpToolService>();
         services.AddSingleton<IAgentToolFactory, CSharpAgentTools>();

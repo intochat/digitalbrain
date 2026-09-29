@@ -64,7 +64,7 @@ class _CSharpManagerState extends State<CSharpManager> {
   Map<String, dynamic>? detail;
   String? selected, failure, notice;
   String query = '';
-  bool allowActivation = false;
+  bool canRun = false;
   bool reading = false, busy = false, loaded = false, stale = true;
   int generation = 0;
   Timer? poll;
@@ -112,7 +112,7 @@ class _CSharpManagerState extends State<CSharpManager> {
       if (!mounted || ticket != generation) return;
       setState(() {
         items = csharpMaps(list['items']);
-        allowActivation = list['allowActivation'] == true;
+        canRun = list['canRun'] == true;
         detail = next;
         loaded = true;
         stale = false;
@@ -379,7 +379,7 @@ class _CSharpManagerState extends State<CSharpManager> {
                 : CSharpDetailView(
                     key: ValueKey(selected),
                     view: detail!,
-                    allowActivation: allowActivation,
+                    canRun: canRun,
                     enabled: !busy && !stale,
                     stale: stale,
                     onSave: (body) =>

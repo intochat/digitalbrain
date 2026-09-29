@@ -45,8 +45,9 @@ behaviors/*.cs   the implementation: one script per concern (plus legacy single 
   `dbtest:pass <name>` / `dbtest:fail <name>\t<message>` line per scenario and exits non-zero on
   failure. Green requires exit 0 AND ≥1 scenario AND all passed — silence never passes. Tests play
   the connector (scripted models, real timers); never a live model in the gate. `Publish` refuses
-  any revision carrying a spec or tests until its verification is green. Verification needs
-  `DigitalBrain:CSharp:AllowActivation=true` (it runs scripts), for every runtime.
+  any revision carrying a spec or tests until its verification is green. Verification runs
+  scripts for every runtime, so it needs the host's C# sandbox (composing `CSharpModule` in a
+  repository declares it).
 - **Subscriptions are code, durability is the brain's.** A script's `brain.On<T>(source)` registers
   a durable, grain-side subscription on its `ICSharpFile` with a buffered watermark (64/subscription,
   oldest dropped). Processes are caches: idle scripts are reaped, a signal for a reaped script

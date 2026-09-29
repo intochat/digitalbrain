@@ -33,13 +33,13 @@ Widget host(Widget child) => MaterialApp(home: Scaffold(body: child));
 
 CSharpDetailView detailView(
   Map<String, dynamic> view, {
-  bool allowActivation = true,
+  bool canRun = true,
   Future<void> Function(Map<String, Object?> body)? onSave,
   Future<void> Function()? onStart,
   Future<void> Function()? onStop,
 }) => CSharpDetailView(
   view: view,
-  allowActivation: allowActivation,
+  canRun: canRun,
   enabled: true,
   stale: false,
   onSave: onSave ?? (_) async {},
@@ -104,11 +104,11 @@ void main() {
     expect(field('csharp-source').controller!.text, 'mine');
   });
 
-  testWidgets('start is disabled when the host does not allow activation', (
+  testWidgets('start is disabled when the host has no sandbox', (
     tester,
   ) async {
     await tester.pumpWidget(
-      host(detailView(fileView(status: 0), allowActivation: false)),
+      host(detailView(fileView(status: 0), canRun: false)),
     );
     expect(
       tester
@@ -122,7 +122,7 @@ void main() {
           .onPressed,
       isNull,
     );
-    expect(find.textContaining('disabled by host settings'), findsOneWidget);
+    expect(find.textContaining('has no C# sandbox'), findsOneWidget);
   });
 
   testWidgets('shows exit code and read-only logs', (tester) async {
@@ -158,7 +158,7 @@ void main() {
             if (path.isEmpty) {
               return {
                 'items': [fileView(status: status)],
-                'allowActivation': true,
+                'canRun': true,
               };
             }
             return fileView(status: status);
@@ -201,7 +201,7 @@ void main() {
             if (path.isEmpty) {
               return {
                 'items': [fileView(status: stopped ? 0 : 1)],
-                'allowActivation': true,
+                'canRun': true,
               };
             }
             if (delay) {
@@ -242,7 +242,7 @@ void main() {
             request: (method, path, {body}) async => path.isEmpty
                 ? {
                     'items': [fileView(), second],
-                    'allowActivation': true,
+                    'canRun': true,
                   }
                 : path == 'timer'
                 ? pending.future
@@ -285,7 +285,7 @@ void main() {
             return path.isEmpty
                 ? {
                     'items': [fileView()],
-                    'allowActivation': true,
+                    'canRun': true,
                   }
                 : fileView();
           },
@@ -332,7 +332,7 @@ void main() {
             return path.isEmpty
                 ? {
                     'items': [if (!deleted) fileView()],
-                    'allowActivation': true,
+                    'canRun': true,
                   }
                 : fileView();
           },
@@ -372,7 +372,7 @@ void main() {
           request: (method, path, {body}) async {
             if (method == 'PUT') writes[path] = body;
             return path.isEmpty
-                ? {'items': <Object>[], 'allowActivation': true}
+                ? {'items': <Object>[], 'canRun': true}
                 : fileView(id: 'hello', name: 'Hello');
           },
           onAsk: (_, _) {},

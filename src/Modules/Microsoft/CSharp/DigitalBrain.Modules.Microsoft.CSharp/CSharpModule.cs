@@ -51,7 +51,7 @@ public sealed class CSharpModule : IModule
         endpoints.MapScriptEdge();
     }
 
-    internal static string? FindRepositoryRoot()
+    public static string? FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
         {

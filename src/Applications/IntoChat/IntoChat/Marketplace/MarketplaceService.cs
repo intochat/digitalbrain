@@ -17,14 +17,14 @@ internal sealed record AppSpecView(
 
 internal sealed class MarketplaceService(IDigitalBrain brain, CSharpToolService csharp)
 {
-    public const string ActivationDisabled = "Running C# apps is disabled by host policy, and verifying an app runs its tests as one. Enable DigitalBrain:CSharp:AllowActivation.";
+    public const string SandboxMissing = "This host has no C# sandbox, and verifying an app runs its tests as one. Compose CSharpModule where the brain can run scripts.";
 
     // Verifying any revision runs its tests.cs in the sandbox, so it is allowed exactly when running scripts is.
     public async Task RequireRunnable(PackageRevisionRef revision)
     {
         var content = (await brain.Get<IPackage>(revision.Package.ToString()).ReadRevision(revision.Revision)).Content;
         var runsScripts = content.Manifest.RuntimeName == PackageManifest.CSharpRuntime || content.File(PackageContent.TestsPath) is not null;
-        if (runsScripts && !csharp.AllowActivation) { throw new InvalidOperationException(ActivationDisabled); }
+        if (runsScripts && !csharp.CanRun) { throw new InvalidOperationException(SandboxMissing); }
     }
 
     public async Task<AppSpecView> Spec(PackageId id, string? revisionId)

@@ -12,6 +12,9 @@ public sealed class CSharpModuleHosting : IDigitalBrainModuleHosting
     {
         ArgumentNullException.ThrowIfNull(brain);
         var options = brain.GetModuleConfiguration<CSharpModule>().GetSection(CSharpOptions.SectionName).Get<CSharpOptions>() ?? new();
+        // The same fallback the silo uses, so composing the module in a repository always declares
+        // the sandbox; only a host without any repository (the session-pool path) has none.
+        if (string.IsNullOrWhiteSpace(options.SourceRoot)) { options.SourceRoot = CSharpModule.FindRepositoryRoot(); }
         if (string.IsNullOrWhiteSpace(options.SourceRoot)) { return; }
         brain.ApplicationBuilder.AddDockerfile(CSharpSandbox.ResourceName, Path.Combine(options.SourceRoot, CSharpSandbox.SourceProject))
             .WithHttpEndpoint(targetPort: CSharpSandbox.Port, name: "http")

@@ -74,7 +74,7 @@ internal sealed class AppDraftNeuron(
     private string AuthorModel => configuration["IntoChat:Apps:AuthorModel"] ?? nameof(IGpt56Luna);
     private string BuilderModel => configuration["IntoChat:Apps:BuilderModel"] ?? nameof(IGpt56Luna);
     // A csharp app is only offered where this host may run it.
-    private string[] Runtimes => csharp?.AllowActivation == true ? [PackageManifest.CSharpRuntime, .. ConfigurationRuntimes] : ConfigurationRuntimes;
+    private string[] Runtimes => csharp?.CanRun == true ? [PackageManifest.CSharpRuntime, .. ConfigurationRuntimes] : ConfigurationRuntimes;
 
     public async Task<AppDraftView> Draft(string request)
     {
@@ -103,7 +103,7 @@ internal sealed class AppDraftNeuron(
     public async Task<AppDraftView> Build()
     {
         RequireSpec();
-        if (!Runtimes.Contains(Snapshot.Runtime)) { throw new InvalidOperationException(MarketplaceService.ActivationDisabled); }
+        if (!Runtimes.Contains(Snapshot.Runtime)) { throw new InvalidOperationException(MarketplaceService.SandboxMissing); }
         await Persist(Snapshot with { Status = AppDraftStatus.Building, Attempts = [], Error = "" });
         var package = GrainFactory.GetGrain<IPackage>(PackageId.Create(Owner, Snapshot.Name).ToString());
         var failures = "";
