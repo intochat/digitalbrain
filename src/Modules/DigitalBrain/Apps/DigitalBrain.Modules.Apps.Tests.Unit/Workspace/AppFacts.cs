@@ -257,6 +257,21 @@ public sealed class AppFacts
     }
 
     [Fact]
+    public async Task AWhitespaceOrOversizedBehaviorIsRefusedAtCommit()
+    {
+        await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
+        Caller.As("alice");
+        var package = brain.Get<IPackage>("alice/tracker");
+        var content = PackageSamples.Tracker();
+
+        var whitespace = content with { Files = new Dictionary<string, string>(content.Files!) { [PackageContent.BehaviorsPrefix + "empty.cs"] = "   \n" } };
+        await Assert.ThrowsAsync<ArgumentException>(() => package.Commit(brain.Commit(null, whitespace, "Empty behavior")));
+
+        var oversized = content with { Files = new Dictionary<string, string>(content.Files!) { [PackageContent.BehaviorsPrefix + "big.cs"] = new string('x', 128 * 1024 + 1) } };
+        await Assert.ThrowsAsync<ArgumentException>(() => package.Commit(brain.Commit(null, oversized, "Oversized behavior")));
+    }
+
+    [Fact]
     public async Task AllBehaviorsRetireOnUninstall()
     {
         await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);

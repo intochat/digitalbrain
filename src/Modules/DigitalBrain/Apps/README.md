@@ -67,10 +67,13 @@ configuration on top of neurons: the host registers an `IAppRuntime` under that 
 answers each invocation through it off the app neuron, responding with `Respond` like a script would.
 `PackageContent.Files` carries everything else an app is made of: prompts, runtime configuration and its spec.
 
-`app.feature` is the app's spec, written with Specs steps. `AppSteps` provides the steps every app can use
-(`I ask "..."`, `the answer is "..."`, `the setting "..." is "..."`). `IAppVerification` (keyed
-`{owner}/{name}@{revision}`) installs a fresh scratch app per scenario and runs the spec against it.
-`Publish` refuses a revision that has an `app.feature` until its verification is green.
+`app.spec.md` is the app's spec in plain language; `tests.cs` is its proof, a C# file-based app that
+installs scratch copies of the revision, drives them through contracts and prints one
+`dbtest:pass <name>` or `dbtest:fail <name>	<message>` line per scenario. `IAppVerification` (keyed
+`{owner}/{name}@{revision}`) runs `tests.cs` through `ITestScriptRunner` (by default as an ordinary
+sandbox script) and keeps the verdicts. `Publish` refuses a revision that carries a spec or tests
+until its verification is green. A csharp app's programs are its `Source` plus every
+`behaviors/*.cs` file; each installs as its own `ICSharpFile`.
 
 ## Sharing from the C# console
 

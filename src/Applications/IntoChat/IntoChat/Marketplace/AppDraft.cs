@@ -125,7 +125,9 @@ internal sealed class AppDraftNeuron(
                     return await Read();
                 }
             }
-            catch (Exception error) when (error is ArgumentException or JsonException or InvalidDataException)
+            // Any failure is one attempt, never an escape: a build must end Published or Failed, or
+            // the draft would stay Building forever (for example when this host cannot run tests).
+            catch (Exception error) when (error is not OperationCanceledException)
             {
                 failures = $"The implementation was rejected: {error.Message}";
                 await Persist(Snapshot with { Attempts = [.. Snapshot.Attempts, new("", false, failures)] });

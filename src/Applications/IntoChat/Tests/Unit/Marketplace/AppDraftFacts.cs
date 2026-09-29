@@ -79,6 +79,33 @@ public sealed class AppDraftFacts
     }
 
     [Fact]
+    public async Task AHostThatCannotRunTestsFailsTheBuildInsteadOfStrandingIt()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await StartAsync(ct, runner: new RefusingTestRunner());
+        await brain.Get<IScriptedLLM>("author").Script([Authored(Spec), Authored(Spec)]);
+        await brain.Get<IScriptedLLM>("builder").Script([
+            Built("// proof v1", "Shout."), Built("// proof v2", "Shout!"), Built("// proof v3", "Shout!!"),
+        ]);
+        StampAlice();
+        var draft = brain.Get<IAppDraft>("alice/drafts/" + Guid.NewGuid().ToString("N"));
+        await draft.Draft("Shout back.");
+
+        var built = await draft.Build();
+
+        Assert.Equal(AppDraftStatus.Failed, built.Draft.Status);
+        Assert.Contains("disabled by host policy", built.Draft.Attempts[0].Failures, StringComparison.Ordinal);
+        var revised = await draft.Revise("Try a different angle.");
+        Assert.Equal(AppDraftStatus.Drafted, revised.Draft.Status);
+    }
+
+    private sealed class RefusingTestRunner : DigitalBrain.Apps.ITestScriptRunner
+    {
+        public Task<DigitalBrain.Apps.AppTestRun> RunAsync(PackageRevisionRef revision, string tests, CancellationToken cancellationToken)
+            => throw new InvalidOperationException(MarketplaceService.ActivationDisabled);
+    }
+
+    [Fact]
     public async Task ARevisionKeepsTheDraftsNameBecauseTheAuthorIsToldIt()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -110,7 +137,7 @@ public sealed class AppDraftFacts
         Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp,
     });
 
-    private static Task<UnitBrain> StartAsync(CancellationToken ct) => UnitTest.Create()
+    private static Task<UnitBrain> StartAsync(CancellationToken ct, DigitalBrain.Apps.ITestScriptRunner? runner = null) => UnitTest.Create()
         .WithModule<AIModule>()
         .WithModule<AppsModule>()
         .ConfigureSilo(silo =>
@@ -122,7 +149,7 @@ public sealed class AppDraftFacts
             }).Build());
             silo.Services.AddAppRuntime<GroupChatRuntime>();
             silo.Services.AddAppRuntime<PromptRuntime>();
-            silo.Services.AddSingleton<DigitalBrain.Apps.ITestScriptRunner, ScriptedTestRunner>();
+            silo.Services.AddSingleton<DigitalBrain.Apps.ITestScriptRunner>(_ => runner ?? new ScriptedTestRunner());
         })
         .StartAsync(ct);
 }

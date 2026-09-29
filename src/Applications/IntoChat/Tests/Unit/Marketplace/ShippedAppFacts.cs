@@ -21,6 +21,26 @@ public sealed class ShippedAppFacts
         => Assert.Equal(["assistant", "group-chat", "word-count"], ShippedApps.Load().Select(app => app.Package.Name).Order());
 
     [Fact]
+    public void EveryShippedProgramAndTestsFileParsesAsCSharp()
+    {
+        foreach (var app in ShippedApps.Load())
+        {
+            var sources = new Dictionary<string, string> { [PackageContent.TestsPath] = app.Content.File(PackageContent.TestsPath)! };
+            foreach (var (path, program) in app.Content.Programs()) { sources[path] = program; }
+            foreach (var (path, source) in sources)
+            {
+                // dotnet run strips the #: file-based-app directives before compiling.
+                var stripped = string.Join("\n", source.Split('\n').Where(line => !line.TrimStart().StartsWith("#:", StringComparison.Ordinal)));
+                var errors = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree
+                    .ParseText(stripped, cancellationToken: TestContext.Current.CancellationToken)
+                    .GetDiagnostics(TestContext.Current.CancellationToken)
+                    .Where(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).ToArray();
+                Assert.True(errors.Length == 0, $"{app.Package}/{path}: {string.Join("; ", errors.Take(3).Select(error => error.ToString()))}");
+            }
+        }
+    }
+
+    [Fact]
     public void EveryShippedAppCarriesSpecAndTests()
         => Assert.All(ShippedApps.Load(), app =>
         {

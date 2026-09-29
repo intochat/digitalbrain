@@ -1,7 +1,8 @@
 namespace DigitalBrain.Apps;
 
-// Source is the C# script of a "csharp" app and empty otherwise. Files carry everything else an app is
-// made of, keyed by path: its app.feature spec, prompts and the configuration its runtime reads.
+// Source is the legacy single script of a "csharp" app and empty otherwise. Files carry everything
+// else an app is made of, keyed by path: its app.spec.md spec, its tests.cs, its behaviors/*.cs
+// scripts, prompts and the configuration its runtime reads.
 [GenerateSerializer, Alias("apps.package-content")]
 public sealed record PackageContent(
     [property: Id(0)] PackageManifest Manifest,

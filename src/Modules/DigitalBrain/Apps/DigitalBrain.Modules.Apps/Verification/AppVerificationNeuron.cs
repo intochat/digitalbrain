@@ -13,7 +13,8 @@ public sealed record AppVerificationState
 
 [GrainType("apps.verification")]
 internal sealed class AppVerificationNeuron(
-    [PersistentState("apps.verification", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<AppVerificationState> store,
+    // A fresh storage name: the pre-tests state carried a FeatureRun and would not deserialize.
+    [PersistentState("apps.test-verification", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<AppVerificationState> store,
     ITestScriptRunner runner,
     TimeProvider clock)
     : Neuron<AppVerificationState>(store), IAppVerification

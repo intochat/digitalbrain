@@ -43,6 +43,13 @@ internal static partial class PackageRules
         Require(content.Source is not null && System.Text.Encoding.UTF8.GetByteCount(content.Source) <= MaxCodeBytes, "Source is at most 128 KiB.");
         Require(manifest.RuntimeName != PackageManifest.CSharpRuntime || content.Programs().Count > 0,
             "A csharp app needs at least one script: its source or a behaviors/*.cs file.");
+        // Mirror ICSharpFile.Write's limits, so an install never starts some behaviors and then
+        // trips over one the file neuron refuses, leaving the started ones without a retiree.
+        foreach (var (path, program) in content.Programs())
+        {
+            Require(!string.IsNullOrWhiteSpace(program), $"Program {path} is empty.");
+            Require(System.Text.Encoding.UTF8.GetByteCount(program) <= MaxCodeBytes, $"Program {path} is at most 128 KiB.");
+        }
         var files = content.Files ?? new Dictionary<string, string>();
         Require(files.Count <= MaxFiles && files.All(file => file.Key.Length <= 128 && FilePath().IsMatch(file.Key) && !file.Key.Contains("..", StringComparison.Ordinal) && file.Value is not null),
             "A package has at most 64 files with relative paths of letters, digits, dots, hyphens and single slashes.");
