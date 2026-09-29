@@ -90,31 +90,14 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
         })
     .WithEnvironment(context =>
     {
-        if (builder.Configuration["IntoChat:Assistant:Model"] is { Length: > 0 } assistantModel)
-        { context.EnvironmentVariables["IntoChat__Assistant__Model"] = assistantModel; }
-        if (builder.Configuration["DigitalBrain:CSharp:AllowActivation"] is { } allowActivation)
-        { context.EnvironmentVariables["DigitalBrain__CSharp__AllowActivation"] = allowActivation; }
-        foreach (var key in new[] { "IntoChat:DataProtection:Certificate", "IntoChat:DataProtection:CertificatePassword" })
-        {
-            if (builder.Configuration[key] is { Length: > 0 } value)
-            { context.EnvironmentVariables[key.Replace(":", "__", StringComparison.Ordinal)] = value; }
-        }
-        foreach (var setting in builder.Configuration.GetSection("IntoChat:DataProtection:PreviousCertificates").AsEnumerable())
-        {
-            if (setting.Value is not null)
-            { context.EnvironmentVariables[setting.Key.Replace(":", "__", StringComparison.Ordinal)] = setting.Value; }
-        }
-
-        // Browser shell (aspire run and Playwright e2e) is a different origin than the kernel.
-        // IsRunMode is false under DistributedApplicationTestingBuilder, so the origin must
-        // always be advertised — not only when `aspire run` is driving the host.
+        // The browser shell is a different origin than the kernel. IsRunMode is false under
+        // DistributedApplicationTestingBuilder, so advertise the origin for aspire run and Playwright.
         var flutter = digitalBrain.GetModuleConfiguration<FlutterModule>().GetSection("DigitalBrain:Flutter:Hosting").Get<FlutterHostingOptions>()!;
         if (flutter.Kind == FlutterHostKind.Web)
         {
             context.EnvironmentVariables["DigitalBrain__Cors__AllowedOrigin"] =
                 builder.CreateResourceBuilder<ExecutableResource>(flutter.ResourceName).GetEndpoint("http");
         }
-
     });
 
 builder.Build().Run();

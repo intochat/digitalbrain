@@ -113,5 +113,5 @@ public sealed class ScopedCSharpTools(IDigitalBrain brain, CSharpCatalogStore ca
     }
 
     private CSharpContractCatalog RequireModule()
-        => contracts ?? throw new InvalidOperationException("This host does not run C# files; compose CSharpModule in the developer profile.");
+        => contracts ?? throw new InvalidOperationException("This host does not run C# files; compose CSharpModule.");
 }
