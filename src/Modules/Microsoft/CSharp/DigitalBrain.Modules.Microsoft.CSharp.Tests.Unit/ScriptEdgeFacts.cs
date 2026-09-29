@@ -94,6 +94,87 @@ public sealed class ScriptEdgeFacts
         Assert.Equal(typeof(ICSharpFile), contracts.Find(typeof(ICSharpFile).FullName!));
     }
 
+    [Fact]
+    public async Task SignalsPublishedBetweenRunsArriveWhenTheNextRunSubscribes()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var sandbox = new FakeSandbox();
+        await using var brain = await Brain(sandbox, ct);
+        var pinger = brain.Get<IPinger>("pinger");
+        var edge = brain.SiloServices.GetRequiredService<ScriptEdge>();
+        var token = await StartAsAlice(brain, sandbox, "workspace-a/durable", ct);
+
+        // The first run subscribes, which registers durably, then dies with its stream.
+        using var first = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        await edge.OpenSignalsAsync(token, typeof(IPinger).FullName!, "pinger", nameof(Pinged), first.Token);
+        await first.CancelAsync();
+        sandbox.ExitLatest(0);
+
+        await pinger.Ping(41);                        // nobody is streaming: buffered, wakes a run
+        await Eventually(() => sandbox.Started == 2, ct);
+        var next = LatestToken(sandbox);              // the wake-run's token
+
+        var resumed = await edge.OpenSignalsAsync(next, typeof(IPinger).FullName!, "pinger", nameof(Pinged), ct);
+        await foreach (var json in resumed.WithCancellation(ct))
+        {
+            Assert.Contains("\"number\":41", json, StringComparison.Ordinal);   // the buffered signal came first
+            break;
+        }
+    }
+
+    [Fact]
+    public async Task ALiveStreamReceivesASignalPromptlyThroughTheDoorbell()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var sandbox = new FakeSandbox();
+        await using var brain = await Brain(sandbox, ct);
+        var pinger = brain.Get<IPinger>("pinger");
+        var edge = brain.SiloServices.GetRequiredService<ScriptEdge>();
+        var token = await StartAsAlice(brain, sandbox, "workspace-a/live", ct);
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
+        var stream = await edge.OpenSignalsAsync(token, typeof(IPinger).FullName!, "pinger", nameof(Pinged), stop.Token);
+        var reading = ReadOneAsync(stream, stop.Token);
+        await pinger.Ping(7);
+
+        Assert.Contains("\"number\":7", await reading.WaitAsync(TimeSpan.FromSeconds(5), ct), StringComparison.Ordinal);
+        await stop.CancelAsync();
+    }
+
+    [Fact]
+    public async Task StreamsRefuseTokensThatNoLongerSpeakForTheFile()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var sandbox = new FakeSandbox();
+        await using var brain = await Brain(sandbox, ct);
+        var edge = brain.SiloServices.GetRequiredService<ScriptEdge>();
+        var token = await StartAsAlice(brain, sandbox, "workspace-a/revoked", ct);
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        await edge.OpenSignalsAsync(token, typeof(IPinger).FullName!, "pinger", nameof(Pinged), stop.Token);
+        await stop.CancelAsync();
+
+        await brain.Get<ICSharpFile>("workspace-a/revoked").Stop(ct);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => edge.OpenSignalsAsync(token, typeof(IPinger).FullName!, "pinger", nameof(Pinged), ct));
+    }
+
+    private static async Task<string> ReadOneAsync(IAsyncEnumerable<string> stream, CancellationToken ct)
+    {
+        await foreach (var json in stream.WithCancellation(ct)) { return json; }
+        throw new InvalidOperationException("The stream ended without a signal.");
+    }
+
+    private static string LatestToken(FakeSandbox sandbox)
+        => sandbox.Requests.Last(FakeSandbox.IsStart).Body!["environment"]!["DigitalBrain__Token"]!.GetValue<string>();
+
+    private static async Task Eventually(Func<bool> condition, CancellationToken ct)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(TimeSpan.FromSeconds(10));
+        while (!condition()) { await Task.Delay(TimeSpan.FromMilliseconds(50), deadline.Token); }
+    }
+
     private static ScriptInvocation Call(string method, params int[] arguments)
         => new(typeof(IPinger).FullName!, "pinger", method, [.. arguments.Select(argument => JsonSerializer.SerializeToElement(argument))]);
 

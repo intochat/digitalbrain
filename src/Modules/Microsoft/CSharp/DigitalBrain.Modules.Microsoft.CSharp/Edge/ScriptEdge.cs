@@ -44,25 +44,60 @@ internal sealed class ScriptEdge(RunTokens tokens, ScriptContracts contracts, IG
         return JsonSerializer.SerializeToElement(result, method.ReturnType.GetGenericArguments()[0], ScriptEdgeProtocol.Json);
     }
 
-    // Authorizes and subscribes before returning, so a refusal surfaces before the stream starts.
+    // The doorbell is best-effort; a missed ring is caught by the next sweep.
+    private static readonly TimeSpan DoorbellSweep = TimeSpan.FromSeconds(5);
+
+    // Authorizes and registers the durable subscription before returning, so a refusal surfaces
+    // before the stream starts. Delivery drains the file's persisted buffer; the file's own signals
+    // are the doorbell that keeps a live stream prompt.
     public async Task<IAsyncEnumerable<string>> OpenSignalsAsync(string? token, string contract, string key, string signal, CancellationToken cancellationToken)
     {
         var (claims, owner) = await AuthorizeAsync(token).ConfigureAwait(false);
         if (grains.GetGrain(contracts.Find(contract), key) is not INeuron source) { throw new ArgumentException($"{contract} is not a neuron."); }
         Stamp(owner, claims);
-        var subscription = await brain.SubscribeAsync<Signal>(source, cancellationToken).ConfigureAwait(false);
-        return Matching(subscription, signal, cancellationToken);
+        var file = grains.GetGrain<ICSharpFileEdge>(claims.File);
+        await file.Subscribed(claims.Run, source.GetGrainId().ToString(), signal).ConfigureAwait(false);
+        var doorbell = await brain.SubscribeAsync<Signal>(grains.GetGrain<ICSharpFile>(claims.File), cancellationToken).ConfigureAwait(false);
+        return Draining(file, claims.Run, source.GetGrainId().ToString(), signal, doorbell, cancellationToken);
     }
 
-    private static async IAsyncEnumerable<string> Matching(ISignalSubscription<Signal> subscription, string signal, [EnumeratorCancellation] CancellationToken cancellationToken)
+    private static async IAsyncEnumerable<string> Draining(
+        ICSharpFileEdge file, string run, string neuron, string signal,
+        ISignalSubscription<Signal> doorbell, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        await using (subscription)
+        await using (doorbell)
         {
-            await foreach (var published in subscription.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+            var rings = doorbell.ReadAllAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
+            try
             {
-                if (published.GetType().Name == signal) { yield return JsonSerializer.Serialize(published, published.GetType(), ScriptEdgeProtocol.Json); }
+                var doorbellAlive = true;
+                Task<bool>? ring = null;
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    foreach (var json in await file.DrainPending(run, neuron, signal).ConfigureAwait(false)) { yield return json; }
+                    if (doorbellAlive)
+                    {
+                        ring ??= NextRingAsync(rings);
+                        if (await Task.WhenAny(ring, Task.Delay(DoorbellSweep, cancellationToken)).ConfigureAwait(false) == ring)
+                        {
+                            doorbellAlive = await ring.ConfigureAwait(false);
+                            ring = null;
+                        }
+                    }
+                    else
+                    {
+                        await Task.Delay(DoorbellSweep, cancellationToken).ConfigureAwait(false);
+                    }
+                }
             }
+            finally { await rings.DisposeAsync().ConfigureAwait(false); }
         }
+    }
+
+    private static async Task<bool> NextRingAsync(IAsyncEnumerator<Signal> rings)
+    {
+        try { return await rings.MoveNextAsync().ConfigureAwait(false); }
+        catch { return false; }
     }
 
     private async Task<(RunTokenClaims Claims, CallerContext? Owner)> AuthorizeAsync(string? token)
