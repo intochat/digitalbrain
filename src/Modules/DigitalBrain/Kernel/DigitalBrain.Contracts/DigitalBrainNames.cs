@@ -7,4 +7,5 @@ public static class DigitalBrainNames
     public const string Reminders = "reminders";
     public const string GrainState = "grainstate";
     public const string DefaultGrainStorage = "Default";
+    public const string OrleansDashboardPath = "/orleans";
 }

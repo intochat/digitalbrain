@@ -28,21 +28,19 @@ internal sealed class AspireBridgeClient(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var brainRuntime = model.Resources.OfType<IResourceWithEndpoints>()
-            .Select(resource => (Resource: resource, Annotation: resource.Annotations.OfType<BrainEndpointAnnotation>().LastOrDefault()))
-            .FirstOrDefault(candidate => candidate.Annotation is not null);
-        if (brainRuntime.Annotation is null)
+        var hosts = SiloHosts.Find(model.Resources).OfType<IResourceWithEndpoints>().ToArray();
+        if (hosts.Length == 0)
         {
-            logger.LogWarning("No primary brain resource is declared; the Aspire bridge stays idle.");
+            logger.LogWarning("No silo host with an http endpoint is declared; the Aspire bridge stays idle.");
             return;
         }
 
         try
         {
-            await notifications.WaitForResourceAsync(brainRuntime.Resource.Name, KnownResourceStates.Running, stoppingToken).ConfigureAwait(false);
+            var host = await WaitForAnyRunningAsync(hosts, stoppingToken).ConfigureAwait(false);
             using var brain = new HttpClient
             {
-                BaseAddress = new Uri(brainRuntime.Resource.GetEndpoint(brainRuntime.Annotation.Endpoint).Url),
+                BaseAddress = new Uri(host.GetEndpoint(SiloHosts.HttpEndpointName).Url),
                 Timeout = Timeout.InfiniteTimeSpan,
             };
             brain.DefaultRequestHeaders.Add(AspireBridgeRoutes.KeyHeader, bridgeKey);
@@ -52,6 +50,21 @@ internal sealed class AspireBridgeClient(
                 ServeCommandsAsync(brain, stoppingToken)).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
+    }
+
+    private async Task<IResourceWithEndpoints> WaitForAnyRunningAsync(IReadOnlyList<IResourceWithEndpoints> hosts, CancellationToken stoppingToken)
+    {
+        using var anyRunning = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+        var started = hosts.Select(async host =>
+        {
+            await notifications.WaitForResourceAsync(host.Name, KnownResourceStates.Running, anyRunning.Token).ConfigureAwait(false);
+            return host;
+        }).ToArray();
+        var finished = await Task.WhenAny(started).ConfigureAwait(false);
+        anyRunning.Cancel();
+        foreach (var task in started)
+        { _ = task.ContinueWith(completed => _ = completed.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default); }
+        return await finished.ConfigureAwait(false);
     }
 
     private async Task WatchResourcesAsync(CancellationToken stoppingToken)

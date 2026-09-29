@@ -134,6 +134,13 @@ public static class DigitalBrainHostingExtensions
             projection.Apply(builder);
         }
 
+        builder.WithUrlForEndpoint("http", endpoint => new ResourceUrlAnnotation
+        {
+            Url = DigitalBrainNames.OrleansDashboardPath,
+            DisplayText = "Orleans Dashboard",
+            Endpoint = endpoint,
+        });
+
         return builder;
     }
 

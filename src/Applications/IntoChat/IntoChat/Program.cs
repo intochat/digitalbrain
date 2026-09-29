@@ -12,7 +12,6 @@ using IntoChat.Applications;
 using IntoChat.ServiceDefaults;
 using IntoChat.Workspace;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Orleans.Dashboard;
 using DigitalBrain.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -47,7 +46,6 @@ app.MapDefaultEndpoints();
 // Developer mode is a server setting, so a client cannot grant itself the C# console.
 app.MapGet("/session/capabilities", static (IConfiguration configuration) =>
     Results.Ok(new { developerMode = AgentToolPolicy.DeveloperModeEnabled(configuration["IntoChat:DeveloperMode"]) }));
-app.MapOrleansDashboard("/orleans");
 app.MapCSharp();
 app.MapPackages();
 app.MapDigitalBrainModules();

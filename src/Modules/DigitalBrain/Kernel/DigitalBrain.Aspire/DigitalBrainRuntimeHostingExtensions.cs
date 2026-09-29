@@ -63,6 +63,7 @@ public static class DigitalBrainRuntimeHostingExtensions
             module.Configure(endpoints);
         }
 
+        endpoints.MapOrleansDashboard(DigitalBrainNames.OrleansDashboardPath);
         return endpoints;
     }
 

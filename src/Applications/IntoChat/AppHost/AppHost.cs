@@ -1,7 +1,6 @@
 using DigitalBrain.Postgres;
 using DigitalBrain.Microsoft.Playwright;
 using Aspire.Hosting;
-using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.AI;
 using DigitalBrain.AI.FoundryLocal;
 using DigitalBrain.AI.Ollama;
@@ -76,15 +75,6 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
         port: ProductSurfaceResources.UiHttpPort,
         name: "http",
         isProxied: false)
-    .WithHttpHealthCheck("/health", endpointName: "http")
-    .AsPrimaryBrain()
-    .WithUrlForEndpoint(
-        "http",
-        endpoint => new ResourceUrlAnnotation
-        {
-            Url = "/orleans",
-            DisplayText = "Orleans Dashboard",
-            Endpoint = endpoint,
-        });
+    .WithHttpHealthCheck("/health", endpointName: "http");
 
 builder.Build().Run();

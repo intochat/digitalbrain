@@ -27,8 +27,7 @@ internal static class ModuleTestHost
             builder.AddExecutable("runtime", "dotnet", launch.WorkingDirectory, launch.Arguments)
                 .WithReference(brain)
                 .WithHttpEndpoint(name: "http", env: "ASPNETCORE_HTTP_PORTS")
-                .WithHttpHealthCheck(ModuleHostEndpoints.Health)
-                .AsPrimaryBrain();
+                .WithHttpHealthCheck(ModuleHostEndpoints.Health);
         }, cancellationToken);
     }
 

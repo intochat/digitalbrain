@@ -76,29 +76,31 @@ public sealed class AspireTestSession : IAsyncDisposable
             builder.Services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning));
             stage = "topology";
             declareTopology?.Invoke(builder);
-            var primary = builder.Resources.Where(r => r.Annotations.OfType<BrainEndpointAnnotation>().Any()).ToArray();
-            if (primary.Length != 1) { throw new InvalidOperationException("The AppHost must declare exactly one primary brain HTTP endpoint."); }
-            var resource = primary[0];
-            if (privateSettings is not null)
+            var hosts = SiloHosts.Find(builder.Resources);
+            if (hosts.Count == 0)
+            { throw new InvalidOperationException("The AppHost must reference the brain from at least one resource with an http endpoint."); }
+            foreach (var resource in hosts)
             {
-                resource.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
-                    context.EnvironmentVariables["DigitalBrain__Testing__PrivateConfiguration"] = privateSettings.FilePath));
-            }
-            if (options.ResourceEnvironment.Count > 0)
-            {
-                resource.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
+                if (privateSettings is not null)
                 {
-                    foreach (var (key, value) in options.ResourceEnvironment) { context.EnvironmentVariables[key] = value; }
-                }));
-            }
-            var endpoint = resource.Annotations.OfType<BrainEndpointAnnotation>().Single();
-            // The AppHost publishes a fixed port. A testing builder also copies launchSettings ports,
-            // so clear both or every session binds the same endpoint.
-            foreach (var http in resource.Annotations.OfType<EndpointAnnotation>())
-            {
-                if (!string.Equals(http.Name, endpoint.Endpoint, StringComparison.Ordinal)) { continue; }
-                http.Port = null;
-                http.TargetPort = null;
+                    resource.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
+                        context.EnvironmentVariables["DigitalBrain__Testing__PrivateConfiguration"] = privateSettings.FilePath));
+                }
+                if (options.ResourceEnvironment.Count > 0)
+                {
+                    resource.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
+                    {
+                        foreach (var (key, value) in options.ResourceEnvironment) { context.EnvironmentVariables[key] = value; }
+                    }));
+                }
+                // The AppHost publishes a fixed port. A testing builder also copies launchSettings ports,
+                // so clear both or every session binds the same endpoint.
+                foreach (var http in resource.Annotations.OfType<EndpointAnnotation>())
+                {
+                    if (!string.Equals(http.Name, SiloHosts.HttpEndpointName, StringComparison.Ordinal)) { continue; }
+                    http.Port = null;
+                    http.TargetPort = null;
+                }
             }
             stage = "build";
             var app = await builder.BuildAsync(ct).ConfigureAwait(false);
@@ -107,7 +109,8 @@ public sealed class AspireTestSession : IAsyncDisposable
             stage = "start";
             await app.StartAsync(ct).ConfigureAwait(false);
             stage = "readiness";
-            await app.ResourceNotifications.WaitForResourceHealthyAsync(resource.Name, ct).ConfigureAwait(false);
+            foreach (var host in hosts)
+            { await app.ResourceNotifications.WaitForResourceHealthyAsync(host.Name, ct).ConfigureAwait(false); }
             var browser = builder.Resources.SelectMany(r => r.Annotations.OfType<BrainBrowserAnnotation>()
                 .Select(a => (r.Name, a.Endpoint, a.Path, a.ReadySelector))).ToArray();
             if (browser.Length > 1) { throw new InvalidOperationException("The AppHost declares multiple primary browser endpoints."); }
@@ -123,7 +126,7 @@ public sealed class AspireTestSession : IAsyncDisposable
             stage = "client";
             await session.ConnectAsync(ct).ConfigureAwait(false);
             lifetime.Own("client", new AsyncAction(session.ReleaseClientAsync));
-            session.HttpClient = app.CreateHttpClient(resource.Name, endpoint.Endpoint);
+            session.HttpClient = app.CreateHttpClient(hosts[0].Name, SiloHosts.HttpEndpointName);
             lifetime.Own("http", new AsyncAction(() => { session.HttpClient.Dispose(); return ValueTask.CompletedTask; }));
             return session;
         }
