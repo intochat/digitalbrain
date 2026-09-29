@@ -29,7 +29,7 @@ public sealed class AgentTurnFacts
     }
 
     [Fact]
-    public async Task EveryAssistantTurnAsksForMatchingCapabilities()
+    public async Task AssistantTurnsDoNotRequestTheRemovedCapabilityProvider()
     {
         var runner = new RecordingRunner();
 
@@ -37,7 +37,7 @@ public sealed class AgentTurnFacts
             new ConfigurationBuilder().Build(), runner, _ => Task.CompletedTask,
             new StringBuilder(), [], new IntentActivity(), TestContext.Current.CancellationToken);
 
-        Assert.Equal([DigitalBrain.Registry.Agents.CapabilityTools.ProviderName], runner.Request!.ContextProviders);
+        Assert.Empty(runner.Request!.ContextProviders!);
     }
 
     // The HTTP adapter must forward the application neuron's instructions unchanged.

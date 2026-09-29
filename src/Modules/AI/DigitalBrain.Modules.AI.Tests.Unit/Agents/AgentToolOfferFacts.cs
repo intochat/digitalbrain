@@ -9,15 +9,6 @@ namespace DigitalBrain.Tests;
 public sealed class AgentToolOfferFacts
 {
     [Fact]
-    public void ToolNamesAreModelSafeAndBounded()
-    {
-        Assert.Equal("supabase_table_CreateFromQuery", NeuronToolName.Of("supabase.table/CreateFromQuery"));
-        var longName = NeuronToolName.Of(new string('a', 80) + "/Method");
-        Assert.Equal(64, longName.Length);
-        Assert.NotEqual(longName, NeuronToolName.Of(new string('a', 80) + "/Other"));
-    }
-
-    [Fact]
     public async Task AnOfferedToolJoinsTheRestOfTheTurn()
     {
         var ct = TestContext.Current.CancellationToken;

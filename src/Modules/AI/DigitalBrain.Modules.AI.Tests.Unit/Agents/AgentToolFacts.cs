@@ -107,7 +107,7 @@ public sealed class AgentToolFacts
         var selected = AgentToolPolicy.SelectTools(developerMode: false, [],
             ["propose_app", "run_leadgenerator"]);
         Assert.True(selected.Count <= AgentToolPolicy.MaxDefaultTools);
-        Assert.Contains("find_capability", selected);
+        Assert.DoesNotContain("find_capability", selected);
         Assert.Contains("propose_app", selected);
         Assert.Contains("run_leadgenerator", selected);
         Assert.DoesNotContain("supabase_schema", selected);
@@ -126,7 +126,7 @@ public sealed class AgentToolFacts
     public void ManyRelevantAppToolsStillFitTheCap()
     {
         var selected = AgentToolPolicy.SelectTools(developerMode: false, [],
-            ["propose_app", "run_leadgenerator", "plan_background_removal", "run_background_removal", "find_capability"]);
+            ["propose_app", "run_leadgenerator", "plan_background_removal", "run_background_removal", "extra_app_tool"]);
         Assert.Equal(AgentToolPolicy.MaxDefaultTools, selected.Count);
         Assert.Equal(selected.Count, selected.Distinct(StringComparer.Ordinal).Count());
     }

@@ -13,11 +13,11 @@ src/Modules/DigitalBrain/
 ├── Registry/
 │   ├── DigitalBrain.Modules.Registry/
 │   │   ├── DigitalBrain.Modules.Registry.csproj
-│   │   ├── Agents/
 │   │   ├── Configuration/
-│   │   ├── Neurons/
-│   │   ├── Search/
-│   │   └── Sources/
+│   │   ├── RegistryNeuron.cs
+│   │   ├── RegistryObserver.cs
+│   │   ├── NeuronTypes.cs
+│   │   └── NeuronTypeSearch.cs
 │   ├── DigitalBrain.Modules.Registry.Contracts/
 │   │   └── DigitalBrain.Modules.Registry.Contracts.csproj
 │   ├── DigitalBrain.Modules.Registry.Tests.Unit/

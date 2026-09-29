@@ -3,9 +3,8 @@ using Orleans.Metadata;
 
 namespace DigitalBrain.Apps;
 
-// The app directory makes saved and installed apps discoverable: the Registry module reads it as its
-// manifest source. It always exposes the committed first-party manifests as global entries, and it
-// records the owning workspace on every saved or installed manifest so discovery can scope search.
+// The app directory exposes committed first-party manifests globally and records the owning
+// workspace on every saved or installed manifest so callers can respect workspace visibility.
 [Alias("app-manifest-directory"), DefaultGrainType("app-manifest-directory")]
 public interface IAppManifestDirectory : INeuron
 {

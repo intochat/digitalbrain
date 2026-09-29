@@ -46,5 +46,3 @@ src/Applications/IntoChat/IntoChat/applications/
 .file-compiler-tests/
 .script-graph-tests/
 .graph-failure-tests/
-
-!src/Modules/DigitalBrain/Registry/DigitalBrain.Modules.Registry/Sources/

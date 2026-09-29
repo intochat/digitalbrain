@@ -1,6 +1,5 @@
 using DigitalBrain.Apps.Manifests;
 using DigitalBrain.Core;
-using DigitalBrain.Registry;
 using DigitalBrain.Specs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -16,7 +15,6 @@ public sealed class AppsModule : IModule
     public void Configure(ISiloBuilder silo)
     {
         ArgumentNullException.ThrowIfNull(silo);
-        silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<ICapabilitySource, AppCapabilitySource>());
         silo.Services.TryAddSingleton(TimeProvider.System);
         silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<StepLibrary, AppSteps>());
     }

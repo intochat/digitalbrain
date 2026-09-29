@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Registry capability sources, search contracts, and unmet intents.</Description>
+    <Description>Neuron type search and observed instance history contracts.</Description>
     <RootNamespace>DigitalBrain.Registry</RootNamespace>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>

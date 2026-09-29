@@ -1,7 +1,7 @@
 namespace DigitalBrain.AI.Agents;
 
 // The default turn carries one small set of tools chosen for the intent: an always-on core, the
-// generic live-table pair when the request is about data, and the tools of the apps discovery or
+// generic live-table pair when the request is about data, and the tools of the apps the request or
 // the conversation makes relevant. The whole selection stays within MaxDefaultTools.
 public static class AgentToolPolicy
 {
@@ -11,7 +11,7 @@ public static class AgentToolPolicy
         "Writing C# apps isn't supported outside developer mode yet; it arrives in Phase 1.";
 
     public static readonly IReadOnlyList<string> CoreTools =
-        ["table_read", "table_refine", "show_form", "show_view", "find_capability"];
+        ["table_read", "table_refine", "show_form", "show_view"];
 
     public static readonly IReadOnlyList<string> TableTools =
         ["supabase_schema", "show_supabase_query_table"];

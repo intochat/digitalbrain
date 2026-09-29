@@ -24,7 +24,7 @@ Feature: Assistant
     And the assistant is started
     When I type "show me customers from supabase"
     Then the chat shows the assistant reply "Your customers are open in a table window."
-    And the assistant used "ReadSchema" and "CreateFromQuery"
+    And the assistant used "supabase_schema" and "show_supabase_query_table"
     And a table window is open in the workspace
     And the table has 3 rows
 

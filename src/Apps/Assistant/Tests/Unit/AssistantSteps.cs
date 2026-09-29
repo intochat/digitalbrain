@@ -104,12 +104,12 @@ internal sealed class AssistantSteps : StepLibrary
             database.Rows = [.. Enumerable.Range(1, args.Int(1)).Select(id => new SupabaseTableRow("row-" + id, [id.ToString(CultureInfo.InvariantCulture), $"\"Customer {id}\""]))];
             return Task.CompletedTask;
         });
-        Step("the assistant used {string} and {string}", "The assistant's agent completed calls to both neuron methods.", (context, args) =>
+        Step("the assistant used {string} and {string}", "The assistant's agent completed calls to both registered tools.", (context, args) =>
         {
             var completed = context.Services.GetRequiredService<InjectedModelTurnRunner>().CompletedTools.ToArray();
             foreach (var method in new[] { args.Text(0), args.Text(1) })
             {
-                if (!completed.Any(tool => tool.EndsWith("_" + method, StringComparison.Ordinal)))
+                if (!completed.Contains(method, StringComparer.Ordinal))
                 { throw new StepFailedException($"No completed call to {method} among [{string.Join(", ", completed)}]."); }
             }
             return Task.CompletedTask;

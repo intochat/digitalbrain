@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Neuron registry, JSON invocation, and hybrid capability search with agent tools.</Description>
+    <Description>Neuron types, vector search, and observed instance history.</Description>
     <RootNamespace>DigitalBrain.Registry</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
@@ -9,7 +9,6 @@
     <ProjectReference Include="../DigitalBrain.Modules.Registry.Contracts/DigitalBrain.Modules.Registry.Contracts.csproj" />
     <ProjectReference Include="../../Kernel/DigitalBrain/DigitalBrain.csproj" />
     <ProjectReference Include="../../../Qdrant/DigitalBrain.Modules.Qdrant/DigitalBrain.Modules.Qdrant.csproj" />
-    <ProjectReference Include="../../../AI/DigitalBrain.Modules.AI.Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.AI" />

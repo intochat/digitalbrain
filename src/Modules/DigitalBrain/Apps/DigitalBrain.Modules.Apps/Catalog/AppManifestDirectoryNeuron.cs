@@ -17,7 +17,7 @@ internal sealed record AppManifestDirectoryState
 
 // The app directory. It always exposes the committed first-party manifests as global entries and the
 // latest saved or installed version of every catalogued app, keyed by app id and carrying the owning
-// workspace so Registry can keep one workspace's content out of another's search.
+// workspace so callers can keep one workspace's content out of another's results.
 [GrainType("app-manifest-directory")]
 internal sealed class AppManifestDirectoryNeuron(
     [PersistentState("directory", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<AppManifestDirectoryState> store)

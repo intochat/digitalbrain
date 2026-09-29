@@ -7,7 +7,6 @@
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Modules.Apps.Tests.Unit" />
     <ProjectReference Include="../DigitalBrain.Modules.Apps.Contracts/DigitalBrain.Modules.Apps.Contracts.csproj" />
-    <ProjectReference Include="../../Registry/DigitalBrain.Modules.Registry.Contracts/DigitalBrain.Modules.Registry.Contracts.csproj" />
     <ProjectReference Include="../../Kernel/DigitalBrain/DigitalBrain.csproj" />
     <ProjectReference Include="../../Specs/DigitalBrain.Modules.Specs/DigitalBrain.Modules.Specs.csproj" />
     <ProjectReference Include="../../../Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp.Contracts/DigitalBrain.Modules.Microsoft.CSharp.Contracts.csproj" />

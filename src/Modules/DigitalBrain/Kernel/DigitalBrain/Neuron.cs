@@ -5,18 +5,49 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.Utilities;
+using System.Reflection;
 
 namespace DigitalBrain.Core;
 
-public abstract class Neuron : Grain, INeuron
+public abstract class Neuron : Grain, INeuron, IGrainBase
 {
     private readonly Guid _activation = Guid.NewGuid();
+    private bool _observedActivation;
     private ObserverManager<INeuronObserver>? _observers;
     private ObserverManager<INeuronObserver> Observers => _observers ??= new(
         ServiceProvider.GetRequiredService<IOptions<BrainOptions>>().Value.ObserverLease,
         ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Neuron.Observers"));
 
     protected TimeSpan ObserverRenewal => ServiceProvider.GetRequiredService<IOptions<BrainOptions>>().Value.RenewEvery;
+
+    // Orleans calls IGrainBase; keep derived virtual hooks intact without relying on a base call.
+    async Task IGrainBase.OnActivateAsync(CancellationToken cancellationToken)
+    {
+        await OnActivateAsync(cancellationToken);
+        _observedActivation = true;
+        PublishActivity(active: true);
+    }
+
+    async Task IGrainBase.OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+    {
+        try { await OnDeactivateAsync(reason, cancellationToken); }
+        finally { if (_observedActivation) { PublishActivity(active: false); } }
+    }
+
+    private void PublishActivity(bool active)
+    {
+        var signals = ServiceProvider.GetService<RuntimeSignals>();
+        if (signals is null) { return; }
+        var typeIds = GetType().GetInterfaces()
+            .Where(type => type != typeof(INeuron) && typeof(INeuron).IsAssignableFrom(type))
+            .Select(type => type.GetCustomAttribute<AliasAttribute>()?.Alias)
+            .OfType<string>().Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        var now = ServiceProvider.GetRequiredService<TimeProvider>().GetUtcNow();
+        NeuronActivity activity = active
+            ? new NeuronActivated { NeuronId = this.GetGrainId().ToString(), Key = this.GetPrimaryKeyString(), TypeIds = typeIds, ActivationId = _activation, ObservedAt = now }
+            : new NeuronDeactivated { NeuronId = this.GetGrainId().ToString(), Key = this.GetPrimaryKeyString(), TypeIds = typeIds, ActivationId = _activation, ObservedAt = now };
+        signals.Publish(activity);
+    }
 
     public virtual Task<Guid> Watch(INeuronObserver observer)
     {
