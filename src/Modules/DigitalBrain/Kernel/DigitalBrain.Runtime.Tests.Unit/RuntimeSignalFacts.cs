@@ -1,3 +1,4 @@
+using DigitalBrain.Contracts.Signals;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;

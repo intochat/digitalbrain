@@ -1,3 +1,4 @@
+using DigitalBrain.Contracts.Signals;
 using DigitalBrain.Contracts;
 
 namespace DigitalBrain.Core;

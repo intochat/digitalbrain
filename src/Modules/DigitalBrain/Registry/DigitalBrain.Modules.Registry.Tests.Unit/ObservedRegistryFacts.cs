@@ -1,3 +1,4 @@
+using DigitalBrain.Contracts.Signals;
 using System.ComponentModel;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
