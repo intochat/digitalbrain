@@ -144,6 +144,15 @@ commit/verify/publish pipeline at startup.
 
 ## What this consolidates
 
+Status 2026-09-29: shipped on `refactor/csharp-module` — durable subscriptions (slice 1);
+multi-behavior packages; verification as a revision's `tests.cs` run through the swappable
+`ITestScriptRunner` (default: an ordinary sandbox script creating GUID-scoped scratch installs —
+a ledgered deviation from the ephemeral-brain form that keeps the gate unit-testable; substance
+unchanged); the Author/Builder compiling free-language specs with `tests.cs` mandatory; the step
+vocabulary deleted from the apps path; shipped apps migrated. Scripts reach UI contracts today
+because `ScriptContracts` exposes every deployed module contracts assembly — the palette itself
+(renderable contracts and the shell's discovery of them) remains the next UI slice.
+
 Build (small, mostly generalization):
 
 - Script-initiated durable subscriptions with watermarks behind `brain.On<T>(source)`; wake-on-
