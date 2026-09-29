@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -48,6 +49,15 @@ class _CreateAppScreenState extends State<CreateAppScreen> {
   String get _path => '/packages/drafts/$_draftId';
 
   @override
+  void initState() {
+    super.initState();
+    // Reopening an existing draft picks up where the person left off.
+    if (widget.draftId != null) {
+      unawaited(_perform('Loading the draft…', () => widget.request('GET', _path)));
+    }
+  }
+
+  @override
   void dispose() {
     _describe.dispose();
     _revise.dispose();
@@ -68,6 +78,9 @@ class _CreateAppScreenState extends State<CreateAppScreen> {
       setState(() {
         _view = view;
         _spec.text = '${_map(view['draft'])['spec'] ?? ''}';
+        if (_describe.text.isEmpty) {
+          _describe.text = '${_map(view['draft'])['request'] ?? ''}';
+        }
         _editing = false;
       });
     } catch (error) {

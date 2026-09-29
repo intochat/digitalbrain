@@ -38,6 +38,7 @@ class PackagesScreen extends StatefulWidget {
 
 class _PackagesScreenState extends State<PackagesScreen> {
   List<Map<String, dynamic>> _listings = [];
+  List<Map<String, dynamic>> _drafts = [];
   final Map<String, Map<String, dynamic>> _apps = {};
   final Map<String, List<Map<String, dynamic>>> _files = {};
   final Map<String, TextEditingController> _inputs = {};
@@ -95,6 +96,12 @@ class _PackagesScreenState extends State<PackagesScreen> {
     final loaded = listings is List
         ? listings.map(_map).toList()
         : <Map<String, dynamic>>[];
+    // The person's own drafts; an unreadable list must not hide the marketplace.
+    var drafts = <Map<String, dynamic>>[];
+    try {
+      final mine = await widget.request('GET', '/packages/drafts');
+      if (mine is List) drafts = mine.map(_map).toList();
+    } catch (_) {}
     final ids = loaded.map(_id).toList();
     // One unreadable install must not hide the rest of the marketplace.
     final reads = await Future.wait(
@@ -109,6 +116,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
     if (!mounted) return;
     setState(() {
       _listings = loaded;
+      _drafts = drafts;
       _apps
         ..clear()
         ..addEntries([
@@ -251,16 +259,65 @@ class _PackagesScreenState extends State<PackagesScreen> {
           if (_notice != null)
             Padding(padding: const EdgeInsets.all(12), child: Text(_notice!)),
           Expanded(
-            child: _listings.isEmpty && !_busy
+            child: _listings.isEmpty && _drafts.isEmpty && !_busy
                 ? const Center(
                     child: Text('No one has published an app yet.'),
                   )
                 : ListView(
                     padding: const EdgeInsets.all(12),
-                    children: [for (final listing in _listings) _card(listing)],
+                    children: [
+                      if (_drafts.isNotEmpty) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text(
+                            'My drafts',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ),
+                        for (final draft in _drafts) _draftTile(draft),
+                        const SizedBox(height: 12),
+                      ],
+                      for (final listing in _listings) _card(listing),
+                    ],
                   ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Numeric values of IntoChat.Marketplace.AppDraftStatus on the wire.
+  static const _draftStatusLabels = [
+    'New',
+    'Scenarios written',
+    'Building',
+    'Published',
+    'Build failed',
+  ];
+
+  Widget _draftTile(Map<String, dynamic> draft) {
+    final id = '${draft['id']}';
+    final title = '${draft['title'] ?? ''}';
+    final status = draft['status'] as int? ?? 0;
+    return Card(
+      key: ValueKey('draft-$id'),
+      child: ListTile(
+        title: Text(title.isEmpty ? 'Untitled draft' : title),
+        subtitle: Text(
+          status < _draftStatusLabels.length ? _draftStatusLabels[status] : '',
+        ),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: _busy
+            ? null
+            : () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) =>
+                        CreateAppScreen(request: widget.request, draftId: id),
+                  ),
+                );
+                if (mounted) await _refresh();
+              },
       ),
     );
   }

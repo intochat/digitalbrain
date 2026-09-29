@@ -1,5 +1,7 @@
 using DigitalBrain.AI;
 using DigitalBrain.AI.Scripted;
+using DigitalBrain.Microsoft.CSharp;
+using Microsoft.Extensions.Options;
 using DigitalBrain.Apps;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
@@ -106,6 +108,60 @@ public sealed class AppDraftFacts
     }
 
     [Fact]
+    public async Task BuildRefusesUpfrontWhenTheHostCannotRunTests()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await StartAsync(ct, canRun: false);
+        await brain.Get<IScriptedLLM>("author").Script([Authored(Spec)]);
+        StampAlice();
+        var draft = brain.Get<IAppDraft>("alice/drafts/" + Guid.NewGuid().ToString("N"));
+        await draft.Draft("Shout back.");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(draft.Build);
+
+        Assert.Equal(AppDraftStatus.Drafted, (await draft.Read()).Draft.Status);
+        Assert.Empty(await brain.Get<IScriptedLLM>("builder").Prompts());
+    }
+
+    [Fact]
+    public async Task DraftsAreListedForTheirOwnerNewestFirst()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await StartAsync(ct);
+        await brain.Get<IScriptedLLM>("author").Script([Authored(Spec), Authored(Spec)]);
+        await brain.Get<IScriptedLLM>("builder").Script([Built("// proof listed", "Shout.")]);
+        ScriptedTestRunner.BySourceMarker["// proof listed"] = (0, "dbtest:pass It shouts");
+        StampAlice();
+        var first = Guid.NewGuid().ToString("N");
+        var second = Guid.NewGuid().ToString("N");
+        await brain.Get<IAppDraft>("alice/drafts/" + first).Draft("Shout back.");
+        await brain.Get<IAppDraft>("alice/drafts/" + second).Draft("Shout back louder.");
+
+        await brain.Get<IAppDraft>("alice/drafts/" + second).Build();
+        var drafts = await brain.Get<IAppDrafts>("alice").List();
+
+        Assert.Equal([second, first], drafts.Select(entry => entry.Id));
+        Assert.Equal(AppDraftStatus.Published, drafts[0].Status);
+        Assert.Equal(AppDraftStatus.Drafted, drafts[1].Status);
+        Assert.Equal("Shouter", drafts[0].Title);
+    }
+
+    [Fact]
+    public async Task AFailedIndexWriteNeverFailsTheDraft()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await StartAsync(ct);
+        await brain.Get<IScriptedLLM>("author").Script([Authored(Spec)]);
+        StampAlice();
+        // "alice" alone has no draft-id segment, so recording into the index throws; the draft
+        // itself must still land, because the index is only a read model.
+        var drafted = await brain.Get<IAppDraft>("alice").Draft("Shout back.");
+
+        Assert.Equal(AppDraftStatus.Drafted, drafted.Draft.Status);
+        Assert.Empty(await brain.Get<IAppDrafts>("alice").List());
+    }
+
+    [Fact]
     public async Task ARevisionKeepsTheDraftsNameBecauseTheAuthorIsToldIt()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -137,7 +193,7 @@ public sealed class AppDraftFacts
         Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp,
     });
 
-    private static Task<UnitBrain> StartAsync(CancellationToken ct, DigitalBrain.Apps.ITestScriptRunner? runner = null) => UnitTest.Create()
+    private static Task<UnitBrain> StartAsync(CancellationToken ct, DigitalBrain.Apps.ITestScriptRunner? runner = null, bool canRun = true) => UnitTest.Create()
         .WithModule<AIModule>()
         .WithModule<AppsModule>()
         .ConfigureSilo(silo =>
@@ -150,6 +206,9 @@ public sealed class AppDraftFacts
             silo.Services.AddAppRuntime<GroupChatRuntime>();
             silo.Services.AddAppRuntime<PromptRuntime>();
             silo.Services.AddSingleton<DigitalBrain.Apps.ITestScriptRunner>(_ => runner ?? new ScriptedTestRunner());
+            silo.Services.AddSingleton<CSharpCatalogStore>();
+            if (canRun) { silo.Services.AddSingleton(new CSharpContractCatalog(Options.Create(new CSharpOptions()))); }
+            silo.Services.AddSingleton<CSharpToolService>();
         })
         .StartAsync(ct);
 }

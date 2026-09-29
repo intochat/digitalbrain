@@ -60,6 +60,7 @@ public sealed record AppDraftChanged([property: Id(0)] string DraftId, [property
 internal sealed class AppDraftNeuron(
     [PersistentState("intochat.app-draft", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<AppDraftState> store,
     IConfiguration configuration,
+    ILogger<AppDraftNeuron> logger,
     CSharpToolService? csharp = null)
     : Neuron<AppDraftState>(store), IAppDraft
 {
@@ -103,7 +104,9 @@ internal sealed class AppDraftNeuron(
     public async Task<AppDraftView> Build()
     {
         RequireSpec();
-        if (!Runtimes.Contains(Snapshot.Runtime)) { throw new InvalidOperationException(MarketplaceService.SandboxMissing); }
+        // Verification runs tests.cs as a sandbox script whatever the app's own runtime is, so a
+        // sandbox-less host refuses here instead of burning build attempts that can only fail.
+        if (csharp?.CanRun != true || !Runtimes.Contains(Snapshot.Runtime)) { throw new InvalidOperationException(MarketplaceService.SandboxMissing); }
         await Persist(Snapshot with { Status = AppDraftStatus.Building, Attempts = [], Error = "" });
         var package = GrainFactory.GetGrain<IPackage>(PackageId.Create(Owner, Snapshot.Name).ToString());
         var failures = "";
@@ -220,10 +223,15 @@ internal sealed class AppDraftNeuron(
         if (Snapshot.Status == AppDraftStatus.Building) { throw new InvalidOperationException("The app is being built."); }
     }
 
-    private Task Persist(AppDraftState next)
+    private async Task Persist(AppDraftState next)
     {
         var saved = next with { Revision = Snapshot.Revision + 1 };
-        return Save(saved, new AppDraftChanged(DraftId, saved.Revision, saved.Status));
+        await Save(saved, new AppDraftChanged(DraftId, saved.Revision, saved.Status));
+        // The index is a read model, so a missed write only stales the list until the next one;
+        // failing here instead could strand a Build or bury a published result.
+        try { await GrainFactory.GetGrain<IAppDrafts>(Owner).Record(DraftId.Split('/')[2], saved.Title, saved.Status); }
+        catch (Exception error) when (error is not OperationCanceledException)
+        { logger.LogWarning(error, "The drafts index for {Owner} missed {DraftId}.", Owner, DraftId); }
     }
 
     private sealed record AuthoredApp(string Name, string Title, string Description, string Runtime, string Spec);

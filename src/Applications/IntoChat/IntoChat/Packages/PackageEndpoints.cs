@@ -39,6 +39,8 @@ internal static class PackageEndpoints
             => service.Accept(PackageId.Create(owner, name), number));
         packages.MapPost("/{owner}/{name}/proposals/{number:int}/close", (string owner, string name, int number, PackageService service)
             => service.Close(PackageId.Create(owner, name), number));
+        packages.MapGet("/drafts", (IDigitalBrain brain)
+            => brain.Get<IAppDrafts>(CallerContextStamper.Require().PrincipalId).List());
         packages.MapPost("/drafts/{id}", (string id, DraftRequest request, IDigitalBrain brain)
             => Draft(brain, id).Draft(request.Text));
         packages.MapGet("/drafts/{id}", (string id, IDigitalBrain brain) => Draft(brain, id).Read());

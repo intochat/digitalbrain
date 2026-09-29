@@ -118,6 +118,58 @@ void main() {
       findsNothing,
     );
   });
+  testWidgets('reopens a draft where the person left off', (tester) async {
+    final draftId = 'a' * 32;
+    final calls = <String>[];
+    Future<dynamic> request(String method, String path, [Object? body]) async {
+      calls.add('$method $path');
+      if (path == '/packages') return <Object>[];
+      if (path == '/packages/drafts') {
+        return [
+          {
+            'id': draftId,
+            'title': 'Shouter',
+            'status': 1,
+            'updatedAt': '2026-09-30T10:00:00Z',
+          },
+        ];
+      }
+      if (path == '/packages/drafts/$draftId') {
+        return {
+          'draft': {
+            'request': 'Shout back whatever I say.',
+            'title': 'Shouter',
+            'runtime': 'prompt',
+            'spec': '## Scenario: It shouts',
+            'status': 1,
+            'attempts': <Object>[],
+          },
+        };
+      }
+      throw StateError('Unexpected $method $path');
+    }
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PackagesScreen(
+          workspaceId: 'workspace-bob',
+          request: request,
+          onClose: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Shouter'), findsOneWidget);
+    expect(find.text('Scenarios written'), findsOneWidget);
+
+    await tester.tap(find.byKey(ValueKey('draft-$draftId')));
+    await tester.pumpAndSettle();
+
+    expect(calls, contains('GET /packages/drafts/$draftId'));
+    expect(find.text('Scenario: It shouts'), findsOneWidget);
+    expect(find.text('Shout back whatever I say.'), findsOneWidget);
+  });
 }
 
 class _FakePackagesServer {
@@ -129,6 +181,7 @@ class _FakePackagesServer {
   Future<dynamic> request(String method, String path, [Object? body]) async {
     calls.add('$method $path');
     const app = '/workspaces/workspace-bob/packages/alice/researcher';
+    if (method == 'GET' && path == '/packages/drafts') return <Object>[];
     if (method == 'GET' && path == '/packages') {
       return [
         {
