@@ -232,6 +232,9 @@ public static class ShellHostingExtensions
 
             if (_flutterKind == FlutterHostKind.Web)
             {
+                builder.WithEnvironment(
+                    EnvironmentKeys.For("DigitalBrain:Cors", "AllowedOrigin"),
+                    _flutterHost.GetEndpoint(ShellNames.HttpEndpointName));
                 _flutterHost.WithArgs(
                     ReferenceExpression.Create($"--dart-define={ShellNames.UIBaseEnvironmentVariable}={uiEndpoint}"),
                     $"--dart-define={ShellNames.ShellEnvironmentVariable}={_pendingShell}",

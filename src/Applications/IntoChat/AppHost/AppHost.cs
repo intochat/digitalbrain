@@ -31,8 +31,6 @@ using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
 using DigitalBrain.Time;
 using DigitalBrain.Files;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
 var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serviceId: "intochat")
@@ -87,17 +85,6 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
             Url = "/orleans",
             DisplayText = "Orleans Dashboard",
             Endpoint = endpoint,
-        })
-    .WithEnvironment(context =>
-    {
-        // The browser shell is a different origin than the kernel. IsRunMode is false under
-        // DistributedApplicationTestingBuilder, so advertise the origin for aspire run and Playwright.
-        var flutter = digitalBrain.GetModuleConfiguration<FlutterModule>().GetSection("DigitalBrain:Flutter:Hosting").Get<FlutterHostingOptions>()!;
-        if (flutter.Kind == FlutterHostKind.Web)
-        {
-            context.EnvironmentVariables["DigitalBrain__Cors__AllowedOrigin"] =
-                builder.CreateResourceBuilder<ExecutableResource>(flutter.ResourceName).GetEndpoint("http");
-        }
-    });
+        });
 
 builder.Build().Run();
