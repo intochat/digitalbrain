@@ -2,31 +2,28 @@ using Aspire.Hosting.Testing;
 
 namespace IntoChat.Tests.E2E.Composition;
 
-/// <summary>
-/// P0.3 profile guard. The AppHost composes developer-only modules (Aspire project path, Roslyn,
-/// DotNet, Coding, CSharp) only in the developer profile; the product profile keeps user-path
-/// modules. This builds the real AppHost model without starting any resource.
-/// </summary>
+// Builds the real AppHost model without starting any resource. Aspire, Roslyn, DotNet, Coding,
+// and CSharp are composed for every profile.
 public sealed class ProfileCompositionFacts
 {
-    private static readonly string[] DeveloperOnlyModules = ["Aspire", "Roslyn", "DotNet", "Coding", "CSharp"];
+    private static readonly string[] ToolingModules = ["Aspire", "Roslyn", "DotNet", "Coding", "CSharp"];
 
     private static readonly string[] UserPathModules =
         ["AI", "Memory", "ClickHouse", "Supabase", "Time", "Gmail", "Salesforce", "GitHub", "Flutter"];
 
     [Fact]
-    public async Task DeveloperProfileComposesDeveloperOnlyModules()
+    public async Task DeveloperProfileComposesToolingModules()
     {
         var names = await ResourceNames(["IntoChat:Profile=developer"], TestContext.Current.CancellationToken);
-        foreach (var module in DeveloperOnlyModules) { Assert.Contains(module, names); }
+        foreach (var module in ToolingModules) { Assert.Contains(module, names); }
         foreach (var module in UserPathModules) { Assert.Contains(module, names); }
     }
 
     [Fact]
-    public async Task ProductProfileComposesOnlyUserPathModules()
+    public async Task ProductProfileComposesToolingModules()
     {
         var names = await ResourceNames(["IntoChat:Profile=product"], TestContext.Current.CancellationToken);
-        foreach (var module in DeveloperOnlyModules) { Assert.DoesNotContain(module, names); }
+        foreach (var module in ToolingModules) { Assert.Contains(module, names); }
         foreach (var module in UserPathModules) { Assert.Contains(module, names); }
     }
 

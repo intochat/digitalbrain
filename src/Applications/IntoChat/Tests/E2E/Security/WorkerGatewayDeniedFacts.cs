@@ -2,17 +2,15 @@ using Aspire.Hosting.Testing;
 
 namespace IntoChat.Tests.E2E.Security;
 
-// P2.1: the product profile must not compose the CSharp module. A C# file is an arbitrary program that
-// calls the brain through the script edge, so leaving the module out of the product profile keeps it
-// out until production sandboxing (session pool, egress limits) is in place. The developer profile
-// keeps it for local authoring.
+// CSharp is composed for every profile. A C# file is an arbitrary program that calls the brain
+// through the script edge; activation stays behind DigitalBrain:CSharp:AllowActivation.
 public sealed class WorkerGatewayDeniedFacts
 {
     [Fact]
-    public async Task ProductProfileComposesNoCSharpModule()
+    public async Task ProductProfileComposesTheCSharpModule()
     {
         var names = await ResourceNames(["IntoChat:Profile=product"], TestContext.Current.CancellationToken);
-        Assert.DoesNotContain("CSharp", names);
+        Assert.Contains("CSharp", names);
     }
 
     [Fact]

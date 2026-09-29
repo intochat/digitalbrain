@@ -39,8 +39,7 @@ var builder = DistributedApplication.CreateBuilder(args);
 var testing = builder.Configuration.GetValue<bool>("DigitalBrain:Testing:Enabled");
 var profile = builder.Configuration[ProductSurfaceResources.ProfileKey] ?? ProductSurfaceResources.DeveloperProfile;
 var hosted = HostedProfile.IsHosted(profile, builder.Configuration);
-var developerProfile = !hosted
-    && !string.Equals(profile, ProductSurfaceResources.ProductProfile, StringComparison.OrdinalIgnoreCase);
+var repositoryRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "..", ".."));
 var repositories = builder.Configuration.GetSection("DigitalBrain:Microsoft:GitHub:Repositories")
     .Get<Dictionary<string, GitHubRepositoryDeclaration>>() ?? [];
 var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, persistentStorage: !testing)
@@ -73,20 +72,12 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, pers
     .WithModule<ComputeModule>()
     .WithModule<RegistryModule>()
     .WithModule<SpecsModule>()
-    .WithModule<AppsModule>();
-
-if (developerProfile)
-{
-    var repositoryRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "..", ".."));
-    // Developer-only surfaces: the Windows executor, C# change sets, C# files run in the on-demand
-    // sandbox container and the AppHost bridge. The product profile composes only modules with a user path.
-    digitalBrain
-        .WithModule<AspireModule>()
-        .WithModule<RoslynModule>()
-        .WithModule<DotNetModule>()
-        .WithModule<CodingModule>(coding => coding.WithSolution(Path.Combine(repositoryRoot, "DigitalBrain.slnx")))
-        .WithModule<CSharpModule>(csharp => csharp.WithSandbox(repositoryRoot));
-}
+    .WithModule<AppsModule>()
+    .WithModule<AspireModule>()
+    .WithModule<RoslynModule>()
+    .WithModule<DotNetModule>()
+    .WithModule<CodingModule>(coding => coding.WithSolution(Path.Combine(repositoryRoot, "DigitalBrain.slnx")))
+    .WithModule<CSharpModule>(csharp => csharp.WithSandbox(repositoryRoot));
 
 var clusterId = builder.Configuration["Orleans:ClusterId"]
     ?? (builder.Environment.IsDevelopment() ? $"digitalbrain-{Guid.NewGuid():N}" : null);
@@ -175,8 +166,7 @@ if (testing)
 
 if (hosted)
 {
-    // Product-only hosted deployment: managed identity and Key Vault are wired by configuration,
-    // and the developer executor is absent because the developer profile was not composed.
+    // Product-only hosted deployment: managed identity and Key Vault are wired by configuration.
     HostedProfile.Apply(runtime, builder.Configuration);
 }
 

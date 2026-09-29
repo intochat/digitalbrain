@@ -100,19 +100,6 @@ public sealed class HygieneFacts
     }
 
     [Fact]
-    public void ProductProfileGatesDeveloperOnlyModules()
-    {
-        var appHost = Read("src/Applications/IntoChat/AppHost/AppHost.cs");
-        var gate = appHost.IndexOf("developerProfile", StringComparison.Ordinal);
-        Assert.True(gate >= 0, "The AppHost must select a product/developer profile.");
-        foreach (var module in new[] { "WithModule<RoslynModule>", "WithModule<DotNetModule>", "WithModule<CodingModule>", "WithModule<CSharpModule>" })
-        {
-            var index = appHost.IndexOf(module, StringComparison.Ordinal);
-            Assert.True(index > gate, $"{module} is developer-only and must be gated behind the developer profile.");
-        }
-    }
-
-    [Fact]
     public void LegacyVolatileInboxIsDeleted()
     {
         string[] gone =
