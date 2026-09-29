@@ -1,8 +1,8 @@
 using DigitalBrain.Compute;
 using DigitalBrain.Compute.Ledger;
 using DigitalBrain.Compute.Metering;
-using DigitalBrain.Compute.Usage;
 using DigitalBrain.Compute.Storage;
+using DigitalBrain.Compute.Usage;
 using DigitalBrain.Testing.Unit;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -12,38 +12,21 @@ namespace DigitalBrain.Tests;
 public sealed class NeuronStoreFacts
 {
     [Fact]
-    public async Task LegacyUsageImportsOnceWithItsTimestampRevisionAndSourceIntact()
+    public async Task ANewAccountReadsAndWritesWithoutALegacySource()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
-        var source = new LegacyUsage();
-        var store = new NeuronUsageStore(brain.Grains, new LegacyComputeSources(Usage: source));
-        var original = Assert.Single((await store.ReadAsync("a", "w", 10, null, ct)).Items);
-        Assert.Equal(DateTimeOffset.UnixEpoch, original.OccurredAt);
-        Assert.Equal("legacy", original.Payload);
-        source.Unavailable = true;
-        await store.AppendAsync("a", "w", "receipt", "stale", ct, DateTimeOffset.UnixEpoch);
-        Assert.Equal("legacy", Assert.Single((await store.ReadAsync("a", "w", 10, null, ct)).Items).Payload);
-        await store.AppendAsync("a", "w", "receipt", "current", ct);
-        var reloaded = new NeuronUsageStore(brain.Grains, new LegacyComputeSources(Usage: source));
-        Assert.Equal("current", Assert.Single((await reloaded.ReadAsync("a", "w", 10, null, ct)).Items).Payload);
-        Assert.Equal(0, source.Writes);
-        Assert.Equal(1, source.Reads);
-    }
-
-    [Fact]
-    public async Task FailedLegacyReadBlocksNewChargesRatherThanResettingBalance()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
-        var store = new NeuronLedgerStore(brain.Grains, new LegacyComputeSources(Ledger: new UnavailableLedger()));
-        await Assert.ThrowsAsync<IOException>(() => store.AppendAsync(new LedgerEntry
+        var ledger = new NeuronLedgerStore(brain.Grains);
+        Assert.Empty(await ledger.ReadAsync("account", ct));
+        var appended = await ledger.AppendAsync(new LedgerEntry
         {
             AccountId = "account", IdempotencyKey = "charge", Kind = LedgerKind.WalletCharge,
-            Amount = 10, OccurredAt = DateTimeOffset.UtcNow,
-        }, ct).AsTask());
-        Assert.Empty(await new NeuronLedgerStore(brain.Grains, new LegacyComputeSources()).ReadAsync("account", ct));
+            Amount = 10, OccurredAt = DateTimeOffset.UnixEpoch,
+        }, ct);
+        Assert.Equal(LedgerAppend.Inserted, appended);
+        Assert.Equal(10m, Assert.Single(await ledger.ReadAsync("account", ct)).Amount);
     }
+
     [Fact]
     public async Task ImmutableTreeBoundsRecordsAndKeepsPublishedRootAfterFailedWrite()
     {
@@ -105,26 +88,4 @@ public sealed class NeuronStoreFacts
         Assert.Null(second.NextCursor);
         await Assert.ThrowsAsync<ArgumentException>(() => usage.ReadAsync("other", "workspace", 1, first.NextCursor, ct).AsTask());
     }
-}
-
-internal sealed class LegacyUsage : IUsageStore
-{
-    public int Reads { get; private set; }
-    public int Writes { get; private set; }
-    public bool Unavailable { get; set; }
-    public ValueTask AppendAsync(string account, string workspace, string id, string payload, CancellationToken ct = default, DateTimeOffset? revision = null)
-    { Writes++; throw new InvalidOperationException("Legacy source cannot be written."); }
-    public ValueTask<UsagePage> ReadAsync(string account, string workspace, int limit, string? cursor, CancellationToken ct = default)
-    {
-        if (Unavailable) { throw new IOException("Legacy host removed."); }
-        Reads++;
-        return ValueTask.FromResult(new UsagePage([new("receipt", "legacy", DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch.AddDays(1).UtcTicks)], null));
-    }
-}
-
-internal sealed class UnavailableLedger : ILedgerStore
-{
-    public ValueTask<decimal> ChargedAsync(string accountId, string? intentId, CancellationToken cancellationToken = default) => throw new IOException();
-    public ValueTask<LedgerAppend> AppendAsync(LedgerEntry entry, CancellationToken cancellationToken = default) => throw new IOException();
-    public ValueTask<IReadOnlyList<LedgerEntry>> ReadAsync(string accountId, CancellationToken cancellationToken = default) => throw new IOException();
 }

@@ -1,7 +1,6 @@
 using DigitalBrain.Compute;
 using DigitalBrain.Compute.Ledger;
 using DigitalBrain.Testing.Unit;
-using Npgsql;
 using Xunit;
 
 namespace DigitalBrain.Tests;
@@ -84,28 +83,6 @@ public sealed class LedgerFacts
         var balance = await wallet.ReadBalanceAsync(ct);
         Assert.Equal(0m, balance.ChargedCompute);
         Assert.Equal(2.5m, balance.CostCompute);
-    }
-
-    [Fact]
-    public async Task PostgresLedgerEnforcesIdempotencyWhenADatabaseIsAvailable()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var connectionString = Environment.GetEnvironmentVariable("DIGITALBRAIN_COMPUTE_TEST_POSTGRES");
-        if (string.IsNullOrWhiteSpace(connectionString))
-        {
-            Assert.Skip("Set DIGITALBRAIN_COMPUTE_TEST_POSTGRES to run the PostgreSQL ledger test.");
-        }
-
-        await using var source = NpgsqlDataSource.Create(connectionString);
-        var store = new PostgresLedgerStore(new ComputeDatabase(source));
-        var key = "postgres-" + Guid.NewGuid().ToString("N");
-
-        var first = await store.AppendAsync(Charge(key, 3m) with { AccountId = key }, ct);
-        var second = await store.AppendAsync(Charge(key, 3m) with { AccountId = key }, ct);
-
-        Assert.Equal(LedgerAppend.Inserted, first);
-        Assert.Equal(LedgerAppend.Duplicate, second);
-        Assert.Single(await store.ReadAsync(key, ct));
     }
 
     private static LedgerEntry Charge(string idempotencyKey, decimal amount) => new()

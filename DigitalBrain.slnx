@@ -150,7 +150,6 @@
     <Project Path="src/Modules/DigitalBrain/Compute/DigitalBrain.Modules.Compute.Tests.Unit/DigitalBrain.Modules.Compute.Tests.Unit.csproj" />
     <Project Path="src/Modules/DigitalBrain/Compute/DigitalBrain.Modules.Compute.Contracts/DigitalBrain.Modules.Compute.Contracts.csproj" />
     <Project Path="src/Modules/DigitalBrain/Compute/DigitalBrain.Modules.Compute/DigitalBrain.Modules.Compute.csproj" />
-    <Project Path="src/Modules/DigitalBrain/Compute/DigitalBrain.Modules.Compute.Deployment/DigitalBrain.Modules.Compute.Deployment.csproj" />
   </Folder>
   <Folder Name="/Modules/DigitalBrain/Apps/">
     <Project Path="src/Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps.Tests.E2E/DigitalBrain.Modules.Apps.Tests.E2E.csproj" />

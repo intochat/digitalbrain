@@ -35,9 +35,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
-var repositoryRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "..", ".."));
-var repositories = builder.Configuration.GetSection("DigitalBrain:Microsoft:GitHub:Repositories")
-    .Get<Dictionary<string, GitHubRepositoryDeclaration>>() ?? [];
 var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serviceId: "intochat")
     .WithModule<AIModule>(ai =>
     {
@@ -63,7 +60,7 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serv
     .WithModule<FilesModule>()
     .WithModule<GmailModule>(gmail => gmail.WithGmail())
     .WithModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
-    .WithModule<GitHubModule>(github => github.WithGitHubRepositories(repositories))
+    .WithModule<GitHubModule>()
     .WithModule<FlutterModule>(flutter => flutter.RunDesktopApp())
     .WithModule<ComputeModule>()
     .WithModule<RegistryModule>()
@@ -72,8 +69,8 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serv
     .WithModule<AspireModule>()
     .WithModule<RoslynModule>()
     .WithModule<DotNetModule>()
-    .WithModule<CodingModule>(coding => coding.WithSolution(Path.Combine(repositoryRoot, "DigitalBrain.slnx")))
-    .WithModule<CSharpModule>(csharp => csharp.WithSandbox(repositoryRoot));
+    .WithModule<CodingModule>()
+    .WithModule<CSharpModule>();
 
 var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.IntoChat)
     .WithReference(digitalBrain)
@@ -119,23 +116,5 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
         }
 
     });
-
-// Existing volumes remain untouched. SQL is an explicit, read-only migration source.
-if (builder.Configuration.GetValue<bool>("DigitalBrain:Compute:ImportLegacy"))
-{
-    runtime.WithEnvironment("DigitalBrain__Compute__ImportLegacy", "true");
-    var legacyConnection = builder.Configuration[ComputeModule.ConnectionStringKey]
-        ?? builder.Configuration.GetConnectionString(ComputeModule.LedgerConnectionName);
-    if (!string.IsNullOrWhiteSpace(legacyConnection))
-    { runtime.WithEnvironment("DigitalBrain__Compute__ConnectionString", legacyConnection); }
-    else if (builder.Configuration["DigitalBrain:Compute:UsageDirectory"] is { Length: > 0 } usageDirectory)
-    { runtime.WithEnvironment("DigitalBrain__Compute__UsageDirectory", usageDirectory); }
-    else
-    {
-        var computeServer = builder.AddPostgres("compute-postgres").WithDataVolume();
-        var computeLedger = computeServer.AddDatabase("compute-database", ComputeModule.LedgerConnectionName);
-        runtime.WithReference(computeLedger, ComputeModule.LedgerConnectionName).WaitFor(computeLedger);
-    }
-}
 
 builder.Build().Run();

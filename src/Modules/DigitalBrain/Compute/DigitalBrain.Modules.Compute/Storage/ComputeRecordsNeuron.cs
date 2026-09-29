@@ -43,8 +43,6 @@ internal interface IComputeRecords : INeuron
     Task<int> Put(ComputeStoredRecord[] records, bool overwrite);
     Task<ComputeStoredRecord[]> Read();
     Task<ComputeRecordPage> Page(string? before, int limit);
-    Task<bool> IsImported();
-    Task CompleteImport();
 }
 
 // A non-reentrant writer serializes deduplication and root publication. Children
@@ -99,10 +97,6 @@ internal sealed class ComputeRecordsNeuron(
         var rows = selected.Reverse().Take(limit).Select(entry => entry.Value).ToArray();
         return new(rows, selected.Count > limit ? rows[^1].SortKey : null);
     }
-
-    public Task<bool> IsImported() => Task.FromResult(state.State.LegacyImported);
-    public Task CompleteImport() => state.State.LegacyImported ? Task.CompletedTask
-        : Save(new() { Root = state.State.Root, LegacyImported = true });
 
     private async Task Save(ComputeRecordsState next)
     {
