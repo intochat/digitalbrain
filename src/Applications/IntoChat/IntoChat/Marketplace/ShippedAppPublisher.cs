@@ -59,7 +59,7 @@ internal sealed class ShippedAppPublisher(IDigitalBrain brain, MarketplaceServic
         if (!verification.Green)
         {
             logger.LogWarning("{Package}@{Revision} stays unpublished: {Failed} of {Total} scenarios did not pass.", app.Package, revisionId,
-                verification.Run.Scenarios.Count(scenario => scenario.Verdict != DigitalBrain.Specs.Verdict.Passed), verification.Run.Scenarios.Count);
+                verification.Run.Scenarios.Count(scenario => !scenario.Passed), verification.Run.Scenarios.Length);
             return;
         }
         if (snapshot.Published != revisionId)

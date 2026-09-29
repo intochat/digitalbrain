@@ -1,8 +1,9 @@
 using DigitalBrain.AI;
+using DigitalBrain.AI.GroupChat;
+using DigitalBrain.AI.Scripted;
 using DigitalBrain.Apps;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
-using DigitalBrain.Specs;
 using IntoChat.Marketplace;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,57 +11,119 @@ using Xunit;
 
 namespace IntoChat.Tests.Unit.Marketplace;
 
-// Every shipped app's spec binds to the brain's steps, and its deterministic scenarios pass against
-// the real runtimes. The @live scenarios need real models and run when the app is verified in the product.
+// Every shipped app carries its spec and its tests, and the configuration apps' deterministic
+// scenarios pass against the real runtimes here, natively — the same assertions their tests.cs
+// makes in the production gate.
 public sealed class ShippedAppFacts
 {
-    private static readonly string[] LiveTags = ["@live"];
-
-    public static TheoryData<string> Apps() => [.. ShippedApps.Load().Select(app => app.Package.Name)];
-
     [Fact]
     public void GroupChatAssistantAndWordCountShip()
         => Assert.Equal(["assistant", "group-chat", "word-count"], ShippedApps.Load().Select(app => app.Package.Name).Order());
 
-    [Theory]
-    [MemberData(nameof(Apps))]
-    public async Task EveryStepOfTheSpecIsOneTheBrainUnderstands(string name)
+    [Fact]
+    public void EveryShippedAppCarriesSpecAndTests()
+        => Assert.All(ShippedApps.Load(), app =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(app.Content.File(PackageContent.SpecPath)), $"{app.Package} has no {PackageContent.SpecPath}.");
+            Assert.False(string.IsNullOrWhiteSpace(app.Content.File(PackageContent.TestsPath)), $"{app.Package} has no {PackageContent.TestsPath}.");
+        });
+
+    [Fact]
+    public async Task TheAssistantAnswersWithItsSystemPromptAgainstTheRealRuntime()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await StartAsync(ct);
-        var spec = Shipped(name).Content.File(PackageContent.SpecPath)!;
+        var (app, scope) = await Install(brain, "assistant");
+        var helper = brain.Get<IScriptedLLM>(scope + "/helper");
+        await helper.Script(["Paris is the capital of France."]);
+        await app.Configure(new ConfigureApp(Guid.NewGuid(), new Dictionary<string, string> { ["Model"] = IScriptedLLM.ModelPrefix + scope + "/helper" }));
 
-        var feature = await brain.Get<IFeature>("shipped/" + name).Set(spec);
+        var (answer, _) = await Ask(app, "What is the capital of France?", ct);
 
-        Assert.Null(feature.Problem);
-        var unbound = feature.Scenarios.SelectMany(scenario => scenario.Steps).Where(step => !step.Bound).Select(step => $"line {step.Line}: {step.Text}");
-        Assert.Empty(unbound);
+        Assert.Equal("Paris is the capital of France.", answer);
+        Assert.Contains(await helper.Prompts(), prompt => prompt.Contains("at most three clear sentences", StringComparison.OrdinalIgnoreCase));
     }
 
-    [Theory]
-    [InlineData("group-chat")]
-    [InlineData("assistant")]
-    public async Task DeterministicScenariosPassAgainstTheRealRuntime(string name)
+    [Fact]
+    public async Task TheGroupChatTakesTurnsAndStopsOnceAgreedAgainstTheRealRuntime()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await StartAsync(ct);
-        var app = Shipped(name);
+        var (app, scope) = await Install(brain, "group-chat");
+        await brain.Get<IScriptedLLM>(scope + "/luna").Script([
+            "A smart dog bowl.",
+            "AGREE: the bowl with a feeding log.",
+            "A smart dog bowl that logs every meal.",
+        ]);
+        await brain.Get<IScriptedLLM>(scope + "/gemma").Script([
+            "Add a feeding log to the bowl.",
+            "AGREE: bowl plus log.",
+        ]);
+        await app.Configure(new ConfigureApp(Guid.NewGuid(), new Dictionary<string, string>
+        {
+            ["LunaModel"] = IScriptedLLM.ModelPrefix + scope + "/luna",
+            ["GemmaModel"] = IScriptedLLM.ModelPrefix + scope + "/gemma",
+        }));
+
+        var (answer, invocationId) = await Ask(app, "Name one product idea for dog owners", ct);
+
+        Assert.Equal("A smart dog bowl that logs every meal.", answer);
+        var discussion = await brain.Get<IGroupChat>(GroupChatRuntime.ChatKey(scope + "/app", invocationId)).Read();
+        var speakers = discussion.Turns.Select(turn => turn.Speaker).ToArray();
+        Assert.True(speakers.Length >= 2 && speakers.SequenceEqual(speakers.Select((_, index) => index % 2 == 0 ? "Luna" : "Gemma")),
+            $"The turns went {string.Join(", ", speakers)}.");
+        Assert.Contains(await brain.Get<IScriptedLLM>(scope + "/gemma").Prompts(), prompt => prompt.Contains("Luna: A smart dog bowl.", StringComparison.Ordinal));
+        Assert.Equal(2, discussion.Turns.Max(turn => turn.Round));
+        Assert.True(discussion.Agreed);
+    }
+
+    [Fact]
+    public async Task TheGroupChatStopsAtTheRoundLimitWithoutAgreement()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await StartAsync(ct);
+        var (app, scope) = await Install(brain, "group-chat");
+        await brain.Get<IScriptedLLM>(scope + "/luna").Script(["A leash.", "A collar.", "A leash with a collar."]);
+        await brain.Get<IScriptedLLM>(scope + "/gemma").Script(["Not a leash.", "Not a collar."]);
+        await app.Configure(new ConfigureApp(Guid.NewGuid(), new Dictionary<string, string>
+        {
+            ["LunaModel"] = IScriptedLLM.ModelPrefix + scope + "/luna",
+            ["GemmaModel"] = IScriptedLLM.ModelPrefix + scope + "/gemma",
+            ["MaxRounds"] = "2",
+        }));
+
+        var (answer, invocationId) = await Ask(app, "Pick one accessory", ct);
+
+        Assert.Equal("A leash with a collar.", answer);
+        var discussion = await brain.Get<IGroupChat>(GroupChatRuntime.ChatKey(scope + "/app", invocationId)).Read();
+        Assert.Equal(2, discussion.Turns.Max(turn => turn.Round));
+        Assert.False(discussion.Agreed);
+    }
+
+    private static async Task<(IApp App, string Scope)> Install(UnitBrain brain, string name)
+    {
+        var shipped = ShippedApps.Load().Single(app => app.Package.Name == name);
         StampPublisher();
-        var revision = await brain.Get<IPackage>(app.Package.ToString()).Commit(new CommitPackage(Guid.NewGuid(), null, app.Content, "Ship"));
-        var feature = brain.Get<IFeature>("shipped/" + name);
-        var bound = await feature.Set(app.Content.File(PackageContent.SpecPath)!);
-        foreach (var scenario in bound.Scenarios)
-        { await brain.Get<IApp>($"scratch/{name}/{scenario.Line}").Install(new InstallApp(Guid.NewGuid(), new(app.Package, revision.Id), new Dictionary<string, string>())); }
-
-        var run = await feature.Run($"scratch/{name}/{FeatureSnapshot.ScenarioPlaceholder}", LiveTags);
-
-        var ran = run.Scenarios.Where(scenario => scenario.Verdict != Verdict.Skipped).ToArray();
-        Assert.NotEmpty(ran);
-        Assert.All(ran, scenario => Assert.True(scenario.Verdict == Verdict.Passed,
-            $"{scenario.Name}: {string.Join("; ", scenario.Steps.Where(step => step.Message is not null).Select(step => $"line {step.Line} {step.Message}"))}"));
+        var revision = await brain.Get<IPackage>(shipped.Package.ToString()).Commit(new CommitPackage(Guid.NewGuid(), null, shipped.Content, "Ship"));
+        var scope = $"scratch/{name}/{Guid.NewGuid():N}";
+        var app = brain.Get<IApp>(scope + "/app");
+        await app.Install(new InstallApp(Guid.NewGuid(), new(shipped.Package, revision.Id), new Dictionary<string, string>()));
+        return (app, scope);
     }
 
-    private static ShippedApp Shipped(string name) => ShippedApps.Load().Single(app => app.Package.Name == name);
+    private static async Task<(string Answer, Guid InvocationId)> Ask(IApp app, string input, CancellationToken ct)
+    {
+        var invocation = await app.Invoke(new InvokeApp(Guid.NewGuid(), "ask", input));
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(TimeSpan.FromSeconds(60));
+        while (invocation.Status == InvocationStatus.Pending)
+        {
+            await Task.Delay(100, deadline.Token);
+            invocation = await app.ReadInvocation(invocation.Id);
+        }
+        Assert.True(invocation.Status == InvocationStatus.Completed, invocation.Error ?? "The app failed.");
+        return (invocation.Output ?? "", invocation.Id);
+    }
 
     private static void StampPublisher() => CallerContextStamper.Stamp(new CallerContext
     {
@@ -73,15 +136,12 @@ public sealed class ShippedAppFacts
 
     private static Task<UnitBrain> StartAsync(CancellationToken ct) => UnitTest.Create()
         .WithModule<AIModule>()
-        .WithModule<SpecsModule>()
         .WithModule<AppsModule>()
         .ConfigureSilo(silo =>
         {
             silo.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
             silo.Services.AddAppRuntime<GroupChatRuntime>();
             silo.Services.AddAppRuntime<PromptRuntime>();
-            silo.Services.AddSingleton<StepLibrary, ModelSteps>();
-            silo.Services.AddSingleton<StepLibrary, GroupChatSteps>();
         })
         .StartAsync(ct);
 }

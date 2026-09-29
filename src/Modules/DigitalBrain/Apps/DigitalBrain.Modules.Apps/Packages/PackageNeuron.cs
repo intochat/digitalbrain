@@ -165,13 +165,13 @@ internal sealed class PackageNeuron(
         return Describe(id);
     }
 
-    // A revision that states its behavior in app.feature is published only once that behavior was shown to hold.
+    // A revision that states its behavior in a spec or tests is published only once its tests ran green.
     private async Task RequireVerified(PackageId id, PackageRevision revision)
     {
-        if (revision.Content.File(PackageContent.SpecPath) is null) { return; }
+        if (revision.Content.File(PackageContent.TestsPath) is null && revision.Content.File(PackageContent.SpecPath) is null) { return; }
         var verification = await GrainFactory.GetGrain<IAppVerification>(IAppVerification.Key(new(id, revision.Id))).Read();
         if (verification is not { Green: true })
-        { throw new InvalidOperationException($"{id}@{revision.Id} has scenarios that have not passed yet. Verify the revision before publishing it."); }
+        { throw new InvalidOperationException($"{id}@{revision.Id} has tests that have not passed yet. Verify the revision before publishing it."); }
     }
 
     // Copies the revisions this package lacks from the source's lineage and checks each id against its content.

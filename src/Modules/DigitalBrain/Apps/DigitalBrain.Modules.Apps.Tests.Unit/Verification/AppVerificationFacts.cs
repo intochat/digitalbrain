@@ -1,9 +1,10 @@
 using DigitalBrain.Apps;
-using DigitalBrain.Specs;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Modules.Apps.Tests.Unit.Verification;
 
+// Verification runs a revision's tests.cs as a sandbox script; the dbtest lines it prints and its
+// exit code are the whole verdict, and a revision with tests reaches the marketplace only when green.
 public sealed class AppVerificationFacts
 {
     private static readonly PackageId Echo = PackageId.Parse("alice/echo");
@@ -13,7 +14,7 @@ public sealed class AppVerificationFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await StartAsync(ct);
-        var revision = await Commit(brain, Spec("the answer is \"you said: hi\""));
+        var revision = await Commit(brain, tests: null);
         var app = brain.Get<IApp>("workspace-alice/apps/echo");
 
         var installed = await app.Install(new(Guid.NewGuid(), new(Echo, revision.Id), new Dictionary<string, string>()));
@@ -25,12 +26,13 @@ public sealed class AppVerificationFacts
     }
 
     [Fact]
-    public async Task ARevisionWithScenariosIsPublishedOnlyAfterTheyPass()
+    public async Task ARevisionWithTestsIsPublishedOnlyAfterTheyPass()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await StartAsync(ct);
-        var revision = await Commit(brain, Spec("the answer is \"you said: hi (polite)\""));
+        var revision = await Commit(brain, tests: "// drives the scratch app");
         var package = brain.Get<IPackage>(Echo.ToString());
+        RecordingCSharpFile.ScriptedRuns[$"specs/{Echo}@{revision.Id}"] = (0, "noise\ndbtest:pass It repeats what I say\nmore noise");
         Caller.As("alice");
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => package.Publish(new(Guid.NewGuid(), revision.Id)));
@@ -40,8 +42,8 @@ public sealed class AppVerificationFacts
 
         Assert.True(verification.Green);
         Assert.Equal(revision.Id, published.Published);
-        var feature = await brain.Get<IFeature>(IAppVerification.FeatureKey(new(Echo, revision.Id))).Read();
-        Assert.True(feature.LastRun?.Green);
+        var verdict = Assert.Single(verification.Run.Scenarios);
+        Assert.Equal(("It repeats what I say", true), (verdict.Name, verdict.Passed));
     }
 
     [Fact]
@@ -49,72 +51,72 @@ public sealed class AppVerificationFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await StartAsync(ct);
-        var revision = await Commit(brain, Spec("the answer mentions \"goodbye\""));
+        var revision = await Commit(brain, tests: "// drives the scratch app");
+        RecordingCSharpFile.ScriptedRuns[$"specs/{Echo}@{revision.Id}"] =
+            (1, "dbtest:pass It greets\ndbtest:fail It repeats\tThe answer was \"you said: hi\".");
 
         var verification = await brain.Get<IAppVerification>(IAppVerification.Key(new(Echo, revision.Id))).Verify();
 
         Assert.False(verification.Green);
-        var failed = Assert.Single(verification.Run.Scenarios).Steps.Single(step => step.Verdict == Verdict.Failed);
-        Assert.Contains("does not mention \"goodbye\"", failed.Message);
+        var failed = verification.Run.Scenarios.Single(scenario => !scenario.Passed);
+        Assert.Equal("It repeats", failed.Name);
+        Assert.Contains("you said: hi", failed.Message, StringComparison.Ordinal);
         Caller.As("alice");
-        await Assert.ThrowsAsync<InvalidOperationException>(() => brain.Get<IPackage>(Echo.ToString()).Publish(new(Guid.NewGuid(), revision.Id)));
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => brain.Get<IPackage>(Echo.ToString()).Publish(new(Guid.NewGuid(), revision.Id)));
     }
 
     [Fact]
-    public async Task ScenariosCanChangeSettingsOfTheAppUnderTest()
+    public async Task ANoScenarioRunIsNotGreen()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await StartAsync(ct);
-        var revision = await Commit(brain, """
-            Feature: Echo
-              Scenario: Tone is a setting
-                Given the setting "tone" is "rude"
-                When I ask "hi"
-                Then the answer is "you said: hi (rude)"
-            """);
+        var revision = await Commit(brain, tests: "// exits without reporting anything");
+        RecordingCSharpFile.ScriptedRuns[$"specs/{Echo}@{revision.Id}"] = (0, "the script crashed before its first scenario");
 
         var verification = await brain.Get<IAppVerification>(IAppVerification.Key(new(Echo, revision.Id))).Verify();
 
-        Assert.True(verification.Green, string.Join("; ", verification.Run.Scenarios.SelectMany(scenario => scenario.Steps).Select(step => step.Message)));
+        Assert.False(verification.Green);
+        Assert.Empty(verification.Run.Scenarios);
     }
 
     [Fact]
-    public async Task EachScenarioStartsFromAFreshInstallation()
+    public async Task VerificationHandsTheRevisionToTheTestsRunAndCleansUp()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await StartAsync(ct);
-        var revision = await Commit(brain, """
-            Feature: Echo
-              Scenario: One scenario changes a setting
-                Given the setting "tone" is "rude"
-                When I ask "hi"
-                Then the answer is "you said: hi (rude)"
+        var revision = await Commit(brain, tests: "// hands the revision over");
+        RecordingCSharpFile.ScriptedRuns[$"specs/{Echo}@{revision.Id}"] = (0, "dbtest:pass All good");
 
-              Scenario: The next one sees the default again
-                When I ask "hi"
-                Then the answer is "you said: hi (polite)"
-            """);
+        await brain.Get<IAppVerification>(IAppVerification.Key(new(Echo, revision.Id))).Verify();
 
-        var verification = await brain.Get<IAppVerification>(IAppVerification.Key(new(Echo, revision.Id))).Verify();
-
-        Assert.True(verification.Green, string.Join("; ", verification.Run.Scenarios.SelectMany(scenario => scenario.Steps).Select(step => step.Message)));
+        var run = RecordingCSharpFile.ConfiguredSettings.Single(pair => pair.Key.StartsWith($"specs/{Echo}@{revision.Id}", StringComparison.Ordinal));
+        Assert.Equal(Echo.ToString(), run.Value["Package"]);
+        Assert.Equal(revision.Id, run.Value["Revision"]);
+        Assert.True(RecordingCSharpFile.Deleted.ContainsKey(run.Key));
     }
 
-    private static string Spec(string then) => $"""
-        Feature: Echo
-          Scenario: It repeats what I say
-            When I ask "hi"
-            Then {then}
-        """;
+    [Fact]
+    public async Task ARevisionWithoutTestsHasNothingToVerify()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await StartAsync(ct);
+        var revision = await Commit(brain, tests: null);
 
-    private static async Task<PackageRevision> Commit(PackageBrain brain, string spec)
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => brain.Get<IAppVerification>(IAppVerification.Key(new(Echo, revision.Id))).Verify());
+    }
+
+    private static async Task<PackageRevision> Commit(PackageBrain brain, string? tests)
     {
         Caller.As("alice");
+        var files = new Dictionary<string, string> { [PackageContent.SpecPath] = "## Scenario: It repeats what I say" };
+        if (tests is not null) { files[PackageContent.TestsPath] = tests; }
         var content = new PackageContent(
             new PackageManifest("Echo", "Repeats what it is told.", [new PackageOperation("ask", "Say something.")],
                 [new PackageSetting("tone", "How it answers.", "polite")], Runtime: "echo"),
             "",
-            new Dictionary<string, string> { [PackageContent.SpecPath] = spec });
+            tests is null ? new Dictionary<string, string>() : files);
         return await brain.Get<IPackage>(Echo.ToString()).Commit(brain.Commit(null, content));
     }
 

@@ -2,7 +2,6 @@ using DigitalBrain.AI.Agents;
 using DigitalBrain.Contracts;
 using DigitalBrain.Apps;
 using DigitalBrain.Core.Enforcement;
-using DigitalBrain.Specs;
 using IntoChat.Marketplace;
 
 namespace IntoChat.Packages;
@@ -18,8 +17,6 @@ internal static class PackageEndpoints
         builder.Services.AddSingleton<MarketplaceService>();
         builder.Services.AddAppRuntime<GroupChatRuntime>();
         builder.Services.AddAppRuntime<PromptRuntime>();
-        builder.Services.AddSingleton<StepLibrary, ModelSteps>();
-        builder.Services.AddSingleton<StepLibrary, GroupChatSteps>();
         builder.Services.AddHostedService<ShippedAppPublisher>();
     }
 
@@ -50,7 +47,6 @@ internal static class PackageEndpoints
         packages.MapPut("/drafts/{id}/spec", (string id, DraftRequest request, IDigitalBrain brain)
             => Draft(brain, id).EditSpec(request.Text));
         packages.MapPost("/drafts/{id}/build", (string id, IDigitalBrain brain) => Draft(brain, id).Build());
-        packages.MapGet("/steps", (MarketplaceService marketplace) => marketplace.Vocabulary());
         packages.MapGet("/{owner}/{name}/spec", (string owner, string name, string? revision, MarketplaceService marketplace)
             => marketplace.Spec(PackageId.Create(owner, name), revision));
         packages.MapPost("/{owner}/{name}/verify", (string owner, string name, string? revision, MarketplaceService marketplace)

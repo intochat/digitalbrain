@@ -1,6 +1,4 @@
-using DigitalBrain.Apps.Manifests;
 using DigitalBrain.Core;
-using DigitalBrain.Specs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
@@ -16,6 +14,6 @@ public sealed class AppsModule : IModule
     {
         ArgumentNullException.ThrowIfNull(silo);
         silo.Services.TryAddSingleton(TimeProvider.System);
-        silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<StepLibrary, AppSteps>());
+        silo.Services.TryAddSingleton<ITestScriptRunner, CSharpFileTestRunner>();
     }
 }

@@ -6,15 +6,14 @@ using DigitalBrain.AI.OpenAI;
 using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
-using DigitalBrain.Specs;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace IntoChat.Marketplace;
 
-// An app someone is creating by describing it. The Author agent writes its scenarios from the request;
-// the person reads and edits them; the Builder agent then writes whatever makes them pass, and the app
-// is published only once they do. Keyed "{owner}/drafts/{id}".
+// An app someone is creating by describing it. The Author agent writes its spec in plain language;
+// the person reads and edits it; the Builder agent then writes the tests and the implementation, and
+// the app is published only once its tests run green. Keyed "{owner}/drafts/{id}".
 [Alias("intochat.app-draft"), Orleans.Metadata.DefaultGrainType("intochat.app-draft")]
 public interface IAppDraft : INeuron
 {
@@ -52,7 +51,7 @@ public sealed record AppDraftState
 [GenerateSerializer, Alias("intochat.app-draft-view")]
 public sealed record AppDraftView(
     [property: Id(0)] AppDraftState Draft,
-    [property: Id(1)] FeatureSnapshot? Feature);
+    [property: Id(1)] AppVerification? Verification);
 
 [GenerateSerializer, Alias("intochat.app-draft-changed")]
 public sealed record AppDraftChanged([property: Id(0)] string DraftId, [property: Id(1)] long Revision, [property: Id(2)] AppDraftStatus Status) : Signal;
@@ -72,7 +71,6 @@ internal sealed class AppDraftNeuron(
 
     private string DraftId => this.GetPrimaryKeyString();
     private string Owner => DraftId.Split('/')[0];
-    private IFeature Feature => GrainFactory.GetGrain<IFeature>("drafts/" + DraftId);
     private string AuthorModel => configuration["IntoChat:Apps:AuthorModel"] ?? nameof(IGpt56Luna);
     private string BuilderModel => configuration["IntoChat:Apps:BuilderModel"] ?? nameof(IGpt56Luna);
     // A csharp app is only offered where this host may run it.
@@ -98,7 +96,6 @@ internal sealed class AppDraftNeuron(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(spec);
         RequireSpec();
-        await Feature.Set(spec);
         await Persist(Snapshot with { Spec = spec, Status = AppDraftStatus.Drafted, Error = "" });
         return await Read();
     }
@@ -107,9 +104,6 @@ internal sealed class AppDraftNeuron(
     {
         RequireSpec();
         if (!Runtimes.Contains(Snapshot.Runtime)) { throw new InvalidOperationException(MarketplaceService.ActivationDisabled); }
-        var feature = await Feature.Set(Snapshot.Spec);
-        if (!feature.FullyBound)
-        { throw new InvalidOperationException("Some steps are not ones the brain understands yet. Edit or revise the scenarios first."); }
         await Persist(Snapshot with { Status = AppDraftStatus.Building, Attempts = [], Error = "" });
         var package = GrainFactory.GetGrain<IPackage>(PackageId.Create(Owner, Snapshot.Name).ToString());
         var failures = "";
@@ -137,17 +131,22 @@ internal sealed class AppDraftNeuron(
                 await Persist(Snapshot with { Attempts = [.. Snapshot.Attempts, new("", false, failures)] });
             }
         }
-        await Persist(Snapshot with { Status = AppDraftStatus.Failed, Error = $"The scenarios still fail after {MaxBuildAttempts} attempts." });
+        await Persist(Snapshot with { Status = AppDraftStatus.Failed, Error = $"The tests still fail after {MaxBuildAttempts} attempts." });
         return await Read();
     }
 
     public async Task<AppDraftView> Read()
-        => new(Snapshot, Snapshot.Spec.Length == 0 ? null : await Feature.Read());
+    {
+        var last = Snapshot.Name.Length == 0 ? null : Snapshot.Attempts.LastOrDefault(attempt => attempt.Revision.Length > 0);
+        var verification = last is null
+            ? null
+            : await GrainFactory.GetGrain<IAppVerification>(IAppVerification.Key(new(PackageId.Create(Owner, Snapshot.Name), last.Revision))).Read();
+        return new(Snapshot, verification);
+    }
 
     private async Task<AppDraftView> Author(AppDraftState draft, string task)
     {
-        var vocabulary = await Feature.Vocabulary();
-        var prompt = $"{task}\n\nRuntimes this brain can run: {string.Join(", ", Runtimes)}.\n\nSteps the brain understands:\n{string.Join("\n", vocabulary.Select(step => $"- {step.Pattern}  ({step.Description})"))}";
+        var prompt = $"{task}\n\nRuntimes this brain can run: {string.Join(", ", Runtimes)}.";
         for (var retry = 0; ; retry++)
         {
             AuthoredApp authored;
@@ -163,21 +162,12 @@ internal sealed class AppDraftNeuron(
                 prompt += $"\n\nYour previous reply could not be used: {error.Message} Reply with the JSON object only.";
                 continue;
             }
-            var feature = await Feature.Set(authored.Feature);
-            var unbound = feature.Scenarios.SelectMany(scenario => scenario.Steps).Concat(feature.Background).Where(step => !step.Bound).ToArray();
-            var complaint = feature.Problem is { } problem
-                ? $"line {problem.Line}: {problem.Message}"
-                : unbound.Length > 0 ? string.Join("\n", unbound.Select(step => $"line {step.Line}: {step.Keyword} {step.Text}")) : null;
-            if (complaint is null || retry == MaxAuthorRetries)
+            await Persist(draft with
             {
-                await Persist(draft with
-                {
-                    Name = package.Name, Title = authored.Title, Description = authored.Description, Runtime = authored.Runtime,
-                    Spec = authored.Feature, Status = AppDraftStatus.Drafted, Attempts = [], Error = "",
-                });
-                return await Read();
-            }
-            prompt += $"\n\nYour previous specification:\n{authored.Feature}\n\nThese lines are not ones the brain understands; rewrite them with the listed phrasings:\n{complaint}";
+                Name = package.Name, Title = authored.Title, Description = authored.Description, Runtime = authored.Runtime,
+                Spec = authored.Spec, Status = AppDraftStatus.Drafted, Attempts = [], Error = "",
+            });
+            return await Read();
         }
     }
 
@@ -185,14 +175,17 @@ internal sealed class AppDraftNeuron(
     {
         var task = new StringBuilder()
             .AppendLine($"Runtime: {Snapshot.Runtime}")
+            .AppendLine($"Package: {Owner}/{Snapshot.Name}")
             .AppendLine($"What the person wants: {Snapshot.Request}")
             .AppendLine().AppendLine("Specification:").AppendLine(Snapshot.Spec);
-        if (failures.Length > 0) { task.AppendLine().AppendLine("The previous attempt failed these steps:").AppendLine(failures); }
+        if (failures.Length > 0) { task.AppendLine().AppendLine("The previous attempt failed:").AppendLine(failures); }
         var built = Parse<BuiltApp>(await ModelAddress.Complete(GrainFactory, BuilderModel, AgentPrompts.Builder, task.ToString()));
         var files = new Dictionary<string, string>(built.Files ?? new Dictionary<string, string>(), StringComparer.Ordinal)
         {
             [PackageContent.SpecPath] = Snapshot.Spec,
         };
+        if (!files.ContainsKey(PackageContent.TestsPath))
+        { throw new InvalidDataException($"The implementation must include {PackageContent.TestsPath}, the scenarios' proof."); }
         return new PackageContent(
             new PackageManifest(Snapshot.Title, Snapshot.Description, [new PackageOperation("ask", "Ask the app.")],
                 [.. (built.Settings ?? []).Select(setting => new PackageSetting(setting.Name, setting.Description ?? "", setting.Default ?? ""))],
@@ -201,11 +194,13 @@ internal sealed class AppDraftNeuron(
             files);
     }
 
-    private static string Failures(FeatureRun run) => string.Join("\n", run.Scenarios
-        .Where(scenario => scenario.Verdict != Verdict.Passed)
-        .Select(scenario => $"Scenario '{scenario.Name}': " + string.Join("; ", scenario.Steps
-            .Where(step => step.Verdict is Verdict.Failed or Verdict.Unbound)
-            .Select(step => $"line {step.Line}: {step.Message}"))));
+    private static string Failures(AppTestRun run)
+    {
+        if (run.Scenarios.Length == 0) { return $"The tests reported no scenarios (exit code {run.ExitCode?.ToString() ?? "unknown"})."; }
+        return string.Join("\n", run.Scenarios
+            .Where(scenario => !scenario.Passed)
+            .Select(scenario => $"Scenario '{scenario.Name}': {scenario.Message}"));
+    }
 
     // Models sometimes wrap the JSON in a code fence or add prose around it; read the first complete object.
     private static T Parse<T>(string reply)
@@ -229,7 +224,7 @@ internal sealed class AppDraftNeuron(
         return Save(saved, new AppDraftChanged(DraftId, saved.Revision, saved.Status));
     }
 
-    private sealed record AuthoredApp(string Name, string Title, string Description, string Runtime, string Feature);
+    private sealed record AuthoredApp(string Name, string Title, string Description, string Runtime, string Spec);
     private sealed record BuiltApp(IReadOnlyList<BuiltSetting>? Settings, IReadOnlyDictionary<string, string>? Files, string? Source);
     private sealed record BuiltSetting(string Name, string? Description, string? Default);
 }
