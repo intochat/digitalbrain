@@ -11,37 +11,39 @@ namespace DigitalBrain.Tests;
 public sealed class RuntimeSignalFacts
 {
     [Fact]
-    public async Task LateSubscribersReceiveTheModuleSnapshotAndFutureSignals()
+    public async Task SiloSubscriptionsReceiveOrdinaryNeuronSignalsAndFilterByType()
     {
-        var signals = new RuntimeSignals(NullLogger<RuntimeSignals>.Instance);
-        signals.Publish(new ModuleLoaded("module-a"));
-        using var subscription = signals.Subscribe();
-        signals.Publish(new ModuleLoaded("module-b"));
         var ct = TestContext.Current.CancellationToken;
-
-        Assert.Equal("module-a", Assert.IsType<ModuleLoaded>(await subscription.Reader.ReadAsync(ct)).ModuleType);
-        Assert.Equal("module-b", Assert.IsType<ModuleLoaded>(await subscription.Reader.ReadAsync(ct)).ModuleType);
-        Assert.Equal(["module-a", "module-b"], signals.Modules.Select(module => module.ModuleType));
+        await using var brain = await UnitTest.Create().StartAsync(ct);
+        using var signals = brain.SiloServices.GetRequiredService<LocalSignalHub>().Subscribe<Number>();
+        await brain.Get<ITestEmitter>("one").EmitText("ignored");
+        await brain.Get<ITestEmitter>("one").Emit(1);
+        await brain.Get<ITestEmitter>("two").Emit(2);
+        Assert.Equal(1, (await signals.Reader.ReadAsync(ct)).Value);
+        Assert.Equal(2, (await signals.Reader.ReadAsync(ct)).Value);
+        Assert.False(signals.Reader.TryRead(out _));
+        signals.Dispose();
+        await brain.Get<ITestEmitter>("one").Emit(3);
+        await signals.Reader.Completion;
     }
 
     [Fact]
-    public async Task StartupAnnouncesSelectedModulesWithoutRegistry()
+    public async Task StartupAnnouncesModulesThroughTheSharedHubAndInventoryRemainsAvailable()
     {
-        await using var brain = await UnitTest.Create().WithModule<RuntimeFixtureModule>()
-            .StartAsync(TestContext.Current.CancellationToken);
-        var signals = brain.SiloServices.GetRequiredService<RuntimeSignals>();
-        using var subscription = signals.Subscribe();
-
+        var hub = new LocalSignalHub(NullLogger<LocalSignalHub>.Instance);
+        var inventory = new ModuleInventory([typeof(RuntimeFixtureModule)]);
+        using var subscription = hub.Subscribe<ModuleLoaded>();
+        await new RuntimeStartupTask(inventory, hub).Execute(TestContext.Current.CancellationToken);
         Assert.Equal(typeof(RuntimeFixtureModule).AssemblyQualifiedName,
-            Assert.IsType<ModuleLoaded>(await subscription.Reader.ReadAsync(TestContext.Current.CancellationToken)).ModuleType);
+            (await subscription.Reader.ReadAsync(TestContext.Current.CancellationToken)).ModuleType);
+        Assert.Equal([typeof(RuntimeFixtureModule)], inventory.Types);
     }
-
     [Fact]
     public async Task LifecycleSignalsDoNotDependOnDerivedHooksCallingBase()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().StartAsync(ct);
-        using var signals = brain.SiloServices.GetRequiredService<RuntimeSignals>().Subscribe();
+        using var signals = brain.SiloServices.GetRequiredService<LocalSignalHub>().Subscribe<NeuronActivity>();
         var neuron = brain.Get<IRuntimeProbe>("runtime-probe");
         await neuron.Ping();
         var activated = Assert.IsType<NeuronActivated>(await signals.Reader.ReadAsync(ct).AsTask().WaitAsync(TimeSpan.FromSeconds(5), ct));
@@ -64,7 +66,7 @@ public sealed class RuntimeSignalFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().StartAsync(ct);
-        using var signals = brain.SiloServices.GetRequiredService<RuntimeSignals>().Subscribe();
+        using var signals = brain.SiloServices.GetRequiredService<LocalSignalHub>().Subscribe<NeuronActivity>();
         await Assert.ThrowsAsync<InvalidOperationException>(() => brain.Get<IRuntimeProbe>("fail").Ping());
         Assert.False(signals.Reader.TryRead(out _));
     }

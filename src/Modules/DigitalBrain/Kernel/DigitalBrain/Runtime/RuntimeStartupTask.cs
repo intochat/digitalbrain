@@ -2,7 +2,7 @@ using DigitalBrain.Contracts;
 
 namespace DigitalBrain.Core;
 
-internal sealed class RuntimeStartupTask(ModuleInventory modules, RuntimeSignals signals) : IStartupTask
+internal sealed class RuntimeStartupTask(ModuleInventory modules, LocalSignalHub signals) : IStartupTask
 {
     public Task Execute(CancellationToken cancellationToken)
     {

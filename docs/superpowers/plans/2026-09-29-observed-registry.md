@@ -40,3 +40,9 @@
 - Independent read-only review found no actionable correctness issues. Additional coverage of persistence-write failure/retry and vector reindexing after a changed module snapshot remains optional.
 - Full browser E2E suite was not rerun. Existing unrelated missing-document failures in IntoChat/Supabase were not changed.
 - History remains best effort and last-known-active; Registry excludes itself. Vector search needs Qdrant and an embedding provider.
+
+## Follow-up: shared signal transport
+
+Removed the separate RuntimeSignal hierarchy and RuntimeSignals service. LocalSignalHub now supports typed, bounded silo-wide subscriptions alongside its existing neuron subscriptions. Lifecycle records derive from Signal; Registry subscribes to NeuronActivity. Type discovery reads the existing immutable ModuleInventory, so module notifications need no replay or second snapshot store.
+
+Verification: solution build passed with zero warnings/errors; Kernel runtime 80, Registry 7, and Time 20 tests passed (107 total). Changed-file whitespace verification passed. Independent review found no actionable issues.

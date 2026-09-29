@@ -10,9 +10,9 @@ var active = await registry.Instances(typeId: "timer", activeOnly: true);
 var history = await registry.Instances(skip: 0, take: 100);
 ```
 
-Kernel's silo startup task publishes `ModuleLoaded` signals for selected modules. Its host-local `RuntimeSignals` source retains that module snapshot for late readers. Registry discovers each selected module's public `INeuron` contracts by Orleans alias; it includes descriptions and method signatures, but never invokes them. A changed module snapshot refreshes metadata and the vector index on the next query.
+Kernel's silo startup task publishes `ModuleLoaded` signals for selected modules. These are ordinary `Signal` records delivered through `LocalSignalHub`, which also carries neuron signals. Registry reads the selected modules from `ModuleInventory`, so late readers do not depend on replay. It discovers their public `INeuron` contracts by Orleans alias and includes descriptions and method signatures, but never invokes them.
 
-`Neuron` automatically publishes `NeuronActivated` and `NeuronDeactivated` after its lifecycle hooks, even when a derived override does not call base. A bounded live subscription forwards those observations to the persistent Registry neuron at `RegistryModule.Key`. Ordinary activation never waits for Registry, storage, or embeddings. Every silo forwards its own observations to the shared registry; type metadata reflects the selected modules on the silo serving the query.
+`Neuron` automatically publishes `NeuronActivated` and `NeuronDeactivated` after its lifecycle hooks, even when a derived override does not call base. A bounded, typed silo-wide subscription on the same hub forwards those observations to the persistent Registry neuron at `RegistryModule.Key`. Ordinary activation never waits for Registry, storage, or embeddings. Every silo forwards its own observations to the shared registry; type metadata reflects the selected modules on the silo serving the query.
 
 History retains one row per observed neuron identity: contract aliases, grain key, first/last observation, latest activation ID, and `LastKnownActive`. Deactivation of an older activation does not deactivate a newer one. Reactivation updates the existing row. The registry excludes its own storage neuron to avoid reactivating itself to record its deactivation.
 

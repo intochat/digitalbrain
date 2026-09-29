@@ -5,22 +5,19 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Registry;
 
-internal sealed class NeuronTypes(RuntimeSignals runtime)
+internal sealed class NeuronTypes(ModuleInventory modules)
 {
     private readonly Lock _gate = new();
-    private IReadOnlyList<ModuleLoaded>? _modules;
-    private IReadOnlyList<NeuronType> _types = [];
+    private IReadOnlyList<NeuronType>? _types;
 
     public IReadOnlyList<NeuronType> Read()
     {
         lock (_gate)
         {
-            var modules = runtime.Modules;
-            if (ReferenceEquals(modules, _modules)) { return _types; }
+            if (_types is not null) { return _types; }
             var types = new Dictionary<string, (Type Contract, NeuronType Metadata)>(StringComparer.Ordinal);
-            foreach (var loaded in modules)
+            foreach (var module in modules.Types)
             {
-                var module = Type.GetType(loaded.ModuleType, throwOnError: true)!;
                 var assembly = module.Assembly;
                 var contracts = assembly.GetReferencedAssemblies()
                     .Where(reference => reference.Name == assembly.GetName().Name + ".Contracts").Select(Assembly.Load).ToArray();
@@ -47,7 +44,6 @@ internal sealed class NeuronTypes(RuntimeSignals runtime)
                 }
             }
             _types = Array.AsReadOnly(types.Values.Select(type => type.Metadata).OrderBy(type => type.Id, StringComparer.Ordinal).ToArray());
-            _modules = modules;
             return _types;
         }
     }

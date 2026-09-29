@@ -36,7 +36,7 @@ public abstract class Neuron : Grain, INeuron, IGrainBase
 
     private void PublishActivity(bool active)
     {
-        var signals = ServiceProvider.GetService<RuntimeSignals>();
+        var signals = ServiceProvider.GetService<LocalSignalHub>();
         if (signals is null) { return; }
         var typeIds = GetType().GetInterfaces()
             .Where(type => type != typeof(INeuron) && typeof(INeuron).IsAssignableFrom(type))

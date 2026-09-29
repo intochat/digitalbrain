@@ -15,7 +15,6 @@ public static class BrainHosting
         ArgumentNullException.ThrowIfNull(silo);
         silo.Services.AddSingleton(new ModuleInventory(moduleTypes));
         silo.Services.TryAddSingleton(TimeProvider.System);
-        silo.Services.TryAddSingleton<RuntimeSignals>();
         silo.AddStartupTask<RuntimeStartupTask>();
         silo.Services.AddDigitalBrainClient();
         silo.Services.TryAddSingleton<ICallFilter, CallFilter>();

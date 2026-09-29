@@ -1,13 +1,10 @@
 namespace DigitalBrain.Contracts;
 
-[GenerateSerializer, Alias("brain.runtime-signal")]
-public abstract record RuntimeSignal : Signal;
-
 [GenerateSerializer, Alias("brain.module-loaded")]
-public sealed record ModuleLoaded([property: Id(0)] string ModuleType) : RuntimeSignal;
+public sealed record ModuleLoaded([property: Id(0)] string ModuleType) : Signal;
 
 [GenerateSerializer, Alias("brain.neuron-activity")]
-public abstract record NeuronActivity : RuntimeSignal
+public abstract record NeuronActivity : Signal
 {
     [Id(0)] public required string NeuronId { get; init; }
     [Id(1)] public required string Key { get; init; }

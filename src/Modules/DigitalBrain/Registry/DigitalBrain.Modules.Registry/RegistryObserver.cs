@@ -5,16 +5,16 @@ using Microsoft.Extensions.Logging;
 
 namespace DigitalBrain.Registry;
 
-internal sealed class RegistryObserver(RuntimeSignals signals, IGrainFactory grains, ILogger<RegistryObserver> logger) : BackgroundService
+internal sealed class RegistryObserver(LocalSignalHub signals, IGrainFactory grains, ILogger<RegistryObserver> logger) : BackgroundService
 {
-    private readonly RuntimeSignals.Subscription _subscription = signals.Subscribe();
+    private readonly LocalSignalHub.Subscription<NeuronActivity> _subscription = signals.Subscribe<NeuronActivity>();
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await foreach (var signal in _subscription.Reader.ReadAllAsync(stoppingToken).ConfigureAwait(false))
+        await foreach (var activity in _subscription.Reader.ReadAllAsync(stoppingToken).ConfigureAwait(false))
         {
             // Recording our own deactivation would reactivate us forever.
-            if (signal is not NeuronActivity activity || activity.TypeIds.Contains("registry", StringComparer.Ordinal)) { continue; }
+            if (activity.TypeIds.Contains("registry", StringComparer.Ordinal)) { continue; }
             try { await grains.GetGrain<IRegistryObserver>(RegistryModule.Key).Observe(activity).WaitAsync(stoppingToken).ConfigureAwait(false); }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception error)

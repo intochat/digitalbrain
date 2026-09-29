@@ -47,13 +47,13 @@ public sealed class TypeSearchFacts
     }
 
     [Fact]
-    public async Task ModuleSnapshotChangesRefreshTypeMetadata()
+    public async Task ModuleAnnouncementsDoNotChangeTheSelectedComposition()
     {
         await using var brain = await UnitTest.Create().WithModule<RegistryModule>().StartAsync(TestContext.Current.CancellationToken);
         var registry = brain.Get<IRegistry>(RegistryModule.Key);
         Assert.DoesNotContain(await registry.Types(), type => type.Id == "test.registry-clock");
-        brain.SiloServices.GetRequiredService<RuntimeSignals>().Publish(new ModuleLoaded(typeof(RegistryFixtureModule).AssemblyQualifiedName!));
-        Assert.Contains(await registry.Types(), type => type.Id == "test.registry-clock");
+        brain.SiloServices.GetRequiredService<LocalSignalHub>().Publish(new ModuleLoaded(typeof(RegistryFixtureModule).AssemblyQualifiedName!));
+        Assert.DoesNotContain(await registry.Types(), type => type.Id == "test.registry-clock");
     }
 
     private sealed class ClockEmbeddings : IEmbeddingGenerator<string, Embedding<float>>
