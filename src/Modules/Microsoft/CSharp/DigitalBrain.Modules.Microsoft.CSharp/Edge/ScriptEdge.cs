@@ -65,32 +65,36 @@ internal sealed class ScriptEdge(RunTokens tokens, ScriptContracts contracts, IG
         ICSharpFileEdge file, string run, string neuron, string signal,
         ISignalSubscription<Signal> doorbell, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        await using (doorbell)
+        var rings = doorbell.ReadAllAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
+        Task<bool>? ring = null;
+        try
         {
-            var rings = doorbell.ReadAllAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
-            try
+            var doorbellAlive = true;
+            while (!cancellationToken.IsCancellationRequested)
             {
-                var doorbellAlive = true;
-                Task<bool>? ring = null;
-                while (!cancellationToken.IsCancellationRequested)
+                foreach (var json in await file.DrainPending(run, neuron, signal).ConfigureAwait(false)) { yield return json; }
+                if (doorbellAlive)
                 {
-                    foreach (var json in await file.DrainPending(run, neuron, signal).ConfigureAwait(false)) { yield return json; }
-                    if (doorbellAlive)
+                    ring ??= NextRingAsync(rings);
+                    if (await Task.WhenAny(ring, Task.Delay(DoorbellSweep, cancellationToken)).ConfigureAwait(false) == ring)
                     {
-                        ring ??= NextRingAsync(rings);
-                        if (await Task.WhenAny(ring, Task.Delay(DoorbellSweep, cancellationToken)).ConfigureAwait(false) == ring)
-                        {
-                            doorbellAlive = await ring.ConfigureAwait(false);
-                            ring = null;
-                        }
-                    }
-                    else
-                    {
-                        await Task.Delay(DoorbellSweep, cancellationToken).ConfigureAwait(false);
+                        doorbellAlive = await ring.ConfigureAwait(false);
+                        ring = null;
                     }
                 }
+                else
+                {
+                    await Task.Delay(DoorbellSweep, cancellationToken).ConfigureAwait(false);
+                }
             }
-            finally { await rings.DisposeAsync().ConfigureAwait(false); }
+        }
+        finally
+        {
+            // Close the subscription first: the pending MoveNextAsync then completes, and only a
+            // settled iterator may be disposed - disposing it mid-move throws NotSupportedException.
+            await doorbell.DisposeAsync().ConfigureAwait(false);
+            if (ring is not null) { await ring.ConfigureAwait(false); }
+            await rings.DisposeAsync().ConfigureAwait(false);
         }
     }
 
