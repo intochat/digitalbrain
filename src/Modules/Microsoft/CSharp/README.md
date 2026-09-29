@@ -54,9 +54,13 @@ Scripts never join the cluster. `DigitalBrainClient.ConnectAsync(args)` reads `D
 | Edge | |
 | --- | --- |
 | `POST /scripts/v1/invoke` | `{ contract, key, method, arguments }` → one grain call; the JSON result or `204`. |
-| `GET /scripts/v1/signals?contract=&key=&signal=` | Server-sent events: each signal of that type the neuron publishes, as JSON. |
+| `GET /scripts/v1/signals?contract=&key=&signal=` | Server-sent events: each signal of that type the neuron publishes, as JSON. Opening the stream registers a durable subscription on the file, so the subscription outlives the run. |
 
 `brain.Get<T>(id)` returns a proxy whose calls become invocations; `SubscribeAsync`/`On<T>` read the signal stream.
+
+### Durable subscriptions
+
+A script's `On<T>(source)` is remembered by the file neuron, which watches the source itself. Signals published while no run is live are buffered on the file (up to 64 per subscription, oldest dropped) and **wake a new run**: the script starts from the top, reaches `On<T>` again and immediately receives the buffered signals, oldest first. A clean exit leaves a subscribed file waiting rather than finished; `Start`, `Arm`, `Stop` and `Delete` clear its subscriptions. Delivery removes a signal from the buffer when it is written to the stream, so handlers dedup through neuron state.
 
 * The run token is HMAC-signed (file, run, 7-day expiry). The edge also asks the file: a token speaks for it only while it should run (the current run, or any run while armed), so `Stop` and `Delete` revoke every token.
 * Only neuron interfaces from installed contract assemblies are callable, never `Watch`/`Unwatch`.
@@ -80,7 +84,9 @@ With `SessionPoolEndpoint` set, runs go to an Azure Container Apps custom-contai
 
 An armed file keeps watching its trigger instead: the reconcile re-watches it after a silo restart, and a signal that arrives after the file was collected reactivates it. Triggered runs are not retried (the next signal is the next attempt); 5 failing runs in a row disarm the file.
 
-A file that should run but is between runs reads as `Restarting`. A script that does not compile is retried like any crash, so its compiler output stays in the logs. Signals published while a script is down are not replayed.
+A file with durable subscriptions behaves like an armed one: the reconcile re-watches its sources, a clean exit leaves it waiting for the next signal, wake-runs are not retried (5 failures in a row clear the subscriptions and disarm), and pending signals a lost run never drained wake a fresh run on the next reconcile.
+
+An always-on file that should run but is between runs reads as `Restarting`. A script that does not compile is retried like any crash, so its compiler output stays in the logs. Signals a trigger fires while its file is down start runs when it returns; signals on durable subscriptions are buffered and replayed.
 
 Options (`DigitalBrain:CSharp`): `SourceRoot`, the repository the sandbox mounts at `/brain` (default: the repository containing the silo); `AspireApplication`, the `IAspire` key (default `DigitalBrain`); `EdgeUrl`; `RunTokenKey`; `SessionPoolEndpoint`. IntoChat's AppHost composes the module and `AspireModule` in the developer profile.
 
