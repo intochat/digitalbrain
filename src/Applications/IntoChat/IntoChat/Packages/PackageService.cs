@@ -137,7 +137,12 @@ internal sealed class PackageService(
     public Task<AppInvocation> ReadInvocation(string workspaceId, PackageId id, Guid invocationId) => App(workspaceId, id).ReadInvocation(invocationId);
 
     private async Task<InstalledPackageView> View(AppSnapshot snapshot)
-        => new(snapshot, snapshot.CSharpFile is { } file && files.CanRun ? await brain.Get<ICSharpFile>(file).Read() : null);
+    {
+        if (!files.CanRun || snapshot.CSharpFiles.Count == 0) { return new(snapshot, []); }
+        var snapshots = new List<CSharpFileSnapshot>(snapshot.CSharpFiles.Count);
+        foreach (var file in snapshot.CSharpFiles) { snapshots.Add(await brain.Get<ICSharpFile>(file).Read()); }
+        return new(snapshot, snapshots);
+    }
 
     private async Task<PackageRevisionRef> Resolve(PackageReference reference, bool preferPublished)
     {

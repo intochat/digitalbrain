@@ -9,6 +9,21 @@ public sealed record PackageContent(
     [property: Id(2)] IReadOnlyDictionary<string, string>? Files = null)
 {
     public const string SpecPath = "app.feature";
+    public const string SourcePath = "app.cs";
+    public const string BehaviorsPrefix = "behaviors/";
 
     public string? File(string path) => Files is not null && Files.TryGetValue(path, out var text) ? text : null;
+
+    // Everything a csharp app runs: the legacy single Source plus one script per behaviors/*.cs file.
+    public IReadOnlyDictionary<string, string> Programs()
+    {
+        var programs = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        if (!string.IsNullOrWhiteSpace(Source)) { programs[SourcePath] = Source; }
+        foreach (var (path, text) in Files ?? new Dictionary<string, string>())
+        {
+            if (path.StartsWith(BehaviorsPrefix, StringComparison.Ordinal) && path.EndsWith(".cs", StringComparison.Ordinal))
+            { programs[path] = text; }
+        }
+        return programs;
+    }
 }

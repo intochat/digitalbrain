@@ -20,7 +20,7 @@ public sealed class AppVerificationFacts
         var invocation = await app.Invoke(new(Guid.NewGuid(), "ask", "hi"));
         while (invocation.Status == InvocationStatus.Pending) { await Task.Delay(50, ct); invocation = await app.ReadInvocation(invocation.Id); }
 
-        Assert.Null(installed.CSharpFile);
+        Assert.Empty(installed.CSharpFiles);
         Assert.Equal("you said: hi (polite)", invocation.Output);
     }
 

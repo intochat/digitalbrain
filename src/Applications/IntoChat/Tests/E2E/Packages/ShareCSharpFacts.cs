@@ -69,7 +69,7 @@ public sealed class ShareCSharpFacts
         var installed = await People.Send(bob.Client, HttpMethod.Post, $"/workspaces/{bob.Workspace}/packages/alice/greeter",
             new { accounts = new { twitter = "bob-twitter" } }, ct);
         Assert.Equal("bob-twitter", installed.GetProperty("app").GetProperty("accounts").GetProperty("twitter").GetString());
-        var file = brain.Get<ICSharpFile>(installed.GetProperty("app").GetProperty("csharpFile").GetString()!);
+        var file = brain.Get<ICSharpFile>(installed.GetProperty("app").GetProperty("csharpFiles")[0].GetString()!);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromMinutes(3));
         string logs;

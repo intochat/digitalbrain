@@ -13,5 +13,7 @@ public sealed record AppState
     [Id(8)] public List<OperationReceipt> Receipts { get; init; } = [];
     [Id(9)] public Dictionary<string, string> Accounts { get; init; } = [];
     [Id(10)] public string Runtime { get; init; } = PackageManifest.CSharpRuntime;
+    // The program paths the current generation deployed, so retiring needs no second look at the revision.
+    [Id(11)] public string[] ScriptPaths { get; init; } = [];
     public bool RunsScript => Runtime == PackageManifest.CSharpRuntime;
 }

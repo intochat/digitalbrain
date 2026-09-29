@@ -41,7 +41,8 @@ internal static partial class PackageRules
             "Account slots and settings cannot share a name.");
         Require(RuntimeName().IsMatch(manifest.RuntimeName), "A runtime name is lowercase words joined by hyphens.");
         Require(content.Source is not null && System.Text.Encoding.UTF8.GetByteCount(content.Source) <= MaxCodeBytes, "Source is at most 128 KiB.");
-        Require(manifest.RuntimeName != PackageManifest.CSharpRuntime || !string.IsNullOrWhiteSpace(content.Source), "A csharp app needs its script as source.");
+        Require(manifest.RuntimeName != PackageManifest.CSharpRuntime || content.Programs().Count > 0,
+            "A csharp app needs at least one script: its source or a behaviors/*.cs file.");
         var files = content.Files ?? new Dictionary<string, string>();
         Require(files.Count <= MaxFiles && files.All(file => file.Key.Length <= 128 && FilePath().IsMatch(file.Key) && !file.Key.Contains("..", StringComparison.Ordinal) && file.Value is not null),
             "A package has at most 64 files with relative paths of letters, digits, dots, hyphens and single slashes.");

@@ -59,7 +59,7 @@ public sealed class AppFacts
             new Dictionary<string, string> { ["twitter"] = "alice-twitter" }));
 
         await Assert.ThrowsAsync<ArgumentException>(() => app.Upgrade(new(Guid.NewGuid(), new(Researcher, second.Id))));
-        Assert.False(RecordingCSharpFile.Deleted.ContainsKey(installed.CSharpFile!));
+        Assert.False(RecordingCSharpFile.Deleted.ContainsKey(installed.CSharpFiles.Single()));
         var upgraded = await app.Upgrade(new(Guid.NewGuid(), new(Researcher, second.Id),
             new Dictionary<string, string> { ["twitter"] = "alice-twitter", ["notify"] = "alice-ui" }));
         Assert.Equal("alice-twitter", upgraded.Accounts!["twitter"]);
@@ -115,9 +115,9 @@ public sealed class AppFacts
         var repeated = await app.Configure(configure);
 
         Assert.Equal("brief", configured.Settings["style"]);
-        Assert.Equal(configured.CSharpFile, repeated.CSharpFile);
-        Assert.NotEqual(installed.CSharpFile, configured.CSharpFile);
-        Assert.True(RecordingCSharpFile.Deleted.ContainsKey(installed.CSharpFile!));
+        Assert.Equal(configured.CSharpFiles, repeated.CSharpFiles);
+        Assert.NotEqual(installed.CSharpFiles.Single(), configured.CSharpFiles.Single());
+        Assert.True(RecordingCSharpFile.Deleted.ContainsKey(installed.CSharpFiles.Single()));
         Assert.Equal(revision.Content.Source, File(configured).Source);
         Assert.Equal("brief", File(configured).Settings["style"]);
     }
@@ -140,13 +140,13 @@ public sealed class AppFacts
         await Assert.ThrowsAnyAsync<Exception>(() => app.Configure(configure));
         var configured = await app.Configure(configure);
         Assert.Equal("brief", File(configured).Settings["style"]);
-        Assert.True(RecordingCSharpFile.Deleted.ContainsKey(installed.CSharpFile!));
+        Assert.True(RecordingCSharpFile.Deleted.ContainsKey(installed.CSharpFiles.Single()));
 
         var uninstall = new UninstallApp(Guid.NewGuid());
         brain.Storage.FailNextWrite = state => state is AppState { Status: AppStatus.Uninstalled };
         await Assert.ThrowsAnyAsync<Exception>(() => app.Uninstall(uninstall));
         Assert.Equal(AppStatus.Uninstalled, (await app.Uninstall(uninstall)).Status);
-        Assert.True(RecordingCSharpFile.Deleted.ContainsKey(configured.CSharpFile!));
+        Assert.True(RecordingCSharpFile.Deleted.ContainsKey(configured.CSharpFiles.Single()));
     }
 
     [Fact]
@@ -224,13 +224,54 @@ public sealed class AppFacts
         var uninstalled = await app.Uninstall(new(Guid.NewGuid()));
 
         Assert.Equal(AppStatus.Uninstalled, uninstalled.Status);
-        Assert.True(RecordingCSharpFile.Deleted.ContainsKey(installed.CSharpFile!));
+        Assert.True(RecordingCSharpFile.Deleted.ContainsKey(installed.CSharpFiles.Single()));
         Assert.Equal(InvocationStatus.Failed, (await app.ReadInvocation(waiting.Id)).Status);
         await Assert.ThrowsAsync<InvalidOperationException>(() => app.Invoke(new(Guid.NewGuid(), "research", "After uninstall")));
 
         var reinstalled = await app.Install(new(Guid.NewGuid(), new(Researcher, revision.Id), new Dictionary<string, string>()));
-        Assert.NotEqual(installed.CSharpFile, reinstalled.CSharpFile);
+        Assert.NotEqual(installed.CSharpFiles.Single(), reinstalled.CSharpFiles.Single());
         Assert.Equal(CSharpFileStatus.Running, File(reinstalled).Status);
+    }
+
+    [Fact]
+    public async Task ARevisionWithSeveralBehaviorsRunsOneFilePerBehavior()
+    {
+        await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
+        Caller.As("alice");
+        var package = brain.Get<IPackage>("alice/tracker");
+        var revision = await package.Commit(brain.Commit(null, PackageSamples.Tracker(), "Two behaviors"));
+        await package.Publish(new(Guid.NewGuid(), revision.Id));
+        Caller.Clear();
+        var key = Key();
+
+        var installed = await brain.Get<IApp>(key).Install(new(Guid.NewGuid(), new(PackageId.Parse("alice/tracker"), revision.Id), new Dictionary<string, string>()));
+
+        Assert.Equal(2, installed.CSharpFiles.Count);
+        foreach (var file in installed.CSharpFiles.Select(id => RecordingCSharpFile.Files[id]))
+        {
+            Assert.Equal(CSharpFileStatus.Running, file.Status);
+            Assert.Equal(key, file.Settings["App"]);
+        }
+        var sources = installed.CSharpFiles.Select(id => RecordingCSharpFile.Files[id].Source).Order().ToArray();
+        Assert.Equal(["// renders the report", "// watches the feed"], sources);
+    }
+
+    [Fact]
+    public async Task AllBehaviorsRetireOnUninstall()
+    {
+        await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
+        Caller.As("alice");
+        var package = brain.Get<IPackage>("alice/tracker");
+        var revision = await package.Commit(brain.Commit(null, PackageSamples.Tracker(), "Two behaviors"));
+        await package.Publish(new(Guid.NewGuid(), revision.Id));
+        Caller.Clear();
+        var app = brain.Get<IApp>(Key());
+        var installed = await app.Install(new(Guid.NewGuid(), new(PackageId.Parse("alice/tracker"), revision.Id), new Dictionary<string, string>()));
+
+        await app.Uninstall(new(Guid.NewGuid()));
+
+        Assert.Equal(2, installed.CSharpFiles.Count);
+        Assert.All(installed.CSharpFiles, id => Assert.True(RecordingCSharpFile.Deleted.ContainsKey(id)));
     }
 
     private static async Task<PackageRevision> Publish(PackageBrain brain, string verb)
@@ -245,5 +286,5 @@ public sealed class AppFacts
 
     private static string Key() => "workspace-test/apps/" + Guid.NewGuid().ToString("N");
 
-    private static CSharpFileSnapshot File(AppSnapshot app) => RecordingCSharpFile.Files[app.CSharpFile!];
+    private static CSharpFileSnapshot File(AppSnapshot app) => RecordingCSharpFile.Files[app.CSharpFiles.Single()];
 }

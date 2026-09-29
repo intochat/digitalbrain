@@ -40,7 +40,7 @@ public sealed class PackageSharingFacts
 
             // Customizing a declared setting reruns the same revision in a fresh file; nothing is forked.
             var configured = await bobsApp.Configure(new(Guid.NewGuid(), new Dictionary<string, string> { ["style"] = "bullets" }));
-            Assert.Equal(CSharpFileStatus.Stopped, (await brain.Get<ICSharpFile>(installed.CSharpFile!).Read(ct)).Status);
+            Assert.Equal(CSharpFileStatus.Stopped, (await brain.Get<ICSharpFile>(installed.CSharpFiles.Single()).Read(ct)).Status);
             Assert.Equal("Research (bullets): What is Orleans?", await Ask(brain, bobsApp, configured, "What is Orleans?", ct));
 
             // Changing the code needs a fork.
@@ -84,7 +84,7 @@ public sealed class PackageSharingFacts
     // The first answer waits for the container to build the script, so a failure reports its logs.
     private static async Task<string?> Ask(E2EBrain brain, IApp app, AppSnapshot installed, string question, CancellationToken ct)
     {
-        var file = brain.Get<ICSharpFile>(installed.CSharpFile!);
+        var file = brain.Get<ICSharpFile>(installed.CSharpFiles.Single());
         var invocation = await app.Invoke(new(Guid.NewGuid(), "research", question));
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(BuildAndAnswer);

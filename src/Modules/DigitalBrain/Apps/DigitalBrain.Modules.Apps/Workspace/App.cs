@@ -31,7 +31,7 @@ internal sealed class App(
         var accounts = ResolveAccounts(revision.Content.Manifest.Accounts ?? [], request.Accounts ?? new Dictionary<string, string>());
         var runtime = revision.Content.Manifest.RuntimeName;
         var generation = Snapshot.ProgramGeneration + 1;
-        await Deploy(runtime, generation, revision.Content.Source, settings, accounts);
+        var programs = await Deploy(runtime, generation, revision.Content, settings, accounts);
         await Persist(Snapshot with
         {
             Status = AppStatus.Installed,
@@ -42,6 +42,7 @@ internal sealed class App(
             Accounts = accounts,
             Operations = [.. revision.Content.Manifest.Operations],
             ProgramGeneration = generation,
+            ScriptPaths = programs,
             Receipts = Receipted(request.OperationId, request),
         });
         return Describe(Snapshot);
@@ -58,8 +59,8 @@ internal sealed class App(
         foreach (var (slot, account) in request.Accounts ?? new Dictionary<string, string>()) { selected[slot] = account; }
         var accounts = ResolveAccounts(revision.Content.Manifest.Accounts ?? [], selected);
         await Retire(Snapshot.Runtime, Snapshot.ProgramGeneration);
-        await Deploy(Snapshot.Runtime, Snapshot.ProgramGeneration + 1, revision.Content.Source, settings, accounts);
-        await Persist(Snapshot with { Settings = settings, Accounts = accounts, ProgramGeneration = Snapshot.ProgramGeneration + 1, Receipts = Receipted(request.OperationId, request) });
+        var programs = await Deploy(Snapshot.Runtime, Snapshot.ProgramGeneration + 1, revision.Content, settings, accounts);
+        await Persist(Snapshot with { Settings = settings, Accounts = accounts, ProgramGeneration = Snapshot.ProgramGeneration + 1, ScriptPaths = programs, Receipts = Receipted(request.OperationId, request) });
         return Describe(Snapshot);
     }
 
@@ -79,7 +80,7 @@ internal sealed class App(
         var accounts = ResolveAccounts(revision.Content.Manifest.Accounts ?? [], request.Accounts ?? Snapshot.Accounts);
         var runtime = revision.Content.Manifest.RuntimeName;
         await Retire(Snapshot.Runtime, Snapshot.ProgramGeneration);
-        await Deploy(runtime, Snapshot.ProgramGeneration + 1, revision.Content.Source, settings, accounts);
+        var programs = await Deploy(runtime, Snapshot.ProgramGeneration + 1, revision.Content, settings, accounts);
         await Persist(Snapshot with
         {
             Runtime = runtime,
@@ -89,6 +90,7 @@ internal sealed class App(
             Settings = settings,
             Accounts = accounts,
             Operations = [.. revision.Content.Manifest.Operations],
+            ScriptPaths = programs,
             Receipts = Receipted(request.OperationId, request),
         });
         return Describe(Snapshot);
@@ -162,22 +164,32 @@ internal sealed class App(
     public Task<IReadOnlyList<AppInvocation>> Pending()
         => Task.FromResult<IReadOnlyList<AppInvocation>>(Snapshot.Invocations.Where(item => item.Status == InvocationStatus.Pending).ToArray());
 
-    // Every deployment gets a fresh file, so a command retried after a lost save rewrites and restarts
-    // the same file instead of depending on what the previous generation left behind.
-    // Only a csharp app has a program to run; every other runtime answers through IAppRuntimeWorker.
-    private async Task Deploy(string runtime, int generation, string source, IReadOnlyDictionary<string, string> settings, IReadOnlyDictionary<string, string> accounts)
+    // Every deployment gets fresh files, so a command retried after a lost save rewrites and restarts
+    // the same files instead of depending on what the previous generation left behind.
+    // Only a csharp app has programs to run; every other runtime answers through IAppRuntimeWorker.
+    private async Task<string[]> Deploy(string runtime, int generation, PackageContent content, IReadOnlyDictionary<string, string> settings, IReadOnlyDictionary<string, string> accounts)
     {
-        if (runtime != PackageManifest.CSharpRuntime) { return; }
-        var file = GrainFactory.GetGrain<ICSharpFile>(FileKey(generation));
-        await file.Write(source);
-        await file.Configure(Configuration(settings, accounts));
-        await file.Start();
+        if (runtime != PackageManifest.CSharpRuntime) { return []; }
+        var programs = content.Programs();
+        foreach (var (path, source) in programs)
+        {
+            var file = GrainFactory.GetGrain<ICSharpFile>(FileKey(generation, path));
+            await file.Write(source);
+            await file.Configure(Configuration(settings, accounts));
+            await file.Start();
+        }
+        return [.. programs.Keys];
     }
 
     // Deleting an already deleted file is harmless, so retries need no bookkeeping.
-    private Task Retire(string runtime, int generation) => runtime == PackageManifest.CSharpRuntime
-        ? GrainFactory.GetGrain<ICSharpFile>(FileKey(generation)).Delete()
-        : Task.CompletedTask;
+    private async Task Retire(string runtime, int generation)
+    {
+        if (runtime != PackageManifest.CSharpRuntime) { return; }
+        foreach (var path in Snapshot.ScriptPaths)
+        {
+            await GrainFactory.GetGrain<ICSharpFile>(FileKey(generation, path)).Delete();
+        }
+    }
 
     // The script reads brain.Setting("App") to find this neuron, brain.Setting(name) for each setting
     // and brain.Setting("Account__" + slot) for each connected account.
@@ -203,8 +215,8 @@ internal sealed class App(
         return result;
     }
 
-    private string FileKey(int generation)
-        => "app-csharp-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(this.GetPrimaryKeyString() + "\0" + generation)));
+    private string FileKey(int generation, string path)
+        => "app-csharp-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(this.GetPrimaryKeyString() + "\0" + generation + "\0" + path)));
 
     private static Dictionary<string, string> Resolve(IReadOnlyList<PackageSetting> declared, IReadOnlyDictionary<string, string> current, IReadOnlyDictionary<string, string> supplied)
     {
@@ -259,6 +271,8 @@ internal sealed class App(
         state.Revision,
         new Dictionary<string, string>(state.Settings),
         state.Operations.ToArray(),
-        state.ProgramGeneration == 0 || !state.RunsScript ? null : FileKey(state.ProgramGeneration),
+        state.ProgramGeneration == 0 || !state.RunsScript
+            ? []
+            : state.ScriptPaths.Select(path => FileKey(state.ProgramGeneration, path)).ToArray(),
         new Dictionary<string, string>(state.Accounts));
 }
