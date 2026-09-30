@@ -2,7 +2,7 @@
 #
 # Platform dependencies are external to product Hub images:
 #   - Qdrant: start separately or uncomment the service below (not a product image)
-#   - Ollama / Azure OpenAI: point DigitalBrain__AI__* at your endpoint
+#   - Ollama / other providers: point DigitalBrain__Integrations__{provider}__* at your endpoint
 #   - Azure Storage: Azurite below is for smoke only
 #
 # Build:
@@ -49,9 +49,8 @@ services:
       # DigitalBrain__Salesforce__OAuth__ConsumerKey:
       # DigitalBrain__Salesforce__OAuth__ConsumerSecret:
       # DigitalBrain__Salesforce__OAuth__PublicOrigin: http://localhost:5080
-      # DigitalBrain__AI__Ollama__Endpoint: http://host.docker.internal:11434
-      # DigitalBrain__AI__OpenAI__ApiKey:
-      # DigitalBrain__AI__OpenAI__Endpoint:
+      # DigitalBrain__Integrations__openai__ApiKey:
+      # DigitalBrain__Integrations__openai__Endpoint:
       ConnectionStrings__clustering: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;TableEndpoint=http://azurite:10002/devstoreaccount1;"
       ConnectionStrings__reminders: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;TableEndpoint=http://azurite:10002/devstoreaccount1;"
       ConnectionStrings__grainstate: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
